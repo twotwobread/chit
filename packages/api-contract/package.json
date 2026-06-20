@@ -17,6 +17,6 @@
     "generate:ts": "openapi --input openapi.yaml --output gen/ts --client fetch --useUnionTypes"
   },
   "devDependencies": {
-    "openapi-typescript-codegen": "^0.29.0"
+    "openapi-typescript-codegen": "0.29.0"
   }
 }
