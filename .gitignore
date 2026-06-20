@@ -1,0 +1,36 @@
+# Local worktrees
+.worktrees/
+
+# Dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+
+# Native build outputs
+android/
+ios/
+
+# Go build outputs
+/apps/api/api
+*.test
+
+# Environment files
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS/editor
+.DS_Store
+.vscode/
+.idea/
