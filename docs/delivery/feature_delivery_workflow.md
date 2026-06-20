@@ -294,7 +294,8 @@ NNNN-short-kebab-case-name.md
 
 - 기본 통합 브랜치는 `develop`이다.
 - 기능 구현은 `feature/<feature-id>-<short-name>` 형식의 feature branch에서 진행한다.
-- 새 worktree를 만들기 전에 기존 `.worktrees/` 하위 worktree 목록을 확인한다.
+- 새 worktree는 직접 `git worktree add`로 만들지 않고 `scripts/worktree-create`로 만든다.
+- `scripts/worktree-create`는 새 worktree 생성 전에 기존 `.worktrees/` 하위 worktree 목록을 확인하고 stale worktree를 정리한다.
 - 기존 worktree의 PR/MR이 merged 또는 closed 상태이고 worktree가 clean하면 먼저 삭제한다.
 - open PR/MR, uncommitted changes가 있는 worktree, PR/MR 상태를 확인할 수 없는 worktree는 삭제하지 않는다.
 - PR/MR 하나마다 별도의 `git worktree`를 만든다.
@@ -304,41 +305,35 @@ NNNN-short-kebab-case-name.md
 - 해당 PR/MR의 구현, 테스트, 문서 수정은 해당 worktree 안에서만 수행한다.
 - 하나의 worktree에서 여러 feature issue를 섞어 구현하지 않는다.
 
-Worktree cleanup 절차:
+표준 명령:
 
 ```bash
-git fetch origin --prune
-git worktree list
-find .worktrees -maxdepth 1 -mindepth 1 -type d -print | sort
+scripts/worktree-create F003 trip-create-and-list
 ```
 
-각 worktree에 대해 현재 branch와 PR/MR 상태를 확인한다.
+위 명령은 기본적으로 다음을 수행한다.
+
+1. `git fetch origin --prune`
+2. `git worktree list`와 `.worktrees/` 하위 목록 확인
+3. clean 상태이며 PR/MR이 `MERGED` 또는 `CLOSED`인 stale worktree 제거
+4. local branch가 `origin/develop`에 포함된 경우 local branch 삭제
+5. `.worktrees/F003-trip-create-and-list` 생성
+6. `feature/F-003-trip-create-and-list` branch 생성
+
+문서/프로세스 PR처럼 feature branch 규칙을 쓰지 않는 경우 branch와 path를 명시한다.
 
 ```bash
-branch=$(git -C <worktree-path> branch --show-current)
-gh pr list --head "$branch" --state all --json number,state,mergedAt,url
+scripts/worktree-create docs worktree-cleanup-rule \
+  --branch docs/worktree-cleanup-rule \
+  --path docs-worktree-cleanup-rule
 ```
 
-삭제 조건을 모두 만족할 때만 제거한다.
+삭제 안전 조건:
 
-- `git -C <worktree-path> status --short` 결과가 비어 있다.
-- 연결된 PR/MR 상태가 `MERGED` 또는 `CLOSED`다.
-- local branch 삭제가 필요하면 해당 branch가 `origin/develop`에 포함되어 있다.
-
-```bash
-git merge-base --is-ancestor <branch> origin/develop
-git worktree remove <worktree-path>
-git branch -d <branch>
-```
-
-예시:
-
-```bash
-git fetch origin
-mkdir -p .worktrees
-git worktree add .worktrees/F001-monorepo-walking-skeleton \
-  -b feature/F-001-monorepo-walking-skeleton origin/develop
-```
+- `git -C <worktree-path> status --short` 결과가 비어 있어야 한다.
+- 연결된 PR/MR 상태가 `MERGED` 또는 `CLOSED`여야 한다.
+- PR/MR 상태 확인에 실패하면 삭제하지 않는다.
+- local branch 삭제가 필요하면 해당 branch가 `origin/develop`에 포함되어 있어야 한다.
 
 `origin/develop`이 아직 없으면 구현을 시작하기 전에 `develop` 생성 또는 기준 브랜치를 확인한다.
 

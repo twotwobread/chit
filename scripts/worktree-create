@@ -1,0 +1,262 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'USAGE'
+Usage:
+  scripts/worktree-create <feature-id> <short-name> [--base <base>] [--branch <branch>] [--path <path>] [--dry-run]
+
+Examples:
+  scripts/worktree-create F003 trip-create-and-list
+  scripts/worktree-create 0003 trip-create-and-list
+  scripts/worktree-create docs worktree-cleanup-rule --branch docs/worktree-cleanup-rule --path docs-worktree-cleanup-rule
+
+Behavior:
+  1. Fetches origin and prunes deleted remote refs.
+  2. Lists .worktrees entries.
+  3. Removes clean worktrees whose GitHub PR is MERGED or CLOSED.
+  4. Creates a new worktree from the base ref.
+
+Safety:
+  - Dirty worktrees are never removed.
+  - Worktrees with OPEN PRs are never removed.
+  - Worktrees with unknown PR status are never removed.
+  - Local branches are deleted only when merged into origin/develop.
+USAGE
+}
+
+log() {
+  printf '[worktree-create] %s\n' "$*"
+}
+
+run() {
+  if [ "$DRY_RUN" = "1" ]; then
+    printf '[worktree-create][dry-run]'
+    printf ' %q' "$@"
+    printf '\n'
+  else
+    "$@"
+  fi
+}
+
+normalize_feature_id() {
+  local raw="$1"
+  if [[ "$raw" =~ ^F-?[0-9]+$ ]]; then
+    local digits="${raw#F}"
+    digits="${digits#-}"
+    printf 'F-%03d' "$((10#$digits))"
+  elif [[ "$raw" =~ ^[0-9]+$ ]]; then
+    printf 'F-%03d' "$((10#$raw))"
+  else
+    printf '%s' "$raw"
+  fi
+}
+
+normalize_path_id() {
+  local id="$1"
+  printf '%s' "$id" | tr -d '-'
+}
+
+branch_exists() {
+  git show-ref --verify --quiet "refs/heads/$1"
+}
+
+remote_branch_exists() {
+  git show-ref --verify --quiet "refs/remotes/origin/$1"
+}
+
+cleanup_stale_worktrees() {
+  log 'checking existing worktrees'
+  git worktree list
+
+  mkdir -p .worktrees
+
+  local worktrees=()
+  while IFS= read -r path; do
+    worktrees+=("$path")
+  done < <(find .worktrees -maxdepth 1 -mindepth 1 -type d -print | sort)
+
+  if [ "${#worktrees[@]}" -eq 0 ]; then
+    log 'no .worktrees entries found'
+    return 0
+  fi
+
+  log 'checking .worktrees entries'
+  printf '%s\n' "${worktrees[@]}"
+
+  local wt branch status pr_count pr_state merged_at
+
+  for wt in "${worktrees[@]}"; do
+    if ! git -C "$wt" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+      log "skip $wt: not a git worktree"
+      continue
+    fi
+
+    branch=$(git -C "$wt" branch --show-current)
+    if [ -z "$branch" ]; then
+      log "skip $wt: detached HEAD or unknown branch"
+      continue
+    fi
+
+    status=$(git -C "$wt" status --short)
+    if [ -n "$status" ]; then
+      log "skip $wt ($branch): uncommitted changes"
+      continue
+    fi
+
+    if ! command -v gh >/dev/null 2>&1; then
+      log "skip $wt ($branch): gh is not installed"
+      continue
+    fi
+
+    pr_count=$(gh pr list --head "$branch" --state all --json number --jq 'length' 2>/dev/null || printf 'error')
+    if [ "$pr_count" = "error" ]; then
+      log "skip $wt ($branch): failed to query PR status"
+      continue
+    fi
+
+    if [ "$pr_count" -eq 0 ]; then
+      log "skip $wt ($branch): no matching PR found"
+      continue
+    fi
+
+    if [ "$pr_count" -gt 1 ]; then
+      log "skip $wt ($branch): multiple matching PRs found"
+      continue
+    fi
+
+    pr_state=$(gh pr list --head "$branch" --state all --json state --jq '.[0].state')
+    merged_at=$(gh pr list --head "$branch" --state all --json mergedAt --jq '.[0].mergedAt')
+
+    case "$pr_state" in
+      MERGED|CLOSED)
+        log "remove stale worktree $wt ($branch): PR state=$pr_state mergedAt=$merged_at"
+        run git worktree remove "$wt"
+
+        if git show-ref --verify --quiet "refs/heads/$branch"; then
+          if git merge-base --is-ancestor "$branch" origin/develop; then
+            run git branch -d "$branch"
+          else
+            log "keep local branch $branch: not merged into origin/develop"
+          fi
+        fi
+        ;;
+      OPEN)
+        log "keep $wt ($branch): PR is OPEN"
+        ;;
+      *)
+        log "skip $wt ($branch): unknown PR state=$pr_state"
+        ;;
+    esac
+  done
+}
+
+if [ "$#" -lt 1 ]; then
+  usage
+  exit 1
+fi
+
+if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+  usage
+  exit 0
+fi
+
+if [ "$#" -lt 2 ]; then
+  usage
+  exit 1
+fi
+
+FEATURE_ID_RAW="$1"
+SHORT_NAME="$2"
+shift 2
+
+BASE_REF="origin/develop"
+BRANCH=""
+WORKTREE_PATH=""
+DRY_RUN="0"
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --base)
+      BASE_REF="${2:-}"
+      shift 2
+      ;;
+    --branch)
+      BRANCH="${2:-}"
+      shift 2
+      ;;
+    --path)
+      WORKTREE_PATH="${2:-}"
+      shift 2
+      ;;
+    --dry-run)
+      DRY_RUN="1"
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      printf 'Unknown argument: %s\n\n' "$1" >&2
+      usage >&2
+      exit 1
+      ;;
+  esac
+done
+
+if [ -z "$BASE_REF" ]; then
+  printf 'Missing --base value.\n' >&2
+  exit 1
+fi
+
+FEATURE_ID=$(normalize_feature_id "$FEATURE_ID_RAW")
+PATH_ID=$(normalize_path_id "$FEATURE_ID")
+
+if [ -z "$BRANCH" ]; then
+  BRANCH="feature/$FEATURE_ID-$SHORT_NAME"
+fi
+
+if [ -z "$WORKTREE_PATH" ]; then
+  WORKTREE_PATH=".worktrees/$PATH_ID-$SHORT_NAME"
+elif [[ "$WORKTREE_PATH" != .worktrees/* ]]; then
+  WORKTREE_PATH=".worktrees/$WORKTREE_PATH"
+fi
+
+if [ ! -d .git ] && ! git rev-parse --show-toplevel >/dev/null 2>&1; then
+  printf 'Run this script from inside the repository.\n' >&2
+  exit 1
+fi
+
+GIT_TOP=$(git rev-parse --show-toplevel)
+case "$GIT_TOP" in
+  */.worktrees/*)
+    REPO_ROOT="${GIT_TOP%%/.worktrees/*}"
+    ;;
+  *)
+    REPO_ROOT="$GIT_TOP"
+    ;;
+esac
+cd "$REPO_ROOT"
+
+log 'fetching origin with prune'
+run git fetch origin --prune
+
+cleanup_stale_worktrees
+
+log "creating worktree path=$WORKTREE_PATH branch=$BRANCH base=$BASE_REF"
+
+if [ -e "$WORKTREE_PATH" ]; then
+  printf 'Worktree path already exists: %s\n' "$WORKTREE_PATH" >&2
+  exit 1
+fi
+
+if branch_exists "$BRANCH"; then
+  run git worktree add "$WORKTREE_PATH" "$BRANCH"
+elif remote_branch_exists "$BRANCH"; then
+  run git worktree add "$WORKTREE_PATH" -b "$BRANCH" "origin/$BRANCH"
+else
+  run git worktree add "$WORKTREE_PATH" -b "$BRANCH" "$BASE_REF"
+fi
+
+log 'done'
