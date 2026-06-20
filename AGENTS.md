@@ -71,6 +71,9 @@ For feature work:
 - Do not start implementation while required product/API/DB/UI decisions remain unresolved.
 
 Worktree rule:
+- Create new worktrees through `scripts/worktree-create`; do not call `git worktree add` directly for feature/doc PR work.
+- `scripts/worktree-create` must clean stale merged/closed PR/MR worktrees before creating the new one.
+- Never remove a worktree with uncommitted changes, an open PR/MR, or unknown PR/MR status.
 - Create one `git worktree` per PR/MR.
 - All feature worktrees must live under the repository root `.worktrees/` directory.
 - Use `.worktrees/<feature-id>-<short-name>` as the local worktree path, e.g. `.worktrees/F001-monorepo-walking-skeleton`.
