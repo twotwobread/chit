@@ -314,6 +314,8 @@ git worktree add .worktrees/F001-monorepo-walking-skeleton \
 
 ### Step 7. pi coding agent로 구현
 
+복잡하거나 장기 실행 feature라고 판단되면 바로 구현하지 않고 사용자에게 Ouroboros 기반 구현 실행으로 진행해도 되는지 확인한다. 사용자가 승인하면 feature spec과 Seed/실행 입력이 서로 어긋나지 않는지 확인한 뒤 Ouroboros 실행 흐름으로 진행한다. 사용자가 승인하지 않거나 단순 feature라면 pi coding agent가 feature spec 문서를 기준으로 직접 구현한다. 사용자의 명시 승인 없이 Ouroboros 구현 실행으로 전환하지 않는다.
+
 pi coding agent에게는 다음 정보를 제공한다.
 
 - GitHub Issue 번호

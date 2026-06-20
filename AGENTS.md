@@ -67,6 +67,7 @@ For feature work:
 - Use `docs/features/_template.md` for new feature documents.
 - Manage feature work through GitHub Issues; link the feature spec from the issue.
 - Use Ouroboros to clarify ambiguous feature requirements before implementation.
+- If a feature appears complex or long-running, pause before implementation and ask whether to execute implementation through Ouroboros. Only use Ouroboros execution after explicit user approval; otherwise implement directly from the feature spec with Pi.
 - Do not start implementation while required product/API/DB/UI decisions remain unresolved.
 
 Worktree rule:
