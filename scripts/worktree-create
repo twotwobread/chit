@@ -135,7 +135,7 @@ cleanup_stale_worktrees() {
 
         if git show-ref --verify --quiet "refs/heads/$branch"; then
           if git merge-base --is-ancestor "$branch" origin/develop; then
-            run git branch -d "$branch"
+            run git branch -D "$branch"
           else
             log "keep local branch $branch: not merged into origin/develop"
           fi
