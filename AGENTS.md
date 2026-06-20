@@ -84,6 +84,10 @@ Vertical slice rule:
 - Mobile UI should use the generated API client rather than hand-written duplicate types.
 - Spec changes discovered during implementation must be reflected in the feature document.
 
+PR/MR rule:
+- When creating a PR/MR, use `.github/pull_request_template.md` for the description.
+- Use title prefixes from `docs/delivery/feature_delivery_workflow.md`: `Feature-0000: <title>`, `Fix: <title>`, or `Docs: <title>`.
+
 Completion report:
 - Summarize what changed.
 - List verification commands and results.

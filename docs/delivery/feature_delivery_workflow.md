@@ -387,6 +387,11 @@ Issue를 닫기 전에 feature 문서의 release notes를 업데이트한다.
 PR/MR 규칙:
 
 - 하나의 PR/MR은 하나의 feature issue를 닫는 것을 기본으로 한다.
+- PR/MR 생성 시 `.github/pull_request_template.md`를 기준으로 description을 작성한다.
+- PR/MR title은 변경 유형에 맞는 prefix를 사용한다.
+  - 기능 개발: `Feature-0000: <title>`
+  - 기능 수정/버그 수정: `Fix: <title>`
+  - 문서/프로세스 변경: `Docs: <title>`
 - PR/MR description 마지막에는 GitHub issue 자동 close 문구를 넣는다.
 - 표준 문구는 다음 형식을 사용한다.
 
