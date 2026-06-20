@@ -294,12 +294,42 @@ NNNN-short-kebab-case-name.md
 
 - 기본 통합 브랜치는 `develop`이다.
 - 기능 구현은 `feature/<feature-id>-<short-name>` 형식의 feature branch에서 진행한다.
+- 새 worktree를 만들기 전에 기존 `.worktrees/` 하위 worktree 목록을 확인한다.
+- 기존 worktree의 PR/MR이 merged 또는 closed 상태이고 worktree가 clean하면 먼저 삭제한다.
+- open PR/MR, uncommitted changes가 있는 worktree, PR/MR 상태를 확인할 수 없는 worktree는 삭제하지 않는다.
 - PR/MR 하나마다 별도의 `git worktree`를 만든다.
 - 모든 feature worktree는 repository root 하위 `.worktrees/` 디렉터리에 만든다.
 - worktree 경로는 `.worktrees/<feature-id>-<short-name>` 형식을 사용한다.
 - repository 형제 디렉터리(`../i-um-F001-*`)에 worktree를 만들지 않는다.
 - 해당 PR/MR의 구현, 테스트, 문서 수정은 해당 worktree 안에서만 수행한다.
 - 하나의 worktree에서 여러 feature issue를 섞어 구현하지 않는다.
+
+Worktree cleanup 절차:
+
+```bash
+git fetch origin --prune
+git worktree list
+find .worktrees -maxdepth 1 -mindepth 1 -type d -print | sort
+```
+
+각 worktree에 대해 현재 branch와 PR/MR 상태를 확인한다.
+
+```bash
+branch=$(git -C <worktree-path> branch --show-current)
+gh pr list --head "$branch" --state all --json number,state,mergedAt,url
+```
+
+삭제 조건을 모두 만족할 때만 제거한다.
+
+- `git -C <worktree-path> status --short` 결과가 비어 있다.
+- 연결된 PR/MR 상태가 `MERGED` 또는 `CLOSED`다.
+- local branch 삭제가 필요하면 해당 branch가 `origin/develop`에 포함되어 있다.
+
+```bash
+git merge-base --is-ancestor <branch> origin/develop
+git worktree remove <worktree-path>
+git branch -d <branch>
+```
 
 예시:
 
