@@ -69,6 +69,13 @@ For feature work:
 - Use Ouroboros to clarify ambiguous feature requirements before implementation.
 - Do not start implementation while required product/API/DB/UI decisions remain unresolved.
 
+Worktree rule:
+- Create one `git worktree` per PR/MR.
+- All feature worktrees must live under the repository root `.worktrees/` directory.
+- Use `.worktrees/<feature-id>-<short-name>` as the local worktree path, e.g. `.worktrees/F001-monorepo-walking-skeleton`.
+- Do not create sibling-directory worktrees such as `../i-um-F001-*`.
+- Check `docs/delivery/feature_delivery_workflow.md` before creating a feature worktree.
+
 Vertical slice rule:
 - A feature is not done until App UI, API contract, API server, DB changes, tests, and deployability are handled as needed.
 - Avoid API-only or UI-only completion unless the user explicitly requested such a narrow task.

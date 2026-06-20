@@ -1,0 +1,11 @@
+{
+  "name": "i-um",
+  "private": true,
+  "packageManager": "pnpm@9.15.9",
+  "scripts": {
+    "generate": "pnpm --filter @i-um/api-contract generate",
+    "dev:api": "pnpm --filter @i-um/api dev",
+    "dev:mobile": "pnpm --filter @i-um/mobile start",
+    "verify": "pnpm generate && git diff --exit-code -- apps/api/internal/openapi/server.gen.go packages/api-contract/gen/ts && pnpm --filter @i-um/api test && pnpm --filter @i-um/api build && pnpm --filter @i-um/mobile typecheck"
+  }
+}

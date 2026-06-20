@@ -286,7 +286,33 @@ NNNN-short-kebab-case-name.md
 
 승인되면 GitHub Issue 상태를 `Ready`로 이동하고 `spec-ready` 또는 `ready` label을 붙인다.
 
-### Step 6. pi coding agent로 구현
+### Step 6. 구현 브랜치와 worktree 준비
+
+기능 구현은 Gitflow 기반으로 진행한다.
+
+원칙:
+
+- 기본 통합 브랜치는 `develop`이다.
+- 기능 구현은 `feature/<feature-id>-<short-name>` 형식의 feature branch에서 진행한다.
+- PR/MR 하나마다 별도의 `git worktree`를 만든다.
+- 모든 feature worktree는 repository root 하위 `.worktrees/` 디렉터리에 만든다.
+- worktree 경로는 `.worktrees/<feature-id>-<short-name>` 형식을 사용한다.
+- repository 형제 디렉터리(`../i-um-F001-*`)에 worktree를 만들지 않는다.
+- 해당 PR/MR의 구현, 테스트, 문서 수정은 해당 worktree 안에서만 수행한다.
+- 하나의 worktree에서 여러 feature issue를 섞어 구현하지 않는다.
+
+예시:
+
+```bash
+git fetch origin
+mkdir -p .worktrees
+git worktree add .worktrees/F001-monorepo-walking-skeleton \
+  -b feature/F-001-monorepo-walking-skeleton origin/develop
+```
+
+`origin/develop`이 아직 없으면 구현을 시작하기 전에 `develop` 생성 또는 기준 브랜치를 확인한다.
+
+### Step 7. pi coding agent로 구현
 
 pi coding agent에게는 다음 정보를 제공한다.
 
@@ -314,7 +340,7 @@ Spec에 없는 기능은 구현하지 마.
 - App UI는 mock에 머물지 않고 실제 API client를 연결한다.
 - 구현 중 spec과 충돌하는 요구가 나오면 임의로 결정하지 않고 spec을 업데이트한다.
 
-### Step 7. Verification 수행
+### Step 8. Verification 수행
 
 기능 완료 전 `definition_of_done.md`를 기준으로 검증한다.
 
@@ -331,7 +357,7 @@ Spec에 없는 기능은 구현하지 마.
 
 프로젝트 초기에는 모든 자동화가 없을 수 있다. 자동화가 없으면 feature 문서의 `Verification` 섹션에 실제로 수행한 수동 검증을 기록한다.
 
-### Step 8. 배포 가능 상태 확인
+### Step 9. 배포 가능 상태 확인
 
 기능이 main branch에 merge될 수 있고, staging 또는 internal build에서 확인 가능해야 한다.
 
@@ -344,7 +370,7 @@ Spec에 없는 기능은 구현하지 마.
 - 기존 핵심 흐름이 깨지지 않는다.
 - 필요 시 feature flag 또는 숨김 진입점으로 보호되어 있다.
 
-### Step 9. Issue close
+### Step 10. PR/MR 생성과 Issue close
 
 완료 보고에는 다음을 포함한다.
 
@@ -355,6 +381,24 @@ Spec에 없는 기능은 구현하지 마.
 - 남은 제한사항 또는 후속 issue
 
 Issue를 닫기 전에 feature 문서의 release notes를 업데이트한다.
+
+PR/MR 규칙:
+
+- 하나의 PR/MR은 하나의 feature issue를 닫는 것을 기본으로 한다.
+- PR/MR description 마지막에는 GitHub issue 자동 close 문구를 넣는다.
+- 표준 문구는 다음 형식을 사용한다.
+
+```md
+Fixes #<issue-number>
+```
+
+예시:
+
+```md
+Fixes #1
+```
+
+여러 issue를 닫아야 하는 예외 상황에서는 각 issue를 별도 줄로 명시한다.
 
 ## 기능 크기 조절 기준
 

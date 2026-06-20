@@ -1,0 +1,10 @@
+{
+  "name": "@i-um/api",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "go run ./cmd/api",
+    "test": "go test ./...",
+    "build": "go build -buildvcs=false ./cmd/api"
+  }
+}
