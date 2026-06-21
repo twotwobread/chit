@@ -96,6 +96,26 @@ func (s apiServer) GetReady(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (s apiServer) ListTrips(w http.ResponseWriter, r *http.Request) {
+	if s.auth == nil || s.trips == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "trip listing is not configured", nil)
+		return
+	}
+
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	trips, err := s.trips.List(r.Context(), authContext.UserID)
+	if err != nil {
+		writeTripError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, listTripsResponseToOpenAPI(trips))
+}
+
 func (s apiServer) CreateTrip(w http.ResponseWriter, r *http.Request) {
 	if s.auth == nil || s.trips == nil {
 		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "trip creation is not configured", nil)
@@ -394,6 +414,22 @@ func tokensToOpenAPI(tokens auth.TokenPair) openapi.AuthTokens {
 		RefreshToken:          tokens.RefreshToken,
 		RefreshTokenExpiresAt: tokens.RefreshTokenExpiresAt,
 	}
+}
+
+func listTripsResponseToOpenAPI(trips []trip.ListItem) openapi.ListTripsResponse {
+	items := make([]openapi.TripListItem, 0, len(trips))
+	for _, item := range trips {
+		items = append(items, openapi.TripListItem{
+			Id:              item.ID,
+			Name:            item.Name,
+			StartDate:       dateToOpenAPI(item.StartDate),
+			EndDate:         dateToOpenAPI(item.EndDate),
+			DefaultCurrency: openapi.SupportedCurrency(item.DefaultCurrency),
+			CreatedAt:       item.CreatedAt,
+			UpdatedAt:       item.UpdatedAt,
+		})
+	}
+	return openapi.ListTripsResponse{Trips: items}
 }
 
 func createTripResponseToOpenAPI(result trip.CreateResult) openapi.CreateTripResponse {

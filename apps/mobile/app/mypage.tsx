@@ -2,12 +2,13 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 
-import type { AuthMeResponse, AuthProvider } from '@i-um/api-contract';
+import type { AuthMeResponse, AuthProvider, TripListItem } from '@i-um/api-contract';
 
 import { getCurrentUserWithRefresh, logoutCurrentSession, MobileAuthError } from '../lib/auth/client';
 import { clearStoredSession, getStoredSession } from '../lib/auth/session';
 import { theme } from '../lib/design';
 import { BottomMenu } from '../lib/navigation/BottomMenu';
+import { listMyTrips } from '../lib/trips/client';
 
 type MyPageState =
   | { status: 'loading' }
@@ -15,11 +16,44 @@ type MyPageState =
   | { status: 'needsLogin'; message?: string }
   | { status: 'error' };
 
+type TripListState =
+  | { status: 'loading' }
+  | { status: 'ready'; trips: TripListItem[] }
+  | { status: 'error' };
+
 export default function MyPageScreen() {
   const [state, setState] = useState<MyPageState>({ status: 'loading' });
+  const [tripState, setTripState] = useState<TripListState>({ status: 'loading' });
+
+  const handleAuthError = useCallback(async (error: unknown) => {
+    if (
+      error instanceof MobileAuthError &&
+      (error.code === 'INVALID_REFRESH_TOKEN' || error.code === 'UNAUTHORIZED')
+    ) {
+      await clearStoredSession();
+      setState({ status: 'needsLogin', message: '다시 로그인해주세요.' });
+      return true;
+    }
+    return false;
+  }, []);
+
+  const loadTrips = useCallback(async () => {
+    setTripState({ status: 'loading' });
+
+    try {
+      const response = await listMyTrips();
+      setTripState({ status: 'ready', trips: response.trips });
+    } catch (error) {
+      if (await handleAuthError(error)) {
+        return;
+      }
+      setTripState({ status: 'error' });
+    }
+  }, [handleAuthError]);
 
   const load = useCallback(async () => {
     setState({ status: 'loading' });
+    setTripState({ status: 'loading' });
 
     try {
       const stored = await getStoredSession();
@@ -30,18 +64,14 @@ export default function MyPageScreen() {
 
       const me = await getCurrentUserWithRefresh();
       setState({ status: 'ready', me });
+      void loadTrips();
     } catch (error) {
-      if (
-        error instanceof MobileAuthError &&
-        (error.code === 'INVALID_REFRESH_TOKEN' || error.code === 'UNAUTHORIZED')
-      ) {
-        await clearStoredSession();
-        setState({ status: 'needsLogin', message: '다시 로그인해주세요.' });
+      if (await handleAuthError(error)) {
         return;
       }
       setState({ status: 'error' });
     }
-  }, []);
+  }, [handleAuthError, loadTrips]);
 
   useEffect(() => {
     void load();
@@ -96,13 +126,7 @@ export default function MyPageScreen() {
               <Text style={styles.message}>{providerSummary(state.me.linkedProviders)}</Text>
             </View>
 
-            <View style={styles.card}>
-              <Text style={styles.sectionTitle}>내 여행</Text>
-              <Text style={styles.message}>새 여행을 만들고 여정을 이어가요.</Text>
-              <Pressable accessibilityRole="button" onPress={() => router.push('/trips/new')} style={styles.button}>
-                <Text style={styles.buttonText}>새 여행 만들기</Text>
-              </Pressable>
-            </View>
+            <MyTripsSection state={tripState} onRetry={loadTrips} />
 
             <View style={styles.card}>
               <Text style={styles.sectionTitle}>설정</Text>
@@ -122,6 +146,61 @@ export default function MyPageScreen() {
   );
 }
 
+function MyTripsSection({ state, onRetry }: { state: TripListState; onRetry: () => void }) {
+  return (
+    <View style={styles.card}>
+      <Text style={styles.sectionTitle}>내 여행</Text>
+
+      {state.status === 'loading' ? (
+        <View style={styles.inlineState}>
+          <ActivityIndicator color={theme.color.primary} />
+          <Text style={styles.message}>여행 목록을 불러오는 중...</Text>
+        </View>
+      ) : null}
+
+      {state.status === 'error' ? (
+        <View style={styles.inlineState}>
+          <Text style={styles.errorMessage}>여행 목록을 불러올 수 없어요. 다시 시도해주세요.</Text>
+          <Pressable accessibilityRole="button" onPress={onRetry} style={styles.secondaryButton}>
+            <Text style={styles.secondaryButtonText}>다시 시도</Text>
+          </Pressable>
+        </View>
+      ) : null}
+
+      {state.status === 'ready' && state.trips.length === 0 ? (
+        <View style={styles.inlineState}>
+          <Text style={styles.emptyTitle}>아직 참여 중인 여행이 없어요.</Text>
+          <Text style={styles.message}>새 여행을 만들고 여정을 이어가요.</Text>
+          <Pressable accessibilityRole="button" onPress={() => router.push('/trips/new')} style={styles.button}>
+            <Text style={styles.buttonText}>새 여행 만들기</Text>
+          </Pressable>
+        </View>
+      ) : null}
+
+      {state.status === 'ready' && state.trips.length > 0 ? (
+        <>
+          <View style={styles.tripList}>
+            {state.trips.map((trip) => (
+              <Pressable
+                accessibilityRole="button"
+                key={trip.id}
+                onPress={() => router.push(`/trips/${trip.id}`)}
+                style={styles.tripRow}
+              >
+                <Text style={styles.tripName}>{trip.name}</Text>
+                <Text style={styles.tripDate}>{formatDateRange(trip.startDate, trip.endDate)}</Text>
+              </Pressable>
+            ))}
+          </View>
+          <Pressable accessibilityRole="button" onPress={() => router.push('/trips/new')} style={styles.secondaryButton}>
+            <Text style={styles.secondaryButtonText}>새 여행 만들기</Text>
+          </Pressable>
+        </>
+      ) : null}
+    </View>
+  );
+}
+
 function displayName(value: string): string {
   return value.trim() || '이름을 불러올 수 없어요.';
 }
@@ -135,6 +214,14 @@ function providerSummary(providers: AuthProvider[]): string {
 
 function providerLabel(provider: AuthProvider): string {
   return provider === 'apple' ? 'Apple' : 'Kakao';
+}
+
+function formatDateRange(startDate: string, endDate: string): string {
+  return `${formatDate(startDate)} - ${formatDate(endDate)}`;
+}
+
+function formatDate(value: string): string {
+  return value.split('-').join('.');
 }
 
 const styles = StyleSheet.create({
@@ -189,6 +276,37 @@ const styles = StyleSheet.create({
     fontSize: theme.font.size.title,
     fontWeight: theme.font.weight.bold,
   },
+  inlineState: {
+    gap: theme.layout.gapCard,
+  },
+  emptyTitle: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.subhead,
+    fontWeight: theme.font.weight.bold,
+  },
+  tripList: {
+    gap: theme.space[3],
+  },
+  tripRow: {
+    backgroundColor: theme.color.surfaceSunken,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    gap: theme.space[2],
+    padding: theme.space[4],
+  },
+  tripName: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.subhead,
+    fontWeight: theme.font.weight.bold,
+  },
+  tripDate: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.label,
+  },
   metaLabel: {
     color: theme.color.textMuted,
     fontFamily: theme.font.family.bold,
@@ -197,6 +315,10 @@ const styles = StyleSheet.create({
   },
   message: {
     color: theme.color.textBody,
+    fontFamily: theme.font.family.regular,
+  },
+  errorMessage: {
+    color: theme.color.danger,
     fontFamily: theme.font.family.regular,
   },
   errorTitle: {

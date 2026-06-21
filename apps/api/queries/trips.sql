@@ -75,3 +75,18 @@ ORDER BY
   joined_at ASC,
   id ASC
 LIMIT 3;
+
+-- name: ListTripsByParticipantUser :many
+SELECT
+  t.id::text AS id,
+  t.name,
+  t.start_date,
+  t.end_date,
+  t.default_currency,
+  t.created_at,
+  t.updated_at
+FROM trips t
+JOIN trip_participants tp ON tp.trip_id = t.id
+WHERE tp.user_id = $1::uuid
+  AND tp.role IN ('owner', 'member')
+ORDER BY t.updated_at DESC, t.created_at DESC, t.id DESC;

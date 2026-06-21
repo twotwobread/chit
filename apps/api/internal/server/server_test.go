@@ -246,6 +246,99 @@ func TestCreateTripValidation(t *testing.T) {
 	}
 }
 
+func TestListTripsHandler(t *testing.T) {
+	backend := newFakeAuthBackend()
+	accessToken := loginTestUser(t, backend)
+	backend.listedTrips = []tripdomain.ListItem{
+		{
+			ID:              "trip-2",
+			Name:            "도쿄 2박 3일",
+			StartDate:       "2026-08-10",
+			EndDate:         "2026-08-12",
+			DefaultCurrency: "JPY",
+			CreatedAt:       time.Date(2026, 6, 22, 15, 0, 0, 0, time.UTC),
+			UpdatedAt:       time.Date(2026, 6, 23, 15, 0, 0, 0, time.UTC),
+		},
+		{
+			ID:              "trip-1",
+			Name:            "오사카 3박 4일",
+			StartDate:       "2026-07-10",
+			EndDate:         "2026-07-13",
+			DefaultCurrency: "JPY",
+			CreatedAt:       time.Date(2026, 6, 21, 15, 0, 0, 0, time.UTC),
+			UpdatedAt:       time.Date(2026, 6, 21, 15, 0, 0, 0, time.UTC),
+		},
+	}
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/trips", nil)
+	request.Header.Set("Authorization", "Bearer "+accessToken)
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusOK, recorder.Code, recorder.Body.String())
+	}
+	if backend.listTripsUserID != "user-1" {
+		t.Fatalf("expected list user user-1, got %q", backend.listTripsUserID)
+	}
+
+	var body struct {
+		Trips []map[string]interface{} `json:"trips"`
+	}
+	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(body.Trips) != 2 {
+		t.Fatalf("expected two trips, got %#v", body.Trips)
+	}
+	if body.Trips[0]["id"] != "trip-2" || body.Trips[1]["id"] != "trip-1" {
+		t.Fatalf("unexpected trip order: %#v", body.Trips)
+	}
+	if body.Trips[0]["name"] != "도쿄 2박 3일" || body.Trips[0]["startDate"] != "2026-08-10" || body.Trips[0]["endDate"] != "2026-08-12" {
+		t.Fatalf("unexpected first trip body: %#v", body.Trips[0])
+	}
+	if _, ok := body.Trips[0]["createdBy"]; ok {
+		t.Fatalf("list response must not include createdBy: %#v", body.Trips[0])
+	}
+}
+
+func TestListTripsReturnsEmpty(t *testing.T) {
+	backend := newFakeAuthBackend()
+	accessToken := loginTestUser(t, backend)
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/trips", nil)
+	request.Header.Set("Authorization", "Bearer "+accessToken)
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusOK, recorder.Code, recorder.Body.String())
+	}
+
+	var body struct {
+		Trips []interface{} `json:"trips"`
+	}
+	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(body.Trips) != 0 {
+		t.Fatalf("expected empty trips, got %#v", body.Trips)
+	}
+}
+
+func TestListTripsRequiresAuth(t *testing.T) {
+	backend := newFakeAuthBackend()
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/trips", nil)
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusUnauthorized, recorder.Code, recorder.Body.String())
+	}
+}
+
 func TestGetTripDetailHandler(t *testing.T) {
 	backend := newFakeAuthBackend()
 	accessToken := loginTestUser(t, backend)
@@ -382,14 +475,16 @@ func TestReadyReturnsServiceUnavailable(t *testing.T) {
 
 type fakeAuthBackend struct {
 	fakeReadiness
-	users        map[string]auth.User
-	identityUser map[string]string
-	sessions     map[string]auth.Session
-	trips        map[string]tripdomain.Trip
-	participants map[string][]tripdomain.Participant
-	nextUser     int
-	nextSession  int
-	nextTrip     int
+	users           map[string]auth.User
+	identityUser    map[string]string
+	sessions        map[string]auth.Session
+	trips           map[string]tripdomain.Trip
+	participants    map[string][]tripdomain.Participant
+	listedTrips     []tripdomain.ListItem
+	listTripsUserID string
+	nextUser        int
+	nextSession     int
+	nextTrip        int
 }
 
 func loginTestUser(t *testing.T, backend *fakeAuthBackend) string {
@@ -619,6 +714,11 @@ func (b *fakeAuthBackend) ListTripParticipantPreviewNames(_ context.Context, tri
 		previewNames = append(previewNames, participant.DisplayName)
 	}
 	return previewNames, nil
+}
+
+func (b *fakeAuthBackend) ListTripsByParticipantUser(_ context.Context, userID string) ([]tripdomain.ListItem, error) {
+	b.listTripsUserID = userID
+	return b.listedTrips, nil
 }
 
 func testUUID(value int) string {

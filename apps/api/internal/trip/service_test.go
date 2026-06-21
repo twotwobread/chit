@@ -18,6 +18,8 @@ type fakeRepository struct {
 	isParticipant    bool
 	participantCount int
 	previewNames     []string
+	listed           []ListItem
+	listedUserID     string
 }
 
 func (r *fakeRepository) GetCreator(context.Context, string) (Creator, bool, error) {
@@ -62,6 +64,11 @@ func (r *fakeRepository) CountTripParticipants(context.Context, string) (int, er
 
 func (r *fakeRepository) ListTripParticipantPreviewNames(context.Context, string) ([]string, error) {
 	return r.previewNames, nil
+}
+
+func (r *fakeRepository) ListTripsByParticipantUser(_ context.Context, userID string) ([]ListItem, error) {
+	r.listedUserID = userID
+	return r.listed, nil
 }
 
 func TestServiceCreate(t *testing.T) {
@@ -128,6 +135,31 @@ func TestServiceCreateRequiresCreator(t *testing.T) {
 		EndDate:         "2026-07-13",
 		DefaultCurrency: "JPY",
 	})
+	if !errors.Is(err, ErrUnauthorized) {
+		t.Fatalf("expected ErrUnauthorized, got %v", err)
+	}
+}
+
+func TestServiceList(t *testing.T) {
+	repo := &fakeRepository{listed: []ListItem{{ID: testTripID, Name: "오사카"}}}
+	service := newTestService(repo)
+
+	trips, err := service.List(context.Background(), "user-1")
+	if err != nil {
+		t.Fatalf("List returned error: %v", err)
+	}
+	if repo.listedUserID != "user-1" {
+		t.Fatalf("expected repository to receive user-1, got %q", repo.listedUserID)
+	}
+	if len(trips) != 1 || trips[0].ID != testTripID {
+		t.Fatalf("unexpected trips: %#v", trips)
+	}
+}
+
+func TestServiceListRequiresAuth(t *testing.T) {
+	service := newTestService(&fakeRepository{})
+
+	_, err := service.List(context.Background(), " ")
 	if !errors.Is(err, ErrUnauthorized) {
 		t.Fatalf("expected ErrUnauthorized, got %v", err)
 	}

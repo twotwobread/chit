@@ -198,6 +198,11 @@ type LinkedIdentity struct {
 	Provider      AuthProvider `json:"provider"`
 }
 
+// ListTripsResponse defines model for ListTripsResponse.
+type ListTripsResponse struct {
+	Trips []TripListItem `json:"trips"`
+}
+
 // MetadataReadinessCheck defines model for MetadataReadinessCheck.
 type MetadataReadinessCheck struct {
 	Schema MetadataReadinessCheckSchema `json:"schema"`
@@ -281,6 +286,17 @@ type Trip struct {
 	UpdatedAt       time.Time          `json:"updatedAt"`
 }
 
+// TripListItem defines model for TripListItem.
+type TripListItem struct {
+	CreatedAt       time.Time          `json:"createdAt"`
+	DefaultCurrency SupportedCurrency  `json:"defaultCurrency"`
+	EndDate         openapi_types.Date `json:"endDate"`
+	Id              string             `json:"id"`
+	Name            string             `json:"name"`
+	StartDate       openapi_types.Date `json:"startDate"`
+	UpdatedAt       time.Time          `json:"updatedAt"`
+}
+
 // TripParticipant defines model for TripParticipant.
 type TripParticipant struct {
 	DisplayName string              `json:"displayName"`
@@ -336,6 +352,9 @@ type ServerInterface interface {
 	// Check API readiness
 	// (GET /ready)
 	GetReady(w http.ResponseWriter, r *http.Request)
+	// List my trips
+	// (GET /trips)
+	ListTrips(w http.ResponseWriter, r *http.Request)
 	// Create a trip
 	// (POST /trips)
 	CreateTrip(w http.ResponseWriter, r *http.Request)
@@ -387,6 +406,12 @@ func (_ Unimplemented) GetHealth(w http.ResponseWriter, r *http.Request) {
 // Check API readiness
 // (GET /ready)
 func (_ Unimplemented) GetReady(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// List my trips
+// (GET /trips)
+func (_ Unimplemented) ListTrips(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -518,6 +543,26 @@ func (siw *ServerInterfaceWrapper) GetReady(w http.ResponseWriter, r *http.Reque
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetReady(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListTrips operation middleware
+func (siw *ServerInterfaceWrapper) ListTrips(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListTrips(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -711,6 +756,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/ready", wrapper.GetReady)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/trips", wrapper.ListTrips)
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/trips", wrapper.CreateTrip)

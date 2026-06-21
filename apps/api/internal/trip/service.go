@@ -64,6 +64,14 @@ func (s *Service) Create(ctx context.Context, userID string, input CreateInput) 
 	})
 }
 
+func (s *Service) List(ctx context.Context, userID string) ([]ListItem, error) {
+	if strings.TrimSpace(userID) == "" {
+		return nil, ErrUnauthorized
+	}
+
+	return s.repo.ListTripsByParticipantUser(ctx, userID)
+}
+
 func (s *Service) GetDetail(ctx context.Context, userID string, tripID string) (GetDetailResult, error) {
 	if strings.TrimSpace(userID) == "" {
 		return GetDetailResult{}, ErrUnauthorized

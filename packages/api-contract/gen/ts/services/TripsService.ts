@@ -5,10 +5,27 @@
 import type { CreateTripRequest } from '../models/CreateTripRequest';
 import type { CreateTripResponse } from '../models/CreateTripResponse';
 import type { GetTripDetailResponse } from '../models/GetTripDetailResponse';
+import type { ListTripsResponse } from '../models/ListTripsResponse';
 import type { CancelablePromise } from '../core/CancelablePromise';
 import { OpenAPI } from '../core/OpenAPI';
 import { request as __request } from '../core/request';
 export class TripsService {
+    /**
+     * List my trips
+     * Returns trips where the authenticated user is an Owner or Member participant.
+     * @returns ListTripsResponse Participated trips for the authenticated user.
+     * @throws ApiError
+     */
+    public static listTrips(): CancelablePromise<ListTripsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/trips',
+            errors: {
+                401: `Unauthorized.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
     /**
      * Create a trip
      * Creates a Trip and the authenticated user's Owner participant.
