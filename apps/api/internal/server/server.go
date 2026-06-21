@@ -126,6 +126,26 @@ func (s apiServer) CreateTrip(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, createTripResponseToOpenAPI(result))
 }
 
+func (s apiServer) GetTripDetail(w http.ResponseWriter, r *http.Request, tripId string) {
+	if s.auth == nil || s.trips == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "trip detail is not configured", nil)
+		return
+	}
+
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	result, err := s.trips.GetDetail(r.Context(), authContext.UserID, tripId)
+	if err != nil {
+		writeTripDetailError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, getTripDetailResponseToOpenAPI(result))
+}
+
 func (s apiServer) LoginWithOAuth(w http.ResponseWriter, r *http.Request) {
 	if s.auth == nil {
 		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "auth is not configured", nil)
@@ -290,6 +310,21 @@ func writeTripError(w http.ResponseWriter, err error) {
 	}
 }
 
+func writeTripDetailError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, trip.ErrValidation):
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid trip id", nil)
+	case errors.Is(err, trip.ErrUnauthorized):
+		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "unauthorized", nil)
+	case errors.Is(err, trip.ErrForbidden):
+		writeError(w, http.StatusForbidden, "FORBIDDEN", "forbidden", nil)
+	case errors.Is(err, trip.ErrNotFound):
+		writeError(w, http.StatusNotFound, "NOT_FOUND", "trip not found", nil)
+	default:
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error", nil)
+	}
+}
+
 func writeAuthError(w http.ResponseWriter, err error, provider auth.Provider) {
 	switch {
 	case errors.Is(err, auth.ErrValidation):
@@ -363,16 +398,7 @@ func tokensToOpenAPI(tokens auth.TokenPair) openapi.AuthTokens {
 
 func createTripResponseToOpenAPI(result trip.CreateResult) openapi.CreateTripResponse {
 	return openapi.CreateTripResponse{
-		Trip: openapi.Trip{
-			Id:              result.Trip.ID,
-			Name:            result.Trip.Name,
-			StartDate:       dateToOpenAPI(result.Trip.StartDate),
-			EndDate:         dateToOpenAPI(result.Trip.EndDate),
-			DefaultCurrency: openapi.SupportedCurrency(result.Trip.DefaultCurrency),
-			CreatedBy:       result.Trip.CreatedBy,
-			CreatedAt:       result.Trip.CreatedAt,
-			UpdatedAt:       result.Trip.UpdatedAt,
-		},
+		Trip: tripToOpenAPI(result.Trip),
 		OwnerParticipant: openapi.TripParticipant{
 			Id:          result.OwnerParticipant.ID,
 			TripId:      result.OwnerParticipant.TripID,
@@ -381,6 +407,30 @@ func createTripResponseToOpenAPI(result trip.CreateResult) openapi.CreateTripRes
 			DisplayName: result.OwnerParticipant.DisplayName,
 			JoinedAt:    result.OwnerParticipant.JoinedAt,
 		},
+	}
+}
+
+func getTripDetailResponseToOpenAPI(result trip.GetDetailResult) openapi.GetTripDetailResponse {
+	return openapi.GetTripDetailResponse{
+		Trip: tripToOpenAPI(result.Trip),
+		ParticipantSummary: openapi.TripParticipantSummary{
+			TotalCount:    result.ParticipantSummary.TotalCount,
+			PreviewNames:  result.ParticipantSummary.PreviewNames,
+			OverflowCount: result.ParticipantSummary.OverflowCount,
+		},
+	}
+}
+
+func tripToOpenAPI(value trip.Trip) openapi.Trip {
+	return openapi.Trip{
+		Id:              value.ID,
+		Name:            value.Name,
+		StartDate:       dateToOpenAPI(value.StartDate),
+		EndDate:         dateToOpenAPI(value.EndDate),
+		DefaultCurrency: openapi.SupportedCurrency(value.DefaultCurrency),
+		CreatedBy:       value.CreatedBy,
+		CreatedAt:       value.CreatedAt,
+		UpdatedAt:       value.UpdatedAt,
 	}
 }
 

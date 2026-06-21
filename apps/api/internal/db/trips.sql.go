@@ -11,6 +11,19 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countTripParticipantsByTripID = `-- name: CountTripParticipantsByTripID :one
+SELECT count(*)::int AS total_count
+FROM trip_participants
+WHERE trip_id = $1::uuid
+`
+
+func (q *Queries) CountTripParticipantsByTripID(ctx context.Context, dollar_1 pgtype.UUID) (int32, error) {
+	row := q.db.QueryRow(ctx, countTripParticipantsByTripID, dollar_1)
+	var total_count int32
+	err := row.Scan(&total_count)
+	return total_count, err
+}
+
 const createTrip = `-- name: CreateTrip :one
 INSERT INTO trips (
   name,
@@ -131,4 +144,95 @@ func (q *Queries) CreateTripParticipant(ctx context.Context, arg CreateTripParti
 		&i.JoinedAt,
 	)
 	return i, err
+}
+
+const getTripByID = `-- name: GetTripByID :one
+SELECT
+  id::text,
+  name,
+  start_date,
+  end_date,
+  default_currency,
+  created_by::text,
+  created_at,
+  updated_at
+FROM trips
+WHERE id = $1::uuid
+`
+
+type GetTripByIDRow struct {
+	ID              string
+	Name            string
+	StartDate       pgtype.Date
+	EndDate         pgtype.Date
+	DefaultCurrency string
+	CreatedBy       string
+	CreatedAt       pgtype.Timestamptz
+	UpdatedAt       pgtype.Timestamptz
+}
+
+func (q *Queries) GetTripByID(ctx context.Context, dollar_1 pgtype.UUID) (GetTripByIDRow, error) {
+	row := q.db.QueryRow(ctx, getTripByID, dollar_1)
+	var i GetTripByIDRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.StartDate,
+		&i.EndDate,
+		&i.DefaultCurrency,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getTripParticipantMembership = `-- name: GetTripParticipantMembership :one
+SELECT id::text
+FROM trip_participants
+WHERE trip_id = $1::uuid
+  AND user_id = $2::uuid
+`
+
+type GetTripParticipantMembershipParams struct {
+	Column1 pgtype.UUID
+	Column2 pgtype.UUID
+}
+
+func (q *Queries) GetTripParticipantMembership(ctx context.Context, arg GetTripParticipantMembershipParams) (string, error) {
+	row := q.db.QueryRow(ctx, getTripParticipantMembership, arg.Column1, arg.Column2)
+	var id string
+	err := row.Scan(&id)
+	return id, err
+}
+
+const listTripParticipantPreviewByTripID = `-- name: ListTripParticipantPreviewByTripID :many
+SELECT display_name
+FROM trip_participants
+WHERE trip_id = $1::uuid
+ORDER BY
+  CASE WHEN role = 'owner' THEN 0 ELSE 1 END,
+  joined_at ASC,
+  id ASC
+LIMIT 3
+`
+
+func (q *Queries) ListTripParticipantPreviewByTripID(ctx context.Context, dollar_1 pgtype.UUID) ([]string, error) {
+	rows, err := q.db.Query(ctx, listTripParticipantPreviewByTripID, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var display_name string
+		if err := rows.Scan(&display_name); err != nil {
+			return nil, err
+		}
+		items = append(items, display_name)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

@@ -118,6 +118,58 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /trips/{tripId}:
+    get:
+      operationId: getTripDetail
+      summary: Get trip detail
+      description: Returns basic trip detail for an authenticated trip participant.
+      tags:
+        - Trips
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Trip detail.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetTripDetailResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /auth/oauth/login:
     post:
       operationId: loginWithOAuth
@@ -499,6 +551,40 @@ components:
           $ref: '#/components/schemas/Trip'
         ownerParticipant:
           $ref: '#/components/schemas/TripParticipant'
+    TripParticipantSummary:
+      type: object
+      required:
+        - totalCount
+        - previewNames
+        - overflowCount
+      properties:
+        totalCount:
+          type: integer
+          minimum: 0
+          example: 4
+        previewNames:
+          type: array
+          maxItems: 3
+          items:
+            type: string
+          example:
+            - 민수
+            - 지영
+            - 현우
+        overflowCount:
+          type: integer
+          minimum: 0
+          example: 1
+    GetTripDetailResponse:
+      type: object
+      required:
+        - trip
+        - participantSummary
+      properties:
+        trip:
+          $ref: '#/components/schemas/Trip'
+        participantSummary:
+          $ref: '#/components/schemas/TripParticipantSummary'
     AuthProvider:
       type: string
       enum:

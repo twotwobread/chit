@@ -13,6 +13,8 @@ const (
 var (
 	ErrValidation   = errors.New("validation error")
 	ErrUnauthorized = errors.New("unauthorized")
+	ErrForbidden    = errors.New("forbidden")
+	ErrNotFound     = errors.New("not found")
 )
 
 type Creator struct {
@@ -61,7 +63,22 @@ type CreateResult struct {
 	OwnerParticipant Participant
 }
 
+type ParticipantSummary struct {
+	TotalCount    int
+	PreviewNames  []string
+	OverflowCount int
+}
+
+type GetDetailResult struct {
+	Trip               Trip
+	ParticipantSummary ParticipantSummary
+}
+
 type Repository interface {
 	GetCreator(ctx context.Context, userID string) (Creator, bool, error)
 	CreateTripWithOwner(ctx context.Context, record CreateRecord) (CreateResult, error)
+	GetTripByID(ctx context.Context, tripID string) (Trip, bool, error)
+	IsTripParticipant(ctx context.Context, tripID string, userID string) (bool, error)
+	CountTripParticipants(ctx context.Context, tripID string) (int, error)
+	ListTripParticipantPreviewNames(ctx context.Context, tripID string) ([]string, error)
 }

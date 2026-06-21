@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/oapi-codegen/runtime"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
@@ -176,6 +177,12 @@ type ErrorResponse struct {
 	} `json:"error"`
 }
 
+// GetTripDetailResponse defines model for GetTripDetailResponse.
+type GetTripDetailResponse struct {
+	ParticipantSummary TripParticipantSummary `json:"participantSummary"`
+	Trip               Trip                   `json:"trip"`
+}
+
 // HealthResponse defines model for HealthResponse.
 type HealthResponse struct {
 	Status HealthResponseStatus `json:"status"`
@@ -287,6 +294,13 @@ type TripParticipant struct {
 // TripParticipantRole defines model for TripParticipantRole.
 type TripParticipantRole string
 
+// TripParticipantSummary defines model for TripParticipantSummary.
+type TripParticipantSummary struct {
+	OverflowCount int      `json:"overflowCount"`
+	PreviewNames  []string `json:"previewNames"`
+	TotalCount    int      `json:"totalCount"`
+}
+
 // LinkOAuthProviderJSONRequestBody defines body for LinkOAuthProvider for application/json ContentType.
 type LinkOAuthProviderJSONRequestBody = OAuthLinkRequest
 
@@ -325,6 +339,9 @@ type ServerInterface interface {
 	// Create a trip
 	// (POST /trips)
 	CreateTrip(w http.ResponseWriter, r *http.Request)
+	// Get trip detail
+	// (GET /trips/{tripId})
+	GetTripDetail(w http.ResponseWriter, r *http.Request, tripId string)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
@@ -376,6 +393,12 @@ func (_ Unimplemented) GetReady(w http.ResponseWriter, r *http.Request) {
 // Create a trip
 // (POST /trips)
 func (_ Unimplemented) CreateTrip(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Get trip detail
+// (GET /trips/{tripId})
+func (_ Unimplemented) GetTripDetail(w http.ResponseWriter, r *http.Request, tripId string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -524,6 +547,37 @@ func (siw *ServerInterfaceWrapper) CreateTrip(w http.ResponseWriter, r *http.Req
 	handler.ServeHTTP(w, r)
 }
 
+// GetTripDetail operation middleware
+func (siw *ServerInterfaceWrapper) GetTripDetail(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetTripDetail(w, r, tripId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 type UnescapedCookieParamError struct {
 	ParamName string
 	Err       error
@@ -660,6 +714,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/trips", wrapper.CreateTrip)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/trips/{tripId}", wrapper.GetTripDetail)
 	})
 
 	return r

@@ -7,10 +7,17 @@ import (
 	"time"
 )
 
+const testTripID = "00000000-0000-0000-0000-000000000001"
+
 type fakeRepository struct {
-	creator      Creator
-	creatorFound bool
-	created      CreateRecord
+	creator          Creator
+	creatorFound     bool
+	created          CreateRecord
+	trip             Trip
+	tripFound        bool
+	isParticipant    bool
+	participantCount int
+	previewNames     []string
 }
 
 func (r *fakeRepository) GetCreator(context.Context, string) (Creator, bool, error) {
@@ -21,7 +28,7 @@ func (r *fakeRepository) CreateTripWithOwner(_ context.Context, record CreateRec
 	r.created = record
 	return CreateResult{
 		Trip: Trip{
-			ID:              "trip-1",
+			ID:              testTripID,
 			Name:            record.Name,
 			StartDate:       record.StartDate.Format(dateLayout),
 			EndDate:         record.EndDate.Format(dateLayout),
@@ -32,13 +39,29 @@ func (r *fakeRepository) CreateTripWithOwner(_ context.Context, record CreateRec
 		},
 		OwnerParticipant: Participant{
 			ID:          "participant-1",
-			TripID:      "trip-1",
+			TripID:      testTripID,
 			UserID:      record.CreatedBy,
 			Role:        RoleOwner,
 			DisplayName: record.OwnerDisplayName,
 			JoinedAt:    time.Date(2026, 6, 21, 15, 0, 0, 0, time.UTC),
 		},
 	}, nil
+}
+
+func (r *fakeRepository) GetTripByID(context.Context, string) (Trip, bool, error) {
+	return r.trip, r.tripFound, nil
+}
+
+func (r *fakeRepository) IsTripParticipant(context.Context, string, string) (bool, error) {
+	return r.isParticipant, nil
+}
+
+func (r *fakeRepository) CountTripParticipants(context.Context, string) (int, error) {
+	return r.participantCount, nil
+}
+
+func (r *fakeRepository) ListTripParticipantPreviewNames(context.Context, string) ([]string, error) {
+	return r.previewNames, nil
 }
 
 func TestServiceCreate(t *testing.T) {
@@ -107,6 +130,72 @@ func TestServiceCreateRequiresCreator(t *testing.T) {
 	})
 	if !errors.Is(err, ErrUnauthorized) {
 		t.Fatalf("expected ErrUnauthorized, got %v", err)
+	}
+}
+
+func TestServiceGetDetail(t *testing.T) {
+	repo := &fakeRepository{
+		trip: Trip{
+			ID:              testTripID,
+			Name:            "오사카 3박 4일",
+			StartDate:       "2026-07-10",
+			EndDate:         "2026-07-13",
+			DefaultCurrency: "JPY",
+			CreatedBy:       "user-1",
+		},
+		tripFound:        true,
+		isParticipant:    true,
+		participantCount: 4,
+		previewNames:     []string{" 민수 ", "지영", ""},
+	}
+	service := newTestService(repo)
+
+	result, err := service.GetDetail(context.Background(), "user-1", testTripID)
+	if err != nil {
+		t.Fatalf("GetDetail returned error: %v", err)
+	}
+
+	if result.Trip.Name != "오사카 3박 4일" {
+		t.Fatalf("expected trip detail, got %#v", result.Trip)
+	}
+	if result.ParticipantSummary.TotalCount != 4 {
+		t.Fatalf("expected total count 4, got %d", result.ParticipantSummary.TotalCount)
+	}
+	if result.ParticipantSummary.OverflowCount != 1 {
+		t.Fatalf("expected overflow count 1, got %d", result.ParticipantSummary.OverflowCount)
+	}
+	expectedNames := []string{"민수", "지영", "여행자"}
+	for index, expected := range expectedNames {
+		if result.ParticipantSummary.PreviewNames[index] != expected {
+			t.Fatalf("expected preview name %d to be %q, got %q", index, expected, result.ParticipantSummary.PreviewNames[index])
+		}
+	}
+}
+
+func TestServiceGetDetailValidation(t *testing.T) {
+	service := newTestService(&fakeRepository{})
+
+	_, err := service.GetDetail(context.Background(), "user-1", "not-a-uuid")
+	if !errors.Is(err, ErrValidation) {
+		t.Fatalf("expected ErrValidation, got %v", err)
+	}
+}
+
+func TestServiceGetDetailNotFound(t *testing.T) {
+	service := newTestService(&fakeRepository{})
+
+	_, err := service.GetDetail(context.Background(), "user-1", testTripID)
+	if !errors.Is(err, ErrNotFound) {
+		t.Fatalf("expected ErrNotFound, got %v", err)
+	}
+}
+
+func TestServiceGetDetailForbidden(t *testing.T) {
+	service := newTestService(&fakeRepository{trip: Trip{ID: testTripID}, tripFound: true})
+
+	_, err := service.GetDetail(context.Background(), "user-1", testTripID)
+	if !errors.Is(err, ErrForbidden) {
+		t.Fatalf("expected ErrForbidden, got %v", err)
 	}
 }
 

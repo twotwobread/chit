@@ -112,8 +112,11 @@ export default function NewTripScreen() {
             </Text>
             <Text style={styles.summaryText}>기본 통화: {created.trip.defaultCurrency}</Text>
           </View>
-          <Pressable accessibilityRole="button" onPress={reset} style={styles.button}>
-            <Text style={styles.buttonText}>새 여행 만들기</Text>
+          <Pressable accessibilityRole="button" onPress={() => router.push(`/trips/${created.trip.id}`)} style={styles.button}>
+            <Text style={styles.buttonText}>여행 상세 보기</Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" onPress={reset} style={styles.secondaryButton}>
+            <Text style={styles.secondaryButtonText}>새 여행 만들기</Text>
           </Pressable>
           <Pressable accessibilityRole="button" onPress={() => router.replace('/')} style={styles.secondaryButton}>
             <Text style={styles.secondaryButtonText}>홈으로</Text>

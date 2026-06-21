@@ -20,6 +20,7 @@ export type { CreateTripRequest } from './models/CreateTripRequest';
 export type { CreateTripResponse } from './models/CreateTripResponse';
 export type { DeviceInfo } from './models/DeviceInfo';
 export type { ErrorResponse } from './models/ErrorResponse';
+export type { GetTripDetailResponse } from './models/GetTripDetailResponse';
 export type { HealthResponse } from './models/HealthResponse';
 export type { LinkedIdentity } from './models/LinkedIdentity';
 export type { MetadataReadinessCheck } from './models/MetadataReadinessCheck';
@@ -34,6 +35,7 @@ export type { SupportedCurrency } from './models/SupportedCurrency';
 export type { Trip } from './models/Trip';
 export type { TripParticipant } from './models/TripParticipant';
 export type { TripParticipantRole } from './models/TripParticipantRole';
+export type { TripParticipantSummary } from './models/TripParticipantSummary';
 
 export { AuthService } from './services/AuthService';
 export { HealthService } from './services/HealthService';

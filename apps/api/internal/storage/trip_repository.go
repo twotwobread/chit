@@ -76,6 +76,53 @@ func (s *Store) CreateTripWithOwner(ctx context.Context, record trip.CreateRecor
 	}, nil
 }
 
+func (s *Store) GetTripByID(ctx context.Context, tripID string) (trip.Trip, bool, error) {
+	row, err := s.queries.GetTripByID(ctx, mustUUID(tripID))
+	if err == pgx.ErrNoRows {
+		return trip.Trip{}, false, nil
+	}
+	if err != nil {
+		return trip.Trip{}, false, err
+	}
+
+	return trip.Trip{
+		ID:              row.ID,
+		Name:            row.Name,
+		StartDate:       dateString(row.StartDate),
+		EndDate:         dateString(row.EndDate),
+		DefaultCurrency: row.DefaultCurrency,
+		CreatedBy:       row.CreatedBy,
+		CreatedAt:       row.CreatedAt.Time,
+		UpdatedAt:       row.UpdatedAt.Time,
+	}, true, nil
+}
+
+func (s *Store) IsTripParticipant(ctx context.Context, tripID string, userID string) (bool, error) {
+	_, err := s.queries.GetTripParticipantMembership(ctx, db.GetTripParticipantMembershipParams{
+		Column1: mustUUID(tripID),
+		Column2: mustUUID(userID),
+	})
+	if err == pgx.ErrNoRows {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func (s *Store) CountTripParticipants(ctx context.Context, tripID string) (int, error) {
+	count, err := s.queries.CountTripParticipantsByTripID(ctx, mustUUID(tripID))
+	if err != nil {
+		return 0, err
+	}
+	return int(count), nil
+}
+
+func (s *Store) ListTripParticipantPreviewNames(ctx context.Context, tripID string) ([]string, error) {
+	return s.queries.ListTripParticipantPreviewByTripID(ctx, mustUUID(tripID))
+}
+
 func dateValue(value time.Time) pgtype.Date {
 	return pgtype.Date{Time: value, Valid: true}
 }
