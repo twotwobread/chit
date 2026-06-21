@@ -9,5 +9,9 @@ export type { OpenAPIConfig } from './core/OpenAPI';
 
 export type { ErrorResponse } from './models/ErrorResponse';
 export type { HealthResponse } from './models/HealthResponse';
+export type { MetadataReadinessCheck } from './models/MetadataReadinessCheck';
+export type { ReadinessCheck } from './models/ReadinessCheck';
+export type { ReadinessChecks } from './models/ReadinessChecks';
+export type { ReadinessResponse } from './models/ReadinessResponse';
 
 export { HealthService } from './services/HealthService';

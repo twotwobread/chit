@@ -12,7 +12,27 @@ import (
 
 // Defines values for HealthResponseStatus.
 const (
-	Ok HealthResponseStatus = "ok"
+	HealthResponseStatusOk HealthResponseStatus = "ok"
+)
+
+// Defines values for MetadataReadinessCheckSchema.
+const (
+	Initialized MetadataReadinessCheckSchema = "initialized"
+)
+
+// Defines values for MetadataReadinessCheckStatus.
+const (
+	MetadataReadinessCheckStatusOk MetadataReadinessCheckStatus = "ok"
+)
+
+// Defines values for ReadinessCheckStatus.
+const (
+	ReadinessCheckStatusOk ReadinessCheckStatus = "ok"
+)
+
+// Defines values for ReadinessResponseStatus.
+const (
+	ReadinessResponseStatusOk ReadinessResponseStatus = "ok"
 )
 
 // ErrorResponse defines model for ErrorResponse.
@@ -32,11 +52,49 @@ type HealthResponse struct {
 // HealthResponseStatus defines model for HealthResponse.Status.
 type HealthResponseStatus string
 
+// MetadataReadinessCheck defines model for MetadataReadinessCheck.
+type MetadataReadinessCheck struct {
+	Schema MetadataReadinessCheckSchema `json:"schema"`
+	Status MetadataReadinessCheckStatus `json:"status"`
+}
+
+// MetadataReadinessCheckSchema defines model for MetadataReadinessCheck.Schema.
+type MetadataReadinessCheckSchema string
+
+// MetadataReadinessCheckStatus defines model for MetadataReadinessCheck.Status.
+type MetadataReadinessCheckStatus string
+
+// ReadinessCheck defines model for ReadinessCheck.
+type ReadinessCheck struct {
+	Status ReadinessCheckStatus `json:"status"`
+}
+
+// ReadinessCheckStatus defines model for ReadinessCheck.Status.
+type ReadinessCheckStatus string
+
+// ReadinessChecks defines model for ReadinessChecks.
+type ReadinessChecks struct {
+	Database ReadinessCheck         `json:"database"`
+	Metadata MetadataReadinessCheck `json:"metadata"`
+}
+
+// ReadinessResponse defines model for ReadinessResponse.
+type ReadinessResponse struct {
+	Checks ReadinessChecks         `json:"checks"`
+	Status ReadinessResponseStatus `json:"status"`
+}
+
+// ReadinessResponseStatus defines model for ReadinessResponse.Status.
+type ReadinessResponseStatus string
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// Check API health
 	// (GET /health)
 	GetHealth(w http.ResponseWriter, r *http.Request)
+	// Check API readiness
+	// (GET /ready)
+	GetReady(w http.ResponseWriter, r *http.Request)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
@@ -46,6 +104,12 @@ type Unimplemented struct{}
 // Check API health
 // (GET /health)
 func (_ Unimplemented) GetHealth(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Check API readiness
+// (GET /ready)
+func (_ Unimplemented) GetReady(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -63,6 +127,20 @@ func (siw *ServerInterfaceWrapper) GetHealth(w http.ResponseWriter, r *http.Requ
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetHealth(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetReady operation middleware
+func (siw *ServerInterfaceWrapper) GetReady(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetReady(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -187,6 +265,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/health", wrapper.GetHealth)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/ready", wrapper.GetReady)
 	})
 
 	return r

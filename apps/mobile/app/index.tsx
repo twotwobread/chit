@@ -1,58 +1,62 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { fetchHealth } from '../lib/api/health';
+import { fetchHealthAndReadiness } from '../lib/api/health';
 
-type HealthState =
+type DiagnosticState =
   | { status: 'loading' }
-  | { status: 'success'; apiStatus: string }
-  | { status: 'error'; message: string };
+  | { status: 'success'; apiStatus: string; dbStatus: string; schema: string }
+  | { status: 'error' };
 
 export default function HealthScreen() {
-  const [healthState, setHealthState] = useState<HealthState>({ status: 'loading' });
+  const [diagnosticState, setDiagnosticState] = useState<DiagnosticState>({ status: 'loading' });
 
-  const loadHealth = useCallback(async () => {
-    setHealthState({ status: 'loading' });
+  const loadDiagnostics = useCallback(async () => {
+    setDiagnosticState({ status: 'loading' });
 
     try {
-      const response = await fetchHealth();
-      setHealthState({ status: 'success', apiStatus: response.status });
-    } catch (error) {
-      setHealthState({
-        status: 'error',
-        message: error instanceof Error ? error.message : 'Unknown API error',
+      const response = await fetchHealthAndReadiness();
+      setDiagnosticState({
+        status: 'success',
+        apiStatus: response.health.status,
+        dbStatus: response.readiness.checks.database.status,
+        schema: response.readiness.checks.metadata.schema,
       });
+    } catch {
+      setDiagnosticState({ status: 'error' });
     }
   }, []);
 
   useEffect(() => {
-    void loadHealth();
-  }, [loadHealth]);
+    void loadDiagnostics();
+  }, [loadDiagnostics]);
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>이음</Text>
-      <Text style={styles.subtitle}>Monorepo walking skeleton</Text>
+      <Text style={styles.subtitle}>Monorepo DB readiness</Text>
 
-      {healthState.status === 'loading' ? (
+      {diagnosticState.status === 'loading' ? (
         <View style={styles.card}>
           <ActivityIndicator />
-          <Text style={styles.message}>API 상태 확인 중...</Text>
+          <Text style={styles.message}>API 및 DB 상태 확인 중...</Text>
         </View>
       ) : null}
 
-      {healthState.status === 'success' ? (
+      {diagnosticState.status === 'success' ? (
         <View style={styles.card}>
           <Text style={styles.successTitle}>API 연결 성공</Text>
-          <Text style={styles.message}>status: {healthState.apiStatus}</Text>
+          <Text style={styles.message}>status: {diagnosticState.apiStatus}</Text>
+          <Text style={styles.successTitle}>DB 연결 성공</Text>
+          <Text style={styles.message}>database: {diagnosticState.dbStatus}</Text>
+          <Text style={styles.message}>schema: {diagnosticState.schema}</Text>
         </View>
       ) : null}
 
-      {healthState.status === 'error' ? (
+      {diagnosticState.status === 'error' ? (
         <View style={styles.card}>
-          <Text style={styles.errorTitle}>API 연결 실패</Text>
-          <Text style={styles.message}>{healthState.message}</Text>
-          <Pressable accessibilityRole="button" onPress={loadHealth} style={styles.button}>
+          <Text style={styles.errorTitle}>API 또는 DB 연결 실패</Text>
+          <Pressable accessibilityRole="button" onPress={loadDiagnostics} style={styles.button}>
             <Text style={styles.buttonText}>다시 시도</Text>
           </Pressable>
         </View>

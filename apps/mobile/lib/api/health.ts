@@ -1,8 +1,13 @@
-import { HealthService, OpenAPI, type HealthResponse } from '@i-um/api-contract';
+import {
+  HealthService,
+  OpenAPI,
+  type HealthResponse,
+  type ReadinessResponse,
+} from '@i-um/api-contract';
 
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, '');
 
-export async function fetchHealth(): Promise<HealthResponse> {
+function configureApiBaseUrl() {
   const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
 
   if (!baseUrl) {
@@ -10,5 +15,16 @@ export async function fetchHealth(): Promise<HealthResponse> {
   }
 
   OpenAPI.BASE = trimTrailingSlash(baseUrl);
-  return HealthService.getHealth();
+}
+
+export async function fetchHealthAndReadiness(): Promise<{
+  health: HealthResponse;
+  readiness: ReadinessResponse;
+}> {
+  configureApiBaseUrl();
+
+  const health = await HealthService.getHealth();
+  const readiness = await HealthService.getReady();
+
+  return { health, readiness };
 }
