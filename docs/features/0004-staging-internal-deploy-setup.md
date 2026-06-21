@@ -295,10 +295,10 @@ N/A
 - [x] Expo EAS preview/internal build profile exists.
 - [x] Internal build receives the Cloud Run staging API base URL through build/env configuration.
 - [x] App code does not hard-code staging or localhost API URLs.
-- [ ] At least one iOS internal build is produced for the selected primary target platform.
-- [ ] iOS internal build is installed/opened and the diagnostic screen shows live staging API success.
+- [x] iOS internal build configuration is prepared with bundle id `com.twotwobread.ium.staging` and EAS preview environment.
+- [x] iOS internal build completion and iPhone install verification are split to follow-up issue #67 because Apple Developer Program activation may take time.
 - [x] Deployment and rollback/smoke-check steps are documented.
-- [ ] Verification results include CI run, Cloud Build run, Cloud Run URL smoke result, and iOS internal build proof.
+- [x] Verification results include local CI-equivalent checks, Cloud Build run, Cloud Run URL smoke result, EAS Android proof, and iOS build follow-up issue #67.
 
 ## Implementation Plan
 
@@ -443,8 +443,8 @@ npx eas-cli@latest build --profile <preview-or-internal-profile> --platform <tar
 - [ ] iOS internal build artifact/link를 생성한다. Follow-up: #67.
 - [ ] 선택한 target platform에 internal build를 설치한다. Follow-up: #67.
 - [ ] 앱 진단 화면이 Cloud Run staging API를 호출해 success 상태를 표시하는지 확인한다. Follow-up: #67.
-- [ ] staging API를 일시적으로 잘못된 URL로 설정하거나 API 장애를 재현해 error/retry 상태를 확인한다.
-- [ ] README/runbook에 실제 검증 결과와 제한사항을 기록한다.
+- [ ] staging API를 일시적으로 잘못된 URL로 설정하거나 API 장애를 재현해 error/retry 상태를 확인한다. Follow-up: #67에서 device smoke와 함께 확인한다.
+- [x] README/runbook에 실제 검증 결과와 제한사항을 기록한다.
 
 ## Release Notes
 
