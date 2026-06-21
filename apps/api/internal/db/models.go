@@ -14,3 +14,43 @@ type AppMetadatum struct {
 	CreatedAt pgtype.Timestamptz
 	UpdatedAt pgtype.Timestamptz
 }
+
+type AuthIdentity struct {
+	ID              pgtype.UUID
+	UserID          pgtype.UUID
+	Provider        string
+	ProviderSubject string
+	Email           pgtype.Text
+	EmailNormalized pgtype.Text
+	EmailVerified   bool
+	DisplayName     pgtype.Text
+	AvatarUrl       pgtype.Text
+	CreatedAt       pgtype.Timestamptz
+	UpdatedAt       pgtype.Timestamptz
+}
+
+type AuthSession struct {
+	ID                    pgtype.UUID
+	UserID                pgtype.UUID
+	RefreshTokenHash      string
+	RefreshTokenExpiresAt pgtype.Timestamptz
+	RevokedAt             pgtype.Timestamptz
+	LastUsedAt            pgtype.Timestamptz
+	RotatedAt             pgtype.Timestamptz
+	DeviceName            pgtype.Text
+	Platform              pgtype.Text
+	UserAgent             pgtype.Text
+	CreatedAt             pgtype.Timestamptz
+	UpdatedAt             pgtype.Timestamptz
+}
+
+type User struct {
+	ID              pgtype.UUID
+	DisplayName     string
+	Email           pgtype.Text
+	EmailNormalized pgtype.Text
+	EmailVerified   bool
+	AvatarUrl       pgtype.Text
+	CreatedAt       pgtype.Timestamptz
+	UpdatedAt       pgtype.Timestamptz
+}

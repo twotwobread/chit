@@ -6,6 +6,9 @@ info:
 servers:
   - url: http://localhost:8080
     description: Local development
+tags:
+  - name: Health
+  - name: Auth
 paths:
   /health:
     get:
@@ -74,7 +77,224 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /auth/oauth/login:
+    post:
+      operationId: loginWithOAuth
+      summary: Login or sign up with Apple or Kakao OAuth
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OAuthLoginRequest'
+      responses:
+        '200':
+          description: Login succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthLoginResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Provider token is invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalidProviderToken:
+                  value:
+                    error:
+                      code: INVALID_PROVIDER_TOKEN
+                      message: provider token is invalid
+                      details: []
+        '409':
+          description: Existing verified email requires explicit account linking.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                accountLinkRequired:
+                  value:
+                    error:
+                      code: ACCOUNT_LINK_REQUIRED
+                      message: account link required
+                      details:
+                        - result: link_required_conflict
+                          provider: apple
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /auth/oauth/link:
+    post:
+      operationId: linkOAuthProvider
+      summary: Link an Apple or Kakao OAuth identity to the current user
+      tags:
+        - Auth
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OAuthLinkRequest'
+      responses:
+        '200':
+          description: Provider linked.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthLinkResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized or invalid provider token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Provider identity already linked to another user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                providerAlreadyLinked:
+                  value:
+                    error:
+                      code: PROVIDER_ALREADY_LINKED
+                      message: provider identity is already linked
+                      details:
+                        - result: provider_already_linked
+                          provider: kakao
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /auth/token/refresh:
+    post:
+      operationId: refreshToken
+      summary: Rotate a refresh token and issue a new token pair
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+      responses:
+        '200':
+          description: Refresh succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthRefreshResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Refresh token is invalid, expired, or revoked.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalidRefreshToken:
+                  value:
+                    error:
+                      code: INVALID_REFRESH_TOKEN
+                      message: refresh token is invalid
+                      details:
+                        - result: invalid_refresh_token
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /auth/logout:
+    post:
+      operationId: logout
+      summary: Revoke the current session
+      tags:
+        - Auth
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Logout succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthLogoutResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /auth/me:
+    get:
+      operationId: getCurrentUser
+      summary: Return the current user and linked providers
+      tags:
+        - Auth
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthMeResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
   schemas:
     HealthResponse:
       type: object
@@ -135,6 +355,193 @@ components:
           enum:
             - initialized
           example: initialized
+    AuthProvider:
+      type: string
+      enum:
+        - apple
+        - kakao
+    AuthResult:
+      type: string
+      enum:
+        - login_success
+        - refresh_success
+        - logout_success
+        - provider_link_success
+    OAuthCredential:
+      type: object
+      description: Provider credential. Apple uses identityToken/authorizationCode/nonce. Kakao uses accessToken. dev* fields are accepted only when server dev OAuth is enabled.
+      additionalProperties: false
+      properties:
+        identityToken:
+          type: string
+        authorizationCode:
+          type: string
+        nonce:
+          type: string
+        accessToken:
+          type: string
+        devSubject:
+          type: string
+        email:
+          type: string
+          nullable: true
+        emailVerified:
+          type: boolean
+        displayName:
+          type: string
+          nullable: true
+        avatarUrl:
+          type: string
+          nullable: true
+    DeviceInfo:
+      type: object
+      additionalProperties: false
+      properties:
+        deviceName:
+          type: string
+          nullable: true
+        platform:
+          type: string
+          nullable: true
+    OAuthLoginRequest:
+      type: object
+      required:
+        - provider
+        - credential
+      additionalProperties: false
+      properties:
+        provider:
+          $ref: '#/components/schemas/AuthProvider'
+        credential:
+          $ref: '#/components/schemas/OAuthCredential'
+        device:
+          $ref: '#/components/schemas/DeviceInfo'
+    OAuthLinkRequest:
+      type: object
+      required:
+        - provider
+        - credential
+      additionalProperties: false
+      properties:
+        provider:
+          $ref: '#/components/schemas/AuthProvider'
+        credential:
+          $ref: '#/components/schemas/OAuthCredential'
+    RefreshTokenRequest:
+      type: object
+      required:
+        - refreshToken
+      additionalProperties: false
+      properties:
+        refreshToken:
+          type: string
+    AuthUser:
+      type: object
+      required:
+        - id
+        - displayName
+      properties:
+        id:
+          type: string
+        displayName:
+          type: string
+        email:
+          type: string
+          nullable: true
+        avatarUrl:
+          type: string
+          nullable: true
+    AuthTokens:
+      type: object
+      required:
+        - accessToken
+        - accessTokenExpiresAt
+        - refreshToken
+        - refreshTokenExpiresAt
+      properties:
+        accessToken:
+          type: string
+        accessTokenExpiresAt:
+          type: string
+          format: date-time
+        refreshToken:
+          type: string
+        refreshTokenExpiresAt:
+          type: string
+          format: date-time
+    AuthLoginResponse:
+      type: object
+      required:
+        - result
+        - user
+        - tokens
+      properties:
+        result:
+          type: string
+          enum:
+            - login_success
+        user:
+          $ref: '#/components/schemas/AuthUser'
+        tokens:
+          $ref: '#/components/schemas/AuthTokens'
+    AuthRefreshResponse:
+      type: object
+      required:
+        - result
+        - tokens
+      properties:
+        result:
+          type: string
+          enum:
+            - refresh_success
+        tokens:
+          $ref: '#/components/schemas/AuthTokens'
+    AuthLogoutResponse:
+      type: object
+      required:
+        - result
+      properties:
+        result:
+          type: string
+          enum:
+            - logout_success
+    LinkedIdentity:
+      type: object
+      required:
+        - provider
+        - emailVerified
+      properties:
+        provider:
+          $ref: '#/components/schemas/AuthProvider'
+        email:
+          type: string
+          nullable: true
+        emailVerified:
+          type: boolean
+    AuthLinkResponse:
+      type: object
+      required:
+        - result
+        - linkedIdentity
+      properties:
+        result:
+          type: string
+          enum:
+            - provider_link_success
+        linkedIdentity:
+          $ref: '#/components/schemas/LinkedIdentity'
+    AuthMeResponse:
+      type: object
+      required:
+        - user
+        - linkedProviders
+      properties:
+        user:
+          $ref: '#/components/schemas/AuthUser'
+        linkedProviders:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuthProvider'
     ErrorResponse:
       type: object
       required:

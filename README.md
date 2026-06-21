@@ -104,6 +104,16 @@ pnpm db:down
 DATABASE_URL='postgres://ium:ium@localhost:5432/ium?sslmode=disable' pnpm dev:api
 ```
 
+F-005부터 auth 기능은 다음 env를 사용합니다.
+
+```bash
+export AUTH_TOKEN_SECRET='<long-random-secret>'
+export APPLE_CLIENT_ID='com.twotwobread.ium.staging' # 또는 APPLE_BUNDLE_ID
+export AUTH_ALLOW_DEV_OAUTH=true                    # local/internal smoke only
+```
+
+`AUTH_ALLOW_DEV_OAUTH=true`일 때만 Apple/Kakao provider token 대신 `devSubject` credential을 local/internal smoke test에 사용할 수 있습니다. 실제 provider access token이나 identity token은 저장하지 않습니다.
+
 기본 주소는 `http://localhost:8080`입니다.
 
 ```bash
@@ -118,6 +128,15 @@ curl http://localhost:8080/ready
 
 Expo 앱은 API base URL을 `EXPO_PUBLIC_API_BASE_URL`에서 읽습니다.
 코드에 `localhost`를 고정하지 않습니다.
+
+F-005 auth 화면은 다음 public env를 사용합니다.
+
+```bash
+export EXPO_PUBLIC_AUTH_DEV_MODE=true          # local/internal smoke only
+export EXPO_PUBLIC_KAKAO_REST_API_KEY='<key>'  # real Kakao OAuth flow
+```
+
+Apple login은 iOS에서 `expo-apple-authentication`을 사용합니다. Kakao login은 `EXPO_PUBLIC_KAKAO_REST_API_KEY`와 Kakao OAuth redirect 설정을 사용합니다.
 
 ### iOS Simulator
 

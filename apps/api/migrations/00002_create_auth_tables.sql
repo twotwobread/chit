@@ -1,11 +1,5 @@
+-- +goose Up
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
-
-CREATE TABLE app_metadata (
-  key text PRIMARY KEY,
-  value text NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
-);
 
 CREATE TABLE users (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -60,3 +54,8 @@ CREATE TABLE auth_sessions (
 
 CREATE INDEX auth_sessions_user_id_idx ON auth_sessions (user_id);
 CREATE INDEX auth_sessions_refresh_token_expires_at_idx ON auth_sessions (refresh_token_expires_at);
+
+-- +goose Down
+DROP TABLE auth_sessions;
+DROP TABLE auth_identities;
+DROP TABLE users;

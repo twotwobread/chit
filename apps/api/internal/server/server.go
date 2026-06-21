@@ -3,9 +3,13 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
+	"os"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/twotwobread/i-um/apps/api/internal/auth"
 	"github.com/twotwobread/i-um/apps/api/internal/openapi"
 )
 
@@ -13,13 +17,44 @@ type readinessChecker interface {
 	CheckReady(context.Context) (string, error)
 }
 
+type Config struct {
+	AuthTokenSecret string
+	AppleAudience   string
+	AllowDevOAuth   bool
+}
+
 type apiServer struct {
 	readiness readinessChecker
+	auth      *auth.Service
 }
 
 func NewRouter(readiness readinessChecker) http.Handler {
+	return NewRouterWithConfig(readiness, ConfigFromEnv())
+}
+
+func NewRouterWithConfig(readiness readinessChecker, config Config) http.Handler {
+	var authService *auth.Service
+	if repo, ok := readiness.(auth.Repository); ok {
+		authService = auth.NewService(
+			repo,
+			auth.NewHTTPProviderVerifier(auth.ProviderConfig{
+				AppleAudience: config.AppleAudience,
+				AllowDevOAuth: config.AllowDevOAuth,
+			}),
+			auth.NewTokenManager(config.AuthTokenSecret),
+		)
+	}
+
 	router := chi.NewRouter()
-	return openapi.HandlerFromMux(apiServer{readiness: readiness}, router)
+	return openapi.HandlerFromMux(apiServer{readiness: readiness, auth: authService}, router)
+}
+
+func ConfigFromEnv() Config {
+	return Config{
+		AuthTokenSecret: os.Getenv("AUTH_TOKEN_SECRET"),
+		AppleAudience:   firstNonEmpty(os.Getenv("APPLE_CLIENT_ID"), os.Getenv("APPLE_BUNDLE_ID")),
+		AllowDevOAuth:   envBool(os.Getenv("AUTH_ALLOW_DEV_OAUTH")),
+	}
 }
 
 func (apiServer) GetHealth(w http.ResponseWriter, _ *http.Request) {
@@ -52,6 +87,149 @@ func (s apiServer) GetReady(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (s apiServer) LoginWithOAuth(w http.ResponseWriter, r *http.Request) {
+	if s.auth == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "auth is not configured", nil)
+		return
+	}
+
+	var body openapi.LoginWithOAuthJSONRequestBody
+	if !decodeJSON(w, r, &body) {
+		return
+	}
+
+	result, err := s.auth.Login(r.Context(), auth.Provider(body.Provider), credentialFromOpenAPI(body.Credential), deviceFromOpenAPI(body.Device, r.UserAgent()))
+	if err != nil {
+		writeAuthError(w, err, auth.Provider(body.Provider))
+		return
+	}
+
+	writeJSON(w, http.StatusOK, openapi.AuthLoginResponse{
+		Result: openapi.LoginSuccess,
+		User:   userToOpenAPI(result.User),
+		Tokens: tokensToOpenAPI(result.Tokens),
+	})
+}
+
+func (s apiServer) LinkOAuthProvider(w http.ResponseWriter, r *http.Request) {
+	if s.auth == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "auth is not configured", nil)
+		return
+	}
+
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	var body openapi.LinkOAuthProviderJSONRequestBody
+	if !decodeJSON(w, r, &body) {
+		return
+	}
+
+	result, err := s.auth.LinkProvider(r.Context(), authContext, auth.Provider(body.Provider), credentialFromOpenAPI(body.Credential))
+	if err != nil {
+		writeAuthError(w, err, auth.Provider(body.Provider))
+		return
+	}
+
+	writeJSON(w, http.StatusOK, openapi.AuthLinkResponse{
+		Result: openapi.ProviderLinkSuccess,
+		LinkedIdentity: openapi.LinkedIdentity{
+			Provider:      openapi.AuthProvider(result.Identity.Provider),
+			Email:         result.Identity.Email,
+			EmailVerified: result.Identity.EmailVerified,
+		},
+	})
+}
+
+func (s apiServer) RefreshToken(w http.ResponseWriter, r *http.Request) {
+	if s.auth == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "auth is not configured", nil)
+		return
+	}
+
+	var body openapi.RefreshTokenJSONRequestBody
+	if !decodeJSON(w, r, &body) {
+		return
+	}
+
+	tokens, err := s.auth.Refresh(r.Context(), body.RefreshToken)
+	if err != nil {
+		writeAuthError(w, err, "")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, openapi.AuthRefreshResponse{
+		Result: openapi.RefreshSuccess,
+		Tokens: tokensToOpenAPI(tokens),
+	})
+}
+
+func (s apiServer) Logout(w http.ResponseWriter, r *http.Request) {
+	if s.auth == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "auth is not configured", nil)
+		return
+	}
+
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+	if err := s.auth.Logout(r.Context(), authContext); err != nil {
+		writeAuthError(w, err, "")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, openapi.AuthLogoutResponse{Result: openapi.LogoutSuccess})
+}
+
+func (s apiServer) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
+	if s.auth == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "auth is not configured", nil)
+		return
+	}
+
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+	result, err := s.auth.Me(r.Context(), authContext)
+	if err != nil {
+		writeAuthError(w, err, "")
+		return
+	}
+
+	providers := make([]openapi.AuthProvider, 0, len(result.LinkedProviders))
+	for _, provider := range result.LinkedProviders {
+		providers = append(providers, openapi.AuthProvider(provider))
+	}
+
+	writeJSON(w, http.StatusOK, openapi.AuthMeResponse{
+		User:            userToOpenAPI(result.User),
+		LinkedProviders: providers,
+	})
+}
+
+func (s apiServer) requireAuth(w http.ResponseWriter, r *http.Request) (auth.AuthContext, bool) {
+	authContext, err := s.auth.Authenticate(r.Context(), r.Header.Get("Authorization"))
+	if err != nil {
+		writeAuthError(w, err, "")
+		return auth.AuthContext{}, false
+	}
+	return authContext, true
+}
+
+func decodeJSON(w http.ResponseWriter, r *http.Request, out interface{}) bool {
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(out); err != nil {
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid request body", nil)
+		return false
+	}
+	return true
+}
+
 func writeJSON(w http.ResponseWriter, status int, body interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
@@ -59,9 +237,101 @@ func writeJSON(w http.ResponseWriter, status int, body interface{}) {
 }
 
 func writeServiceUnavailable(w http.ResponseWriter) {
+	writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "database is not ready", nil)
+}
+
+func writeAuthError(w http.ResponseWriter, err error, provider auth.Provider) {
+	switch {
+	case errors.Is(err, auth.ErrValidation):
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid auth request", nil)
+	case errors.Is(err, auth.ErrInvalidProviderToken):
+		writeError(w, http.StatusUnauthorized, "INVALID_PROVIDER_TOKEN", "provider token is invalid", nil)
+	case errors.Is(err, auth.ErrAccountLinkRequired):
+		writeError(w, http.StatusConflict, "ACCOUNT_LINK_REQUIRED", "account link required", []map[string]interface{}{{"result": "link_required_conflict", "provider": string(provider)}})
+	case errors.Is(err, auth.ErrProviderAlreadyLinked):
+		writeError(w, http.StatusConflict, "PROVIDER_ALREADY_LINKED", "provider identity is already linked", []map[string]interface{}{{"result": "provider_already_linked", "provider": string(provider)}})
+	case errors.Is(err, auth.ErrInvalidRefreshToken):
+		writeError(w, http.StatusUnauthorized, "INVALID_REFRESH_TOKEN", "refresh token is invalid", []map[string]interface{}{{"result": "invalid_refresh_token"}})
+	case errors.Is(err, auth.ErrUnauthorized):
+		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "unauthorized", nil)
+	default:
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error", nil)
+	}
+}
+
+func writeError(w http.ResponseWriter, status int, code string, message string, details []map[string]interface{}) {
+	if details == nil {
+		details = []map[string]interface{}{}
+	}
 	var body openapi.ErrorResponse
-	body.Error.Code = "SERVICE_UNAVAILABLE"
-	body.Error.Message = "database is not ready"
-	body.Error.Details = []map[string]interface{}{}
-	writeJSON(w, http.StatusServiceUnavailable, body)
+	body.Error.Code = code
+	body.Error.Message = message
+	body.Error.Details = details
+	writeJSON(w, status, body)
+}
+
+func credentialFromOpenAPI(value openapi.OAuthCredential) auth.Credential {
+	return auth.Credential{
+		IdentityToken:     value.IdentityToken,
+		AuthorizationCode: value.AuthorizationCode,
+		Nonce:             value.Nonce,
+		AccessToken:       value.AccessToken,
+		DevSubject:        value.DevSubject,
+		Email:             value.Email,
+		EmailVerified:     value.EmailVerified,
+		DisplayName:       value.DisplayName,
+		AvatarURL:         value.AvatarUrl,
+	}
+}
+
+func deviceFromOpenAPI(value *openapi.DeviceInfo, userAgent string) auth.Device {
+	device := auth.Device{UserAgent: optionalString(userAgent)}
+	if value != nil {
+		device.DeviceName = value.DeviceName
+		device.Platform = value.Platform
+	}
+	return device
+}
+
+func userToOpenAPI(user auth.User) openapi.AuthUser {
+	return openapi.AuthUser{
+		Id:          user.ID,
+		DisplayName: user.DisplayName,
+		Email:       user.Email,
+		AvatarUrl:   user.AvatarURL,
+	}
+}
+
+func tokensToOpenAPI(tokens auth.TokenPair) openapi.AuthTokens {
+	return openapi.AuthTokens{
+		AccessToken:           tokens.AccessToken,
+		AccessTokenExpiresAt:  tokens.AccessTokenExpiresAt,
+		RefreshToken:          tokens.RefreshToken,
+		RefreshTokenExpiresAt: tokens.RefreshTokenExpiresAt,
+	}
+}
+
+func optionalString(value string) *string {
+	if strings.TrimSpace(value) == "" {
+		return nil
+	}
+	return &value
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
+}
+
+func envBool(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "1", "true", "yes", "y", "on":
+		return true
+	default:
+		return false
+	}
 }

@@ -4,10 +4,42 @@
 package openapi
 
 import (
+	"context"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
+)
+
+const (
+	BearerAuthScopes = "bearerAuth.Scopes"
+)
+
+// Defines values for AuthLinkResponseResult.
+const (
+	ProviderLinkSuccess AuthLinkResponseResult = "provider_link_success"
+)
+
+// Defines values for AuthLoginResponseResult.
+const (
+	LoginSuccess AuthLoginResponseResult = "login_success"
+)
+
+// Defines values for AuthLogoutResponseResult.
+const (
+	LogoutSuccess AuthLogoutResponseResult = "logout_success"
+)
+
+// Defines values for AuthProvider.
+const (
+	Apple AuthProvider = "apple"
+	Kakao AuthProvider = "kakao"
+)
+
+// Defines values for AuthRefreshResponseResult.
+const (
+	RefreshSuccess AuthRefreshResponseResult = "refresh_success"
 )
 
 // Defines values for HealthResponseStatus.
@@ -35,6 +67,73 @@ const (
 	ReadinessResponseStatusOk ReadinessResponseStatus = "ok"
 )
 
+// AuthLinkResponse defines model for AuthLinkResponse.
+type AuthLinkResponse struct {
+	LinkedIdentity LinkedIdentity         `json:"linkedIdentity"`
+	Result         AuthLinkResponseResult `json:"result"`
+}
+
+// AuthLinkResponseResult defines model for AuthLinkResponse.Result.
+type AuthLinkResponseResult string
+
+// AuthLoginResponse defines model for AuthLoginResponse.
+type AuthLoginResponse struct {
+	Result AuthLoginResponseResult `json:"result"`
+	Tokens AuthTokens              `json:"tokens"`
+	User   AuthUser                `json:"user"`
+}
+
+// AuthLoginResponseResult defines model for AuthLoginResponse.Result.
+type AuthLoginResponseResult string
+
+// AuthLogoutResponse defines model for AuthLogoutResponse.
+type AuthLogoutResponse struct {
+	Result AuthLogoutResponseResult `json:"result"`
+}
+
+// AuthLogoutResponseResult defines model for AuthLogoutResponse.Result.
+type AuthLogoutResponseResult string
+
+// AuthMeResponse defines model for AuthMeResponse.
+type AuthMeResponse struct {
+	LinkedProviders []AuthProvider `json:"linkedProviders"`
+	User            AuthUser       `json:"user"`
+}
+
+// AuthProvider defines model for AuthProvider.
+type AuthProvider string
+
+// AuthRefreshResponse defines model for AuthRefreshResponse.
+type AuthRefreshResponse struct {
+	Result AuthRefreshResponseResult `json:"result"`
+	Tokens AuthTokens                `json:"tokens"`
+}
+
+// AuthRefreshResponseResult defines model for AuthRefreshResponse.Result.
+type AuthRefreshResponseResult string
+
+// AuthTokens defines model for AuthTokens.
+type AuthTokens struct {
+	AccessToken           string    `json:"accessToken"`
+	AccessTokenExpiresAt  time.Time `json:"accessTokenExpiresAt"`
+	RefreshToken          string    `json:"refreshToken"`
+	RefreshTokenExpiresAt time.Time `json:"refreshTokenExpiresAt"`
+}
+
+// AuthUser defines model for AuthUser.
+type AuthUser struct {
+	AvatarUrl   *string `json:"avatarUrl"`
+	DisplayName string  `json:"displayName"`
+	Email       *string `json:"email"`
+	Id          string  `json:"id"`
+}
+
+// DeviceInfo defines model for DeviceInfo.
+type DeviceInfo struct {
+	DeviceName *string `json:"deviceName"`
+	Platform   *string `json:"platform"`
+}
+
 // ErrorResponse defines model for ErrorResponse.
 type ErrorResponse struct {
 	Error struct {
@@ -52,6 +151,13 @@ type HealthResponse struct {
 // HealthResponseStatus defines model for HealthResponse.Status.
 type HealthResponseStatus string
 
+// LinkedIdentity defines model for LinkedIdentity.
+type LinkedIdentity struct {
+	Email         *string      `json:"email"`
+	EmailVerified bool         `json:"emailVerified"`
+	Provider      AuthProvider `json:"provider"`
+}
+
 // MetadataReadinessCheck defines model for MetadataReadinessCheck.
 type MetadataReadinessCheck struct {
 	Schema MetadataReadinessCheckSchema `json:"schema"`
@@ -63,6 +169,34 @@ type MetadataReadinessCheckSchema string
 
 // MetadataReadinessCheckStatus defines model for MetadataReadinessCheck.Status.
 type MetadataReadinessCheckStatus string
+
+// OAuthCredential Provider credential. Apple uses identityToken/authorizationCode/nonce. Kakao uses accessToken. dev* fields are accepted only when server dev OAuth is enabled.
+type OAuthCredential struct {
+	AccessToken       *string `json:"accessToken,omitempty"`
+	AuthorizationCode *string `json:"authorizationCode,omitempty"`
+	AvatarUrl         *string `json:"avatarUrl"`
+	DevSubject        *string `json:"devSubject,omitempty"`
+	DisplayName       *string `json:"displayName"`
+	Email             *string `json:"email"`
+	EmailVerified     *bool   `json:"emailVerified,omitempty"`
+	IdentityToken     *string `json:"identityToken,omitempty"`
+	Nonce             *string `json:"nonce,omitempty"`
+}
+
+// OAuthLinkRequest defines model for OAuthLinkRequest.
+type OAuthLinkRequest struct {
+	// Credential Provider credential. Apple uses identityToken/authorizationCode/nonce. Kakao uses accessToken. dev* fields are accepted only when server dev OAuth is enabled.
+	Credential OAuthCredential `json:"credential"`
+	Provider   AuthProvider    `json:"provider"`
+}
+
+// OAuthLoginRequest defines model for OAuthLoginRequest.
+type OAuthLoginRequest struct {
+	// Credential Provider credential. Apple uses identityToken/authorizationCode/nonce. Kakao uses accessToken. dev* fields are accepted only when server dev OAuth is enabled.
+	Credential OAuthCredential `json:"credential"`
+	Device     *DeviceInfo     `json:"device,omitempty"`
+	Provider   AuthProvider    `json:"provider"`
+}
 
 // ReadinessCheck defines model for ReadinessCheck.
 type ReadinessCheck struct {
@@ -87,8 +221,37 @@ type ReadinessResponse struct {
 // ReadinessResponseStatus defines model for ReadinessResponse.Status.
 type ReadinessResponseStatus string
 
+// RefreshTokenRequest defines model for RefreshTokenRequest.
+type RefreshTokenRequest struct {
+	RefreshToken string `json:"refreshToken"`
+}
+
+// LinkOAuthProviderJSONRequestBody defines body for LinkOAuthProvider for application/json ContentType.
+type LinkOAuthProviderJSONRequestBody = OAuthLinkRequest
+
+// LoginWithOAuthJSONRequestBody defines body for LoginWithOAuth for application/json ContentType.
+type LoginWithOAuthJSONRequestBody = OAuthLoginRequest
+
+// RefreshTokenJSONRequestBody defines body for RefreshToken for application/json ContentType.
+type RefreshTokenJSONRequestBody = RefreshTokenRequest
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// Revoke the current session
+	// (POST /auth/logout)
+	Logout(w http.ResponseWriter, r *http.Request)
+	// Return the current user and linked providers
+	// (GET /auth/me)
+	GetCurrentUser(w http.ResponseWriter, r *http.Request)
+	// Link an Apple or Kakao OAuth identity to the current user
+	// (POST /auth/oauth/link)
+	LinkOAuthProvider(w http.ResponseWriter, r *http.Request)
+	// Login or sign up with Apple or Kakao OAuth
+	// (POST /auth/oauth/login)
+	LoginWithOAuth(w http.ResponseWriter, r *http.Request)
+	// Rotate a refresh token and issue a new token pair
+	// (POST /auth/token/refresh)
+	RefreshToken(w http.ResponseWriter, r *http.Request)
 	// Check API health
 	// (GET /health)
 	GetHealth(w http.ResponseWriter, r *http.Request)
@@ -100,6 +263,36 @@ type ServerInterface interface {
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
 
 type Unimplemented struct{}
+
+// Revoke the current session
+// (POST /auth/logout)
+func (_ Unimplemented) Logout(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Return the current user and linked providers
+// (GET /auth/me)
+func (_ Unimplemented) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Link an Apple or Kakao OAuth identity to the current user
+// (POST /auth/oauth/link)
+func (_ Unimplemented) LinkOAuthProvider(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Login or sign up with Apple or Kakao OAuth
+// (POST /auth/oauth/login)
+func (_ Unimplemented) LoginWithOAuth(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Rotate a refresh token and issue a new token pair
+// (POST /auth/token/refresh)
+func (_ Unimplemented) RefreshToken(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
 
 // Check API health
 // (GET /health)
@@ -121,6 +314,94 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// Logout operation middleware
+func (siw *ServerInterfaceWrapper) Logout(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.Logout(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetCurrentUser operation middleware
+func (siw *ServerInterfaceWrapper) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetCurrentUser(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// LinkOAuthProvider operation middleware
+func (siw *ServerInterfaceWrapper) LinkOAuthProvider(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.LinkOAuthProvider(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// LoginWithOAuth operation middleware
+func (siw *ServerInterfaceWrapper) LoginWithOAuth(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.LoginWithOAuth(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RefreshToken operation middleware
+func (siw *ServerInterfaceWrapper) RefreshToken(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RefreshToken(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // GetHealth operation middleware
 func (siw *ServerInterfaceWrapper) GetHealth(w http.ResponseWriter, r *http.Request) {
@@ -263,6 +544,21 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/auth/logout", wrapper.Logout)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/auth/me", wrapper.GetCurrentUser)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/auth/oauth/link", wrapper.LinkOAuthProvider)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/auth/oauth/login", wrapper.LoginWithOAuth)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/auth/token/refresh", wrapper.RefreshToken)
+	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/health", wrapper.GetHealth)
 	})
