@@ -7,10 +7,13 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 	"github.com/twotwobread/i-um/apps/api/internal/auth"
 	"github.com/twotwobread/i-um/apps/api/internal/openapi"
+	"github.com/twotwobread/i-um/apps/api/internal/trip"
 )
 
 type readinessChecker interface {
@@ -26,6 +29,7 @@ type Config struct {
 type apiServer struct {
 	readiness readinessChecker
 	auth      *auth.Service
+	trips     *trip.Service
 }
 
 func NewRouter(readiness readinessChecker) http.Handler {
@@ -45,8 +49,13 @@ func NewRouterWithConfig(readiness readinessChecker, config Config) http.Handler
 		)
 	}
 
+	var tripService *trip.Service
+	if repo, ok := readiness.(trip.Repository); ok {
+		tripService = trip.NewService(repo)
+	}
+
 	router := chi.NewRouter()
-	return openapi.HandlerFromMux(apiServer{readiness: readiness, auth: authService}, router)
+	return openapi.HandlerFromMux(apiServer{readiness: readiness, auth: authService, trips: tripService}, router)
 }
 
 func ConfigFromEnv() Config {
@@ -85,6 +94,36 @@ func (s apiServer) GetReady(w http.ResponseWriter, r *http.Request) {
 			},
 		},
 	})
+}
+
+func (s apiServer) CreateTrip(w http.ResponseWriter, r *http.Request) {
+	if s.auth == nil || s.trips == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "trip creation is not configured", nil)
+		return
+	}
+
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	var body openapi.CreateTripJSONRequestBody
+	if !decodeJSON(w, r, &body) {
+		return
+	}
+
+	result, err := s.trips.Create(r.Context(), authContext.UserID, trip.CreateInput{
+		Name:            body.Name,
+		StartDate:       dateFromOpenAPI(body.StartDate),
+		EndDate:         dateFromOpenAPI(body.EndDate),
+		DefaultCurrency: string(body.DefaultCurrency),
+	})
+	if err != nil {
+		writeTripError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, createTripResponseToOpenAPI(result))
 }
 
 func (s apiServer) LoginWithOAuth(w http.ResponseWriter, r *http.Request) {
@@ -240,6 +279,17 @@ func writeServiceUnavailable(w http.ResponseWriter) {
 	writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "database is not ready", nil)
 }
 
+func writeTripError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, trip.ErrValidation):
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid trip request", nil)
+	case errors.Is(err, trip.ErrUnauthorized):
+		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "unauthorized", nil)
+	default:
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error", nil)
+	}
+}
+
 func writeAuthError(w http.ResponseWriter, err error, provider auth.Provider) {
 	switch {
 	case errors.Is(err, auth.ErrValidation):
@@ -309,6 +359,44 @@ func tokensToOpenAPI(tokens auth.TokenPair) openapi.AuthTokens {
 		RefreshToken:          tokens.RefreshToken,
 		RefreshTokenExpiresAt: tokens.RefreshTokenExpiresAt,
 	}
+}
+
+func createTripResponseToOpenAPI(result trip.CreateResult) openapi.CreateTripResponse {
+	return openapi.CreateTripResponse{
+		Trip: openapi.Trip{
+			Id:              result.Trip.ID,
+			Name:            result.Trip.Name,
+			StartDate:       dateToOpenAPI(result.Trip.StartDate),
+			EndDate:         dateToOpenAPI(result.Trip.EndDate),
+			DefaultCurrency: openapi.SupportedCurrency(result.Trip.DefaultCurrency),
+			CreatedBy:       result.Trip.CreatedBy,
+			CreatedAt:       result.Trip.CreatedAt,
+			UpdatedAt:       result.Trip.UpdatedAt,
+		},
+		OwnerParticipant: openapi.TripParticipant{
+			Id:          result.OwnerParticipant.ID,
+			TripId:      result.OwnerParticipant.TripID,
+			UserId:      result.OwnerParticipant.UserID,
+			Role:        openapi.TripParticipantRole(result.OwnerParticipant.Role),
+			DisplayName: result.OwnerParticipant.DisplayName,
+			JoinedAt:    result.OwnerParticipant.JoinedAt,
+		},
+	}
+}
+
+func dateFromOpenAPI(value openapi_types.Date) string {
+	if value.Time.IsZero() {
+		return ""
+	}
+	return value.Time.Format("2006-01-02")
+}
+
+func dateToOpenAPI(value string) openapi_types.Date {
+	parsed, err := time.Parse("2006-01-02", value)
+	if err != nil {
+		return openapi_types.Date{}
+	}
+	return openapi_types.Date{Time: parsed}
 }
 
 func optionalString(value string) *string {

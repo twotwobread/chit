@@ -87,6 +87,9 @@ export default function HomeScreen() {
           <Text style={styles.successTitle}>DB 연결 성공</Text>
           <Text style={styles.message}>database: {homeState.dbStatus}</Text>
           <Text style={styles.message}>schema: {homeState.schema}</Text>
+          <Pressable accessibilityRole="button" onPress={() => router.push('/trips/new')} style={styles.button}>
+            <Text style={styles.buttonText}>새 여행 만들기</Text>
+          </Pressable>
           <View style={styles.row}>
             <Pressable accessibilityRole="button" onPress={() => router.push('/account')} style={styles.secondaryButton}>
               <Text style={styles.secondaryButtonText}>계정</Text>

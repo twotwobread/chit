@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/twotwobread/i-um/apps/api/internal/auth"
+	tripdomain "github.com/twotwobread/i-um/apps/api/internal/trip"
 )
 
 type fakeReadiness struct {
@@ -133,6 +134,117 @@ func TestLoginWithOAuthHandler(t *testing.T) {
 	}
 }
 
+func TestCreateTripHandler(t *testing.T) {
+	backend := newFakeAuthBackend()
+	accessToken := loginTestUser(t, backend)
+
+	requestBody := []byte(`{
+		"name":"  오사카 3박 4일  ",
+		"startDate":"2026-07-10",
+		"endDate":"2026-07-13",
+		"defaultCurrency":"JPY"
+	}`)
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/trips", bytes.NewReader(requestBody))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", "Bearer "+accessToken)
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusCreated, recorder.Code, recorder.Body.String())
+	}
+
+	var body struct {
+		Trip struct {
+			Name            string `json:"name"`
+			StartDate       string `json:"startDate"`
+			EndDate         string `json:"endDate"`
+			DefaultCurrency string `json:"defaultCurrency"`
+			CreatedBy       string `json:"createdBy"`
+		} `json:"trip"`
+		OwnerParticipant struct {
+			Role        string `json:"role"`
+			DisplayName string `json:"displayName"`
+			UserID      string `json:"userId"`
+		} `json:"ownerParticipant"`
+	}
+	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Trip.Name != "오사카 3박 4일" {
+		t.Fatalf("expected trimmed name, got %q", body.Trip.Name)
+	}
+	if body.Trip.StartDate != "2026-07-10" || body.Trip.EndDate != "2026-07-13" {
+		t.Fatalf("unexpected dates: %#v", body.Trip)
+	}
+	if body.Trip.DefaultCurrency != "JPY" {
+		t.Fatalf("expected JPY, got %q", body.Trip.DefaultCurrency)
+	}
+	if body.Trip.CreatedBy != "user-1" {
+		t.Fatalf("expected createdBy user-1, got %q", body.Trip.CreatedBy)
+	}
+	if body.OwnerParticipant.Role != "owner" {
+		t.Fatalf("expected owner role, got %q", body.OwnerParticipant.Role)
+	}
+	if body.OwnerParticipant.DisplayName != "민수" {
+		t.Fatalf("expected display name snapshot 민수, got %q", body.OwnerParticipant.DisplayName)
+	}
+	if body.OwnerParticipant.UserID != "user-1" {
+		t.Fatalf("expected owner user user-1, got %q", body.OwnerParticipant.UserID)
+	}
+}
+
+func TestCreateTripRequiresAuth(t *testing.T) {
+	backend := newFakeAuthBackend()
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/trips", bytes.NewReader([]byte(`{
+		"name":"오사카",
+		"startDate":"2026-07-10",
+		"endDate":"2026-07-13",
+		"defaultCurrency":"JPY"
+	}`)))
+	request.Header.Set("Content-Type", "application/json")
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusUnauthorized, recorder.Code, recorder.Body.String())
+	}
+}
+
+func TestCreateTripValidation(t *testing.T) {
+	backend := newFakeAuthBackend()
+	accessToken := loginTestUser(t, backend)
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/trips", bytes.NewReader([]byte(`{
+		"name":"오사카",
+		"startDate":"2026-07-13",
+		"endDate":"2026-07-10",
+		"defaultCurrency":"JPY"
+	}`)))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", "Bearer "+accessToken)
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusBadRequest, recorder.Code, recorder.Body.String())
+	}
+
+	var body struct {
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Error.Code != "VALIDATION_ERROR" {
+		t.Fatalf("expected VALIDATION_ERROR, got %q", body.Error.Code)
+	}
+}
+
 func TestReadyReturnsServiceUnavailable(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/ready", nil)
@@ -171,6 +283,43 @@ type fakeAuthBackend struct {
 	sessions     map[string]auth.Session
 	nextUser     int
 	nextSession  int
+}
+
+func loginTestUser(t *testing.T, backend *fakeAuthBackend) string {
+	t.Helper()
+
+	requestBody := []byte(`{
+		"provider":"apple",
+		"credential":{
+			"devSubject":"apple-1",
+			"email":"minsu@example.com",
+			"emailVerified":true,
+			"displayName":"민수"
+		},
+		"device":{"platform":"ios"}
+	}`)
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/auth/oauth/login", bytes.NewReader(requestBody))
+	request.Header.Set("Content-Type", "application/json")
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected login status %d, got %d with body %s", http.StatusOK, recorder.Code, recorder.Body.String())
+	}
+
+	var body struct {
+		Tokens struct {
+			AccessToken string `json:"accessToken"`
+		} `json:"tokens"`
+	}
+	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+		t.Fatalf("decode login response: %v", err)
+	}
+	if body.Tokens.AccessToken == "" {
+		t.Fatal("expected access token")
+	}
+	return body.Tokens.AccessToken
 }
 
 func newFakeAuthBackend() *fakeAuthBackend {
@@ -251,4 +400,36 @@ func (b *fakeAuthBackend) GetUser(_ context.Context, userID string) (auth.User, 
 
 func (b *fakeAuthBackend) ListProviders(context.Context, string) ([]auth.Provider, error) {
 	return []auth.Provider{auth.ProviderApple}, nil
+}
+
+func (b *fakeAuthBackend) GetCreator(_ context.Context, userID string) (tripdomain.Creator, bool, error) {
+	user, ok := b.users[userID]
+	if !ok {
+		return tripdomain.Creator{}, false, nil
+	}
+	return tripdomain.Creator{ID: user.ID, DisplayName: user.DisplayName}, true, nil
+}
+
+func (b *fakeAuthBackend) CreateTripWithOwner(_ context.Context, record tripdomain.CreateRecord) (tripdomain.CreateResult, error) {
+	now := time.Date(2026, 6, 21, 15, 0, 0, 0, time.UTC)
+	return tripdomain.CreateResult{
+		Trip: tripdomain.Trip{
+			ID:              "trip-1",
+			Name:            record.Name,
+			StartDate:       record.StartDate.Format("2006-01-02"),
+			EndDate:         record.EndDate.Format("2006-01-02"),
+			DefaultCurrency: record.DefaultCurrency,
+			CreatedBy:       record.CreatedBy,
+			CreatedAt:       now,
+			UpdatedAt:       now,
+		},
+		OwnerParticipant: tripdomain.Participant{
+			ID:          "participant-1",
+			TripID:      "trip-1",
+			UserID:      record.CreatedBy,
+			Role:        tripdomain.RoleOwner,
+			DisplayName: record.OwnerDisplayName,
+			JoinedAt:    now,
+		},
+	}, nil
 }

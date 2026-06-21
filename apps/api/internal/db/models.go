@@ -44,6 +44,26 @@ type AuthSession struct {
 	UpdatedAt             pgtype.Timestamptz
 }
 
+type Trip struct {
+	ID              pgtype.UUID
+	Name            string
+	StartDate       pgtype.Date
+	EndDate         pgtype.Date
+	DefaultCurrency string
+	CreatedBy       pgtype.UUID
+	CreatedAt       pgtype.Timestamptz
+	UpdatedAt       pgtype.Timestamptz
+}
+
+type TripParticipant struct {
+	ID          pgtype.UUID
+	TripID      pgtype.UUID
+	UserID      pgtype.UUID
+	Role        string
+	DisplayName string
+	JoinedAt    pgtype.Timestamptz
+}
+
 type User struct {
 	ID              pgtype.UUID
 	DisplayName     string

@@ -9,6 +9,7 @@ servers:
 tags:
   - name: Health
   - name: Auth
+  - name: Trips
 paths:
   /health:
     get:
@@ -71,6 +72,46 @@ paths:
                       code: SERVICE_UNAVAILABLE
                       message: database is not ready
                       details: []
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /trips:
+    post:
+      operationId: createTrip
+      summary: Create a trip
+      description: Creates a Trip and the authenticated user's Owner participant.
+      tags:
+        - Trips
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTripRequest'
+      responses:
+        '201':
+          description: Trip created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateTripResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '500':
           description: Unexpected server error.
           content:
@@ -355,6 +396,109 @@ components:
           enum:
             - initialized
           example: initialized
+    SupportedCurrency:
+      type: string
+      enum:
+        - KRW
+        - JPY
+        - USD
+        - EUR
+    TripParticipantRole:
+      type: string
+      enum:
+        - owner
+        - member
+    CreateTripRequest:
+      type: object
+      required:
+        - name
+        - startDate
+        - endDate
+        - defaultCurrency
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+          example: 오사카 3박 4일
+        startDate:
+          type: string
+          format: date
+          description: Start date in YYYY-MM-DD format. Must be today or later.
+          example: '2026-07-10'
+        endDate:
+          type: string
+          format: date
+          description: End date in YYYY-MM-DD format. Must be today or later and not before startDate.
+          example: '2026-07-13'
+        defaultCurrency:
+          $ref: '#/components/schemas/SupportedCurrency'
+    Trip:
+      type: object
+      required:
+        - id
+        - name
+        - startDate
+        - endDate
+        - defaultCurrency
+        - createdBy
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        defaultCurrency:
+          $ref: '#/components/schemas/SupportedCurrency'
+        createdBy:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    TripParticipant:
+      type: object
+      required:
+        - id
+        - tripId
+        - userId
+        - role
+        - displayName
+        - joinedAt
+      properties:
+        id:
+          type: string
+        tripId:
+          type: string
+        userId:
+          type: string
+        role:
+          $ref: '#/components/schemas/TripParticipantRole'
+        displayName:
+          type: string
+        joinedAt:
+          type: string
+          format: date-time
+    CreateTripResponse:
+      type: object
+      required:
+        - trip
+        - ownerParticipant
+      properties:
+        trip:
+          $ref: '#/components/schemas/Trip'
+        ownerParticipant:
+          $ref: '#/components/schemas/TripParticipant'
     AuthProvider:
       type: string
       enum:
