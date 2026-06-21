@@ -4,6 +4,7 @@
 /* eslint-disable */
 import type { CreateTripRequest } from '../models/CreateTripRequest';
 import type { CreateTripResponse } from '../models/CreateTripResponse';
+import type { GetTripDetailResponse } from '../models/GetTripDetailResponse';
 import type { CancelablePromise } from '../core/CancelablePromise';
 import { OpenAPI } from '../core/OpenAPI';
 import { request as __request } from '../core/request';
@@ -26,6 +27,31 @@ export class TripsService {
             errors: {
                 400: `Validation error.`,
                 401: `Unauthorized.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
+     * Get trip detail
+     * Returns basic trip detail for an authenticated trip participant.
+     * @param tripId
+     * @returns GetTripDetailResponse Trip detail.
+     * @throws ApiError
+     */
+    public static getTripDetail(
+        tripId: string,
+    ): CancelablePromise<GetTripDetailResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/trips/{tripId}',
+            path: {
+                'tripId': tripId,
+            },
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                403: `Forbidden.`,
+                404: `Trip not found.`,
                 500: `Unexpected server error.`,
             },
         });
