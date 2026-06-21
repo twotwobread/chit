@@ -236,3 +236,57 @@ func (q *Queries) ListTripParticipantPreviewByTripID(ctx context.Context, dollar
 	}
 	return items, nil
 }
+
+const listTripsByParticipantUser = `-- name: ListTripsByParticipantUser :many
+SELECT
+  t.id::text AS id,
+  t.name,
+  t.start_date,
+  t.end_date,
+  t.default_currency,
+  t.created_at,
+  t.updated_at
+FROM trips t
+JOIN trip_participants tp ON tp.trip_id = t.id
+WHERE tp.user_id = $1::uuid
+  AND tp.role IN ('owner', 'member')
+ORDER BY t.updated_at DESC, t.created_at DESC, t.id DESC
+`
+
+type ListTripsByParticipantUserRow struct {
+	ID              string
+	Name            string
+	StartDate       pgtype.Date
+	EndDate         pgtype.Date
+	DefaultCurrency string
+	CreatedAt       pgtype.Timestamptz
+	UpdatedAt       pgtype.Timestamptz
+}
+
+func (q *Queries) ListTripsByParticipantUser(ctx context.Context, dollar_1 pgtype.UUID) ([]ListTripsByParticipantUserRow, error) {
+	rows, err := q.db.Query(ctx, listTripsByParticipantUser, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListTripsByParticipantUserRow
+	for rows.Next() {
+		var i ListTripsByParticipantUserRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.StartDate,
+			&i.EndDate,
+			&i.DefaultCurrency,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

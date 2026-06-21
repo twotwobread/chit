@@ -74,6 +74,16 @@ type GetDetailResult struct {
 	ParticipantSummary ParticipantSummary
 }
 
+type ListItem struct {
+	ID              string
+	Name            string
+	StartDate       string
+	EndDate         string
+	DefaultCurrency string
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+}
+
 type Repository interface {
 	GetCreator(ctx context.Context, userID string) (Creator, bool, error)
 	CreateTripWithOwner(ctx context.Context, record CreateRecord) (CreateResult, error)
@@ -81,4 +91,5 @@ type Repository interface {
 	IsTripParticipant(ctx context.Context, tripID string, userID string) (bool, error)
 	CountTripParticipants(ctx context.Context, tripID string) (int, error)
 	ListTripParticipantPreviewNames(ctx context.Context, tripID string) ([]string, error)
+	ListTripsByParticipantUser(ctx context.Context, userID string) ([]ListItem, error)
 }

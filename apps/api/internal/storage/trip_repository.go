@@ -123,6 +123,27 @@ func (s *Store) ListTripParticipantPreviewNames(ctx context.Context, tripID stri
 	return s.queries.ListTripParticipantPreviewByTripID(ctx, mustUUID(tripID))
 }
 
+func (s *Store) ListTripsByParticipantUser(ctx context.Context, userID string) ([]trip.ListItem, error) {
+	rows, err := s.queries.ListTripsByParticipantUser(ctx, mustUUID(userID))
+	if err != nil {
+		return nil, err
+	}
+
+	trips := make([]trip.ListItem, 0, len(rows))
+	for _, row := range rows {
+		trips = append(trips, trip.ListItem{
+			ID:              row.ID,
+			Name:            row.Name,
+			StartDate:       dateString(row.StartDate),
+			EndDate:         dateString(row.EndDate),
+			DefaultCurrency: row.DefaultCurrency,
+			CreatedAt:       row.CreatedAt.Time,
+			UpdatedAt:       row.UpdatedAt.Time,
+		})
+	}
+	return trips, nil
+}
+
 func dateValue(value time.Time) pgtype.Date {
 	return pgtype.Date{Time: value, Valid: true}
 }
