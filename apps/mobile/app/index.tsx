@@ -4,14 +4,14 @@ import { router } from 'expo-router';
 
 import type { AuthMeResponse } from '@i-um/api-contract';
 
-import { fetchHealthAndReadiness } from '../lib/api/health';
+import { getCurrentUserWithRefresh, MobileAuthError } from '../lib/auth/client';
 import { clearStoredSession, getStoredSession } from '../lib/auth/session';
-import { getCurrentUserWithRefresh, logoutCurrentSession, MobileAuthError } from '../lib/auth/client';
 import { theme } from '../lib/design';
+import { BottomMenu } from '../lib/navigation/BottomMenu';
 
 type HomeState =
   | { status: 'loading' }
-  | { status: 'authenticated'; me: AuthMeResponse; apiStatus: string; dbStatus: string; schema: string }
+  | { status: 'authenticated'; me: AuthMeResponse }
   | { status: 'needsLogin'; message?: string }
   | { status: 'error' };
 
@@ -29,16 +29,12 @@ export default function HomeScreen() {
       }
 
       const me = await getCurrentUserWithRefresh();
-      const diagnostics = await fetchHealthAndReadiness();
-      setHomeState({
-        status: 'authenticated',
-        me,
-        apiStatus: diagnostics.health.status,
-        dbStatus: diagnostics.readiness.checks.database.status,
-        schema: diagnostics.readiness.checks.metadata.schema,
-      });
+      setHomeState({ status: 'authenticated', me });
     } catch (error) {
-      if (error instanceof MobileAuthError && error.code === 'INVALID_REFRESH_TOKEN') {
+      if (
+        error instanceof MobileAuthError &&
+        (error.code === 'INVALID_REFRESH_TOKEN' || error.code === 'UNAUTHORIZED')
+      ) {
         await clearStoredSession();
         setHomeState({ status: 'needsLogin', message: '다시 로그인해주세요.' });
         return;
@@ -51,74 +47,66 @@ export default function HomeScreen() {
     void load();
   }, [load]);
 
-  const logout = async () => {
-    await logoutCurrentSession();
-    setHomeState({ status: 'needsLogin' });
-  };
-
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>이음</Text>
-      <Text style={styles.subtitle}>여행을 이어갈 준비를 확인해요.</Text>
+    <View style={styles.screen}>
+      <View style={styles.content}>
+        <Text style={styles.title}>이음</Text>
+        <Text style={styles.subtitle}>여행을 이어갈 준비를 해요.</Text>
 
-      {homeState.status === 'loading' ? (
-        <View style={styles.card}>
-          <ActivityIndicator color={theme.color.primary} />
-          <Text style={styles.message}>API 및 DB 상태 확인 중...</Text>
-        </View>
-      ) : null}
+        {homeState.status === 'loading' ? (
+          <View style={styles.card}>
+            <ActivityIndicator color={theme.color.primary} />
+            <Text style={styles.message}>홈을 불러오는 중...</Text>
+          </View>
+        ) : null}
 
-      {homeState.status === 'needsLogin' ? (
-        <View style={styles.card}>
-          <Text style={styles.message}>{homeState.message ?? '로그인이 필요합니다.'}</Text>
-          <Pressable accessibilityRole="button" onPress={() => router.replace('/login')} style={styles.button}>
-            <Text style={styles.buttonText}>로그인하기</Text>
-          </Pressable>
-        </View>
-      ) : null}
-
-      {homeState.status === 'authenticated' ? (
-        <View style={styles.card}>
-          <Text style={styles.successTitle}>로그인되었습니다.</Text>
-          <Text style={styles.message}>사용자: {homeState.me.user.displayName}</Text>
-          <Text style={styles.message}>연결된 로그인: {homeState.me.linkedProviders.join(', ')}</Text>
-          <Text style={styles.successTitle}>API 연결 성공</Text>
-          <Text style={styles.message}>status: {homeState.apiStatus}</Text>
-          <Text style={styles.successTitle}>DB 연결 성공</Text>
-          <Text style={styles.message}>database: {homeState.dbStatus}</Text>
-          <Text style={styles.message}>schema: {homeState.schema}</Text>
-          <Pressable accessibilityRole="button" onPress={() => router.push('/trips/new')} style={styles.button}>
-            <Text style={styles.buttonText}>새 여행 만들기</Text>
-          </Pressable>
-          <View style={styles.row}>
-            <Pressable accessibilityRole="button" onPress={() => router.push('/account')} style={styles.secondaryButton}>
-              <Text style={styles.secondaryButtonText}>계정</Text>
-            </Pressable>
-            <Pressable accessibilityRole="button" onPress={() => void logout()} style={styles.button}>
-              <Text style={styles.buttonText}>로그아웃</Text>
+        {homeState.status === 'needsLogin' ? (
+          <View style={styles.card}>
+            <Text style={styles.message}>{homeState.message ?? '로그인이 필요합니다.'}</Text>
+            <Pressable accessibilityRole="button" onPress={() => router.replace('/login')} style={styles.button}>
+              <Text style={styles.buttonText}>로그인하기</Text>
             </Pressable>
           </View>
-        </View>
-      ) : null}
+        ) : null}
 
-      {homeState.status === 'error' ? (
-        <View style={styles.card}>
-          <Text style={styles.errorTitle}>API 또는 DB 연결 실패</Text>
-          <Pressable accessibilityRole="button" onPress={load} style={styles.button}>
-            <Text style={styles.buttonText}>다시 시도</Text>
-          </Pressable>
-        </View>
-      ) : null}
+        {homeState.status === 'authenticated' ? (
+          <View style={styles.card}>
+            <Text style={styles.successTitle}>여행을 이어가요.</Text>
+            <Text style={styles.message}>{displayName(homeState.me.user.displayName)}님, 다음 여행을 준비해볼까요?</Text>
+            <Pressable accessibilityRole="button" onPress={() => router.push('/trips/new')} style={styles.button}>
+              <Text style={styles.buttonText}>새 여행 만들기</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {homeState.status === 'error' ? (
+          <View style={styles.card}>
+            <Text style={styles.errorTitle}>홈을 불러올 수 없어요.</Text>
+            <Pressable accessibilityRole="button" onPress={load} style={styles.button}>
+              <Text style={styles.buttonText}>다시 시도</Text>
+            </Pressable>
+          </View>
+        ) : null}
+      </View>
+
+      {homeState.status === 'authenticated' ? <BottomMenu selected="home" /> : null}
     </View>
   );
 }
 
+function displayName(value: string): string {
+  return value.trim() || '이름을 불러올 수 없어요.';
+}
+
 const styles = StyleSheet.create({
-  container: {
+  screen: {
+    flex: 1,
+    backgroundColor: theme.color.bg,
+  },
+  content: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: theme.color.bg,
     padding: theme.space[7],
   },
   title: {
@@ -146,17 +134,13 @@ const styles = StyleSheet.create({
     padding: theme.space[7],
     ...theme.shadow.sm,
   },
-  row: {
-    flexDirection: 'row',
-    gap: theme.space[4],
-  },
   message: {
     color: theme.color.textBody,
     fontFamily: theme.font.family.regular,
     textAlign: 'center',
   },
   successTitle: {
-    color: theme.color.success,
+    color: theme.color.textStrong,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.headline,
     fontWeight: theme.font.weight.bold,
@@ -166,6 +150,7 @@ const styles = StyleSheet.create({
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.headline,
     fontWeight: theme.font.weight.bold,
+    textAlign: 'center',
   },
   button: {
     backgroundColor: theme.color.primary,
@@ -177,21 +162,6 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: theme.color.onPrimary,
-    fontFamily: theme.font.family.bold,
-    fontWeight: theme.font.weight.bold,
-    textAlign: 'center',
-  },
-  secondaryButton: {
-    borderColor: theme.color.primary,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    minHeight: theme.layout.controlH,
-    justifyContent: 'center',
-    paddingHorizontal: theme.space[5],
-    paddingVertical: theme.space[3],
-  },
-  secondaryButtonText: {
-    color: theme.color.primary,
     fontFamily: theme.font.family.bold,
     fontWeight: theme.font.weight.bold,
     textAlign: 'center',
