@@ -7,6 +7,7 @@ import type { AuthMeResponse } from '@i-um/api-contract';
 import { fetchHealthAndReadiness } from '../lib/api/health';
 import { clearStoredSession, getStoredSession } from '../lib/auth/session';
 import { getCurrentUserWithRefresh, logoutCurrentSession, MobileAuthError } from '../lib/auth/client';
+import { theme } from '../lib/design';
 
 type HomeState =
   | { status: 'loading' }
@@ -58,11 +59,11 @@ export default function HomeScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>이음</Text>
-      <Text style={styles.subtitle}>OAuth session readiness</Text>
+      <Text style={styles.subtitle}>여행을 이어갈 준비를 확인해요.</Text>
 
       {homeState.status === 'loading' ? (
         <View style={styles.card}>
-          <ActivityIndicator />
+          <ActivityIndicator color={theme.color.primary} />
           <Text style={styles.message}>API 및 DB 상태 확인 중...</Text>
         </View>
       ) : null}
@@ -114,65 +115,82 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#ffffff',
-    padding: 24,
+    backgroundColor: theme.color.bg,
+    padding: theme.space[7],
   },
   title: {
-    fontSize: 32,
-    fontWeight: '700',
-    marginBottom: 8,
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.display,
+    fontWeight: theme.font.weight.bold,
+    marginBottom: theme.space[3],
   },
   subtitle: {
-    color: '#666666',
-    marginBottom: 24,
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.regular,
+    marginBottom: theme.space[7],
+    textAlign: 'center',
   },
   card: {
     width: '100%',
-    maxWidth: 360,
+    maxWidth: theme.layout.cardMaxW,
     alignItems: 'center',
-    borderColor: '#eeeeee',
-    borderRadius: 16,
+    backgroundColor: theme.color.surface,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.lg,
     borderWidth: 1,
-    gap: 12,
-    padding: 24,
+    gap: theme.layout.gapCard,
+    padding: theme.space[7],
+    ...theme.shadow.sm,
   },
   row: {
     flexDirection: 'row',
-    gap: 12,
+    gap: theme.space[4],
   },
   message: {
-    color: '#333333',
+    color: theme.color.textBody,
+    fontFamily: theme.font.family.regular,
     textAlign: 'center',
   },
   successTitle: {
-    color: '#087f5b',
-    fontSize: 20,
-    fontWeight: '700',
+    color: theme.color.success,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.headline,
+    fontWeight: theme.font.weight.bold,
   },
   errorTitle: {
-    color: '#c92a2a',
-    fontSize: 20,
-    fontWeight: '700',
+    color: theme.color.danger,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.headline,
+    fontWeight: theme.font.weight.bold,
   },
   button: {
-    backgroundColor: '#222222',
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    backgroundColor: theme.color.primary,
+    borderRadius: theme.radius.md,
+    minHeight: theme.layout.controlH,
+    justifyContent: 'center',
+    paddingHorizontal: theme.space[5],
+    paddingVertical: theme.space[3],
   },
   buttonText: {
-    color: '#ffffff',
-    fontWeight: '700',
+    color: theme.color.onPrimary,
+    fontFamily: theme.font.family.bold,
+    fontWeight: theme.font.weight.bold,
+    textAlign: 'center',
   },
   secondaryButton: {
-    borderColor: '#222222',
-    borderRadius: 10,
+    borderColor: theme.color.primary,
+    borderRadius: theme.radius.md,
     borderWidth: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    minHeight: theme.layout.controlH,
+    justifyContent: 'center',
+    paddingHorizontal: theme.space[5],
+    paddingVertical: theme.space[3],
   },
   secondaryButtonText: {
-    color: '#222222',
-    fontWeight: '700',
+    color: theme.color.primary,
+    fontFamily: theme.font.family.bold,
+    fontWeight: theme.font.weight.bold,
+    textAlign: 'center',
   },
 });
