@@ -10,7 +10,10 @@ import (
 	"github.com/twotwobread/i-um/apps/api/internal/db"
 )
 
-const readinessTimeout = 2 * time.Second
+const (
+	readinessTimeout = 5 * time.Second
+	maxOpenConns     = int32(4)
+)
 
 type Store struct {
 	pool    *pgxpool.Pool
@@ -22,7 +25,13 @@ func Open(ctx context.Context, databaseURL string) (*Store, error) {
 		return nil, errors.New("DATABASE_URL is required")
 	}
 
-	pool, err := pgxpool.New(ctx, databaseURL)
+	config, err := pgxpool.ParseConfig(databaseURL)
+	if err != nil {
+		return nil, err
+	}
+	config.MaxConns = maxOpenConns
+
+	pool, err := pgxpool.NewWithConfig(ctx, config)
 	if err != nil {
 		return nil, err
 	}

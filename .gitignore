@@ -23,6 +23,15 @@ ios/
 !.env.example
 !.env.*.example
 
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+tfplan
+crash.log
+crash.*.log
+
 # Logs
 *.log
 npm-debug.log*

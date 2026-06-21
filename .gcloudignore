@@ -1,0 +1,23 @@
+.git
+.gitignore
+.gcloudignore
+
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Local worktrees and tooling
+.worktrees/
+.terraform/
+
+# Expo/native build outputs
+.expo/
+dist/
+web-build/
+android/
+ios/
+
+# Environment and logs
+.env
+.env.*
+*.log

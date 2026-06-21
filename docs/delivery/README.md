@@ -16,6 +16,8 @@ Feature Slice = App UI + API Contract + API Server + DB + Tests + Deployable Sta
   - GitHub Issue, Ouroboros, feature spec, pi coding agent, 배포까지의 전체 흐름
 - `definition_of_done.md`
   - 기능을 완료로 볼 수 있는 기준
+- `staging_internal_deploy.md`
+  - GCP Cloud Run staging API와 Expo internal build 배포 runbook
 - `../features/_template.md`
   - 기능별 spec + implementation plan 작성 템플릿
 
