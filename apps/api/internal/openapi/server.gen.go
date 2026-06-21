@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 const (
@@ -65,6 +66,20 @@ const (
 // Defines values for ReadinessResponseStatus.
 const (
 	ReadinessResponseStatusOk ReadinessResponseStatus = "ok"
+)
+
+// Defines values for SupportedCurrency.
+const (
+	EUR SupportedCurrency = "EUR"
+	JPY SupportedCurrency = "JPY"
+	KRW SupportedCurrency = "KRW"
+	USD SupportedCurrency = "USD"
+)
+
+// Defines values for TripParticipantRole.
+const (
+	Member TripParticipantRole = "member"
+	Owner  TripParticipantRole = "owner"
 )
 
 // AuthLinkResponse defines model for AuthLinkResponse.
@@ -126,6 +141,24 @@ type AuthUser struct {
 	DisplayName string  `json:"displayName"`
 	Email       *string `json:"email"`
 	Id          string  `json:"id"`
+}
+
+// CreateTripRequest defines model for CreateTripRequest.
+type CreateTripRequest struct {
+	DefaultCurrency SupportedCurrency `json:"defaultCurrency"`
+
+	// EndDate End date in YYYY-MM-DD format. Must be today or later and not before startDate.
+	EndDate openapi_types.Date `json:"endDate"`
+	Name    string             `json:"name"`
+
+	// StartDate Start date in YYYY-MM-DD format. Must be today or later.
+	StartDate openapi_types.Date `json:"startDate"`
+}
+
+// CreateTripResponse defines model for CreateTripResponse.
+type CreateTripResponse struct {
+	OwnerParticipant TripParticipant `json:"ownerParticipant"`
+	Trip             Trip            `json:"trip"`
 }
 
 // DeviceInfo defines model for DeviceInfo.
@@ -226,6 +259,34 @@ type RefreshTokenRequest struct {
 	RefreshToken string `json:"refreshToken"`
 }
 
+// SupportedCurrency defines model for SupportedCurrency.
+type SupportedCurrency string
+
+// Trip defines model for Trip.
+type Trip struct {
+	CreatedAt       time.Time          `json:"createdAt"`
+	CreatedBy       string             `json:"createdBy"`
+	DefaultCurrency SupportedCurrency  `json:"defaultCurrency"`
+	EndDate         openapi_types.Date `json:"endDate"`
+	Id              string             `json:"id"`
+	Name            string             `json:"name"`
+	StartDate       openapi_types.Date `json:"startDate"`
+	UpdatedAt       time.Time          `json:"updatedAt"`
+}
+
+// TripParticipant defines model for TripParticipant.
+type TripParticipant struct {
+	DisplayName string              `json:"displayName"`
+	Id          string              `json:"id"`
+	JoinedAt    time.Time           `json:"joinedAt"`
+	Role        TripParticipantRole `json:"role"`
+	TripId      string              `json:"tripId"`
+	UserId      string              `json:"userId"`
+}
+
+// TripParticipantRole defines model for TripParticipantRole.
+type TripParticipantRole string
+
 // LinkOAuthProviderJSONRequestBody defines body for LinkOAuthProvider for application/json ContentType.
 type LinkOAuthProviderJSONRequestBody = OAuthLinkRequest
 
@@ -234,6 +295,9 @@ type LoginWithOAuthJSONRequestBody = OAuthLoginRequest
 
 // RefreshTokenJSONRequestBody defines body for RefreshToken for application/json ContentType.
 type RefreshTokenJSONRequestBody = RefreshTokenRequest
+
+// CreateTripJSONRequestBody defines body for CreateTrip for application/json ContentType.
+type CreateTripJSONRequestBody = CreateTripRequest
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -258,6 +322,9 @@ type ServerInterface interface {
 	// Check API readiness
 	// (GET /ready)
 	GetReady(w http.ResponseWriter, r *http.Request)
+	// Create a trip
+	// (POST /trips)
+	CreateTrip(w http.ResponseWriter, r *http.Request)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
@@ -303,6 +370,12 @@ func (_ Unimplemented) GetHealth(w http.ResponseWriter, r *http.Request) {
 // Check API readiness
 // (GET /ready)
 func (_ Unimplemented) GetReady(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Create a trip
+// (POST /trips)
+func (_ Unimplemented) CreateTrip(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -422,6 +495,26 @@ func (siw *ServerInterfaceWrapper) GetReady(w http.ResponseWriter, r *http.Reque
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetReady(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateTrip operation middleware
+func (siw *ServerInterfaceWrapper) CreateTrip(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateTrip(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -564,6 +657,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/ready", wrapper.GetReady)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/trips", wrapper.CreateTrip)
 	})
 
 	return r
