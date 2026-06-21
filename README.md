@@ -25,6 +25,9 @@ asdf install
 - Node.js 20+
 - pnpm 9.15.9
 - Go 1.22.5
+- Terraform 1.6+
+- Google Cloud SDK
+- EAS CLI for internal mobile builds
 
 ## Install
 
@@ -153,12 +156,55 @@ pnpm verify
 
 Generated artifact가 current source와 drift되거나, regenerated artifact가 server/mobile consumer와 맞지 않으면 실패해야 합니다.
 
-## Internal Build Readiness
+## Staging / Internal Deployment
 
-F-003은 실제 staging/internal 배포 파이프라인을 만들지 않습니다. 해당 작업은 #4에서 다룹니다.
-F-003의 readiness 기준은 다음입니다.
+F-004부터 staging API는 GCP Cloud Run에 배포하고, Expo iOS internal build는 Cloud Run staging URL을 `EXPO_PUBLIC_API_BASE_URL`로 사용합니다. Android internal build는 Android tester/device가 생겼을 때 선택적으로 생성합니다.
 
-- API base URL이 `EXPO_PUBLIC_API_BASE_URL`로 주입된다.
-- API 서버의 DB URL이 `DATABASE_URL`로 주입된다.
-- 앱 코드에 hard-coded localhost가 없다.
-- iOS Simulator, Android Emulator, 또는 physical device에서 live API `/health`와 `/ready` 호출 성공을 기록할 수 있다.
+Fixed staging resources:
+
+```text
+GCP project: i-um-488511
+Region: asia-northeast3
+Cloud Run service: i-um-api-staging
+Artifact Registry repository: i-um-staging
+Secret Manager secret: i-um-staging-database-url
+Cloud Build trigger: i-um-api-staging-deploy
+Terraform state bucket: i-um-488511-terraform-state
+```
+
+Terraform validation:
+
+```bash
+terraform -chdir=infra/terraform/gcp-staging init
+terraform -chdir=infra/terraform/gcp-staging fmt -check
+terraform -chdir=infra/terraform/gcp-staging validate
+terraform -chdir=infra/terraform/gcp-staging plan
+```
+
+Deploy staging API through the manual Cloud Build trigger:
+
+```bash
+gcloud builds triggers run i-um-api-staging-deploy \
+  --region=asia-northeast3 \
+  --branch=develop
+```
+
+Run staging smoke checks:
+
+```bash
+CLOUD_RUN_URL="$(gcloud run services describe i-um-api-staging \
+  --region=asia-northeast3 \
+  --format='value(status.url)')"
+
+curl -i "$CLOUD_RUN_URL/health"
+curl -i "$CLOUD_RUN_URL/ready"
+```
+
+iOS internal build uses `apps/mobile/eas.json` profile `preview` and EAS managed credentials:
+
+```bash
+cd apps/mobile
+npx eas-cli@latest build --profile preview --platform ios
+```
+
+Full bootstrap, migration, deploy, EAS environment, smoke test, and rollback steps are documented in `docs/delivery/staging_internal_deploy.md`.
