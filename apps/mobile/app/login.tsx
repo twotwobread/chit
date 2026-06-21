@@ -6,6 +6,7 @@ import type { AuthProvider } from '@i-um/api-contract';
 
 import { loginWithOAuth, MobileAuthError } from '../lib/auth/client';
 import { getOAuthCredential } from '../lib/auth/oauth';
+import { theme } from '../lib/design';
 
 type LoginState =
   | { status: 'idle' }
@@ -54,7 +55,7 @@ export default function LoginScreen() {
 
         {isLoading ? (
           <View style={styles.loadingRow}>
-            <ActivityIndicator />
+            <ActivityIndicator color={theme.color.primary} />
             <Text style={styles.message}>로그인 중...</Text>
           </View>
         ) : null}
@@ -95,49 +96,60 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#ffffff',
-    padding: 24,
+    backgroundColor: theme.color.bg,
+    padding: theme.space[7],
   },
   title: {
-    fontSize: 32,
-    fontWeight: '700',
-    marginBottom: 8,
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.display,
+    fontWeight: theme.font.weight.bold,
+    marginBottom: theme.space[3],
   },
   subtitle: {
-    color: '#666666',
-    marginBottom: 24,
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.regular,
+    marginBottom: theme.space[7],
     textAlign: 'center',
   },
   card: {
     width: '100%',
-    maxWidth: 360,
-    borderColor: '#eeeeee',
-    borderRadius: 16,
+    maxWidth: theme.layout.cardMaxW,
+    backgroundColor: theme.color.surface,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.lg,
     borderWidth: 1,
-    gap: 12,
-    padding: 24,
+    gap: theme.layout.gapCard,
+    padding: theme.space[7],
+    ...theme.shadow.sm,
   },
   button: {
     alignItems: 'center',
-    backgroundColor: '#111111',
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    backgroundColor: theme.providerColor.appleBg,
+    borderRadius: theme.radius.md,
+    justifyContent: 'center',
+    minHeight: theme.layout.controlH,
+    paddingHorizontal: theme.space[5],
+    paddingVertical: theme.space[4],
   },
   buttonText: {
-    color: '#ffffff',
-    fontWeight: '700',
+    color: theme.providerColor.appleText,
+    fontFamily: theme.font.family.bold,
+    fontWeight: theme.font.weight.bold,
   },
   kakaoButton: {
     alignItems: 'center',
-    backgroundColor: '#fee500',
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    backgroundColor: theme.providerColor.kakaoBg,
+    borderRadius: theme.radius.md,
+    justifyContent: 'center',
+    minHeight: theme.layout.controlH,
+    paddingHorizontal: theme.space[5],
+    paddingVertical: theme.space[4],
   },
   kakaoButtonText: {
-    color: '#111111',
-    fontWeight: '700',
+    color: theme.providerColor.kakaoText,
+    fontFamily: theme.font.family.bold,
+    fontWeight: theme.font.weight.bold,
   },
   disabledButton: {
     opacity: 0.5,
@@ -145,23 +157,26 @@ const styles = StyleSheet.create({
   loadingRow: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 8,
+    gap: theme.space[3],
     justifyContent: 'center',
   },
   message: {
-    color: '#333333',
+    color: theme.color.textBody,
+    fontFamily: theme.font.family.regular,
     textAlign: 'center',
   },
   errorBox: {
-    gap: 8,
+    gap: theme.space[3],
   },
   errorText: {
-    color: '#c92a2a',
+    color: theme.color.danger,
+    fontFamily: theme.font.family.regular,
     textAlign: 'center',
   },
   linkText: {
-    color: '#1971c2',
-    fontWeight: '700',
+    color: theme.color.textLink,
+    fontFamily: theme.font.family.bold,
+    fontWeight: theme.font.weight.bold,
     textAlign: 'center',
   },
 });

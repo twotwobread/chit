@@ -6,6 +6,7 @@ import type { AuthMeResponse, AuthProvider } from '@i-um/api-contract';
 
 import { getCurrentUserWithRefresh, linkOAuthProvider, logoutCurrentSession, MobileAuthError } from '../lib/auth/client';
 import { getOAuthCredential } from '../lib/auth/oauth';
+import { theme } from '../lib/design';
 
 type AccountState =
   | { status: 'loading' }
@@ -57,7 +58,7 @@ export default function AccountScreen() {
 
       {state.status === 'loading' ? (
         <View style={styles.card}>
-          <ActivityIndicator />
+          <ActivityIndicator color={theme.color.primary} />
           <Text style={styles.message}>계정 정보를 확인 중...</Text>
         </View>
       ) : null}
@@ -126,57 +127,72 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#ffffff',
-    padding: 24,
+    backgroundColor: theme.color.bg,
+    padding: theme.space[7],
   },
   title: {
-    fontSize: 28,
-    fontWeight: '700',
-    marginBottom: 24,
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.titleLg,
+    fontWeight: theme.font.weight.bold,
+    marginBottom: theme.space[7],
   },
   card: {
     width: '100%',
-    maxWidth: 360,
+    maxWidth: theme.layout.cardMaxW,
     alignItems: 'center',
-    borderColor: '#eeeeee',
-    borderRadius: 16,
+    backgroundColor: theme.color.surface,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.lg,
     borderWidth: 1,
-    gap: 12,
-    padding: 24,
+    gap: theme.layout.gapCard,
+    padding: theme.space[7],
+    ...theme.shadow.sm,
   },
   row: {
     flexDirection: 'row',
-    gap: 12,
+    gap: theme.space[4],
   },
   message: {
-    color: '#333333',
+    color: theme.color.textBody,
+    fontFamily: theme.font.family.regular,
     textAlign: 'center',
   },
   errorTitle: {
-    color: '#c92a2a',
-    fontSize: 20,
-    fontWeight: '700',
+    color: theme.color.danger,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.headline,
+    fontWeight: theme.font.weight.bold,
+    textAlign: 'center',
   },
   button: {
-    backgroundColor: '#222222',
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    backgroundColor: theme.color.primary,
+    borderRadius: theme.radius.md,
+    justifyContent: 'center',
+    minHeight: theme.layout.controlH,
+    paddingHorizontal: theme.space[5],
+    paddingVertical: theme.space[3],
   },
   buttonText: {
-    color: '#ffffff',
-    fontWeight: '700',
+    color: theme.color.onPrimary,
+    fontFamily: theme.font.family.bold,
+    fontWeight: theme.font.weight.bold,
+    textAlign: 'center',
   },
   secondaryButton: {
-    borderColor: '#222222',
-    borderRadius: 10,
+    borderColor: theme.color.primary,
+    borderRadius: theme.radius.md,
     borderWidth: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    justifyContent: 'center',
+    minHeight: theme.layout.controlH,
+    paddingHorizontal: theme.space[5],
+    paddingVertical: theme.space[3],
   },
   secondaryButtonText: {
-    color: '#222222',
-    fontWeight: '700',
+    color: theme.color.primary,
+    fontFamily: theme.font.family.bold,
+    fontWeight: theme.font.weight.bold,
+    textAlign: 'center',
   },
   disabledButton: {
     opacity: 0.5,

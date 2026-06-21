@@ -35,6 +35,10 @@ asdf install
 pnpm install
 ```
 
+## Design System
+
+UI 작업은 `docs/design/README.md`와 모바일 토큰 `apps/mobile/lib/design/theme.ts`를 기준으로 합니다. 브랜드 SVG 에셋은 `apps/mobile/assets/brand/`에 있습니다.
+
 ## OpenAPI/codegen Workflow
 
 API 계약 변경은 항상 `packages/api-contract/openapi.yaml`에서 시작합니다.

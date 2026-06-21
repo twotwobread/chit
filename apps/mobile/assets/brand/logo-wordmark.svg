@@ -1,0 +1,12 @@
+<svg width="220" height="72" viewBox="0 0 220 72" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="이음 i-um logo">
+  <rect x="0" y="4" width="64" height="64" rx="17" fill="#098563"></rect>
+  <svg x="0" y="4" width="64" height="64" viewBox="0 0 96 96">
+    <g transform="rotate(-30 48 48)">
+      <circle cx="57" cy="48" r="18" stroke="#7CE0BE" stroke-width="8"></circle>
+      <circle cx="39" cy="48" r="18" stroke="#ffffff" stroke-width="8"></circle>
+      <path d="M44 35 A18 18 0 0 1 52 31" stroke="#7CE0BE" stroke-width="8" fill="none"></path>
+    </g>
+  </svg>
+  <text x="82" y="48" font-family="&#39;Pretendard Variable&#39;, sans-serif" font-size="34" font-weight="700" letter-spacing="-0.02em" fill="#1a1a17">이음</text>
+  <text x="150" y="48" font-family="&#39;Pretendard Variable&#39;, sans-serif" font-size="20" font-weight="500" letter-spacing="-0.01em" fill="#9a9a8e">i-um</text>
+</svg>
