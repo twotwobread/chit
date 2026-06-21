@@ -2,7 +2,7 @@
 
 이음(i-um)은 여행 중 다음 일정과 지출을 한 흐름으로 이어주는 공동 여행 실행 앱입니다.
 
-## F-001 Walking Skeleton
+## Monorepo Overview
 
 이 저장소는 `pnpm` workspace 기반 monorepo입니다.
 
@@ -43,31 +43,62 @@ Generated 파일을 직접 수정하지 않습니다.
 4. custom server/mobile behavior는 non-generated 파일에 구현합니다.
 5. `pnpm verify`로 generated drift와 downstream integration을 확인합니다.
 
-### Generate OpenAPI Artifacts
+### Generate OpenAPI and DB Artifacts
 
 ```bash
 pnpm generate
 ```
 
-`pnpm generate`는 OpenAPI artifact를 재생성하는 단일 entrypoint입니다.
-별도의 global `oapi-codegen` 또는 `openapi-typescript-codegen` 설치가 필요하지 않습니다.
+`pnpm generate`는 OpenAPI artifact와 sqlc DB artifact를 재생성하는 단일 entrypoint입니다.
+별도의 global `oapi-codegen`, `openapi-typescript-codegen`, `sqlc` 설치가 필요하지 않습니다.
 
 Pinned generator tooling:
 
-- Go: `oapi-codegen@v2.4.1` via `go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.4.1`
-- TypeScript: `openapi-typescript-codegen@0.29.0` via workspace devDependency and `pnpm-lock.yaml`
+- OpenAPI Go: `oapi-codegen@v2.4.1` via `go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.4.1`
+- OpenAPI TypeScript: `openapi-typescript-codegen@0.29.0` via workspace devDependency and `pnpm-lock.yaml`
+- SQLC Go: `sqlc@v1.27.0` via `CGO_ENABLED=0 go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.27.0`
 
 Committed generated artifacts:
 
 - `apps/api/internal/openapi/server.gen.go`
+- `apps/api/internal/db/`
 - `packages/api-contract/gen/ts/`
 
 These generated artifacts are read-only, committed, and reviewable. Update them only by running `pnpm generate`.
 
+## Local DB and Migration
+
+F-003부터 API 서버는 PostgreSQL `DATABASE_URL`을 사용합니다.
+로컬 기본 DB URL은 다음입니다.
+
+```bash
+export DATABASE_URL='postgres://ium:ium@localhost:5432/ium?sslmode=disable'
+```
+
+로컬 PostgreSQL 실행:
+
+```bash
+pnpm db:up
+```
+
+migration 적용/상태 확인/rollback:
+
+```bash
+DATABASE_URL='postgres://ium:ium@localhost:5432/ium?sslmode=disable' pnpm db:migrate
+DATABASE_URL='postgres://ium:ium@localhost:5432/ium?sslmode=disable' pnpm db:status
+DATABASE_URL='postgres://ium:ium@localhost:5432/ium?sslmode=disable' pnpm db:rollback
+```
+
+로컬 DB 중지:
+
+```bash
+pnpm db:down
+```
+
 ## Run API
 
 ```bash
-pnpm dev:api
+DATABASE_URL='postgres://ium:ium@localhost:5432/ium?sslmode=disable' pnpm dev:api
 ```
 
 기본 주소는 `http://localhost:8080`입니다.
@@ -75,6 +106,9 @@ pnpm dev:api
 ```bash
 curl http://localhost:8080/health
 # {"status":"ok"}
+
+curl http://localhost:8080/ready
+# {"checks":{"database":{"status":"ok"},"metadata":{"schema":"initialized","status":"ok"}},"status":"ok"}
 ```
 
 ## Run Mobile
@@ -112,19 +146,19 @@ pnpm verify
 
 `pnpm verify`는 다음을 실행합니다.
 
-- `pnpm generate`
-- `git diff --exit-code -- apps/api/internal/openapi/server.gen.go packages/api-contract/gen/ts`
+- `pnpm verify:generated`로 generated artifact 재생성 전/후 checksum 비교
 - Go API tests
 - Go API build
 - mobile TypeScript typecheck
 
-Generated artifact가 committed source와 drift되거나, regenerated artifact가 server/mobile consumer와 맞지 않으면 실패해야 합니다.
+Generated artifact가 current source와 drift되거나, regenerated artifact가 server/mobile consumer와 맞지 않으면 실패해야 합니다.
 
 ## Internal Build Readiness
 
-F-001은 실제 staging/internal 배포 파이프라인을 만들지 않습니다. 해당 작업은 #4에서 다룹니다.
-F-001의 readiness 기준은 다음입니다.
+F-003은 실제 staging/internal 배포 파이프라인을 만들지 않습니다. 해당 작업은 #4에서 다룹니다.
+F-003의 readiness 기준은 다음입니다.
 
 - API base URL이 `EXPO_PUBLIC_API_BASE_URL`로 주입된다.
+- API 서버의 DB URL이 `DATABASE_URL`로 주입된다.
 - 앱 코드에 hard-coded localhost가 없다.
-- iOS Simulator 또는 Android Emulator에서 live API `/health` 호출 성공을 기록할 수 있다.
+- iOS Simulator, Android Emulator, 또는 physical device에서 live API `/health`와 `/ready` 호출 성공을 기록할 수 있다.

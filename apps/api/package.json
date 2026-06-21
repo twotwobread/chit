@@ -5,6 +5,10 @@
   "scripts": {
     "dev": "go run ./cmd/api",
     "test": "go test ./...",
-    "build": "go build -buildvcs=false ./cmd/api"
+    "build": "go build -buildvcs=false ./cmd/api",
+    "generate": "CGO_ENABLED=0 go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.27.0 generate -f sqlc.yaml",
+    "db:migrate": "go run github.com/pressly/goose/v3/cmd/goose@v3.24.1 -dir ./migrations postgres \"$DATABASE_URL\" up",
+    "db:rollback": "go run github.com/pressly/goose/v3/cmd/goose@v3.24.1 -dir ./migrations postgres \"$DATABASE_URL\" down",
+    "db:status": "go run github.com/pressly/goose/v3/cmd/goose@v3.24.1 -dir ./migrations postgres \"$DATABASE_URL\" status"
   }
 }

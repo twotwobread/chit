@@ -31,6 +31,49 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /ready:
+    get:
+      operationId: getReady
+      summary: Check API readiness
+      description: Returns API readiness, including PostgreSQL migration/query readiness.
+      tags:
+        - Health
+      responses:
+        '200':
+          description: API and database are ready.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessResponse'
+              examples:
+                ok:
+                  value:
+                    status: ok
+                    checks:
+                      database:
+                        status: ok
+                      metadata:
+                        status: ok
+                        schema: initialized
+        '503':
+          description: API or database is not ready.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                databaseNotReady:
+                  value:
+                    error:
+                      code: SERVICE_UNAVAILABLE
+                      message: database is not ready
+                      details: []
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 components:
   schemas:
     HealthResponse:
@@ -43,6 +86,55 @@ components:
           enum:
             - ok
           example: ok
+    ReadinessResponse:
+      type: object
+      required:
+        - status
+        - checks
+      properties:
+        status:
+          type: string
+          enum:
+            - ok
+          example: ok
+        checks:
+          $ref: '#/components/schemas/ReadinessChecks'
+    ReadinessChecks:
+      type: object
+      required:
+        - database
+        - metadata
+      properties:
+        database:
+          $ref: '#/components/schemas/ReadinessCheck'
+        metadata:
+          $ref: '#/components/schemas/MetadataReadinessCheck'
+    ReadinessCheck:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum:
+            - ok
+          example: ok
+    MetadataReadinessCheck:
+      type: object
+      required:
+        - status
+        - schema
+      properties:
+        status:
+          type: string
+          enum:
+            - ok
+          example: ok
+        schema:
+          type: string
+          enum:
+            - initialized
+          example: initialized
     ErrorResponse:
       type: object
       required:
