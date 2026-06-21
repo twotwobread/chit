@@ -7,11 +7,27 @@ export { CancelablePromise, CancelError } from './core/CancelablePromise';
 export { OpenAPI } from './core/OpenAPI';
 export type { OpenAPIConfig } from './core/OpenAPI';
 
+export type { AuthLinkResponse } from './models/AuthLinkResponse';
+export type { AuthLoginResponse } from './models/AuthLoginResponse';
+export type { AuthLogoutResponse } from './models/AuthLogoutResponse';
+export type { AuthMeResponse } from './models/AuthMeResponse';
+export type { AuthProvider } from './models/AuthProvider';
+export type { AuthRefreshResponse } from './models/AuthRefreshResponse';
+export type { AuthResult } from './models/AuthResult';
+export type { AuthTokens } from './models/AuthTokens';
+export type { AuthUser } from './models/AuthUser';
+export type { DeviceInfo } from './models/DeviceInfo';
 export type { ErrorResponse } from './models/ErrorResponse';
 export type { HealthResponse } from './models/HealthResponse';
+export type { LinkedIdentity } from './models/LinkedIdentity';
 export type { MetadataReadinessCheck } from './models/MetadataReadinessCheck';
+export type { OAuthCredential } from './models/OAuthCredential';
+export type { OAuthLinkRequest } from './models/OAuthLinkRequest';
+export type { OAuthLoginRequest } from './models/OAuthLoginRequest';
 export type { ReadinessCheck } from './models/ReadinessCheck';
 export type { ReadinessChecks } from './models/ReadinessChecks';
 export type { ReadinessResponse } from './models/ReadinessResponse';
+export type { RefreshTokenRequest } from './models/RefreshTokenRequest';
 
+export { AuthService } from './services/AuthService';
 export { HealthService } from './services/HealthService';

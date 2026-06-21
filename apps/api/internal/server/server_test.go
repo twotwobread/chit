@@ -1,12 +1,16 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
+
+	"github.com/twotwobread/i-um/apps/api/internal/auth"
 )
 
 type fakeReadiness struct {
@@ -83,6 +87,52 @@ func TestReady(t *testing.T) {
 	}
 }
 
+func TestLoginWithOAuthHandler(t *testing.T) {
+	backend := newFakeAuthBackend()
+	requestBody := []byte(`{
+		"provider":"apple",
+		"credential":{
+			"devSubject":"apple-1",
+			"email":"minsu@example.com",
+			"emailVerified":true,
+			"displayName":"민수"
+		},
+		"device":{"platform":"ios"}
+	}`)
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/auth/oauth/login", bytes.NewReader(requestBody))
+	request.Header.Set("Content-Type", "application/json")
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusOK, recorder.Code, recorder.Body.String())
+	}
+
+	var body struct {
+		Result string `json:"result"`
+		User   struct {
+			DisplayName string `json:"displayName"`
+		} `json:"user"`
+		Tokens struct {
+			AccessToken  string `json:"accessToken"`
+			RefreshToken string `json:"refreshToken"`
+		} `json:"tokens"`
+	}
+	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Result != "login_success" {
+		t.Fatalf("expected login_success, got %q", body.Result)
+	}
+	if body.User.DisplayName != "민수" {
+		t.Fatalf("expected display name 민수, got %q", body.User.DisplayName)
+	}
+	if body.Tokens.AccessToken == "" || body.Tokens.RefreshToken == "" {
+		t.Fatalf("expected tokens, got %#v", body.Tokens)
+	}
+}
+
 func TestReadyReturnsServiceUnavailable(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/ready", nil)
@@ -112,4 +162,93 @@ func TestReadyReturnsServiceUnavailable(t *testing.T) {
 	if len(body.Error.Details) != 0 {
 		t.Fatalf("expected empty details, got %#v", body.Error.Details)
 	}
+}
+
+type fakeAuthBackend struct {
+	fakeReadiness
+	users        map[string]auth.User
+	identityUser map[string]string
+	sessions     map[string]auth.Session
+	nextUser     int
+	nextSession  int
+}
+
+func newFakeAuthBackend() *fakeAuthBackend {
+	return &fakeAuthBackend{
+		fakeReadiness: fakeReadiness{schema: "initialized"},
+		users:         map[string]auth.User{},
+		identityUser:  map[string]string{},
+		sessions:      map[string]auth.Session{},
+	}
+}
+
+func (b *fakeAuthBackend) FindUserByIdentity(_ context.Context, provider auth.Provider, providerSubject string) (auth.User, bool, error) {
+	userID, ok := b.identityUser[string(provider)+":"+providerSubject]
+	if !ok {
+		return auth.User{}, false, nil
+	}
+	return b.users[userID], true, nil
+}
+
+func (b *fakeAuthBackend) FindUserByVerifiedEmail(context.Context, string) (auth.User, bool, error) {
+	return auth.User{}, false, nil
+}
+
+func (b *fakeAuthBackend) CreateUserWithIdentity(_ context.Context, user auth.User, identity auth.Identity) (auth.User, error) {
+	b.nextUser++
+	user.ID = "user-1"
+	b.users[user.ID] = user
+	b.identityUser[string(identity.Provider)+":"+identity.ProviderSubject] = user.ID
+	return user, nil
+}
+
+func (b *fakeAuthBackend) CreateIdentity(_ context.Context, userID string, identity auth.Identity) (auth.Identity, error) {
+	identity.UserID = userID
+	return identity, nil
+}
+
+func (b *fakeAuthBackend) CreateSession(_ context.Context, userID string, refreshTokenHash string, refreshTokenExpiresAt time.Time, _ auth.Device) (auth.Session, error) {
+	b.nextSession++
+	session := auth.Session{ID: "session-1", UserID: userID, RefreshTokenHash: refreshTokenHash, RefreshTokenExpiresAt: refreshTokenExpiresAt}
+	b.sessions[session.ID] = session
+	return session, nil
+}
+
+func (b *fakeAuthBackend) FindSessionByRefreshTokenHash(_ context.Context, refreshTokenHash string) (auth.Session, bool, error) {
+	for _, session := range b.sessions {
+		if session.RefreshTokenHash == refreshTokenHash {
+			return session, true, nil
+		}
+	}
+	return auth.Session{}, false, nil
+}
+
+func (b *fakeAuthBackend) GetSession(_ context.Context, sessionID string) (auth.Session, bool, error) {
+	session, ok := b.sessions[sessionID]
+	return session, ok, nil
+}
+
+func (b *fakeAuthBackend) RotateSessionRefreshToken(_ context.Context, sessionID string, refreshTokenHash string, refreshTokenExpiresAt time.Time) (auth.Session, error) {
+	session := b.sessions[sessionID]
+	session.RefreshTokenHash = refreshTokenHash
+	session.RefreshTokenExpiresAt = refreshTokenExpiresAt
+	b.sessions[sessionID] = session
+	return session, nil
+}
+
+func (b *fakeAuthBackend) RevokeSession(_ context.Context, sessionID string) error {
+	session := b.sessions[sessionID]
+	now := time.Now()
+	session.RevokedAt = &now
+	b.sessions[sessionID] = session
+	return nil
+}
+
+func (b *fakeAuthBackend) GetUser(_ context.Context, userID string) (auth.User, bool, error) {
+	user, ok := b.users[userID]
+	return user, ok, nil
+}
+
+func (b *fakeAuthBackend) ListProviders(context.Context, string) ([]auth.Provider, error) {
+	return []auth.Provider{auth.ProviderApple}, nil
 }
