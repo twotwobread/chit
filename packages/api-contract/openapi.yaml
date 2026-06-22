@@ -197,6 +197,63 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+    patch:
+      operationId: updateTrip
+      summary: Update trip basic information
+      description: Updates basic trip metadata for the authenticated trip owner. Only changed fields need to be sent.
+      tags:
+        - Trips
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTripRequest'
+      responses:
+        '200':
+          description: Trip updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateTripResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /auth/oauth/login:
     post:
       operationId: loginWithOAuth
@@ -545,6 +602,35 @@ components:
         updatedAt:
           type: string
           format: date-time
+    UpdateTripRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+          example: 오사카 4박 5일
+        startDate:
+          type: string
+          format: date
+          description: Start date in YYYY-MM-DD format. May be past, current, or future.
+          example: '2026-07-10'
+        endDate:
+          type: string
+          format: date
+          description: End date in YYYY-MM-DD format. Must not be before the merged startDate.
+          example: '2026-07-14'
+        defaultCurrency:
+          $ref: '#/components/schemas/SupportedCurrency'
+    UpdateTripResponse:
+      type: object
+      required:
+        - trip
+      properties:
+        trip:
+          $ref: '#/components/schemas/Trip'
     TripListItem:
       type: object
       required:

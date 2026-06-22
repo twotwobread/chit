@@ -1,16 +1,17 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 
 import { ApiError, type GetTripDetailResponse } from '@i-um/api-contract';
 
 import { MobileAuthError } from '../../../lib/auth/client';
+import { getStoredSession } from '../../../lib/auth/session';
 import { theme } from '../../../lib/design';
 import { getTripDetail } from '../../../lib/trips/client';
 
 type DetailState =
   | { status: 'loading' }
-  | { status: 'success'; detail: GetTripDetailResponse }
+  | { status: 'success'; detail: GetTripDetailResponse; currentUserId?: string }
   | { status: 'auth' }
   | { status: 'notFound' }
   | { status: 'error' };
@@ -29,7 +30,8 @@ export default function TripDetailScreen() {
     setState({ status: 'loading' });
     try {
       const detail = await getTripDetail(tripId);
-      setState({ status: 'success', detail });
+      const session = await getStoredSession();
+      setState({ status: 'success', detail, currentUserId: session?.user.id });
     } catch (error) {
       if (error instanceof MobileAuthError && (error.code === 'UNAUTHORIZED' || error.code === 'INVALID_REFRESH_TOKEN')) {
         setState({ status: 'auth' });
@@ -49,9 +51,11 @@ export default function TripDetailScreen() {
     }
   }, [tripId]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+    }, [load]),
+  );
 
   return (
     <ScrollView contentContainerStyle={styles.scrollContent} style={styles.scroll}>
@@ -66,7 +70,7 @@ export default function TripDetailScreen() {
         </View>
       ) : null}
 
-      {state.status === 'success' ? <TripDetailCard detail={state.detail} /> : null}
+      {state.status === 'success' ? <TripDetailCard currentUserId={state.currentUserId} detail={state.detail} /> : null}
 
       {state.status === 'auth' ? (
         <View style={styles.card}>
@@ -100,7 +104,8 @@ export default function TripDetailScreen() {
   );
 }
 
-function TripDetailCard({ detail }: { detail: GetTripDetailResponse }) {
+function TripDetailCard({ currentUserId, detail }: { currentUserId?: string; detail: GetTripDetailResponse }) {
+  const canEdit = currentUserId === detail.trip.createdBy;
   return (
     <View style={styles.card}>
       <Text style={styles.tripName}>{detail.trip.name}</Text>
@@ -109,6 +114,11 @@ function TripDetailCard({ detail }: { detail: GetTripDetailResponse }) {
         <InfoRow label="기본 통화" value={detail.trip.defaultCurrency} />
         <InfoRow label="참여자" value={formatParticipantSummary(detail.participantSummary)} />
       </View>
+      {canEdit ? (
+        <Pressable accessibilityRole="button" onPress={() => router.push(`/trips/${detail.trip.id}/edit`)} style={styles.secondaryButton}>
+          <Text style={styles.secondaryButtonText}>여행 정보 수정</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -222,6 +232,22 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: theme.color.onPrimary,
+    fontFamily: theme.font.family.bold,
+    fontWeight: theme.font.weight.bold,
+    textAlign: 'center',
+  },
+  secondaryButton: {
+    alignItems: 'center',
+    borderColor: theme.color.primary,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    justifyContent: 'center',
+    minHeight: theme.layout.controlH,
+    paddingHorizontal: theme.space[5],
+    paddingVertical: theme.space[4],
+  },
+  secondaryButtonText: {
+    color: theme.color.primary,
     fontFamily: theme.font.family.bold,
     fontWeight: theme.font.weight.bold,
     textAlign: 'center',

@@ -29,6 +29,13 @@ type CreateInput struct {
 	DefaultCurrency string
 }
 
+type UpdateInput struct {
+	Name            *string
+	StartDate       *string
+	EndDate         *string
+	DefaultCurrency *string
+}
+
 type CreateRecord struct {
 	Name             string
 	StartDate        time.Time
@@ -36,6 +43,14 @@ type CreateRecord struct {
 	DefaultCurrency  string
 	CreatedBy        string
 	OwnerDisplayName string
+}
+
+type UpdateRecord struct {
+	ID              string
+	Name            string
+	StartDate       time.Time
+	EndDate         time.Time
+	DefaultCurrency string
 }
 
 type Trip struct {
@@ -61,6 +76,10 @@ type Participant struct {
 type CreateResult struct {
 	Trip             Trip
 	OwnerParticipant Participant
+}
+
+type UpdateResult struct {
+	Trip Trip
 }
 
 type ParticipantSummary struct {
@@ -89,6 +108,8 @@ type Repository interface {
 	CreateTripWithOwner(ctx context.Context, record CreateRecord) (CreateResult, error)
 	GetTripByID(ctx context.Context, tripID string) (Trip, bool, error)
 	IsTripParticipant(ctx context.Context, tripID string, userID string) (bool, error)
+	IsTripOwner(ctx context.Context, tripID string, userID string) (bool, error)
+	UpdateTripBasicInfo(ctx context.Context, record UpdateRecord) (Trip, error)
 	CountTripParticipants(ctx context.Context, tripID string) (int, error)
 	ListTripParticipantPreviewNames(ctx context.Context, tripID string) ([]string, error)
 	ListTripsByParticipantUser(ctx context.Context, userID string) ([]ListItem, error)

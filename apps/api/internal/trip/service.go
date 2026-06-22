@@ -72,6 +72,45 @@ func (s *Service) List(ctx context.Context, userID string) ([]ListItem, error) {
 	return s.repo.ListTripsByParticipantUser(ctx, userID)
 }
 
+func (s *Service) Update(ctx context.Context, userID string, tripID string, input UpdateInput) (UpdateResult, error) {
+	if strings.TrimSpace(userID) == "" {
+		return UpdateResult{}, ErrUnauthorized
+	}
+
+	tripID = strings.TrimSpace(tripID)
+	if !isUUID(tripID) || isEmptyUpdate(input) {
+		return UpdateResult{}, ErrValidation
+	}
+
+	foundTrip, ok, err := s.repo.GetTripByID(ctx, tripID)
+	if err != nil {
+		return UpdateResult{}, err
+	}
+	if !ok {
+		return UpdateResult{}, ErrNotFound
+	}
+
+	isOwner, err := s.repo.IsTripOwner(ctx, tripID, userID)
+	if err != nil {
+		return UpdateResult{}, err
+	}
+	if !isOwner {
+		return UpdateResult{}, ErrForbidden
+	}
+
+	merged, err := mergeUpdateInput(foundTrip, input)
+	if err != nil {
+		return UpdateResult{}, err
+	}
+
+	updatedTrip, err := s.repo.UpdateTripBasicInfo(ctx, merged)
+	if err != nil {
+		return UpdateResult{}, err
+	}
+
+	return UpdateResult{Trip: updatedTrip}, nil
+}
+
 func (s *Service) GetDetail(ctx context.Context, userID string, tripID string) (GetDetailResult, error) {
 	if strings.TrimSpace(userID) == "" {
 		return GetDetailResult{}, ErrUnauthorized
@@ -124,6 +163,57 @@ func (s *Service) GetDetail(ctx context.Context, userID string, tripID string) (
 			OverflowCount: overflowCount,
 		},
 	}, nil
+}
+
+func mergeUpdateInput(foundTrip Trip, input UpdateInput) (UpdateRecord, error) {
+	name := foundTrip.Name
+	if input.Name != nil {
+		name = strings.TrimSpace(*input.Name)
+	}
+	if len([]rune(name)) < 1 || len([]rune(name)) > 80 {
+		return UpdateRecord{}, ErrValidation
+	}
+
+	startDateText := foundTrip.StartDate
+	if input.StartDate != nil {
+		startDateText = *input.StartDate
+	}
+	startDate, err := parseDate(startDateText)
+	if err != nil {
+		return UpdateRecord{}, ErrValidation
+	}
+
+	endDateText := foundTrip.EndDate
+	if input.EndDate != nil {
+		endDateText = *input.EndDate
+	}
+	endDate, err := parseDate(endDateText)
+	if err != nil {
+		return UpdateRecord{}, ErrValidation
+	}
+	if startDate.After(endDate) {
+		return UpdateRecord{}, ErrValidation
+	}
+
+	defaultCurrency := foundTrip.DefaultCurrency
+	if input.DefaultCurrency != nil {
+		defaultCurrency = *input.DefaultCurrency
+	}
+	if !isSupportedCurrency(defaultCurrency) {
+		return UpdateRecord{}, ErrValidation
+	}
+
+	return UpdateRecord{
+		ID:              foundTrip.ID,
+		Name:            name,
+		StartDate:       startDate,
+		EndDate:         endDate,
+		DefaultCurrency: defaultCurrency,
+	}, nil
+}
+
+func isEmptyUpdate(input UpdateInput) bool {
+	return input.Name == nil && input.StartDate == nil && input.EndDate == nil && input.DefaultCurrency == nil
 }
 
 func parseDate(value string) (time.Time, error) {
