@@ -34,6 +34,7 @@ export type { ReadinessResponse } from './models/ReadinessResponse';
 export type { RefreshTokenRequest } from './models/RefreshTokenRequest';
 export type { SupportedCurrency } from './models/SupportedCurrency';
 export type { Trip } from './models/Trip';
+export type { TripDay } from './models/TripDay';
 export type { TripListItem } from './models/TripListItem';
 export type { TripParticipant } from './models/TripParticipant';
 export type { TripParticipantRole } from './models/TripParticipantRole';

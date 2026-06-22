@@ -179,6 +179,7 @@ type ErrorResponse struct {
 
 // GetTripDetailResponse defines model for GetTripDetailResponse.
 type GetTripDetailResponse struct {
+	Days               []TripDay              `json:"days"`
 	ParticipantSummary TripParticipantSummary `json:"participantSummary"`
 	Trip               Trip                   `json:"trip"`
 }
@@ -284,6 +285,12 @@ type Trip struct {
 	Name            string             `json:"name"`
 	StartDate       openapi_types.Date `json:"startDate"`
 	UpdatedAt       time.Time          `json:"updatedAt"`
+}
+
+// TripDay defines model for TripDay.
+type TripDay struct {
+	Date     openapi_types.Date `json:"date"`
+	DayOrder int                `json:"dayOrder"`
 }
 
 // TripListItem defines model for TripListItem.
