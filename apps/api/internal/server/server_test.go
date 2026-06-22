@@ -649,6 +649,160 @@ func TestUpdateTripForbiddenDoesNotChangeTrip(t *testing.T) {
 	}
 }
 
+func TestDeleteTripHandler(t *testing.T) {
+	backend := newFakeAuthBackend()
+	accessToken := loginTestUser(t, backend)
+	tripID := createTestTrip(t, backend, accessToken)
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodDelete, "/trips/"+tripID, nil)
+	request.Header.Set("Authorization", "Bearer "+accessToken)
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusNoContent {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusNoContent, recorder.Code, recorder.Body.String())
+	}
+	if recorder.Body.Len() != 0 {
+		t.Fatalf("expected empty body, got %q", recorder.Body.String())
+	}
+	if _, ok := backend.trips[tripID]; ok {
+		t.Fatalf("expected trip %s to be deleted", tripID)
+	}
+	if _, ok := backend.participants[tripID]; ok {
+		t.Fatalf("expected participants for %s to be deleted", tripID)
+	}
+
+	listRecorder := httptest.NewRecorder()
+	listRequest := httptest.NewRequest(http.MethodGet, "/trips", nil)
+	listRequest.Header.Set("Authorization", "Bearer "+accessToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(listRecorder, listRequest)
+	if listRecorder.Code != http.StatusOK {
+		t.Fatalf("expected list status %d, got %d with body %s", http.StatusOK, listRecorder.Code, listRecorder.Body.String())
+	}
+	var listBody struct {
+		Trips []interface{} `json:"trips"`
+	}
+	if err := json.NewDecoder(listRecorder.Body).Decode(&listBody); err != nil {
+		t.Fatalf("decode list response: %v", err)
+	}
+	if len(listBody.Trips) != 0 {
+		t.Fatalf("expected deleted trip to be removed from list, got %#v", listBody.Trips)
+	}
+
+	detailRecorder := httptest.NewRecorder()
+	detailRequest := httptest.NewRequest(http.MethodGet, "/trips/"+tripID, nil)
+	detailRequest.Header.Set("Authorization", "Bearer "+accessToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(detailRecorder, detailRequest)
+	if detailRecorder.Code != http.StatusNotFound {
+		t.Fatalf("expected deleted detail status %d, got %d with body %s", http.StatusNotFound, detailRecorder.Code, detailRecorder.Body.String())
+	}
+}
+
+func TestDeleteTripRequiresAuthBeforeValidation(t *testing.T) {
+	backend := newFakeAuthBackend()
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodDelete, "/trips/not-a-uuid", nil)
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusUnauthorized, recorder.Code, recorder.Body.String())
+	}
+}
+
+func TestDeleteTripValidation(t *testing.T) {
+	backend := newFakeAuthBackend()
+	accessToken := loginTestUser(t, backend)
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodDelete, "/trips/not-a-uuid", nil)
+	request.Header.Set("Authorization", "Bearer "+accessToken)
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusBadRequest, recorder.Code, recorder.Body.String())
+	}
+	var body struct {
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Error.Code != "VALIDATION_ERROR" {
+		t.Fatalf("expected VALIDATION_ERROR, got %q", body.Error.Code)
+	}
+}
+
+func TestDeleteTripNotFound(t *testing.T) {
+	backend := newFakeAuthBackend()
+	accessToken := loginTestUser(t, backend)
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodDelete, "/trips/00000000-0000-0000-0000-000000000404", nil)
+	request.Header.Set("Authorization", "Bearer "+accessToken)
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusNotFound {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusNotFound, recorder.Code, recorder.Body.String())
+	}
+}
+
+func TestDeleteTripForbiddenDoesNotDeleteTrip(t *testing.T) {
+	backend := newFakeAuthBackend()
+	ownerToken := loginTestUser(t, backend)
+	tripID := createTestTrip(t, backend, ownerToken)
+	memberToken := loginTestUserWithSubject(t, backend, "apple-2", "지영")
+	backend.participants[tripID] = append(backend.participants[tripID], tripdomain.Participant{
+		ID:          testUUID(2000),
+		TripID:      tripID,
+		UserID:      "user-2",
+		Role:        "member",
+		DisplayName: "지영",
+		JoinedAt:    time.Date(2026, 6, 22, 15, 0, 0, 0, time.UTC),
+	})
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodDelete, "/trips/"+tripID, nil)
+	request.Header.Set("Authorization", "Bearer "+memberToken)
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusForbidden {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusForbidden, recorder.Code, recorder.Body.String())
+	}
+	if _, ok := backend.trips[tripID]; !ok {
+		t.Fatalf("expected forbidden delete not to remove trip %s", tripID)
+	}
+	if len(backend.participants[tripID]) != 2 {
+		t.Fatalf("expected forbidden delete not to remove participants, got %#v", backend.participants[tripID])
+	}
+}
+
+func TestDeleteTripRetryAfterSuccessReturnsNotFound(t *testing.T) {
+	backend := newFakeAuthBackend()
+	accessToken := loginTestUser(t, backend)
+	tripID := createTestTrip(t, backend, accessToken)
+
+	firstRecorder := httptest.NewRecorder()
+	firstRequest := httptest.NewRequest(http.MethodDelete, "/trips/"+tripID, nil)
+	firstRequest.Header.Set("Authorization", "Bearer "+accessToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(firstRecorder, firstRequest)
+	if firstRecorder.Code != http.StatusNoContent {
+		t.Fatalf("expected first delete status %d, got %d with body %s", http.StatusNoContent, firstRecorder.Code, firstRecorder.Body.String())
+	}
+
+	secondRecorder := httptest.NewRecorder()
+	secondRequest := httptest.NewRequest(http.MethodDelete, "/trips/"+tripID, nil)
+	secondRequest.Header.Set("Authorization", "Bearer "+accessToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(secondRecorder, secondRequest)
+	if secondRecorder.Code != http.StatusNotFound {
+		t.Fatalf("expected retry status %d, got %d with body %s", http.StatusNotFound, secondRecorder.Code, secondRecorder.Body.String())
+	}
+}
+
 func TestReadyReturnsServiceUnavailable(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/ready", nil)
@@ -924,6 +1078,15 @@ func (b *fakeAuthBackend) UpdateTripBasicInfo(_ context.Context, record tripdoma
 	updatedTrip.UpdatedAt = updatedTrip.UpdatedAt.Add(time.Hour)
 	b.trips[record.ID] = updatedTrip
 	return updatedTrip, nil
+}
+
+func (b *fakeAuthBackend) DeleteTripByID(_ context.Context, tripID string) (bool, error) {
+	if _, ok := b.trips[tripID]; !ok {
+		return false, nil
+	}
+	delete(b.trips, tripID)
+	delete(b.participants, tripID)
+	return true, nil
 }
 
 func (b *fakeAuthBackend) CountTripParticipants(_ context.Context, tripID string) (int, error) {

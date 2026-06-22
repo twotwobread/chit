@@ -104,4 +104,29 @@ export class TripsService {
             },
         });
     }
+    /**
+     * Delete a trip
+     * Hard-deletes a trip for all participants when requested by the authenticated trip owner.
+     * @param tripId
+     * @returns void
+     * @throws ApiError
+     */
+    public static deleteTrip(
+        tripId: string,
+    ): CancelablePromise<void> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/trips/{tripId}',
+            path: {
+                'tripId': tripId,
+            },
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                403: `Forbidden.`,
+                404: `Trip not found.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
 }

@@ -110,6 +110,7 @@ type Repository interface {
 	IsTripParticipant(ctx context.Context, tripID string, userID string) (bool, error)
 	IsTripOwner(ctx context.Context, tripID string, userID string) (bool, error)
 	UpdateTripBasicInfo(ctx context.Context, record UpdateRecord) (Trip, error)
+	DeleteTripByID(ctx context.Context, tripID string) (bool, error)
 	CountTripParticipants(ctx context.Context, tripID string) (int, error)
 	ListTripParticipantPreviewNames(ctx context.Context, tripID string) ([]string, error)
 	ListTripsByParticipantUser(ctx context.Context, userID string) ([]ListItem, error)

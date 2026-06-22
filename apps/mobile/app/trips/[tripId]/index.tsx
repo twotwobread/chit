@@ -1,5 +1,5 @@
-import { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useRef, useState } from 'react';
+import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 
 import { ApiError, type GetTripDetailResponse } from '@i-um/api-contract';
@@ -7,7 +7,14 @@ import { ApiError, type GetTripDetailResponse } from '@i-um/api-contract';
 import { MobileAuthError } from '../../../lib/auth/client';
 import { getStoredSession } from '../../../lib/auth/session';
 import { theme } from '../../../lib/design';
-import { getTripDetail } from '../../../lib/trips/client';
+import { deleteTrip, getTripDetail } from '../../../lib/trips/client';
+import {
+  beginTripDelete,
+  cancelTripDelete,
+  deleteTripFailureState,
+  openTripDeleteConfirmation,
+  type TripDeleteState,
+} from '../../../lib/trips/delete-flow';
 
 type DetailState =
   | { status: 'loading' }
@@ -105,7 +112,36 @@ export default function TripDetailScreen() {
 }
 
 function TripDetailCard({ currentUserId, detail }: { currentUserId?: string; detail: GetTripDetailResponse }) {
-  const canEdit = currentUserId === detail.trip.createdBy;
+  const canManage = currentUserId === detail.trip.createdBy;
+  const [deleteState, setDeleteState] = useState<TripDeleteState>({ status: 'idle' });
+  const deletingRef = useRef(false);
+
+  const confirmDelete = async () => {
+    const nextState = beginTripDelete(deleteState);
+    if (nextState.status !== 'deleting' || deletingRef.current) {
+      return;
+    }
+
+    deletingRef.current = true;
+    setDeleteState(nextState);
+    try {
+      await deleteTrip(detail.trip.id);
+      router.replace('/mypage');
+    } catch (error) {
+      if (error instanceof MobileAuthError && (error.code === 'UNAUTHORIZED' || error.code === 'INVALID_REFRESH_TOKEN')) {
+        setDeleteState(deleteTripFailureState(401));
+        return;
+      }
+      if (error instanceof ApiError) {
+        setDeleteState(deleteTripFailureState(error.status));
+        return;
+      }
+      setDeleteState(deleteTripFailureState());
+    } finally {
+      deletingRef.current = false;
+    }
+  };
+
   return (
     <View style={styles.card}>
       <Text style={styles.tripName}>{detail.trip.name}</Text>
@@ -114,10 +150,72 @@ function TripDetailCard({ currentUserId, detail }: { currentUserId?: string; det
         <InfoRow label="기본 통화" value={detail.trip.defaultCurrency} />
         <InfoRow label="참여자" value={formatParticipantSummary(detail.participantSummary)} />
       </View>
-      {canEdit ? (
-        <Pressable accessibilityRole="button" onPress={() => router.push(`/trips/${detail.trip.id}/edit`)} style={styles.secondaryButton}>
-          <Text style={styles.secondaryButtonText}>여행 정보 수정</Text>
-        </Pressable>
+      {canManage ? (
+        <>
+          <Pressable accessibilityRole="button" onPress={() => router.push(`/trips/${detail.trip.id}/edit`)} style={styles.secondaryButton}>
+            <Text style={styles.secondaryButtonText}>여행 정보 수정</Text>
+          </Pressable>
+          {deleteState.status === 'idle' ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setDeleteState(openTripDeleteConfirmation(deleteState))}
+              style={styles.dangerOutlineButton}
+            >
+              <Text style={styles.dangerOutlineButtonText}>여행 삭제</Text>
+            </Pressable>
+          ) : null}
+          <Modal
+            animationType="fade"
+            onRequestClose={() => setDeleteState(cancelTripDelete(deleteState))}
+            transparent
+            visible={deleteState.status === 'confirming'}
+          >
+            <View style={styles.modalBackdrop}>
+              <View style={styles.modalCard}>
+                <Text style={styles.deleteTitle}>여행을 삭제할까요?</Text>
+                <Text style={styles.message}>이 여행은 모든 참여자에게서 삭제되고 되돌릴 수 없어요.</Text>
+                <View style={styles.actionRow}>
+                  <Pressable accessibilityRole="button" onPress={() => setDeleteState(cancelTripDelete(deleteState))} style={styles.secondaryActionButton}>
+                    <Text style={styles.secondaryButtonText}>취소</Text>
+                  </Pressable>
+                  <Pressable accessibilityRole="button" onPress={() => void confirmDelete()} style={styles.dangerButton}>
+                    <Text style={styles.buttonText}>삭제하기</Text>
+                  </Pressable>
+                </View>
+              </View>
+            </View>
+          </Modal>
+          {deleteState.status === 'deleting' ? (
+            <View style={styles.dangerPanel}>
+              <ActivityIndicator color={theme.color.danger} />
+              <Text style={styles.message}>여행을 삭제하는 중...</Text>
+            </View>
+          ) : null}
+          {deleteState.status === 'auth' ? (
+            <View style={styles.dangerPanel}>
+              <Text style={styles.errorTitle}>{deleteState.message}</Text>
+              <Pressable accessibilityRole="button" onPress={() => router.replace('/login')} style={styles.button}>
+                <Text style={styles.buttonText}>로그인하기</Text>
+              </Pressable>
+            </View>
+          ) : null}
+          {deleteState.status === 'safeFailure' ? (
+            <View style={styles.dangerPanel}>
+              <Text style={styles.errorTitle}>{deleteState.message}</Text>
+              <Pressable accessibilityRole="button" onPress={() => router.replace('/mypage')} style={styles.button}>
+                <Text style={styles.buttonText}>마이페이지로</Text>
+              </Pressable>
+            </View>
+          ) : null}
+          {deleteState.status === 'error' ? (
+            <View style={styles.dangerPanel}>
+              <Text style={styles.errorTitle}>{deleteState.message}</Text>
+              <Pressable accessibilityRole="button" onPress={() => setDeleteState(openTripDeleteConfirmation(deleteState))} style={styles.secondaryButton}>
+                <Text style={styles.secondaryButtonText}>다시 시도</Text>
+              </Pressable>
+            </View>
+          ) : null}
+        </>
       ) : null}
     </View>
   );
@@ -246,10 +344,84 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.space[5],
     paddingVertical: theme.space[4],
   },
+  secondaryActionButton: {
+    alignItems: 'center',
+    borderColor: theme.color.primary,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: theme.layout.controlH,
+    paddingHorizontal: theme.space[5],
+    paddingVertical: theme.space[4],
+  },
   secondaryButtonText: {
     color: theme.color.primary,
     fontFamily: theme.font.family.bold,
     fontWeight: theme.font.weight.bold,
     textAlign: 'center',
+  },
+  dangerOutlineButton: {
+    alignItems: 'center',
+    borderColor: theme.color.danger,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    justifyContent: 'center',
+    minHeight: theme.layout.controlH,
+    paddingHorizontal: theme.space[5],
+    paddingVertical: theme.space[4],
+  },
+  dangerOutlineButtonText: {
+    color: theme.color.danger,
+    fontFamily: theme.font.family.bold,
+    fontWeight: theme.font.weight.bold,
+    textAlign: 'center',
+  },
+  dangerButton: {
+    alignItems: 'center',
+    backgroundColor: theme.color.danger,
+    borderRadius: theme.radius.md,
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: theme.layout.controlH,
+    paddingHorizontal: theme.space[5],
+    paddingVertical: theme.space[4],
+  },
+  dangerPanel: {
+    backgroundColor: theme.color.surfaceSunken,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    gap: theme.layout.gapCard,
+    padding: theme.space[5],
+  },
+  modalBackdrop: {
+    alignItems: 'center',
+    backgroundColor: theme.color.bg,
+    flex: 1,
+    justifyContent: 'center',
+    padding: theme.space[7],
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: theme.layout.cardMaxW,
+    backgroundColor: theme.color.surface,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    gap: theme.layout.gapCard,
+    padding: theme.space[7],
+    ...theme.shadow.md,
+  },
+  deleteTitle: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.subhead,
+    fontWeight: theme.font.weight.bold,
+    textAlign: 'center',
+  },
+  actionRow: {
+    flexDirection: 'row',
+    gap: theme.space[3],
   },
 });

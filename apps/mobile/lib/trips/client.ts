@@ -25,6 +25,11 @@ export async function updateTrip(tripId: string, request: UpdateTripRequest): Pr
   return TripsService.updateTrip(tripId, request);
 }
 
+export async function deleteTrip(tripId: string): Promise<void> {
+  await getCurrentUserWithRefresh();
+  return TripsService.deleteTrip(tripId);
+}
+
 export async function listMyTrips(): Promise<ListTripsResponse> {
   await getCurrentUserWithRefresh();
   return TripsService.listTrips();

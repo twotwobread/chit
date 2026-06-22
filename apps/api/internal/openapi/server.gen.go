@@ -378,6 +378,9 @@ type ServerInterface interface {
 	// Create a trip
 	// (POST /trips)
 	CreateTrip(w http.ResponseWriter, r *http.Request)
+	// Delete a trip
+	// (DELETE /trips/{tripId})
+	DeleteTrip(w http.ResponseWriter, r *http.Request, tripId string)
 	// Get trip detail
 	// (GET /trips/{tripId})
 	GetTripDetail(w http.ResponseWriter, r *http.Request, tripId string)
@@ -441,6 +444,12 @@ func (_ Unimplemented) ListTrips(w http.ResponseWriter, r *http.Request) {
 // Create a trip
 // (POST /trips)
 func (_ Unimplemented) CreateTrip(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Delete a trip
+// (DELETE /trips/{tripId})
+func (_ Unimplemented) DeleteTrip(w http.ResponseWriter, r *http.Request, tripId string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -612,6 +621,37 @@ func (siw *ServerInterfaceWrapper) CreateTrip(w http.ResponseWriter, r *http.Req
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateTrip(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteTrip operation middleware
+func (siw *ServerInterfaceWrapper) DeleteTrip(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteTrip(w, r, tripId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -822,6 +862,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/trips", wrapper.CreateTrip)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/trips/{tripId}", wrapper.DeleteTrip)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/trips/{tripId}", wrapper.GetTripDetail)
