@@ -195,10 +195,43 @@ func (s *Store) ListTripsByParticipantUser(ctx context.Context, userID string) (
 	return trips, nil
 }
 
+func (s *Store) ListItineraryItemsByTripAndDate(ctx context.Context, tripID string, date string) ([]trip.DayItineraryItem, error) {
+	rows, err := s.queries.ListItineraryItemsByTripAndDate(ctx, db.ListItineraryItemsByTripAndDateParams{
+		Column1:       mustUUID(tripID),
+		ScheduledDate: dateTextValue(date),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	items := make([]trip.DayItineraryItem, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, trip.DayItineraryItem{
+			ID:        row.ID,
+			ItemOrder: int(row.ItemOrder),
+			Place: trip.TripPlaceSummary{
+				ID:        row.TripPlaceID,
+				Name:      row.PlaceName,
+				PlaceType: row.PlaceType,
+				Address:   row.Address,
+			},
+		})
+	}
+	return items, nil
+}
+
 func dateValue(value time.Time) pgtype.Date {
 	return pgtype.Date{Time: value, Valid: true}
 }
 
 func dateString(value pgtype.Date) string {
 	return value.Time.Format("2006-01-02")
+}
+
+func dateTextValue(value string) pgtype.Date {
+	parsed, err := time.Parse("2006-01-02", value)
+	if err != nil {
+		return pgtype.Date{}
+	}
+	return pgtype.Date{Time: parsed, Valid: true}
 }

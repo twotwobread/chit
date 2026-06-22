@@ -4,6 +4,7 @@
 /* eslint-disable */
 import type { CreateTripRequest } from '../models/CreateTripRequest';
 import type { CreateTripResponse } from '../models/CreateTripResponse';
+import type { GetDayItineraryResponse } from '../models/GetDayItineraryResponse';
 import type { GetTripDetailResponse } from '../models/GetTripDetailResponse';
 import type { ListTripsResponse } from '../models/ListTripsResponse';
 import type { UpdateTripRequest } from '../models/UpdateTripRequest';
@@ -125,6 +126,34 @@ export class TripsService {
                 401: `Unauthorized.`,
                 403: `Forbidden.`,
                 404: `Trip not found.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
+     * Get a trip day itinerary
+     * Returns the ordered read-only itinerary items for a selected virtual trip day.
+     * @param tripId
+     * @param date
+     * @returns GetDayItineraryResponse Day itinerary.
+     * @throws ApiError
+     */
+    public static getDayItinerary(
+        tripId: string,
+        date: string,
+    ): CancelablePromise<GetDayItineraryResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/trips/{tripId}/days/{date}/itinerary',
+            path: {
+                'tripId': tripId,
+                'date': date,
+            },
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                403: `Forbidden.`,
+                404: `Trip or virtual day not found.`,
                 500: `Unexpected server error.`,
             },
         });

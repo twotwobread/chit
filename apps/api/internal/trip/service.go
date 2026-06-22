@@ -215,6 +215,60 @@ func (s *Service) GetDetail(ctx context.Context, userID string, tripID string) (
 	}, nil
 }
 
+func (s *Service) GetDayItinerary(ctx context.Context, userID string, tripID string, date string) (GetDayItineraryResult, error) {
+	if strings.TrimSpace(userID) == "" {
+		return GetDayItineraryResult{}, ErrUnauthorized
+	}
+
+	tripID = strings.TrimSpace(tripID)
+	date = strings.TrimSpace(date)
+	if !isUUID(tripID) {
+		return GetDayItineraryResult{}, ErrValidation
+	}
+
+	selectedDate, err := parseDate(date)
+	if err != nil {
+		return GetDayItineraryResult{}, ErrValidation
+	}
+
+	foundTrip, ok, err := s.repo.GetTripByID(ctx, tripID)
+	if err != nil {
+		return GetDayItineraryResult{}, err
+	}
+	if !ok {
+		return GetDayItineraryResult{}, ErrNotFound
+	}
+
+	isParticipant, err := s.repo.IsTripParticipant(ctx, tripID, userID)
+	if err != nil {
+		return GetDayItineraryResult{}, err
+	}
+	if !isParticipant {
+		return GetDayItineraryResult{}, ErrForbidden
+	}
+
+	dayOrder, err := dayOrderInRange(foundTrip.StartDate, foundTrip.EndDate, selectedDate)
+	if err != nil {
+		return GetDayItineraryResult{}, ErrValidation
+	}
+	if dayOrder == 0 {
+		return GetDayItineraryResult{}, ErrNotFound
+	}
+
+	items, err := s.repo.ListItineraryItemsByTripAndDate(ctx, tripID, selectedDate.Format(dateLayout))
+	if err != nil {
+		return GetDayItineraryResult{}, err
+	}
+
+	return GetDayItineraryResult{
+		Day: TripDay{
+			Date:     selectedDate.Format(dateLayout),
+			DayOrder: dayOrder,
+		},
+		Items: items,
+	}, nil
+}
+
 func mergeUpdateInput(foundTrip Trip, input UpdateInput) (UpdateRecord, error) {
 	name := foundTrip.Name
 	if input.Name != nil {
@@ -288,6 +342,21 @@ func tripDaysForRange(startDateText string, endDateText string) ([]TripDay, erro
 		})
 	}
 	return days, nil
+}
+
+func dayOrderInRange(startDateText string, endDateText string, selectedDate time.Time) (int, error) {
+	startDate, err := parseDate(startDateText)
+	if err != nil {
+		return 0, err
+	}
+	endDate, err := parseDate(endDateText)
+	if err != nil {
+		return 0, err
+	}
+	if selectedDate.Before(startDate) || selectedDate.After(endDate) {
+		return 0, nil
+	}
+	return int(selectedDate.Sub(startDate).Hours()/24) + 1, nil
 }
 
 func dateOnly(value time.Time) time.Time {

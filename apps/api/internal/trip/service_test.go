@@ -11,22 +11,25 @@ import (
 const testTripID = "00000000-0000-0000-0000-000000000001"
 
 type fakeRepository struct {
-	creator          Creator
-	creatorFound     bool
-	created          CreateRecord
-	trip             Trip
-	tripFound        bool
-	isParticipant    bool
-	isOwner          bool
-	participantCount int
-	previewNames     []string
-	listed           []ListItem
-	listedUserID     string
-	updated          UpdateRecord
-	updatedCalled    bool
-	deletedID        string
-	deletedCalled    bool
-	deleteOK         bool
+	creator               Creator
+	creatorFound          bool
+	created               CreateRecord
+	trip                  Trip
+	tripFound             bool
+	isParticipant         bool
+	isOwner               bool
+	participantCount      int
+	previewNames          []string
+	listed                []ListItem
+	listedUserID          string
+	dayItineraryItems     []DayItineraryItem
+	listedItineraryTripID string
+	listedItineraryDate   string
+	updated               UpdateRecord
+	updatedCalled         bool
+	deletedID             string
+	deletedCalled         bool
+	deleteOK              bool
 }
 
 func (r *fakeRepository) GetCreator(context.Context, string) (Creator, bool, error) {
@@ -101,6 +104,12 @@ func (r *fakeRepository) ListTripParticipantPreviewNames(context.Context, string
 func (r *fakeRepository) ListTripsByParticipantUser(_ context.Context, userID string) ([]ListItem, error) {
 	r.listedUserID = userID
 	return r.listed, nil
+}
+
+func (r *fakeRepository) ListItineraryItemsByTripAndDate(_ context.Context, tripID string, date string) ([]DayItineraryItem, error) {
+	r.listedItineraryTripID = tripID
+	r.listedItineraryDate = date
+	return r.dayItineraryItems, nil
 }
 
 func TestServiceCreate(t *testing.T) {
@@ -468,6 +477,128 @@ func TestServiceGetDetailForbidden(t *testing.T) {
 	_, err := service.GetDetail(context.Background(), "user-1", testTripID)
 	if !errors.Is(err, ErrForbidden) {
 		t.Fatalf("expected ErrForbidden, got %v", err)
+	}
+}
+
+func TestServiceGetDayItinerary(t *testing.T) {
+	repo := &fakeRepository{
+		trip: Trip{
+			ID:        testTripID,
+			StartDate: "2026-07-10",
+			EndDate:   "2026-07-13",
+		},
+		tripFound:     true,
+		isParticipant: true,
+		dayItineraryItems: []DayItineraryItem{
+			{
+				ID:        "item-1",
+				ItemOrder: 1,
+				Place: TripPlaceSummary{
+					ID:        "place-1",
+					Name:      "우메다 공중정원",
+					PlaceType: "sights",
+					Address:   "Umeda",
+				},
+			},
+		},
+	}
+	service := newTestService(repo)
+
+	result, err := service.GetDayItinerary(context.Background(), "user-1", testTripID, "2026-07-11")
+	if err != nil {
+		t.Fatalf("GetDayItinerary returned error: %v", err)
+	}
+
+	if result.Day.Date != "2026-07-11" || result.Day.DayOrder != 2 {
+		t.Fatalf("expected server-calculated day metadata, got %#v", result.Day)
+	}
+	if repo.listedItineraryTripID != testTripID || repo.listedItineraryDate != "2026-07-11" {
+		t.Fatalf("expected repository lookup by trip/date, got trip=%q date=%q", repo.listedItineraryTripID, repo.listedItineraryDate)
+	}
+	if len(result.Items) != 1 || result.Items[0].Place.Name != "우메다 공중정원" {
+		t.Fatalf("expected itinerary item to pass through, got %#v", result.Items)
+	}
+}
+
+func TestServiceGetDayItineraryEmpty(t *testing.T) {
+	repo := &fakeRepository{
+		trip:          Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"},
+		tripFound:     true,
+		isParticipant: true,
+	}
+	service := newTestService(repo)
+
+	result, err := service.GetDayItinerary(context.Background(), "user-1", testTripID, "2026-07-10")
+	if err != nil {
+		t.Fatalf("GetDayItinerary returned error: %v", err)
+	}
+	if result.Day.DayOrder != 1 || len(result.Items) != 0 {
+		t.Fatalf("expected day 1 empty itinerary, got %#v", result)
+	}
+}
+
+func TestServiceGetDayItineraryValidation(t *testing.T) {
+	service := newTestService(&fakeRepository{})
+
+	tests := []struct {
+		name   string
+		tripID string
+		date   string
+	}{
+		{name: "invalid trip id", tripID: "not-a-uuid", date: "2026-07-10"},
+		{name: "invalid date", tripID: testTripID, date: "2026/07/10"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := service.GetDayItinerary(context.Background(), "user-1", tt.tripID, tt.date)
+			if !errors.Is(err, ErrValidation) {
+				t.Fatalf("expected ErrValidation, got %v", err)
+			}
+		})
+	}
+}
+
+func TestServiceGetDayItineraryRequiresAuth(t *testing.T) {
+	service := newTestService(&fakeRepository{})
+
+	_, err := service.GetDayItinerary(context.Background(), " ", testTripID, "2026-07-10")
+	if !errors.Is(err, ErrUnauthorized) {
+		t.Fatalf("expected ErrUnauthorized, got %v", err)
+	}
+}
+
+func TestServiceGetDayItineraryNotFound(t *testing.T) {
+	service := newTestService(&fakeRepository{})
+
+	_, err := service.GetDayItinerary(context.Background(), "user-1", testTripID, "2026-07-10")
+	if !errors.Is(err, ErrNotFound) {
+		t.Fatalf("expected ErrNotFound, got %v", err)
+	}
+}
+
+func TestServiceGetDayItineraryForbidden(t *testing.T) {
+	service := newTestService(&fakeRepository{trip: Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"}, tripFound: true})
+
+	_, err := service.GetDayItinerary(context.Background(), "user-1", testTripID, "2026-07-10")
+	if !errors.Is(err, ErrForbidden) {
+		t.Fatalf("expected ErrForbidden, got %v", err)
+	}
+}
+
+func TestServiceGetDayItineraryOutOfRange(t *testing.T) {
+	repo := &fakeRepository{
+		trip:          Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"},
+		tripFound:     true,
+		isParticipant: true,
+	}
+	service := newTestService(repo)
+
+	_, err := service.GetDayItinerary(context.Background(), "user-1", testTripID, "2026-07-14")
+	if !errors.Is(err, ErrNotFound) {
+		t.Fatalf("expected ErrNotFound, got %v", err)
+	}
+	if repo.listedItineraryTripID != "" {
+		t.Fatal("expected out-of-range date not to query itinerary items")
 	}
 }
 

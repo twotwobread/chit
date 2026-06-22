@@ -44,6 +44,16 @@ type AuthSession struct {
 	UpdatedAt             pgtype.Timestamptz
 }
 
+type ItineraryItem struct {
+	ID            pgtype.UUID
+	TripID        pgtype.UUID
+	ScheduledDate pgtype.Date
+	TripPlaceID   pgtype.UUID
+	ItemOrder     int32
+	CreatedAt     pgtype.Timestamptz
+	UpdatedAt     pgtype.Timestamptz
+}
+
 type Trip struct {
 	ID              pgtype.UUID
 	Name            string
@@ -62,6 +72,16 @@ type TripParticipant struct {
 	Role        string
 	DisplayName string
 	JoinedAt    pgtype.Timestamptz
+}
+
+type TripPlace struct {
+	ID        pgtype.UUID
+	TripID    pgtype.UUID
+	Name      string
+	Address   string
+	PlaceType string
+	CreatedAt pgtype.Timestamptz
+	UpdatedAt pgtype.Timestamptz
 }
 
 type User struct {

@@ -8,6 +8,7 @@ import { MobileAuthError } from '../../../lib/auth/client';
 import { getStoredSession } from '../../../lib/auth/session';
 import { theme } from '../../../lib/design';
 import { deleteTrip, getTripDetail } from '../../../lib/trips/client';
+import { buildDayItineraryRoute } from '../../../lib/trips/day-itinerary';
 import { buildTripDayViewModels, formatTripDayDate } from '../../../lib/trips/days';
 import {
   beginTripDelete,
@@ -151,7 +152,7 @@ function TripDetailCard({ currentUserId, detail }: { currentUserId?: string; det
         <InfoRow label="기본 통화" value={detail.trip.defaultCurrency} />
         <InfoRow label="참여자" value={formatParticipantSummary(detail.participantSummary)} />
       </View>
-      <TripDayList days={detail.days} />
+      <TripDayList days={detail.days} tripId={detail.trip.id} />
       {canManage ? (
         <>
           <Pressable accessibilityRole="button" onPress={() => router.push(`/trips/${detail.trip.id}/edit`)} style={styles.secondaryButton}>
@@ -232,7 +233,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function TripDayList({ days }: { days: GetTripDetailResponse['days'] }) {
+function TripDayList({ days, tripId }: { days: GetTripDetailResponse['days']; tripId: string }) {
   const viewModels = buildTripDayViewModels(days);
 
   return (
@@ -243,10 +244,15 @@ function TripDayList({ days }: { days: GetTripDetailResponse['days'] }) {
       </View>
       <View style={styles.dayList}>
         {viewModels.map((day) => (
-          <View key={day.date} style={styles.dayRow}>
+          <Pressable
+            accessibilityRole="button"
+            key={day.date}
+            onPress={() => router.push(buildDayItineraryRoute(tripId, day.date))}
+            style={styles.dayRow}
+          >
             <Text style={styles.dayLabel}>{day.dayLabel}</Text>
             <Text style={styles.dayDate}>{day.formattedDate}</Text>
-          </View>
+          </Pressable>
         ))}
       </View>
     </View>

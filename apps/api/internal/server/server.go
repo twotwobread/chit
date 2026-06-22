@@ -55,7 +55,10 @@ func NewRouterWithConfig(readiness readinessChecker, config Config) http.Handler
 	}
 
 	router := chi.NewRouter()
-	return openapi.HandlerFromMux(apiServer{readiness: readiness, auth: authService, trips: tripService}, router)
+	return openapi.HandlerWithOptions(apiServer{readiness: readiness, auth: authService, trips: tripService}, openapi.ChiServerOptions{
+		BaseRouter:       router,
+		ErrorHandlerFunc: writeOpenAPIRequestError,
+	})
 }
 
 func ConfigFromEnv() Config {
@@ -164,6 +167,26 @@ func (s apiServer) GetTripDetail(w http.ResponseWriter, r *http.Request, tripId 
 	}
 
 	writeJSON(w, http.StatusOK, getTripDetailResponseToOpenAPI(result))
+}
+
+func (s apiServer) GetDayItinerary(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date) {
+	if s.auth == nil || s.trips == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "day itinerary is not configured", nil)
+		return
+	}
+
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	result, err := s.trips.GetDayItinerary(r.Context(), authContext.UserID, tripId, dateFromOpenAPI(date))
+	if err != nil {
+		writeTripDayItineraryError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, getDayItineraryResponseToOpenAPI(result))
 }
 
 func (s apiServer) UpdateTrip(w http.ResponseWriter, r *http.Request, tripId string) {
@@ -368,6 +391,10 @@ func writeServiceUnavailable(w http.ResponseWriter) {
 	writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "database is not ready", nil)
 }
 
+func writeOpenAPIRequestError(w http.ResponseWriter, _ *http.Request, _ error) {
+	writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid request parameter", nil)
+}
+
 func writeTripError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, trip.ErrValidation):
@@ -389,6 +416,21 @@ func writeTripDetailError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusForbidden, "FORBIDDEN", "forbidden", nil)
 	case errors.Is(err, trip.ErrNotFound):
 		writeError(w, http.StatusNotFound, "NOT_FOUND", "trip not found", nil)
+	default:
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error", nil)
+	}
+}
+
+func writeTripDayItineraryError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, trip.ErrValidation):
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid day itinerary request", nil)
+	case errors.Is(err, trip.ErrUnauthorized):
+		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "unauthorized", nil)
+	case errors.Is(err, trip.ErrForbidden):
+		writeError(w, http.StatusForbidden, "FORBIDDEN", "forbidden", nil)
+	case errors.Is(err, trip.ErrNotFound):
+		writeError(w, http.StatusNotFound, "NOT_FOUND", "day itinerary not found", nil)
 	default:
 		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error", nil)
 	}
@@ -526,6 +568,29 @@ func getTripDetailResponseToOpenAPI(result trip.GetDetailResult) openapi.GetTrip
 
 func updateTripResponseToOpenAPI(result trip.UpdateResult) openapi.UpdateTripResponse {
 	return openapi.UpdateTripResponse{Trip: tripToOpenAPI(result.Trip)}
+}
+
+func getDayItineraryResponseToOpenAPI(result trip.GetDayItineraryResult) openapi.GetDayItineraryResponse {
+	items := make([]openapi.DayItineraryItem, 0, len(result.Items))
+	for _, item := range result.Items {
+		items = append(items, openapi.DayItineraryItem{
+			Id:        item.ID,
+			ItemOrder: item.ItemOrder,
+			Place: openapi.TripPlaceSummary{
+				Id:        item.Place.ID,
+				Name:      item.Place.Name,
+				PlaceType: openapi.TripPlaceType(item.Place.PlaceType),
+				Address:   item.Place.Address,
+			},
+		})
+	}
+	return openapi.GetDayItineraryResponse{
+		Day: openapi.TripDay{
+			Date:     dateToOpenAPI(result.Day.Date),
+			DayOrder: result.Day.DayOrder,
+		},
+		Items: items,
+	}
 }
 
 func tripToOpenAPI(value trip.Trip) openapi.Trip {
