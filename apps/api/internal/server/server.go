@@ -166,6 +166,36 @@ func (s apiServer) GetTripDetail(w http.ResponseWriter, r *http.Request, tripId 
 	writeJSON(w, http.StatusOK, getTripDetailResponseToOpenAPI(result))
 }
 
+func (s apiServer) UpdateTrip(w http.ResponseWriter, r *http.Request, tripId string) {
+	if s.auth == nil || s.trips == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "trip update is not configured", nil)
+		return
+	}
+
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	var body openapi.UpdateTripJSONRequestBody
+	if !decodeJSON(w, r, &body) {
+		return
+	}
+
+	result, err := s.trips.Update(r.Context(), authContext.UserID, tripId, trip.UpdateInput{
+		Name:            body.Name,
+		StartDate:       optionalDateFromOpenAPI(body.StartDate),
+		EndDate:         optionalDateFromOpenAPI(body.EndDate),
+		DefaultCurrency: optionalCurrencyFromOpenAPI(body.DefaultCurrency),
+	})
+	if err != nil {
+		writeTripUpdateError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, updateTripResponseToOpenAPI(result))
+}
+
 func (s apiServer) LoginWithOAuth(w http.ResponseWriter, r *http.Request) {
 	if s.auth == nil {
 		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "auth is not configured", nil)
@@ -345,6 +375,21 @@ func writeTripDetailError(w http.ResponseWriter, err error) {
 	}
 }
 
+func writeTripUpdateError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, trip.ErrValidation):
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid trip update request", nil)
+	case errors.Is(err, trip.ErrUnauthorized):
+		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "unauthorized", nil)
+	case errors.Is(err, trip.ErrForbidden):
+		writeError(w, http.StatusForbidden, "FORBIDDEN", "forbidden", nil)
+	case errors.Is(err, trip.ErrNotFound):
+		writeError(w, http.StatusNotFound, "NOT_FOUND", "trip not found", nil)
+	default:
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error", nil)
+	}
+}
+
 func writeAuthError(w http.ResponseWriter, err error, provider auth.Provider) {
 	switch {
 	case errors.Is(err, auth.ErrValidation):
@@ -457,6 +502,10 @@ func getTripDetailResponseToOpenAPI(result trip.GetDetailResult) openapi.GetTrip
 	}
 }
 
+func updateTripResponseToOpenAPI(result trip.UpdateResult) openapi.UpdateTripResponse {
+	return openapi.UpdateTripResponse{Trip: tripToOpenAPI(result.Trip)}
+}
+
 func tripToOpenAPI(value trip.Trip) openapi.Trip {
 	return openapi.Trip{
 		Id:              value.ID,
@@ -475,6 +524,22 @@ func dateFromOpenAPI(value openapi_types.Date) string {
 		return ""
 	}
 	return value.Time.Format("2006-01-02")
+}
+
+func optionalDateFromOpenAPI(value *openapi_types.Date) *string {
+	if value == nil {
+		return nil
+	}
+	date := dateFromOpenAPI(*value)
+	return &date
+}
+
+func optionalCurrencyFromOpenAPI(value *openapi.SupportedCurrency) *string {
+	if value == nil {
+		return nil
+	}
+	currency := string(*value)
+	return &currency
 }
 
 func dateToOpenAPI(value string) openapi_types.Date {

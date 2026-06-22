@@ -206,6 +206,25 @@ func (q *Queries) GetTripParticipantMembership(ctx context.Context, arg GetTripP
 	return id, err
 }
 
+const getTripParticipantRole = `-- name: GetTripParticipantRole :one
+SELECT role
+FROM trip_participants
+WHERE trip_id = $1::uuid
+  AND user_id = $2::uuid
+`
+
+type GetTripParticipantRoleParams struct {
+	Column1 pgtype.UUID
+	Column2 pgtype.UUID
+}
+
+func (q *Queries) GetTripParticipantRole(ctx context.Context, arg GetTripParticipantRoleParams) (string, error) {
+	row := q.db.QueryRow(ctx, getTripParticipantRole, arg.Column1, arg.Column2)
+	var role string
+	err := row.Scan(&role)
+	return role, err
+}
+
 const listTripParticipantPreviewByTripID = `-- name: ListTripParticipantPreviewByTripID :many
 SELECT display_name
 FROM trip_participants
@@ -288,4 +307,65 @@ func (q *Queries) ListTripsByParticipantUser(ctx context.Context, dollar_1 pgtyp
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateTripBasicInfo = `-- name: UpdateTripBasicInfo :one
+UPDATE trips
+SET
+  name = $2,
+  start_date = $3,
+  end_date = $4,
+  default_currency = $5,
+  updated_at = now()
+WHERE id = $1::uuid
+RETURNING
+  id::text,
+  name,
+  start_date,
+  end_date,
+  default_currency,
+  created_by::text,
+  created_at,
+  updated_at
+`
+
+type UpdateTripBasicInfoParams struct {
+	Column1         pgtype.UUID
+	Name            string
+	StartDate       pgtype.Date
+	EndDate         pgtype.Date
+	DefaultCurrency string
+}
+
+type UpdateTripBasicInfoRow struct {
+	ID              string
+	Name            string
+	StartDate       pgtype.Date
+	EndDate         pgtype.Date
+	DefaultCurrency string
+	CreatedBy       string
+	CreatedAt       pgtype.Timestamptz
+	UpdatedAt       pgtype.Timestamptz
+}
+
+func (q *Queries) UpdateTripBasicInfo(ctx context.Context, arg UpdateTripBasicInfoParams) (UpdateTripBasicInfoRow, error) {
+	row := q.db.QueryRow(ctx, updateTripBasicInfo,
+		arg.Column1,
+		arg.Name,
+		arg.StartDate,
+		arg.EndDate,
+		arg.DefaultCurrency,
+	)
+	var i UpdateTripBasicInfoRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.StartDate,
+		&i.EndDate,
+		&i.DefaultCurrency,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }

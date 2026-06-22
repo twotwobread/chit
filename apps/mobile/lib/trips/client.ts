@@ -4,6 +4,8 @@ import {
   type CreateTripResponse,
   type GetTripDetailResponse,
   type ListTripsResponse,
+  type UpdateTripRequest,
+  type UpdateTripResponse,
 } from '@i-um/api-contract';
 
 import { getCurrentUserWithRefresh } from '../auth/client';
@@ -16,6 +18,11 @@ export async function createTrip(request: CreateTripRequest): Promise<CreateTrip
 export async function getTripDetail(tripId: string): Promise<GetTripDetailResponse> {
   await getCurrentUserWithRefresh();
   return TripsService.getTripDetail(tripId);
+}
+
+export async function updateTrip(tripId: string, request: UpdateTripRequest): Promise<UpdateTripResponse> {
+  await getCurrentUserWithRefresh();
+  return TripsService.updateTrip(tripId, request);
 }
 
 export async function listMyTrips(): Promise<ListTripsResponse> {

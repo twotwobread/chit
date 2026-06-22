@@ -38,6 +38,8 @@ export type { TripListItem } from './models/TripListItem';
 export type { TripParticipant } from './models/TripParticipant';
 export type { TripParticipantRole } from './models/TripParticipantRole';
 export type { TripParticipantSummary } from './models/TripParticipantSummary';
+export type { UpdateTripRequest } from './models/UpdateTripRequest';
+export type { UpdateTripResponse } from './models/UpdateTripResponse';
 
 export { AuthService } from './services/AuthService';
 export { HealthService } from './services/HealthService';

@@ -3,6 +3,7 @@ package trip
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 )
@@ -16,10 +17,13 @@ type fakeRepository struct {
 	trip             Trip
 	tripFound        bool
 	isParticipant    bool
+	isOwner          bool
 	participantCount int
 	previewNames     []string
 	listed           []ListItem
 	listedUserID     string
+	updated          UpdateRecord
+	updatedCalled    bool
 }
 
 func (r *fakeRepository) GetCreator(context.Context, string) (Creator, bool, error) {
@@ -56,6 +60,25 @@ func (r *fakeRepository) GetTripByID(context.Context, string) (Trip, bool, error
 
 func (r *fakeRepository) IsTripParticipant(context.Context, string, string) (bool, error) {
 	return r.isParticipant, nil
+}
+
+func (r *fakeRepository) IsTripOwner(context.Context, string, string) (bool, error) {
+	return r.isOwner, nil
+}
+
+func (r *fakeRepository) UpdateTripBasicInfo(_ context.Context, record UpdateRecord) (Trip, error) {
+	r.updated = record
+	r.updatedCalled = true
+	return Trip{
+		ID:              record.ID,
+		Name:            record.Name,
+		StartDate:       record.StartDate.Format(dateLayout),
+		EndDate:         record.EndDate.Format(dateLayout),
+		DefaultCurrency: record.DefaultCurrency,
+		CreatedBy:       r.trip.CreatedBy,
+		CreatedAt:       r.trip.CreatedAt,
+		UpdatedAt:       time.Date(2026, 6, 22, 9, 0, 0, 0, time.UTC),
+	}, nil
 }
 
 func (r *fakeRepository) CountTripParticipants(context.Context, string) (int, error) {
@@ -165,6 +188,126 @@ func TestServiceListRequiresAuth(t *testing.T) {
 	}
 }
 
+func TestServiceUpdate(t *testing.T) {
+	repo := &fakeRepository{
+		trip: Trip{
+			ID:              testTripID,
+			Name:            "오사카 3박 4일",
+			StartDate:       "2026-07-10",
+			EndDate:         "2026-07-13",
+			DefaultCurrency: "JPY",
+			CreatedBy:       "user-1",
+			CreatedAt:       time.Date(2026, 6, 21, 15, 0, 0, 0, time.UTC),
+			UpdatedAt:       time.Date(2026, 6, 21, 15, 0, 0, 0, time.UTC),
+		},
+		tripFound: true,
+		isOwner:   true,
+	}
+	service := newTestService(repo)
+
+	result, err := service.Update(context.Background(), "user-1", testTripID, UpdateInput{
+		Name: stringPtr("  오사카 4박 5일  "),
+	})
+	if err != nil {
+		t.Fatalf("Update returned error: %v", err)
+	}
+
+	if result.Trip.Name != "오사카 4박 5일" {
+		t.Fatalf("expected trimmed updated name, got %q", result.Trip.Name)
+	}
+	if result.Trip.StartDate != "2026-07-10" || result.Trip.EndDate != "2026-07-13" || result.Trip.DefaultCurrency != "JPY" {
+		t.Fatalf("expected unchanged fields to be preserved, got %#v", result.Trip)
+	}
+	if repo.updated.Name != "오사카 4박 5일" {
+		t.Fatalf("expected repository to receive trimmed name, got %q", repo.updated.Name)
+	}
+}
+
+func TestServiceUpdateAllowsPastDates(t *testing.T) {
+	repo := &fakeRepository{
+		trip: Trip{ID: testTripID, Name: "오사카", StartDate: "2026-07-10", EndDate: "2026-07-13", DefaultCurrency: "JPY"},
+		tripFound: true,
+		isOwner:   true,
+	}
+	service := newTestService(repo)
+
+	result, err := service.Update(context.Background(), "user-1", testTripID, UpdateInput{
+		StartDate: stringPtr("2026-06-01"),
+		EndDate:   stringPtr("2026-06-03"),
+	})
+	if err != nil {
+		t.Fatalf("Update returned error for past dates: %v", err)
+	}
+	if result.Trip.StartDate != "2026-06-01" || result.Trip.EndDate != "2026-06-03" {
+		t.Fatalf("expected past dates to be saved, got %#v", result.Trip)
+	}
+}
+
+func TestServiceUpdateValidation(t *testing.T) {
+	baseTrip := Trip{ID: testTripID, Name: "오사카", StartDate: "2026-07-10", EndDate: "2026-07-13", DefaultCurrency: "JPY"}
+	tests := []struct {
+		name  string
+		input UpdateInput
+	}{
+		{name: "empty patch", input: UpdateInput{}},
+		{name: "empty name", input: UpdateInput{Name: stringPtr(" ")}},
+		{name: "too long name", input: UpdateInput{Name: stringPtr(strings.Repeat("가", 81))}},
+		{name: "invalid start date", input: UpdateInput{StartDate: stringPtr("2026/07/10")}},
+		{name: "invalid end date", input: UpdateInput{EndDate: stringPtr("2026/07/13")}},
+		{name: "merged end before start", input: UpdateInput{StartDate: stringPtr("2026-07-14")}},
+		{name: "unsupported currency", input: UpdateInput{DefaultCurrency: stringPtr("GBP")}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := &fakeRepository{trip: baseTrip, tripFound: true, isOwner: true}
+			service := newTestService(repo)
+			_, err := service.Update(context.Background(), "user-1", testTripID, tt.input)
+			if !errors.Is(err, ErrValidation) {
+				t.Fatalf("expected ErrValidation, got %v", err)
+			}
+			if repo.updatedCalled {
+				t.Fatal("expected invalid update not to call repository update")
+			}
+		})
+	}
+}
+
+func TestServiceUpdateRequiresOwner(t *testing.T) {
+	repo := &fakeRepository{
+		trip:      Trip{ID: testTripID, Name: "오사카", StartDate: "2026-07-10", EndDate: "2026-07-13", DefaultCurrency: "JPY"},
+		tripFound: true,
+		isOwner:   false,
+	}
+	service := newTestService(repo)
+
+	_, err := service.Update(context.Background(), "user-2", testTripID, UpdateInput{Name: stringPtr("도쿄")})
+	if !errors.Is(err, ErrForbidden) {
+		t.Fatalf("expected ErrForbidden, got %v", err)
+	}
+	if repo.updatedCalled {
+		t.Fatal("expected forbidden update not to call repository update")
+	}
+}
+
+func TestServiceUpdateNotFound(t *testing.T) {
+	service := newTestService(&fakeRepository{})
+
+	_, err := service.Update(context.Background(), "user-1", testTripID, UpdateInput{Name: stringPtr("도쿄")})
+	if !errors.Is(err, ErrNotFound) {
+		t.Fatalf("expected ErrNotFound, got %v", err)
+	}
+}
+
+func TestServiceUpdateRequiresAuth(t *testing.T) {
+	service := newTestService(&fakeRepository{})
+
+	_, err := service.Update(context.Background(), " ", testTripID, UpdateInput{Name: stringPtr("도쿄")})
+	if !errors.Is(err, ErrUnauthorized) {
+		t.Fatalf("expected ErrUnauthorized, got %v", err)
+	}
+}
+
 func TestServiceGetDetail(t *testing.T) {
 	repo := &fakeRepository{
 		trip: Trip{
@@ -229,6 +372,10 @@ func TestServiceGetDetailForbidden(t *testing.T) {
 	if !errors.Is(err, ErrForbidden) {
 		t.Fatalf("expected ErrForbidden, got %v", err)
 	}
+}
+
+func stringPtr(value string) *string {
+	return &value
 }
 
 func newTestService(repo Repository) *Service {
