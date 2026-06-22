@@ -484,13 +484,15 @@ func listTripsResponseToOpenAPI(trips []trip.ListItem) openapi.ListTripsResponse
 	items := make([]openapi.TripListItem, 0, len(trips))
 	for _, item := range trips {
 		items = append(items, openapi.TripListItem{
-			Id:              item.ID,
-			Name:            item.Name,
-			StartDate:       dateToOpenAPI(item.StartDate),
-			EndDate:         dateToOpenAPI(item.EndDate),
-			DefaultCurrency: openapi.SupportedCurrency(item.DefaultCurrency),
-			JoinedAt:        item.JoinedAt,
-			CreatedAt:       item.CreatedAt,
+			Id:               item.ID,
+			Name:             item.Name,
+			StartDate:        dateToOpenAPI(item.StartDate),
+			EndDate:          dateToOpenAPI(item.EndDate),
+			DefaultCurrency:  openapi.SupportedCurrency(item.DefaultCurrency),
+			JoinedAt:         item.JoinedAt,
+			CreatedAt:        item.CreatedAt,
+			MyRole:           openapi.TripParticipantRole(item.MyRole),
+			ParticipantCount: item.ParticipantCount,
 		})
 	}
 	return openapi.ListTripsResponse{Trips: items}

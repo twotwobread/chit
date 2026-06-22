@@ -252,22 +252,26 @@ func TestListTripsHandler(t *testing.T) {
 	accessToken := loginTestUser(t, backend)
 	backend.listedTrips = []tripdomain.ListItem{
 		{
-			ID:              "trip-2",
-			Name:            "도쿄 2박 3일",
-			StartDate:       "2026-08-10",
-			EndDate:         "2026-08-12",
-			DefaultCurrency: "JPY",
-			JoinedAt:        time.Date(2026, 6, 23, 15, 0, 0, 0, time.UTC),
-			CreatedAt:       time.Date(2026, 6, 22, 15, 0, 0, 0, time.UTC),
+			ID:               "trip-2",
+			Name:             "도쿄 2박 3일",
+			StartDate:        "2026-08-10",
+			EndDate:          "2026-08-12",
+			DefaultCurrency:  "JPY",
+			JoinedAt:         time.Date(2026, 6, 23, 15, 0, 0, 0, time.UTC),
+			CreatedAt:        time.Date(2026, 6, 22, 15, 0, 0, 0, time.UTC),
+			MyRole:           tripdomain.RoleMember,
+			ParticipantCount: 3,
 		},
 		{
-			ID:              "trip-1",
-			Name:            "오사카 3박 4일",
-			StartDate:       "2026-07-10",
-			EndDate:         "2026-07-13",
-			DefaultCurrency: "JPY",
-			JoinedAt:        time.Date(2026, 6, 21, 15, 0, 0, 0, time.UTC),
-			CreatedAt:       time.Date(2026, 6, 21, 15, 0, 0, 0, time.UTC),
+			ID:               "trip-1",
+			Name:             "오사카 3박 4일",
+			StartDate:        "2026-07-10",
+			EndDate:          "2026-07-13",
+			DefaultCurrency:  "JPY",
+			JoinedAt:         time.Date(2026, 6, 21, 15, 0, 0, 0, time.UTC),
+			CreatedAt:        time.Date(2026, 6, 21, 15, 0, 0, 0, time.UTC),
+			MyRole:           tripdomain.RoleOwner,
+			ParticipantCount: 1,
 		},
 	}
 
@@ -301,6 +305,9 @@ func TestListTripsHandler(t *testing.T) {
 	}
 	if body.Trips[0]["defaultCurrency"] != "JPY" || body.Trips[0]["joinedAt"] == "" || body.Trips[0]["createdAt"] == "" {
 		t.Fatalf("expected currency, joinedAt, and createdAt in first trip body: %#v", body.Trips[0])
+	}
+	if body.Trips[0]["myRole"] != "member" || body.Trips[0]["participantCount"] != float64(3) {
+		t.Fatalf("expected role and participant count in first trip body: %#v", body.Trips[0])
 	}
 	if _, ok := body.Trips[0]["updatedAt"]; ok {
 		t.Fatalf("list response must not include updatedAt: %#v", body.Trips[0])
@@ -351,10 +358,12 @@ func TestCreateTripThenListTripsShowsCreatedTrip(t *testing.T) {
 
 	var body struct {
 		Trips []struct {
-			ID              string `json:"id"`
-			Name            string `json:"name"`
-			DefaultCurrency string `json:"defaultCurrency"`
-			JoinedAt        string `json:"joinedAt"`
+			ID               string `json:"id"`
+			Name             string `json:"name"`
+			DefaultCurrency  string `json:"defaultCurrency"`
+			JoinedAt         string `json:"joinedAt"`
+			MyRole           string `json:"myRole"`
+			ParticipantCount int    `json:"participantCount"`
 		} `json:"trips"`
 	}
 	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
@@ -365,6 +374,51 @@ func TestCreateTripThenListTripsShowsCreatedTrip(t *testing.T) {
 	}
 	if body.Trips[0].ID != tripID || body.Trips[0].Name != "오사카 3박 4일" || body.Trips[0].DefaultCurrency != "JPY" || body.Trips[0].JoinedAt == "" {
 		t.Fatalf("unexpected created trip in list: %#v", body.Trips[0])
+	}
+	if body.Trips[0].MyRole != tripdomain.RoleOwner || body.Trips[0].ParticipantCount != 1 {
+		t.Fatalf("expected owner role and participant count for created trip, got %#v", body.Trips[0])
+	}
+}
+
+func TestListTripsReturnsCurrentUserRoleAndParticipantCount(t *testing.T) {
+	backend := newFakeAuthBackend()
+	ownerToken := loginTestUser(t, backend)
+	tripID := createTestTrip(t, backend, ownerToken)
+	memberToken := loginTestUserWithSubject(t, backend, "apple-2", "지영")
+	backend.participants[tripID] = append(backend.participants[tripID], tripdomain.Participant{
+		ID:          testUUID(2000),
+		TripID:      tripID,
+		UserID:      "user-2",
+		Role:        tripdomain.RoleMember,
+		DisplayName: "지영",
+		JoinedAt:    time.Date(2026, 6, 22, 15, 0, 0, 0, time.UTC),
+	})
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/trips", nil)
+	request.Header.Set("Authorization", "Bearer "+memberToken)
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusOK, recorder.Code, recorder.Body.String())
+	}
+
+	var body struct {
+		Trips []struct {
+			ID               string `json:"id"`
+			MyRole           string `json:"myRole"`
+			ParticipantCount int    `json:"participantCount"`
+		} `json:"trips"`
+	}
+	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(body.Trips) != 1 {
+		t.Fatalf("expected one trip, got %#v", body.Trips)
+	}
+	if body.Trips[0].ID != tripID || body.Trips[0].MyRole != tripdomain.RoleMember || body.Trips[0].ParticipantCount != 2 {
+		t.Fatalf("expected member role and accepted participant count, got %#v", body.Trips[0])
 	}
 }
 
@@ -1120,13 +1174,15 @@ func (b *fakeAuthBackend) ListTripsByParticipantUser(_ context.Context, userID s
 			}
 			foundTrip := b.trips[tripID]
 			trips = append(trips, tripdomain.ListItem{
-				ID:              foundTrip.ID,
-				Name:            foundTrip.Name,
-				StartDate:       foundTrip.StartDate,
-				EndDate:         foundTrip.EndDate,
-				DefaultCurrency: foundTrip.DefaultCurrency,
-				JoinedAt:        participant.JoinedAt,
-				CreatedAt:       foundTrip.CreatedAt,
+				ID:               foundTrip.ID,
+				Name:             foundTrip.Name,
+				StartDate:        foundTrip.StartDate,
+				EndDate:          foundTrip.EndDate,
+				DefaultCurrency:  foundTrip.DefaultCurrency,
+				JoinedAt:         participant.JoinedAt,
+				CreatedAt:        foundTrip.CreatedAt,
+				MyRole:           participant.Role,
+				ParticipantCount: len(participants),
 			})
 		}
 	}

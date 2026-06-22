@@ -688,6 +688,8 @@ components:
         - defaultCurrency
         - joinedAt
         - createdAt
+        - myRole
+        - participantCount
       properties:
         id:
           type: string
@@ -707,6 +709,11 @@ components:
         createdAt:
           type: string
           format: date-time
+        myRole:
+          $ref: '#/components/schemas/TripParticipantRole'
+        participantCount:
+          type: integer
+          minimum: 1
     ListTripsResponse:
       type: object
       required:
