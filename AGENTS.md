@@ -108,7 +108,7 @@ For UI/design work:
 - Use `apps/mobile/lib/design/theme.ts` for mobile color, spacing, radius, shadow, typography, and domain color tokens.
 - Do not add raw hex colors or arbitrary spacing/radius values in screen code. If a value is needed, add or reuse a named token first.
 - External provider brand colors must also be represented as tokens before use.
-- Promote repeated UI patterns into reusable primitives instead of copying one-off styles across screens.
+- When a UI pattern is needed in more than one place, extract/reuse a shared primitive first; do not duplicate button/list/card/etc. styles across screens.
 - Money UI must preserve semantic meaning: credit/받을 돈 = green `+`, debit/보낼 돈 = red `−`, with tabular numerals where supported.
 - Do not use emoji or arbitrary unicode as product icons. When iconography is introduced, keep one consistent line-icon source.
 - Reference screen patterns from `docs/design/mobile-ui-reference.md` instead of re-inventing visuals during feature work.

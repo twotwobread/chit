@@ -112,7 +112,7 @@
 
 ## 도메인 primitive 후보
 
-반복 구현이 시작되면 아래 primitive를 `apps/mobile/lib/design/` 또는 별도 UI 폴더로 승격합니다.
+아래 primitive는 중복이 발생하면 즉시 `apps/mobile/lib/design/` 또는 별도 UI 폴더로 승격합니다. 같은 버튼/리스트/카드 스타일을 두 곳에 복붙하지 않습니다.
 
 - `Button`
 - `Card`
