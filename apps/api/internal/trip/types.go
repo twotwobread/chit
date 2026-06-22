@@ -7,7 +7,8 @@ import (
 )
 
 const (
-	RoleOwner = "owner"
+	RoleOwner  = "owner"
+	RoleMember = "member"
 )
 
 var (
@@ -94,13 +95,15 @@ type GetDetailResult struct {
 }
 
 type ListItem struct {
-	ID              string
-	Name            string
-	StartDate       string
-	EndDate         string
-	DefaultCurrency string
-	JoinedAt        time.Time
-	CreatedAt       time.Time
+	ID               string
+	Name             string
+	StartDate        string
+	EndDate          string
+	DefaultCurrency  string
+	JoinedAt         time.Time
+	CreatedAt        time.Time
+	MyRole           string
+	ParticipantCount int
 }
 
 type Repository interface {

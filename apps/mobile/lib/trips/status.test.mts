@@ -14,6 +14,8 @@ function trip(overrides: Partial<TripListItem>): TripListItem {
     defaultCurrency: 'KRW',
     createdAt: '2026-06-01T00:00:00Z',
     joinedAt: '2026-06-01T00:00:00Z',
+    myRole: 'owner',
+    participantCount: 1,
     ...overrides,
   };
 }

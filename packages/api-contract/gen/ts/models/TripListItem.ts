@@ -3,6 +3,7 @@
 /* tslint:disable */
 /* eslint-disable */
 import type { SupportedCurrency } from './SupportedCurrency';
+import type { TripParticipantRole } from './TripParticipantRole';
 export type TripListItem = {
     id: string;
     name: string;
@@ -11,5 +12,7 @@ export type TripListItem = {
     defaultCurrency: SupportedCurrency;
     joinedAt: string;
     createdAt: string;
+    myRole: TripParticipantRole;
+    participantCount: number;
 };
 

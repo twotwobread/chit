@@ -170,13 +170,15 @@ func (s *Store) ListTripsByParticipantUser(ctx context.Context, userID string) (
 	trips := make([]trip.ListItem, 0, len(rows))
 	for _, row := range rows {
 		trips = append(trips, trip.ListItem{
-			ID:              row.ID,
-			Name:            row.Name,
-			StartDate:       dateString(row.StartDate),
-			EndDate:         dateString(row.EndDate),
-			DefaultCurrency: row.DefaultCurrency,
-			JoinedAt:        row.JoinedAt.Time,
-			CreatedAt:       row.CreatedAt.Time,
+			ID:               row.ID,
+			Name:             row.Name,
+			StartDate:        dateString(row.StartDate),
+			EndDate:          dateString(row.EndDate),
+			DefaultCurrency:  row.DefaultCurrency,
+			JoinedAt:         row.JoinedAt.Time,
+			CreatedAt:        row.CreatedAt.Time,
+			MyRole:           row.MyRole,
+			ParticipantCount: int(row.ParticipantCount),
 		})
 	}
 	return trips, nil

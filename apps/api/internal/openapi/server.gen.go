@@ -288,13 +288,15 @@ type Trip struct {
 
 // TripListItem defines model for TripListItem.
 type TripListItem struct {
-	CreatedAt       time.Time          `json:"createdAt"`
-	DefaultCurrency SupportedCurrency  `json:"defaultCurrency"`
-	EndDate         openapi_types.Date `json:"endDate"`
-	Id              string             `json:"id"`
-	JoinedAt        time.Time          `json:"joinedAt"`
-	Name            string             `json:"name"`
-	StartDate       openapi_types.Date `json:"startDate"`
+	CreatedAt        time.Time           `json:"createdAt"`
+	DefaultCurrency  SupportedCurrency   `json:"defaultCurrency"`
+	EndDate          openapi_types.Date  `json:"endDate"`
+	Id               string              `json:"id"`
+	JoinedAt         time.Time           `json:"joinedAt"`
+	MyRole           TripParticipantRole `json:"myRole"`
+	Name             string              `json:"name"`
+	ParticipantCount int                 `json:"participantCount"`
+	StartDate        openapi_types.Date  `json:"startDate"`
 }
 
 // TripParticipant defines model for TripParticipant.

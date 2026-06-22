@@ -164,7 +164,7 @@ func TestServiceCreateRequiresCreator(t *testing.T) {
 }
 
 func TestServiceList(t *testing.T) {
-	repo := &fakeRepository{listed: []ListItem{{ID: testTripID, Name: "오사카"}}}
+	repo := &fakeRepository{listed: []ListItem{{ID: testTripID, Name: "오사카", MyRole: RoleMember, ParticipantCount: 2}}}
 	service := newTestService(repo)
 
 	trips, err := service.List(context.Background(), "user-1")
@@ -176,6 +176,9 @@ func TestServiceList(t *testing.T) {
 	}
 	if len(trips) != 1 || trips[0].ID != testTripID {
 		t.Fatalf("unexpected trips: %#v", trips)
+	}
+	if trips[0].MyRole != RoleMember || trips[0].ParticipantCount != 2 {
+		t.Fatalf("expected role and participant count to pass through service, got %#v", trips[0])
 	}
 }
 
@@ -225,7 +228,7 @@ func TestServiceUpdate(t *testing.T) {
 
 func TestServiceUpdateAllowsPastDates(t *testing.T) {
 	repo := &fakeRepository{
-		trip: Trip{ID: testTripID, Name: "오사카", StartDate: "2026-07-10", EndDate: "2026-07-13", DefaultCurrency: "JPY"},
+		trip:      Trip{ID: testTripID, Name: "오사카", StartDate: "2026-07-10", EndDate: "2026-07-13", DefaultCurrency: "JPY"},
 		tripFound: true,
 		isOwner:   true,
 	}

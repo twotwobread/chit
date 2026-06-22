@@ -90,7 +90,13 @@ SELECT
   t.end_date,
   t.default_currency,
   tp.joined_at,
-  t.created_at
+  t.created_at,
+  tp.role AS my_role,
+  (
+    SELECT count(*)::int
+    FROM trip_participants participants
+    WHERE participants.trip_id = t.id
+  ) AS participant_count
 FROM trips t
 JOIN trip_participants tp ON tp.trip_id = t.id
 WHERE tp.user_id = $1::uuid

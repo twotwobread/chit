@@ -197,6 +197,10 @@ function MyTripsSection({ state, onRetry }: { state: TripListState; onRetry: () 
               <Text style={styles.tripName}>{currentTrip.name}</Text>
               <Text style={styles.tripDate}>{formatDateRange(currentTrip.startDate, currentTrip.endDate)}</Text>
               <Text style={styles.tripCurrency}>기본 통화 {currentTrip.defaultCurrency}</Text>
+              <View style={styles.tripMetaRow}>
+                <Text style={styles.metaLabel}>{currentTrip.roleLabel}</Text>
+                <Text style={styles.metaLabel}>{currentTrip.participantCountLabel}</Text>
+              </View>
               <View style={styles.currentTripCta}>
                 <Text style={styles.secondaryButtonText}>여행 바로가기</Text>
               </View>
@@ -218,6 +222,10 @@ function MyTripsSection({ state, onRetry }: { state: TripListState; onRetry: () 
                       <Text style={styles.tripName}>{trip.name}</Text>
                       <Text style={styles.tripDate}>{formatDateRange(trip.startDate, trip.endDate)}</Text>
                       <Text style={styles.tripCurrency}>기본 통화 {trip.defaultCurrency}</Text>
+                      <View style={styles.tripMetaRow}>
+                        <Text style={styles.metaLabel}>{trip.roleLabel}</Text>
+                        <Text style={styles.metaLabel}>{trip.participantCountLabel}</Text>
+                      </View>
                     </Pressable>
                   ))}
                 </View>
@@ -365,6 +373,11 @@ const styles = StyleSheet.create({
     color: theme.color.textBody,
     fontFamily: theme.font.family.regular,
     fontSize: theme.font.size.label,
+  },
+  tripMetaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.space[3],
   },
   metaLabel: {
     color: theme.color.textMuted,
