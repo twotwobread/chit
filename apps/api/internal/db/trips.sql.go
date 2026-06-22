@@ -146,6 +146,19 @@ func (q *Queries) CreateTripParticipant(ctx context.Context, arg CreateTripParti
 	return i, err
 }
 
+const deleteTripByID = `-- name: DeleteTripByID :one
+DELETE FROM trips
+WHERE id = $1::uuid
+RETURNING id::text
+`
+
+func (q *Queries) DeleteTripByID(ctx context.Context, dollar_1 pgtype.UUID) (string, error) {
+	row := q.db.QueryRow(ctx, deleteTripByID, dollar_1)
+	var id string
+	err := row.Scan(&id)
+	return id, err
+}
+
 const getTripByID = `-- name: GetTripByID :one
 SELECT
   id::text,

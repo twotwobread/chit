@@ -24,6 +24,9 @@ type fakeRepository struct {
 	listedUserID     string
 	updated          UpdateRecord
 	updatedCalled    bool
+	deletedID        string
+	deletedCalled    bool
+	deleteOK         bool
 }
 
 func (r *fakeRepository) GetCreator(context.Context, string) (Creator, bool, error) {
@@ -79,6 +82,12 @@ func (r *fakeRepository) UpdateTripBasicInfo(_ context.Context, record UpdateRec
 		CreatedAt:       r.trip.CreatedAt,
 		UpdatedAt:       time.Date(2026, 6, 22, 9, 0, 0, 0, time.UTC),
 	}, nil
+}
+
+func (r *fakeRepository) DeleteTripByID(_ context.Context, tripID string) (bool, error) {
+	r.deletedID = tripID
+	r.deletedCalled = true
+	return r.deleteOK, nil
 }
 
 func (r *fakeRepository) CountTripParticipants(context.Context, string) (int, error) {
@@ -225,7 +234,7 @@ func TestServiceUpdate(t *testing.T) {
 
 func TestServiceUpdateAllowsPastDates(t *testing.T) {
 	repo := &fakeRepository{
-		trip: Trip{ID: testTripID, Name: "오사카", StartDate: "2026-07-10", EndDate: "2026-07-13", DefaultCurrency: "JPY"},
+		trip:      Trip{ID: testTripID, Name: "오사카", StartDate: "2026-07-10", EndDate: "2026-07-13", DefaultCurrency: "JPY"},
 		tripFound: true,
 		isOwner:   true,
 	}
@@ -305,6 +314,88 @@ func TestServiceUpdateRequiresAuth(t *testing.T) {
 	_, err := service.Update(context.Background(), " ", testTripID, UpdateInput{Name: stringPtr("도쿄")})
 	if !errors.Is(err, ErrUnauthorized) {
 		t.Fatalf("expected ErrUnauthorized, got %v", err)
+	}
+}
+
+func TestServiceDelete(t *testing.T) {
+	repo := &fakeRepository{
+		trip:      Trip{ID: testTripID, Name: "오사카"},
+		tripFound: true,
+		isOwner:   true,
+		deleteOK:  true,
+	}
+	service := newTestService(repo)
+
+	err := service.Delete(context.Background(), "user-1", testTripID)
+	if err != nil {
+		t.Fatalf("Delete returned error: %v", err)
+	}
+	if !repo.deletedCalled || repo.deletedID != testTripID {
+		t.Fatalf("expected repository delete for %s, got called=%v id=%q", testTripID, repo.deletedCalled, repo.deletedID)
+	}
+}
+
+func TestServiceDeleteValidation(t *testing.T) {
+	repo := &fakeRepository{}
+	service := newTestService(repo)
+
+	err := service.Delete(context.Background(), "user-1", "not-a-uuid")
+	if !errors.Is(err, ErrValidation) {
+		t.Fatalf("expected ErrValidation, got %v", err)
+	}
+	if repo.deletedCalled {
+		t.Fatal("expected invalid delete not to call repository delete")
+	}
+}
+
+func TestServiceDeleteRequiresAuth(t *testing.T) {
+	service := newTestService(&fakeRepository{})
+
+	err := service.Delete(context.Background(), " ", testTripID)
+	if !errors.Is(err, ErrUnauthorized) {
+		t.Fatalf("expected ErrUnauthorized, got %v", err)
+	}
+}
+
+func TestServiceDeleteNotFound(t *testing.T) {
+	service := newTestService(&fakeRepository{})
+
+	err := service.Delete(context.Background(), "user-1", testTripID)
+	if !errors.Is(err, ErrNotFound) {
+		t.Fatalf("expected ErrNotFound, got %v", err)
+	}
+}
+
+func TestServiceDeleteRequiresOwner(t *testing.T) {
+	repo := &fakeRepository{
+		trip:      Trip{ID: testTripID, Name: "오사카"},
+		tripFound: true,
+		isOwner:   false,
+		deleteOK:  true,
+	}
+	service := newTestService(repo)
+
+	err := service.Delete(context.Background(), "user-2", testTripID)
+	if !errors.Is(err, ErrForbidden) {
+		t.Fatalf("expected ErrForbidden, got %v", err)
+	}
+	if repo.deletedCalled {
+		t.Fatal("expected forbidden delete not to call repository delete")
+	}
+}
+
+func TestServiceDeleteMapsMissingFinalDeleteToNotFound(t *testing.T) {
+	repo := &fakeRepository{
+		trip:      Trip{ID: testTripID, Name: "오사카"},
+		tripFound: true,
+		isOwner:   true,
+		deleteOK:  false,
+	}
+	service := newTestService(repo)
+
+	err := service.Delete(context.Background(), "user-1", testTripID)
+	if !errors.Is(err, ErrNotFound) {
+		t.Fatalf("expected ErrNotFound, got %v", err)
 	}
 }
 

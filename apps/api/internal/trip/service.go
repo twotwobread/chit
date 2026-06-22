@@ -111,6 +111,50 @@ func (s *Service) Update(ctx context.Context, userID string, tripID string, inpu
 	return UpdateResult{Trip: updatedTrip}, nil
 }
 
+func (s *Service) Delete(ctx context.Context, userID string, tripID string) error {
+	if strings.TrimSpace(userID) == "" {
+		return ErrUnauthorized
+	}
+
+	tripID = strings.TrimSpace(tripID)
+	if !isUUID(tripID) {
+		return ErrValidation
+	}
+
+	_, ok, err := s.repo.GetTripByID(ctx, tripID)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return ErrNotFound
+	}
+
+	isOwner, err := s.repo.IsTripOwner(ctx, tripID, userID)
+	if err != nil {
+		return err
+	}
+	if !isOwner {
+		_, ok, err := s.repo.GetTripByID(ctx, tripID)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return ErrNotFound
+		}
+		return ErrForbidden
+	}
+
+	deleted, err := s.repo.DeleteTripByID(ctx, tripID)
+	if err != nil {
+		return err
+	}
+	if !deleted {
+		return ErrNotFound
+	}
+
+	return nil
+}
+
 func (s *Service) GetDetail(ctx context.Context, userID string, tripID string) (GetDetailResult, error) {
 	if strings.TrimSpace(userID) == "" {
 		return GetDetailResult{}, ErrUnauthorized

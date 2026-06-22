@@ -149,6 +149,17 @@ func (s *Store) UpdateTripBasicInfo(ctx context.Context, record trip.UpdateRecor
 	}, nil
 }
 
+func (s *Store) DeleteTripByID(ctx context.Context, tripID string) (bool, error) {
+	_, err := s.queries.DeleteTripByID(ctx, mustUUID(tripID))
+	if err == pgx.ErrNoRows {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 func (s *Store) CountTripParticipants(ctx context.Context, tripID string) (int, error) {
 	count, err := s.queries.CountTripParticipantsByTripID(ctx, mustUUID(tripID))
 	if err != nil {

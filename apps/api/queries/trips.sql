@@ -114,3 +114,8 @@ RETURNING
   created_by::text,
   created_at,
   updated_at;
+
+-- name: DeleteTripByID :one
+DELETE FROM trips
+WHERE id = $1::uuid
+RETURNING id::text;

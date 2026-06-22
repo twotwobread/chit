@@ -196,6 +196,25 @@ func (s apiServer) UpdateTrip(w http.ResponseWriter, r *http.Request, tripId str
 	writeJSON(w, http.StatusOK, updateTripResponseToOpenAPI(result))
 }
 
+func (s apiServer) DeleteTrip(w http.ResponseWriter, r *http.Request, tripId string) {
+	if s.auth == nil || s.trips == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "trip deletion is not configured", nil)
+		return
+	}
+
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	if err := s.trips.Delete(r.Context(), authContext.UserID, tripId); err != nil {
+		writeTripDetailError(w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (s apiServer) LoginWithOAuth(w http.ResponseWriter, r *http.Request) {
 	if s.auth == nil {
 		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "auth is not configured", nil)
