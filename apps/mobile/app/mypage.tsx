@@ -1,9 +1,17 @@
-import { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useRef, useState } from 'react';
+import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 
 import type { AuthMeResponse, AuthProvider, TripListItem } from '@i-um/api-contract';
 
+import {
+  buildAppInfoLegalRows,
+  initialLegalLinkOpenState,
+  openLegalLink,
+  type AppInfoLegalRow,
+  type LegalLinkId,
+  type LegalLinkOpenState,
+} from '../lib/app-info/legal';
 import { getCurrentUserWithRefresh, logoutCurrentSession, MobileAuthError } from '../lib/auth/client';
 import { clearStoredSession, getStoredSession } from '../lib/auth/session';
 import { theme } from '../lib/design';
@@ -25,6 +33,13 @@ type TripListState =
 export default function MyPageScreen() {
   const [state, setState] = useState<MyPageState>({ status: 'loading' });
   const [tripState, setTripState] = useState<TripListState>({ status: 'loading' });
+  const [legalLinkState, setLegalLinkState] = useState<LegalLinkOpenState>(initialLegalLinkOpenState);
+  const legalLinkStateRef = useRef<LegalLinkOpenState>(initialLegalLinkOpenState);
+
+  const updateLegalLinkState = useCallback((nextState: LegalLinkOpenState) => {
+    legalLinkStateRef.current = nextState;
+    setLegalLinkState(nextState);
+  }, []);
 
   const handleAuthError = useCallback(async (error: unknown) => {
     if (
@@ -55,6 +70,7 @@ export default function MyPageScreen() {
   const load = useCallback(async () => {
     setState({ status: 'loading' });
     setTripState({ status: 'loading' });
+    updateLegalLinkState(initialLegalLinkOpenState);
 
     try {
       const stored = await getStoredSession();
@@ -72,12 +88,24 @@ export default function MyPageScreen() {
       }
       setState({ status: 'error' });
     }
-  }, [handleAuthError, loadTrips]);
+  }, [handleAuthError, loadTrips, updateLegalLinkState]);
 
   useFocusEffect(
     useCallback(() => {
       void load();
     }, [load]),
+  );
+
+  const openLegalLinkRow = useCallback(
+    (id: LegalLinkId) => {
+      void openLegalLink({
+        id,
+        getState: () => legalLinkStateRef.current,
+        setState: updateLegalLinkState,
+        opener: (url) => Linking.openURL(url),
+      });
+    },
+    [updateLegalLinkState],
   );
 
   const logout = async () => {
@@ -136,6 +164,7 @@ export default function MyPageScreen() {
               <Pressable accessibilityRole="button" onPress={() => router.push('/account')} style={styles.secondaryButton}>
                 <Text style={styles.secondaryButtonText}>계정 관리</Text>
               </Pressable>
+              <AppInfoLegalGroup state={legalLinkState} onOpen={openLegalLinkRow} />
               <Pressable accessibilityRole="button" onPress={() => void logout()} style={styles.dangerButton}>
                 <Text style={styles.buttonText}>로그아웃</Text>
               </Pressable>
@@ -146,6 +175,54 @@ export default function MyPageScreen() {
 
       {state.status === 'ready' ? <BottomMenu selected="my" /> : null}
     </View>
+  );
+}
+
+function AppInfoLegalGroup({ state, onOpen }: { state: LegalLinkOpenState; onOpen: (id: LegalLinkId) => void }) {
+  return (
+    <View style={styles.legalGroup}>
+      {buildAppInfoLegalRows().map((row) => (
+        <AppInfoLegalRow key={row.id} row={row} state={state} onOpen={onOpen} />
+      ))}
+      {state.errorMessage ? <Text style={styles.legalError}>{state.errorMessage}</Text> : null}
+    </View>
+  );
+}
+
+function AppInfoLegalRow({
+  row,
+  state,
+  onOpen,
+}: {
+  row: AppInfoLegalRow;
+  state: LegalLinkOpenState;
+  onOpen: (id: LegalLinkId) => void;
+}) {
+  if (!row.tappable) {
+    return (
+      <View style={styles.settingsRow}>
+        <Text style={styles.settingsRowLabel}>{row.label}</Text>
+        <Text style={styles.settingsRowValue}>{row.value}</Text>
+      </View>
+    );
+  }
+
+  const disabled = state.openingId === row.id;
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      disabled={disabled}
+      onPress={() => onOpen(row.id)}
+      style={({ pressed }) => [
+        styles.settingsRow,
+        pressed ? styles.settingsRowPressed : null,
+        disabled ? styles.settingsRowDisabled : null,
+      ]}
+    >
+      <Text style={styles.settingsRowLabel}>{row.label}</Text>
+      <Text style={styles.settingsLinkText}>{row.affordance}</Text>
+    </Pressable>
   );
 }
 
@@ -318,6 +395,48 @@ const styles = StyleSheet.create({
   },
   inlineState: {
     gap: theme.layout.gapCard,
+  },
+  legalGroup: {
+    borderBottomColor: theme.color.borderSubtle,
+    borderBottomWidth: 1,
+    borderTopColor: theme.color.borderSubtle,
+    borderTopWidth: 1,
+    gap: theme.space[2],
+    paddingVertical: theme.space[2],
+  },
+  settingsRow: {
+    alignItems: 'center',
+    borderRadius: theme.radius.sm,
+    flexDirection: 'row',
+    gap: theme.space[4],
+    justifyContent: 'space-between',
+    minHeight: theme.layout.tapMin,
+    paddingHorizontal: theme.space[2],
+    paddingVertical: theme.space[3],
+  },
+  settingsRowPressed: {
+    backgroundColor: theme.color.surfaceSunken,
+  },
+  settingsRowDisabled: {
+    opacity: 0.5,
+  },
+  settingsRowLabel: {
+    color: theme.color.textBody,
+    fontFamily: theme.font.family.regular,
+  },
+  settingsRowValue: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.bold,
+    fontWeight: theme.font.weight.bold,
+  },
+  settingsLinkText: {
+    color: theme.color.textLink,
+    fontFamily: theme.font.family.bold,
+    fontWeight: theme.font.weight.bold,
+  },
+  legalError: {
+    color: theme.color.danger,
+    fontFamily: theme.font.family.regular,
   },
   emptyTitle: {
     color: theme.color.textStrong,
