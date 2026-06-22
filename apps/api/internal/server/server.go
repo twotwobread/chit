@@ -425,8 +425,8 @@ func listTripsResponseToOpenAPI(trips []trip.ListItem) openapi.ListTripsResponse
 			StartDate:       dateToOpenAPI(item.StartDate),
 			EndDate:         dateToOpenAPI(item.EndDate),
 			DefaultCurrency: openapi.SupportedCurrency(item.DefaultCurrency),
+			JoinedAt:        item.JoinedAt,
 			CreatedAt:       item.CreatedAt,
-			UpdatedAt:       item.UpdatedAt,
 		})
 	}
 	return openapi.ListTripsResponse{Trips: items}

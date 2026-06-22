@@ -115,6 +115,9 @@ export default function NewTripScreen() {
           <Pressable accessibilityRole="button" onPress={() => router.push(`/trips/${created.trip.id}`)} style={styles.button}>
             <Text style={styles.buttonText}>여행 상세 보기</Text>
           </Pressable>
+          <Pressable accessibilityRole="button" onPress={() => router.push('/mypage')} style={styles.secondaryButton}>
+            <Text style={styles.secondaryButtonText}>마이페이지에서 보기</Text>
+          </Pressable>
           <Pressable accessibilityRole="button" onPress={reset} style={styles.secondaryButton}>
             <Text style={styles.secondaryButtonText}>새 여행 만들기</Text>
           </Pressable>

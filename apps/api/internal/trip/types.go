@@ -80,8 +80,8 @@ type ListItem struct {
 	StartDate       string
 	EndDate         string
 	DefaultCurrency string
+	JoinedAt        time.Time
 	CreatedAt       time.Time
-	UpdatedAt       time.Time
 }
 
 type Repository interface {

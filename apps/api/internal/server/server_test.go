@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sort"
 	"testing"
 	"time"
 
@@ -256,8 +257,8 @@ func TestListTripsHandler(t *testing.T) {
 			StartDate:       "2026-08-10",
 			EndDate:         "2026-08-12",
 			DefaultCurrency: "JPY",
+			JoinedAt:        time.Date(2026, 6, 23, 15, 0, 0, 0, time.UTC),
 			CreatedAt:       time.Date(2026, 6, 22, 15, 0, 0, 0, time.UTC),
-			UpdatedAt:       time.Date(2026, 6, 23, 15, 0, 0, 0, time.UTC),
 		},
 		{
 			ID:              "trip-1",
@@ -265,8 +266,8 @@ func TestListTripsHandler(t *testing.T) {
 			StartDate:       "2026-07-10",
 			EndDate:         "2026-07-13",
 			DefaultCurrency: "JPY",
+			JoinedAt:        time.Date(2026, 6, 21, 15, 0, 0, 0, time.UTC),
 			CreatedAt:       time.Date(2026, 6, 21, 15, 0, 0, 0, time.UTC),
-			UpdatedAt:       time.Date(2026, 6, 21, 15, 0, 0, 0, time.UTC),
 		},
 	}
 
@@ -298,6 +299,12 @@ func TestListTripsHandler(t *testing.T) {
 	if body.Trips[0]["name"] != "도쿄 2박 3일" || body.Trips[0]["startDate"] != "2026-08-10" || body.Trips[0]["endDate"] != "2026-08-12" {
 		t.Fatalf("unexpected first trip body: %#v", body.Trips[0])
 	}
+	if body.Trips[0]["defaultCurrency"] != "JPY" || body.Trips[0]["joinedAt"] == "" || body.Trips[0]["createdAt"] == "" {
+		t.Fatalf("expected currency, joinedAt, and createdAt in first trip body: %#v", body.Trips[0])
+	}
+	if _, ok := body.Trips[0]["updatedAt"]; ok {
+		t.Fatalf("list response must not include updatedAt: %#v", body.Trips[0])
+	}
 	if _, ok := body.Trips[0]["createdBy"]; ok {
 		t.Fatalf("list response must not include createdBy: %#v", body.Trips[0])
 	}
@@ -324,6 +331,40 @@ func TestListTripsReturnsEmpty(t *testing.T) {
 	}
 	if len(body.Trips) != 0 {
 		t.Fatalf("expected empty trips, got %#v", body.Trips)
+	}
+}
+
+func TestCreateTripThenListTripsShowsCreatedTrip(t *testing.T) {
+	backend := newFakeAuthBackend()
+	accessToken := loginTestUser(t, backend)
+	tripID := createTestTrip(t, backend, accessToken)
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/trips", nil)
+	request.Header.Set("Authorization", "Bearer "+accessToken)
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusOK, recorder.Code, recorder.Body.String())
+	}
+
+	var body struct {
+		Trips []struct {
+			ID              string `json:"id"`
+			Name            string `json:"name"`
+			DefaultCurrency string `json:"defaultCurrency"`
+			JoinedAt        string `json:"joinedAt"`
+		} `json:"trips"`
+	}
+	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(body.Trips) != 1 {
+		t.Fatalf("expected one trip, got %#v", body.Trips)
+	}
+	if body.Trips[0].ID != tripID || body.Trips[0].Name != "오사카 3박 4일" || body.Trips[0].DefaultCurrency != "JPY" || body.Trips[0].JoinedAt == "" {
+		t.Fatalf("unexpected created trip in list: %#v", body.Trips[0])
 	}
 }
 
@@ -718,7 +759,38 @@ func (b *fakeAuthBackend) ListTripParticipantPreviewNames(_ context.Context, tri
 
 func (b *fakeAuthBackend) ListTripsByParticipantUser(_ context.Context, userID string) ([]tripdomain.ListItem, error) {
 	b.listTripsUserID = userID
-	return b.listedTrips, nil
+	if b.listedTrips != nil {
+		return b.listedTrips, nil
+	}
+
+	trips := []tripdomain.ListItem{}
+	for tripID, participants := range b.participants {
+		for _, participant := range participants {
+			if participant.UserID != userID {
+				continue
+			}
+			foundTrip := b.trips[tripID]
+			trips = append(trips, tripdomain.ListItem{
+				ID:              foundTrip.ID,
+				Name:            foundTrip.Name,
+				StartDate:       foundTrip.StartDate,
+				EndDate:         foundTrip.EndDate,
+				DefaultCurrency: foundTrip.DefaultCurrency,
+				JoinedAt:        participant.JoinedAt,
+				CreatedAt:       foundTrip.CreatedAt,
+			})
+		}
+	}
+	sort.Slice(trips, func(i, j int) bool {
+		if !trips[i].JoinedAt.Equal(trips[j].JoinedAt) {
+			return trips[i].JoinedAt.After(trips[j].JoinedAt)
+		}
+		if !trips[i].CreatedAt.Equal(trips[j].CreatedAt) {
+			return trips[i].CreatedAt.After(trips[j].CreatedAt)
+		}
+		return trips[i].ID > trips[j].ID
+	})
+	return trips, nil
 }
 
 func testUUID(value int) string {

@@ -553,8 +553,8 @@ components:
         - startDate
         - endDate
         - defaultCurrency
+        - joinedAt
         - createdAt
-        - updatedAt
       properties:
         id:
           type: string
@@ -568,10 +568,10 @@ components:
           format: date
         defaultCurrency:
           $ref: '#/components/schemas/SupportedCurrency'
-        createdAt:
+        joinedAt:
           type: string
           format: date-time
-        updatedAt:
+        createdAt:
           type: string
           format: date-time
     ListTripsResponse:
