@@ -244,13 +244,12 @@ SELECT
   t.start_date,
   t.end_date,
   t.default_currency,
-  t.created_at,
-  t.updated_at
+  tp.joined_at,
+  t.created_at
 FROM trips t
 JOIN trip_participants tp ON tp.trip_id = t.id
 WHERE tp.user_id = $1::uuid
-  AND tp.role IN ('owner', 'member')
-ORDER BY t.updated_at DESC, t.created_at DESC, t.id DESC
+ORDER BY tp.joined_at DESC, t.created_at DESC, t.id DESC
 `
 
 type ListTripsByParticipantUserRow struct {
@@ -259,8 +258,8 @@ type ListTripsByParticipantUserRow struct {
 	StartDate       pgtype.Date
 	EndDate         pgtype.Date
 	DefaultCurrency string
+	JoinedAt        pgtype.Timestamptz
 	CreatedAt       pgtype.Timestamptz
-	UpdatedAt       pgtype.Timestamptz
 }
 
 func (q *Queries) ListTripsByParticipantUser(ctx context.Context, dollar_1 pgtype.UUID) ([]ListTripsByParticipantUserRow, error) {
@@ -278,8 +277,8 @@ func (q *Queries) ListTripsByParticipantUser(ctx context.Context, dollar_1 pgtyp
 			&i.StartDate,
 			&i.EndDate,
 			&i.DefaultCurrency,
+			&i.JoinedAt,
 			&i.CreatedAt,
-			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}

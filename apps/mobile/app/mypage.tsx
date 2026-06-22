@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 
 import type { AuthMeResponse, AuthProvider, TripListItem } from '@i-um/api-contract';
 
@@ -73,9 +73,11 @@ export default function MyPageScreen() {
     }
   }, [handleAuthError, loadTrips]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+    }, [load]),
+  );
 
   const logout = async () => {
     await logoutCurrentSession();
@@ -154,13 +156,13 @@ function MyTripsSection({ state, onRetry }: { state: TripListState; onRetry: () 
       {state.status === 'loading' ? (
         <View style={styles.inlineState}>
           <ActivityIndicator color={theme.color.primary} />
-          <Text style={styles.message}>여행 목록을 불러오는 중...</Text>
+          <Text style={styles.message}>내 여행을 불러오는 중...</Text>
         </View>
       ) : null}
 
       {state.status === 'error' ? (
         <View style={styles.inlineState}>
-          <Text style={styles.errorMessage}>여행 목록을 불러올 수 없어요. 다시 시도해주세요.</Text>
+          <Text style={styles.errorMessage}>내 여행을 불러올 수 없어요.</Text>
           <Pressable accessibilityRole="button" onPress={onRetry} style={styles.secondaryButton}>
             <Text style={styles.secondaryButtonText}>다시 시도</Text>
           </Pressable>
@@ -169,7 +171,7 @@ function MyTripsSection({ state, onRetry }: { state: TripListState; onRetry: () 
 
       {state.status === 'ready' && state.trips.length === 0 ? (
         <View style={styles.inlineState}>
-          <Text style={styles.emptyTitle}>아직 참여 중인 여행이 없어요.</Text>
+          <Text style={styles.emptyTitle}>아직 여행이 없어요.</Text>
           <Text style={styles.message}>새 여행을 만들고 여정을 이어가요.</Text>
           <Pressable accessibilityRole="button" onPress={() => router.push('/trips/new')} style={styles.button}>
             <Text style={styles.buttonText}>새 여행 만들기</Text>
@@ -189,6 +191,7 @@ function MyTripsSection({ state, onRetry }: { state: TripListState; onRetry: () 
               >
                 <Text style={styles.tripName}>{trip.name}</Text>
                 <Text style={styles.tripDate}>{formatDateRange(trip.startDate, trip.endDate)}</Text>
+                <Text style={styles.tripCurrency}>기본 통화 {trip.defaultCurrency}</Text>
               </Pressable>
             ))}
           </View>
@@ -217,7 +220,7 @@ function providerLabel(provider: AuthProvider): string {
 }
 
 function formatDateRange(startDate: string, endDate: string): string {
-  return `${formatDate(startDate)} - ${formatDate(endDate)}`;
+  return `${formatDate(startDate)} ~ ${formatDate(endDate)}`;
 }
 
 function formatDate(value: string): string {
@@ -304,6 +307,11 @@ const styles = StyleSheet.create({
   },
   tripDate: {
     color: theme.color.textMuted,
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.label,
+  },
+  tripCurrency: {
+    color: theme.color.textBody,
     fontFamily: theme.font.family.regular,
     fontSize: theme.font.size.label,
   },

@@ -9,7 +9,7 @@ export type TripListItem = {
     startDate: string;
     endDate: string;
     defaultCurrency: SupportedCurrency;
+    joinedAt: string;
     createdAt: string;
-    updatedAt: string;
 };
 

@@ -137,8 +137,8 @@ func (s *Store) ListTripsByParticipantUser(ctx context.Context, userID string) (
 			StartDate:       dateString(row.StartDate),
 			EndDate:         dateString(row.EndDate),
 			DefaultCurrency: row.DefaultCurrency,
+			JoinedAt:        row.JoinedAt.Time,
 			CreatedAt:       row.CreatedAt.Time,
-			UpdatedAt:       row.UpdatedAt.Time,
 		})
 	}
 	return trips, nil

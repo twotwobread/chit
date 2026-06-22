@@ -292,9 +292,9 @@ type TripListItem struct {
 	DefaultCurrency SupportedCurrency  `json:"defaultCurrency"`
 	EndDate         openapi_types.Date `json:"endDate"`
 	Id              string             `json:"id"`
+	JoinedAt        time.Time          `json:"joinedAt"`
 	Name            string             `json:"name"`
 	StartDate       openapi_types.Date `json:"startDate"`
-	UpdatedAt       time.Time          `json:"updatedAt"`
 }
 
 // TripParticipant defines model for TripParticipant.
