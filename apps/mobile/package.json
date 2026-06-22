@@ -7,7 +7,7 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "test": "node --import tsx --test lib/trips/status.test.mts lib/trips/update-form.test.mts",
+    "test": "node --import tsx --test lib/trips/*.test.mts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

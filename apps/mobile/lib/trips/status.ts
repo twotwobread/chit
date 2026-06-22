@@ -34,6 +34,10 @@ export function groupTripsByStatus(trips: TripListItem[], today = localDateStrin
   );
 }
 
+export function selectCurrentTrip(trips: TripListItem[], today = localDateString()): TripListItem | null {
+  return groupTripsByStatus(trips, today).find((section) => section.status === 'ongoing')?.trips[0] ?? null;
+}
+
 export function tripStatus(trip: TripListItem, today: string): TripStatus {
   if (trip.startDate <= today && today <= trip.endDate) {
     return 'ongoing';
