@@ -3,7 +3,7 @@ import test from 'node:test';
 
 import type { TripListItem } from '@i-um/api-contract';
 
-import { groupTripsByStatus, localDateString, tripStatus } from './status.ts';
+import { groupTripsByStatus, localDateString, selectCurrentTrip, tripStatus } from './status.ts';
 
 function trip(overrides: Partial<TripListItem>): TripListItem {
   return {
@@ -149,6 +149,45 @@ test('sorts past trips by endDate, startDate, joinedAt, createdAt, and id descen
     'same-dates-new-a',
     'same-dates-old',
   ]);
+});
+
+test('selects no current trip when no trip is ongoing', () => {
+  const currentTrip = selectCurrentTrip(
+    [
+      trip({ id: 'past', startDate: '2026-06-18', endDate: '2026-06-21' }),
+      trip({ id: 'upcoming', startDate: '2026-06-23', endDate: '2026-06-25' }),
+    ],
+    '2026-06-22',
+  );
+
+  assert.equal(currentTrip, null);
+});
+
+test('selects the only ongoing trip including start and end date boundaries', () => {
+  assert.equal(
+    selectCurrentTrip([trip({ id: 'starts-today', startDate: '2026-06-22', endDate: '2026-06-24' })], '2026-06-22')
+      ?.id,
+    'starts-today',
+  );
+  assert.equal(
+    selectCurrentTrip([trip({ id: 'ends-today', startDate: '2026-06-20', endDate: '2026-06-22' })], '2026-06-22')
+      ?.id,
+    'ends-today',
+  );
+});
+
+test('selects the primary current trip using ongoing trip sort order', () => {
+  const currentTrip = selectCurrentTrip(
+    [
+      trip({ id: 'same-dates-old', startDate: '2026-06-20', endDate: '2026-06-24', joinedAt: '2026-06-20T00:00:00Z' }),
+      trip({ id: 'later-start', startDate: '2026-06-21', endDate: '2026-06-23' }),
+      trip({ id: 'earlier-start', startDate: '2026-06-20', endDate: '2026-06-23' }),
+      trip({ id: 'earliest-end', startDate: '2026-06-20', endDate: '2026-06-22' }),
+    ],
+    '2026-06-22',
+  );
+
+  assert.equal(currentTrip?.id, 'earliest-end');
 });
 
 test('formats local dates without UTC conversion', () => {
