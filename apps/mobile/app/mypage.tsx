@@ -9,7 +9,7 @@ import { clearStoredSession, getStoredSession } from '../lib/auth/session';
 import { theme } from '../lib/design';
 import { BottomMenu } from '../lib/navigation/BottomMenu';
 import { listMyTrips } from '../lib/trips/client';
-import { groupTripsByStatus, localDateString } from '../lib/trips/status';
+import { buildMyTripsSuccessViewModel, tripDetailPath } from '../lib/trips/mypage';
 
 type MyPageState =
   | { status: 'loading' }
@@ -150,8 +150,9 @@ export default function MyPageScreen() {
 }
 
 function MyTripsSection({ state, onRetry }: { state: TripListState; onRetry: () => void }) {
-  const groupedTrips =
-    state.status === 'ready' && state.trips.length > 0 ? groupTripsByStatus(state.trips, localDateString()) : [];
+  const viewModel = state.status === 'ready' && state.trips.length > 0 ? buildMyTripsSuccessViewModel(state.trips) : null;
+  const currentTrip = viewModel?.currentTrip ?? null;
+  const groupedTrips = viewModel?.sections ?? [];
 
   return (
     <View style={styles.card}>
@@ -185,6 +186,23 @@ function MyTripsSection({ state, onRetry }: { state: TripListState; onRetry: () 
 
       {state.status === 'ready' && state.trips.length > 0 ? (
         <>
+          {currentTrip ? (
+            <Pressable
+              accessibilityLabel={`${currentTrip.name} 여행 바로가기`}
+              accessibilityRole="button"
+              onPress={() => router.push(tripDetailPath(currentTrip.id))}
+              style={[styles.tripRow, styles.currentTripShortcut]}
+            >
+              <Text style={styles.currentTripLabel}>현재 진행 중인 여행</Text>
+              <Text style={styles.tripName}>{currentTrip.name}</Text>
+              <Text style={styles.tripDate}>{formatDateRange(currentTrip.startDate, currentTrip.endDate)}</Text>
+              <Text style={styles.tripCurrency}>기본 통화 {currentTrip.defaultCurrency}</Text>
+              <View style={styles.currentTripCta}>
+                <Text style={styles.secondaryButtonText}>여행 바로가기</Text>
+              </View>
+            </Pressable>
+          ) : null}
+
           <View style={styles.tripSections}>
             {groupedTrips.map((section) => (
               <View key={section.title} style={styles.tripSection}>
@@ -194,7 +212,7 @@ function MyTripsSection({ state, onRetry }: { state: TripListState; onRetry: () 
                     <Pressable
                       accessibilityRole="button"
                       key={trip.id}
-                      onPress={() => router.push(`/trips/${trip.id}`)}
+                      onPress={() => router.push(tripDetailPath(trip.id))}
                       style={styles.tripRow}
                     >
                       <Text style={styles.tripName}>{trip.name}</Text>
@@ -322,10 +340,20 @@ const styles = StyleSheet.create({
     gap: theme.space[2],
     padding: theme.space[4],
   },
+  currentTripShortcut: {
+    backgroundColor: theme.color.surfaceSoft,
+    borderColor: theme.color.borderDefault,
+  },
   tripName: {
     color: theme.color.textStrong,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.subhead,
+    fontWeight: theme.font.weight.bold,
+  },
+  currentTripLabel: {
+    color: theme.color.primary,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.label,
     fontWeight: theme.font.weight.bold,
   },
   tripDate: {
@@ -391,6 +419,16 @@ const styles = StyleSheet.create({
     minHeight: theme.layout.controlH,
     paddingHorizontal: theme.space[5],
     paddingVertical: theme.space[3],
+  },
+  currentTripCta: {
+    alignItems: 'center',
+    borderColor: theme.color.primary,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    justifyContent: 'center',
+    minHeight: theme.layout.controlHSm,
+    paddingHorizontal: theme.space[4],
+    paddingVertical: theme.space[2],
   },
   secondaryButtonText: {
     color: theme.color.primary,
