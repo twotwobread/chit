@@ -16,6 +16,8 @@ Feature Slice = App UI + API Contract + API Server + DB + Tests + Deployable Sta
   - GitHub Issue, Ouroboros, feature spec, pi coding agent, 배포까지의 전체 흐름
 - `definition_of_done.md`
   - 기능을 완료로 볼 수 있는 기준
+- `testing_guidelines.md`
+  - TDD, regression test, manual smoke 분리 기준
 - `staging_internal_deploy.md`
   - GCP Cloud Run staging API와 Expo internal build 배포 runbook
 - `../features/_template.md`
@@ -26,10 +28,12 @@ Feature Slice = App UI + API Contract + API Server + DB + Tests + Deployable Sta
 1. 기능 단위는 GitHub Issue로 관리한다.
 2. 구현 전 `docs/features/` 하위에 기능별 spec + plan 문서를 작성한다.
 3. 모호한 요구사항은 Ouroboros로 먼저 구체화한다.
-4. 기능 구현은 App UI, API Server, DB, OpenAPI, 테스트를 함께 포함한다.
-5. 기능 완료 시점에는 staging 또는 internal build에서 검증 가능한 상태여야 한다.
-6. Spec에 없는 기능은 구현하지 않는다.
-7. API 변경은 OpenAPI 계약을 먼저 수정한다.
+4. 기능 구현은 App UI, API Server, DB, OpenAPI, regression test를 함께 포함한다.
+5. 변경된 behavior는 코드로 남는 자동화 테스트로 회귀 검증 가능해야 한다.
+6. 수동 검증은 staging/internal build smoke check이며 regression test를 대체하지 않는다.
+7. 기능 완료 시점에는 staging 또는 internal build에서 smoke 검증 가능한 상태여야 한다.
+8. Spec에 없는 기능은 구현하지 않는다.
+9. API 변경은 OpenAPI 계약을 먼저 수정한다.
 
 ## 빠른 시작
 
@@ -39,12 +43,13 @@ Feature Slice = App UI + API Contract + API Server + DB + Tests + Deployable Sta
 1. GitHub Issue 생성
 2. Ouroboros interview/pm으로 요구사항 구체화
 3. docs/features/<feature>.md 작성
-4. Issue에 feature spec 문서 링크
-5. Spec review / approve
-6. pi coding agent로 구현
-7. Definition of Done 검증
-8. staging/internal build 확인
-9. Issue close
+4. Regression Test Plan과 TDD Implementation Plan 작성
+5. Issue에 feature spec 문서 링크
+6. Spec review / approve
+7. pi coding agent로 구현
+8. Definition of Done 검증
+9. staging/internal build smoke 확인
+10. Issue close
 ```
 
 자세한 내용은 `feature_delivery_workflow.md`를 따른다.

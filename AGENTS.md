@@ -62,6 +62,7 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 For feature work:
 - Follow `docs/delivery/feature_delivery_workflow.md`.
+- Follow `docs/delivery/testing_guidelines.md` for TDD and regression test requirements.
 - Use `docs/delivery/definition_of_done.md` as the completion checklist.
 - Create or update a feature spec + plan under `docs/features/` before implementation.
 - Use `docs/features/_template.md` for new feature documents.
@@ -69,6 +70,7 @@ For feature work:
 - Use Ouroboros to clarify ambiguous feature requirements before implementation.
 - If a feature appears complex or long-running, pause before implementation and ask whether to execute implementation through Ouroboros. Only use Ouroboros execution after explicit user approval; otherwise implement directly from the feature spec with Pi.
 - Do not start implementation while required product/API/DB/UI decisions remain unresolved.
+- Do not treat manual verification as a substitute for regression tests. Changed behavior must have code-based tests or an explicit Regression Gap with risk/follow-up.
 
 Worktree rule:
 - Create new worktrees through `scripts/worktree-create`; do not call `git worktree add` directly for feature/doc PR work.
@@ -93,9 +95,9 @@ PR/MR rule:
 
 Completion report:
 - Summarize what changed.
-- List verification commands and results.
-- Mention staging/internal build verification when applicable.
-- Call out follow-up issues or unresolved risks.
+- List regression test commands and results.
+- Mention manual smoke/staging/internal build verification separately when applicable.
+- Call out regression gaps, follow-up issues, or unresolved risks.
 
 ## 6. Design Guardrails
 
