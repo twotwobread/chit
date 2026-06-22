@@ -7,6 +7,90 @@ import (
 	"time"
 )
 
+func TestListItineraryItemsByTripAndDateFiltersSortsAndJoinsPlaces(t *testing.T) {
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("DATABASE_URL is required for storage integration test")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	store, err := Open(ctx, databaseURL)
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer store.Close()
+
+	var userID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO users (display_name)
+		VALUES ('일정 조회 테스트')
+		RETURNING id::text
+	`).Scan(&userID); err != nil {
+		t.Fatalf("insert user: %v", err)
+	}
+	defer func() { _, _ = store.pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1::uuid`, userID) }()
+
+	var tripID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO trips (name, start_date, end_date, default_currency, created_by)
+		VALUES ('일정 조회 테스트 여행', '2026-07-10', '2026-07-13', 'JPY', $1::uuid)
+		RETURNING id::text
+	`, userID).Scan(&tripID); err != nil {
+		t.Fatalf("insert trip: %v", err)
+	}
+
+	var firstPlaceID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO trip_places (trip_id, name, address, place_type)
+		VALUES ($1::uuid, '우메다 공중정원', 'Umeda', 'sights')
+		RETURNING id::text
+	`, tripID).Scan(&firstPlaceID); err != nil {
+		t.Fatalf("insert first trip place: %v", err)
+	}
+	var secondPlaceID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO trip_places (trip_id, name, address, place_type)
+		VALUES ($1::uuid, '도톤보리', 'Dotonbori', 'food')
+		RETURNING id::text
+	`, tripID).Scan(&secondPlaceID); err != nil {
+		t.Fatalf("insert second trip place: %v", err)
+	}
+	var otherDatePlaceID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO trip_places (trip_id, name, address, place_type)
+		VALUES ($1::uuid, '오사카성', 'Osaka Castle', 'sights')
+		RETURNING id::text
+	`, tripID).Scan(&otherDatePlaceID); err != nil {
+		t.Fatalf("insert other date place: %v", err)
+	}
+
+	if _, err := store.pool.Exec(ctx, `
+		INSERT INTO itinerary_items (trip_id, scheduled_date, trip_place_id, item_order)
+		VALUES
+		  ($1::uuid, '2026-07-11', $3::uuid, 2),
+		  ($1::uuid, '2026-07-11', $2::uuid, 1),
+		  ($1::uuid, '2026-07-12', $4::uuid, 1)
+	`, tripID, firstPlaceID, secondPlaceID, otherDatePlaceID); err != nil {
+		t.Fatalf("insert itinerary items: %v", err)
+	}
+
+	items, err := store.ListItineraryItemsByTripAndDate(ctx, tripID, "2026-07-11")
+	if err != nil {
+		t.Fatalf("list itinerary items: %v", err)
+	}
+	if len(items) != 2 {
+		t.Fatalf("expected two filtered items, got %#v", items)
+	}
+	if items[0].ItemOrder != 1 || items[0].Place.Name != "우메다 공중정원" || items[0].Place.PlaceType != "sights" || items[0].Place.Address != "Umeda" {
+		t.Fatalf("unexpected first item mapping: %#v", items[0])
+	}
+	if items[1].ItemOrder != 2 || items[1].Place.Name != "도톤보리" || items[1].Place.PlaceType != "food" || items[1].Place.Address != "Dotonbori" {
+		t.Fatalf("unexpected second item mapping: %#v", items[1])
+	}
+}
+
 func TestDeleteTripByIDCascadesParticipants(t *testing.T) {
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {

@@ -238,6 +238,64 @@ func (q *Queries) GetTripParticipantRole(ctx context.Context, arg GetTripPartici
 	return role, err
 }
 
+const listItineraryItemsByTripAndDate = `-- name: ListItineraryItemsByTripAndDate :many
+SELECT
+  ii.id::text AS id,
+  ii.item_order,
+  tp.id::text AS trip_place_id,
+  tp.name AS place_name,
+  tp.place_type,
+  tp.address
+FROM itinerary_items ii
+JOIN trip_places tp
+  ON tp.id = ii.trip_place_id
+ AND tp.trip_id = ii.trip_id
+WHERE ii.trip_id = $1::uuid
+  AND ii.scheduled_date = $2
+ORDER BY ii.item_order ASC, ii.id ASC
+`
+
+type ListItineraryItemsByTripAndDateParams struct {
+	Column1       pgtype.UUID
+	ScheduledDate pgtype.Date
+}
+
+type ListItineraryItemsByTripAndDateRow struct {
+	ID          string
+	ItemOrder   int32
+	TripPlaceID string
+	PlaceName   string
+	PlaceType   string
+	Address     string
+}
+
+func (q *Queries) ListItineraryItemsByTripAndDate(ctx context.Context, arg ListItineraryItemsByTripAndDateParams) ([]ListItineraryItemsByTripAndDateRow, error) {
+	rows, err := q.db.Query(ctx, listItineraryItemsByTripAndDate, arg.Column1, arg.ScheduledDate)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListItineraryItemsByTripAndDateRow
+	for rows.Next() {
+		var i ListItineraryItemsByTripAndDateRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ItemOrder,
+			&i.TripPlaceID,
+			&i.PlaceName,
+			&i.PlaceType,
+			&i.Address,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTripParticipantPreviewByTripID = `-- name: ListTripParticipantPreviewByTripID :many
 SELECT display_name
 FROM trip_participants

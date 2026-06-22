@@ -301,6 +301,64 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /trips/{tripId}/days/{date}/itinerary:
+    get:
+      operationId: getDayItinerary
+      summary: Get a trip day itinerary
+      description: Returns the ordered read-only itinerary items for a selected virtual trip day.
+      tags:
+        - Trips
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: date
+          in: path
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Day itinerary.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetDayItineraryResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip or virtual day not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /auth/oauth/login:
     post:
       operationId: loginWithOAuth
@@ -661,6 +719,57 @@ components:
         dayOrder:
           type: integer
           minimum: 1
+    TripPlaceType:
+      type: string
+      enum:
+        - sights
+        - food
+        - lodging
+        - cafe
+        - shopping
+        - etc
+    TripPlaceSummary:
+      type: object
+      required:
+        - id
+        - name
+        - placeType
+        - address
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        placeType:
+          $ref: '#/components/schemas/TripPlaceType'
+        address:
+          type: string
+    DayItineraryItem:
+      type: object
+      required:
+        - id
+        - itemOrder
+        - place
+      properties:
+        id:
+          type: string
+        itemOrder:
+          type: integer
+          minimum: 1
+        place:
+          $ref: '#/components/schemas/TripPlaceSummary'
+    GetDayItineraryResponse:
+      type: object
+      required:
+        - day
+        - items
+      properties:
+        day:
+          $ref: '#/components/schemas/TripDay'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DayItineraryItem'
     UpdateTripRequest:
       type: object
       additionalProperties: false

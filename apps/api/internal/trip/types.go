@@ -100,6 +100,24 @@ type GetDetailResult struct {
 	Days               []TripDay
 }
 
+type TripPlaceSummary struct {
+	ID        string
+	Name      string
+	PlaceType string
+	Address   string
+}
+
+type DayItineraryItem struct {
+	ID        string
+	ItemOrder int
+	Place     TripPlaceSummary
+}
+
+type GetDayItineraryResult struct {
+	Day   TripDay
+	Items []DayItineraryItem
+}
+
 type ListItem struct {
 	ID               string
 	Name             string
@@ -123,4 +141,5 @@ type Repository interface {
 	CountTripParticipants(ctx context.Context, tripID string) (int, error)
 	ListTripParticipantPreviewNames(ctx context.Context, tripID string) ([]string, error)
 	ListTripsByParticipantUser(ctx context.Context, userID string) ([]ListItem, error)
+	ListItineraryItemsByTripAndDate(ctx context.Context, tripID string, date string) ([]DayItineraryItem, error)
 }

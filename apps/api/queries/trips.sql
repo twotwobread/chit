@@ -125,3 +125,19 @@ RETURNING
 DELETE FROM trips
 WHERE id = $1::uuid
 RETURNING id::text;
+
+-- name: ListItineraryItemsByTripAndDate :many
+SELECT
+  ii.id::text AS id,
+  ii.item_order,
+  tp.id::text AS trip_place_id,
+  tp.name AS place_name,
+  tp.place_type,
+  tp.address
+FROM itinerary_items ii
+JOIN trip_places tp
+  ON tp.id = ii.trip_place_id
+ AND tp.trip_id = ii.trip_id
+WHERE ii.trip_id = $1::uuid
+  AND ii.scheduled_date = $2
+ORDER BY ii.item_order ASC, ii.id ASC;

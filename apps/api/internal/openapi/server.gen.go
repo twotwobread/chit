@@ -83,6 +83,16 @@ const (
 	Owner  TripParticipantRole = "owner"
 )
 
+// Defines values for TripPlaceType.
+const (
+	Cafe     TripPlaceType = "cafe"
+	Etc      TripPlaceType = "etc"
+	Food     TripPlaceType = "food"
+	Lodging  TripPlaceType = "lodging"
+	Shopping TripPlaceType = "shopping"
+	Sights   TripPlaceType = "sights"
+)
+
 // AuthLinkResponse defines model for AuthLinkResponse.
 type AuthLinkResponse struct {
 	LinkedIdentity LinkedIdentity         `json:"linkedIdentity"`
@@ -162,6 +172,13 @@ type CreateTripResponse struct {
 	Trip             Trip            `json:"trip"`
 }
 
+// DayItineraryItem defines model for DayItineraryItem.
+type DayItineraryItem struct {
+	Id        string           `json:"id"`
+	ItemOrder int              `json:"itemOrder"`
+	Place     TripPlaceSummary `json:"place"`
+}
+
 // DeviceInfo defines model for DeviceInfo.
 type DeviceInfo struct {
 	DeviceName *string `json:"deviceName"`
@@ -175,6 +192,12 @@ type ErrorResponse struct {
 		Details []map[string]interface{} `json:"details"`
 		Message string                   `json:"message"`
 	} `json:"error"`
+}
+
+// GetDayItineraryResponse defines model for GetDayItineraryResponse.
+type GetDayItineraryResponse struct {
+	Day   TripDay            `json:"day"`
+	Items []DayItineraryItem `json:"items"`
 }
 
 // GetTripDetailResponse defines model for GetTripDetailResponse.
@@ -326,6 +349,17 @@ type TripParticipantSummary struct {
 	TotalCount    int      `json:"totalCount"`
 }
 
+// TripPlaceSummary defines model for TripPlaceSummary.
+type TripPlaceSummary struct {
+	Address   string        `json:"address"`
+	Id        string        `json:"id"`
+	Name      string        `json:"name"`
+	PlaceType TripPlaceType `json:"placeType"`
+}
+
+// TripPlaceType defines model for TripPlaceType.
+type TripPlaceType string
+
 // UpdateTripRequest defines model for UpdateTripRequest.
 type UpdateTripRequest struct {
 	DefaultCurrency *SupportedCurrency `json:"defaultCurrency,omitempty"`
@@ -396,6 +430,9 @@ type ServerInterface interface {
 	// Update trip basic information
 	// (PATCH /trips/{tripId})
 	UpdateTrip(w http.ResponseWriter, r *http.Request, tripId string)
+	// Get a trip day itinerary
+	// (GET /trips/{tripId}/days/{date}/itinerary)
+	GetDayItinerary(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
@@ -471,6 +508,12 @@ func (_ Unimplemented) GetTripDetail(w http.ResponseWriter, r *http.Request, tri
 // Update trip basic information
 // (PATCH /trips/{tripId})
 func (_ Unimplemented) UpdateTrip(w http.ResponseWriter, r *http.Request, tripId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Get a trip day itinerary
+// (GET /trips/{tripId}/days/{date}/itinerary)
+func (_ Unimplemented) GetDayItinerary(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -732,6 +775,46 @@ func (siw *ServerInterfaceWrapper) UpdateTrip(w http.ResponseWriter, r *http.Req
 	handler.ServeHTTP(w, r)
 }
 
+// GetDayItinerary operation middleware
+func (siw *ServerInterfaceWrapper) GetDayItinerary(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "date" -------------
+	var date openapi_types.Date
+
+	err = runtime.BindStyledParameterWithOptions("simple", "date", chi.URLParam(r, "date"), &date, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "date", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetDayItinerary(w, r, tripId, date)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 type UnescapedCookieParamError struct {
 	ParamName string
 	Err       error
@@ -880,6 +963,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Patch(options.BaseURL+"/trips/{tripId}", wrapper.UpdateTrip)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/trips/{tripId}/days/{date}/itinerary", wrapper.GetDayItinerary)
 	})
 
 	return r

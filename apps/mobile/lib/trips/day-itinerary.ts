@@ -1,0 +1,93 @@
+import type { GetDayItineraryResponse, TripPlaceType } from '@i-um/api-contract';
+
+import { theme } from '../design/theme';
+import { formatTripDayDate } from './days';
+
+export type DayItineraryRowViewModel = {
+  id: string;
+  orderLabel: string;
+  placeName: string;
+  placeTypeLabel: string;
+  address: string;
+};
+
+export type DayItineraryViewModel =
+  | {
+      status: 'success';
+      dayLabel: string;
+      formattedDate: string;
+      items: DayItineraryRowViewModel[];
+    }
+  | {
+      status: 'empty';
+      dayLabel: string;
+      formattedDate: string;
+      title: string;
+      helper: string;
+    };
+
+export type DayItineraryFailureViewModel =
+  | {
+      status: 'notFound';
+      title: string;
+      helper: string;
+    }
+  | {
+      status: 'retryableError';
+      title: string;
+      helper: string;
+    };
+
+export function buildDayItineraryRoute(tripId: string, date: string): string {
+  return `/trips/${tripId}/days/${date}`;
+}
+
+export function getPlaceTypeLabel(placeType: TripPlaceType): string {
+  return theme.placeType[placeType].label;
+}
+
+export function buildDayItineraryViewModel(response: GetDayItineraryResponse): DayItineraryViewModel {
+  const dayLabel = `Day ${response.day.dayOrder}`;
+  const formattedDate = formatTripDayDate(response.day.date);
+
+  if (response.items.length === 0) {
+    return {
+      status: 'empty',
+      dayLabel,
+      formattedDate,
+      title: '아직 등록된 장소가 없어요.',
+      helper: '장소 추가는 다음 기능에서 제공될 예정이에요.',
+    };
+  }
+
+  return {
+    status: 'success',
+    dayLabel,
+    formattedDate,
+    items: [...response.items]
+      .sort((left, right) => left.itemOrder - right.itemOrder)
+      .map((item) => ({
+        id: item.id,
+        orderLabel: String(item.itemOrder),
+        placeName: item.place.name,
+        placeTypeLabel: getPlaceTypeLabel(item.place.placeType),
+        address: item.place.address,
+      })),
+  };
+}
+
+export function dayItineraryFailureState(status?: number): DayItineraryFailureViewModel {
+  if (status === 403 || status === 404) {
+    return {
+      status: 'notFound',
+      title: '일정을 찾을 수 없어요.',
+      helper: '삭제되었거나 접근할 수 없는 여행 일정이에요.',
+    };
+  }
+
+  return {
+    status: 'retryableError',
+    title: '일정을 불러올 수 없어요.',
+    helper: '잠시 후 다시 시도해주세요.',
+  };
+}
