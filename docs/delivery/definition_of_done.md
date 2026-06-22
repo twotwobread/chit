@@ -16,10 +16,11 @@ Done = Spec 충족 + Vertical Slice 구현 + 검증 완료 + 배포 가능 상�
 - [ ] `docs/features/` 하위에 feature spec + plan 문서가 있다.
 - [ ] Scope와 out of scope가 명확하다.
 - [ ] Acceptance criteria가 모두 충족되었다.
+- [ ] Acceptance criteria가 코드로 남는 regression test 또는 명시된 `Regression Gaps`와 연결되어 있다.
 - [ ] Open questions가 없거나 후속 issue로 분리되었다.
 - [ ] 구현 내용이 spec을 벗어나지 않는다.
-- [ ] 완료 보고에 검증 명령과 결과가 포함되어 있다.
-- [ ] staging 또는 internal build에서 확인 가능하다.
+- [ ] 완료 보고에 regression test 명령과 결과가 포함되어 있다.
+- [ ] staging 또는 internal build에서 smoke 확인 가능하다.
 
 ## Product / UX 기준
 
@@ -50,7 +51,7 @@ Go API 서버 변경이 포함된 기능은 다음을 만족해야 한다.
 - [ ] DB 접근은 repository/sqlc query를 통해 수행한다.
 - [ ] 인증/권한이 필요한 endpoint는 participant 권한을 확인한다.
 - [ ] validation error, not found, forbidden 등 필요한 에러가 공통 포맷으로 반환된다.
-- [ ] 관련 service test 또는 handler test가 있다.
+- [ ] 변경된 API behavior에 대해 관련 service test 또는 handler test가 코드로 남아 있다.
 - [ ] `go test ./...`가 통과한다.
 - [ ] `go build` 또는 이에 준하는 build 검증이 통과한다.
 
@@ -65,6 +66,7 @@ DB 변경이 포함된 기능은 다음을 만족해야 한다.
 - [ ] 날짜와 timestamp 저장 기준이 API 규칙과 일치한다.
 - [ ] migration up/down 또는 적용/초기화 경로가 확인되었다.
 - [ ] sqlc query가 필요한 경우 추가 또는 갱신되었다.
+- [ ] 변경된 query behavior를 검증하는 repository/service test가 코드로 남아 있다.
 - [ ] generated DB code가 최신이다.
 
 ## Mobile App 기준
@@ -78,25 +80,36 @@ Expo 앱 변경이 포함된 기능은 다음을 만족해야 한다.
 - [ ] API error state가 있다.
 - [ ] empty state가 필요한 화면에는 empty state가 있다.
 - [ ] 입력 validation이 필요한 경우 사용자에게 이해 가능한 피드백을 준다.
+- [ ] 변경된 mobile logic/state behavior에 대해 단위 테스트가 코드로 남아 있다.
 - [ ] TypeScript typecheck가 통과한다.
-- [ ] Google Maps URL 등 순수 로직은 가능한 경우 단위 테스트가 있다.
+- [ ] Google Maps URL 등 순수 로직은 단위 테스트가 있다.
 
-## 테스트 기준
+## Regression Test 기준
 
-기능 성격에 맞게 최소 하나 이상의 검증이 있어야 한다.
+기능의 동작 보장은 코드로 남는 자동화 regression test가 담당한다. 수동 검증은 배포/기기/환경 smoke check일 뿐, regression test를 대체하지 않는다.
 
-권장 테스트:
+모든 feature는 다음을 만족해야 한다.
 
-- API service test
+- [ ] Feature spec에 `Regression Test Plan`이 있다.
+- [ ] 변경된 layer에는 test-first로 작성된 regression test가 있다.
+- [ ] 변경하지 않은 layer는 기존 regression suite로 깨지지 않았음을 확인했다.
+- [ ] `pnpm verify` 또는 동등한 CI gate에서 regression test가 반복 실행된다.
+- [ ] 자동화하지 못한 behavior는 `Regression Gaps`에 risk와 follow-up issue로 기록되어 있다.
+
+권장 regression test:
+
 - API handler test
-- settlement 계산 test
-- repository integration test
-- mobile hook 또는 utility test
+- API service test
+- repository/sqlc query test
+- DB migration apply/rollback 검증
+- settlement/expense 계산 test
+- mobile pure logic test
+- mobile state/helper test
+- mobile component/render test
+- OpenAPI/generated drift check
 - TypeScript typecheck
-- OpenAPI lint
-- DB migration 적용 확인
 
-테스트 자동화가 아직 없는 초기 단계에서는 feature 문서의 `Verification` 섹션에 수동 검증 절차와 결과를 기록한다.
+수동 smoke 확인은 `Manual Smoke`로 분리해서 기록한다. `Manual Smoke`만으로 acceptance criteria가 회귀 보호되었다고 보지 않는다.
 
 ## 배포 가능 상태 기준
 
@@ -107,7 +120,7 @@ Expo 앱 변경이 포함된 기능은 다음을 만족해야 한다.
 - [ ] migration 적용 순서가 안전하다.
 - [ ] 앱과 API의 버전/계약이 호환된다.
 - [ ] 기존 핵심 기능을 깨뜨리지 않는다.
-- [ ] staging 또는 internal build에서 happy path를 확인했다.
+- [ ] staging 또는 internal build에서 smoke happy path를 확인했거나 미실행 사유를 기록했다.
 - [ ] release notes가 작성되었다.
 
 ## 완료 보고 형식
@@ -123,14 +136,19 @@ Expo 앱 변경이 포함된 기능은 다음을 만족해야 한다.
 
 - `<path>`: <변경 내용>
 
-## Verification
+## Regression Tests
 
 - `<command>`: pass/fail
-- `<manual check>`: pass/fail
+- `<test file>`: <covered behavior>
 
-## Deployment
+## Manual Smoke
 
-- Staging/Internal build: <확인 결과 또는 링크>
+- Staging/Internal build: <확인 결과, 링크, 또는 미실행 사유>
+- Device/Simulator: <확인 결과 또는 미실행 사유>
+
+## Regression Gaps
+
+- <없으면 None, 있으면 behavior/risk/follow-up>
 
 ## Notes
 
@@ -146,8 +164,10 @@ Expo 앱 변경이 포함된 기능은 다음을 만족해야 한다.
 - DB migration 없이 로컬 임시 schema에 의존한다.
 - OpenAPI 계약과 실제 구현이 다르다.
 - generated client가 갱신되지 않았다.
-- happy path를 앱에서 확인하지 않았다.
-- staging/internal build에서 검증하지 않았다.
+- 변경된 behavior에 대한 regression test 코드가 없다.
+- 수동 검증만 있고 regression test 또는 Regression Gap 기록이 없다.
+- happy path를 앱에서 smoke 확인하지 않았고 미실행 사유도 없다.
+- staging/internal build에서 smoke 확인하지 않았고 미실행 사유도 없다.
 - spec에 없는 기능을 추가했다.
 - 실패한 테스트나 typecheck를 설명 없이 남겼다.
 

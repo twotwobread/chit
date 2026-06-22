@@ -9,6 +9,7 @@ import { clearStoredSession, getStoredSession } from '../lib/auth/session';
 import { theme } from '../lib/design';
 import { BottomMenu } from '../lib/navigation/BottomMenu';
 import { listMyTrips } from '../lib/trips/client';
+import { groupTripsByStatus, localDateString } from '../lib/trips/status';
 
 type MyPageState =
   | { status: 'loading' }
@@ -149,6 +150,9 @@ export default function MyPageScreen() {
 }
 
 function MyTripsSection({ state, onRetry }: { state: TripListState; onRetry: () => void }) {
+  const groupedTrips =
+    state.status === 'ready' && state.trips.length > 0 ? groupTripsByStatus(state.trips, localDateString()) : [];
+
   return (
     <View style={styles.card}>
       <Text style={styles.sectionTitle}>내 여행</Text>
@@ -181,18 +185,25 @@ function MyTripsSection({ state, onRetry }: { state: TripListState; onRetry: () 
 
       {state.status === 'ready' && state.trips.length > 0 ? (
         <>
-          <View style={styles.tripList}>
-            {state.trips.map((trip) => (
-              <Pressable
-                accessibilityRole="button"
-                key={trip.id}
-                onPress={() => router.push(`/trips/${trip.id}`)}
-                style={styles.tripRow}
-              >
-                <Text style={styles.tripName}>{trip.name}</Text>
-                <Text style={styles.tripDate}>{formatDateRange(trip.startDate, trip.endDate)}</Text>
-                <Text style={styles.tripCurrency}>기본 통화 {trip.defaultCurrency}</Text>
-              </Pressable>
+          <View style={styles.tripSections}>
+            {groupedTrips.map((section) => (
+              <View key={section.title} style={styles.tripSection}>
+                <Text style={styles.tripSectionTitle}>{section.title}</Text>
+                <View style={styles.tripList}>
+                  {section.trips.map((trip) => (
+                    <Pressable
+                      accessibilityRole="button"
+                      key={trip.id}
+                      onPress={() => router.push(`/trips/${trip.id}`)}
+                      style={styles.tripRow}
+                    >
+                      <Text style={styles.tripName}>{trip.name}</Text>
+                      <Text style={styles.tripDate}>{formatDateRange(trip.startDate, trip.endDate)}</Text>
+                      <Text style={styles.tripCurrency}>기본 통화 {trip.defaultCurrency}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
             ))}
           </View>
           <Pressable accessibilityRole="button" onPress={() => router.push('/trips/new')} style={styles.secondaryButton}>
@@ -286,6 +297,18 @@ const styles = StyleSheet.create({
     color: theme.color.textStrong,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.subhead,
+    fontWeight: theme.font.weight.bold,
+  },
+  tripSections: {
+    gap: theme.space[5],
+  },
+  tripSection: {
+    gap: theme.space[3],
+  },
+  tripSectionTitle: {
+    color: theme.color.textBody,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.label,
     fontWeight: theme.font.weight.bold,
   },
   tripList: {

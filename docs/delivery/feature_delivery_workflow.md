@@ -53,7 +53,8 @@ docs/features/0003-itinerary-item-create.md
 - UI 변경
 - 비즈니스 규칙
 - acceptance criteria
-- implementation plan
+- regression test plan
+- TDD implementation plan
 - verification plan
 - release notes
 
@@ -67,6 +68,7 @@ docs/features/0003-itinerary-item-create.md
 - 제품 결정이 필요하다.
 - scope와 out of scope가 모호하다.
 - acceptance criteria를 바로 쓰기 어렵다.
+- acceptance criteria별 regression test를 바로 정의하기 어렵다.
 - 기능이 여러 도메인에 걸쳐 있다.
 - 구현 후 되돌리기 어려운 기술/제품 결정이 포함된다.
 
@@ -184,6 +186,18 @@ App과 API가 서로 다른 계약을 암묵적으로 공유하지 않도록 한
 | 9주차 | 지출 분할 | 전체 1/N, 일부 인원 분할 확인 |
 | 10주차 | 정산 결과 | 최종 송금 결과 확인 |
 
+## TDD / Regression Test 원칙
+
+기능 구현은 `docs/delivery/testing_guidelines.md`를 따른다.
+
+핵심 규칙:
+
+- Acceptance Criteria는 코드로 남는 regression test와 연결한다.
+- 수동 검증은 배포/기기/환경 smoke check일 뿐 regression test를 대체하지 않는다.
+- 변경한 layer에는 먼저 실패하는 테스트를 작성한다.
+- 변경하지 않은 layer는 기존 regression suite로 깨지지 않았음을 확인한다.
+- Feature spec에는 `Regression Test Plan`, `Regression Gaps`, `TDD Implementation Plan`, `Manual Smoke`를 분리해서 기록한다.
+
 ## 표준 흐름
 
 ### Step 1. Feature candidate 선정
@@ -215,7 +229,7 @@ Issue에는 최소한 다음을 포함한다.
 
 ### Step 3. Ouroboros로 요구사항 구체화
 
-기능 요구사항이 모호하면 Ouroboros를 사용한다.
+기능 요구사항이 모호하면 Ouroboros를 사용한다. Ouroboros interview/seed/spec 단계에서도 TDD와 regression test 설계를 함께 구체화한다.
 
 예시:
 
@@ -243,6 +257,14 @@ ooo publish <seed_path>
 
 단, `ooo publish` 결과는 프로젝트의 feature 문서와 GitHub Issue 운영 방식에 맞게 검토 후 사용한다.
 
+Ouroboros clarification에서 반드시 다룰 질문:
+
+- 각 acceptance criteria는 어떤 regression test로 남는가?
+- API/Mobile/DB 중 어떤 layer가 변경되는가?
+- 어떤 실패 테스트를 먼저 작성할 것인가?
+- 날짜/시간/현재 사용자/외부 API는 어떻게 테스트에서 주입 가능한가?
+- 자동화하지 못하는 behavior가 있다면 gap과 follow-up은 무엇인가?
+
 ### Step 4. Feature spec + plan 작성
 
 `docs/features/_template.md`를 복사해 기능 문서를 작성한다.
@@ -266,8 +288,10 @@ NNNN-short-kebab-case-name.md
 - goal은 사용자 관점으로 쓴다.
 - scope와 out of scope를 명확히 분리한다.
 - API, DB, UI 변경을 모두 적는다.
-- acceptance criteria는 검증 가능하게 쓴다.
-- implementation plan은 순서와 검증 방법을 포함한다.
+- acceptance criteria는 regression test와 연결 가능하게 쓴다.
+- `Regression Test Plan`은 manual smoke보다 먼저 작성한다.
+- `TDD Implementation Plan`은 Red-Green-Refactor 순서와 검증 명령을 포함한다.
+- 자동화하지 못하는 behavior는 `Regression Gaps`에 risk와 follow-up을 남긴다.
 - 불확실한 항목은 open questions에 남긴다.
 
 ### Step 5. Spec review / approve
@@ -280,7 +304,8 @@ NNNN-short-kebab-case-name.md
 - 한 주 안에 구현 가능한 크기인가?
 - App UI + API + DB가 모두 포함되어 있는가?
 - out of scope가 충분히 명확한가?
-- acceptance criteria가 테스트 가능한가?
+- acceptance criteria가 코드로 남는 regression test와 연결되어 있는가?
+- manual smoke가 regression test를 대체하지 않도록 분리되어 있는가?
 - 배포 가능 상태의 기준이 명확한가?
 - 기존 product/architecture 문서와 충돌하지 않는가?
 
@@ -371,18 +396,21 @@ Spec에 없는 기능은 구현하지 마.
 
 기능 완료 전 `definition_of_done.md`를 기준으로 검증한다.
 
-기본 검증 항목:
+기본 regression 검증 항목:
 
-- OpenAPI lint 또는 계약 확인
+- OpenAPI/generated drift 확인
 - Go test
 - Go build
+- mobile test
 - TypeScript typecheck
-- mobile lint/typecheck
-- DB migration 적용 확인
+- DB migration 적용/rollback 확인
+
+Manual smoke 항목:
+
 - 앱에서 happy path 확인
 - staging 또는 internal build 확인
 
-프로젝트 초기에는 모든 자동화가 없을 수 있다. 자동화가 없으면 feature 문서의 `Verification` 섹션에 실제로 수행한 수동 검증을 기록한다.
+Manual smoke는 regression test의 대체물이 아니다. 자동화하지 못한 behavior가 있으면 feature 문서의 `Regression Gaps`에 risk와 follow-up issue를 기록한다.
 
 ### Step 9. 배포 가능 상태 확인
 
@@ -490,6 +518,7 @@ Fixes #1
 ## 관련 문서
 
 - `docs/delivery/definition_of_done.md`
+- `docs/delivery/testing_guidelines.md`
 - `docs/features/_template.md`
 - `docs/product/mvp_scope.md`
 - `docs/architecture/technical_architecture.md`

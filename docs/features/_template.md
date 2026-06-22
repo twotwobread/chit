@@ -160,7 +160,7 @@ startDate는 endDate보다 늦을 수 없다.
 
 ## Acceptance Criteria
 
-검증 가능한 문장으로 작성한다.
+검증 가능한 문장으로 작성한다. Acceptance Criteria는 아래 `Regression Test Plan`의 자동화 테스트와 연결되어야 한다. 수동 검증은 회귀 방지 증거가 아니므로 acceptance criteria의 유일한 검증 수단으로 쓰지 않는다.
 
 - [ ] <조건 1>
 - [ ] <조건 2>
@@ -178,35 +178,60 @@ startDate는 endDate보다 늦을 수 없다.
 
 ```text
 - [ ] 여행 기능 잘 동작
+- [ ] 수동으로 화면에서 확인한다
 ```
 
-## Implementation Plan
+## Regression Test Plan
 
-작업 순서와 각 단계의 검증 방법을 작성한다.
+코드로 남고 CI/`pnpm verify`에서 반복 실행되는 회귀 테스트 계획이다. Manual smoke는 이 표를 대체하지 않는다.
 
-1. <작업>
-   - Verify: <검증 방법>
-2. <작업>
-   - Verify: <검증 방법>
-3. <작업>
-   - Verify: <검증 방법>
+| Behavior / Acceptance Criteria | Layer | Test File / Gate | Command |
+|---|---|---|---|
+| <검증할 동작> | <API handler / API service / DB / Mobile logic / Mobile state / Contract> | `<path>` 또는 `<gate>` | `<command>` |
 
-권장 순서:
+## Regression Gaps
 
-1. OpenAPI 계약 작성/수정
-2. generated Go/TS code 갱신
-3. DB migration 작성
-4. API Server 구현
-5. App UI 구현
-6. generated client 연결
-7. 테스트 추가
-8. staging/internal build 검증
+자동화하지 못한 behavior가 있으면 기록한다. 기본값은 `None`이다.
+
+- None
+
+예외가 있으면 다음 형식으로 적는다.
+
+```text
+- <behavior>: <자동화하지 못한 이유>
+  - Risk: <회귀 감지 리스크>
+  - Follow-up: #<issue>
+```
+
+## TDD Implementation Plan
+
+Red-Green-Refactor 순서로 작성한다. 구현 계획보다 실패 테스트와 회귀 테스트 게이트를 먼저 고정한다.
+
+1. Red: <실패 테스트 작성>
+   - Verify: <테스트 실패 확인 명령과 기대 실패 이유>
+2. Green: <최소 구현>
+   - Verify: <테스트 통과 확인 명령>
+3. Refactor: <구조 정리>
+   - Verify: <관련 테스트 재실행>
+4. Regression gate
+   - Verify: `pnpm verify`
+
+API/DB가 포함된 경우 권장 순서:
+
+1. Red: OpenAPI/API/DB/Mobile behavior별 실패 테스트 작성
+2. OpenAPI 계약 작성/수정
+3. generated Go/TS code 갱신
+4. DB migration/query 작성
+5. API Server 최소 구현
+6. App UI/generated client 연결
+7. Refactor
+8. `pnpm verify`와 DB migration 검증
 
 ## Verification Plan
 
-완료 전 실행할 검증 명령과 수동 확인 절차를 작성한다.
+완료 전 실행할 자동화 회귀 검증 명령과 manual smoke 절차를 분리해서 작성한다.
 
-### Automated
+### Automated Regression
 
 ```text
 <command>
@@ -222,7 +247,9 @@ pnpm typecheck
 pnpm lint
 ```
 
-### Manual
+### Manual Smoke
+
+아래 항목은 실제 기기, staging, internal build, 환경변수 연결을 확인하는 보조 smoke check다. Regression Test Plan을 대체하지 않는다.
 
 - [ ] <앱에서 확인할 happy path>
 - [ ] <오류 상태 확인>
