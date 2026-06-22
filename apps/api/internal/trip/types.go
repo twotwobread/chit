@@ -74,6 +74,11 @@ type Participant struct {
 	JoinedAt    time.Time
 }
 
+type TripDay struct {
+	Date     string
+	DayOrder int
+}
+
 type CreateResult struct {
 	Trip             Trip
 	OwnerParticipant Participant
@@ -92,6 +97,7 @@ type ParticipantSummary struct {
 type GetDetailResult struct {
 	Trip               Trip
 	ParticipantSummary ParticipantSummary
+	Days               []TripDay
 }
 
 type ListItem struct {

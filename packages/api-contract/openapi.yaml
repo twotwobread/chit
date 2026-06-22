@@ -649,6 +649,18 @@ components:
         updatedAt:
           type: string
           format: date-time
+    TripDay:
+      type: object
+      required:
+        - date
+        - dayOrder
+      properties:
+        date:
+          type: string
+          format: date
+        dayOrder:
+          type: integer
+          minimum: 1
     UpdateTripRequest:
       type: object
       additionalProperties: false
@@ -785,11 +797,16 @@ components:
       required:
         - trip
         - participantSummary
+        - days
       properties:
         trip:
           $ref: '#/components/schemas/Trip'
         participantSummary:
           $ref: '#/components/schemas/TripParticipantSummary'
+        days:
+          type: array
+          items:
+            $ref: '#/components/schemas/TripDay'
     AuthProvider:
       type: string
       enum:

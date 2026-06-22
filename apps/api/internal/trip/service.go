@@ -194,6 +194,11 @@ func (s *Service) GetDetail(ctx context.Context, userID string, tripID string) (
 		previewNames[index] = participantDisplayName(name)
 	}
 
+	days, err := tripDaysForRange(foundTrip.StartDate, foundTrip.EndDate)
+	if err != nil {
+		return GetDetailResult{}, err
+	}
+
 	overflowCount := totalCount - len(previewNames)
 	if overflowCount < 0 {
 		overflowCount = 0
@@ -206,6 +211,7 @@ func (s *Service) GetDetail(ctx context.Context, userID string, tripID string) (
 			PreviewNames:  previewNames,
 			OverflowCount: overflowCount,
 		},
+		Days: days,
 	}, nil
 }
 
@@ -262,6 +268,26 @@ func isEmptyUpdate(input UpdateInput) bool {
 
 func parseDate(value string) (time.Time, error) {
 	return time.Parse(dateLayout, value)
+}
+
+func tripDaysForRange(startDateText string, endDateText string) ([]TripDay, error) {
+	startDate, err := parseDate(startDateText)
+	if err != nil {
+		return nil, err
+	}
+	endDate, err := parseDate(endDateText)
+	if err != nil {
+		return nil, err
+	}
+
+	days := []TripDay{}
+	for current, order := startDate, 1; !current.After(endDate); current, order = current.AddDate(0, 0, 1), order+1 {
+		days = append(days, TripDay{
+			Date:     current.Format(dateLayout),
+			DayOrder: order,
+		})
+	}
+	return days, nil
 }
 
 func dateOnly(value time.Time) time.Time {

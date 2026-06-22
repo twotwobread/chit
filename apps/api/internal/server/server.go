@@ -520,6 +520,7 @@ func getTripDetailResponseToOpenAPI(result trip.GetDetailResult) openapi.GetTrip
 			PreviewNames:  result.ParticipantSummary.PreviewNames,
 			OverflowCount: result.ParticipantSummary.OverflowCount,
 		},
+		Days: tripDaysToOpenAPI(result.Days),
 	}
 }
 
@@ -538,6 +539,17 @@ func tripToOpenAPI(value trip.Trip) openapi.Trip {
 		CreatedAt:       value.CreatedAt,
 		UpdatedAt:       value.UpdatedAt,
 	}
+}
+
+func tripDaysToOpenAPI(days []trip.TripDay) []openapi.TripDay {
+	items := make([]openapi.TripDay, 0, len(days))
+	for _, day := range days {
+		items = append(items, openapi.TripDay{
+			Date:     dateToOpenAPI(day.Date),
+			DayOrder: day.DayOrder,
+		})
+	}
+	return items
 }
 
 func dateFromOpenAPI(value openapi_types.Date) string {

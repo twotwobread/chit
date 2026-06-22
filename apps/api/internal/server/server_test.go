@@ -462,6 +462,10 @@ func TestGetTripDetailHandler(t *testing.T) {
 			PreviewNames  []string `json:"previewNames"`
 			OverflowCount int      `json:"overflowCount"`
 		} `json:"participantSummary"`
+		Days []struct {
+			Date     string `json:"date"`
+			DayOrder int    `json:"dayOrder"`
+		} `json:"days"`
 	}
 	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
 		t.Fatalf("decode response: %v", err)
@@ -477,6 +481,18 @@ func TestGetTripDetailHandler(t *testing.T) {
 	}
 	if len(body.ParticipantSummary.PreviewNames) != 1 || body.ParticipantSummary.PreviewNames[0] != "민수" {
 		t.Fatalf("unexpected preview names: %#v", body.ParticipantSummary.PreviewNames)
+	}
+	if len(body.Days) != 4 {
+		t.Fatalf("expected 4 trip days, got %#v", body.Days)
+	}
+	for index, day := range body.Days {
+		expectedOrder := index + 1
+		if day.DayOrder != expectedOrder {
+			t.Fatalf("unexpected day %d: %#v", index, day)
+		}
+	}
+	if body.Days[0].Date != "2026-07-10" || body.Days[3].Date != "2026-07-13" {
+		t.Fatalf("unexpected day dates: %#v", body.Days)
 	}
 }
 
@@ -599,6 +615,50 @@ func TestUpdateTripAllowsPastDates(t *testing.T) {
 
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d with body %s", http.StatusOK, recorder.Code, recorder.Body.String())
+	}
+}
+
+func TestUpdateTripDateRangeUpdatesVirtualDays(t *testing.T) {
+	backend := newFakeAuthBackend()
+	accessToken := loginTestUser(t, backend)
+	tripID := createTestTrip(t, backend, accessToken)
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPatch, "/trips/"+tripID, bytes.NewReader([]byte(`{
+		"startDate":"2026-07-11",
+		"endDate":"2026-07-12"
+	}`)))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", "Bearer "+accessToken)
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusOK, recorder.Code, recorder.Body.String())
+	}
+
+	detailRecorder := httptest.NewRecorder()
+	detailRequest := httptest.NewRequest(http.MethodGet, "/trips/"+tripID, nil)
+	detailRequest.Header.Set("Authorization", "Bearer "+accessToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(detailRecorder, detailRequest)
+
+	if detailRecorder.Code != http.StatusOK {
+		t.Fatalf("expected detail status %d, got %d with body %s", http.StatusOK, detailRecorder.Code, detailRecorder.Body.String())
+	}
+	var body struct {
+		Days []struct {
+			Date     string `json:"date"`
+			DayOrder int    `json:"dayOrder"`
+		} `json:"days"`
+	}
+	if err := json.NewDecoder(detailRecorder.Body).Decode(&body); err != nil {
+		t.Fatalf("decode detail response: %v", err)
+	}
+	if len(body.Days) != 2 {
+		t.Fatalf("expected 2 synced days, got %#v", body.Days)
+	}
+	if body.Days[0].Date != "2026-07-11" || body.Days[0].DayOrder != 1 || body.Days[1].Date != "2026-07-12" || body.Days[1].DayOrder != 2 {
+		t.Fatalf("unexpected synced days: %#v", body.Days)
 	}
 }
 

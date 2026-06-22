@@ -8,6 +8,7 @@ import { MobileAuthError } from '../../../lib/auth/client';
 import { getStoredSession } from '../../../lib/auth/session';
 import { theme } from '../../../lib/design';
 import { deleteTrip, getTripDetail } from '../../../lib/trips/client';
+import { buildTripDayViewModels, formatTripDayDate } from '../../../lib/trips/days';
 import {
   beginTripDelete,
   cancelTripDelete,
@@ -146,10 +147,11 @@ function TripDetailCard({ currentUserId, detail }: { currentUserId?: string; det
     <View style={styles.card}>
       <Text style={styles.tripName}>{detail.trip.name}</Text>
       <View style={styles.infoList}>
-        <InfoRow label="기간" value={`${formatDate(detail.trip.startDate)} ~ ${formatDate(detail.trip.endDate)}`} />
+        <InfoRow label="기간" value={`${formatTripDayDate(detail.trip.startDate)} ~ ${formatTripDayDate(detail.trip.endDate)}`} />
         <InfoRow label="기본 통화" value={detail.trip.defaultCurrency} />
         <InfoRow label="참여자" value={formatParticipantSummary(detail.participantSummary)} />
       </View>
+      <TripDayList days={detail.days} />
       {canManage ? (
         <>
           <Pressable accessibilityRole="button" onPress={() => router.push(`/trips/${detail.trip.id}/edit`)} style={styles.secondaryButton}>
@@ -230,8 +232,25 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function formatDate(value: string): string {
-  return value.replace(/-/g, '.');
+function TripDayList({ days }: { days: GetTripDetailResponse['days'] }) {
+  const viewModels = buildTripDayViewModels(days);
+
+  return (
+    <View style={styles.daySection}>
+      <View style={styles.daySectionHeader}>
+        <Text style={styles.sectionTitle}>여행 일정</Text>
+        <Text style={styles.sectionHelper}>여행 기간에 맞춰 날짜별 일정이 준비됐어요.</Text>
+      </View>
+      <View style={styles.dayList}>
+        {viewModels.map((day) => (
+          <View key={day.date} style={styles.dayRow}>
+            <Text style={styles.dayLabel}>{day.dayLabel}</Text>
+            <Text style={styles.dayDate}>{day.formattedDate}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
 }
 
 function formatParticipantSummary(summary: GetTripDetailResponse['participantSummary']): string {
@@ -295,6 +314,54 @@ const styles = StyleSheet.create({
   },
   infoRow: {
     gap: theme.space[2],
+  },
+  daySection: {
+    backgroundColor: theme.color.surfaceSunken,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    gap: theme.space[5],
+    padding: theme.space[5],
+  },
+  daySectionHeader: {
+    gap: theme.space[2],
+  },
+  sectionTitle: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.subhead,
+    fontWeight: theme.font.weight.bold,
+  },
+  sectionHelper: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.caption,
+  },
+  dayList: {
+    gap: theme.space[3],
+  },
+  dayRow: {
+    alignItems: 'center',
+    backgroundColor: theme.color.surface,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    minHeight: theme.layout.tapMin,
+    paddingHorizontal: theme.space[4],
+    paddingVertical: theme.space[3],
+  },
+  dayLabel: {
+    color: theme.color.primary,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.body,
+    fontWeight: theme.font.weight.bold,
+  },
+  dayDate: {
+    color: theme.color.textBody,
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.body,
   },
   label: {
     color: theme.color.textMuted,

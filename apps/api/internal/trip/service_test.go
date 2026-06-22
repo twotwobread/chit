@@ -439,6 +439,9 @@ func TestServiceGetDetail(t *testing.T) {
 			t.Fatalf("expected preview name %d to be %q, got %q", index, expected, result.ParticipantSummary.PreviewNames[index])
 		}
 	}
+	if len(result.Days) != 4 || result.Days[0].Date != "2026-07-10" || result.Days[0].DayOrder != 1 || result.Days[3].Date != "2026-07-13" || result.Days[3].DayOrder != 4 {
+		t.Fatalf("expected virtual days in detail result, got %#v", result.Days)
+	}
 }
 
 func TestServiceGetDetailValidation(t *testing.T) {
