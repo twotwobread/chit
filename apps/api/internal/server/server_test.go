@@ -483,6 +483,172 @@ func TestGetTripDetailForbidden(t *testing.T) {
 	}
 }
 
+func TestUpdateTripHandler(t *testing.T) {
+	backend := newFakeAuthBackend()
+	accessToken := loginTestUser(t, backend)
+	tripID := createTestTrip(t, backend, accessToken)
+
+	requestBody := []byte(`{
+		"name":"  오사카 4박 5일  ",
+		"endDate":"2026-07-14",
+		"defaultCurrency":"USD"
+	}`)
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPatch, "/trips/"+tripID, bytes.NewReader(requestBody))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", "Bearer "+accessToken)
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusOK, recorder.Code, recorder.Body.String())
+	}
+
+	var body struct {
+		Trip struct {
+			ID              string `json:"id"`
+			Name            string `json:"name"`
+			StartDate       string `json:"startDate"`
+			EndDate         string `json:"endDate"`
+			DefaultCurrency string `json:"defaultCurrency"`
+			UpdatedAt       string `json:"updatedAt"`
+		} `json:"trip"`
+	}
+	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Trip.ID != tripID || body.Trip.Name != "오사카 4박 5일" {
+		t.Fatalf("unexpected updated trip: %#v", body.Trip)
+	}
+	if body.Trip.StartDate != "2026-07-10" || body.Trip.EndDate != "2026-07-14" || body.Trip.DefaultCurrency != "USD" {
+		t.Fatalf("unexpected merged update: %#v", body.Trip)
+	}
+	if body.Trip.UpdatedAt == "" {
+		t.Fatalf("expected updatedAt in response: %#v", body.Trip)
+	}
+}
+
+func TestUpdateTripAllowsPastDates(t *testing.T) {
+	backend := newFakeAuthBackend()
+	accessToken := loginTestUser(t, backend)
+	tripID := createTestTrip(t, backend, accessToken)
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPatch, "/trips/"+tripID, bytes.NewReader([]byte(`{
+		"startDate":"2026-06-01",
+		"endDate":"2026-06-03"
+	}`)))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", "Bearer "+accessToken)
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusOK, recorder.Code, recorder.Body.String())
+	}
+}
+
+func TestUpdateTripRequiresAuth(t *testing.T) {
+	backend := newFakeAuthBackend()
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPatch, "/trips/00000000-0000-0000-0000-000000000001", bytes.NewReader([]byte(`{"name":"도쿄"}`)))
+	request.Header.Set("Content-Type", "application/json")
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusUnauthorized, recorder.Code, recorder.Body.String())
+	}
+}
+
+func TestUpdateTripValidation(t *testing.T) {
+	backend := newFakeAuthBackend()
+	accessToken := loginTestUser(t, backend)
+	tripID := createTestTrip(t, backend, accessToken)
+
+	tests := []struct {
+		name string
+		path string
+		body string
+	}{
+		{name: "invalid id", path: "/trips/not-a-uuid", body: `{"name":"도쿄"}`},
+		{name: "empty patch", path: "/trips/" + tripID, body: `{}`},
+		{name: "invalid name", path: "/trips/" + tripID, body: `{"name":" "}`},
+		{name: "merged date range", path: "/trips/" + tripID, body: `{"startDate":"2026-07-14"}`},
+		{name: "invalid currency", path: "/trips/" + tripID, body: `{"defaultCurrency":"GBP"}`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			request := httptest.NewRequest(http.MethodPatch, tt.path, bytes.NewReader([]byte(tt.body)))
+			request.Header.Set("Content-Type", "application/json")
+			request.Header.Set("Authorization", "Bearer "+accessToken)
+
+			NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+			if recorder.Code != http.StatusBadRequest {
+				t.Fatalf("expected status %d, got %d with body %s", http.StatusBadRequest, recorder.Code, recorder.Body.String())
+			}
+			var body struct {
+				Error struct {
+					Code string `json:"code"`
+				} `json:"error"`
+			}
+			if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+				t.Fatalf("decode response: %v", err)
+			}
+			if body.Error.Code != "VALIDATION_ERROR" {
+				t.Fatalf("expected VALIDATION_ERROR, got %q", body.Error.Code)
+			}
+		})
+	}
+}
+
+func TestUpdateTripNotFound(t *testing.T) {
+	backend := newFakeAuthBackend()
+	accessToken := loginTestUser(t, backend)
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPatch, "/trips/00000000-0000-0000-0000-000000000404", bytes.NewReader([]byte(`{"name":"도쿄"}`)))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", "Bearer "+accessToken)
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusNotFound {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusNotFound, recorder.Code, recorder.Body.String())
+	}
+}
+
+func TestUpdateTripForbiddenDoesNotChangeTrip(t *testing.T) {
+	backend := newFakeAuthBackend()
+	ownerToken := loginTestUser(t, backend)
+	tripID := createTestTrip(t, backend, ownerToken)
+	memberToken := loginTestUserWithSubject(t, backend, "apple-2", "지영")
+	backend.participants[tripID] = append(backend.participants[tripID], tripdomain.Participant{
+		ID:          testUUID(2000),
+		TripID:      tripID,
+		UserID:      "user-2",
+		Role:        "member",
+		DisplayName: "지영",
+		JoinedAt:    time.Date(2026, 6, 22, 15, 0, 0, 0, time.UTC),
+	})
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPatch, "/trips/"+tripID, bytes.NewReader([]byte(`{"name":"도쿄"}`)))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", "Bearer "+memberToken)
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusForbidden {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusForbidden, recorder.Code, recorder.Body.String())
+	}
+	if backend.trips[tripID].Name != "오사카 3박 4일" {
+		t.Fatalf("expected forbidden update not to mutate trip, got %#v", backend.trips[tripID])
+	}
+}
+
 func TestReadyReturnsServiceUnavailable(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/ready", nil)
@@ -738,6 +904,26 @@ func (b *fakeAuthBackend) IsTripParticipant(_ context.Context, tripID string, us
 		}
 	}
 	return false, nil
+}
+
+func (b *fakeAuthBackend) IsTripOwner(_ context.Context, tripID string, userID string) (bool, error) {
+	for _, participant := range b.participants[tripID] {
+		if participant.UserID == userID && participant.Role == tripdomain.RoleOwner {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (b *fakeAuthBackend) UpdateTripBasicInfo(_ context.Context, record tripdomain.UpdateRecord) (tripdomain.Trip, error) {
+	updatedTrip := b.trips[record.ID]
+	updatedTrip.Name = record.Name
+	updatedTrip.StartDate = record.StartDate.Format("2006-01-02")
+	updatedTrip.EndDate = record.EndDate.Format("2006-01-02")
+	updatedTrip.DefaultCurrency = record.DefaultCurrency
+	updatedTrip.UpdatedAt = updatedTrip.UpdatedAt.Add(time.Hour)
+	b.trips[record.ID] = updatedTrip
+	return updatedTrip, nil
 }
 
 func (b *fakeAuthBackend) CountTripParticipants(_ context.Context, tripID string) (int, error) {

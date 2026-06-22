@@ -111,6 +111,44 @@ func (s *Store) IsTripParticipant(ctx context.Context, tripID string, userID str
 	return true, nil
 }
 
+func (s *Store) IsTripOwner(ctx context.Context, tripID string, userID string) (bool, error) {
+	role, err := s.queries.GetTripParticipantRole(ctx, db.GetTripParticipantRoleParams{
+		Column1: mustUUID(tripID),
+		Column2: mustUUID(userID),
+	})
+	if err == pgx.ErrNoRows {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return role == trip.RoleOwner, nil
+}
+
+func (s *Store) UpdateTripBasicInfo(ctx context.Context, record trip.UpdateRecord) (trip.Trip, error) {
+	row, err := s.queries.UpdateTripBasicInfo(ctx, db.UpdateTripBasicInfoParams{
+		Column1:         mustUUID(record.ID),
+		Name:            record.Name,
+		StartDate:       dateValue(record.StartDate),
+		EndDate:         dateValue(record.EndDate),
+		DefaultCurrency: record.DefaultCurrency,
+	})
+	if err != nil {
+		return trip.Trip{}, err
+	}
+
+	return trip.Trip{
+		ID:              row.ID,
+		Name:            row.Name,
+		StartDate:       dateString(row.StartDate),
+		EndDate:         dateString(row.EndDate),
+		DefaultCurrency: row.DefaultCurrency,
+		CreatedBy:       row.CreatedBy,
+		CreatedAt:       row.CreatedAt.Time,
+		UpdatedAt:       row.UpdatedAt.Time,
+	}, nil
+}
+
 func (s *Store) CountTripParticipants(ctx context.Context, tripID string) (int, error) {
 	count, err := s.queries.CountTripParticipantsByTripID(ctx, mustUUID(tripID))
 	if err != nil {

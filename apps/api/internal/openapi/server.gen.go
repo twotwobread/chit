@@ -317,6 +317,23 @@ type TripParticipantSummary struct {
 	TotalCount    int      `json:"totalCount"`
 }
 
+// UpdateTripRequest defines model for UpdateTripRequest.
+type UpdateTripRequest struct {
+	DefaultCurrency *SupportedCurrency `json:"defaultCurrency,omitempty"`
+
+	// EndDate End date in YYYY-MM-DD format. Must not be before the merged startDate.
+	EndDate *openapi_types.Date `json:"endDate,omitempty"`
+	Name    *string             `json:"name,omitempty"`
+
+	// StartDate Start date in YYYY-MM-DD format. May be past, current, or future.
+	StartDate *openapi_types.Date `json:"startDate,omitempty"`
+}
+
+// UpdateTripResponse defines model for UpdateTripResponse.
+type UpdateTripResponse struct {
+	Trip Trip `json:"trip"`
+}
+
 // LinkOAuthProviderJSONRequestBody defines body for LinkOAuthProvider for application/json ContentType.
 type LinkOAuthProviderJSONRequestBody = OAuthLinkRequest
 
@@ -328,6 +345,9 @@ type RefreshTokenJSONRequestBody = RefreshTokenRequest
 
 // CreateTripJSONRequestBody defines body for CreateTrip for application/json ContentType.
 type CreateTripJSONRequestBody = CreateTripRequest
+
+// UpdateTripJSONRequestBody defines body for UpdateTrip for application/json ContentType.
+type UpdateTripJSONRequestBody = UpdateTripRequest
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -361,6 +381,9 @@ type ServerInterface interface {
 	// Get trip detail
 	// (GET /trips/{tripId})
 	GetTripDetail(w http.ResponseWriter, r *http.Request, tripId string)
+	// Update trip basic information
+	// (PATCH /trips/{tripId})
+	UpdateTrip(w http.ResponseWriter, r *http.Request, tripId string)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
@@ -424,6 +447,12 @@ func (_ Unimplemented) CreateTrip(w http.ResponseWriter, r *http.Request) {
 // Get trip detail
 // (GET /trips/{tripId})
 func (_ Unimplemented) GetTripDetail(w http.ResponseWriter, r *http.Request, tripId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Update trip basic information
+// (PATCH /trips/{tripId})
+func (_ Unimplemented) UpdateTrip(w http.ResponseWriter, r *http.Request, tripId string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -623,6 +652,37 @@ func (siw *ServerInterfaceWrapper) GetTripDetail(w http.ResponseWriter, r *http.
 	handler.ServeHTTP(w, r)
 }
 
+// UpdateTrip operation middleware
+func (siw *ServerInterfaceWrapper) UpdateTrip(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateTrip(w, r, tripId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 type UnescapedCookieParamError struct {
 	ParamName string
 	Err       error
@@ -765,6 +825,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/trips/{tripId}", wrapper.GetTripDetail)
+	})
+	r.Group(func(r chi.Router) {
+		r.Patch(options.BaseURL+"/trips/{tripId}", wrapper.UpdateTrip)
 	})
 
 	return r

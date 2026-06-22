@@ -6,6 +6,8 @@ import type { CreateTripRequest } from '../models/CreateTripRequest';
 import type { CreateTripResponse } from '../models/CreateTripResponse';
 import type { GetTripDetailResponse } from '../models/GetTripDetailResponse';
 import type { ListTripsResponse } from '../models/ListTripsResponse';
+import type { UpdateTripRequest } from '../models/UpdateTripRequest';
+import type { UpdateTripResponse } from '../models/UpdateTripResponse';
 import type { CancelablePromise } from '../core/CancelablePromise';
 import { OpenAPI } from '../core/OpenAPI';
 import { request as __request } from '../core/request';
@@ -64,6 +66,35 @@ export class TripsService {
             path: {
                 'tripId': tripId,
             },
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                403: `Forbidden.`,
+                404: `Trip not found.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
+     * Update trip basic information
+     * Updates basic trip metadata for the authenticated trip owner. Only changed fields need to be sent.
+     * @param tripId
+     * @param requestBody
+     * @returns UpdateTripResponse Trip updated.
+     * @throws ApiError
+     */
+    public static updateTrip(
+        tripId: string,
+        requestBody: UpdateTripRequest,
+    ): CancelablePromise<UpdateTripResponse> {
+        return __request(OpenAPI, {
+            method: 'PATCH',
+            url: '/trips/{tripId}',
+            path: {
+                'tripId': tripId,
+            },
+            body: requestBody,
+            mediaType: 'application/json',
             errors: {
                 400: `Validation error.`,
                 401: `Unauthorized.`,

@@ -61,6 +61,12 @@ FROM trip_participants
 WHERE trip_id = $1::uuid
   AND user_id = $2::uuid;
 
+-- name: GetTripParticipantRole :one
+SELECT role
+FROM trip_participants
+WHERE trip_id = $1::uuid
+  AND user_id = $2::uuid;
+
 -- name: CountTripParticipantsByTripID :one
 SELECT count(*)::int AS total_count
 FROM trip_participants
@@ -89,3 +95,22 @@ FROM trips t
 JOIN trip_participants tp ON tp.trip_id = t.id
 WHERE tp.user_id = $1::uuid
 ORDER BY tp.joined_at DESC, t.created_at DESC, t.id DESC;
+
+-- name: UpdateTripBasicInfo :one
+UPDATE trips
+SET
+  name = $2,
+  start_date = $3,
+  end_date = $4,
+  default_currency = $5,
+  updated_at = now()
+WHERE id = $1::uuid
+RETURNING
+  id::text,
+  name,
+  start_date,
+  end_date,
+  default_currency,
+  created_by::text,
+  created_at,
+  updated_at;
