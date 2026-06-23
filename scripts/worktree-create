@@ -16,6 +16,7 @@ Behavior:
   2. Lists .worktrees entries.
   3. Removes clean worktrees whose GitHub PR is MERGED or CLOSED.
   4. Creates a new worktree from the base ref.
+  5. Runs scripts/worktree-post-create for safe local setup.
 
 Safety:
   - Dirty worktrees are never removed.
@@ -258,5 +259,7 @@ elif remote_branch_exists "$BRANCH"; then
 else
   run git worktree add "$WORKTREE_PATH" -b "$BRANCH" "$BASE_REF"
 fi
+
+run scripts/worktree-post-create "$WORKTREE_PATH"
 
 log 'done'
