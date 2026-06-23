@@ -13,6 +13,7 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 	"github.com/twotwobread/i-um/apps/api/internal/auth"
 	"github.com/twotwobread/i-um/apps/api/internal/openapi"
+	"github.com/twotwobread/i-um/apps/api/internal/place"
 	"github.com/twotwobread/i-um/apps/api/internal/trip"
 )
 
@@ -21,15 +22,18 @@ type readinessChecker interface {
 }
 
 type Config struct {
-	AuthTokenSecret string
-	AppleAudience   string
-	AllowDevOAuth   bool
+	AuthTokenSecret    string
+	AppleAudience      string
+	AllowDevOAuth      bool
+	GooglePlacesAPIKey string
+	PlaceProvider      place.Provider
 }
 
 type apiServer struct {
 	readiness readinessChecker
 	auth      *auth.Service
 	trips     *trip.Service
+	places    *place.Service
 }
 
 func NewRouter(readiness readinessChecker) http.Handler {
@@ -54,8 +58,17 @@ func NewRouterWithConfig(readiness readinessChecker, config Config) http.Handler
 		tripService = trip.NewService(repo)
 	}
 
+	var placeService *place.Service
+	if repo, ok := readiness.(place.Repository); ok {
+		provider := config.PlaceProvider
+		if provider == nil {
+			provider = place.NewGoogleProvider(config.GooglePlacesAPIKey)
+		}
+		placeService = place.NewService(repo, provider)
+	}
+
 	router := chi.NewRouter()
-	return openapi.HandlerWithOptions(apiServer{readiness: readiness, auth: authService, trips: tripService}, openapi.ChiServerOptions{
+	return openapi.HandlerWithOptions(apiServer{readiness: readiness, auth: authService, trips: tripService, places: placeService}, openapi.ChiServerOptions{
 		BaseRouter:       router,
 		ErrorHandlerFunc: writeOpenAPIRequestError,
 	})
@@ -63,9 +76,10 @@ func NewRouterWithConfig(readiness readinessChecker, config Config) http.Handler
 
 func ConfigFromEnv() Config {
 	return Config{
-		AuthTokenSecret: os.Getenv("AUTH_TOKEN_SECRET"),
-		AppleAudience:   firstNonEmpty(os.Getenv("APPLE_CLIENT_ID"), os.Getenv("APPLE_BUNDLE_ID")),
-		AllowDevOAuth:   envBool(os.Getenv("AUTH_ALLOW_DEV_OAUTH")),
+		AuthTokenSecret:    os.Getenv("AUTH_TOKEN_SECRET"),
+		AppleAudience:      firstNonEmpty(os.Getenv("APPLE_CLIENT_ID"), os.Getenv("APPLE_BUNDLE_ID")),
+		AllowDevOAuth:      envBool(os.Getenv("AUTH_ALLOW_DEV_OAUTH")),
+		GooglePlacesAPIKey: os.Getenv("GOOGLE_PLACES_API_KEY"),
 	}
 }
 
@@ -216,6 +230,33 @@ func (s apiServer) CreateManualDayItineraryItem(w http.ResponseWriter, r *http.R
 	}
 
 	writeJSON(w, http.StatusCreated, createManualDayItineraryItemResponseToOpenAPI(result))
+}
+
+func (s apiServer) SearchGooglePlaces(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, params openapi.SearchGooglePlacesParams) {
+	if s.auth == nil || s.places == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "place search is not configured", nil)
+		return
+	}
+
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	limit := 0
+	if params.Limit != nil {
+		limit = *params.Limit
+	}
+	results, err := s.places.SearchGoogle(r.Context(), authContext.UserID, tripId, dateFromOpenAPI(date), place.SearchInput{
+		Query: params.Query,
+		Limit: limit,
+	})
+	if err != nil {
+		writePlaceSearchError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, searchGooglePlacesResponseToOpenAPI(results))
 }
 
 func (s apiServer) UpdateTrip(w http.ResponseWriter, r *http.Request, tripId string) {
@@ -482,6 +523,25 @@ func writeTripUpdateError(w http.ResponseWriter, err error) {
 	}
 }
 
+func writePlaceSearchError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, place.ErrValidation):
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid place search request", nil)
+	case errors.Is(err, place.ErrUnauthorized):
+		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "unauthorized", nil)
+	case errors.Is(err, place.ErrForbidden):
+		writeError(w, http.StatusForbidden, "FORBIDDEN", "forbidden", nil)
+	case errors.Is(err, place.ErrNotFound):
+		writeError(w, http.StatusNotFound, "NOT_FOUND", "place search context not found", nil)
+	case errors.Is(err, place.ErrProviderRateLimited):
+		writeError(w, http.StatusTooManyRequests, "PLACE_PROVIDER_RATE_LIMITED", "place provider rate limited", nil)
+	case errors.Is(err, place.ErrProviderUnavailable):
+		writeError(w, http.StatusBadGateway, "PLACE_PROVIDER_UNAVAILABLE", "place provider unavailable", nil)
+	default:
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error", nil)
+	}
+}
+
 func writeAuthError(w http.ResponseWriter, err error, provider auth.Provider) {
 	switch {
 	case errors.Is(err, auth.ErrValidation):
@@ -623,6 +683,19 @@ func createManualDayItineraryItemResponseToOpenAPI(result trip.CreateManualDayIt
 		},
 		Item: dayItineraryItemToOpenAPI(result.Item),
 	}
+}
+
+func searchGooglePlacesResponseToOpenAPI(results []place.SearchResult) openapi.SearchGooglePlacesResponse {
+	items := make([]openapi.GooglePlaceSearchResult, 0, len(results))
+	for _, result := range results {
+		items = append(items, openapi.GooglePlaceSearchResult{
+			GooglePlaceId:    result.GooglePlaceID,
+			DisplayName:      result.DisplayName,
+			FormattedAddress: result.FormattedAddress,
+			PrimaryType:      result.PrimaryType,
+		})
+	}
+	return openapi.SearchGooglePlacesResponse{Results: items}
 }
 
 func dayItineraryItemToOpenAPI(item trip.DayItineraryItem) openapi.DayItineraryItem {

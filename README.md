@@ -118,6 +118,12 @@ export AUTH_ALLOW_DEV_OAUTH=true                    # local/internal smoke only
 
 `AUTH_ALLOW_DEV_OAUTH=true`일 때만 Apple/Kakao provider token 대신 `devSubject` credential을 local/internal smoke test에 사용할 수 있습니다. 실제 provider access token이나 identity token은 저장하지 않습니다.
 
+F-027부터 Google Places 검색은 API 서버가 호출하며 다음 env를 사용합니다. 모바일 앱에는 Google API key를 설정하지 않습니다.
+
+```bash
+export GOOGLE_PLACES_API_KEY='<google-places-api-key>'
+```
+
 기본 주소는 `http://localhost:8080`입니다.
 
 ```bash

@@ -10,6 +10,7 @@ tags:
   - name: Health
   - name: Auth
   - name: Trips
+  - name: Places
 paths:
   /health:
     get:
@@ -419,6 +420,91 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '409':
           description: Concurrent append conflict.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /trips/{tripId}/days/{date}/places/google/search:
+    get:
+      operationId: searchGooglePlaces
+      summary: Search Google Places for a trip day
+      description: Returns display-only Google Places text search results for an authenticated trip participant and in-range virtual trip day. Results are not persisted.
+      tags:
+        - Places
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: date
+          in: path
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: query
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 2
+            maxLength: 120
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 10
+            default: 5
+      responses:
+        '200':
+          description: Google Places search results.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchGooglePlacesResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip or virtual day not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Google Places provider rate limited.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Google Places provider unavailable.
           content:
             application/json:
               schema:
@@ -870,6 +956,35 @@ components:
           $ref: '#/components/schemas/TripDay'
         item:
           $ref: '#/components/schemas/DayItineraryItem'
+    GooglePlaceSearchResult:
+      type: object
+      required:
+        - googlePlaceId
+        - displayName
+        - formattedAddress
+        - primaryType
+      properties:
+        googlePlaceId:
+          type: string
+          example: ChIJ...
+        displayName:
+          type: string
+          example: 도톤보리
+        formattedAddress:
+          type: string
+          example: 1 Chome Dotonbori, Chuo Ward, Osaka, Japan
+        primaryType:
+          type: string
+          example: tourist_attraction
+    SearchGooglePlacesResponse:
+      type: object
+      required:
+        - results
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/GooglePlaceSearchResult'
     UpdateTripRequest:
       type: object
       additionalProperties: false

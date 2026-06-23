@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/twotwobread/i-um/apps/api/internal/auth"
+	placedomain "github.com/twotwobread/i-um/apps/api/internal/place"
 	tripdomain "github.com/twotwobread/i-um/apps/api/internal/trip"
 )
 
@@ -917,6 +918,162 @@ func TestCreateManualDayItineraryItemNotFoundAndForbidden(t *testing.T) {
 	}
 }
 
+func TestSearchGooglePlacesHandlerReturnsResults(t *testing.T) {
+	backend := newFakeAuthBackend()
+	accessToken := loginTestUser(t, backend)
+	tripID := createTestTrip(t, backend, accessToken)
+	provider := &fakePlaceProvider{results: []placedomain.SearchResult{
+		{GooglePlaceID: "google-1", DisplayName: "도톤보리", FormattedAddress: "Osaka", PrimaryType: "tourist_attraction"},
+	}}
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/trips/"+tripID+"/days/2026-07-11/places/google/search?query=%20%EB%8F%84%ED%86%A4%EB%B3%B4%EB%A6%AC%20&limit=3", nil)
+	request.Header.Set("Authorization", "Bearer "+accessToken)
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true, PlaceProvider: provider}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusOK, recorder.Code, recorder.Body.String())
+	}
+	if provider.input.Query != "도톤보리" || provider.input.Limit != 3 {
+		t.Fatalf("expected provider input to be trimmed with limit, got %#v", provider.input)
+	}
+
+	var body struct {
+		Results []struct {
+			GooglePlaceID    string `json:"googlePlaceId"`
+			DisplayName      string `json:"displayName"`
+			FormattedAddress string `json:"formattedAddress"`
+			PrimaryType      string `json:"primaryType"`
+		} `json:"results"`
+	}
+	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(body.Results) != 1 || body.Results[0].GooglePlaceID != "google-1" || body.Results[0].DisplayName != "도톤보리" || body.Results[0].FormattedAddress != "Osaka" || body.Results[0].PrimaryType != "tourist_attraction" {
+		t.Fatalf("unexpected search results: %#v", body.Results)
+	}
+	if len(backend.dayItineraryItems) != 0 {
+		t.Fatalf("expected search not to persist itinerary items, got %#v", backend.dayItineraryItems)
+	}
+}
+
+func TestSearchGooglePlacesRequiresAuth(t *testing.T) {
+	backend := newFakeAuthBackend()
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/trips/00000000-0000-0000-0000-000000000001/days/2026-07-10/places/google/search?query=%EB%8F%84%ED%86%A4%EB%B3%B4%EB%A6%AC", nil)
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true, PlaceProvider: &fakePlaceProvider{}}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusUnauthorized, recorder.Code, recorder.Body.String())
+	}
+}
+
+func TestSearchGooglePlacesValidation(t *testing.T) {
+	backend := newFakeAuthBackend()
+	accessToken := loginTestUser(t, backend)
+	tripID := createTestTrip(t, backend, accessToken)
+
+	tests := []string{
+		"/trips/not-a-uuid/days/2026-07-10/places/google/search?query=%EB%8F%84%ED%86%A4%EB%B3%B4%EB%A6%AC",
+		"/trips/" + tripID + "/days/not-a-date/places/google/search?query=%EB%8F%84%ED%86%A4%EB%B3%B4%EB%A6%AC",
+		"/trips/" + tripID + "/days/2026-07-10/places/google/search?query=%EB%8F%84",
+		"/trips/" + tripID + "/days/2026-07-10/places/google/search?query=%EB%8F%84%ED%86%A4%EB%B3%B4%EB%A6%AC&limit=11",
+	}
+	for _, path := range tests {
+		t.Run(path, func(t *testing.T) {
+			provider := &fakePlaceProvider{}
+			recorder := httptest.NewRecorder()
+			request := httptest.NewRequest(http.MethodGet, path, nil)
+			request.Header.Set("Authorization", "Bearer "+accessToken)
+
+			NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true, PlaceProvider: provider}).ServeHTTP(recorder, request)
+
+			if recorder.Code != http.StatusBadRequest {
+				t.Fatalf("expected status %d, got %d with body %s", http.StatusBadRequest, recorder.Code, recorder.Body.String())
+			}
+			if provider.called {
+				t.Fatal("expected invalid request not to call provider")
+			}
+		})
+	}
+}
+
+func TestSearchGooglePlacesNotFoundAndForbidden(t *testing.T) {
+	backend := newFakeAuthBackend()
+	ownerToken := loginTestUser(t, backend)
+	tripID := createTestTrip(t, backend, ownerToken)
+	nonParticipantToken := loginTestUserWithSubject(t, backend, "apple-2", "지영")
+
+	tests := []struct {
+		name       string
+		path       string
+		token      string
+		expectCode int
+	}{
+		{name: "missing trip", path: "/trips/00000000-0000-0000-0000-000000000404/days/2026-07-10/places/google/search?query=%EB%8F%84%ED%86%A4%EB%B3%B4%EB%A6%AC", token: ownerToken, expectCode: http.StatusNotFound},
+		{name: "out of range", path: "/trips/" + tripID + "/days/2026-07-14/places/google/search?query=%EB%8F%84%ED%86%A4%EB%B3%B4%EB%A6%AC", token: ownerToken, expectCode: http.StatusNotFound},
+		{name: "forbidden", path: "/trips/" + tripID + "/days/2026-07-10/places/google/search?query=%EB%8F%84%ED%86%A4%EB%B3%B4%EB%A6%AC", token: nonParticipantToken, expectCode: http.StatusForbidden},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			provider := &fakePlaceProvider{}
+			recorder := httptest.NewRecorder()
+			request := httptest.NewRequest(http.MethodGet, tt.path, nil)
+			request.Header.Set("Authorization", "Bearer "+tt.token)
+
+			NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true, PlaceProvider: provider}).ServeHTTP(recorder, request)
+
+			if recorder.Code != tt.expectCode {
+				t.Fatalf("expected status %d, got %d with body %s", tt.expectCode, recorder.Code, recorder.Body.String())
+			}
+			if provider.called {
+				t.Fatal("expected auth/range failure not to call provider")
+			}
+		})
+	}
+}
+
+func TestSearchGooglePlacesProviderErrors(t *testing.T) {
+	backend := newFakeAuthBackend()
+	accessToken := loginTestUser(t, backend)
+	tripID := createTestTrip(t, backend, accessToken)
+	tests := []struct {
+		name       string
+		err        error
+		expectCode int
+		expectBody string
+	}{
+		{name: "unavailable", err: placedomain.ErrProviderUnavailable, expectCode: http.StatusBadGateway, expectBody: "PLACE_PROVIDER_UNAVAILABLE"},
+		{name: "rate limited", err: placedomain.ErrProviderRateLimited, expectCode: http.StatusTooManyRequests, expectBody: "PLACE_PROVIDER_RATE_LIMITED"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			request := httptest.NewRequest(http.MethodGet, "/trips/"+tripID+"/days/2026-07-10/places/google/search?query=%EB%8F%84%ED%86%A4%EB%B3%B4%EB%A6%AC", nil)
+			request.Header.Set("Authorization", "Bearer "+accessToken)
+
+			NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true, PlaceProvider: &fakePlaceProvider{err: tt.err}}).ServeHTTP(recorder, request)
+
+			if recorder.Code != tt.expectCode {
+				t.Fatalf("expected status %d, got %d with body %s", tt.expectCode, recorder.Code, recorder.Body.String())
+			}
+			var body struct {
+				Error struct {
+					Code string `json:"code"`
+				} `json:"error"`
+			}
+			if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+				t.Fatalf("decode response: %v", err)
+			}
+			if body.Error.Code != tt.expectBody {
+				t.Fatalf("expected error code %q, got %q", tt.expectBody, body.Error.Code)
+			}
+		})
+	}
+}
+
 func TestUpdateTripHandler(t *testing.T) {
 	backend := newFakeAuthBackend()
 	accessToken := loginTestUser(t, backend)
@@ -1646,6 +1803,19 @@ func (b *fakeAuthBackend) ListTripsByParticipantUser(_ context.Context, userID s
 		return trips[i].ID > trips[j].ID
 	})
 	return trips, nil
+}
+
+type fakePlaceProvider struct {
+	called  bool
+	input   placedomain.ProviderSearchInput
+	results []placedomain.SearchResult
+	err     error
+}
+
+func (p *fakePlaceProvider) Search(_ context.Context, input placedomain.ProviderSearchInput) ([]placedomain.SearchResult, error) {
+	p.called = true
+	p.input = input
+	return p.results, p.err
 }
 
 func testUUID(value int) string {
