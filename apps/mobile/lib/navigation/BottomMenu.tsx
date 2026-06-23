@@ -25,7 +25,7 @@ export function BottomMenu({ selected }: BottomMenuProps) {
         }}
         style={[styles.item, selected === 'home' ? styles.selectedItem : null]}
       >
-        <Text style={[styles.label, selected === 'home' ? styles.selectedLabel : null]}>홈</Text>
+        <Text style={[styles.label, selected === 'home' ? styles.selectedLabel : null]}>오늘</Text>
       </Pressable>
       <Pressable
         accessibilityRole="button"
