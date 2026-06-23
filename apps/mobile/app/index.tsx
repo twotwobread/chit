@@ -223,6 +223,7 @@ function TodayContent({ onAction, viewModel }: { onAction: (action: TodayAction)
         </View>
         <Text style={styles.address}>{viewModel.nextPlace.address}</Text>
       </View>
+      <RemainingPlacesSection section={viewModel.remainingSection} />
       <ActionButton action={viewModel.primaryAction} onAction={onAction} />
       <MultipleOngoingNotice notice={viewModel.multipleOngoingTripNotice} onAction={onAction} />
     </View>
@@ -234,6 +235,40 @@ function TodayDayHeader({ dayLabel, formattedDate, tripName }: { dayLabel: strin
     <View style={styles.dayHeader}>
       <Text style={styles.tripName}>{tripName}</Text>
       <Text style={styles.dayText}>{dayLabel} · {formattedDate}</Text>
+    </View>
+  );
+}
+
+function RemainingPlacesSection({ section }: { section: Extract<TodayExecutionViewModel, { status: 'success' }>['remainingSection'] }) {
+  return (
+    <View style={styles.remainingSection}>
+      <View style={styles.remainingHeader}>
+        <Text style={styles.remainingTitle}>{section.title}</Text>
+        {section.status === 'list' ? <Text style={styles.remainingCount}>{section.countLabel}</Text> : null}
+      </View>
+
+      {section.status === 'empty' ? (
+        <View style={styles.remainingEmptyPanel}>
+          <Text style={styles.remainingEmptyTitle}>{section.emptyTitle}</Text>
+          <Text style={styles.remainingHelper}>{section.helper}</Text>
+        </View>
+      ) : null}
+
+      {section.status === 'list' ? (
+        <View style={styles.remainingList}>
+          {section.items.map((item) => (
+            <View key={item.itemId} style={styles.remainingRow}>
+              <View style={styles.placeMetaRow}>
+                <Text style={styles.orderBadge}>{item.orderLabel}</Text>
+                {item.timeLabel ? <Text style={styles.timeLabel}>{item.timeLabel}</Text> : null}
+                <Text style={styles.placeType}>{item.placeTypeLabel}</Text>
+              </View>
+              <Text style={styles.remainingPlaceName}>{item.placeName}</Text>
+              <Text style={styles.address}>{item.address}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -385,6 +420,68 @@ const styles = StyleSheet.create({
     color: theme.color.textMuted,
     fontFamily: theme.font.family.regular,
     fontSize: theme.font.size.body,
+  },
+  remainingSection: {
+    gap: theme.space[4],
+  },
+  remainingHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  remainingTitle: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.subhead,
+    fontWeight: theme.font.weight.bold,
+  },
+  remainingCount: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.semibold,
+    fontSize: theme.font.size.caption,
+    fontWeight: theme.font.weight.semibold,
+  },
+  remainingEmptyPanel: {
+    backgroundColor: theme.color.surfaceSunken,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    gap: theme.space[2],
+    padding: theme.space[5],
+  },
+  remainingEmptyTitle: {
+    color: theme.color.textBody,
+    fontFamily: theme.font.family.semibold,
+    fontSize: theme.font.size.body,
+    fontWeight: theme.font.weight.semibold,
+  },
+  remainingHelper: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.label,
+  },
+  remainingList: {
+    gap: theme.space[3],
+  },
+  remainingRow: {
+    backgroundColor: theme.color.surfaceSunken,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    gap: theme.space[2],
+    padding: theme.space[4],
+  },
+  remainingPlaceName: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.subhead,
+    fontWeight: theme.font.weight.bold,
+  },
+  timeLabel: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.semibold,
+    fontSize: theme.font.size.caption,
+    fontWeight: theme.font.weight.semibold,
   },
   emptyPanel: {
     backgroundColor: theme.color.surfaceSunken,

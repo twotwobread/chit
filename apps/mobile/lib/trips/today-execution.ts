@@ -64,6 +64,29 @@ export type TodayEmptyItineraryViewModel = {
   multipleOngoingTripNotice: TodayMultipleOngoingTripNotice | null;
 };
 
+export type TodayRemainingPlaceRowViewModel = {
+  itemId: string;
+  orderLabel: string;
+  placeName: string;
+  placeTypeLabel: string;
+  address: string;
+  timeLabel: string | null;
+};
+
+export type TodayRemainingSectionViewModel =
+  | {
+      status: 'empty';
+      title: string;
+      emptyTitle: string;
+      helper: string;
+    }
+  | {
+      status: 'list';
+      title: string;
+      countLabel: string;
+      items: TodayRemainingPlaceRowViewModel[];
+    };
+
 export type TodaySuccessViewModel = {
   status: 'success';
   tripName: string;
@@ -76,6 +99,7 @@ export type TodaySuccessViewModel = {
     placeTypeLabel: string;
     address: string;
   };
+  remainingSection: TodayRemainingSectionViewModel;
   primaryAction: TodayRouteAction;
   multipleOngoingTripNotice: TodayMultipleOngoingTripNotice | null;
 };
@@ -138,7 +162,8 @@ export function buildTodayExecutionViewModel({
     multipleOngoingTripNotice: buildMultipleOngoingTripNotice(ongoingTripCount),
   };
 
-  const nextItem = firstOrderedItem(itinerary.items);
+  const orderedItems = orderedItineraryItems(itinerary.items);
+  const nextItem = orderedItems[0];
   if (!nextItem) {
     return {
       status: 'emptyItinerary',
@@ -158,6 +183,7 @@ export function buildTodayExecutionViewModel({
       placeTypeLabel: getPlaceTypeLabel(nextItem.place.placeType),
       address: nextItem.place.address,
     },
+    remainingSection: buildRemainingSection(orderedItems.slice(1)),
   };
 }
 
@@ -185,8 +211,33 @@ export function findTodayTripDay(days: TripDay[], today: string): TripDay | null
   return days.find((day) => day.date === today) ?? null;
 }
 
-function firstOrderedItem(items: DayItineraryItem[]): DayItineraryItem | null {
-  return [...items].sort((left, right) => left.itemOrder - right.itemOrder)[0] ?? null;
+function orderedItineraryItems(items: DayItineraryItem[]): DayItineraryItem[] {
+  return [...items].sort((left, right) => left.itemOrder - right.itemOrder);
+}
+
+function buildRemainingSection(items: DayItineraryItem[]): TodayRemainingSectionViewModel {
+  if (items.length === 0) {
+    return {
+      status: 'empty',
+      title: '남은 장소',
+      emptyTitle: '다음 장소 이후 남은 장소가 없어요.',
+      helper: '도착하면 오늘 일정이 끝나요.',
+    };
+  }
+
+  return {
+    status: 'list',
+    title: '남은 장소',
+    countLabel: `${items.length}곳 남았어요`,
+    items: items.map((item) => ({
+      itemId: item.id,
+      orderLabel: String(item.itemOrder),
+      placeName: item.place.name,
+      placeTypeLabel: getPlaceTypeLabel(item.place.placeType),
+      address: item.place.address,
+      timeLabel: null,
+    })),
+  };
 }
 
 function buildMultipleOngoingTripNotice(ongoingTripCount: number): TodayMultipleOngoingTripNotice | null {

@@ -146,7 +146,7 @@ test('builds an empty-itinerary Today state with current day context and day iti
   });
 });
 
-test('maps the first ordered itinerary item to the next place and ignores lodging-only hints', () => {
+test('maps the first ordered itinerary item to the next place and subsequent items to the remaining list', () => {
   const viewModel = buildTodayExecutionViewModel({
     selectedTrip: trip({ id: 'trip-current' }),
     tripDetail: tripDetail(),
@@ -173,6 +173,16 @@ test('maps the first ordered itinerary item to the next place and ignores lodgin
             address: '1 Chome Dotonbori, Chuo Ward, Osaka',
           },
         }),
+        item({
+          id: 'item-third',
+          itemOrder: 3,
+          place: {
+            id: 'place-third',
+            name: '오사카성',
+            placeType: 'sights',
+            address: '1-1 Osakajo, Chuo Ward, Osaka',
+          },
+        }),
       ],
     }),
     today: '2026-07-10',
@@ -191,8 +201,60 @@ test('maps the first ordered itinerary item to the next place and ignores lodgin
       placeTypeLabel: '식당',
       address: '1 Chome Dotonbori, Chuo Ward, Osaka',
     },
+    remainingSection: {
+      status: 'list',
+      title: '남은 장소',
+      countLabel: '2곳 남았어요',
+      items: [
+        {
+          itemId: 'item-lodging',
+          orderLabel: '2',
+          placeName: '호텔 니코 오사카',
+          placeTypeLabel: '숙소',
+          address: '1 Chome-3-3 Nishi-Shinsaibashi, Chuo Ward, Osaka',
+          timeLabel: null,
+        },
+        {
+          itemId: 'item-third',
+          orderLabel: '3',
+          placeName: '오사카성',
+          placeTypeLabel: '관광지',
+          address: '1-1 Osakajo, Chuo Ward, Osaka',
+          timeLabel: null,
+        },
+      ],
+    },
     primaryAction: { kind: 'route', label: '오늘 일정 보기', route: '/trips/trip-current/days/2026-07-10' },
     multipleOngoingTripNotice: null,
+  });
+
+  const firstRemaining = viewModel.status === 'success' && viewModel.remainingSection.status === 'list'
+    ? viewModel.remainingSection.items[0]
+    : null;
+  assert.ok(firstRemaining);
+  assert.equal('route' in firstRemaining, false);
+  assert.equal('action' in firstRemaining, false);
+});
+
+test('keeps the remaining section visible with an empty message when only the next place exists', () => {
+  const viewModel = buildTodayExecutionViewModel({
+    selectedTrip: trip({ id: 'trip-current' }),
+    tripDetail: tripDetail(),
+    itinerary: itinerary({ items: [item({ id: 'item-next', itemOrder: 1 })] }),
+    today: '2026-07-10',
+    ongoingTripCount: 1,
+  });
+
+  assert.equal(viewModel.status, 'success');
+  if (viewModel.status !== 'success') {
+    return;
+  }
+
+  assert.deepEqual(viewModel.remainingSection, {
+    status: 'empty',
+    title: '남은 장소',
+    emptyTitle: '다음 장소 이후 남은 장소가 없어요.',
+    helper: '도착하면 오늘 일정이 끝나요.',
   });
 });
 
