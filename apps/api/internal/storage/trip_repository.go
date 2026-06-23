@@ -178,6 +178,24 @@ func (s *Store) ListTripParticipantPreviewNames(ctx context.Context, tripID stri
 	return s.queries.ListTripParticipantPreviewByTripID(ctx, mustUUID(tripID))
 }
 
+func (s *Store) ListTripParticipants(ctx context.Context, tripID string) ([]trip.ParticipantListItem, error) {
+	rows, err := s.queries.ListTripParticipantsByTripID(ctx, mustUUID(tripID))
+	if err != nil {
+		return nil, err
+	}
+
+	participants := make([]trip.ParticipantListItem, 0, len(rows))
+	for _, row := range rows {
+		participants = append(participants, trip.ParticipantListItem{
+			ParticipantID: row.ID,
+			DisplayName:   row.DisplayName,
+			Role:          row.Role,
+			JoinedAt:      row.JoinedAt.Time,
+		})
+	}
+	return participants, nil
+}
+
 func (s *Store) ListTripsByParticipantUser(ctx context.Context, userID string) ([]trip.ListItem, error) {
 	rows, err := s.queries.ListTripsByParticipantUser(ctx, mustUUID(userID))
 	if err != nil {

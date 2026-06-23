@@ -215,6 +215,42 @@ func (s *Service) GetDetail(ctx context.Context, userID string, tripID string) (
 	}, nil
 }
 
+func (s *Service) ListParticipants(ctx context.Context, userID string, tripID string) ([]ParticipantListItem, error) {
+	if strings.TrimSpace(userID) == "" {
+		return nil, ErrUnauthorized
+	}
+
+	tripID = strings.TrimSpace(tripID)
+	if !isUUID(tripID) {
+		return nil, ErrValidation
+	}
+
+	_, ok, err := s.repo.GetTripByID(ctx, tripID)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, ErrNotFound
+	}
+
+	isParticipant, err := s.repo.IsTripParticipant(ctx, tripID, userID)
+	if err != nil {
+		return nil, err
+	}
+	if !isParticipant {
+		return nil, ErrForbidden
+	}
+
+	participants, err := s.repo.ListTripParticipants(ctx, tripID)
+	if err != nil {
+		return nil, err
+	}
+	for index, participant := range participants {
+		participants[index].DisplayName = participantDisplayName(participant.DisplayName)
+	}
+	return participants, nil
+}
+
 func (s *Service) GetDayItinerary(ctx context.Context, userID string, tripID string, date string) (GetDayItineraryResult, error) {
 	if strings.TrimSpace(userID) == "" {
 		return GetDayItineraryResult{}, ErrUnauthorized

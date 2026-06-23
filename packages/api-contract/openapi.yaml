@@ -302,6 +302,58 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /trips/{tripId}/participants:
+    get:
+      operationId: listTripParticipants
+      summary: List trip participants
+      description: Returns the current accepted participants for a trip. Only authenticated current trip participants can access the list.
+      tags:
+        - Trips
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Current trip participants.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListTripParticipantsResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /trips/{tripId}/days/{date}/itinerary:
     get:
       operationId: getDayItinerary
@@ -1334,6 +1386,32 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/TripListItem'
+    TripParticipantListItem:
+      type: object
+      required:
+        - participantId
+        - displayName
+        - role
+        - joinedAt
+      properties:
+        participantId:
+          type: string
+        displayName:
+          type: string
+        role:
+          $ref: '#/components/schemas/TripParticipantRole'
+        joinedAt:
+          type: string
+          format: date-time
+    ListTripParticipantsResponse:
+      type: object
+      required:
+        - participants
+      properties:
+        participants:
+          type: array
+          items:
+            $ref: '#/components/schemas/TripParticipantListItem'
     TripParticipant:
       type: object
       required:

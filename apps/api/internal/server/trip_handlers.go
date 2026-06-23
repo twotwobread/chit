@@ -78,6 +78,26 @@ func (s apiServer) GetTripDetail(w http.ResponseWriter, r *http.Request, tripId 
 	writeJSON(w, http.StatusOK, getTripDetailResponseToOpenAPI(result))
 }
 
+func (s apiServer) ListTripParticipants(w http.ResponseWriter, r *http.Request, tripId string) {
+	if s.auth == nil || s.trips == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "trip participants are not configured", nil)
+		return
+	}
+
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	participants, err := s.trips.ListParticipants(r.Context(), authContext.UserID, tripId)
+	if err != nil {
+		writeTripDetailError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, listTripParticipantsResponseToOpenAPI(participants))
+}
+
 func (s apiServer) GetDayItinerary(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date) {
 	if s.auth == nil || s.trips == nil {
 		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "day itinerary is not configured", nil)

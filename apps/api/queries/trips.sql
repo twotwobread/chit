@@ -82,6 +82,19 @@ ORDER BY
   id ASC
 LIMIT 3;
 
+-- name: ListTripParticipantsByTripID :many
+SELECT
+  id::text,
+  display_name,
+  role,
+  joined_at
+FROM trip_participants
+WHERE trip_id = $1::uuid
+ORDER BY
+  CASE WHEN role = 'owner' THEN 0 ELSE 1 END,
+  joined_at ASC,
+  id ASC;
+
 -- name: ListTripsByParticipantUser :many
 SELECT
   t.id::text AS id,

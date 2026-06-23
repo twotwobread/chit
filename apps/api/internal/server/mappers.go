@@ -96,6 +96,19 @@ func getTripDetailResponseToOpenAPI(result trip.GetDetailResult) openapi.GetTrip
 	}
 }
 
+func listTripParticipantsResponseToOpenAPI(participants []trip.ParticipantListItem) openapi.ListTripParticipantsResponse {
+	items := make([]openapi.TripParticipantListItem, 0, len(participants))
+	for _, participant := range participants {
+		items = append(items, openapi.TripParticipantListItem{
+			ParticipantId: participant.ParticipantID,
+			DisplayName:   participant.DisplayName,
+			Role:          openapi.TripParticipantRole(participant.Role),
+			JoinedAt:      participant.JoinedAt,
+		})
+	}
+	return openapi.ListTripParticipantsResponse{Participants: items}
+}
+
 func updateTripResponseToOpenAPI(result trip.UpdateResult) openapi.UpdateTripResponse {
 	return openapi.UpdateTripResponse{Trip: tripToOpenAPI(result.Trip)}
 }

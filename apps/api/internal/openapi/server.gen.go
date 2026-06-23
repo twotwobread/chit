@@ -244,6 +244,11 @@ type LinkedIdentity struct {
 	Provider      AuthProvider `json:"provider"`
 }
 
+// ListTripParticipantsResponse defines model for ListTripParticipantsResponse.
+type ListTripParticipantsResponse struct {
+	Participants []TripParticipantListItem `json:"participants"`
+}
+
 // ListTripsResponse defines model for ListTripsResponse.
 type ListTripsResponse struct {
 	Trips []TripListItem `json:"trips"`
@@ -395,6 +400,14 @@ type TripParticipant struct {
 	UserId      string              `json:"userId"`
 }
 
+// TripParticipantListItem defines model for TripParticipantListItem.
+type TripParticipantListItem struct {
+	DisplayName   string              `json:"displayName"`
+	JoinedAt      time.Time           `json:"joinedAt"`
+	ParticipantId string              `json:"participantId"`
+	Role          TripParticipantRole `json:"role"`
+}
+
 // TripParticipantRole defines model for TripParticipantRole.
 type TripParticipantRole string
 
@@ -531,6 +544,9 @@ type ServerInterface interface {
 	// Search Google Places for a trip day
 	// (GET /trips/{tripId}/days/{date}/places/google/search)
 	SearchGooglePlaces(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, params SearchGooglePlacesParams)
+	// List trip participants
+	// (GET /trips/{tripId}/participants)
+	ListTripParticipants(w http.ResponseWriter, r *http.Request, tripId string)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
@@ -642,6 +658,12 @@ func (_ Unimplemented) UpdateDayItineraryItem(w http.ResponseWriter, r *http.Req
 // Search Google Places for a trip day
 // (GET /trips/{tripId}/days/{date}/places/google/search)
 func (_ Unimplemented) SearchGooglePlaces(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, params SearchGooglePlacesParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// List trip participants
+// (GET /trips/{tripId}/participants)
+func (_ Unimplemented) ListTripParticipants(w http.ResponseWriter, r *http.Request, tripId string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1187,6 +1209,37 @@ func (siw *ServerInterfaceWrapper) SearchGooglePlaces(w http.ResponseWriter, r *
 	handler.ServeHTTP(w, r)
 }
 
+// ListTripParticipants operation middleware
+func (siw *ServerInterfaceWrapper) ListTripParticipants(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListTripParticipants(w, r, tripId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 type UnescapedCookieParamError struct {
 	ParamName string
 	Err       error
@@ -1353,6 +1406,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/trips/{tripId}/days/{date}/places/google/search", wrapper.SearchGooglePlaces)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/trips/{tripId}/participants", wrapper.ListTripParticipants)
 	})
 
 	return r
