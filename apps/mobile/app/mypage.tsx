@@ -12,7 +12,7 @@ import {
   type LegalLinkId,
   type LegalLinkOpenState,
 } from '../lib/app-info/legal';
-import { getCurrentUserWithRefresh, logoutCurrentSession, MobileAuthError } from '../lib/auth/client';
+import { getMeWithRefresh, logoutCurrentSession, MobileAuthError } from '../lib/auth/client';
 import { createLogoutFlow, type LogoutFlow } from '../lib/auth/logout-flow';
 import { clearStoredSession, readStoredSession } from '../lib/auth/session';
 import { theme } from '../lib/design';
@@ -93,7 +93,7 @@ export default function MyPageScreen() {
         return;
       }
 
-      const me = await getCurrentUserWithRefresh();
+      const me = await getMeWithRefresh();
       setState({ status: 'ready', me });
       void loadTrips();
     } catch (error) {

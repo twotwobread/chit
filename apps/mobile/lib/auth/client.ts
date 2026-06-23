@@ -36,7 +36,7 @@ type AuthServiceClient = {
   }) => Promise<AuthLoginResponse>;
   linkOAuthProvider: (request: { provider: AuthProvider; credential: OAuthCredential }) => Promise<AuthLinkResponse>;
   refreshToken: (request: { refreshToken: string }) => Promise<AuthRefreshResponse>;
-  getCurrentUser: () => Promise<AuthMeResponse>;
+  getMe: () => Promise<AuthMeResponse>;
   logout: () => Promise<unknown>;
 };
 
@@ -60,7 +60,7 @@ const defaultAuthClientDeps: AuthClientDeps = {
   clearProviderLocalSessions: clearOAuthProviderLocalSessions,
 };
 
-let currentUserWithRefreshInFlight: Promise<AuthMeResponse> | null = null;
+let meWithRefreshInFlight: Promise<AuthMeResponse> | null = null;
 let logoutInFlight: Promise<void> | null = null;
 
 export class MobileAuthError extends Error {
@@ -110,26 +110,26 @@ export async function linkOAuthProvider(
   }
 }
 
-export function getCurrentUserWithRefresh(deps: AuthClientDeps = defaultAuthClientDeps): Promise<AuthMeResponse> {
-  if (currentUserWithRefreshInFlight) {
-    return currentUserWithRefreshInFlight;
+export function getMeWithRefresh(deps: AuthClientDeps = defaultAuthClientDeps): Promise<AuthMeResponse> {
+  if (meWithRefreshInFlight) {
+    return meWithRefreshInFlight;
   }
 
-  const promise = getCurrentUserWithRefreshOnce(deps).finally(() => {
-    if (currentUserWithRefreshInFlight === promise) {
-      currentUserWithRefreshInFlight = null;
+  const promise = getMeWithRefreshOnce(deps).finally(() => {
+    if (meWithRefreshInFlight === promise) {
+      meWithRefreshInFlight = null;
     }
   });
-  currentUserWithRefreshInFlight = promise;
+  meWithRefreshInFlight = promise;
   return promise;
 }
 
-async function getCurrentUserWithRefreshOnce(deps: AuthClientDeps): Promise<AuthMeResponse> {
+async function getMeWithRefreshOnce(deps: AuthClientDeps): Promise<AuthMeResponse> {
   const session = await requireSession(deps);
   deps.configureApi(session.tokens.accessToken);
 
   try {
-    return await deps.authService.getCurrentUser();
+    return await deps.authService.getMe();
   } catch (error) {
     if (getErrorCode(error) !== 'UNAUTHORIZED') {
       throw toMobileAuthError(error);
@@ -140,7 +140,7 @@ async function getCurrentUserWithRefreshOnce(deps: AuthClientDeps): Promise<Auth
   deps.configureApi(refreshed.tokens.accessToken);
 
   try {
-    return await deps.authService.getCurrentUser();
+    return await deps.authService.getMe();
   } catch (error) {
     if (isNonRetryableAuthError(error)) {
       await bestEffortClearStoredSession(deps);
