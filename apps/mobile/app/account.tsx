@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 
 import type { AuthMeResponse, AuthProvider } from '@i-um/api-contract';
 
-import { getCurrentUserWithRefresh, linkOAuthProvider, logoutCurrentSession, MobileAuthError } from '../lib/auth/client';
+import { getMeWithRefresh, linkOAuthProvider, logoutCurrentSession, MobileAuthError } from '../lib/auth/client';
 import { createLogoutFlow, type LogoutFlow } from '../lib/auth/logout-flow';
 import { getOAuthCredential } from '../lib/auth/oauth';
 import { theme } from '../lib/design';
@@ -31,7 +31,7 @@ export default function AccountScreen() {
   const load = useCallback(async () => {
     setState({ status: 'loading' });
     try {
-      const me = await getCurrentUserWithRefresh();
+      const me = await getMeWithRefresh();
       setState({ status: 'ready', me });
     } catch {
       setState({ status: 'error', message: '다시 로그인해주세요.' });
@@ -50,7 +50,7 @@ export default function AccountScreen() {
     try {
       const credential = await getOAuthCredential(provider);
       await linkOAuthProvider(provider, credential);
-      const me = await getCurrentUserWithRefresh();
+      const me = await getMeWithRefresh();
       setState({ status: 'ready', me, message: '로그인 방법이 연결되었습니다.' });
     } catch (error) {
       setState({ status: 'ready', me: state.me, message: linkErrorMessage(error) });

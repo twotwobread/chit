@@ -170,6 +170,97 @@ func TestLoginWithOAuthRejectsDevCredentialWhenDisabled(t *testing.T) {
 	}
 }
 
+func TestGetMeHandlerMatchesDeprecatedAuthMe(t *testing.T) {
+	backend := newFakeAuthBackend()
+	accessToken := loginTestUser(t, backend)
+
+	requestCurrentProfile := func(path string) (int, string) {
+		t.Helper()
+		recorder := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodGet, path, nil)
+		request.Header.Set("Authorization", "Bearer "+accessToken)
+
+		NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+		return recorder.Code, recorder.Body.String()
+	}
+
+	meStatus, meBody := requestCurrentProfile("/me")
+	legacyStatus, legacyBody := requestCurrentProfile("/auth/me")
+
+	if meStatus != http.StatusOK {
+		t.Fatalf("expected /me status %d, got %d with body %s", http.StatusOK, meStatus, meBody)
+	}
+	if legacyStatus != http.StatusOK {
+		t.Fatalf("expected /auth/me status %d, got %d with body %s", http.StatusOK, legacyStatus, legacyBody)
+	}
+	if meBody != legacyBody {
+		t.Fatalf("expected /me and /auth/me response bodies to match\n/me: %s\n/auth/me: %s", meBody, legacyBody)
+	}
+
+	var body struct {
+		User struct {
+			ID          string  `json:"id"`
+			DisplayName string  `json:"displayName"`
+			Email       *string `json:"email"`
+			AvatarURL   *string `json:"avatarUrl"`
+		} `json:"user"`
+		LinkedProviders []string `json:"linkedProviders"`
+	}
+	if err := json.Unmarshal([]byte(meBody), &body); err != nil {
+		t.Fatalf("decode /me response: %v", err)
+	}
+	if body.User.ID != "user-1" || body.User.DisplayName != "민수" {
+		t.Fatalf("unexpected user profile: %#v", body.User)
+	}
+	if body.User.Email == nil || *body.User.Email != "apple-1@example.com" {
+		t.Fatalf("expected email apple-1@example.com, got %#v", body.User.Email)
+	}
+	if body.User.AvatarURL != nil {
+		t.Fatalf("expected null avatarUrl, got %#v", body.User.AvatarURL)
+	}
+	if len(body.LinkedProviders) != 1 || body.LinkedProviders[0] != "apple" {
+		t.Fatalf("expected linked provider apple, got %#v", body.LinkedProviders)
+	}
+}
+
+func TestGetMeHandlerMatchesDeprecatedAuthMeUnauthorized(t *testing.T) {
+	backend := newFakeAuthBackend()
+
+	requestCurrentProfile := func(path string) (int, string) {
+		t.Helper()
+		recorder := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodGet, path, nil)
+
+		NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+		return recorder.Code, recorder.Body.String()
+	}
+
+	meStatus, meBody := requestCurrentProfile("/me")
+	legacyStatus, legacyBody := requestCurrentProfile("/auth/me")
+
+	if meStatus != http.StatusUnauthorized {
+		t.Fatalf("expected /me status %d, got %d with body %s", http.StatusUnauthorized, meStatus, meBody)
+	}
+	if legacyStatus != http.StatusUnauthorized {
+		t.Fatalf("expected /auth/me status %d, got %d with body %s", http.StatusUnauthorized, legacyStatus, legacyBody)
+	}
+	if meBody != legacyBody {
+		t.Fatalf("expected unauthorized bodies to match\n/me: %s\n/auth/me: %s", meBody, legacyBody)
+	}
+
+	var body struct {
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal([]byte(meBody), &body); err != nil {
+		t.Fatalf("decode /me unauthorized response: %v", err)
+	}
+	if body.Error.Code != "UNAUTHORIZED" {
+		t.Fatalf("expected UNAUTHORIZED, got %q", body.Error.Code)
+	}
+}
+
 func TestCreateTripHandler(t *testing.T) {
 	backend := newFakeAuthBackend()
 	accessToken := loginTestUser(t, backend)

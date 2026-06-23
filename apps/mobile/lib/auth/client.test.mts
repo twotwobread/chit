@@ -4,7 +4,7 @@ import test from 'node:test';
 import type { AuthLoginResponse, AuthMeResponse, AuthRefreshResponse } from '@i-um/api-contract';
 
 import {
-  getCurrentUserWithRefresh,
+  getMeWithRefresh,
   logoutCurrentSession,
   MobileAuthError,
   type AuthClientDeps,
@@ -38,7 +38,7 @@ const refreshResponse: AuthRefreshResponse = { result: 'refresh_success', tokens
 type DepsOptions = {
   stored?: StoredSession | null;
   readResult?: StoredSessionReadResult;
-  getCurrentUser?: () => Promise<AuthMeResponse>;
+  getMe?: () => Promise<AuthMeResponse>;
   refreshToken?: () => Promise<AuthRefreshResponse>;
   logout?: () => Promise<unknown>;
   saveStoredSession?: (session: StoredSession) => Promise<void>;
@@ -52,7 +52,7 @@ function createDeps(options: DepsOptions = {}) {
     authService: {
       loginWithOAuth: async () => loginResponse,
       linkOAuthProvider: async () => ({ result: 'provider_link_success', linkedIdentity: { provider: 'kakao' } }),
-      getCurrentUser: options.getCurrentUser ?? (async () => me),
+      getMe: options.getMe ?? (async () => me),
       refreshToken: options.refreshToken ?? (async () => refreshResponse),
       logout:
         options.logout ??
@@ -91,15 +91,15 @@ function apiError(code: string): Error & { body: { error: { code: string } }; st
 test('does not call auth API when stored session is missing', async () => {
   const { deps, calls } = createDeps({
     readResult: { status: 'missing' },
-    getCurrentUser: async () => {
-      throw new Error('getCurrentUser must not be called');
+    getMe: async () => {
+      throw new Error('getMe must not be called');
     },
     refreshToken: async () => {
       throw new Error('refreshToken must not be called');
     },
   });
 
-  await assert.rejects(() => getCurrentUserWithRefresh(deps), (error) => {
+  await assert.rejects(() => getMeWithRefresh(deps), (error) => {
     assert.ok(error instanceof MobileAuthError);
     assert.equal(error.code, 'UNAUTHORIZED');
     return true;
@@ -110,15 +110,15 @@ test('does not call auth API when stored session is missing', async () => {
 test('does not call auth API when stored session is corrupt', async () => {
   const { deps, calls } = createDeps({
     readResult: { status: 'corrupt' },
-    getCurrentUser: async () => {
-      throw new Error('getCurrentUser must not be called');
+    getMe: async () => {
+      throw new Error('getMe must not be called');
     },
     refreshToken: async () => {
       throw new Error('refreshToken must not be called');
     },
   });
 
-  await assert.rejects(() => getCurrentUserWithRefresh(deps), (error) => {
+  await assert.rejects(() => getMeWithRefresh(deps), (error) => {
     assert.ok(error instanceof MobileAuthError);
     assert.equal(error.code, 'UNAUTHORIZED');
     return true;
@@ -135,7 +135,7 @@ test('restores current user with a valid stored access token without refreshing'
     },
   });
 
-  assert.deepEqual(await getCurrentUserWithRefresh(deps), me);
+  assert.deepEqual(await getMeWithRefresh(deps), me);
   assert.equal(refreshCalls, 0);
   assert.deepEqual(calls, ['configure:old-access-token']);
 });
@@ -143,7 +143,7 @@ test('restores current user with a valid stored access token without refreshing'
 test('refreshes once after unauthorized current user, saves rotated tokens, then retries current user', async () => {
   let getMeCalls = 0;
   const { deps, calls, getStored } = createDeps({
-    getCurrentUser: async () => {
+    getMe: async () => {
       getMeCalls += 1;
       if (getMeCalls === 1) {
         throw apiError('UNAUTHORIZED');
@@ -152,7 +152,7 @@ test('refreshes once after unauthorized current user, saves rotated tokens, then
     },
   });
 
-  assert.deepEqual(await getCurrentUserWithRefresh(deps), me);
+  assert.deepEqual(await getMeWithRefresh(deps), me);
   assert.equal(getMeCalls, 2);
   assert.equal(getStored()?.tokens.refreshToken, 'new-refresh-token');
   assert.deepEqual(calls, [
@@ -165,7 +165,7 @@ test('refreshes once after unauthorized current user, saves rotated tokens, then
 
 test('clears local session on non-retryable refresh failure', async () => {
   const { deps, getStored } = createDeps({
-    getCurrentUser: async () => {
+    getMe: async () => {
       throw apiError('UNAUTHORIZED');
     },
     refreshToken: async () => {
@@ -173,7 +173,7 @@ test('clears local session on non-retryable refresh failure', async () => {
     },
   });
 
-  await assert.rejects(() => getCurrentUserWithRefresh(deps), (error) => {
+  await assert.rejects(() => getMeWithRefresh(deps), (error) => {
     assert.ok(error instanceof MobileAuthError);
     assert.equal(error.code, 'INVALID_REFRESH_TOKEN');
     return true;
@@ -183,7 +183,7 @@ test('clears local session on non-retryable refresh failure', async () => {
 
 test('keeps local session on retryable refresh transport failure', async () => {
   const { deps, getStored } = createDeps({
-    getCurrentUser: async () => {
+    getMe: async () => {
       throw apiError('UNAUTHORIZED');
     },
     refreshToken: async () => {
@@ -191,7 +191,7 @@ test('keeps local session on retryable refresh transport failure', async () => {
     },
   });
 
-  await assert.rejects(() => getCurrentUserWithRefresh(deps), (error) => {
+  await assert.rejects(() => getMeWithRefresh(deps), (error) => {
     assert.ok(error instanceof MobileAuthError);
     assert.equal(error.code, 'UNKNOWN');
     return true;
@@ -202,7 +202,7 @@ test('keeps local session on retryable refresh transport failure', async () => {
 test('does not return authenticated success when saving rotated tokens fails', async () => {
   let getMeCalls = 0;
   const { deps, getStored } = createDeps({
-    getCurrentUser: async () => {
+    getMe: async () => {
       getMeCalls += 1;
       if (getMeCalls === 1) {
         throw apiError('UNAUTHORIZED');
@@ -214,7 +214,7 @@ test('does not return authenticated success when saving rotated tokens fails', a
     },
   });
 
-  await assert.rejects(() => getCurrentUserWithRefresh(deps), (error) => {
+  await assert.rejects(() => getMeWithRefresh(deps), (error) => {
     assert.ok(error instanceof MobileAuthError);
     assert.equal(error.code, 'UNAUTHORIZED');
     return true;
@@ -227,7 +227,7 @@ test('shares one in-flight refresh across concurrent current-user restore caller
   let getMeCalls = 0;
   let refreshCalls = 0;
   const { deps } = createDeps({
-    getCurrentUser: async () => {
+    getMe: async () => {
       getMeCalls += 1;
       if (getMeCalls === 1) {
         throw apiError('UNAUTHORIZED');
@@ -240,7 +240,7 @@ test('shares one in-flight refresh across concurrent current-user restore caller
     },
   });
 
-  const [first, second] = await Promise.all([getCurrentUserWithRefresh(deps), getCurrentUserWithRefresh(deps)]);
+  const [first, second] = await Promise.all([getMeWithRefresh(deps), getMeWithRefresh(deps)]);
 
   assert.deepEqual(first, me);
   assert.deepEqual(second, me);

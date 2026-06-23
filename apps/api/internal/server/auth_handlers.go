@@ -104,6 +104,10 @@ func (s apiServer) Logout(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, openapi.AuthLogoutResponse{Result: openapi.LogoutSuccess})
 }
 
+func (s apiServer) GetMe(w http.ResponseWriter, r *http.Request) {
+	s.GetCurrentUser(w, r)
+}
+
 func (s apiServer) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
 	if s.auth == nil {
 		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "auth is not configured", nil)

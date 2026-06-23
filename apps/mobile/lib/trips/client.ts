@@ -18,25 +18,25 @@ import {
   type UpdateTripResponse,
 } from '@i-um/api-contract';
 
-import { getCurrentUserWithRefresh } from '../auth/client';
+import { getMeWithRefresh } from '../auth/client';
 
 export async function createTrip(request: CreateTripRequest): Promise<CreateTripResponse> {
-  await getCurrentUserWithRefresh();
+  await getMeWithRefresh();
   return TripsService.createTrip(request);
 }
 
 export async function getTripDetail(tripId: string): Promise<GetTripDetailResponse> {
-  await getCurrentUserWithRefresh();
+  await getMeWithRefresh();
   return TripsService.getTripDetail(tripId);
 }
 
 export async function listTripParticipants(tripId: string): Promise<ListTripParticipantsResponse> {
-  await getCurrentUserWithRefresh();
+  await getMeWithRefresh();
   return TripsService.listTripParticipants(tripId);
 }
 
 export async function getTripDayItinerary(tripId: string, date: string): Promise<GetDayItineraryResponse> {
-  await getCurrentUserWithRefresh();
+  await getMeWithRefresh();
   return TripsService.getDayItinerary(tripId, date);
 }
 
@@ -45,7 +45,7 @@ export async function createManualDayItineraryItem(
   date: string,
   request: CreateManualDayItineraryItemRequest,
 ): Promise<CreateManualDayItineraryItemResponse> {
-  await getCurrentUserWithRefresh();
+  await getMeWithRefresh();
   return TripsService.createManualDayItineraryItem(tripId, date, request);
 }
 
@@ -54,12 +54,12 @@ export async function setDayLodgingPlace(
   date: string,
   request: SetDayLodgingPlaceRequest,
 ): Promise<SetDayLodgingPlaceResponse> {
-  await getCurrentUserWithRefresh();
+  await getMeWithRefresh();
   return TripsService.setDayLodgingPlace(tripId, date, request);
 }
 
 export async function clearDayLodgingPlace(tripId: string, date: string): Promise<void> {
-  await getCurrentUserWithRefresh();
+  await getMeWithRefresh();
   return TripsService.clearDayLodgingPlace(tripId, date);
 }
 
@@ -68,7 +68,7 @@ export async function reorderDayItineraryItems(
   date: string,
   request: ReorderDayItineraryItemsRequest,
 ): Promise<ReorderDayItineraryItemsResponse> {
-  await getCurrentUserWithRefresh();
+  await getMeWithRefresh();
   return TripsService.reorderDayItineraryItems(tripId, date, request);
 }
 
@@ -78,26 +78,26 @@ export async function updateDayItineraryItem(
   itemId: string,
   request: UpdateDayItineraryItemRequest,
 ): Promise<UpdateDayItineraryItemResponse> {
-  await getCurrentUserWithRefresh();
+  await getMeWithRefresh();
   return TripsService.updateDayItineraryItem(tripId, date, itemId, request);
 }
 
 export async function deleteDayItineraryItem(tripId: string, date: string, itemId: string): Promise<void> {
-  await getCurrentUserWithRefresh();
+  await getMeWithRefresh();
   return TripsService.deleteDayItineraryItem(tripId, date, itemId);
 }
 
 export async function updateTrip(tripId: string, request: UpdateTripRequest): Promise<UpdateTripResponse> {
-  await getCurrentUserWithRefresh();
+  await getMeWithRefresh();
   return TripsService.updateTrip(tripId, request);
 }
 
 export async function deleteTrip(tripId: string): Promise<void> {
-  await getCurrentUserWithRefresh();
+  await getMeWithRefresh();
   return TripsService.deleteTrip(tripId);
 }
 
 export async function listMyTrips(): Promise<ListTripsResponse> {
-  await getCurrentUserWithRefresh();
+  await getMeWithRefresh();
   return TripsService.listTrips();
 }

@@ -1066,10 +1066,40 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /me:
+    get:
+      operationId: getMe
+      summary: Return the current user and linked providers
+      description: Canonical current-profile endpoint. Returns the same AuthMeResponse shape as deprecated GET /auth/me.
+      tags:
+        - Auth
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthMeResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /auth/me:
     get:
       operationId: getCurrentUser
       summary: Return the current user and linked providers
+      description: Deprecated compatibility alias for GET /me. Use GET /me for new clients.
+      deprecated: true
       tags:
         - Auth
       security:

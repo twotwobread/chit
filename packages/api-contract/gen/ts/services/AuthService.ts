@@ -96,6 +96,24 @@ export class AuthService {
     }
     /**
      * Return the current user and linked providers
+     * Canonical current-profile endpoint. Returns the same AuthMeResponse shape as deprecated GET /auth/me.
+     * @returns AuthMeResponse Current user.
+     * @throws ApiError
+     */
+    public static getMe(): CancelablePromise<AuthMeResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/me',
+            errors: {
+                401: `Unauthorized.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
+     * @deprecated
+     * Return the current user and linked providers
+     * Deprecated compatibility alias for GET /me. Use GET /me for new clients.
      * @returns AuthMeResponse Current user.
      * @throws ApiError
      */
