@@ -73,6 +73,39 @@ Committed generated artifacts:
 
 These generated artifacts are read-only, committed, and reviewable. Update them only by running `pnpm generate`.
 
+## Local Environment
+
+로컬 secret/env 값은 프로젝트 루트의 `.env`를 source of truth로 둡니다. `.env`는 git ignore 대상이며, 커밋하지 않습니다.
+
+처음 설정할 때는 샘플을 복사해 실제 값을 채웁니다.
+
+```bash
+cp .env.example .env
+```
+
+Go API는 `.env`를 자동 로드하지 않으므로 API, migration, test 명령을 실행하기 전에 현재 shell에 로드합니다.
+
+```bash
+set -a; source .env; set +a
+```
+
+Feature worktree에서는 `.env`를 복사하지 말고 루트 `.env`로 symlink합니다. 이렇게 하면 key rotation이나 local URL 변경이 모든 worktree에 같이 반영됩니다.
+
+Worktree 안에서 실행:
+
+```bash
+cd .worktrees/<worktree-name>
+ln -s ../../.env .env
+```
+
+또는 프로젝트 루트에서 실행:
+
+```bash
+ln -s ../../.env .worktrees/<worktree-name>/.env
+```
+
+이미 worktree에 `.env` 파일이 있다면 덮어쓰기 전에 내용을 확인하고 직접 정리합니다. 실제 API key, OAuth secret, DB URL은 git, GitHub issue, chat에 붙여넣지 않습니다.
+
 ## Local DB and Migration
 
 F-003부터 API 서버는 PostgreSQL `DATABASE_URL`을 사용합니다.
