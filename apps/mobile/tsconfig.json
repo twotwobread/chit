@@ -8,6 +8,7 @@
     "app/**/*.ts",
     "app/**/*.tsx",
     "lib/**/*.ts",
+    "app.config.ts",
     "env.d.ts",
     ".expo/types/**/*.ts",
     "expo-env.d.ts"

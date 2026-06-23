@@ -136,6 +136,38 @@ func TestLoginWithOAuthHandler(t *testing.T) {
 	}
 }
 
+func TestLoginWithOAuthRejectsDevCredentialWhenDisabled(t *testing.T) {
+	backend := newFakeAuthBackend()
+	requestBody := []byte(`{
+		"provider":"kakao",
+		"credential":{
+			"devSubject":"should-fail"
+		},
+		"device":{"platform":"ios"}
+	}`)
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/auth/oauth/login", bytes.NewReader(requestBody))
+	request.Header.Set("Content-Type", "application/json")
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: false}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusUnauthorized, recorder.Code, recorder.Body.String())
+	}
+
+	var body struct {
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Error.Code != "INVALID_PROVIDER_TOKEN" {
+		t.Fatalf("expected INVALID_PROVIDER_TOKEN, got %q", body.Error.Code)
+	}
+}
+
 func TestCreateTripHandler(t *testing.T) {
 	backend := newFakeAuthBackend()
 	accessToken := loginTestUser(t, backend)

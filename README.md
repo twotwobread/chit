@@ -133,14 +133,14 @@ curl http://localhost:8080/ready
 Expo 앱은 API base URL을 `EXPO_PUBLIC_API_BASE_URL`에서 읽습니다.
 코드에 `localhost`를 고정하지 않습니다.
 
-F-005 auth 화면은 다음 public env를 사용합니다.
+F-005/F-007 auth 화면은 다음 public env를 사용합니다.
 
 ```bash
-export EXPO_PUBLIC_AUTH_DEV_MODE=true          # local/internal smoke only
-export EXPO_PUBLIC_KAKAO_REST_API_KEY='<key>'  # real Kakao OAuth flow
+export EXPO_PUBLIC_AUTH_DEV_MODE=true                 # local/internal smoke only
+export EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY='<native-key>' # real iOS Kakao Native SDK flow; do not commit the value
 ```
 
-Apple login은 iOS에서 `expo-apple-authentication`을 사용합니다. Kakao login은 `EXPO_PUBLIC_KAKAO_REST_API_KEY`와 Kakao OAuth redirect 설정을 사용합니다.
+Apple login은 iOS에서 `expo-apple-authentication`을 사용합니다. Kakao login은 iOS internal/development build에서 `@react-native-seoul/kakao-login` Native SDK를 사용하며, native scheme은 `kakao${EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY}`로 주입됩니다. Expo Go에서는 Native SDK 로그인을 검증할 수 없습니다.
 
 ### iOS Simulator
 
