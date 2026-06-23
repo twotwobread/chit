@@ -232,6 +232,54 @@ func (s apiServer) CreateManualDayItineraryItem(w http.ResponseWriter, r *http.R
 	writeJSON(w, http.StatusCreated, createManualDayItineraryItemResponseToOpenAPI(result))
 }
 
+func (s apiServer) UpdateDayItineraryItem(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, itemId string) {
+	if s.auth == nil || s.trips == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "day itinerary update is not configured", nil)
+		return
+	}
+
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	var body openapi.UpdateDayItineraryItemJSONRequestBody
+	if !decodeJSON(w, r, &body) {
+		return
+	}
+
+	result, err := s.trips.UpdateDayItineraryItem(r.Context(), authContext.UserID, tripId, dateFromOpenAPI(date), itemId, trip.UpdateDayItineraryItemInput{
+		Name:      body.Name,
+		Address:   body.Address,
+		PlaceType: optionalPlaceTypeFromOpenAPI(body.PlaceType),
+	})
+	if err != nil {
+		writeTripDayItineraryError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, updateDayItineraryItemResponseToOpenAPI(result))
+}
+
+func (s apiServer) DeleteDayItineraryItem(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, itemId string) {
+	if s.auth == nil || s.trips == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "day itinerary deletion is not configured", nil)
+		return
+	}
+
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	if err := s.trips.DeleteDayItineraryItem(r.Context(), authContext.UserID, tripId, dateFromOpenAPI(date), itemId); err != nil {
+		writeTripDayItineraryError(w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (s apiServer) SearchGooglePlaces(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, params openapi.SearchGooglePlacesParams) {
 	if s.auth == nil || s.places == nil {
 		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "place search is not configured", nil)
@@ -685,6 +733,10 @@ func createManualDayItineraryItemResponseToOpenAPI(result trip.CreateManualDayIt
 	}
 }
 
+func updateDayItineraryItemResponseToOpenAPI(result trip.UpdateDayItineraryItemResult) openapi.UpdateDayItineraryItemResponse {
+	return openapi.UpdateDayItineraryItemResponse{Item: dayItineraryItemToOpenAPI(result.Item)}
+}
+
 func searchGooglePlacesResponseToOpenAPI(results []place.SearchResult) openapi.SearchGooglePlacesResponse {
 	items := make([]openapi.GooglePlaceSearchResult, 0, len(results))
 	for _, result := range results {
@@ -756,6 +808,14 @@ func optionalCurrencyFromOpenAPI(value *openapi.SupportedCurrency) *string {
 	}
 	currency := string(*value)
 	return &currency
+}
+
+func optionalPlaceTypeFromOpenAPI(value *openapi.TripPlaceType) *string {
+	if value == nil {
+		return nil
+	}
+	placeType := string(*value)
+	return &placeType
 }
 
 func dateToOpenAPI(value string) openapi_types.Date {

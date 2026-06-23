@@ -1,15 +1,30 @@
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 
-import { ApiError } from '@i-um/api-contract';
+import { ApiError, type TripPlaceType } from '@i-um/api-contract';
 
 import { MobileAuthError } from '../../../../lib/auth/client';
 import { theme } from '../../../../lib/design';
-import { buildDayItineraryViewModel, dayItineraryFailureState, type DayItineraryViewModel } from '../../../../lib/trips/day-itinerary';
-import { buildManualPlaceRoute } from '../../../../lib/trips/manual-place';
+import {
+  buildDayItineraryViewModel,
+  dayItineraryFailureState,
+  type DayItineraryRowViewModel,
+  type DayItineraryViewModel,
+} from '../../../../lib/trips/day-itinerary';
+import {
+  buildDayItineraryDeleteConfirmation,
+  buildDayItineraryDeleteSubmitState,
+  buildDayItineraryEditForm,
+  buildDayItineraryEditSubmitState,
+  dayItineraryMutationFailureState,
+  validateDayItineraryEditForm,
+  type DayItineraryEditFormErrors,
+  type DayItineraryEditFormValues,
+} from '../../../../lib/trips/day-itinerary-edit';
+import { buildManualPlaceRoute, manualPlaceTypeOptions } from '../../../../lib/trips/manual-place';
 import { buildGooglePlaceSearchRoute } from '../../../../lib/places/google-search';
-import { getTripDayItinerary } from '../../../../lib/trips/client';
+import { deleteDayItineraryItem, getTripDayItinerary, updateDayItineraryItem } from '../../../../lib/trips/client';
 
 type DayItineraryState =
   | { status: 'loading' }
@@ -18,11 +33,28 @@ type DayItineraryState =
   | { status: 'notFound'; title: string; helper: string }
   | { status: 'error'; title: string; helper: string };
 
+type EditState =
+  | { status: 'idle' }
+  | {
+      status: 'editing' | 'saving';
+      item: DayItineraryRowViewModel;
+      original: DayItineraryEditFormValues;
+      values: DayItineraryEditFormValues;
+      errors: DayItineraryEditFormErrors;
+      error?: { title: string; helper: string };
+    };
+
+type DeleteState =
+  | { status: 'idle' }
+  | { status: 'confirming' | 'deleting'; item: DayItineraryRowViewModel; error?: { title: string; helper: string } };
+
 export default function TripDayItineraryScreen() {
   const { tripId: tripIdParam, date: dateParam } = useLocalSearchParams<{ tripId?: string | string[]; date?: string | string[] }>();
   const tripId = Array.isArray(tripIdParam) ? tripIdParam[0] : tripIdParam;
   const date = Array.isArray(dateParam) ? dateParam[0] : dateParam;
   const [state, setState] = useState<DayItineraryState>({ status: 'loading' });
+  const [editState, setEditState] = useState<EditState>({ status: 'idle' });
+  const [deleteState, setDeleteState] = useState<DeleteState>({ status: 'idle' });
 
   const load = useCallback(async () => {
     if (!tripId || !date) {
@@ -72,6 +104,96 @@ export default function TripDayItineraryScreen() {
     router.replace('/');
   };
 
+  const beginEdit = (item: DayItineraryRowViewModel) => {
+    const values = buildDayItineraryEditForm(item);
+    setDeleteState({ status: 'idle' });
+    setEditState({ status: 'editing', item, original: values, values, errors: {} });
+  };
+
+  const updateEditValues = (values: DayItineraryEditFormValues) => {
+    setEditState((current) => {
+      if (current.status !== 'editing' && current.status !== 'saving') {
+        return current;
+      }
+      return { ...current, values, errors: {}, error: undefined };
+    });
+  };
+
+  const submitEdit = async () => {
+    if (!tripId || !date || (editState.status !== 'editing' && editState.status !== 'saving') || editState.status === 'saving') {
+      return;
+    }
+
+    const validation = validateDayItineraryEditForm(editState.original, editState.values);
+    if (!validation.ok) {
+      setEditState({ ...editState, errors: validation.errors, error: undefined });
+      return;
+    }
+
+    const submittingState: EditState = { ...editState, status: 'saving', errors: {}, error: undefined };
+    setEditState(submittingState);
+    try {
+      await updateDayItineraryItem(tripId, date, editState.item.id, validation.request);
+      setEditState({ status: 'idle' });
+      await load();
+    } catch (error) {
+      if (error instanceof MobileAuthError && (error.code === 'UNAUTHORIZED' || error.code === 'INVALID_REFRESH_TOKEN')) {
+        setState({ status: 'auth' });
+        return;
+      }
+      if (error instanceof ApiError) {
+        if (error.status === 401) {
+          setState({ status: 'auth' });
+          return;
+        }
+        if (error.status === 403 || error.status === 404) {
+          setEditState({ status: 'idle' });
+          await load();
+          return;
+        }
+      }
+      const failure = dayItineraryMutationFailureState('update');
+      setEditState({ ...submittingState, status: 'editing', error: { title: failure.title, helper: failure.helper } });
+    }
+  };
+
+  const beginDelete = (item: DayItineraryRowViewModel) => {
+    setEditState({ status: 'idle' });
+    setDeleteState({ status: 'confirming', item });
+  };
+
+  const submitDelete = async () => {
+    if (!tripId || !date || (deleteState.status !== 'confirming' && deleteState.status !== 'deleting') || deleteState.status === 'deleting') {
+      return;
+    }
+
+    const deletingState: DeleteState = { ...deleteState, status: 'deleting', error: undefined };
+    setDeleteState(deletingState);
+    try {
+      await deleteDayItineraryItem(tripId, date, deleteState.item.id);
+      setDeleteState({ status: 'idle' });
+      await load();
+    } catch (error) {
+      if (error instanceof MobileAuthError && (error.code === 'UNAUTHORIZED' || error.code === 'INVALID_REFRESH_TOKEN')) {
+        setState({ status: 'auth' });
+        return;
+      }
+      if (error instanceof ApiError) {
+        if (error.status === 401) {
+          setState({ status: 'auth' });
+          return;
+        }
+        if (error.status === 403 || error.status === 404) {
+          setDeleteState({ status: 'idle' });
+          await load();
+          return;
+        }
+      }
+      const failure = dayItineraryMutationFailureState('delete');
+      setDeleteState({ ...deletingState, status: 'confirming', error: { title: failure.title, helper: failure.helper } });
+    }
+  };
+
   return (
     <ScrollView contentContainerStyle={styles.scrollContent} style={styles.scroll}>
       <View style={styles.header}>
@@ -86,19 +208,38 @@ export default function TripDayItineraryScreen() {
       ) : null}
 
       {state.status === 'success' ? (
-        <DayItineraryContent
-          onAddPlace={() => {
-            if (tripId && date) {
-              router.push(buildManualPlaceRoute(tripId, date));
-            }
-          }}
-          onSearchPlace={() => {
-            if (tripId && date) {
-              router.push(buildGooglePlaceSearchRoute(tripId, date));
-            }
-          }}
-          viewModel={state.viewModel}
-        />
+        <>
+          <DayItineraryContent
+            onAddPlace={() => {
+              if (tripId && date) {
+                router.push(buildManualPlaceRoute(tripId, date));
+              }
+            }}
+            onDeletePlace={beginDelete}
+            onEditPlace={beginEdit}
+            onSearchPlace={() => {
+              if (tripId && date) {
+                router.push(buildGooglePlaceSearchRoute(tripId, date));
+              }
+            }}
+            viewModel={state.viewModel}
+          />
+          {editState.status === 'editing' || editState.status === 'saving' ? (
+            <EditPlacePanel
+              editState={editState}
+              onCancel={() => setEditState({ status: 'idle' })}
+              onSubmit={() => void submitEdit()}
+              onUpdateValues={updateEditValues}
+            />
+          ) : null}
+          {deleteState.status === 'confirming' || deleteState.status === 'deleting' ? (
+            <DeletePlacePanel
+              deleteState={deleteState}
+              onCancel={() => setDeleteState({ status: 'idle' })}
+              onConfirm={() => void submitDelete()}
+            />
+          ) : null}
+        </>
       ) : null}
 
       {state.status === 'auth' ? (
@@ -133,7 +274,19 @@ export default function TripDayItineraryScreen() {
   );
 }
 
-function DayItineraryContent({ onAddPlace, onSearchPlace, viewModel }: { onAddPlace: () => void; onSearchPlace: () => void; viewModel: DayItineraryViewModel }) {
+function DayItineraryContent({
+  onAddPlace,
+  onDeletePlace,
+  onEditPlace,
+  onSearchPlace,
+  viewModel,
+}: {
+  onAddPlace: () => void;
+  onDeletePlace: (item: DayItineraryRowViewModel) => void;
+  onEditPlace: (item: DayItineraryRowViewModel) => void;
+  onSearchPlace: () => void;
+  viewModel: DayItineraryViewModel;
+}) {
   return (
     <View style={styles.card}>
       <View style={styles.dayHeader}>
@@ -161,6 +314,14 @@ function DayItineraryContent({ onAddPlace, onSearchPlace, viewModel }: { onAddPl
                   <Text style={styles.placeType}>{item.placeTypeLabel}</Text>
                 </View>
                 <Text style={styles.address}>{item.address}</Text>
+                <View style={styles.rowActionGroup}>
+                  <Pressable accessibilityRole="button" onPress={() => onEditPlace(item)} style={styles.rowActionButton}>
+                    <Text style={styles.rowActionText}>수정</Text>
+                  </Pressable>
+                  <Pressable accessibilityRole="button" onPress={() => onDeletePlace(item)} style={styles.rowDangerActionButton}>
+                    <Text style={styles.rowDangerActionText}>삭제</Text>
+                  </Pressable>
+                </View>
               </View>
             </View>
           ))}
@@ -173,6 +334,130 @@ function DayItineraryContent({ onAddPlace, onSearchPlace, viewModel }: { onAddPl
         </Pressable>
         <Pressable accessibilityRole="button" onPress={onAddPlace} style={styles.button}>
           <Text style={styles.buttonText}>장소 추가</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+function EditPlacePanel({
+  editState,
+  onCancel,
+  onSubmit,
+  onUpdateValues,
+}: {
+  editState: Extract<EditState, { status: 'editing' | 'saving' }>;
+  onCancel: () => void;
+  onSubmit: () => void;
+  onUpdateValues: (values: DayItineraryEditFormValues) => void;
+}) {
+  const isSaving = editState.status === 'saving';
+  const submitView = buildDayItineraryEditSubmitState(isSaving);
+
+  return (
+    <View style={styles.card}>
+      <Text style={styles.panelTitle}>장소 수정</Text>
+      <View style={styles.fieldGroup}>
+        <Text style={styles.label}>장소명</Text>
+        <TextInput
+          editable={!isSaving}
+          onChangeText={(name) => onUpdateValues({ ...editState.values, name })}
+          placeholder="예: 우메다 공중정원"
+          placeholderTextColor={theme.color.textFaint}
+          style={styles.input}
+          value={editState.values.name}
+        />
+        {editState.errors.name ? <Text style={styles.fieldError}>{editState.errors.name}</Text> : null}
+      </View>
+
+      <View style={styles.fieldGroup}>
+        <Text style={styles.label}>주소</Text>
+        <TextInput
+          editable={!isSaving}
+          multiline
+          onChangeText={(address) => onUpdateValues({ ...editState.values, address })}
+          placeholder="예: 1 Chome-1-88 Oyodonaka, Kita Ward, Osaka"
+          placeholderTextColor={theme.color.textFaint}
+          style={[styles.input, styles.addressInput]}
+          textAlignVertical="top"
+          value={editState.values.address}
+        />
+        {editState.errors.address ? <Text style={styles.fieldError}>{editState.errors.address}</Text> : null}
+      </View>
+
+      <View style={styles.fieldGroup}>
+        <Text style={styles.label}>장소 타입</Text>
+        <View style={styles.chipList}>
+          {manualPlaceTypeOptions.map((option) => {
+            const selected = editState.values.placeType === option.value;
+            return (
+              <Pressable
+                accessibilityRole="button"
+                disabled={isSaving}
+                key={option.value}
+                onPress={() => onUpdateValues({ ...editState.values, placeType: option.value as TripPlaceType })}
+                style={[styles.chip, selected ? styles.chipSelected : null]}
+              >
+                <Text style={[styles.chipText, selected ? styles.chipTextSelected : null]}>{option.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        {editState.errors.placeType ? <Text style={styles.fieldError}>{editState.errors.placeType}</Text> : null}
+        {editState.errors.form ? <Text style={styles.fieldError}>{editState.errors.form}</Text> : null}
+      </View>
+
+      {editState.error ? (
+        <View style={styles.errorBox}>
+          <Text style={styles.errorTitle}>{editState.error.title}</Text>
+          <Text style={styles.message}>{editState.error.helper}</Text>
+        </View>
+      ) : null}
+
+      <View style={styles.actionGroup}>
+        <Pressable accessibilityRole="button" disabled={submitView.disabled} onPress={onSubmit} style={[styles.button, submitView.disabled ? styles.buttonDisabled : null]}>
+          {isSaving ? <ActivityIndicator color={theme.color.onPrimary} /> : null}
+          <Text style={styles.buttonText}>{submitView.label}</Text>
+        </Pressable>
+        <Pressable accessibilityRole="button" disabled={isSaving} onPress={onCancel} style={styles.secondaryButton}>
+          <Text style={styles.secondaryButtonText}>취소</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+function DeletePlacePanel({
+  deleteState,
+  onCancel,
+  onConfirm,
+}: {
+  deleteState: Extract<DeleteState, { status: 'confirming' | 'deleting' }>;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const isDeleting = deleteState.status === 'deleting';
+  const confirmation = buildDayItineraryDeleteConfirmation(deleteState.item);
+  const submitView = buildDayItineraryDeleteSubmitState(isDeleting);
+
+  return (
+    <View style={styles.card}>
+      <Text style={styles.errorTitle}>{confirmation.title}</Text>
+      <Text style={styles.message}>{confirmation.itemLabel}</Text>
+      <Text style={styles.message}>{confirmation.helper}</Text>
+      {deleteState.error ? (
+        <View style={styles.errorBox}>
+          <Text style={styles.errorTitle}>{deleteState.error.title}</Text>
+          <Text style={styles.message}>{deleteState.error.helper}</Text>
+        </View>
+      ) : null}
+      <View style={styles.actionGroup}>
+        <Pressable accessibilityRole="button" disabled={submitView.disabled} onPress={onConfirm} style={[styles.dangerButton, submitView.disabled ? styles.buttonDisabled : null]}>
+          {isDeleting ? <ActivityIndicator color={theme.color.onPrimary} /> : null}
+          <Text style={styles.buttonText}>{submitView.label}</Text>
+        </Pressable>
+        <Pressable accessibilityRole="button" disabled={isDeleting} onPress={onCancel} style={styles.secondaryButton}>
+          <Text style={styles.secondaryButtonText}>취소</Text>
         </Pressable>
       </View>
     </View>
@@ -281,6 +566,37 @@ const styles = StyleSheet.create({
     fontFamily: theme.font.family.regular,
     fontSize: theme.font.size.caption,
   },
+  rowActionGroup: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.space[2],
+  },
+  rowActionButton: {
+    borderColor: theme.color.borderDefault,
+    borderRadius: theme.radius.sm,
+    borderWidth: 1,
+    paddingHorizontal: theme.space[3],
+    paddingVertical: theme.space[2],
+  },
+  rowDangerActionButton: {
+    borderColor: theme.color.danger,
+    borderRadius: theme.radius.sm,
+    borderWidth: 1,
+    paddingHorizontal: theme.space[3],
+    paddingVertical: theme.space[2],
+  },
+  rowActionText: {
+    color: theme.color.textBody,
+    fontFamily: theme.font.family.semibold,
+    fontSize: theme.font.size.caption,
+    fontWeight: theme.font.weight.semibold,
+  },
+  rowDangerActionText: {
+    color: theme.color.danger,
+    fontFamily: theme.font.family.semibold,
+    fontSize: theme.font.size.caption,
+    fontWeight: theme.font.weight.semibold,
+  },
   emptyBox: {
     backgroundColor: theme.color.surfaceSunken,
     borderColor: theme.color.borderSubtle,
@@ -308,6 +624,79 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.bold,
     textAlign: 'center',
   },
+  panelTitle: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.headline,
+    fontWeight: theme.font.weight.bold,
+    textAlign: 'center',
+  },
+  fieldGroup: {
+    gap: theme.space[3],
+  },
+  label: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.semibold,
+    fontSize: theme.font.size.label,
+    fontWeight: theme.font.weight.semibold,
+  },
+  input: {
+    backgroundColor: theme.color.surfaceSunken,
+    borderColor: theme.color.borderDefault,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.body,
+    minHeight: theme.layout.controlH,
+    paddingHorizontal: theme.space[4],
+    paddingVertical: theme.space[3],
+  },
+  addressInput: {
+    minHeight: theme.layout.controlHLg,
+  },
+  fieldError: {
+    color: theme.color.danger,
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.caption,
+  },
+  chipList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.space[3],
+  },
+  chip: {
+    alignItems: 'center',
+    backgroundColor: theme.color.surfaceSunken,
+    borderColor: theme.color.borderDefault,
+    borderRadius: theme.radius.pill,
+    borderWidth: 1,
+    justifyContent: 'center',
+    minHeight: theme.layout.tapMin,
+    paddingHorizontal: theme.space[4],
+    paddingVertical: theme.space[3],
+  },
+  chipSelected: {
+    backgroundColor: theme.color.primarySoft,
+    borderColor: theme.color.primary,
+  },
+  chipText: {
+    color: theme.color.textBody,
+    fontFamily: theme.font.family.semibold,
+    fontSize: theme.font.size.label,
+    fontWeight: theme.font.weight.semibold,
+  },
+  chipTextSelected: {
+    color: theme.color.primary,
+  },
+  errorBox: {
+    backgroundColor: theme.color.surfaceSunken,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    gap: theme.space[2],
+    padding: theme.space[5],
+  },
   actionGroup: {
     gap: theme.space[3],
   },
@@ -315,10 +704,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: theme.color.primary,
     borderRadius: theme.radius.md,
+    flexDirection: 'row',
+    gap: theme.space[3],
     justifyContent: 'center',
     minHeight: theme.layout.controlH,
     paddingHorizontal: theme.space[5],
     paddingVertical: theme.space[4],
+  },
+  dangerButton: {
+    alignItems: 'center',
+    backgroundColor: theme.color.danger,
+    borderRadius: theme.radius.md,
+    flexDirection: 'row',
+    gap: theme.space[3],
+    justifyContent: 'center',
+    minHeight: theme.layout.controlH,
+    paddingHorizontal: theme.space[5],
+    paddingVertical: theme.space[4],
+  },
+  buttonDisabled: {
+    backgroundColor: theme.color.textFaint,
   },
   secondaryButton: {
     alignItems: 'center',

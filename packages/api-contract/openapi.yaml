@@ -430,6 +430,133 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /trips/{tripId}/days/{date}/itinerary/items/{itemId}:
+    patch:
+      operationId: updateDayItineraryItem
+      summary: Update a trip day itinerary item place snapshot
+      description: Updates name, address, and/or place type for the trip place snapshot linked from the selected Day itinerary item.
+      tags:
+        - Trips
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: date
+          in: path
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDayItineraryItemRequest'
+      responses:
+        '200':
+          description: Day itinerary item updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateDayItineraryItemResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip, virtual day, or itinerary item not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      operationId: deleteDayItineraryItem
+      summary: Delete a trip day itinerary item
+      description: Removes the selected itinerary item from the virtual Day and orphan-cleans the linked trip place when unreferenced.
+      tags:
+        - Trips
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: date
+          in: path
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Day itinerary item deleted.
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip, virtual day, or itinerary item not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /trips/{tripId}/days/{date}/places/google/search:
     get:
       operationId: searchGooglePlaces
@@ -954,6 +1081,30 @@ components:
       properties:
         day:
           $ref: '#/components/schemas/TripDay'
+        item:
+          $ref: '#/components/schemas/DayItineraryItem'
+    UpdateDayItineraryItemRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+          example: 우메다 스카이빌딩
+        address:
+          type: string
+          minLength: 1
+          maxLength: 300
+          example: 1 Chome-1-88 Oyodonaka, Kita Ward, Osaka
+        placeType:
+          $ref: '#/components/schemas/TripPlaceType'
+    UpdateDayItineraryItemResponse:
+      type: object
+      required:
+        - item
+      properties:
         item:
           $ref: '#/components/schemas/DayItineraryItem'
     GooglePlaceSearchResult:

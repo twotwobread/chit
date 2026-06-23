@@ -344,6 +344,111 @@ func (s *Service) CreateManualDayItineraryItem(ctx context.Context, userID strin
 	}, nil
 }
 
+func (s *Service) UpdateDayItineraryItem(ctx context.Context, userID string, tripID string, date string, itemID string, input UpdateDayItineraryItemInput) (UpdateDayItineraryItemResult, error) {
+	if strings.TrimSpace(userID) == "" {
+		return UpdateDayItineraryItemResult{}, ErrUnauthorized
+	}
+
+	tripID = strings.TrimSpace(tripID)
+	date = strings.TrimSpace(date)
+	itemID = strings.TrimSpace(itemID)
+	if !isUUID(tripID) || !isUUID(itemID) || isEmptyDayItineraryItemUpdate(input) {
+		return UpdateDayItineraryItemResult{}, ErrValidation
+	}
+
+	selectedDate, err := parseDate(date)
+	if err != nil {
+		return UpdateDayItineraryItemResult{}, ErrValidation
+	}
+
+	if err := validateUpdateDayItineraryItemInput(input); err != nil {
+		return UpdateDayItineraryItemResult{}, err
+	}
+
+	if err := s.validateTripDayParticipant(ctx, userID, tripID, selectedDate); err != nil {
+		return UpdateDayItineraryItemResult{}, err
+	}
+
+	foundItem, ok, err := s.repo.GetItineraryItemByTripDateAndID(ctx, tripID, selectedDate.Format(dateLayout), itemID)
+	if err != nil {
+		return UpdateDayItineraryItemResult{}, err
+	}
+	if !ok {
+		return UpdateDayItineraryItemResult{}, ErrNotFound
+	}
+
+	merged, err := mergeUpdateDayItineraryItemInput(tripID, selectedDate.Format(dateLayout), itemID, foundItem, input)
+	if err != nil {
+		return UpdateDayItineraryItemResult{}, err
+	}
+
+	updatedItem, err := s.repo.UpdateDayItineraryItemPlace(ctx, merged)
+	if err != nil {
+		return UpdateDayItineraryItemResult{}, err
+	}
+
+	return UpdateDayItineraryItemResult{Item: updatedItem}, nil
+}
+
+func (s *Service) DeleteDayItineraryItem(ctx context.Context, userID string, tripID string, date string, itemID string) error {
+	if strings.TrimSpace(userID) == "" {
+		return ErrUnauthorized
+	}
+
+	tripID = strings.TrimSpace(tripID)
+	date = strings.TrimSpace(date)
+	itemID = strings.TrimSpace(itemID)
+	if !isUUID(tripID) || !isUUID(itemID) {
+		return ErrValidation
+	}
+
+	selectedDate, err := parseDate(date)
+	if err != nil {
+		return ErrValidation
+	}
+
+	if err := s.validateTripDayParticipant(ctx, userID, tripID, selectedDate); err != nil {
+		return err
+	}
+
+	deleted, err := s.repo.DeleteDayItineraryItem(ctx, tripID, selectedDate.Format(dateLayout), itemID)
+	if err != nil {
+		return err
+	}
+	if !deleted {
+		return ErrNotFound
+	}
+
+	return nil
+}
+
+func (s *Service) validateTripDayParticipant(ctx context.Context, userID string, tripID string, selectedDate time.Time) error {
+	foundTrip, ok, err := s.repo.GetTripByID(ctx, tripID)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return ErrNotFound
+	}
+
+	isParticipant, err := s.repo.IsTripParticipant(ctx, tripID, userID)
+	if err != nil {
+		return err
+	}
+	if !isParticipant {
+		return ErrForbidden
+	}
+
+	dayOrder, err := dayOrderInRange(foundTrip.StartDate, foundTrip.EndDate, selectedDate)
+	if err != nil {
+		return ErrValidation
+	}
+	if dayOrder == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 func mergeUpdateInput(foundTrip Trip, input UpdateInput) (UpdateRecord, error) {
 	name := foundTrip.Name
 	if input.Name != nil {
@@ -393,6 +498,67 @@ func mergeUpdateInput(foundTrip Trip, input UpdateInput) (UpdateRecord, error) {
 
 func isEmptyUpdate(input UpdateInput) bool {
 	return input.Name == nil && input.StartDate == nil && input.EndDate == nil && input.DefaultCurrency == nil
+}
+
+func isEmptyDayItineraryItemUpdate(input UpdateDayItineraryItemInput) bool {
+	return input.Name == nil && input.Address == nil && input.PlaceType == nil
+}
+
+func validateUpdateDayItineraryItemInput(input UpdateDayItineraryItemInput) error {
+	if input.Name != nil {
+		name := strings.TrimSpace(*input.Name)
+		if len([]rune(name)) < 1 || len([]rune(name)) > 120 {
+			return ErrValidation
+		}
+	}
+	if input.Address != nil {
+		address := strings.TrimSpace(*input.Address)
+		if len([]rune(address)) < 1 || len([]rune(address)) > 300 {
+			return ErrValidation
+		}
+	}
+	if input.PlaceType != nil {
+		placeType := strings.TrimSpace(*input.PlaceType)
+		if !isSupportedPlaceType(placeType) {
+			return ErrValidation
+		}
+	}
+	return nil
+}
+
+func mergeUpdateDayItineraryItemInput(tripID string, date string, itemID string, foundItem DayItineraryItem, input UpdateDayItineraryItemInput) (UpdateDayItineraryItemRecord, error) {
+	name := foundItem.Place.Name
+	if input.Name != nil {
+		name = strings.TrimSpace(*input.Name)
+	}
+	if len([]rune(name)) < 1 || len([]rune(name)) > 120 {
+		return UpdateDayItineraryItemRecord{}, ErrValidation
+	}
+
+	address := foundItem.Place.Address
+	if input.Address != nil {
+		address = strings.TrimSpace(*input.Address)
+	}
+	if len([]rune(address)) < 1 || len([]rune(address)) > 300 {
+		return UpdateDayItineraryItemRecord{}, ErrValidation
+	}
+
+	placeType := foundItem.Place.PlaceType
+	if input.PlaceType != nil {
+		placeType = strings.TrimSpace(*input.PlaceType)
+	}
+	if !isSupportedPlaceType(placeType) {
+		return UpdateDayItineraryItemRecord{}, ErrValidation
+	}
+
+	return UpdateDayItineraryItemRecord{
+		TripID:        tripID,
+		ScheduledDate: date,
+		ItemID:        itemID,
+		Name:          name,
+		Address:       address,
+		PlaceType:     placeType,
+	}, nil
 }
 
 func parseDate(value string) (time.Time, error) {

@@ -40,8 +40,8 @@ describe('day itinerary helpers', () => {
       dayLabel: 'Day 1',
       formattedDate: '2026.07.10',
       items: [
-        { id: 'item-1', orderLabel: '1', placeName: '우메다 공중정원', placeTypeLabel: '관광지', address: 'Umeda' },
-        { id: 'item-2', orderLabel: '2', placeName: '도톤보리', placeTypeLabel: '식당', address: 'Dotonbori' },
+        { id: 'item-1', orderLabel: '1', placeName: '우메다 공중정원', placeType: 'sights', placeTypeLabel: '관광지', address: 'Umeda' },
+        { id: 'item-2', orderLabel: '2', placeName: '도톤보리', placeType: 'food', placeTypeLabel: '식당', address: 'Dotonbori' },
       ],
     });
   });

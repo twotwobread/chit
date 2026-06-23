@@ -172,6 +172,193 @@ func TestCreateManualDayItineraryItemCreatesPlaceAndAppendsItem(t *testing.T) {
 	}
 }
 
+func TestUpdateDayItineraryItemPlaceUpdatesSharedPlaceSnapshot(t *testing.T) {
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("DATABASE_URL is required for storage integration test")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	store, err := Open(ctx, databaseURL)
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer store.Close()
+
+	var userID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO users (display_name)
+		VALUES ('장소 수정 테스트')
+		RETURNING id::text
+	`).Scan(&userID); err != nil {
+		t.Fatalf("insert user: %v", err)
+	}
+	defer func() { _, _ = store.pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1::uuid`, userID) }()
+
+	var tripID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO trips (name, start_date, end_date, default_currency, created_by)
+		VALUES ('장소 수정 테스트 여행', '2026-07-10', '2026-07-13', 'JPY', $1::uuid)
+		RETURNING id::text
+	`, userID).Scan(&tripID); err != nil {
+		t.Fatalf("insert trip: %v", err)
+	}
+
+	var placeID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO trip_places (trip_id, name, address, place_type)
+		VALUES ($1::uuid, '우메다 공중정원', 'Umeda', 'sights')
+		RETURNING id::text
+	`, tripID).Scan(&placeID); err != nil {
+		t.Fatalf("insert trip place: %v", err)
+	}
+
+	var firstItemID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO itinerary_items (trip_id, scheduled_date, trip_place_id, item_order)
+		VALUES ($1::uuid, '2026-07-11', $2::uuid, 1)
+		RETURNING id::text
+	`, tripID, placeID).Scan(&firstItemID); err != nil {
+		t.Fatalf("insert first itinerary item: %v", err)
+	}
+	if _, err := store.pool.Exec(ctx, `
+		INSERT INTO itinerary_items (trip_id, scheduled_date, trip_place_id, item_order)
+		VALUES ($1::uuid, '2026-07-12', $2::uuid, 1)
+	`, tripID, placeID); err != nil {
+		t.Fatalf("insert second itinerary item: %v", err)
+	}
+
+	updated, err := store.UpdateDayItineraryItemPlace(ctx, trip.UpdateDayItineraryItemRecord{
+		TripID:        tripID,
+		ScheduledDate: "2026-07-11",
+		ItemID:        firstItemID,
+		Name:          "우메다 스카이빌딩",
+		Address:       "Umeda Sky Building",
+		PlaceType:     "food",
+	})
+	if err != nil {
+		t.Fatalf("update day itinerary item place: %v", err)
+	}
+	if updated.ID != firstItemID || updated.ItemOrder != 1 || updated.Place.ID != placeID || updated.Place.Name != "우메다 스카이빌딩" || updated.Place.Address != "Umeda Sky Building" || updated.Place.PlaceType != "food" {
+		t.Fatalf("unexpected updated item: %#v", updated)
+	}
+
+	otherDayItems, err := store.ListItineraryItemsByTripAndDate(ctx, tripID, "2026-07-12")
+	if err != nil {
+		t.Fatalf("list other day items: %v", err)
+	}
+	if len(otherDayItems) != 1 || otherDayItems[0].Place.Name != "우메다 스카이빌딩" || otherDayItems[0].Place.PlaceType != "food" {
+		t.Fatalf("expected shared place snapshot to be updated, got %#v", otherDayItems)
+	}
+}
+
+func TestDeleteDayItineraryItemRemovesSelectedItemAndCleansOrphanPlace(t *testing.T) {
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("DATABASE_URL is required for storage integration test")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	store, err := Open(ctx, databaseURL)
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer store.Close()
+
+	var userID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO users (display_name)
+		VALUES ('장소 삭제 테스트')
+		RETURNING id::text
+	`).Scan(&userID); err != nil {
+		t.Fatalf("insert user: %v", err)
+	}
+	defer func() { _, _ = store.pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1::uuid`, userID) }()
+
+	var tripID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO trips (name, start_date, end_date, default_currency, created_by)
+		VALUES ('장소 삭제 테스트 여행', '2026-07-10', '2026-07-13', 'JPY', $1::uuid)
+		RETURNING id::text
+	`, userID).Scan(&tripID); err != nil {
+		t.Fatalf("insert trip: %v", err)
+	}
+
+	var sharedPlaceID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO trip_places (trip_id, name, address, place_type)
+		VALUES ($1::uuid, '도톤보리', 'Dotonbori', 'food')
+		RETURNING id::text
+	`, tripID).Scan(&sharedPlaceID); err != nil {
+		t.Fatalf("insert shared trip place: %v", err)
+	}
+	var firstSharedItemID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO itinerary_items (trip_id, scheduled_date, trip_place_id, item_order)
+		VALUES ($1::uuid, '2026-07-11', $2::uuid, 1)
+		RETURNING id::text
+	`, tripID, sharedPlaceID).Scan(&firstSharedItemID); err != nil {
+		t.Fatalf("insert first shared item: %v", err)
+	}
+	if _, err := store.pool.Exec(ctx, `
+		INSERT INTO itinerary_items (trip_id, scheduled_date, trip_place_id, item_order)
+		VALUES ($1::uuid, '2026-07-12', $2::uuid, 1)
+	`, tripID, sharedPlaceID); err != nil {
+		t.Fatalf("insert second shared item: %v", err)
+	}
+
+	deleted, err := store.DeleteDayItineraryItem(ctx, tripID, "2026-07-11", firstSharedItemID)
+	if err != nil {
+		t.Fatalf("delete shared itinerary item: %v", err)
+	}
+	if !deleted {
+		t.Fatal("expected delete to report true")
+	}
+	var sharedPlaceCount int
+	if err := store.pool.QueryRow(ctx, `SELECT count(*)::int FROM trip_places WHERE id = $1::uuid`, sharedPlaceID).Scan(&sharedPlaceCount); err != nil {
+		t.Fatalf("count shared place: %v", err)
+	}
+	if sharedPlaceCount != 1 {
+		t.Fatalf("expected shared place to remain, got count %d", sharedPlaceCount)
+	}
+
+	var orphanPlaceID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO trip_places (trip_id, name, address, place_type)
+		VALUES ($1::uuid, '오사카성', 'Osaka Castle', 'sights')
+		RETURNING id::text
+	`, tripID).Scan(&orphanPlaceID); err != nil {
+		t.Fatalf("insert orphan trip place: %v", err)
+	}
+	var orphanItemID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO itinerary_items (trip_id, scheduled_date, trip_place_id, item_order)
+		VALUES ($1::uuid, '2026-07-11', $2::uuid, 2)
+		RETURNING id::text
+	`, tripID, orphanPlaceID).Scan(&orphanItemID); err != nil {
+		t.Fatalf("insert orphan item: %v", err)
+	}
+
+	deleted, err = store.DeleteDayItineraryItem(ctx, tripID, "2026-07-11", orphanItemID)
+	if err != nil {
+		t.Fatalf("delete orphan itinerary item: %v", err)
+	}
+	if !deleted {
+		t.Fatal("expected orphan delete to report true")
+	}
+	var orphanPlaceCount int
+	if err := store.pool.QueryRow(ctx, `SELECT count(*)::int FROM trip_places WHERE id = $1::uuid`, orphanPlaceID).Scan(&orphanPlaceCount); err != nil {
+		t.Fatalf("count orphan place: %v", err)
+	}
+	if orphanPlaceCount != 0 {
+		t.Fatalf("expected orphan place to be cleaned up, got count %d", orphanPlaceCount)
+	}
+}
+
 func TestDeleteTripByIDCascadesParticipants(t *testing.T) {
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {

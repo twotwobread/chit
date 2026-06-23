@@ -386,6 +386,18 @@ type TripPlaceSummary struct {
 // TripPlaceType defines model for TripPlaceType.
 type TripPlaceType string
 
+// UpdateDayItineraryItemRequest defines model for UpdateDayItineraryItemRequest.
+type UpdateDayItineraryItemRequest struct {
+	Address   *string        `json:"address,omitempty"`
+	Name      *string        `json:"name,omitempty"`
+	PlaceType *TripPlaceType `json:"placeType,omitempty"`
+}
+
+// UpdateDayItineraryItemResponse defines model for UpdateDayItineraryItemResponse.
+type UpdateDayItineraryItemResponse struct {
+	Item DayItineraryItem `json:"item"`
+}
+
 // UpdateTripRequest defines model for UpdateTripRequest.
 type UpdateTripRequest struct {
 	DefaultCurrency *SupportedCurrency `json:"defaultCurrency,omitempty"`
@@ -426,6 +438,9 @@ type UpdateTripJSONRequestBody = UpdateTripRequest
 
 // CreateManualDayItineraryItemJSONRequestBody defines body for CreateManualDayItineraryItem for application/json ContentType.
 type CreateManualDayItineraryItemJSONRequestBody = CreateManualDayItineraryItemRequest
+
+// UpdateDayItineraryItemJSONRequestBody defines body for UpdateDayItineraryItem for application/json ContentType.
+type UpdateDayItineraryItemJSONRequestBody = UpdateDayItineraryItemRequest
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -471,6 +486,12 @@ type ServerInterface interface {
 	// Add a manual place to a trip day itinerary
 	// (POST /trips/{tripId}/days/{date}/itinerary-items)
 	CreateManualDayItineraryItem(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date)
+	// Delete a trip day itinerary item
+	// (DELETE /trips/{tripId}/days/{date}/itinerary/items/{itemId})
+	DeleteDayItineraryItem(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, itemId string)
+	// Update a trip day itinerary item place snapshot
+	// (PATCH /trips/{tripId}/days/{date}/itinerary/items/{itemId})
+	UpdateDayItineraryItem(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, itemId string)
 	// Search Google Places for a trip day
 	// (GET /trips/{tripId}/days/{date}/places/google/search)
 	SearchGooglePlaces(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, params SearchGooglePlacesParams)
@@ -561,6 +582,18 @@ func (_ Unimplemented) GetDayItinerary(w http.ResponseWriter, r *http.Request, t
 // Add a manual place to a trip day itinerary
 // (POST /trips/{tripId}/days/{date}/itinerary-items)
 func (_ Unimplemented) CreateManualDayItineraryItem(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Delete a trip day itinerary item
+// (DELETE /trips/{tripId}/days/{date}/itinerary/items/{itemId})
+func (_ Unimplemented) DeleteDayItineraryItem(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, itemId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Update a trip day itinerary item place snapshot
+// (PATCH /trips/{tripId}/days/{date}/itinerary/items/{itemId})
+func (_ Unimplemented) UpdateDayItineraryItem(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, itemId string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -908,6 +941,104 @@ func (siw *ServerInterfaceWrapper) CreateManualDayItineraryItem(w http.ResponseW
 	handler.ServeHTTP(w, r)
 }
 
+// DeleteDayItineraryItem operation middleware
+func (siw *ServerInterfaceWrapper) DeleteDayItineraryItem(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "date" -------------
+	var date openapi_types.Date
+
+	err = runtime.BindStyledParameterWithOptions("simple", "date", chi.URLParam(r, "date"), &date, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "date", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "itemId" -------------
+	var itemId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "itemId", chi.URLParam(r, "itemId"), &itemId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "itemId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteDayItineraryItem(w, r, tripId, date, itemId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateDayItineraryItem operation middleware
+func (siw *ServerInterfaceWrapper) UpdateDayItineraryItem(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "date" -------------
+	var date openapi_types.Date
+
+	err = runtime.BindStyledParameterWithOptions("simple", "date", chi.URLParam(r, "date"), &date, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "date", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "itemId" -------------
+	var itemId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "itemId", chi.URLParam(r, "itemId"), &itemId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "itemId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateDayItineraryItem(w, r, tripId, date, itemId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // SearchGooglePlaces operation middleware
 func (siw *ServerInterfaceWrapper) SearchGooglePlaces(w http.ResponseWriter, r *http.Request) {
 
@@ -1128,6 +1259,12 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/trips/{tripId}/days/{date}/itinerary-items", wrapper.CreateManualDayItineraryItem)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/trips/{tripId}/days/{date}/itinerary/items/{itemId}", wrapper.DeleteDayItineraryItem)
+	})
+	r.Group(func(r chi.Router) {
+		r.Patch(options.BaseURL+"/trips/{tripId}/days/{date}/itinerary/items/{itemId}", wrapper.UpdateDayItineraryItem)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/trips/{tripId}/days/{date}/places/google/search", wrapper.SearchGooglePlaces)
