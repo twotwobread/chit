@@ -2,6 +2,8 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
+import type { CreateManualDayItineraryItemRequest } from '../models/CreateManualDayItineraryItemRequest';
+import type { CreateManualDayItineraryItemResponse } from '../models/CreateManualDayItineraryItemResponse';
 import type { CreateTripRequest } from '../models/CreateTripRequest';
 import type { CreateTripResponse } from '../models/CreateTripResponse';
 import type { GetDayItineraryResponse } from '../models/GetDayItineraryResponse';
@@ -154,6 +156,39 @@ export class TripsService {
                 401: `Unauthorized.`,
                 403: `Forbidden.`,
                 404: `Trip or virtual day not found.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
+     * Add a manual place to a trip day itinerary
+     * Creates a manual trip place snapshot and appends a linked itinerary item to the selected virtual trip day.
+     * @param tripId
+     * @param date
+     * @param requestBody
+     * @returns CreateManualDayItineraryItemResponse Manual place added to the selected Day itinerary.
+     * @throws ApiError
+     */
+    public static createManualDayItineraryItem(
+        tripId: string,
+        date: string,
+        requestBody: CreateManualDayItineraryItemRequest,
+    ): CancelablePromise<CreateManualDayItineraryItemResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/trips/{tripId}/days/{date}/itinerary-items',
+            path: {
+                'tripId': tripId,
+                'date': date,
+            },
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                403: `Forbidden.`,
+                404: `Trip or virtual day not found.`,
+                409: `Concurrent append conflict.`,
                 500: `Unexpected server error.`,
             },
         });

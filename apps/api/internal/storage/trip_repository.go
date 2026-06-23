@@ -2,9 +2,11 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/twotwobread/i-um/apps/api/internal/db"
 	"github.com/twotwobread/i-um/apps/api/internal/trip"
@@ -220,6 +222,52 @@ func (s *Store) ListItineraryItemsByTripAndDate(ctx context.Context, tripID stri
 	return items, nil
 }
 
+func (s *Store) CreateManualDayItineraryItem(ctx context.Context, record trip.CreateManualDayItineraryItemRecord) (trip.DayItineraryItem, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return trip.DayItineraryItem{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	qtx := s.queries.WithTx(tx)
+	place, err := qtx.CreateTripPlace(ctx, db.CreateTripPlaceParams{
+		TripID:    mustUUID(record.TripID),
+		Name:      record.Name,
+		Address:   record.Address,
+		PlaceType: record.PlaceType,
+	})
+	if err != nil {
+		return trip.DayItineraryItem{}, err
+	}
+
+	item, err := qtx.CreateItineraryItemAtEnd(ctx, db.CreateItineraryItemAtEndParams{
+		TripID:        mustUUID(record.TripID),
+		ScheduledDate: dateTextValue(record.ScheduledDate),
+		TripPlaceID:   mustUUID(place.ID),
+	})
+	if err != nil {
+		if isUniqueConstraintViolation(err, "itinerary_items_trip_date_order_unique") {
+			return trip.DayItineraryItem{}, trip.ErrConflict
+		}
+		return trip.DayItineraryItem{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return trip.DayItineraryItem{}, err
+	}
+
+	return trip.DayItineraryItem{
+		ID:        item.ID,
+		ItemOrder: int(item.ItemOrder),
+		Place: trip.TripPlaceSummary{
+			ID:        place.ID,
+			Name:      place.Name,
+			PlaceType: place.PlaceType,
+			Address:   place.Address,
+		},
+	}, nil
+}
+
 func dateValue(value time.Time) pgtype.Date {
 	return pgtype.Date{Time: value, Valid: true}
 }
@@ -234,4 +282,9 @@ func dateTextValue(value string) pgtype.Date {
 		return pgtype.Date{}
 	}
 	return pgtype.Date{Time: parsed, Valid: true}
+}
+
+func isUniqueConstraintViolation(err error, constraintName string) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == constraintName
 }

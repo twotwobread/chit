@@ -359,6 +359,76 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /trips/{tripId}/days/{date}/itinerary-items:
+    post:
+      operationId: createManualDayItineraryItem
+      summary: Add a manual place to a trip day itinerary
+      description: Creates a manual trip place snapshot and appends a linked itinerary item to the selected virtual trip day.
+      tags:
+        - Trips
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: date
+          in: path
+          required: true
+          schema:
+            type: string
+            format: date
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateManualDayItineraryItemRequest'
+      responses:
+        '201':
+          description: Manual place added to the selected Day itinerary.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateManualDayItineraryItemResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip or virtual day not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Concurrent append conflict.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /auth/oauth/login:
     post:
       operationId: loginWithOAuth
@@ -770,6 +840,36 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/DayItineraryItem'
+    CreateManualDayItineraryItemRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - address
+        - placeType
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+          example: 우메다 공중정원
+        address:
+          type: string
+          minLength: 1
+          maxLength: 240
+          example: 1 Chome-1-88 Oyodonaka, Kita Ward, Osaka
+        placeType:
+          $ref: '#/components/schemas/TripPlaceType'
+    CreateManualDayItineraryItemResponse:
+      type: object
+      required:
+        - day
+        - item
+      properties:
+        day:
+          $ref: '#/components/schemas/TripDay'
+        item:
+          $ref: '#/components/schemas/DayItineraryItem'
     UpdateTripRequest:
       type: object
       additionalProperties: false

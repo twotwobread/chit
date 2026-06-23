@@ -1,5 +1,7 @@
 import {
   TripsService,
+  type CreateManualDayItineraryItemRequest,
+  type CreateManualDayItineraryItemResponse,
   type CreateTripRequest,
   type CreateTripResponse,
   type GetDayItineraryResponse,
@@ -24,6 +26,15 @@ export async function getTripDetail(tripId: string): Promise<GetTripDetailRespon
 export async function getTripDayItinerary(tripId: string, date: string): Promise<GetDayItineraryResponse> {
   await getCurrentUserWithRefresh();
   return TripsService.getDayItinerary(tripId, date);
+}
+
+export async function createManualDayItineraryItem(
+  tripId: string,
+  date: string,
+  request: CreateManualDayItineraryItemRequest,
+): Promise<CreateManualDayItineraryItemResponse> {
+  await getCurrentUserWithRefresh();
+  return TripsService.createManualDayItineraryItem(tripId, date, request);
 }
 
 export async function updateTrip(tripId: string, request: UpdateTripRequest): Promise<UpdateTripResponse> {

@@ -269,6 +269,81 @@ func (s *Service) GetDayItinerary(ctx context.Context, userID string, tripID str
 	}, nil
 }
 
+func (s *Service) CreateManualDayItineraryItem(ctx context.Context, userID string, tripID string, date string, input CreateManualDayItineraryItemInput) (CreateManualDayItineraryItemResult, error) {
+	if strings.TrimSpace(userID) == "" {
+		return CreateManualDayItineraryItemResult{}, ErrUnauthorized
+	}
+
+	tripID = strings.TrimSpace(tripID)
+	date = strings.TrimSpace(date)
+	if !isUUID(tripID) {
+		return CreateManualDayItineraryItemResult{}, ErrValidation
+	}
+
+	selectedDate, err := parseDate(date)
+	if err != nil {
+		return CreateManualDayItineraryItemResult{}, ErrValidation
+	}
+
+	name := strings.TrimSpace(input.Name)
+	if len([]rune(name)) < 1 || len([]rune(name)) > 120 {
+		return CreateManualDayItineraryItemResult{}, ErrValidation
+	}
+
+	address := strings.TrimSpace(input.Address)
+	if len([]rune(address)) < 1 || len([]rune(address)) > 240 {
+		return CreateManualDayItineraryItemResult{}, ErrValidation
+	}
+
+	placeType := strings.TrimSpace(input.PlaceType)
+	if !isSupportedPlaceType(placeType) {
+		return CreateManualDayItineraryItemResult{}, ErrValidation
+	}
+
+	foundTrip, ok, err := s.repo.GetTripByID(ctx, tripID)
+	if err != nil {
+		return CreateManualDayItineraryItemResult{}, err
+	}
+	if !ok {
+		return CreateManualDayItineraryItemResult{}, ErrNotFound
+	}
+
+	isParticipant, err := s.repo.IsTripParticipant(ctx, tripID, userID)
+	if err != nil {
+		return CreateManualDayItineraryItemResult{}, err
+	}
+	if !isParticipant {
+		return CreateManualDayItineraryItemResult{}, ErrForbidden
+	}
+
+	dayOrder, err := dayOrderInRange(foundTrip.StartDate, foundTrip.EndDate, selectedDate)
+	if err != nil {
+		return CreateManualDayItineraryItemResult{}, ErrValidation
+	}
+	if dayOrder == 0 {
+		return CreateManualDayItineraryItemResult{}, ErrNotFound
+	}
+
+	item, err := s.repo.CreateManualDayItineraryItem(ctx, CreateManualDayItineraryItemRecord{
+		TripID:        tripID,
+		ScheduledDate: selectedDate.Format(dateLayout),
+		Name:          name,
+		Address:       address,
+		PlaceType:     placeType,
+	})
+	if err != nil {
+		return CreateManualDayItineraryItemResult{}, err
+	}
+
+	return CreateManualDayItineraryItemResult{
+		Day: TripDay{
+			Date:     selectedDate.Format(dateLayout),
+			DayOrder: dayOrder,
+		},
+		Item: item,
+	}, nil
+}
+
 func mergeUpdateInput(foundTrip Trip, input UpdateInput) (UpdateRecord, error) {
 	name := foundTrip.Name
 	if input.Name != nil {
@@ -370,6 +445,15 @@ func dateOnly(value time.Time) time.Time {
 func isSupportedCurrency(value string) bool {
 	switch value {
 	case "KRW", "JPY", "USD", "EUR":
+		return true
+	default:
+		return false
+	}
+}
+
+func isSupportedPlaceType(value string) bool {
+	switch value {
+	case "sights", "food", "lodging", "cafe", "shopping", "etc":
 		return true
 	default:
 		return false

@@ -16,6 +16,7 @@ var (
 	ErrUnauthorized = errors.New("unauthorized")
 	ErrForbidden    = errors.New("forbidden")
 	ErrNotFound     = errors.New("not found")
+	ErrConflict     = errors.New("conflict")
 )
 
 type Creator struct {
@@ -37,6 +38,12 @@ type UpdateInput struct {
 	DefaultCurrency *string
 }
 
+type CreateManualDayItineraryItemInput struct {
+	Name      string
+	Address   string
+	PlaceType string
+}
+
 type CreateRecord struct {
 	Name             string
 	StartDate        time.Time
@@ -52,6 +59,14 @@ type UpdateRecord struct {
 	StartDate       time.Time
 	EndDate         time.Time
 	DefaultCurrency string
+}
+
+type CreateManualDayItineraryItemRecord struct {
+	TripID        string
+	ScheduledDate string
+	Name          string
+	Address       string
+	PlaceType     string
 }
 
 type Trip struct {
@@ -118,6 +133,11 @@ type GetDayItineraryResult struct {
 	Items []DayItineraryItem
 }
 
+type CreateManualDayItineraryItemResult struct {
+	Day  TripDay
+	Item DayItineraryItem
+}
+
 type ListItem struct {
 	ID               string
 	Name             string
@@ -142,4 +162,5 @@ type Repository interface {
 	ListTripParticipantPreviewNames(ctx context.Context, tripID string) ([]string, error)
 	ListTripsByParticipantUser(ctx context.Context, userID string) ([]ListItem, error)
 	ListItineraryItemsByTripAndDate(ctx context.Context, tripID string, date string) ([]DayItineraryItem, error)
+	CreateManualDayItineraryItem(ctx context.Context, record CreateManualDayItineraryItemRecord) (DayItineraryItem, error)
 }

@@ -24,6 +24,46 @@ func (q *Queries) CountTripParticipantsByTripID(ctx context.Context, dollar_1 pg
 	return total_count, err
 }
 
+const createItineraryItemAtEnd = `-- name: CreateItineraryItemAtEnd :one
+INSERT INTO itinerary_items (
+  trip_id,
+  scheduled_date,
+  trip_place_id,
+  item_order
+) VALUES (
+  $1::uuid,
+  $2,
+  $3::uuid,
+  (
+    SELECT COALESCE(MAX(item_order), 0) + 1
+    FROM itinerary_items
+    WHERE trip_id = $1::uuid
+      AND scheduled_date = $2
+  )
+)
+RETURNING
+  id::text,
+  item_order
+`
+
+type CreateItineraryItemAtEndParams struct {
+	TripID        pgtype.UUID
+	ScheduledDate pgtype.Date
+	TripPlaceID   pgtype.UUID
+}
+
+type CreateItineraryItemAtEndRow struct {
+	ID        string
+	ItemOrder int32
+}
+
+func (q *Queries) CreateItineraryItemAtEnd(ctx context.Context, arg CreateItineraryItemAtEndParams) (CreateItineraryItemAtEndRow, error) {
+	row := q.db.QueryRow(ctx, createItineraryItemAtEnd, arg.TripID, arg.ScheduledDate, arg.TripPlaceID)
+	var i CreateItineraryItemAtEndRow
+	err := row.Scan(&i.ID, &i.ItemOrder)
+	return i, err
+}
+
 const createTrip = `-- name: CreateTrip :one
 INSERT INTO trips (
   name,
@@ -142,6 +182,56 @@ func (q *Queries) CreateTripParticipant(ctx context.Context, arg CreateTripParti
 		&i.Role,
 		&i.DisplayName,
 		&i.JoinedAt,
+	)
+	return i, err
+}
+
+const createTripPlace = `-- name: CreateTripPlace :one
+INSERT INTO trip_places (
+  trip_id,
+  name,
+  address,
+  place_type
+) VALUES (
+  $1::uuid,
+  $2,
+  $3,
+  $4
+)
+RETURNING
+  id::text,
+  name,
+  place_type,
+  address
+`
+
+type CreateTripPlaceParams struct {
+	TripID    pgtype.UUID
+	Name      string
+	Address   string
+	PlaceType string
+}
+
+type CreateTripPlaceRow struct {
+	ID        string
+	Name      string
+	PlaceType string
+	Address   string
+}
+
+func (q *Queries) CreateTripPlace(ctx context.Context, arg CreateTripPlaceParams) (CreateTripPlaceRow, error) {
+	row := q.db.QueryRow(ctx, createTripPlace,
+		arg.TripID,
+		arg.Name,
+		arg.Address,
+		arg.PlaceType,
+	)
+	var i CreateTripPlaceRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.PlaceType,
+		&i.Address,
 	)
 	return i, err
 }
