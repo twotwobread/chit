@@ -13,6 +13,7 @@ import {
   type LegalLinkOpenState,
 } from '../lib/app-info/legal';
 import { getCurrentUserWithRefresh, logoutCurrentSession, MobileAuthError } from '../lib/auth/client';
+import { createLogoutFlow, type LogoutFlow } from '../lib/auth/logout-flow';
 import { clearStoredSession, readStoredSession } from '../lib/auth/session';
 import { theme } from '../lib/design';
 import { BottomMenu } from '../lib/navigation/BottomMenu';
@@ -34,7 +35,16 @@ export default function MyPageScreen() {
   const [state, setState] = useState<MyPageState>({ status: 'loading' });
   const [tripState, setTripState] = useState<TripListState>({ status: 'loading' });
   const [legalLinkState, setLegalLinkState] = useState<LegalLinkOpenState>(initialLegalLinkOpenState);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const legalLinkStateRef = useRef<LegalLinkOpenState>(initialLegalLinkOpenState);
+  const logoutFlowRef = useRef<LogoutFlow | null>(null);
+
+  if (logoutFlowRef.current === null) {
+    logoutFlowRef.current = createLogoutFlow({
+      logoutCurrentSession,
+      replace: (path) => router.replace(path),
+    });
+  }
 
   const updateLegalLinkState = useCallback((nextState: LegalLinkOpenState) => {
     legalLinkStateRef.current = nextState;
@@ -113,8 +123,17 @@ export default function MyPageScreen() {
   );
 
   const logout = async () => {
-    await logoutCurrentSession();
-    router.replace('/login');
+    const logoutFlow = logoutFlowRef.current;
+    if (!logoutFlow || logoutFlow.isLoggingOut()) {
+      return;
+    }
+
+    setIsLoggingOut(true);
+    try {
+      await logoutFlow.run();
+    } finally {
+      setIsLoggingOut(false);
+    }
   };
 
   return (
@@ -169,8 +188,13 @@ export default function MyPageScreen() {
                 <Text style={styles.secondaryButtonText}>계정 관리</Text>
               </Pressable>
               <AppInfoLegalGroup state={legalLinkState} onOpen={openLegalLinkRow} />
-              <Pressable accessibilityRole="button" onPress={() => void logout()} style={styles.dangerButton}>
-                <Text style={styles.buttonText}>로그아웃</Text>
+              <Pressable
+                accessibilityRole="button"
+                disabled={isLoggingOut}
+                onPress={() => void logout()}
+                style={[styles.dangerButton, isLoggingOut ? styles.disabledButton : null]}
+              >
+                <Text style={styles.buttonText}>{isLoggingOut ? '로그아웃 중...' : '로그아웃'}</Text>
               </Pressable>
             </View>
           </>
@@ -539,6 +563,9 @@ const styles = StyleSheet.create({
     minHeight: theme.layout.controlH,
     paddingHorizontal: theme.space[5],
     paddingVertical: theme.space[3],
+  },
+  disabledButton: {
+    opacity: 0.5,
   },
   buttonText: {
     color: theme.color.onPrimary,

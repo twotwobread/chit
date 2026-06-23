@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 
 import type { AuthMeResponse, AuthProvider } from '@i-um/api-contract';
 
 import { getCurrentUserWithRefresh, linkOAuthProvider, logoutCurrentSession, MobileAuthError } from '../lib/auth/client';
+import { createLogoutFlow, type LogoutFlow } from '../lib/auth/logout-flow';
 import { getOAuthCredential } from '../lib/auth/oauth';
 import { theme } from '../lib/design';
 
@@ -17,6 +18,15 @@ const providers: AuthProvider[] = ['apple', 'kakao'];
 
 export default function AccountScreen() {
   const [state, setState] = useState<AccountState>({ status: 'loading' });
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const logoutFlowRef = useRef<LogoutFlow | null>(null);
+
+  if (logoutFlowRef.current === null) {
+    logoutFlowRef.current = createLogoutFlow({
+      logoutCurrentSession,
+      replace: (path) => router.replace(path),
+    });
+  }
 
   const load = useCallback(async () => {
     setState({ status: 'loading' });
@@ -48,8 +58,17 @@ export default function AccountScreen() {
   };
 
   const logout = async () => {
-    await logoutCurrentSession();
-    router.replace('/login');
+    const logoutFlow = logoutFlowRef.current;
+    if (!logoutFlow || logoutFlow.isLoggingOut()) {
+      return;
+    }
+
+    setIsLoggingOut(true);
+    try {
+      await logoutFlow.run();
+    } finally {
+      setIsLoggingOut(false);
+    }
   };
 
   return (
@@ -100,8 +119,13 @@ export default function AccountScreen() {
             <Pressable accessibilityRole="button" onPress={() => router.back()} style={styles.secondaryButton}>
               <Text style={styles.secondaryButtonText}>뒤로</Text>
             </Pressable>
-            <Pressable accessibilityRole="button" onPress={() => void logout()} style={styles.button}>
-              <Text style={styles.buttonText}>로그아웃</Text>
+            <Pressable
+              accessibilityRole="button"
+              disabled={isLoggingOut}
+              onPress={() => void logout()}
+              style={[styles.button, isLoggingOut ? styles.disabledButton : null]}
+            >
+              <Text style={styles.buttonText}>{isLoggingOut ? '로그아웃 중...' : '로그아웃'}</Text>
             </Pressable>
           </View>
         </View>
