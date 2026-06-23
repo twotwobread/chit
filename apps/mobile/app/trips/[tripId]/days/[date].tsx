@@ -1,5 +1,15 @@
-import { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  PanResponder,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  type LayoutChangeEvent,
+} from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 
 import { ApiError, type TripPlaceType } from '@i-um/api-contract';
@@ -13,6 +23,18 @@ import {
   type DayItineraryViewModel,
 } from '../../../../lib/trips/day-itinerary';
 import {
+  buildDayItineraryReorderAction,
+  buildDayItineraryReorderConflictViewModel,
+  buildDayItineraryReorderDraft,
+  buildDayItineraryReorderSuccessViewModel,
+  buildDayItineraryReorderSubmitState,
+  buildReorderDayItineraryItemsRequest,
+  dayItineraryReorderFailureState,
+  moveDayItineraryReorderItem,
+  submitDayItineraryReorder,
+  type DayItineraryReorderDraftViewModel,
+} from '../../../../lib/trips/reorder-itinerary';
+import {
   buildDayItineraryDeleteConfirmation,
   buildDayItineraryDeleteSubmitState,
   buildDayItineraryEditForm,
@@ -24,7 +46,7 @@ import {
 } from '../../../../lib/trips/day-itinerary-edit';
 import { buildManualPlaceRoute, manualPlaceTypeOptions } from '../../../../lib/trips/manual-place';
 import { buildGooglePlaceSearchRoute } from '../../../../lib/places/google-search';
-import { deleteDayItineraryItem, getTripDayItinerary, updateDayItineraryItem } from '../../../../lib/trips/client';
+import { deleteDayItineraryItem, getTripDayItinerary, reorderDayItineraryItems, updateDayItineraryItem } from '../../../../lib/trips/client';
 
 type DayItineraryState =
   | { status: 'loading' }
@@ -48,6 +70,14 @@ type DeleteState =
   | { status: 'idle' }
   | { status: 'confirming' | 'deleting'; item: DayItineraryRowViewModel; error?: { title: string; helper: string } };
 
+type ReorderState =
+  | { status: 'idle' }
+  | {
+      status: 'editing' | 'saving';
+      draft: DayItineraryReorderDraftViewModel;
+      error?: { title: string; helper: string };
+    };
+
 export default function TripDayItineraryScreen() {
   const { tripId: tripIdParam, date: dateParam } = useLocalSearchParams<{ tripId?: string | string[]; date?: string | string[] }>();
   const tripId = Array.isArray(tripIdParam) ? tripIdParam[0] : tripIdParam;
@@ -55,6 +85,13 @@ export default function TripDayItineraryScreen() {
   const [state, setState] = useState<DayItineraryState>({ status: 'loading' });
   const [editState, setEditState] = useState<EditState>({ status: 'idle' });
   const [deleteState, setDeleteState] = useState<DeleteState>({ status: 'idle' });
+  const [reorderState, setReorderState] = useState<ReorderState>({ status: 'idle' });
+  const [reorderFeedback, setReorderFeedback] = useState<string | null>(null);
+  const reorderStateRef = useRef<ReorderState>({ status: 'idle' });
+
+  useEffect(() => {
+    reorderStateRef.current = reorderState;
+  }, [reorderState]);
 
   const load = useCallback(async () => {
     if (!tripId || !date) {
@@ -93,8 +130,20 @@ export default function TripDayItineraryScreen() {
   useFocusEffect(
     useCallback(() => {
       void load();
+
+      return () => {
+        if (reorderStateRef.current.status === 'editing') {
+          setReorderFeedback(null);
+          setReorderState({ status: 'idle' });
+        }
+      };
     }, [load]),
   );
+
+  const discardReorder = useCallback(() => {
+    setReorderFeedback(null);
+    setReorderState({ status: 'idle' });
+  }, []);
 
   const backToTripDetail = () => {
     if (tripId) {
@@ -105,9 +154,40 @@ export default function TripDayItineraryScreen() {
   };
 
   const beginEdit = (item: DayItineraryRowViewModel) => {
+    discardReorder();
     const values = buildDayItineraryEditForm(item);
     setDeleteState({ status: 'idle' });
     setEditState({ status: 'editing', item, original: values, values, errors: {} });
+  };
+
+  const beginReorder = (viewModel: DayItineraryViewModel) => {
+    const draft = buildDayItineraryReorderDraft(viewModel);
+    if (!draft) {
+      return;
+    }
+
+    setReorderFeedback(null);
+    setEditState({ status: 'idle' });
+    setDeleteState({ status: 'idle' });
+    setReorderState({ status: 'editing', draft });
+  };
+
+  const cancelReorder = () => {
+    discardReorder();
+  };
+
+  const moveReorderItem = (fromIndex: number, toIndex: number) => {
+    setReorderState((current) => {
+      if (current.status !== 'editing') {
+        return current;
+      }
+
+      return {
+        ...current,
+        draft: moveDayItineraryReorderItem(current.draft, fromIndex, toIndex),
+        error: undefined,
+      };
+    });
   };
 
   const updateEditValues = (values: DayItineraryEditFormValues) => {
@@ -158,8 +238,60 @@ export default function TripDayItineraryScreen() {
   };
 
   const beginDelete = (item: DayItineraryRowViewModel) => {
+    discardReorder();
     setEditState({ status: 'idle' });
     setDeleteState({ status: 'confirming', item });
+  };
+
+  const submitReorder = async () => {
+    if (!tripId || !date || (reorderState.status !== 'editing' && reorderState.status !== 'saving') || reorderState.status === 'saving') {
+      return;
+    }
+
+    const draft = reorderState.draft;
+    if (!buildReorderDayItineraryItemsRequest(draft)) {
+      return;
+    }
+
+    const submittingState: ReorderState = { ...reorderState, status: 'saving', error: undefined };
+    setReorderState(submittingState);
+    try {
+      const response = await submitDayItineraryReorder(draft, (request) => reorderDayItineraryItems(tripId, date, request));
+      if (!response) {
+        setReorderState({ status: 'editing', draft });
+        return;
+      }
+      const success = buildDayItineraryReorderSuccessViewModel(response);
+      setReorderFeedback(success.reorderFeedback);
+      setReorderState(success.reorderState);
+      setState({ status: 'success', viewModel: success.itinerary });
+    } catch (error) {
+      if (error instanceof MobileAuthError && (error.code === 'UNAUTHORIZED' || error.code === 'INVALID_REFRESH_TOKEN')) {
+        setState({ status: 'auth' });
+        return;
+      }
+      if (error instanceof ApiError) {
+        if (error.status === 401) {
+          setState({ status: 'auth' });
+          return;
+        }
+        if (error.status === 403 || error.status === 404) {
+          setReorderState({ status: 'idle' });
+          await load();
+          return;
+        }
+        if (error.status === 409) {
+          const conflictViewModel = buildDayItineraryReorderConflictViewModel();
+          setReorderState(conflictViewModel.reorderState);
+          setReorderFeedback(conflictViewModel.reorderFeedback);
+          await load();
+          return;
+        }
+      }
+
+      const failure = dayItineraryReorderFailureState();
+      setReorderState({ ...submittingState, status: 'editing', error: { title: failure.title, helper: failure.helper } });
+    }
   };
 
   const submitDelete = async () => {
@@ -217,11 +349,17 @@ export default function TripDayItineraryScreen() {
             }}
             onDeletePlace={beginDelete}
             onEditPlace={beginEdit}
+            onEnterReorderMode={() => beginReorder(state.viewModel)}
+            onExitReorderMode={cancelReorder}
+            onMoveReorderItem={moveReorderItem}
             onSearchPlace={() => {
               if (tripId && date) {
                 router.push(buildGooglePlaceSearchRoute(tripId, date));
               }
             }}
+            onSaveReorder={() => void submitReorder()}
+            reorderFeedback={reorderFeedback}
+            reorderState={reorderState}
             viewModel={state.viewModel}
           />
           {editState.status === 'editing' || editState.status === 'saving' ? (
@@ -278,15 +416,32 @@ function DayItineraryContent({
   onAddPlace,
   onDeletePlace,
   onEditPlace,
+  onEnterReorderMode,
+  onExitReorderMode,
+  onMoveReorderItem,
   onSearchPlace,
+  onSaveReorder,
+  reorderFeedback,
+  reorderState,
   viewModel,
 }: {
   onAddPlace: () => void;
   onDeletePlace: (item: DayItineraryRowViewModel) => void;
   onEditPlace: (item: DayItineraryRowViewModel) => void;
+  onEnterReorderMode: () => void;
+  onExitReorderMode: () => void;
+  onMoveReorderItem: (fromIndex: number, toIndex: number) => void;
   onSearchPlace: () => void;
+  onSaveReorder: () => void;
+  reorderFeedback: string | null;
+  reorderState: ReorderState;
   viewModel: DayItineraryViewModel;
 }) {
+  const reorderAction = buildDayItineraryReorderAction(viewModel);
+  const reorderSubmitState = reorderState.status === 'editing' || reorderState.status === 'saving'
+    ? buildDayItineraryReorderSubmitState(reorderState.status === 'saving', reorderState.draft)
+    : null;
+
   return (
     <View style={styles.card}>
       <View style={styles.dayHeader}>
@@ -303,41 +458,204 @@ function DayItineraryContent({
 
       {viewModel.status === 'success' ? (
         <View style={styles.placeList}>
-          {viewModel.items.map((item) => (
-            <View key={item.id} style={styles.placeRow}>
-              <View style={styles.orderBadge}>
-                <Text style={styles.orderText}>{item.orderLabel}</Text>
-              </View>
-              <View style={styles.placeContent}>
-                <View style={styles.placeTitleRow}>
-                  <Text style={styles.placeName}>{item.placeName}</Text>
-                  <Text style={styles.placeType}>{item.placeTypeLabel}</Text>
+          {reorderState.status === 'editing' || reorderState.status === 'saving'
+            ? (
+                <ReorderPlaceList
+                  draft={reorderState.draft}
+                  isDisabled={reorderState.status === 'saving'}
+                  onMoveItem={onMoveReorderItem}
+                />
+              )
+            : viewModel.items.map((item) => (
+                <View key={item.id} style={styles.placeRow}>
+                  <View style={styles.orderBadge}>
+                    <Text style={styles.orderText}>{item.orderLabel}</Text>
+                  </View>
+                  <View style={styles.placeContent}>
+                    <View style={styles.placeTitleRow}>
+                      <Text style={styles.placeName}>{item.placeName}</Text>
+                      <Text style={styles.placeType}>{item.placeTypeLabel}</Text>
+                    </View>
+                    <Text style={styles.address}>{item.address}</Text>
+                    <View style={styles.rowActionGroup}>
+                      <Pressable accessibilityRole="button" onPress={() => onEditPlace(item)} style={styles.rowActionButton}>
+                        <Text style={styles.rowActionText}>수정</Text>
+                      </Pressable>
+                      <Pressable accessibilityRole="button" onPress={() => onDeletePlace(item)} style={styles.rowDangerActionButton}>
+                        <Text style={styles.rowDangerActionText}>삭제</Text>
+                      </Pressable>
+                    </View>
+                  </View>
                 </View>
-                <Text style={styles.address}>{item.address}</Text>
-                <View style={styles.rowActionGroup}>
-                  <Pressable accessibilityRole="button" onPress={() => onEditPlace(item)} style={styles.rowActionButton}>
-                    <Text style={styles.rowActionText}>수정</Text>
-                  </Pressable>
-                  <Pressable accessibilityRole="button" onPress={() => onDeletePlace(item)} style={styles.rowDangerActionButton}>
-                    <Text style={styles.rowDangerActionText}>삭제</Text>
-                  </Pressable>
-                </View>
-              </View>
-            </View>
-          ))}
+              ))}
         </View>
       ) : null}
 
       <View style={styles.actionGroup}>
-        <Pressable accessibilityRole="button" onPress={onSearchPlace} style={styles.secondaryButton}>
-          <Text style={styles.secondaryButtonText}>장소 검색</Text>
-        </Pressable>
-        <Pressable accessibilityRole="button" onPress={onAddPlace} style={styles.button}>
-          <Text style={styles.buttonText}>장소 추가</Text>
-        </Pressable>
+        {reorderFeedback ? (
+          <View style={styles.reorderNotice}>
+            <Text style={styles.message}>{reorderFeedback}</Text>
+          </View>
+        ) : null}
+
+        {reorderState.status === 'editing' || reorderState.status === 'saving' ? (
+          <>
+            <View style={styles.reorderNotice}>
+              <Text style={styles.message}>{reorderState.draft.helper}</Text>
+            </View>
+            {reorderState.error ? (
+              <View style={styles.errorBox}>
+                <Text style={styles.errorTitle}>{reorderState.error.title}</Text>
+                <Text style={styles.message}>{reorderState.error.helper}</Text>
+              </View>
+            ) : null}
+            <Pressable
+              accessibilityRole="button"
+              disabled={reorderSubmitState?.disabled ?? true}
+              onPress={onSaveReorder}
+              style={[styles.button, reorderSubmitState?.disabled ? styles.buttonDisabled : null]}
+            >
+              {reorderState.status === 'saving' ? <ActivityIndicator color={theme.color.onPrimary} /> : null}
+              <Text style={styles.buttonText}>{reorderSubmitState?.label ?? '저장'}</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              disabled={reorderState.status === 'saving'}
+              onPress={onExitReorderMode}
+              style={[styles.secondaryButton, reorderState.status === 'saving' ? styles.secondaryButtonDisabled : null]}
+            >
+              <Text style={styles.secondaryButtonText}>취소</Text>
+            </Pressable>
+          </>
+        ) : (
+          <>
+            {reorderAction.status === 'enabled' ? (
+              <Pressable accessibilityRole="button" onPress={onEnterReorderMode} style={styles.secondaryButton}>
+                <Text style={styles.secondaryButtonText}>{reorderAction.label}</Text>
+              </Pressable>
+            ) : null}
+            <Pressable accessibilityRole="button" onPress={onSearchPlace} style={styles.secondaryButton}>
+              <Text style={styles.secondaryButtonText}>장소 검색</Text>
+            </Pressable>
+            <Pressable accessibilityRole="button" onPress={onAddPlace} style={styles.button}>
+              <Text style={styles.buttonText}>장소 추가</Text>
+            </Pressable>
+          </>
+        )}
       </View>
     </View>
   );
+}
+
+function ReorderPlaceList({
+  draft,
+  isDisabled,
+  onMoveItem,
+}: {
+  draft: DayItineraryReorderDraftViewModel;
+  isDisabled: boolean;
+  onMoveItem: (fromIndex: number, toIndex: number) => void;
+}) {
+  const rowHeightsRef = useRef<Record<string, number>>({});
+  const dragRef = useRef<{
+    itemId: string;
+    currentIndex: number;
+    startIndex: number;
+    snapshotHeights: number[];
+  } | null>(null);
+  const [activeItemId, setActiveItemId] = useState<string | null>(null);
+
+  const updateRowHeight = (itemId: string, event: LayoutChangeEvent) => {
+    rowHeightsRef.current[itemId] = event.nativeEvent.layout.height;
+  };
+
+  const finishDrag = () => {
+    dragRef.current = null;
+    setActiveItemId(null);
+  };
+
+  const resolveTargetIndex = (startIndex: number, dy: number, snapshotHeights: number[]) => {
+    let targetIndex = startIndex;
+
+    if (dy > 0) {
+      let consumedHeight = 0;
+      for (let index = startIndex + 1; index < snapshotHeights.length; index += 1) {
+        consumedHeight += snapshotHeights[index] ?? 0;
+        if (dy >= consumedHeight - (snapshotHeights[index] ?? 0) / 2) {
+          targetIndex = index;
+        }
+      }
+    }
+
+    if (dy < 0) {
+      let consumedHeight = 0;
+      for (let index = startIndex - 1; index >= 0; index -= 1) {
+        consumedHeight += snapshotHeights[index] ?? 0;
+        if (-dy >= consumedHeight - (snapshotHeights[index] ?? 0) / 2) {
+          targetIndex = index;
+        }
+      }
+    }
+
+    return targetIndex;
+  };
+
+  return draft.items.map((item, index) => {
+    const responder = PanResponder.create({
+      onStartShouldSetPanResponder: () => !isDisabled,
+      onMoveShouldSetPanResponder: () => !isDisabled,
+      onPanResponderGrant: () => {
+        dragRef.current = {
+          itemId: item.id,
+          currentIndex: index,
+          startIndex: index,
+          snapshotHeights: draft.items.map((draftItem) => rowHeightsRef.current[draftItem.id] ?? theme.layout.controlH),
+        };
+        setActiveItemId(item.id);
+      },
+      onPanResponderMove: (_, gestureState) => {
+        if (!dragRef.current || dragRef.current.itemId !== item.id) {
+          return;
+        }
+
+        const targetIndex = resolveTargetIndex(dragRef.current.startIndex, gestureState.dy, dragRef.current.snapshotHeights);
+        if (targetIndex === dragRef.current.currentIndex) {
+          return;
+        }
+
+        onMoveItem(dragRef.current.currentIndex, targetIndex);
+        dragRef.current.currentIndex = targetIndex;
+      },
+      onPanResponderRelease: finishDrag,
+      onPanResponderTerminate: finishDrag,
+    });
+
+    const isActive = activeItemId === item.id;
+
+    return (
+      <View key={item.id} onLayout={(event) => updateRowHeight(item.id, event)} style={[styles.placeRow, isActive ? styles.placeRowActive : null]}>
+        <View style={styles.orderBadge}>
+          <Text style={styles.orderText}>{item.orderLabel}</Text>
+        </View>
+        <View style={styles.placeContent}>
+          <View style={styles.placeTitleRow}>
+            <Text style={styles.placeName}>{item.placeName}</Text>
+            <Text style={styles.placeType}>{item.placeTypeLabel}</Text>
+          </View>
+          <Text style={styles.address}>{item.address}</Text>
+        </View>
+        <View
+          accessibilityHint="길게 누른 뒤 끌어서 순서를 바꿔요."
+          accessibilityLabel={`${item.placeName} ${item.dragHandleLabel}`}
+          accessibilityRole="button"
+          style={[styles.dragHandle, isActive ? styles.dragHandleActive : null]}
+          {...responder.panHandlers}
+        >
+          <Text style={styles.dragHandleText}>{item.dragHandleLabel}</Text>
+        </View>
+      </View>
+    );
+  });
 }
 
 function EditPlacePanel({
@@ -526,6 +844,10 @@ const styles = StyleSheet.create({
     gap: theme.space[4],
     padding: theme.space[4],
   },
+  placeRowActive: {
+    borderColor: theme.color.primary,
+    backgroundColor: theme.color.primarySoft,
+  },
   orderBadge: {
     alignItems: 'center',
     backgroundColor: theme.color.primarySoft,
@@ -593,6 +915,26 @@ const styles = StyleSheet.create({
   },
   rowDangerActionText: {
     color: theme.color.danger,
+    fontFamily: theme.font.family.semibold,
+    fontSize: theme.font.size.caption,
+    fontWeight: theme.font.weight.semibold,
+  },
+  dragHandle: {
+    alignItems: 'center',
+    borderColor: theme.color.borderDefault,
+    borderRadius: theme.radius.sm,
+    borderWidth: 1,
+    justifyContent: 'center',
+    minHeight: theme.layout.controlHSm,
+    minWidth: theme.layout.controlHSm,
+    paddingHorizontal: theme.space[3],
+    paddingVertical: theme.space[2],
+  },
+  dragHandleActive: {
+    borderColor: theme.color.primary,
+  },
+  dragHandleText: {
+    color: theme.color.textMuted,
     fontFamily: theme.font.family.semibold,
     fontSize: theme.font.size.caption,
     fontWeight: theme.font.weight.semibold,
@@ -697,6 +1039,13 @@ const styles = StyleSheet.create({
     gap: theme.space[2],
     padding: theme.space[5],
   },
+  reorderNotice: {
+    backgroundColor: theme.color.surfaceSunken,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    padding: theme.space[4],
+  },
   actionGroup: {
     gap: theme.space[3],
   },
@@ -735,6 +1084,9 @@ const styles = StyleSheet.create({
     minHeight: theme.layout.controlH,
     paddingHorizontal: theme.space[5],
     paddingVertical: theme.space[4],
+  },
+  secondaryButtonDisabled: {
+    opacity: 0.6,
   },
   buttonText: {
     color: theme.color.onPrimary,

@@ -422,31 +422,120 @@ func (s *Service) DeleteDayItineraryItem(ctx context.Context, userID string, tri
 	return nil
 }
 
+func (s *Service) ReorderDayItineraryItems(ctx context.Context, userID string, tripID string, date string, moves []ReorderDayItineraryMoveInput) (ReorderDayItineraryItemsResult, error) {
+	if strings.TrimSpace(userID) == "" {
+		return ReorderDayItineraryItemsResult{}, ErrUnauthorized
+	}
+
+	tripID = strings.TrimSpace(tripID)
+	date = strings.TrimSpace(date)
+	if !isUUID(tripID) || len(moves) == 0 {
+		return ReorderDayItineraryItemsResult{}, ErrValidation
+	}
+
+	selectedDate, err := parseDate(date)
+	if err != nil {
+		return ReorderDayItineraryItemsResult{}, ErrValidation
+	}
+
+	if err := s.validateTripDayParticipant(ctx, userID, tripID, selectedDate); err != nil {
+		return ReorderDayItineraryItemsResult{}, err
+	}
+
+	recordMoves := make([]ReorderDayItineraryMoveRecord, 0, len(moves))
+	for _, move := range moves {
+		recordMove, err := s.validateReorderDayItineraryMove(ctx, tripID, selectedDate.Format(dateLayout), move)
+		if err != nil {
+			return ReorderDayItineraryItemsResult{}, err
+		}
+		recordMoves = append(recordMoves, recordMove)
+	}
+
+	items, err := s.repo.ReorderDayItineraryItems(ctx, ReorderDayItineraryItemsRecord{
+		TripID:        tripID,
+		ScheduledDate: selectedDate.Format(dateLayout),
+		Moves:         recordMoves,
+	})
+	if err != nil {
+		return ReorderDayItineraryItemsResult{}, err
+	}
+
+	dayOrder, err := s.dayOrder(ctx, userID, tripID, selectedDate)
+	if err != nil {
+		return ReorderDayItineraryItemsResult{}, err
+	}
+
+	return ReorderDayItineraryItemsResult{
+		Day: TripDay{
+			Date:     selectedDate.Format(dateLayout),
+			DayOrder: dayOrder,
+		},
+		Items: items,
+	}, nil
+}
+
 func (s *Service) validateTripDayParticipant(ctx context.Context, userID string, tripID string, selectedDate time.Time) error {
+	_, err := s.dayOrder(ctx, userID, tripID, selectedDate)
+	return err
+}
+
+func (s *Service) dayOrder(ctx context.Context, userID string, tripID string, selectedDate time.Time) (int, error) {
 	foundTrip, ok, err := s.repo.GetTripByID(ctx, tripID)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	if !ok {
-		return ErrNotFound
+		return 0, ErrNotFound
 	}
 
 	isParticipant, err := s.repo.IsTripParticipant(ctx, tripID, userID)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	if !isParticipant {
-		return ErrForbidden
+		return 0, ErrForbidden
 	}
 
 	dayOrder, err := dayOrderInRange(foundTrip.StartDate, foundTrip.EndDate, selectedDate)
 	if err != nil {
-		return ErrValidation
+		return 0, ErrValidation
 	}
 	if dayOrder == 0 {
-		return ErrNotFound
+		return 0, ErrNotFound
 	}
-	return nil
+	return dayOrder, nil
+}
+
+func (s *Service) validateReorderDayItineraryMove(ctx context.Context, tripID string, date string, move ReorderDayItineraryMoveInput) (ReorderDayItineraryMoveRecord, error) {
+	itemID := strings.TrimSpace(move.ItemID)
+	beforeItemID := trimOptionalString(move.BeforeItemID)
+	afterItemID := trimOptionalString(move.AfterItemID)
+	if !isUUID(itemID) || move.ClientVersion < 1 || (beforeItemID == nil && afterItemID == nil) {
+		return ReorderDayItineraryMoveRecord{}, ErrValidation
+	}
+	if !isDistinctMoveIDs(itemID, beforeItemID, afterItemID) {
+		return ReorderDayItineraryMoveRecord{}, ErrValidation
+	}
+	if !optionalUUID(beforeItemID) || !optionalUUID(afterItemID) {
+		return ReorderDayItineraryMoveRecord{}, ErrValidation
+	}
+
+	for _, referencedID := range referencedMoveItemIDs(itemID, beforeItemID, afterItemID) {
+		_, ok, err := s.repo.GetItineraryItemByTripDateAndID(ctx, tripID, date, referencedID)
+		if err != nil {
+			return ReorderDayItineraryMoveRecord{}, err
+		}
+		if !ok {
+			return ReorderDayItineraryMoveRecord{}, ErrValidation
+		}
+	}
+
+	return ReorderDayItineraryMoveRecord{
+		ItemID:        itemID,
+		BeforeItemID:  beforeItemID,
+		AfterItemID:   afterItemID,
+		ClientVersion: move.ClientVersion,
+	}, nil
 }
 
 func mergeUpdateInput(foundTrip Trip, input UpdateInput) (UpdateRecord, error) {
@@ -624,6 +713,45 @@ func isSupportedPlaceType(value string) bool {
 	default:
 		return false
 	}
+}
+
+func trimOptionalString(value *string) *string {
+	if value == nil {
+		return nil
+	}
+	trimmed := strings.TrimSpace(*value)
+	return &trimmed
+}
+
+func optionalUUID(value *string) bool {
+	return value == nil || isUUID(*value)
+}
+
+func isDistinctMoveIDs(itemID string, beforeItemID *string, afterItemID *string) bool {
+	ids := map[string]struct{}{itemID: {}}
+	if beforeItemID != nil {
+		if _, exists := ids[*beforeItemID]; exists {
+			return false
+		}
+		ids[*beforeItemID] = struct{}{}
+	}
+	if afterItemID != nil {
+		if _, exists := ids[*afterItemID]; exists {
+			return false
+		}
+	}
+	return true
+}
+
+func referencedMoveItemIDs(itemID string, beforeItemID *string, afterItemID *string) []string {
+	referenced := []string{itemID}
+	if beforeItemID != nil {
+		referenced = append(referenced, *beforeItemID)
+	}
+	if afterItemID != nil {
+		referenced = append(referenced, *afterItemID)
+	}
+	return referenced
 }
 
 func isUUID(value string) bool {

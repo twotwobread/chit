@@ -34,6 +34,10 @@ type fakeRepository struct {
 	dayItemLookupTripID   string
 	dayItemLookupDate     string
 	dayItemLookupItemID   string
+	reorderedRecord       ReorderDayItineraryItemsRecord
+	reorderedCalled       bool
+	reorderedItems        []DayItineraryItem
+	reorderErr            error
 	updatedDayItemRecord  UpdateDayItineraryItemRecord
 	updatedDayItemCalled  bool
 	updatedDayItem        DayItineraryItem
@@ -140,6 +144,7 @@ func (r *fakeRepository) CreateManualDayItineraryItem(_ context.Context, record 
 	return DayItineraryItem{
 		ID:        "item-1",
 		ItemOrder: 1,
+		Version:   1,
 		Place: TripPlaceSummary{
 			ID:        "place-1",
 			Name:      record.Name,
@@ -153,7 +158,24 @@ func (r *fakeRepository) GetItineraryItemByTripDateAndID(_ context.Context, trip
 	r.dayItemLookupTripID = tripID
 	r.dayItemLookupDate = date
 	r.dayItemLookupItemID = itemID
+	for _, item := range r.dayItineraryItems {
+		if item.ID == itemID {
+			return item, true, nil
+		}
+	}
 	return r.dayItem, r.dayItemFound, nil
+}
+
+func (r *fakeRepository) ReorderDayItineraryItems(_ context.Context, record ReorderDayItineraryItemsRecord) ([]DayItineraryItem, error) {
+	r.reorderedRecord = record
+	r.reorderedCalled = true
+	if r.reorderErr != nil {
+		return nil, r.reorderErr
+	}
+	if r.reorderedItems != nil {
+		return r.reorderedItems, nil
+	}
+	return r.dayItineraryItems, nil
 }
 
 func (r *fakeRepository) UpdateDayItineraryItemPlace(_ context.Context, record UpdateDayItineraryItemRecord) (DayItineraryItem, error) {
@@ -165,6 +187,7 @@ func (r *fakeRepository) UpdateDayItineraryItemPlace(_ context.Context, record U
 	return DayItineraryItem{
 		ID:        record.ItemID,
 		ItemOrder: r.dayItem.ItemOrder,
+		Version:   r.dayItem.Version,
 		Place: TripPlaceSummary{
 			ID:        r.dayItem.Place.ID,
 			Name:      record.Name,
@@ -563,6 +586,7 @@ func TestServiceGetDayItinerary(t *testing.T) {
 			{
 				ID:        "item-1",
 				ItemOrder: 1,
+				Version:   4,
 				Place: TripPlaceSummary{
 					ID:        "place-1",
 					Name:      "우메다 공중정원",
@@ -585,7 +609,7 @@ func TestServiceGetDayItinerary(t *testing.T) {
 	if repo.listedItineraryTripID != testTripID || repo.listedItineraryDate != "2026-07-11" {
 		t.Fatalf("expected repository lookup by trip/date, got trip=%q date=%q", repo.listedItineraryTripID, repo.listedItineraryDate)
 	}
-	if len(result.Items) != 1 || result.Items[0].Place.Name != "우메다 공중정원" {
+	if len(result.Items) != 1 || result.Items[0].Place.Name != "우메다 공중정원" || result.Items[0].Version != 4 {
 		t.Fatalf("expected itinerary item to pass through, got %#v", result.Items)
 	}
 }
@@ -920,6 +944,128 @@ func TestServiceDeleteDayItineraryItem(t *testing.T) {
 	}
 	if !repo.deletedDayItemCalled || repo.deletedDayItemTripID != testTripID || repo.deletedDayItemDate != "2026-07-11" || repo.deletedDayItemID != testUUID(7001) {
 		t.Fatalf("expected repository delete by trip/date/item, got trip=%q date=%q item=%q called=%v", repo.deletedDayItemTripID, repo.deletedDayItemDate, repo.deletedDayItemID, repo.deletedDayItemCalled)
+	}
+}
+
+func TestServiceReorderDayItineraryItemsValidation(t *testing.T) {
+	validTrip := Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"}
+	anchorBefore := testUUID(7002)
+	anchorAfter := testUUID(7003)
+	tests := []struct {
+		name  string
+		user  string
+		trip  string
+		date  string
+		moves []ReorderDayItineraryMoveInput
+	}{
+		{name: "missing auth", user: " ", trip: testTripID, date: "2026-07-10", moves: []ReorderDayItineraryMoveInput{{ItemID: testUUID(7001), BeforeItemID: &anchorBefore, ClientVersion: 1}}},
+		{name: "invalid trip id", user: "user-1", trip: "not-a-uuid", date: "2026-07-10", moves: []ReorderDayItineraryMoveInput{{ItemID: testUUID(7001), BeforeItemID: &anchorBefore, ClientVersion: 1}}},
+		{name: "invalid date", user: "user-1", trip: testTripID, date: "2026/07/10", moves: []ReorderDayItineraryMoveInput{{ItemID: testUUID(7001), BeforeItemID: &anchorBefore, ClientVersion: 1}}},
+		{name: "empty moves", user: "user-1", trip: testTripID, date: "2026-07-10", moves: nil},
+		{name: "both anchors nil", user: "user-1", trip: testTripID, date: "2026-07-10", moves: []ReorderDayItineraryMoveInput{{ItemID: testUUID(7001), ClientVersion: 1}}},
+		{name: "duplicate ids", user: "user-1", trip: testTripID, date: "2026-07-10", moves: []ReorderDayItineraryMoveInput{{ItemID: testUUID(7001), BeforeItemID: stringPtr(testUUID(7001)), ClientVersion: 1}}},
+		{name: "invalid client version", user: "user-1", trip: testTripID, date: "2026-07-10", moves: []ReorderDayItineraryMoveInput{{ItemID: testUUID(7001), BeforeItemID: &anchorBefore, ClientVersion: 0}}},
+		{name: "missing referenced item", user: "user-1", trip: testTripID, date: "2026-07-10", moves: []ReorderDayItineraryMoveInput{{ItemID: testUUID(7999), BeforeItemID: &anchorBefore, ClientVersion: 1}}},
+		{name: "missing anchor item", user: "user-1", trip: testTripID, date: "2026-07-10", moves: []ReorderDayItineraryMoveInput{{ItemID: testUUID(7001), BeforeItemID: stringPtr(testUUID(7999)), AfterItemID: &anchorAfter, ClientVersion: 1}}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := &fakeRepository{
+				trip:              validTrip,
+				tripFound:         true,
+				isParticipant:     true,
+				dayItineraryItems: []DayItineraryItem{{ID: testUUID(7001)}, {ID: anchorBefore}, {ID: anchorAfter}},
+			}
+			service := newTestService(repo)
+			_, err := service.ReorderDayItineraryItems(context.Background(), tt.user, tt.trip, tt.date, tt.moves)
+			want := ErrValidation
+			if tt.name == "missing auth" {
+				want = ErrUnauthorized
+			}
+			if !errors.Is(err, want) {
+				t.Fatalf("expected %v, got %v", want, err)
+			}
+			if repo.reorderedCalled {
+				t.Fatal("expected invalid reorder not to reach repository")
+			}
+		})
+	}
+}
+
+func TestServiceReorderDayItineraryItemsAuthConflictAndRange(t *testing.T) {
+	move := ReorderDayItineraryMoveInput{ItemID: testUUID(7001), BeforeItemID: stringPtr(testUUID(7002)), ClientVersion: 1}
+	tests := []struct {
+		name string
+		repo *fakeRepository
+		user string
+		date string
+		want error
+	}{
+		{name: "missing trip", repo: &fakeRepository{}, user: "user-1", date: "2026-07-10", want: ErrNotFound},
+		{name: "forbidden", repo: &fakeRepository{trip: Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"}, tripFound: true, dayItineraryItems: []DayItineraryItem{{ID: testUUID(7001)}, {ID: testUUID(7002)}}}, user: "user-1", date: "2026-07-10", want: ErrForbidden},
+		{name: "out of range", repo: &fakeRepository{trip: Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"}, tripFound: true, isParticipant: true, dayItineraryItems: []DayItineraryItem{{ID: testUUID(7001)}, {ID: testUUID(7002)}}}, user: "user-1", date: "2026-07-14", want: ErrNotFound},
+		{name: "conflict", repo: &fakeRepository{trip: Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"}, tripFound: true, isParticipant: true, dayItineraryItems: []DayItineraryItem{{ID: testUUID(7001)}, {ID: testUUID(7002)}}, reorderErr: ErrConflict}, user: "user-1", date: "2026-07-10", want: ErrConflict},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			service := newTestService(tt.repo)
+			_, err := service.ReorderDayItineraryItems(context.Background(), tt.user, testTripID, tt.date, []ReorderDayItineraryMoveInput{move})
+			if !errors.Is(err, tt.want) {
+				t.Fatalf("expected %v, got %v", tt.want, err)
+			}
+		})
+	}
+}
+
+func TestServiceReorderDayItineraryItemsSuccess(t *testing.T) {
+	reorderedItems := []DayItineraryItem{
+		{ID: testUUID(7001), ItemOrder: 1, Version: 1},
+		{ID: testUUID(7004), ItemOrder: 2, Version: 2},
+		{ID: testUUID(7003), ItemOrder: 3, Version: 1},
+		{ID: testUUID(7002), ItemOrder: 4, Version: 2},
+	}
+	repo := &fakeRepository{
+		trip:          Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"},
+		tripFound:     true,
+		isParticipant: true,
+		dayItineraryItems: []DayItineraryItem{
+			{ID: testUUID(7001)},
+			{ID: testUUID(7002)},
+			{ID: testUUID(7003)},
+			{ID: testUUID(7004)},
+		},
+		reorderedItems: reorderedItems,
+	}
+	service := newTestService(repo)
+
+	result, err := service.ReorderDayItineraryItems(context.Background(), "user-1", testTripID, "2026-07-11", []ReorderDayItineraryMoveInput{
+		{ItemID: testUUID(7004), BeforeItemID: stringPtr(testUUID(7001)), AfterItemID: stringPtr(testUUID(7002)), ClientVersion: 1},
+		{ItemID: testUUID(7002), BeforeItemID: stringPtr(testUUID(7003)), ClientVersion: 1},
+	})
+	if err != nil {
+		t.Fatalf("ReorderDayItineraryItems returned error: %v", err)
+	}
+	if !repo.reorderedCalled {
+		t.Fatal("expected repository reorder to be called")
+	}
+	if repo.reorderedRecord.TripID != testTripID || repo.reorderedRecord.ScheduledDate != "2026-07-11" {
+		t.Fatalf("unexpected reorder record metadata: %#v", repo.reorderedRecord)
+	}
+	if len(repo.reorderedRecord.Moves) != 2 {
+		t.Fatalf("expected two recorded moves, got %#v", repo.reorderedRecord.Moves)
+	}
+	if result.Day.Date != "2026-07-11" || result.Day.DayOrder != 2 {
+		t.Fatalf("unexpected day mapping: %#v", result.Day)
+	}
+	if len(result.Items) != len(reorderedItems) {
+		t.Fatalf("expected reordered items to be returned, got %#v", result.Items)
+	}
+	for index, want := range reorderedItems {
+		if result.Items[index].ID != want.ID || result.Items[index].ItemOrder != want.ItemOrder || result.Items[index].Version != want.Version {
+			t.Fatalf("unexpected reordered result at %d: got %#v want %#v", index, result.Items[index], want)
+		}
 	}
 }
 

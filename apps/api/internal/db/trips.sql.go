@@ -48,7 +48,8 @@ INSERT INTO itinerary_items (
   trip_id,
   scheduled_date,
   trip_place_id,
-  item_order
+  item_order,
+  rank
 ) VALUES (
   $1::uuid,
   $2,
@@ -58,11 +59,22 @@ INSERT INTO itinerary_items (
     FROM itinerary_items
     WHERE trip_id = $1::uuid
       AND scheduled_date = $2
+  ),
+  lpad(
+    (
+      SELECT COALESCE(MAX(rank::bigint), 0) + 1024
+      FROM itinerary_items
+      WHERE trip_id = $1::uuid
+        AND scheduled_date = $2
+    )::text,
+    19,
+    '0'
   )
 )
 RETURNING
   id::text,
-  item_order
+  item_order,
+  version
 `
 
 type CreateItineraryItemAtEndParams struct {
@@ -74,12 +86,13 @@ type CreateItineraryItemAtEndParams struct {
 type CreateItineraryItemAtEndRow struct {
 	ID        string
 	ItemOrder int32
+	Version   int32
 }
 
 func (q *Queries) CreateItineraryItemAtEnd(ctx context.Context, arg CreateItineraryItemAtEndParams) (CreateItineraryItemAtEndRow, error) {
 	row := q.db.QueryRow(ctx, createItineraryItemAtEnd, arg.TripID, arg.ScheduledDate, arg.TripPlaceID)
 	var i CreateItineraryItemAtEndRow
-	err := row.Scan(&i.ID, &i.ItemOrder)
+	err := row.Scan(&i.ID, &i.ItemOrder, &i.Version)
 	return i, err
 }
 
@@ -309,6 +322,7 @@ const getItineraryItemByTripDateAndID = `-- name: GetItineraryItemByTripDateAndI
 SELECT
   ii.id::text AS id,
   ii.item_order,
+  ii.version,
   tp.id::text AS trip_place_id,
   tp.name AS place_name,
   tp.place_type,
@@ -331,6 +345,7 @@ type GetItineraryItemByTripDateAndIDParams struct {
 type GetItineraryItemByTripDateAndIDRow struct {
 	ID          string
 	ItemOrder   int32
+	Version     int32
 	TripPlaceID string
 	PlaceName   string
 	PlaceType   string
@@ -343,6 +358,7 @@ func (q *Queries) GetItineraryItemByTripDateAndID(ctx context.Context, arg GetIt
 	err := row.Scan(
 		&i.ID,
 		&i.ItemOrder,
+		&i.Version,
 		&i.TripPlaceID,
 		&i.PlaceName,
 		&i.PlaceType,
@@ -433,7 +449,7 @@ func (q *Queries) GetTripParticipantRole(ctx context.Context, arg GetTripPartici
 const listItineraryItemsByTripAndDate = `-- name: ListItineraryItemsByTripAndDate :many
 SELECT
   ii.id::text AS id,
-  ii.item_order,
+  ii.version,
   tp.id::text AS trip_place_id,
   tp.name AS place_name,
   tp.place_type,
@@ -444,7 +460,7 @@ JOIN trip_places tp
  AND tp.trip_id = ii.trip_id
 WHERE ii.trip_id = $1::uuid
   AND ii.scheduled_date = $2
-ORDER BY ii.item_order ASC, ii.id ASC
+ORDER BY ii.rank ASC, ii.id ASC
 `
 
 type ListItineraryItemsByTripAndDateParams struct {
@@ -454,7 +470,7 @@ type ListItineraryItemsByTripAndDateParams struct {
 
 type ListItineraryItemsByTripAndDateRow struct {
 	ID          string
-	ItemOrder   int32
+	Version     int32
 	TripPlaceID string
 	PlaceName   string
 	PlaceType   string
@@ -472,7 +488,7 @@ func (q *Queries) ListItineraryItemsByTripAndDate(ctx context.Context, arg ListI
 		var i ListItineraryItemsByTripAndDateRow
 		if err := rows.Scan(
 			&i.ID,
-			&i.ItemOrder,
+			&i.Version,
 			&i.TripPlaceID,
 			&i.PlaceName,
 			&i.PlaceType,
@@ -648,6 +664,7 @@ WITH target AS (
   SELECT
     ii.id,
     ii.item_order,
+    ii.version,
     ii.trip_place_id
   FROM itinerary_items ii
   WHERE ii.trip_id = $1::uuid
@@ -672,6 +689,7 @@ WITH target AS (
 SELECT
   target.id::text AS id,
   target.item_order,
+  target.version,
   updated_place.id AS trip_place_id,
   updated_place.name AS place_name,
   updated_place.place_type,
@@ -692,6 +710,7 @@ type UpdateTripPlaceSnapshotByItineraryItemParams struct {
 type UpdateTripPlaceSnapshotByItineraryItemRow struct {
 	ID          string
 	ItemOrder   int32
+	Version     int32
 	TripPlaceID string
 	PlaceName   string
 	PlaceType   string
@@ -711,6 +730,7 @@ func (q *Queries) UpdateTripPlaceSnapshotByItineraryItem(ctx context.Context, ar
 	err := row.Scan(
 		&i.ID,
 		&i.ItemOrder,
+		&i.Version,
 		&i.TripPlaceID,
 		&i.PlaceName,
 		&i.PlaceType,
