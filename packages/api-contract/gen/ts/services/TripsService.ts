@@ -12,6 +12,8 @@ import type { ListTripParticipantsResponse } from '../models/ListTripParticipant
 import type { ListTripsResponse } from '../models/ListTripsResponse';
 import type { ReorderDayItineraryItemsRequest } from '../models/ReorderDayItineraryItemsRequest';
 import type { ReorderDayItineraryItemsResponse } from '../models/ReorderDayItineraryItemsResponse';
+import type { SetDayLodgingPlaceRequest } from '../models/SetDayLodgingPlaceRequest';
+import type { SetDayLodgingPlaceResponse } from '../models/SetDayLodgingPlaceResponse';
 import type { UpdateDayItineraryItemRequest } from '../models/UpdateDayItineraryItemRequest';
 import type { UpdateDayItineraryItemResponse } from '../models/UpdateDayItineraryItemResponse';
 import type { UpdateTripRequest } from '../models/UpdateTripRequest';
@@ -158,6 +160,66 @@ export class TripsService {
                 401: `Unauthorized.`,
                 403: `Forbidden.`,
                 404: `Trip not found.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
+     * Set a trip day lodging place
+     * Stores or replaces the selected Day lodging target for an authenticated trip participant.
+     * @param tripId
+     * @param date
+     * @param requestBody
+     * @returns SetDayLodgingPlaceResponse Day lodging place saved.
+     * @throws ApiError
+     */
+    public static setDayLodgingPlace(
+        tripId: string,
+        date: string,
+        requestBody: SetDayLodgingPlaceRequest,
+    ): CancelablePromise<SetDayLodgingPlaceResponse> {
+        return __request(OpenAPI, {
+            method: 'PUT',
+            url: '/trips/{tripId}/days/{date}/lodging-place',
+            path: {
+                'tripId': tripId,
+                'date': date,
+            },
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                403: `Forbidden.`,
+                404: `Trip, virtual day, or trip place not found.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
+     * Clear a trip day lodging place
+     * Removes the selected Day lodging target for an authenticated trip participant. Clearing an empty Day lodging selection is a 204 no-op.
+     * @param tripId
+     * @param date
+     * @returns void
+     * @throws ApiError
+     */
+    public static clearDayLodgingPlace(
+        tripId: string,
+        date: string,
+    ): CancelablePromise<void> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/trips/{tripId}/days/{date}/lodging-place',
+            path: {
+                'tripId': tripId,
+                'date': date,
+            },
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                403: `Forbidden.`,
+                404: `Trip or virtual day not found.`,
                 500: `Unexpected server error.`,
             },
         });

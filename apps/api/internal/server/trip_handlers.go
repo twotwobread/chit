@@ -98,6 +98,52 @@ func (s apiServer) ListTripParticipants(w http.ResponseWriter, r *http.Request, 
 	writeJSON(w, http.StatusOK, listTripParticipantsResponseToOpenAPI(participants))
 }
 
+func (s apiServer) SetDayLodgingPlace(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date) {
+	if s.auth == nil || s.trips == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "day lodging place is not configured", nil)
+		return
+	}
+
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	var body openapi.SetDayLodgingPlaceJSONRequestBody
+	if !decodeJSON(w, r, &body) {
+		return
+	}
+
+	result, err := s.trips.SetDayLodgingPlace(r.Context(), authContext.UserID, tripId, dateFromOpenAPI(date), trip.SetDayLodgingPlaceInput{
+		TripPlaceID: body.TripPlaceId,
+	})
+	if err != nil {
+		writeDayLodgingPlaceError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, setDayLodgingPlaceResponseToOpenAPI(result))
+}
+
+func (s apiServer) ClearDayLodgingPlace(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date) {
+	if s.auth == nil || s.trips == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "day lodging place is not configured", nil)
+		return
+	}
+
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	if err := s.trips.ClearDayLodgingPlace(r.Context(), authContext.UserID, tripId, dateFromOpenAPI(date)); err != nil {
+		writeDayLodgingPlaceError(w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (s apiServer) GetDayItinerary(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date) {
 	if s.auth == nil || s.trips == nil {
 		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "day itinerary is not configured", nil)

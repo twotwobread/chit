@@ -188,6 +188,7 @@ type CreateTripResponse struct {
 // DayItineraryItem defines model for DayItineraryItem.
 type DayItineraryItem struct {
 	Id        string           `json:"id"`
+	IsLodging bool             `json:"isLodging"`
 	ItemOrder int              `json:"itemOrder"`
 	Place     TripPlaceSummary `json:"place"`
 	Version   int              `json:"version"`
@@ -356,6 +357,17 @@ type SearchGooglePlacesResponse struct {
 	Results []GooglePlaceSearchResult `json:"results"`
 }
 
+// SetDayLodgingPlaceRequest defines model for SetDayLodgingPlaceRequest.
+type SetDayLodgingPlaceRequest struct {
+	TripPlaceId string `json:"tripPlaceId"`
+}
+
+// SetDayLodgingPlaceResponse defines model for SetDayLodgingPlaceResponse.
+type SetDayLodgingPlaceResponse struct {
+	Day          TripDay          `json:"day"`
+	LodgingPlace TripPlaceSummary `json:"lodgingPlace"`
+}
+
 // SupportedCurrency defines model for SupportedCurrency.
 type SupportedCurrency string
 
@@ -373,8 +385,9 @@ type Trip struct {
 
 // TripDay defines model for TripDay.
 type TripDay struct {
-	Date     openapi_types.Date `json:"date"`
-	DayOrder int                `json:"dayOrder"`
+	Date         openapi_types.Date `json:"date"`
+	DayOrder     int                `json:"dayOrder"`
+	LodgingPlace *TripPlaceSummary  `json:"lodgingPlace"`
 }
 
 // TripListItem defines model for TripListItem.
@@ -488,6 +501,9 @@ type ReorderDayItineraryItemsJSONRequestBody = ReorderDayItineraryItemsRequest
 // UpdateDayItineraryItemJSONRequestBody defines body for UpdateDayItineraryItem for application/json ContentType.
 type UpdateDayItineraryItemJSONRequestBody = UpdateDayItineraryItemRequest
 
+// SetDayLodgingPlaceJSONRequestBody defines body for SetDayLodgingPlace for application/json ContentType.
+type SetDayLodgingPlaceJSONRequestBody = SetDayLodgingPlaceRequest
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// Revoke the current session
@@ -541,6 +557,12 @@ type ServerInterface interface {
 	// Update a trip day itinerary item place snapshot
 	// (PATCH /trips/{tripId}/days/{date}/itinerary/items/{itemId})
 	UpdateDayItineraryItem(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, itemId string)
+	// Clear a trip day lodging place
+	// (DELETE /trips/{tripId}/days/{date}/lodging-place)
+	ClearDayLodgingPlace(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date)
+	// Set a trip day lodging place
+	// (PUT /trips/{tripId}/days/{date}/lodging-place)
+	SetDayLodgingPlace(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date)
 	// Search Google Places for a trip day
 	// (GET /trips/{tripId}/days/{date}/places/google/search)
 	SearchGooglePlaces(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, params SearchGooglePlacesParams)
@@ -652,6 +674,18 @@ func (_ Unimplemented) DeleteDayItineraryItem(w http.ResponseWriter, r *http.Req
 // Update a trip day itinerary item place snapshot
 // (PATCH /trips/{tripId}/days/{date}/itinerary/items/{itemId})
 func (_ Unimplemented) UpdateDayItineraryItem(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, itemId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Clear a trip day lodging place
+// (DELETE /trips/{tripId}/days/{date}/lodging-place)
+func (_ Unimplemented) ClearDayLodgingPlace(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Set a trip day lodging place
+// (PUT /trips/{tripId}/days/{date}/lodging-place)
+func (_ Unimplemented) SetDayLodgingPlace(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1143,6 +1177,86 @@ func (siw *ServerInterfaceWrapper) UpdateDayItineraryItem(w http.ResponseWriter,
 	handler.ServeHTTP(w, r)
 }
 
+// ClearDayLodgingPlace operation middleware
+func (siw *ServerInterfaceWrapper) ClearDayLodgingPlace(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "date" -------------
+	var date openapi_types.Date
+
+	err = runtime.BindStyledParameterWithOptions("simple", "date", chi.URLParam(r, "date"), &date, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "date", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ClearDayLodgingPlace(w, r, tripId, date)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetDayLodgingPlace operation middleware
+func (siw *ServerInterfaceWrapper) SetDayLodgingPlace(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "date" -------------
+	var date openapi_types.Date
+
+	err = runtime.BindStyledParameterWithOptions("simple", "date", chi.URLParam(r, "date"), &date, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "date", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetDayLodgingPlace(w, r, tripId, date)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // SearchGooglePlaces operation middleware
 func (siw *ServerInterfaceWrapper) SearchGooglePlaces(w http.ResponseWriter, r *http.Request) {
 
@@ -1403,6 +1517,12 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Patch(options.BaseURL+"/trips/{tripId}/days/{date}/itinerary/items/{itemId}", wrapper.UpdateDayItineraryItem)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/trips/{tripId}/days/{date}/lodging-place", wrapper.ClearDayLodgingPlace)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/trips/{tripId}/days/{date}/lodging-place", wrapper.SetDayLodgingPlace)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/trips/{tripId}/days/{date}/places/google/search", wrapper.SearchGooglePlaces)

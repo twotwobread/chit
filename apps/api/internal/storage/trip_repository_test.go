@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"testing"
@@ -91,6 +92,203 @@ func TestListItineraryItemsByTripAndDateFiltersSortsAndJoinsPlaces(t *testing.T)
 	}
 	if items[1].ItemOrder != 2 || items[1].Version != 2 || items[1].Place.Name != "도톤보리" || items[1].Place.PlaceType != "food" || items[1].Place.Address != "Dotonbori" {
 		t.Fatalf("unexpected second item mapping: %#v", items[1])
+	}
+}
+
+func TestDayLodgingPlacePersistenceAndItineraryMapping(t *testing.T) {
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("DATABASE_URL is required for storage integration test")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	store, err := Open(ctx, databaseURL)
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer store.Close()
+
+	var userID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO users (display_name)
+		VALUES ('숙소 지정 테스트')
+		RETURNING id::text
+	`).Scan(&userID); err != nil {
+		t.Fatalf("insert user: %v", err)
+	}
+	defer func() { _, _ = store.pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1::uuid`, userID) }()
+
+	var tripID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO trips (name, start_date, end_date, default_currency, created_by)
+		VALUES ('숙소 지정 테스트 여행', '2026-07-10', '2026-07-13', 'JPY', $1::uuid)
+		RETURNING id::text
+	`, userID).Scan(&tripID); err != nil {
+		t.Fatalf("insert trip: %v", err)
+	}
+
+	var lodgingPlaceID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO trip_places (trip_id, name, address, place_type)
+		VALUES ($1::uuid, '호텔 니코 오사카', 'Nishi-Shinsaibashi', 'lodging')
+		RETURNING id::text
+	`, tripID).Scan(&lodgingPlaceID); err != nil {
+		t.Fatalf("insert lodging trip place: %v", err)
+	}
+	var foodPlaceID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO trip_places (trip_id, name, address, place_type)
+		VALUES ($1::uuid, '도톤보리', 'Dotonbori', 'food')
+		RETURNING id::text
+	`, tripID).Scan(&foodPlaceID); err != nil {
+		t.Fatalf("insert food trip place: %v", err)
+	}
+
+	if _, err := store.pool.Exec(ctx, `
+		INSERT INTO itinerary_items (trip_id, scheduled_date, trip_place_id, item_order, rank, version)
+		VALUES
+		  ($1::uuid, '2026-07-11', $2::uuid, 1, '0000000000000001024', 1),
+		  ($1::uuid, '2026-07-11', $2::uuid, 2, '0000000000000002048', 1),
+		  ($1::uuid, '2026-07-11', $3::uuid, 3, '0000000000000003072', 1)
+	`, tripID, lodgingPlaceID, foodPlaceID); err != nil {
+		t.Fatalf("insert itinerary items: %v", err)
+	}
+
+	selected, err := store.SetDayLodgingPlace(ctx, trip.SetDayLodgingPlaceRecord{TripID: tripID, ScheduledDate: "2026-07-11", TripPlaceID: lodgingPlaceID})
+	if err != nil {
+		t.Fatalf("set day lodging place: %v", err)
+	}
+	if selected.ID != lodgingPlaceID || selected.Name != "호텔 니코 오사카" {
+		t.Fatalf("unexpected selected lodging: %#v", selected)
+	}
+
+	lodgingPlaces, err := store.ListDayLodgingPlacesByTrip(ctx, tripID)
+	if err != nil {
+		t.Fatalf("list day lodging places: %v", err)
+	}
+	if len(lodgingPlaces) != 1 || lodgingPlaces[0].Date != "2026-07-11" || lodgingPlaces[0].Place.ID != lodgingPlaceID {
+		t.Fatalf("unexpected lodging place list: %#v", lodgingPlaces)
+	}
+
+	items, err := store.ListItineraryItemsByTripAndDate(ctx, tripID, "2026-07-11")
+	if err != nil {
+		t.Fatalf("list lodging-mapped itinerary items: %v", err)
+	}
+	if len(items) != 3 || !items[0].IsLodging || !items[1].IsLodging || items[2].IsLodging {
+		t.Fatalf("expected all matching lodging rows to be marked, got %#v", items)
+	}
+
+	replaced, err := store.SetDayLodgingPlace(ctx, trip.SetDayLodgingPlaceRecord{TripID: tripID, ScheduledDate: "2026-07-11", TripPlaceID: foodPlaceID})
+	if err != nil {
+		t.Fatalf("replace day lodging place: %v", err)
+	}
+	if replaced.ID != foodPlaceID {
+		t.Fatalf("expected replacement lodging place %q, got %#v", foodPlaceID, replaced)
+	}
+
+	items, err = store.ListItineraryItemsByTripAndDate(ctx, tripID, "2026-07-11")
+	if err != nil {
+		t.Fatalf("list replaced lodging-mapped itinerary items: %v", err)
+	}
+	if len(items) != 3 || items[0].IsLodging || items[1].IsLodging || !items[2].IsLodging {
+		t.Fatalf("expected replacement lodging mapping, got %#v", items)
+	}
+
+	if err := store.DeleteDayLodgingPlace(ctx, tripID, "2026-07-11"); err != nil {
+		t.Fatalf("clear day lodging place: %v", err)
+	}
+	_, found, err := store.GetDayLodgingPlaceByTripAndDate(ctx, tripID, "2026-07-11")
+	if err != nil {
+		t.Fatalf("get cleared day lodging place: %v", err)
+	}
+	if found {
+		t.Fatal("expected day lodging place to be cleared")
+	}
+}
+
+func TestDayLodgingPlaceEnforcesSameTripAndCascadesOnPlaceDelete(t *testing.T) {
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("DATABASE_URL is required for storage integration test")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	store, err := Open(ctx, databaseURL)
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer store.Close()
+
+	var firstUserID string
+	if err := store.pool.QueryRow(ctx, `INSERT INTO users (display_name) VALUES ('숙소 FK 테스트 1') RETURNING id::text`).Scan(&firstUserID); err != nil {
+		t.Fatalf("insert first user: %v", err)
+	}
+	defer func() {
+		_, _ = store.pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1::uuid`, firstUserID)
+	}()
+	var secondUserID string
+	if err := store.pool.QueryRow(ctx, `INSERT INTO users (display_name) VALUES ('숙소 FK 테스트 2') RETURNING id::text`).Scan(&secondUserID); err != nil {
+		t.Fatalf("insert second user: %v", err)
+	}
+	defer func() {
+		_, _ = store.pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1::uuid`, secondUserID)
+	}()
+
+	var firstTripID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO trips (name, start_date, end_date, default_currency, created_by)
+		VALUES ('숙소 FK 테스트 여행 1', '2026-07-10', '2026-07-13', 'JPY', $1::uuid)
+		RETURNING id::text
+	`, firstUserID).Scan(&firstTripID); err != nil {
+		t.Fatalf("insert first trip: %v", err)
+	}
+	var secondTripID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO trips (name, start_date, end_date, default_currency, created_by)
+		VALUES ('숙소 FK 테스트 여행 2', '2026-07-10', '2026-07-13', 'JPY', $1::uuid)
+		RETURNING id::text
+	`, secondUserID).Scan(&secondTripID); err != nil {
+		t.Fatalf("insert second trip: %v", err)
+	}
+
+	var firstPlaceID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO trip_places (trip_id, name, address, place_type)
+		VALUES ($1::uuid, '첫 여행 호텔', 'First', 'lodging')
+		RETURNING id::text
+	`, firstTripID).Scan(&firstPlaceID); err != nil {
+		t.Fatalf("insert first trip place: %v", err)
+	}
+	var secondPlaceID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO trip_places (trip_id, name, address, place_type)
+		VALUES ($1::uuid, '다른 여행 호텔', 'Second', 'lodging')
+		RETURNING id::text
+	`, secondTripID).Scan(&secondPlaceID); err != nil {
+		t.Fatalf("insert second trip place: %v", err)
+	}
+
+	_, err = store.SetDayLodgingPlace(ctx, trip.SetDayLodgingPlaceRecord{TripID: firstTripID, ScheduledDate: "2026-07-11", TripPlaceID: secondPlaceID})
+	if !errors.Is(err, trip.ErrNotFound) {
+		t.Fatalf("expected cross-trip place to map to ErrNotFound, got %v", err)
+	}
+
+	if _, err := store.SetDayLodgingPlace(ctx, trip.SetDayLodgingPlaceRecord{TripID: firstTripID, ScheduledDate: "2026-07-11", TripPlaceID: firstPlaceID}); err != nil {
+		t.Fatalf("set first trip lodging: %v", err)
+	}
+	if _, err := store.pool.Exec(ctx, `DELETE FROM trip_places WHERE id = $1::uuid`, firstPlaceID); err != nil {
+		t.Fatalf("delete selected trip place: %v", err)
+	}
+	_, found, err := store.GetDayLodgingPlaceByTripAndDate(ctx, firstTripID, "2026-07-11")
+	if err != nil {
+		t.Fatalf("get day lodging after place delete: %v", err)
+	}
+	if found {
+		t.Fatal("expected selected place delete to cascade-clear day lodging")
 	}
 }
 
@@ -875,6 +1073,47 @@ func TestDeleteDayItineraryItemRemovesSelectedItemAndCleansOrphanPlace(t *testin
 		t.Fatalf("expected shared place to remain, got count %d", sharedPlaceCount)
 	}
 
+	var lodgingOnlyPlaceID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO trip_places (trip_id, name, address, place_type)
+		VALUES ($1::uuid, '호텔 니코 오사카', 'Nishi-Shinsaibashi', 'lodging')
+		RETURNING id::text
+	`, tripID).Scan(&lodgingOnlyPlaceID); err != nil {
+		t.Fatalf("insert lodging-only trip place: %v", err)
+	}
+	var lodgingOnlyItemID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO itinerary_items (trip_id, scheduled_date, trip_place_id, item_order, rank)
+		VALUES ($1::uuid, '2026-07-11', $2::uuid, 2, '0000000000000002048')
+		RETURNING id::text
+	`, tripID, lodgingOnlyPlaceID).Scan(&lodgingOnlyItemID); err != nil {
+		t.Fatalf("insert lodging-only item: %v", err)
+	}
+	if _, err := store.SetDayLodgingPlace(ctx, trip.SetDayLodgingPlaceRecord{TripID: tripID, ScheduledDate: "2026-07-11", TripPlaceID: lodgingOnlyPlaceID}); err != nil {
+		t.Fatalf("set lodging-only place as day lodging: %v", err)
+	}
+	deleted, err = store.DeleteDayItineraryItem(ctx, tripID, "2026-07-11", lodgingOnlyItemID)
+	if err != nil {
+		t.Fatalf("delete lodging-only itinerary item: %v", err)
+	}
+	if !deleted {
+		t.Fatal("expected lodging-only item delete to report true")
+	}
+	var lodgingOnlyPlaceCount int
+	if err := store.pool.QueryRow(ctx, `SELECT count(*)::int FROM trip_places WHERE id = $1::uuid`, lodgingOnlyPlaceID).Scan(&lodgingOnlyPlaceCount); err != nil {
+		t.Fatalf("count lodging-only place: %v", err)
+	}
+	if lodgingOnlyPlaceCount != 1 {
+		t.Fatalf("expected day lodging reference to keep trip place, got count %d", lodgingOnlyPlaceCount)
+	}
+	lodgingPlace, found, err := store.GetDayLodgingPlaceByTripAndDate(ctx, tripID, "2026-07-11")
+	if err != nil {
+		t.Fatalf("get lodging after itinerary item delete: %v", err)
+	}
+	if !found || lodgingPlace.ID != lodgingOnlyPlaceID {
+		t.Fatalf("expected day lodging to remain after item delete, found=%v place=%#v", found, lodgingPlace)
+	}
+
 	var orphanPlaceID string
 	if err := store.pool.QueryRow(ctx, `
 		INSERT INTO trip_places (trip_id, name, address, place_type)
@@ -886,7 +1125,7 @@ func TestDeleteDayItineraryItemRemovesSelectedItemAndCleansOrphanPlace(t *testin
 	var orphanItemID string
 	if err := store.pool.QueryRow(ctx, `
 		INSERT INTO itinerary_items (trip_id, scheduled_date, trip_place_id, item_order, rank)
-		VALUES ($1::uuid, '2026-07-11', $2::uuid, 2, '0000000000000002048')
+		VALUES ($1::uuid, '2026-07-11', $2::uuid, 3, '0000000000000003072')
 		RETURNING id::text
 	`, tripID, orphanPlaceID).Scan(&orphanItemID); err != nil {
 		t.Fatalf("insert orphan item: %v", err)

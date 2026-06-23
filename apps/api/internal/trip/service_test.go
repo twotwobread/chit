@@ -25,6 +25,22 @@ type fakeRepository struct {
 	listParticipantsTripID string
 	listed                 []ListItem
 	listedUserID           string
+	dayLodgingPlaces       []DayLodgingPlace
+	dayLodgingPlace        TripPlaceSummary
+	dayLodgingFound        bool
+	dayLodgingLookupTrip   string
+	dayLodgingLookupDate   string
+	tripPlaceSummary       TripPlaceSummary
+	tripPlaceFound         bool
+	tripPlaceLookupTripID  string
+	tripPlaceLookupID      string
+	setDayLodgingRecord    SetDayLodgingPlaceRecord
+	setDayLodgingCalled    bool
+	setDayLodgingPlace     TripPlaceSummary
+	setDayLodgingErr       error
+	deletedDayLodgingTrip  string
+	deletedDayLodgingDate  string
+	deletedDayLodgingCall  bool
 	dayItineraryItems      []DayItineraryItem
 	listedItineraryTripID  string
 	listedItineraryDate    string
@@ -132,6 +148,41 @@ func (r *fakeRepository) ListTripParticipants(_ context.Context, tripID string) 
 func (r *fakeRepository) ListTripsByParticipantUser(_ context.Context, userID string) ([]ListItem, error) {
 	r.listedUserID = userID
 	return r.listed, nil
+}
+
+func (r *fakeRepository) ListDayLodgingPlacesByTrip(context.Context, string) ([]DayLodgingPlace, error) {
+	return r.dayLodgingPlaces, nil
+}
+
+func (r *fakeRepository) GetDayLodgingPlaceByTripAndDate(_ context.Context, tripID string, date string) (TripPlaceSummary, bool, error) {
+	r.dayLodgingLookupTrip = tripID
+	r.dayLodgingLookupDate = date
+	return r.dayLodgingPlace, r.dayLodgingFound, nil
+}
+
+func (r *fakeRepository) GetTripPlaceSummaryByTripAndPlace(_ context.Context, tripID string, tripPlaceID string) (TripPlaceSummary, bool, error) {
+	r.tripPlaceLookupTripID = tripID
+	r.tripPlaceLookupID = tripPlaceID
+	return r.tripPlaceSummary, r.tripPlaceFound, nil
+}
+
+func (r *fakeRepository) SetDayLodgingPlace(_ context.Context, record SetDayLodgingPlaceRecord) (TripPlaceSummary, error) {
+	r.setDayLodgingRecord = record
+	r.setDayLodgingCalled = true
+	if r.setDayLodgingErr != nil {
+		return TripPlaceSummary{}, r.setDayLodgingErr
+	}
+	if r.setDayLodgingPlace.ID != "" {
+		return r.setDayLodgingPlace, nil
+	}
+	return r.tripPlaceSummary, nil
+}
+
+func (r *fakeRepository) DeleteDayLodgingPlace(_ context.Context, tripID string, date string) error {
+	r.deletedDayLodgingTrip = tripID
+	r.deletedDayLodgingDate = date
+	r.deletedDayLodgingCall = true
+	return nil
 }
 
 func (r *fakeRepository) ListItineraryItemsByTripAndDate(_ context.Context, tripID string, date string) ([]DayItineraryItem, error) {
@@ -525,6 +576,9 @@ func TestServiceGetDetail(t *testing.T) {
 		isParticipant:    true,
 		participantCount: 4,
 		previewNames:     []string{" 민수 ", "지영", ""},
+		dayLodgingPlaces: []DayLodgingPlace{
+			{Date: "2026-07-11", Place: TripPlaceSummary{ID: testUUID(8001), Name: "호텔 니코 오사카", PlaceType: "lodging", Address: "Nishi-Shinsaibashi"}},
+		},
 	}
 	service := newTestService(repo)
 
@@ -550,6 +604,12 @@ func TestServiceGetDetail(t *testing.T) {
 	}
 	if len(result.Days) != 4 || result.Days[0].Date != "2026-07-10" || result.Days[0].DayOrder != 1 || result.Days[3].Date != "2026-07-13" || result.Days[3].DayOrder != 4 {
 		t.Fatalf("expected virtual days in detail result, got %#v", result.Days)
+	}
+	if result.Days[0].LodgingPlace != nil {
+		t.Fatalf("expected day 1 lodging to be empty, got %#v", result.Days[0].LodgingPlace)
+	}
+	if result.Days[1].LodgingPlace == nil || result.Days[1].LodgingPlace.Name != "호텔 니코 오사카" {
+		t.Fatalf("expected day 2 lodging summary, got %#v", result.Days[1].LodgingPlace)
 	}
 }
 
@@ -654,13 +714,16 @@ func TestServiceGetDayItinerary(t *testing.T) {
 			StartDate: "2026-07-10",
 			EndDate:   "2026-07-13",
 		},
-		tripFound:     true,
-		isParticipant: true,
+		tripFound:       true,
+		isParticipant:   true,
+		dayLodgingPlace: TripPlaceSummary{ID: "place-1", Name: "우메다 공중정원", PlaceType: "sights", Address: "Umeda"},
+		dayLodgingFound: true,
 		dayItineraryItems: []DayItineraryItem{
 			{
 				ID:        "item-1",
 				ItemOrder: 1,
 				Version:   4,
+				IsLodging: true,
 				Place: TripPlaceSummary{
 					ID:        "place-1",
 					Name:      "우메다 공중정원",
@@ -680,10 +743,16 @@ func TestServiceGetDayItinerary(t *testing.T) {
 	if result.Day.Date != "2026-07-11" || result.Day.DayOrder != 2 {
 		t.Fatalf("expected server-calculated day metadata, got %#v", result.Day)
 	}
+	if repo.dayLodgingLookupTrip != testTripID || repo.dayLodgingLookupDate != "2026-07-11" {
+		t.Fatalf("expected lodging lookup by trip/date, got trip=%q date=%q", repo.dayLodgingLookupTrip, repo.dayLodgingLookupDate)
+	}
+	if result.Day.LodgingPlace == nil || result.Day.LodgingPlace.Name != "우메다 공중정원" {
+		t.Fatalf("expected day lodging summary, got %#v", result.Day.LodgingPlace)
+	}
 	if repo.listedItineraryTripID != testTripID || repo.listedItineraryDate != "2026-07-11" {
 		t.Fatalf("expected repository lookup by trip/date, got trip=%q date=%q", repo.listedItineraryTripID, repo.listedItineraryDate)
 	}
-	if len(result.Items) != 1 || result.Items[0].Place.Name != "우메다 공중정원" || result.Items[0].Version != 4 {
+	if len(result.Items) != 1 || result.Items[0].Place.Name != "우메다 공중정원" || result.Items[0].Version != 4 || !result.Items[0].IsLodging {
 		t.Fatalf("expected itinerary item to pass through, got %#v", result.Items)
 	}
 }
@@ -767,6 +836,119 @@ func TestServiceGetDayItineraryOutOfRange(t *testing.T) {
 	}
 	if repo.listedItineraryTripID != "" {
 		t.Fatal("expected out-of-range date not to query itinerary items")
+	}
+}
+
+func TestServiceSetDayLodgingPlace(t *testing.T) {
+	placeID := testUUID(8001)
+	repo := &fakeRepository{
+		trip:             Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"},
+		tripFound:        true,
+		isParticipant:    true,
+		tripPlaceSummary: TripPlaceSummary{ID: placeID, Name: "호텔 니코 오사카", PlaceType: "lodging", Address: "Nishi-Shinsaibashi"},
+		tripPlaceFound:   true,
+	}
+	service := newTestService(repo)
+
+	result, err := service.SetDayLodgingPlace(context.Background(), "user-1", testTripID, "2026-07-11", SetDayLodgingPlaceInput{TripPlaceID: placeID})
+	if err != nil {
+		t.Fatalf("SetDayLodgingPlace returned error: %v", err)
+	}
+	if repo.tripPlaceLookupTripID != testTripID || repo.tripPlaceLookupID != placeID {
+		t.Fatalf("expected same-trip place lookup, got trip=%q place=%q", repo.tripPlaceLookupTripID, repo.tripPlaceLookupID)
+	}
+	if !repo.setDayLodgingCalled || repo.setDayLodgingRecord.TripID != testTripID || repo.setDayLodgingRecord.ScheduledDate != "2026-07-11" || repo.setDayLodgingRecord.TripPlaceID != placeID {
+		t.Fatalf("expected repository set day lodging call, got called=%v record=%#v", repo.setDayLodgingCalled, repo.setDayLodgingRecord)
+	}
+	if result.Day.Date != "2026-07-11" || result.Day.DayOrder != 2 || result.Day.LodgingPlace == nil || result.Day.LodgingPlace.ID != placeID {
+		t.Fatalf("expected selected day lodging result, got %#v", result)
+	}
+	if result.LodgingPlace.Name != "호텔 니코 오사카" {
+		t.Fatalf("expected lodging summary response, got %#v", result.LodgingPlace)
+	}
+}
+
+func TestServiceSetDayLodgingPlaceValidationAuthAndTarget(t *testing.T) {
+	placeID := testUUID(8001)
+	tests := []struct {
+		name   string
+		repo   *fakeRepository
+		user   string
+		tripID string
+		date   string
+		input  SetDayLodgingPlaceInput
+		want   error
+	}{
+		{name: "requires auth", repo: &fakeRepository{}, user: " ", tripID: testTripID, date: "2026-07-10", input: SetDayLodgingPlaceInput{TripPlaceID: placeID}, want: ErrUnauthorized},
+		{name: "invalid trip id", repo: &fakeRepository{}, user: "user-1", tripID: "not-a-uuid", date: "2026-07-10", input: SetDayLodgingPlaceInput{TripPlaceID: placeID}, want: ErrValidation},
+		{name: "invalid date", repo: &fakeRepository{}, user: "user-1", tripID: testTripID, date: "2026/07/10", input: SetDayLodgingPlaceInput{TripPlaceID: placeID}, want: ErrValidation},
+		{name: "missing place id", repo: &fakeRepository{}, user: "user-1", tripID: testTripID, date: "2026-07-10", input: SetDayLodgingPlaceInput{}, want: ErrValidation},
+		{name: "invalid place id", repo: &fakeRepository{}, user: "user-1", tripID: testTripID, date: "2026-07-10", input: SetDayLodgingPlaceInput{TripPlaceID: "not-a-uuid"}, want: ErrValidation},
+		{name: "missing trip", repo: &fakeRepository{}, user: "user-1", tripID: testTripID, date: "2026-07-10", input: SetDayLodgingPlaceInput{TripPlaceID: placeID}, want: ErrNotFound},
+		{name: "forbidden", repo: &fakeRepository{trip: Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"}, tripFound: true}, user: "user-1", tripID: testTripID, date: "2026-07-10", input: SetDayLodgingPlaceInput{TripPlaceID: placeID}, want: ErrForbidden},
+		{name: "out of range", repo: &fakeRepository{trip: Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"}, tripFound: true, isParticipant: true}, user: "user-1", tripID: testTripID, date: "2026-07-14", input: SetDayLodgingPlaceInput{TripPlaceID: placeID}, want: ErrNotFound},
+		{name: "place not in trip", repo: &fakeRepository{trip: Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"}, tripFound: true, isParticipant: true}, user: "user-1", tripID: testTripID, date: "2026-07-10", input: SetDayLodgingPlaceInput{TripPlaceID: placeID}, want: ErrNotFound},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			service := newTestService(tt.repo)
+			_, err := service.SetDayLodgingPlace(context.Background(), tt.user, tt.tripID, tt.date, tt.input)
+			if !errors.Is(err, tt.want) {
+				t.Fatalf("expected %v, got %v", tt.want, err)
+			}
+			if tt.repo.setDayLodgingCalled {
+				t.Fatal("expected failure not to set day lodging")
+			}
+		})
+	}
+}
+
+func TestServiceClearDayLodgingPlace(t *testing.T) {
+	repo := &fakeRepository{
+		trip:          Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"},
+		tripFound:     true,
+		isParticipant: true,
+	}
+	service := newTestService(repo)
+
+	err := service.ClearDayLodgingPlace(context.Background(), "user-1", testTripID, "2026-07-11")
+	if err != nil {
+		t.Fatalf("ClearDayLodgingPlace returned error: %v", err)
+	}
+	if !repo.deletedDayLodgingCall || repo.deletedDayLodgingTrip != testTripID || repo.deletedDayLodgingDate != "2026-07-11" {
+		t.Fatalf("expected repository clear day lodging call, got called=%v trip=%q date=%q", repo.deletedDayLodgingCall, repo.deletedDayLodgingTrip, repo.deletedDayLodgingDate)
+	}
+}
+
+func TestServiceClearDayLodgingPlaceValidationAndAuth(t *testing.T) {
+	tests := []struct {
+		name   string
+		repo   *fakeRepository
+		user   string
+		tripID string
+		date   string
+		want   error
+	}{
+		{name: "requires auth", repo: &fakeRepository{}, user: " ", tripID: testTripID, date: "2026-07-10", want: ErrUnauthorized},
+		{name: "invalid trip id", repo: &fakeRepository{}, user: "user-1", tripID: "not-a-uuid", date: "2026-07-10", want: ErrValidation},
+		{name: "invalid date", repo: &fakeRepository{}, user: "user-1", tripID: testTripID, date: "2026/07/10", want: ErrValidation},
+		{name: "missing trip", repo: &fakeRepository{}, user: "user-1", tripID: testTripID, date: "2026-07-10", want: ErrNotFound},
+		{name: "forbidden", repo: &fakeRepository{trip: Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"}, tripFound: true}, user: "user-1", tripID: testTripID, date: "2026-07-10", want: ErrForbidden},
+		{name: "out of range", repo: &fakeRepository{trip: Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"}, tripFound: true, isParticipant: true}, user: "user-1", tripID: testTripID, date: "2026-07-14", want: ErrNotFound},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			service := newTestService(tt.repo)
+			err := service.ClearDayLodgingPlace(context.Background(), tt.user, tt.tripID, tt.date)
+			if !errors.Is(err, tt.want) {
+				t.Fatalf("expected %v, got %v", tt.want, err)
+			}
+			if tt.repo.deletedDayLodgingCall {
+				t.Fatal("expected failure not to clear day lodging")
+			}
+		})
 	}
 }
 

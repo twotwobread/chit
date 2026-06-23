@@ -2,10 +2,10 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
+import type { TripDay } from './TripDay';
 import type { TripPlaceSummary } from './TripPlaceSummary';
-export type TripDay = {
-    date: string;
-    dayOrder: number;
-    lodgingPlace: TripPlaceSummary | null;
+export type SetDayLodgingPlaceResponse = {
+    day: TripDay;
+    lodgingPlace: TripPlaceSummary;
 };
 

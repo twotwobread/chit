@@ -7,6 +7,8 @@ export type DayItineraryRowViewModel = {
   id: string;
   version: number;
   orderLabel: string;
+  isLodging?: boolean;
+  placeId?: string;
   placeName: string;
   placeType: TripPlaceType;
   placeTypeLabel: string;
@@ -72,6 +74,8 @@ export function buildDayItineraryViewModel(response: GetDayItineraryResponse): D
         id: item.id,
         version: item.version,
         orderLabel: String(item.itemOrder),
+        isLodging: item.isLodging,
+        placeId: item.place.id,
         placeName: item.place.name,
         placeType: item.place.placeType,
         placeTypeLabel: getPlaceTypeLabel(item.place.placeType),

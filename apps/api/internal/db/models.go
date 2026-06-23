@@ -44,6 +44,14 @@ type AuthSession struct {
 	UpdatedAt             pgtype.Timestamptz
 }
 
+type DayLodgingPlace struct {
+	TripID      pgtype.UUID
+	LodgingDate pgtype.Date
+	TripPlaceID pgtype.UUID
+	CreatedAt   pgtype.Timestamptz
+	UpdatedAt   pgtype.Timestamptz
+}
+
 type ItineraryItem struct {
 	ID            pgtype.UUID
 	TripID        pgtype.UUID

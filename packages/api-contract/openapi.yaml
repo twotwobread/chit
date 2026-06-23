@@ -354,6 +354,123 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /trips/{tripId}/days/{date}/lodging-place:
+    put:
+      operationId: setDayLodgingPlace
+      summary: Set a trip day lodging place
+      description: Stores or replaces the selected Day lodging target for an authenticated trip participant.
+      tags:
+        - Trips
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: date
+          in: path
+          required: true
+          schema:
+            type: string
+            format: date
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetDayLodgingPlaceRequest'
+      responses:
+        '200':
+          description: Day lodging place saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SetDayLodgingPlaceResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip, virtual day, or trip place not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      operationId: clearDayLodgingPlace
+      summary: Clear a trip day lodging place
+      description: Removes the selected Day lodging target for an authenticated trip participant. Clearing an empty Day lodging selection is a 204 no-op.
+      tags:
+        - Trips
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: date
+          in: path
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '204':
+          description: Day lodging place cleared or already empty.
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip or virtual day not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /trips/{tripId}/days/{date}/itinerary:
     get:
       operationId: getDayItinerary
@@ -1117,6 +1234,7 @@ components:
       required:
         - date
         - dayOrder
+        - lodgingPlace
       properties:
         date:
           type: string
@@ -1124,6 +1242,10 @@ components:
         dayOrder:
           type: integer
           minimum: 1
+        lodgingPlace:
+          allOf:
+            - $ref: '#/components/schemas/TripPlaceSummary'
+          nullable: true
     TripPlaceType:
       type: string
       enum:
@@ -1155,6 +1277,7 @@ components:
         - id
         - itemOrder
         - version
+        - isLodging
         - place
       properties:
         id:
@@ -1165,6 +1288,8 @@ components:
         version:
           type: integer
           minimum: 1
+        isLodging:
+          type: boolean
         place:
           $ref: '#/components/schemas/TripPlaceSummary'
     GetDayItineraryResponse:
@@ -1179,6 +1304,24 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/DayItineraryItem'
+    SetDayLodgingPlaceRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - tripPlaceId
+      properties:
+        tripPlaceId:
+          type: string
+    SetDayLodgingPlaceResponse:
+      type: object
+      required:
+        - day
+        - lodgingPlace
+      properties:
+        day:
+          $ref: '#/components/schemas/TripDay'
+        lodgingPlace:
+          $ref: '#/components/schemas/TripPlaceSummary'
     ReorderDayItineraryMove:
       type: object
       additionalProperties: false

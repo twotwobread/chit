@@ -199,6 +199,12 @@ func (s *Service) GetDetail(ctx context.Context, userID string, tripID string) (
 		return GetDetailResult{}, err
 	}
 
+	lodgingPlaces, err := s.repo.ListDayLodgingPlacesByTrip(ctx, tripID)
+	if err != nil {
+		return GetDetailResult{}, err
+	}
+	applyDayLodgingPlaces(days, lodgingPlaces)
+
 	overflowCount := totalCount - len(previewNames)
 	if overflowCount < 0 {
 		overflowCount = 0
@@ -291,6 +297,11 @@ func (s *Service) GetDayItinerary(ctx context.Context, userID string, tripID str
 		return GetDayItineraryResult{}, ErrNotFound
 	}
 
+	lodgingPlace, hasLodgingPlace, err := s.repo.GetDayLodgingPlaceByTripAndDate(ctx, tripID, selectedDate.Format(dateLayout))
+	if err != nil {
+		return GetDayItineraryResult{}, err
+	}
+
 	items, err := s.repo.ListItineraryItemsByTripAndDate(ctx, tripID, selectedDate.Format(dateLayout))
 	if err != nil {
 		return GetDayItineraryResult{}, err
@@ -298,11 +309,82 @@ func (s *Service) GetDayItinerary(ctx context.Context, userID string, tripID str
 
 	return GetDayItineraryResult{
 		Day: TripDay{
-			Date:     selectedDate.Format(dateLayout),
-			DayOrder: dayOrder,
+			Date:         selectedDate.Format(dateLayout),
+			DayOrder:     dayOrder,
+			LodgingPlace: optionalTripPlaceSummary(lodgingPlace, hasLodgingPlace),
 		},
 		Items: items,
 	}, nil
+}
+
+func (s *Service) SetDayLodgingPlace(ctx context.Context, userID string, tripID string, date string, input SetDayLodgingPlaceInput) (SetDayLodgingPlaceResult, error) {
+	if strings.TrimSpace(userID) == "" {
+		return SetDayLodgingPlaceResult{}, ErrUnauthorized
+	}
+
+	tripID = strings.TrimSpace(tripID)
+	date = strings.TrimSpace(date)
+	tripPlaceID := strings.TrimSpace(input.TripPlaceID)
+	if !isUUID(tripID) || !isUUID(tripPlaceID) {
+		return SetDayLodgingPlaceResult{}, ErrValidation
+	}
+
+	selectedDate, err := parseDate(date)
+	if err != nil {
+		return SetDayLodgingPlaceResult{}, ErrValidation
+	}
+
+	dayOrder, err := s.dayOrder(ctx, userID, tripID, selectedDate)
+	if err != nil {
+		return SetDayLodgingPlaceResult{}, err
+	}
+
+	if _, ok, err := s.repo.GetTripPlaceSummaryByTripAndPlace(ctx, tripID, tripPlaceID); err != nil {
+		return SetDayLodgingPlaceResult{}, err
+	} else if !ok {
+		return SetDayLodgingPlaceResult{}, ErrNotFound
+	}
+
+	lodgingPlace, err := s.repo.SetDayLodgingPlace(ctx, SetDayLodgingPlaceRecord{
+		TripID:        tripID,
+		ScheduledDate: selectedDate.Format(dateLayout),
+		TripPlaceID:   tripPlaceID,
+	})
+	if err != nil {
+		return SetDayLodgingPlaceResult{}, err
+	}
+
+	return SetDayLodgingPlaceResult{
+		Day: TripDay{
+			Date:         selectedDate.Format(dateLayout),
+			DayOrder:     dayOrder,
+			LodgingPlace: &lodgingPlace,
+		},
+		LodgingPlace: lodgingPlace,
+	}, nil
+}
+
+func (s *Service) ClearDayLodgingPlace(ctx context.Context, userID string, tripID string, date string) error {
+	if strings.TrimSpace(userID) == "" {
+		return ErrUnauthorized
+	}
+
+	tripID = strings.TrimSpace(tripID)
+	date = strings.TrimSpace(date)
+	if !isUUID(tripID) {
+		return ErrValidation
+	}
+
+	selectedDate, err := parseDate(date)
+	if err != nil {
+		return ErrValidation
+	}
+
+	if err := s.validateTripDayParticipant(ctx, userID, tripID, selectedDate); err != nil {
+		return err
+	}
+
+	return s.repo.DeleteDayLodgingPlace(ctx, tripID, selectedDate.Format(dateLayout))
 }
 
 func (s *Service) CreateManualDayItineraryItem(ctx context.Context, userID string, tripID string, date string, input CreateManualDayItineraryItemInput) (CreateManualDayItineraryItemResult, error) {
@@ -371,10 +453,16 @@ func (s *Service) CreateManualDayItineraryItem(ctx context.Context, userID strin
 		return CreateManualDayItineraryItemResult{}, err
 	}
 
+	lodgingPlace, hasLodgingPlace, err := s.repo.GetDayLodgingPlaceByTripAndDate(ctx, tripID, selectedDate.Format(dateLayout))
+	if err != nil {
+		return CreateManualDayItineraryItemResult{}, err
+	}
+
 	return CreateManualDayItineraryItemResult{
 		Day: TripDay{
-			Date:     selectedDate.Format(dateLayout),
-			DayOrder: dayOrder,
+			Date:         selectedDate.Format(dateLayout),
+			DayOrder:     dayOrder,
+			LodgingPlace: optionalTripPlaceSummary(lodgingPlace, hasLodgingPlace),
 		},
 		Item: item,
 	}, nil
@@ -501,10 +589,16 @@ func (s *Service) ReorderDayItineraryItems(ctx context.Context, userID string, t
 		return ReorderDayItineraryItemsResult{}, err
 	}
 
+	lodgingPlace, hasLodgingPlace, err := s.repo.GetDayLodgingPlaceByTripAndDate(ctx, tripID, selectedDate.Format(dateLayout))
+	if err != nil {
+		return ReorderDayItineraryItemsResult{}, err
+	}
+
 	return ReorderDayItineraryItemsResult{
 		Day: TripDay{
-			Date:     selectedDate.Format(dateLayout),
-			DayOrder: dayOrder,
+			Date:         selectedDate.Format(dateLayout),
+			DayOrder:     dayOrder,
+			LodgingPlace: optionalTripPlaceSummary(lodgingPlace, hasLodgingPlace),
 		},
 		Items: items,
 	}, nil
@@ -708,6 +802,26 @@ func tripDaysForRange(startDateText string, endDateText string) ([]TripDay, erro
 		})
 	}
 	return days, nil
+}
+
+func applyDayLodgingPlaces(days []TripDay, lodgingPlaces []DayLodgingPlace) {
+	byDate := map[string]TripPlaceSummary{}
+	for _, lodgingPlace := range lodgingPlaces {
+		byDate[lodgingPlace.Date] = lodgingPlace.Place
+	}
+	for index := range days {
+		place, ok := byDate[days[index].Date]
+		if ok {
+			days[index].LodgingPlace = &place
+		}
+	}
+}
+
+func optionalTripPlaceSummary(place TripPlaceSummary, ok bool) *TripPlaceSummary {
+	if !ok {
+		return nil
+	}
+	return &place
 }
 
 func dayOrderInRange(startDateText string, endDateText string, selectedDate time.Time) (int, error) {
