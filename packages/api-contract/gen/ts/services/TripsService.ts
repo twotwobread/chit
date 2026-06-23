@@ -9,6 +9,8 @@ import type { CreateTripResponse } from '../models/CreateTripResponse';
 import type { GetDayItineraryResponse } from '../models/GetDayItineraryResponse';
 import type { GetTripDetailResponse } from '../models/GetTripDetailResponse';
 import type { ListTripsResponse } from '../models/ListTripsResponse';
+import type { UpdateDayItineraryItemRequest } from '../models/UpdateDayItineraryItemRequest';
+import type { UpdateDayItineraryItemResponse } from '../models/UpdateDayItineraryItemResponse';
 import type { UpdateTripRequest } from '../models/UpdateTripRequest';
 import type { UpdateTripResponse } from '../models/UpdateTripResponse';
 import type { CancelablePromise } from '../core/CancelablePromise';
@@ -189,6 +191,72 @@ export class TripsService {
                 403: `Forbidden.`,
                 404: `Trip or virtual day not found.`,
                 409: `Concurrent append conflict.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
+     * Update a trip day itinerary item place snapshot
+     * Updates name, address, and/or place type for the trip place snapshot linked from the selected Day itinerary item.
+     * @param tripId
+     * @param date
+     * @param itemId
+     * @param requestBody
+     * @returns UpdateDayItineraryItemResponse Day itinerary item updated.
+     * @throws ApiError
+     */
+    public static updateDayItineraryItem(
+        tripId: string,
+        date: string,
+        itemId: string,
+        requestBody: UpdateDayItineraryItemRequest,
+    ): CancelablePromise<UpdateDayItineraryItemResponse> {
+        return __request(OpenAPI, {
+            method: 'PATCH',
+            url: '/trips/{tripId}/days/{date}/itinerary/items/{itemId}',
+            path: {
+                'tripId': tripId,
+                'date': date,
+                'itemId': itemId,
+            },
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                403: `Forbidden.`,
+                404: `Trip, virtual day, or itinerary item not found.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
+     * Delete a trip day itinerary item
+     * Removes the selected itinerary item from the virtual Day and orphan-cleans the linked trip place when unreferenced.
+     * @param tripId
+     * @param date
+     * @param itemId
+     * @returns void
+     * @throws ApiError
+     */
+    public static deleteDayItineraryItem(
+        tripId: string,
+        date: string,
+        itemId: string,
+    ): CancelablePromise<void> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/trips/{tripId}/days/{date}/itinerary/items/{itemId}',
+            path: {
+                'tripId': tripId,
+                'date': date,
+                'itemId': itemId,
+            },
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                403: `Forbidden.`,
+                404: `Trip, virtual day, or itinerary item not found.`,
                 500: `Unexpected server error.`,
             },
         });

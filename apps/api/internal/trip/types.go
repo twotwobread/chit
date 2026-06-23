@@ -44,6 +44,12 @@ type CreateManualDayItineraryItemInput struct {
 	PlaceType string
 }
 
+type UpdateDayItineraryItemInput struct {
+	Name      *string
+	Address   *string
+	PlaceType *string
+}
+
 type CreateRecord struct {
 	Name             string
 	StartDate        time.Time
@@ -64,6 +70,15 @@ type UpdateRecord struct {
 type CreateManualDayItineraryItemRecord struct {
 	TripID        string
 	ScheduledDate string
+	Name          string
+	Address       string
+	PlaceType     string
+}
+
+type UpdateDayItineraryItemRecord struct {
+	TripID        string
+	ScheduledDate string
+	ItemID        string
 	Name          string
 	Address       string
 	PlaceType     string
@@ -138,6 +153,10 @@ type CreateManualDayItineraryItemResult struct {
 	Item DayItineraryItem
 }
 
+type UpdateDayItineraryItemResult struct {
+	Item DayItineraryItem
+}
+
 type ListItem struct {
 	ID               string
 	Name             string
@@ -163,4 +182,7 @@ type Repository interface {
 	ListTripsByParticipantUser(ctx context.Context, userID string) ([]ListItem, error)
 	ListItineraryItemsByTripAndDate(ctx context.Context, tripID string, date string) ([]DayItineraryItem, error)
 	CreateManualDayItineraryItem(ctx context.Context, record CreateManualDayItineraryItemRecord) (DayItineraryItem, error)
+	GetItineraryItemByTripDateAndID(ctx context.Context, tripID string, date string, itemID string) (DayItineraryItem, bool, error)
+	UpdateDayItineraryItemPlace(ctx context.Context, record UpdateDayItineraryItemRecord) (DayItineraryItem, error)
+	DeleteDayItineraryItem(ctx context.Context, tripID string, date string, itemID string) (bool, error)
 }

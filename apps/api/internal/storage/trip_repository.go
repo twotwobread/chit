@@ -268,6 +268,99 @@ func (s *Store) CreateManualDayItineraryItem(ctx context.Context, record trip.Cr
 	}, nil
 }
 
+func (s *Store) GetItineraryItemByTripDateAndID(ctx context.Context, tripID string, date string, itemID string) (trip.DayItineraryItem, bool, error) {
+	row, err := s.queries.GetItineraryItemByTripDateAndID(ctx, db.GetItineraryItemByTripDateAndIDParams{
+		TripID:        mustUUID(tripID),
+		ScheduledDate: dateTextValue(date),
+		ItemID:        mustUUID(itemID),
+	})
+	if err == pgx.ErrNoRows {
+		return trip.DayItineraryItem{}, false, nil
+	}
+	if err != nil {
+		return trip.DayItineraryItem{}, false, err
+	}
+	return trip.DayItineraryItem{
+		ID:        row.ID,
+		ItemOrder: int(row.ItemOrder),
+		Place: trip.TripPlaceSummary{
+			ID:        row.TripPlaceID,
+			Name:      row.PlaceName,
+			PlaceType: row.PlaceType,
+			Address:   row.Address,
+		},
+	}, true, nil
+}
+
+func (s *Store) UpdateDayItineraryItemPlace(ctx context.Context, record trip.UpdateDayItineraryItemRecord) (trip.DayItineraryItem, error) {
+	row, err := s.queries.UpdateTripPlaceSnapshotByItineraryItem(ctx, db.UpdateTripPlaceSnapshotByItineraryItemParams{
+		TripID:        mustUUID(record.TripID),
+		ScheduledDate: dateTextValue(record.ScheduledDate),
+		ItemID:        mustUUID(record.ItemID),
+		Name:          record.Name,
+		Address:       record.Address,
+		PlaceType:     record.PlaceType,
+	})
+	if err == pgx.ErrNoRows {
+		return trip.DayItineraryItem{}, trip.ErrNotFound
+	}
+	if err != nil {
+		return trip.DayItineraryItem{}, err
+	}
+	return trip.DayItineraryItem{
+		ID:        row.ID,
+		ItemOrder: int(row.ItemOrder),
+		Place: trip.TripPlaceSummary{
+			ID:        row.TripPlaceID,
+			Name:      row.PlaceName,
+			PlaceType: row.PlaceType,
+			Address:   row.Address,
+		},
+	}, nil
+}
+
+func (s *Store) DeleteDayItineraryItem(ctx context.Context, tripID string, date string, itemID string) (bool, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	qtx := s.queries.WithTx(tx)
+	placeID, err := qtx.DeleteItineraryItemByTripDateAndID(ctx, db.DeleteItineraryItemByTripDateAndIDParams{
+		TripID:        mustUUID(tripID),
+		ScheduledDate: dateTextValue(date),
+		ItemID:        mustUUID(itemID),
+	})
+	if err == pgx.ErrNoRows {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+
+	remaining, err := qtx.CountItineraryItemsByTripPlaceID(ctx, db.CountItineraryItemsByTripPlaceIDParams{
+		TripID:      mustUUID(tripID),
+		TripPlaceID: mustUUID(placeID),
+	})
+	if err != nil {
+		return false, err
+	}
+	if remaining == 0 {
+		if err := qtx.DeleteTripPlaceByID(ctx, db.DeleteTripPlaceByIDParams{
+			TripID:      mustUUID(tripID),
+			TripPlaceID: mustUUID(placeID),
+		}); err != nil {
+			return false, err
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 func dateValue(value time.Time) pgtype.Date {
 	return pgtype.Date{Time: value, Valid: true}
 }

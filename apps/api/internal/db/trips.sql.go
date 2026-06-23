@@ -11,6 +11,25 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countItineraryItemsByTripPlaceID = `-- name: CountItineraryItemsByTripPlaceID :one
+SELECT count(*)::int AS total_count
+FROM itinerary_items
+WHERE trip_id = $1::uuid
+  AND trip_place_id = $2::uuid
+`
+
+type CountItineraryItemsByTripPlaceIDParams struct {
+	TripID      pgtype.UUID
+	TripPlaceID pgtype.UUID
+}
+
+func (q *Queries) CountItineraryItemsByTripPlaceID(ctx context.Context, arg CountItineraryItemsByTripPlaceIDParams) (int32, error) {
+	row := q.db.QueryRow(ctx, countItineraryItemsByTripPlaceID, arg.TripID, arg.TripPlaceID)
+	var total_count int32
+	err := row.Scan(&total_count)
+	return total_count, err
+}
+
 const countTripParticipantsByTripID = `-- name: CountTripParticipantsByTripID :one
 SELECT count(*)::int AS total_count
 FROM trip_participants
@@ -236,6 +255,27 @@ func (q *Queries) CreateTripPlace(ctx context.Context, arg CreateTripPlaceParams
 	return i, err
 }
 
+const deleteItineraryItemByTripDateAndID = `-- name: DeleteItineraryItemByTripDateAndID :one
+DELETE FROM itinerary_items
+WHERE trip_id = $1::uuid
+  AND scheduled_date = $2
+  AND id = $3::uuid
+RETURNING trip_place_id::text
+`
+
+type DeleteItineraryItemByTripDateAndIDParams struct {
+	TripID        pgtype.UUID
+	ScheduledDate pgtype.Date
+	ItemID        pgtype.UUID
+}
+
+func (q *Queries) DeleteItineraryItemByTripDateAndID(ctx context.Context, arg DeleteItineraryItemByTripDateAndIDParams) (string, error) {
+	row := q.db.QueryRow(ctx, deleteItineraryItemByTripDateAndID, arg.TripID, arg.ScheduledDate, arg.ItemID)
+	var trip_place_id string
+	err := row.Scan(&trip_place_id)
+	return trip_place_id, err
+}
+
 const deleteTripByID = `-- name: DeleteTripByID :one
 DELETE FROM trips
 WHERE id = $1::uuid
@@ -247,6 +287,68 @@ func (q *Queries) DeleteTripByID(ctx context.Context, dollar_1 pgtype.UUID) (str
 	var id string
 	err := row.Scan(&id)
 	return id, err
+}
+
+const deleteTripPlaceByID = `-- name: DeleteTripPlaceByID :exec
+DELETE FROM trip_places
+WHERE trip_id = $1::uuid
+  AND id = $2::uuid
+`
+
+type DeleteTripPlaceByIDParams struct {
+	TripID      pgtype.UUID
+	TripPlaceID pgtype.UUID
+}
+
+func (q *Queries) DeleteTripPlaceByID(ctx context.Context, arg DeleteTripPlaceByIDParams) error {
+	_, err := q.db.Exec(ctx, deleteTripPlaceByID, arg.TripID, arg.TripPlaceID)
+	return err
+}
+
+const getItineraryItemByTripDateAndID = `-- name: GetItineraryItemByTripDateAndID :one
+SELECT
+  ii.id::text AS id,
+  ii.item_order,
+  tp.id::text AS trip_place_id,
+  tp.name AS place_name,
+  tp.place_type,
+  tp.address
+FROM itinerary_items ii
+JOIN trip_places tp
+  ON tp.id = ii.trip_place_id
+ AND tp.trip_id = ii.trip_id
+WHERE ii.trip_id = $1::uuid
+  AND ii.scheduled_date = $2
+  AND ii.id = $3::uuid
+`
+
+type GetItineraryItemByTripDateAndIDParams struct {
+	TripID        pgtype.UUID
+	ScheduledDate pgtype.Date
+	ItemID        pgtype.UUID
+}
+
+type GetItineraryItemByTripDateAndIDRow struct {
+	ID          string
+	ItemOrder   int32
+	TripPlaceID string
+	PlaceName   string
+	PlaceType   string
+	Address     string
+}
+
+func (q *Queries) GetItineraryItemByTripDateAndID(ctx context.Context, arg GetItineraryItemByTripDateAndIDParams) (GetItineraryItemByTripDateAndIDRow, error) {
+	row := q.db.QueryRow(ctx, getItineraryItemByTripDateAndID, arg.TripID, arg.ScheduledDate, arg.ItemID)
+	var i GetItineraryItemByTripDateAndIDRow
+	err := row.Scan(
+		&i.ID,
+		&i.ItemOrder,
+		&i.TripPlaceID,
+		&i.PlaceName,
+		&i.PlaceType,
+		&i.Address,
+	)
+	return i, err
 }
 
 const getTripByID = `-- name: GetTripByID :one
@@ -537,6 +639,82 @@ func (q *Queries) UpdateTripBasicInfo(ctx context.Context, arg UpdateTripBasicIn
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const updateTripPlaceSnapshotByItineraryItem = `-- name: UpdateTripPlaceSnapshotByItineraryItem :one
+WITH target AS (
+  SELECT
+    ii.id,
+    ii.item_order,
+    ii.trip_place_id
+  FROM itinerary_items ii
+  WHERE ii.trip_id = $1::uuid
+    AND ii.scheduled_date = $2
+    AND ii.id = $3::uuid
+), updated_place AS (
+  UPDATE trip_places tp
+  SET
+    name = $4,
+    address = $5,
+    place_type = $6,
+    updated_at = now()
+  FROM target
+  WHERE tp.id = target.trip_place_id
+    AND tp.trip_id = $1::uuid
+  RETURNING
+    tp.id::text AS id,
+    tp.name,
+    tp.place_type,
+    tp.address
+)
+SELECT
+  target.id::text AS id,
+  target.item_order,
+  updated_place.id AS trip_place_id,
+  updated_place.name AS place_name,
+  updated_place.place_type,
+  updated_place.address
+FROM target
+JOIN updated_place ON true
+`
+
+type UpdateTripPlaceSnapshotByItineraryItemParams struct {
+	TripID        pgtype.UUID
+	ScheduledDate pgtype.Date
+	ItemID        pgtype.UUID
+	Name          string
+	Address       string
+	PlaceType     string
+}
+
+type UpdateTripPlaceSnapshotByItineraryItemRow struct {
+	ID          string
+	ItemOrder   int32
+	TripPlaceID string
+	PlaceName   string
+	PlaceType   string
+	Address     string
+}
+
+func (q *Queries) UpdateTripPlaceSnapshotByItineraryItem(ctx context.Context, arg UpdateTripPlaceSnapshotByItineraryItemParams) (UpdateTripPlaceSnapshotByItineraryItemRow, error) {
+	row := q.db.QueryRow(ctx, updateTripPlaceSnapshotByItineraryItem,
+		arg.TripID,
+		arg.ScheduledDate,
+		arg.ItemID,
+		arg.Name,
+		arg.Address,
+		arg.PlaceType,
+	)
+	var i UpdateTripPlaceSnapshotByItineraryItemRow
+	err := row.Scan(
+		&i.ID,
+		&i.ItemOrder,
+		&i.TripPlaceID,
+		&i.PlaceName,
+		&i.PlaceType,
+		&i.Address,
 	)
 	return i, err
 }

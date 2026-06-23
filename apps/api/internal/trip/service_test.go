@@ -3,6 +3,7 @@ package trip
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -28,6 +29,19 @@ type fakeRepository struct {
 	createdManualRecords  []CreateManualDayItineraryItemRecord
 	createdManualItem     DayItineraryItem
 	createManualErr       error
+	dayItem               DayItineraryItem
+	dayItemFound          bool
+	dayItemLookupTripID   string
+	dayItemLookupDate     string
+	dayItemLookupItemID   string
+	updatedDayItemRecord  UpdateDayItineraryItemRecord
+	updatedDayItemCalled  bool
+	updatedDayItem        DayItineraryItem
+	deletedDayItemTripID  string
+	deletedDayItemDate    string
+	deletedDayItemID      string
+	deletedDayItemCalled  bool
+	deletedDayItemOK      bool
 	updated               UpdateRecord
 	updatedCalled         bool
 	deletedID             string
@@ -133,6 +147,39 @@ func (r *fakeRepository) CreateManualDayItineraryItem(_ context.Context, record 
 			Address:   record.Address,
 		},
 	}, nil
+}
+
+func (r *fakeRepository) GetItineraryItemByTripDateAndID(_ context.Context, tripID string, date string, itemID string) (DayItineraryItem, bool, error) {
+	r.dayItemLookupTripID = tripID
+	r.dayItemLookupDate = date
+	r.dayItemLookupItemID = itemID
+	return r.dayItem, r.dayItemFound, nil
+}
+
+func (r *fakeRepository) UpdateDayItineraryItemPlace(_ context.Context, record UpdateDayItineraryItemRecord) (DayItineraryItem, error) {
+	r.updatedDayItemRecord = record
+	r.updatedDayItemCalled = true
+	if r.updatedDayItem.ID != "" {
+		return r.updatedDayItem, nil
+	}
+	return DayItineraryItem{
+		ID:        record.ItemID,
+		ItemOrder: r.dayItem.ItemOrder,
+		Place: TripPlaceSummary{
+			ID:        r.dayItem.Place.ID,
+			Name:      record.Name,
+			PlaceType: record.PlaceType,
+			Address:   record.Address,
+		},
+	}, nil
+}
+
+func (r *fakeRepository) DeleteDayItineraryItem(_ context.Context, tripID string, date string, itemID string) (bool, error) {
+	r.deletedDayItemTripID = tripID
+	r.deletedDayItemDate = date
+	r.deletedDayItemID = itemID
+	r.deletedDayItemCalled = true
+	return r.deletedDayItemOK, nil
 }
 
 func TestServiceCreate(t *testing.T) {
@@ -749,6 +796,166 @@ func TestServiceCreateManualDayItineraryItemAllowsDuplicates(t *testing.T) {
 	if len(repo.createdManualRecords) != 2 {
 		t.Fatalf("expected duplicate creates to call repository twice, got %#v", repo.createdManualRecords)
 	}
+}
+
+func TestServiceUpdateDayItineraryItem(t *testing.T) {
+	repo := &fakeRepository{
+		trip:          Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"},
+		tripFound:     true,
+		isParticipant: true,
+		dayItem: DayItineraryItem{
+			ID:        testUUID(7001),
+			ItemOrder: 2,
+			Place: TripPlaceSummary{
+				ID:        testUUID(8001),
+				Name:      "우메다 공중정원",
+				Address:   "Umeda",
+				PlaceType: "sights",
+			},
+		},
+		dayItemFound: true,
+	}
+	service := newTestService(repo)
+
+	result, err := service.UpdateDayItineraryItem(context.Background(), "user-1", testTripID, "2026-07-11", testUUID(7001), UpdateDayItineraryItemInput{
+		Name:    stringPtr("  우메다 스카이빌딩  "),
+		Address: stringPtr("  Umeda Sky Building  "),
+	})
+	if err != nil {
+		t.Fatalf("UpdateDayItineraryItem returned error: %v", err)
+	}
+
+	if result.Item.ID != testUUID(7001) || result.Item.ItemOrder != 2 || result.Item.Place.Name != "우메다 스카이빌딩" || result.Item.Place.Address != "Umeda Sky Building" || result.Item.Place.PlaceType != "sights" {
+		t.Fatalf("expected updated item with unchanged order/place type, got %#v", result.Item)
+	}
+	if repo.dayItemLookupTripID != testTripID || repo.dayItemLookupDate != "2026-07-11" || repo.dayItemLookupItemID != testUUID(7001) {
+		t.Fatalf("expected item lookup by trip/date/item, got trip=%q date=%q item=%q", repo.dayItemLookupTripID, repo.dayItemLookupDate, repo.dayItemLookupItemID)
+	}
+	if !repo.updatedDayItemCalled {
+		t.Fatal("expected repository update call")
+	}
+	if repo.updatedDayItemRecord.TripID != testTripID || repo.updatedDayItemRecord.ScheduledDate != "2026-07-11" || repo.updatedDayItemRecord.ItemID != testUUID(7001) || repo.updatedDayItemRecord.Name != "우메다 스카이빌딩" || repo.updatedDayItemRecord.Address != "Umeda Sky Building" || repo.updatedDayItemRecord.PlaceType != "sights" {
+		t.Fatalf("expected merged trimmed update record, got %#v", repo.updatedDayItemRecord)
+	}
+}
+
+func TestServiceUpdateDayItineraryItemValidation(t *testing.T) {
+	validTrip := Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"}
+	tests := []struct {
+		name   string
+		tripID string
+		date   string
+		itemID string
+		input  UpdateDayItineraryItemInput
+	}{
+		{name: "invalid trip id", tripID: "not-a-uuid", date: "2026-07-10", itemID: testUUID(7001), input: UpdateDayItineraryItemInput{Name: stringPtr("우메다")}},
+		{name: "invalid date", tripID: testTripID, date: "2026/07/10", itemID: testUUID(7001), input: UpdateDayItineraryItemInput{Name: stringPtr("우메다")}},
+		{name: "invalid item id", tripID: testTripID, date: "2026-07-10", itemID: "not-a-uuid", input: UpdateDayItineraryItemInput{Name: stringPtr("우메다")}},
+		{name: "empty patch", tripID: testTripID, date: "2026-07-10", itemID: testUUID(7001), input: UpdateDayItineraryItemInput{}},
+		{name: "blank name", tripID: testTripID, date: "2026-07-10", itemID: testUUID(7001), input: UpdateDayItineraryItemInput{Name: stringPtr(" ")}},
+		{name: "too long name", tripID: testTripID, date: "2026-07-10", itemID: testUUID(7001), input: UpdateDayItineraryItemInput{Name: stringPtr(strings.Repeat("가", 121))}},
+		{name: "blank address", tripID: testTripID, date: "2026-07-10", itemID: testUUID(7001), input: UpdateDayItineraryItemInput{Address: stringPtr(" ")}},
+		{name: "too long address", tripID: testTripID, date: "2026-07-10", itemID: testUUID(7001), input: UpdateDayItineraryItemInput{Address: stringPtr(strings.Repeat("가", 301))}},
+		{name: "invalid place type", tripID: testTripID, date: "2026-07-10", itemID: testUUID(7001), input: UpdateDayItineraryItemInput{PlaceType: stringPtr("museum")}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := &fakeRepository{trip: validTrip, tripFound: true, isParticipant: true, dayItem: DayItineraryItem{ID: testUUID(7001), ItemOrder: 1, Place: TripPlaceSummary{ID: testUUID(8001), Name: "우메다", Address: "Umeda", PlaceType: "sights"}}, dayItemFound: true}
+			service := newTestService(repo)
+			_, err := service.UpdateDayItineraryItem(context.Background(), "user-1", tt.tripID, tt.date, tt.itemID, tt.input)
+			if !errors.Is(err, ErrValidation) {
+				t.Fatalf("expected ErrValidation, got %v", err)
+			}
+			if repo.updatedDayItemCalled {
+				t.Fatal("expected invalid update not to call repository update")
+			}
+		})
+	}
+}
+
+func TestServiceUpdateDayItineraryItemAuthRangeAndTarget(t *testing.T) {
+	tests := []struct {
+		name string
+		repo *fakeRepository
+		user string
+		date string
+		want error
+	}{
+		{name: "requires auth", repo: &fakeRepository{}, user: " ", date: "2026-07-10", want: ErrUnauthorized},
+		{name: "missing trip", repo: &fakeRepository{}, user: "user-1", date: "2026-07-10", want: ErrNotFound},
+		{name: "forbidden", repo: &fakeRepository{trip: Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"}, tripFound: true}, user: "user-1", date: "2026-07-10", want: ErrForbidden},
+		{name: "out of range", repo: &fakeRepository{trip: Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"}, tripFound: true, isParticipant: true}, user: "user-1", date: "2026-07-14", want: ErrNotFound},
+		{name: "item not in day", repo: &fakeRepository{trip: Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"}, tripFound: true, isParticipant: true}, user: "user-1", date: "2026-07-10", want: ErrNotFound},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			service := newTestService(tt.repo)
+			_, err := service.UpdateDayItineraryItem(context.Background(), tt.user, testTripID, tt.date, testUUID(7001), UpdateDayItineraryItemInput{Name: stringPtr("우메다")})
+			if !errors.Is(err, tt.want) {
+				t.Fatalf("expected %v, got %v", tt.want, err)
+			}
+			if tt.want != ErrNotFound || tt.name != "item not in day" {
+				if tt.repo.updatedDayItemCalled {
+					t.Fatal("expected failure not to update item")
+				}
+			}
+		})
+	}
+}
+
+func TestServiceDeleteDayItineraryItem(t *testing.T) {
+	repo := &fakeRepository{
+		trip:             Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"},
+		tripFound:        true,
+		isParticipant:    true,
+		deletedDayItemOK: true,
+	}
+	service := newTestService(repo)
+
+	err := service.DeleteDayItineraryItem(context.Background(), "user-1", testTripID, "2026-07-11", testUUID(7001))
+	if err != nil {
+		t.Fatalf("DeleteDayItineraryItem returned error: %v", err)
+	}
+	if !repo.deletedDayItemCalled || repo.deletedDayItemTripID != testTripID || repo.deletedDayItemDate != "2026-07-11" || repo.deletedDayItemID != testUUID(7001) {
+		t.Fatalf("expected repository delete by trip/date/item, got trip=%q date=%q item=%q called=%v", repo.deletedDayItemTripID, repo.deletedDayItemDate, repo.deletedDayItemID, repo.deletedDayItemCalled)
+	}
+}
+
+func TestServiceDeleteDayItineraryItemFailures(t *testing.T) {
+	tests := []struct {
+		name   string
+		repo   *fakeRepository
+		user   string
+		tripID string
+		date   string
+		itemID string
+		want   error
+	}{
+		{name: "requires auth", repo: &fakeRepository{}, user: " ", tripID: testTripID, date: "2026-07-10", itemID: testUUID(7001), want: ErrUnauthorized},
+		{name: "invalid trip id", repo: &fakeRepository{}, user: "user-1", tripID: "not-a-uuid", date: "2026-07-10", itemID: testUUID(7001), want: ErrValidation},
+		{name: "invalid date", repo: &fakeRepository{}, user: "user-1", tripID: testTripID, date: "2026/07/10", itemID: testUUID(7001), want: ErrValidation},
+		{name: "invalid item id", repo: &fakeRepository{}, user: "user-1", tripID: testTripID, date: "2026-07-10", itemID: "not-a-uuid", want: ErrValidation},
+		{name: "missing trip", repo: &fakeRepository{}, user: "user-1", tripID: testTripID, date: "2026-07-10", itemID: testUUID(7001), want: ErrNotFound},
+		{name: "forbidden", repo: &fakeRepository{trip: Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"}, tripFound: true}, user: "user-1", tripID: testTripID, date: "2026-07-10", itemID: testUUID(7001), want: ErrForbidden},
+		{name: "out of range", repo: &fakeRepository{trip: Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"}, tripFound: true, isParticipant: true}, user: "user-1", tripID: testTripID, date: "2026-07-14", itemID: testUUID(7001), want: ErrNotFound},
+		{name: "item not found", repo: &fakeRepository{trip: Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"}, tripFound: true, isParticipant: true}, user: "user-1", tripID: testTripID, date: "2026-07-10", itemID: testUUID(7001), want: ErrNotFound},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			service := newTestService(tt.repo)
+			err := service.DeleteDayItineraryItem(context.Background(), tt.user, tt.tripID, tt.date, tt.itemID)
+			if !errors.Is(err, tt.want) {
+				t.Fatalf("expected %v, got %v", tt.want, err)
+			}
+		})
+	}
+}
+
+func testUUID(value int) string {
+	return fmt.Sprintf("00000000-0000-0000-0000-%012d", value)
 }
 
 func stringPtr(value string) *string {

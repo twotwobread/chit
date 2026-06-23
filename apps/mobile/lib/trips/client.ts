@@ -7,6 +7,8 @@ import {
   type GetDayItineraryResponse,
   type GetTripDetailResponse,
   type ListTripsResponse,
+  type UpdateDayItineraryItemRequest,
+  type UpdateDayItineraryItemResponse,
   type UpdateTripRequest,
   type UpdateTripResponse,
 } from '@i-um/api-contract';
@@ -35,6 +37,21 @@ export async function createManualDayItineraryItem(
 ): Promise<CreateManualDayItineraryItemResponse> {
   await getCurrentUserWithRefresh();
   return TripsService.createManualDayItineraryItem(tripId, date, request);
+}
+
+export async function updateDayItineraryItem(
+  tripId: string,
+  date: string,
+  itemId: string,
+  request: UpdateDayItineraryItemRequest,
+): Promise<UpdateDayItineraryItemResponse> {
+  await getCurrentUserWithRefresh();
+  return TripsService.updateDayItineraryItem(tripId, date, itemId, request);
+}
+
+export async function deleteDayItineraryItem(tripId: string, date: string, itemId: string): Promise<void> {
+  await getCurrentUserWithRefresh();
+  return TripsService.deleteDayItineraryItem(tripId, date, itemId);
 }
 
 export async function updateTrip(tripId: string, request: UpdateTripRequest): Promise<UpdateTripResponse> {
