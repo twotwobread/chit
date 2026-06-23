@@ -5,6 +5,8 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	"github.com/twotwobread/i-um/apps/api/internal/trip"
 )
 
 func TestListItineraryItemsByTripAndDateFiltersSortsAndJoinsPlaces(t *testing.T) {
@@ -88,6 +90,85 @@ func TestListItineraryItemsByTripAndDateFiltersSortsAndJoinsPlaces(t *testing.T)
 	}
 	if items[1].ItemOrder != 2 || items[1].Place.Name != "도톤보리" || items[1].Place.PlaceType != "food" || items[1].Place.Address != "Dotonbori" {
 		t.Fatalf("unexpected second item mapping: %#v", items[1])
+	}
+}
+
+func TestCreateManualDayItineraryItemCreatesPlaceAndAppendsItem(t *testing.T) {
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("DATABASE_URL is required for storage integration test")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	store, err := Open(ctx, databaseURL)
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer store.Close()
+
+	var userID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO users (display_name)
+		VALUES ('장소 추가 테스트')
+		RETURNING id::text
+	`).Scan(&userID); err != nil {
+		t.Fatalf("insert user: %v", err)
+	}
+	defer func() { _, _ = store.pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1::uuid`, userID) }()
+
+	var tripID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO trips (name, start_date, end_date, default_currency, created_by)
+		VALUES ('장소 추가 테스트 여행', '2026-07-10', '2026-07-13', 'JPY', $1::uuid)
+		RETURNING id::text
+	`, userID).Scan(&tripID); err != nil {
+		t.Fatalf("insert trip: %v", err)
+	}
+
+	first, err := store.CreateManualDayItineraryItem(ctx, trip.CreateManualDayItineraryItemRecord{
+		TripID:        tripID,
+		ScheduledDate: "2026-07-11",
+		Name:          "우메다 공중정원",
+		Address:       "Umeda",
+		PlaceType:     "sights",
+	})
+	if err != nil {
+		t.Fatalf("create first manual item: %v", err)
+	}
+	if first.ItemOrder != 1 || first.Place.Name != "우메다 공중정원" || first.Place.PlaceType != "sights" || first.Place.Address != "Umeda" {
+		t.Fatalf("unexpected first item: %#v", first)
+	}
+
+	second, err := store.CreateManualDayItineraryItem(ctx, trip.CreateManualDayItineraryItemRecord{
+		TripID:        tripID,
+		ScheduledDate: "2026-07-11",
+		Name:          "우메다 공중정원",
+		Address:       "Umeda",
+		PlaceType:     "sights",
+	})
+	if err != nil {
+		t.Fatalf("create duplicate manual item: %v", err)
+	}
+	if second.ItemOrder != 2 {
+		t.Fatalf("expected duplicate item to append at order 2, got %#v", second)
+	}
+
+	items, err := store.ListItineraryItemsByTripAndDate(ctx, tripID, "2026-07-11")
+	if err != nil {
+		t.Fatalf("list created itinerary items: %v", err)
+	}
+	if len(items) != 2 || items[0].ItemOrder != 1 || items[1].ItemOrder != 2 {
+		t.Fatalf("expected two appended items, got %#v", items)
+	}
+
+	var placeCount int
+	if err := store.pool.QueryRow(ctx, `SELECT count(*)::int FROM trip_places WHERE trip_id = $1::uuid`, tripID).Scan(&placeCount); err != nil {
+		t.Fatalf("count trip places: %v", err)
+	}
+	if placeCount != 2 {
+		t.Fatalf("expected duplicate manual additions to create separate places, got %d", placeCount)
 	}
 }
 

@@ -154,6 +154,19 @@ type AuthUser struct {
 	Id          string  `json:"id"`
 }
 
+// CreateManualDayItineraryItemRequest defines model for CreateManualDayItineraryItemRequest.
+type CreateManualDayItineraryItemRequest struct {
+	Address   string        `json:"address"`
+	Name      string        `json:"name"`
+	PlaceType TripPlaceType `json:"placeType"`
+}
+
+// CreateManualDayItineraryItemResponse defines model for CreateManualDayItineraryItemResponse.
+type CreateManualDayItineraryItemResponse struct {
+	Day  TripDay          `json:"day"`
+	Item DayItineraryItem `json:"item"`
+}
+
 // CreateTripRequest defines model for CreateTripRequest.
 type CreateTripRequest struct {
 	DefaultCurrency SupportedCurrency `json:"defaultCurrency"`
@@ -392,6 +405,9 @@ type CreateTripJSONRequestBody = CreateTripRequest
 // UpdateTripJSONRequestBody defines body for UpdateTrip for application/json ContentType.
 type UpdateTripJSONRequestBody = UpdateTripRequest
 
+// CreateManualDayItineraryItemJSONRequestBody defines body for CreateManualDayItineraryItem for application/json ContentType.
+type CreateManualDayItineraryItemJSONRequestBody = CreateManualDayItineraryItemRequest
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// Revoke the current session
@@ -433,6 +449,9 @@ type ServerInterface interface {
 	// Get a trip day itinerary
 	// (GET /trips/{tripId}/days/{date}/itinerary)
 	GetDayItinerary(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date)
+	// Add a manual place to a trip day itinerary
+	// (POST /trips/{tripId}/days/{date}/itinerary-items)
+	CreateManualDayItineraryItem(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
@@ -514,6 +533,12 @@ func (_ Unimplemented) UpdateTrip(w http.ResponseWriter, r *http.Request, tripId
 // Get a trip day itinerary
 // (GET /trips/{tripId}/days/{date}/itinerary)
 func (_ Unimplemented) GetDayItinerary(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Add a manual place to a trip day itinerary
+// (POST /trips/{tripId}/days/{date}/itinerary-items)
+func (_ Unimplemented) CreateManualDayItineraryItem(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -815,6 +840,46 @@ func (siw *ServerInterfaceWrapper) GetDayItinerary(w http.ResponseWriter, r *htt
 	handler.ServeHTTP(w, r)
 }
 
+// CreateManualDayItineraryItem operation middleware
+func (siw *ServerInterfaceWrapper) CreateManualDayItineraryItem(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "date" -------------
+	var date openapi_types.Date
+
+	err = runtime.BindStyledParameterWithOptions("simple", "date", chi.URLParam(r, "date"), &date, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "date", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateManualDayItineraryItem(w, r, tripId, date)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 type UnescapedCookieParamError struct {
 	ParamName string
 	Err       error
@@ -966,6 +1031,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/trips/{tripId}/days/{date}/itinerary", wrapper.GetDayItinerary)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/trips/{tripId}/days/{date}/itinerary-items", wrapper.CreateManualDayItineraryItem)
 	})
 
 	return r

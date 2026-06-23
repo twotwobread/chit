@@ -141,3 +141,42 @@ JOIN trip_places tp
 WHERE ii.trip_id = $1::uuid
   AND ii.scheduled_date = $2
 ORDER BY ii.item_order ASC, ii.id ASC;
+
+-- name: CreateTripPlace :one
+INSERT INTO trip_places (
+  trip_id,
+  name,
+  address,
+  place_type
+) VALUES (
+  sqlc.arg(trip_id)::uuid,
+  sqlc.arg(name),
+  sqlc.arg(address),
+  sqlc.arg(place_type)
+)
+RETURNING
+  id::text,
+  name,
+  place_type,
+  address;
+
+-- name: CreateItineraryItemAtEnd :one
+INSERT INTO itinerary_items (
+  trip_id,
+  scheduled_date,
+  trip_place_id,
+  item_order
+) VALUES (
+  sqlc.arg(trip_id)::uuid,
+  sqlc.arg(scheduled_date),
+  sqlc.arg(trip_place_id)::uuid,
+  (
+    SELECT COALESCE(MAX(item_order), 0) + 1
+    FROM itinerary_items
+    WHERE trip_id = sqlc.arg(trip_id)::uuid
+      AND scheduled_date = sqlc.arg(scheduled_date)
+  )
+)
+RETURNING
+  id::text,
+  item_order;

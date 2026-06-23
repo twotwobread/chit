@@ -25,6 +25,9 @@ type fakeRepository struct {
 	dayItineraryItems     []DayItineraryItem
 	listedItineraryTripID string
 	listedItineraryDate   string
+	createdManualRecords  []CreateManualDayItineraryItemRecord
+	createdManualItem     DayItineraryItem
+	createManualErr       error
 	updated               UpdateRecord
 	updatedCalled         bool
 	deletedID             string
@@ -110,6 +113,26 @@ func (r *fakeRepository) ListItineraryItemsByTripAndDate(_ context.Context, trip
 	r.listedItineraryTripID = tripID
 	r.listedItineraryDate = date
 	return r.dayItineraryItems, nil
+}
+
+func (r *fakeRepository) CreateManualDayItineraryItem(_ context.Context, record CreateManualDayItineraryItemRecord) (DayItineraryItem, error) {
+	r.createdManualRecords = append(r.createdManualRecords, record)
+	if r.createManualErr != nil {
+		return DayItineraryItem{}, r.createManualErr
+	}
+	if r.createdManualItem.ID != "" {
+		return r.createdManualItem, nil
+	}
+	return DayItineraryItem{
+		ID:        "item-1",
+		ItemOrder: 1,
+		Place: TripPlaceSummary{
+			ID:        "place-1",
+			Name:      record.Name,
+			PlaceType: record.PlaceType,
+			Address:   record.Address,
+		},
+	}, nil
 }
 
 func TestServiceCreate(t *testing.T) {
@@ -599,6 +622,132 @@ func TestServiceGetDayItineraryOutOfRange(t *testing.T) {
 	}
 	if repo.listedItineraryTripID != "" {
 		t.Fatal("expected out-of-range date not to query itinerary items")
+	}
+}
+
+func TestServiceCreateManualDayItineraryItem(t *testing.T) {
+	repo := &fakeRepository{
+		trip: Trip{
+			ID:        testTripID,
+			StartDate: "2026-07-10",
+			EndDate:   "2026-07-13",
+		},
+		tripFound:     true,
+		isParticipant: true,
+		createdManualItem: DayItineraryItem{
+			ID:        "item-3",
+			ItemOrder: 3,
+			Place: TripPlaceSummary{
+				ID:        "place-3",
+				Name:      "우메다 공중정원",
+				PlaceType: "sights",
+				Address:   "Umeda",
+			},
+		},
+	}
+	service := newTestService(repo)
+
+	result, err := service.CreateManualDayItineraryItem(context.Background(), "user-1", testTripID, "2026-07-11", CreateManualDayItineraryItemInput{
+		Name:      "  우메다 공중정원  ",
+		Address:   "  Umeda  ",
+		PlaceType: "sights",
+	})
+	if err != nil {
+		t.Fatalf("CreateManualDayItineraryItem returned error: %v", err)
+	}
+
+	if result.Day.Date != "2026-07-11" || result.Day.DayOrder != 2 {
+		t.Fatalf("expected server-calculated day, got %#v", result.Day)
+	}
+	if result.Item.ID != "item-3" || result.Item.ItemOrder != 3 || result.Item.Place.Name != "우메다 공중정원" {
+		t.Fatalf("expected created item to pass through, got %#v", result.Item)
+	}
+	if len(repo.createdManualRecords) != 1 {
+		t.Fatalf("expected one repository create call, got %#v", repo.createdManualRecords)
+	}
+	record := repo.createdManualRecords[0]
+	if record.TripID != testTripID || record.ScheduledDate != "2026-07-11" || record.Name != "우메다 공중정원" || record.Address != "Umeda" || record.PlaceType != "sights" {
+		t.Fatalf("expected trimmed create record, got %#v", record)
+	}
+}
+
+func TestServiceCreateManualDayItineraryItemValidation(t *testing.T) {
+	validTrip := Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"}
+	tests := []struct {
+		name   string
+		tripID string
+		date   string
+		input  CreateManualDayItineraryItemInput
+	}{
+		{name: "invalid trip id", tripID: "not-a-uuid", date: "2026-07-10", input: CreateManualDayItineraryItemInput{Name: "우메다", Address: "Umeda", PlaceType: "sights"}},
+		{name: "invalid date", tripID: testTripID, date: "2026/07/10", input: CreateManualDayItineraryItemInput{Name: "우메다", Address: "Umeda", PlaceType: "sights"}},
+		{name: "blank name", tripID: testTripID, date: "2026-07-10", input: CreateManualDayItineraryItemInput{Name: " ", Address: "Umeda", PlaceType: "sights"}},
+		{name: "too long name", tripID: testTripID, date: "2026-07-10", input: CreateManualDayItineraryItemInput{Name: strings.Repeat("가", 121), Address: "Umeda", PlaceType: "sights"}},
+		{name: "blank address", tripID: testTripID, date: "2026-07-10", input: CreateManualDayItineraryItemInput{Name: "우메다", Address: " ", PlaceType: "sights"}},
+		{name: "too long address", tripID: testTripID, date: "2026-07-10", input: CreateManualDayItineraryItemInput{Name: "우메다", Address: strings.Repeat("가", 241), PlaceType: "sights"}},
+		{name: "invalid place type", tripID: testTripID, date: "2026-07-10", input: CreateManualDayItineraryItemInput{Name: "우메다", Address: "Umeda", PlaceType: "museum"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := &fakeRepository{trip: validTrip, tripFound: true, isParticipant: true}
+			service := newTestService(repo)
+			_, err := service.CreateManualDayItineraryItem(context.Background(), "user-1", tt.tripID, tt.date, tt.input)
+			if !errors.Is(err, ErrValidation) {
+				t.Fatalf("expected ErrValidation, got %v", err)
+			}
+			if len(repo.createdManualRecords) != 0 {
+				t.Fatalf("expected invalid input not to create rows, got %#v", repo.createdManualRecords)
+			}
+		})
+	}
+}
+
+func TestServiceCreateManualDayItineraryItemAuthAndRange(t *testing.T) {
+	tests := []struct {
+		name string
+		repo *fakeRepository
+		user string
+		date string
+		want error
+	}{
+		{name: "requires auth", repo: &fakeRepository{}, user: " ", date: "2026-07-10", want: ErrUnauthorized},
+		{name: "missing trip", repo: &fakeRepository{}, user: "user-1", date: "2026-07-10", want: ErrNotFound},
+		{name: "forbidden", repo: &fakeRepository{trip: Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"}, tripFound: true}, user: "user-1", date: "2026-07-10", want: ErrForbidden},
+		{name: "out of range", repo: &fakeRepository{trip: Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"}, tripFound: true, isParticipant: true}, user: "user-1", date: "2026-07-14", want: ErrNotFound},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			service := newTestService(tt.repo)
+			_, err := service.CreateManualDayItineraryItem(context.Background(), tt.user, testTripID, tt.date, CreateManualDayItineraryItemInput{Name: "우메다", Address: "Umeda", PlaceType: "sights"})
+			if !errors.Is(err, tt.want) {
+				t.Fatalf("expected %v, got %v", tt.want, err)
+			}
+			if len(tt.repo.createdManualRecords) != 0 {
+				t.Fatalf("expected failure not to create rows, got %#v", tt.repo.createdManualRecords)
+			}
+		})
+	}
+}
+
+func TestServiceCreateManualDayItineraryItemAllowsDuplicates(t *testing.T) {
+	repo := &fakeRepository{
+		trip:          Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"},
+		tripFound:     true,
+		isParticipant: true,
+	}
+	service := newTestService(repo)
+	input := CreateManualDayItineraryItemInput{Name: "우메다", Address: "Umeda", PlaceType: "sights"}
+
+	if _, err := service.CreateManualDayItineraryItem(context.Background(), "user-1", testTripID, "2026-07-10", input); err != nil {
+		t.Fatalf("first create returned error: %v", err)
+	}
+	if _, err := service.CreateManualDayItineraryItem(context.Background(), "user-1", testTripID, "2026-07-10", input); err != nil {
+		t.Fatalf("duplicate create returned error: %v", err)
+	}
+	if len(repo.createdManualRecords) != 2 {
+		t.Fatalf("expected duplicate creates to call repository twice, got %#v", repo.createdManualRecords)
 	}
 }
 

@@ -189,6 +189,35 @@ func (s apiServer) GetDayItinerary(w http.ResponseWriter, r *http.Request, tripI
 	writeJSON(w, http.StatusOK, getDayItineraryResponseToOpenAPI(result))
 }
 
+func (s apiServer) CreateManualDayItineraryItem(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date) {
+	if s.auth == nil || s.trips == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "day itinerary creation is not configured", nil)
+		return
+	}
+
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	var body openapi.CreateManualDayItineraryItemJSONRequestBody
+	if !decodeJSON(w, r, &body) {
+		return
+	}
+
+	result, err := s.trips.CreateManualDayItineraryItem(r.Context(), authContext.UserID, tripId, dateFromOpenAPI(date), trip.CreateManualDayItineraryItemInput{
+		Name:      body.Name,
+		Address:   body.Address,
+		PlaceType: string(body.PlaceType),
+	})
+	if err != nil {
+		writeTripDayItineraryError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, createManualDayItineraryItemResponseToOpenAPI(result))
+}
+
 func (s apiServer) UpdateTrip(w http.ResponseWriter, r *http.Request, tripId string) {
 	if s.auth == nil || s.trips == nil {
 		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "trip update is not configured", nil)
@@ -431,6 +460,8 @@ func writeTripDayItineraryError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusForbidden, "FORBIDDEN", "forbidden", nil)
 	case errors.Is(err, trip.ErrNotFound):
 		writeError(w, http.StatusNotFound, "NOT_FOUND", "day itinerary not found", nil)
+	case errors.Is(err, trip.ErrConflict):
+		writeError(w, http.StatusConflict, "CONFLICT", "day itinerary append conflict", nil)
 	default:
 		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error", nil)
 	}
@@ -573,16 +604,7 @@ func updateTripResponseToOpenAPI(result trip.UpdateResult) openapi.UpdateTripRes
 func getDayItineraryResponseToOpenAPI(result trip.GetDayItineraryResult) openapi.GetDayItineraryResponse {
 	items := make([]openapi.DayItineraryItem, 0, len(result.Items))
 	for _, item := range result.Items {
-		items = append(items, openapi.DayItineraryItem{
-			Id:        item.ID,
-			ItemOrder: item.ItemOrder,
-			Place: openapi.TripPlaceSummary{
-				Id:        item.Place.ID,
-				Name:      item.Place.Name,
-				PlaceType: openapi.TripPlaceType(item.Place.PlaceType),
-				Address:   item.Place.Address,
-			},
-		})
+		items = append(items, dayItineraryItemToOpenAPI(item))
 	}
 	return openapi.GetDayItineraryResponse{
 		Day: openapi.TripDay{
@@ -590,6 +612,29 @@ func getDayItineraryResponseToOpenAPI(result trip.GetDayItineraryResult) openapi
 			DayOrder: result.Day.DayOrder,
 		},
 		Items: items,
+	}
+}
+
+func createManualDayItineraryItemResponseToOpenAPI(result trip.CreateManualDayItineraryItemResult) openapi.CreateManualDayItineraryItemResponse {
+	return openapi.CreateManualDayItineraryItemResponse{
+		Day: openapi.TripDay{
+			Date:     dateToOpenAPI(result.Day.Date),
+			DayOrder: result.Day.DayOrder,
+		},
+		Item: dayItineraryItemToOpenAPI(result.Item),
+	}
+}
+
+func dayItineraryItemToOpenAPI(item trip.DayItineraryItem) openapi.DayItineraryItem {
+	return openapi.DayItineraryItem{
+		Id:        item.ID,
+		ItemOrder: item.ItemOrder,
+		Place: openapi.TripPlaceSummary{
+			Id:        item.Place.ID,
+			Name:      item.Place.Name,
+			PlaceType: openapi.TripPlaceType(item.Place.PlaceType),
+			Address:   item.Place.Address,
+		},
 	}
 }
 

@@ -1,12 +1,13 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 
 import { ApiError } from '@i-um/api-contract';
 
 import { MobileAuthError } from '../../../../lib/auth/client';
 import { theme } from '../../../../lib/design';
 import { buildDayItineraryViewModel, dayItineraryFailureState, type DayItineraryViewModel } from '../../../../lib/trips/day-itinerary';
+import { buildManualPlaceRoute } from '../../../../lib/trips/manual-place';
 import { getTripDayItinerary } from '../../../../lib/trips/client';
 
 type DayItineraryState =
@@ -56,9 +57,11 @@ export default function TripDayItineraryScreen() {
     }
   }, [date, tripId]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+    }, [load]),
+  );
 
   const backToTripDetail = () => {
     if (tripId) {
@@ -81,7 +84,16 @@ export default function TripDayItineraryScreen() {
         </View>
       ) : null}
 
-      {state.status === 'success' ? <DayItineraryContent viewModel={state.viewModel} /> : null}
+      {state.status === 'success' ? (
+        <DayItineraryContent
+          onAddPlace={() => {
+            if (tripId && date) {
+              router.push(buildManualPlaceRoute(tripId, date));
+            }
+          }}
+          viewModel={state.viewModel}
+        />
+      ) : null}
 
       {state.status === 'auth' ? (
         <View style={styles.card}>
@@ -115,7 +127,7 @@ export default function TripDayItineraryScreen() {
   );
 }
 
-function DayItineraryContent({ viewModel }: { viewModel: DayItineraryViewModel }) {
+function DayItineraryContent({ onAddPlace, viewModel }: { onAddPlace: () => void; viewModel: DayItineraryViewModel }) {
   return (
     <View style={styles.card}>
       <View style={styles.dayHeader}>
@@ -148,6 +160,10 @@ function DayItineraryContent({ viewModel }: { viewModel: DayItineraryViewModel }
           ))}
         </View>
       ) : null}
+
+      <Pressable accessibilityRole="button" onPress={onAddPlace} style={styles.button}>
+        <Text style={styles.buttonText}>장소 추가</Text>
+      </Pressable>
     </View>
   );
 }

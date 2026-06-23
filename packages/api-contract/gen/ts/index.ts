@@ -16,6 +16,8 @@ export type { AuthRefreshResponse } from './models/AuthRefreshResponse';
 export type { AuthResult } from './models/AuthResult';
 export type { AuthTokens } from './models/AuthTokens';
 export type { AuthUser } from './models/AuthUser';
+export type { CreateManualDayItineraryItemRequest } from './models/CreateManualDayItineraryItemRequest';
+export type { CreateManualDayItineraryItemResponse } from './models/CreateManualDayItineraryItemResponse';
 export type { CreateTripRequest } from './models/CreateTripRequest';
 export type { CreateTripResponse } from './models/CreateTripResponse';
 export type { DayItineraryItem } from './models/DayItineraryItem';
