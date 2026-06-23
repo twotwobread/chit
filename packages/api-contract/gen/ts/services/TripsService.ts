@@ -9,6 +9,8 @@ import type { CreateTripResponse } from '../models/CreateTripResponse';
 import type { GetDayItineraryResponse } from '../models/GetDayItineraryResponse';
 import type { GetTripDetailResponse } from '../models/GetTripDetailResponse';
 import type { ListTripsResponse } from '../models/ListTripsResponse';
+import type { ReorderDayItineraryItemsRequest } from '../models/ReorderDayItineraryItemsRequest';
+import type { ReorderDayItineraryItemsResponse } from '../models/ReorderDayItineraryItemsResponse';
 import type { UpdateDayItineraryItemRequest } from '../models/UpdateDayItineraryItemRequest';
 import type { UpdateDayItineraryItemResponse } from '../models/UpdateDayItineraryItemResponse';
 import type { UpdateTripRequest } from '../models/UpdateTripRequest';
@@ -191,6 +193,39 @@ export class TripsService {
                 403: `Forbidden.`,
                 404: `Trip or virtual day not found.`,
                 409: `Concurrent append conflict.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
+     * Reorder a trip day itinerary
+     * Applies an ordered batch of same-Day itinerary item moves inside one transaction and returns the latest Day itinerary.
+     * @param tripId
+     * @param date
+     * @param requestBody
+     * @returns ReorderDayItineraryItemsResponse Day itinerary reordered.
+     * @throws ApiError
+     */
+    public static reorderDayItineraryItems(
+        tripId: string,
+        date: string,
+        requestBody: ReorderDayItineraryItemsRequest,
+    ): CancelablePromise<ReorderDayItineraryItemsResponse> {
+        return __request(OpenAPI, {
+            method: 'PATCH',
+            url: '/trips/{tripId}/days/{date}/itinerary-items/order',
+            path: {
+                'tripId': tripId,
+                'date': date,
+            },
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                403: `Forbidden.`,
+                404: `Trip or virtual day not found.`,
+                409: `Reorder conflict.`,
                 500: `Unexpected server error.`,
             },
         });

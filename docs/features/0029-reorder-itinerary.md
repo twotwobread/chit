@@ -401,30 +401,30 @@ Existing `item_order`:
 
 각 acceptance criterion은 아래 `Regression Test Plan`의 자동화 테스트와 연결한다.
 
-- [ ] AC-01: Day 일정 success state에서 장소가 2개 이상이면 `순서 변경` action으로 edit mode에 진입할 수 있다.
-- [ ] AC-02: edit mode는 drag-and-drop reorder, `저장`, `취소`를 제공한다.
-- [ ] AC-03: drag만으로는 API를 호출하지 않는다.
-- [ ] AC-04: `취소`, back, route 이탈은 미저장 순서를 버리며 confirmation을 표시하지 않는다.
-- [ ] AC-05: 로컬 최종 순서가 원래 순서와 같으면 `저장`이 disabled이고 API를 호출하지 않는다.
-- [ ] AC-06: mobile은 original order, final order, item versions로 ordered move batch를 만든다.
-- [ ] AC-07: `packages/api-contract/openapi.yaml`에 authenticated `PATCH /trips/{tripId}/days/{date}/itinerary-items/order` endpoint와 request/response/error schema가 정의되어 있다.
-- [ ] AC-08: generated Go server artifact와 TypeScript client/type이 reorder endpoint/schema와 `DayItineraryItem.version`을 포함한다.
-- [ ] AC-09: DB migration은 existing `itinerary_items`에 `rank`와 `version`을 추가하고 existing visible order 기준으로 rank를 backfill한다.
-- [ ] AC-10: DB migration rollback은 rank order 기준으로 legacy `item_order`를 보존한 뒤 `rank`/`version`을 제거할 수 있다.
-- [ ] AC-11: manual place append flow는 새 row에 마지막 rank 이후의 rank와 version `1`을 부여한다.
-- [ ] AC-12: `GET /trips/{tripId}/days/{date}/itinerary`는 rank order로 정렬하고 `itemOrder`를 1-based display order로 계산하며 각 item의 `version`을 반환한다.
-- [ ] AC-13: 인증되지 않은 reorder 요청은 `401 UNAUTHORIZED`를 반환한다.
-- [ ] AC-14: invalid `tripId`, invalid `date`, invalid move body, empty moves는 `400 VALIDATION_ERROR`를 반환한다.
-- [ ] AC-15: 존재하지 않는 trip 또는 범위 밖 date는 `404 NOT_FOUND`를 반환한다.
-- [ ] AC-16: participant가 아닌 authenticated user의 reorder 요청은 `403 FORBIDDEN`을 반환한다.
-- [ ] AC-17: moved item 또는 neighbor item이 같은 `tripId + date`에 속하지 않으면 `400 VALIDATION_ERROR`를 반환하고 데이터가 변경되지 않는다.
-- [ ] AC-18: valid move batch는 하나의 transaction에서 순서대로 적용되고 최신 ordered itinerary를 반환한다.
-- [ ] AC-19: batch 중 하나라도 실패하면 전체 transaction이 rollback되고 기존 rank/version/order가 보존된다.
-- [ ] AC-20: moved item `clientVersion`이 최신이 아니면 `409 CONFLICT`를 반환하고 데이터가 변경되지 않는다.
-- [ ] AC-21: rank unique collision은 서버가 1회 재시도하며, retry 실패 시 `409 CONFLICT`를 반환한다.
-- [ ] AC-22: 저장 성공 후 mobile은 edit mode를 종료하고 최신 Day itinerary 순서를 즉시 보여준다.
-- [ ] AC-23: `409 CONFLICT` 후 mobile은 `다른 변경이 있어 저장되지 않았어요. 최신 일정으로 다시 불러왔어요.`를 표시하고, 로컬 미저장 순서를 버린 뒤 최신 itinerary를 보여준다.
-- [ ] AC-24: F-029는 realtime shared-edit refresh, rank rebalance, CRDT, place edit/delete, cross-Day move, 지도/길찾기를 구현하지 않는다.
+- [x] AC-01: Day 일정 success state에서 장소가 2개 이상이면 `순서 변경` action으로 edit mode에 진입할 수 있다.
+- [x] AC-02: edit mode는 drag-and-drop reorder, `저장`, `취소`를 제공한다.
+- [x] AC-03: drag만으로는 API를 호출하지 않는다.
+- [x] AC-04: `취소`, back, route 이탈은 미저장 순서를 버리며 confirmation을 표시하지 않는다.
+- [x] AC-05: 로컬 최종 순서가 원래 순서와 같으면 `저장`이 disabled이고 API를 호출하지 않는다.
+- [x] AC-06: mobile은 original order, final order, item versions로 ordered move batch를 만든다.
+- [x] AC-07: `packages/api-contract/openapi.yaml`에 authenticated `PATCH /trips/{tripId}/days/{date}/itinerary-items/order` endpoint와 request/response/error schema가 정의되어 있다.
+- [x] AC-08: generated Go server artifact와 TypeScript client/type이 reorder endpoint/schema와 `DayItineraryItem.version`을 포함한다.
+- [x] AC-09: DB migration은 existing `itinerary_items`에 `rank`와 `version`을 추가하고 existing visible order 기준으로 rank를 backfill한다.
+- [x] AC-10: DB migration rollback은 rank order 기준으로 legacy `item_order`를 보존한 뒤 `rank`/`version`을 제거할 수 있다.
+- [x] AC-11: manual place append flow는 새 row에 마지막 rank 이후의 rank와 version `1`을 부여한다.
+- [x] AC-12: `GET /trips/{tripId}/days/{date}/itinerary`는 rank order로 정렬하고 `itemOrder`를 1-based display order로 계산하며 각 item의 `version`을 반환한다.
+- [x] AC-13: 인증되지 않은 reorder 요청은 `401 UNAUTHORIZED`를 반환한다.
+- [x] AC-14: invalid `tripId`, invalid `date`, invalid move body, empty moves는 `400 VALIDATION_ERROR`를 반환한다.
+- [x] AC-15: 존재하지 않는 trip 또는 범위 밖 date는 `404 NOT_FOUND`를 반환한다.
+- [x] AC-16: participant가 아닌 authenticated user의 reorder 요청은 `403 FORBIDDEN`을 반환한다.
+- [x] AC-17: moved item 또는 neighbor item이 같은 `tripId + date`에 속하지 않으면 `400 VALIDATION_ERROR`를 반환하고 데이터가 변경되지 않는다.
+- [x] AC-18: valid move batch는 하나의 transaction에서 순서대로 적용되고 최신 ordered itinerary를 반환한다.
+- [x] AC-19: batch 중 하나라도 실패하면 전체 transaction이 rollback되고 기존 rank/version/order가 보존된다.
+- [x] AC-20: moved item `clientVersion`이 최신이 아니면 `409 CONFLICT`를 반환하고 데이터가 변경되지 않는다.
+- [x] AC-21: rank unique collision은 서버가 1회 재시도하며, retry 실패 시 `409 CONFLICT`를 반환한다.
+- [x] AC-22: 저장 성공 후 mobile은 edit mode를 종료하고 최신 Day itinerary 순서를 즉시 보여준다.
+- [x] AC-23: `409 CONFLICT` 후 mobile은 `다른 변경이 있어 저장되지 않았어요. 최신 일정으로 다시 불러왔어요.`를 표시하고, 로컬 미저장 순서를 버린 뒤 최신 itinerary를 보여준다.
+- [x] AC-24: F-029는 realtime shared-edit refresh, rank rebalance, CRDT, place edit/delete, cross-Day move, 지도/길찾기를 구현하지 않는다.
 
 ## Regression Test Plan
 
@@ -507,6 +507,12 @@ DATABASE_URL=... pnpm db:rollback
 DATABASE_URL=... pnpm db:migrate
 pnpm verify
 ```
+
+Verification notes:
+
+- 2026-06-23: `DATABASE_URL=postgres://ium:ium@localhost:5432/ium?sslmode=disable pnpm db:rollback && DATABASE_URL=postgres://ium:ium@localhost:5432/ium?sslmode=disable pnpm db:migrate && DATABASE_URL=postgres://ium:ium@localhost:5432/ium?sslmode=disable pnpm db:status` passed in `.worktrees/F029-reorder-itinerary`.
+- 2026-06-23: `DATABASE_URL=postgres://ium:ium@localhost:5432/ium?sslmode=disable pnpm --filter @i-um/api test` passed in `.worktrees/F029-reorder-itinerary`.
+- 2026-06-23: `pnpm verify` passed in `.worktrees/F029-reorder-itinerary`.
 
 ### Manual Smoke
 

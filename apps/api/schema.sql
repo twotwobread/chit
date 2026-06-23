@@ -111,9 +111,15 @@ CREATE TABLE itinerary_items (
   scheduled_date date NOT NULL,
   trip_place_id uuid NOT NULL,
   item_order integer NOT NULL,
+  rank text COLLATE "C" NOT NULL,
+  version integer NOT NULL DEFAULT 1,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT itinerary_items_item_order_check CHECK (item_order >= 1),
+  CONSTRAINT itinerary_items_version_check CHECK (version >= 1),
   CONSTRAINT itinerary_items_trip_place_fk FOREIGN KEY (trip_place_id, trip_id) REFERENCES trip_places(id, trip_id) ON DELETE CASCADE,
-  CONSTRAINT itinerary_items_trip_date_order_unique UNIQUE (trip_id, scheduled_date, item_order)
+  CONSTRAINT itinerary_items_trip_date_order_unique UNIQUE (trip_id, scheduled_date, item_order),
+  CONSTRAINT itinerary_items_trip_date_rank_unique UNIQUE (trip_id, scheduled_date, rank)
 );
+
+CREATE INDEX itinerary_items_trip_date_rank_idx ON itinerary_items (trip_id, scheduled_date, rank);

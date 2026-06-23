@@ -129,7 +129,7 @@ RETURNING id::text;
 -- name: ListItineraryItemsByTripAndDate :many
 SELECT
   ii.id::text AS id,
-  ii.item_order,
+  ii.version,
   tp.id::text AS trip_place_id,
   tp.name AS place_name,
   tp.place_type,
@@ -140,7 +140,7 @@ JOIN trip_places tp
  AND tp.trip_id = ii.trip_id
 WHERE ii.trip_id = $1::uuid
   AND ii.scheduled_date = $2
-ORDER BY ii.item_order ASC, ii.id ASC;
+ORDER BY ii.rank ASC, ii.id ASC;
 
 -- name: CreateTripPlace :one
 INSERT INTO trip_places (
@@ -165,7 +165,8 @@ INSERT INTO itinerary_items (
   trip_id,
   scheduled_date,
   trip_place_id,
-  item_order
+  item_order,
+  rank
 ) VALUES (
   sqlc.arg(trip_id)::uuid,
   sqlc.arg(scheduled_date),
@@ -175,16 +176,28 @@ INSERT INTO itinerary_items (
     FROM itinerary_items
     WHERE trip_id = sqlc.arg(trip_id)::uuid
       AND scheduled_date = sqlc.arg(scheduled_date)
+  ),
+  lpad(
+    (
+      SELECT COALESCE(MAX(rank::bigint), 0) + 1024
+      FROM itinerary_items
+      WHERE trip_id = sqlc.arg(trip_id)::uuid
+        AND scheduled_date = sqlc.arg(scheduled_date)
+    )::text,
+    19,
+    '0'
   )
 )
 RETURNING
   id::text,
-  item_order;
+  item_order,
+  version;
 
 -- name: GetItineraryItemByTripDateAndID :one
 SELECT
   ii.id::text AS id,
   ii.item_order,
+  ii.version,
   tp.id::text AS trip_place_id,
   tp.name AS place_name,
   tp.place_type,
@@ -202,6 +215,7 @@ WITH target AS (
   SELECT
     ii.id,
     ii.item_order,
+    ii.version,
     ii.trip_place_id
   FROM itinerary_items ii
   WHERE ii.trip_id = sqlc.arg(trip_id)::uuid
@@ -226,6 +240,7 @@ WITH target AS (
 SELECT
   target.id::text AS id,
   target.item_order,
+  target.version,
   updated_place.id AS trip_place_id,
   updated_place.name AS place_name,
   updated_place.place_type,

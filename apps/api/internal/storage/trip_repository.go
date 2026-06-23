@@ -3,6 +3,8 @@ package storage
 import (
 	"context"
 	"errors"
+	"fmt"
+	"math/big"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -11,6 +13,8 @@ import (
 	"github.com/twotwobread/i-um/apps/api/internal/db"
 	"github.com/twotwobread/i-um/apps/api/internal/trip"
 )
+
+var errRetryReorderRankCollision = errors.New("retry reorder rank collision")
 
 func (s *Store) GetCreator(ctx context.Context, userID string) (trip.Creator, bool, error) {
 	row, err := s.queries.GetUserByID(ctx, mustUUID(userID))
@@ -206,20 +210,7 @@ func (s *Store) ListItineraryItemsByTripAndDate(ctx context.Context, tripID stri
 		return nil, err
 	}
 
-	items := make([]trip.DayItineraryItem, 0, len(rows))
-	for _, row := range rows {
-		items = append(items, trip.DayItineraryItem{
-			ID:        row.ID,
-			ItemOrder: int(row.ItemOrder),
-			Place: trip.TripPlaceSummary{
-				ID:        row.TripPlaceID,
-				Name:      row.PlaceName,
-				PlaceType: row.PlaceType,
-				Address:   row.Address,
-			},
-		})
-	}
-	return items, nil
+	return mapDayItineraryItems(rows), nil
 }
 
 func (s *Store) CreateManualDayItineraryItem(ctx context.Context, record trip.CreateManualDayItineraryItemRecord) (trip.DayItineraryItem, error) {
@@ -246,7 +237,7 @@ func (s *Store) CreateManualDayItineraryItem(ctx context.Context, record trip.Cr
 		TripPlaceID:   mustUUID(place.ID),
 	})
 	if err != nil {
-		if isUniqueConstraintViolation(err, "itinerary_items_trip_date_order_unique") {
+		if isUniqueConstraintViolation(err, "itinerary_items_trip_date_order_unique") || isUniqueConstraintViolation(err, "itinerary_items_trip_date_rank_unique") {
 			return trip.DayItineraryItem{}, trip.ErrConflict
 		}
 		return trip.DayItineraryItem{}, err
@@ -259,6 +250,7 @@ func (s *Store) CreateManualDayItineraryItem(ctx context.Context, record trip.Cr
 	return trip.DayItineraryItem{
 		ID:        item.ID,
 		ItemOrder: int(item.ItemOrder),
+		Version:   int(item.Version),
 		Place: trip.TripPlaceSummary{
 			ID:        place.ID,
 			Name:      place.Name,
@@ -283,6 +275,7 @@ func (s *Store) GetItineraryItemByTripDateAndID(ctx context.Context, tripID stri
 	return trip.DayItineraryItem{
 		ID:        row.ID,
 		ItemOrder: int(row.ItemOrder),
+		Version:   int(row.Version),
 		Place: trip.TripPlaceSummary{
 			ID:        row.TripPlaceID,
 			Name:      row.PlaceName,
@@ -290,6 +283,41 @@ func (s *Store) GetItineraryItemByTripDateAndID(ctx context.Context, tripID stri
 			Address:   row.Address,
 		},
 	}, true, nil
+}
+
+func (s *Store) ReorderDayItineraryItems(ctx context.Context, record trip.ReorderDayItineraryItemsRecord) ([]trip.DayItineraryItem, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	current, err := loadOrderedItineraryRowsForUpdate(ctx, tx, record.TripID, record.ScheduledDate)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, move := range record.Moves {
+		current, err = applyReorderMove(ctx, tx, record.TripID, record.ScheduledDate, current, move)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	qtx := s.queries.WithTx(tx)
+	rows, err := qtx.ListItineraryItemsByTripAndDate(ctx, db.ListItineraryItemsByTripAndDateParams{
+		Column1:       mustUUID(record.TripID),
+		ScheduledDate: dateTextValue(record.ScheduledDate),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+
+	return mapDayItineraryItems(rows), nil
 }
 
 func (s *Store) UpdateDayItineraryItemPlace(ctx context.Context, record trip.UpdateDayItineraryItemRecord) (trip.DayItineraryItem, error) {
@@ -310,6 +338,7 @@ func (s *Store) UpdateDayItineraryItemPlace(ctx context.Context, record trip.Upd
 	return trip.DayItineraryItem{
 		ID:        row.ID,
 		ItemOrder: int(row.ItemOrder),
+		Version:   int(row.Version),
 		Place: trip.TripPlaceSummary{
 			ID:        row.TripPlaceID,
 			Name:      row.PlaceName,
@@ -359,6 +388,238 @@ func (s *Store) DeleteDayItineraryItem(ctx context.Context, tripID string, date 
 		return false, err
 	}
 	return true, nil
+}
+
+type orderedItineraryRow struct {
+	ID      string
+	Rank    string
+	Version int
+}
+
+func loadOrderedItineraryRowsForUpdate(ctx context.Context, tx pgx.Tx, tripID string, date string) ([]orderedItineraryRow, error) {
+	rows, err := tx.Query(ctx, `
+		SELECT id::text, rank, version
+		FROM itinerary_items
+		WHERE trip_id = $1::uuid
+		  AND scheduled_date = $2
+		ORDER BY rank ASC, id ASC
+		FOR UPDATE
+	`, mustUUID(tripID), dateTextValue(date))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	ordered := make([]orderedItineraryRow, 0)
+	for rows.Next() {
+		var item orderedItineraryRow
+		if err := rows.Scan(&item.ID, &item.Rank, &item.Version); err != nil {
+			return nil, err
+		}
+		ordered = append(ordered, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return ordered, nil
+}
+
+func applyReorderMove(ctx context.Context, tx pgx.Tx, tripID string, date string, current []orderedItineraryRow, move trip.ReorderDayItineraryMoveRecord) ([]orderedItineraryRow, error) {
+	ordered := current
+	for attempt := 0; attempt < 2; attempt++ {
+		next, err := applyReorderMoveOnce(ctx, tx, tripID, date, ordered, move)
+		if err == nil {
+			return next, nil
+		}
+		if !errors.Is(err, errRetryReorderRankCollision) {
+			return nil, err
+		}
+		if attempt == 1 {
+			return nil, trip.ErrConflict
+		}
+
+		ordered, err = loadOrderedItineraryRowsForUpdate(ctx, tx, tripID, date)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return nil, trip.ErrConflict
+}
+
+func applyReorderMoveOnce(ctx context.Context, tx pgx.Tx, tripID string, date string, current []orderedItineraryRow, move trip.ReorderDayItineraryMoveRecord) ([]orderedItineraryRow, error) {
+	movedIndex := indexOrderedItineraryItem(current, move.ItemID)
+	if movedIndex < 0 {
+		return nil, trip.ErrConflict
+	}
+	if current[movedIndex].Version != move.ClientVersion {
+		return nil, trip.ErrConflict
+	}
+
+	moved := current[movedIndex]
+	remaining := append(append([]orderedItineraryRow{}, current[:movedIndex]...), current[movedIndex+1:]...)
+	insertIndex, err := reorderInsertIndex(remaining, move)
+	if err != nil {
+		return nil, err
+	}
+
+	newRank, err := reorderedRank(remaining, insertIndex)
+	if err != nil {
+		return nil, err
+	}
+
+	commandTag, err := execReorderRankUpdate(ctx, tx, tripID, date, move.ItemID, newRank, move.ClientVersion)
+	if err != nil {
+		if isUniqueConstraintViolation(err, "itinerary_items_trip_date_rank_unique") {
+			return nil, errRetryReorderRankCollision
+		}
+		return nil, err
+	}
+	if commandTag.RowsAffected() != 1 {
+		return nil, trip.ErrConflict
+	}
+
+	moved.Rank = newRank
+	moved.Version++
+	next := append([]orderedItineraryRow{}, remaining[:insertIndex]...)
+	next = append(next, moved)
+	next = append(next, remaining[insertIndex:]...)
+	return next, nil
+}
+
+func execReorderRankUpdate(ctx context.Context, tx pgx.Tx, tripID string, date string, itemID string, newRank string, clientVersion int) (pgconn.CommandTag, error) {
+	if _, err := tx.Exec(ctx, `SAVEPOINT reorder_rank_update`); err != nil {
+		return pgconn.CommandTag{}, err
+	}
+
+	commandTag, err := tx.Exec(ctx, `
+		UPDATE itinerary_items
+		SET rank = $4, version = version + 1
+		WHERE trip_id = $1::uuid
+		  AND scheduled_date = $2
+		  AND id = $3::uuid
+		  AND version = $5
+	`, mustUUID(tripID), dateTextValue(date), mustUUID(itemID), newRank, clientVersion)
+	if err != nil {
+		if rollbackErr := rollbackReorderRankUpdateSavepoint(ctx, tx); rollbackErr != nil {
+			return commandTag, rollbackErr
+		}
+		return commandTag, err
+	}
+
+	if _, err := tx.Exec(ctx, `RELEASE SAVEPOINT reorder_rank_update`); err != nil {
+		return commandTag, err
+	}
+	return commandTag, nil
+}
+
+func rollbackReorderRankUpdateSavepoint(ctx context.Context, tx pgx.Tx) error {
+	if _, err := tx.Exec(ctx, `ROLLBACK TO SAVEPOINT reorder_rank_update`); err != nil {
+		return err
+	}
+	_, err := tx.Exec(ctx, `RELEASE SAVEPOINT reorder_rank_update`)
+	return err
+}
+
+func reorderInsertIndex(remaining []orderedItineraryRow, move trip.ReorderDayItineraryMoveRecord) (int, error) {
+	if move.BeforeItemID == nil {
+		if len(remaining) == 0 || remaining[0].ID != *move.AfterItemID {
+			return 0, trip.ErrConflict
+		}
+		return 0, nil
+	}
+	if move.AfterItemID == nil {
+		if len(remaining) == 0 || remaining[len(remaining)-1].ID != *move.BeforeItemID {
+			return 0, trip.ErrConflict
+		}
+		return len(remaining), nil
+	}
+
+	beforeIndex := indexOrderedItineraryItem(remaining, *move.BeforeItemID)
+	if beforeIndex < 0 || beforeIndex+1 >= len(remaining) || remaining[beforeIndex+1].ID != *move.AfterItemID {
+		return 0, trip.ErrConflict
+	}
+	return beforeIndex + 1, nil
+}
+
+func reorderedRank(remaining []orderedItineraryRow, insertIndex int) (string, error) {
+	var previousRank *string
+	if insertIndex > 0 {
+		previousRank = &remaining[insertIndex-1].Rank
+	}
+	var nextRank *string
+	if insertIndex < len(remaining) {
+		nextRank = &remaining[insertIndex].Rank
+	}
+	return rankBetween(previousRank, nextRank)
+}
+
+func rankBetween(previousRank *string, nextRank *string) (string, error) {
+	const rankStep int64 = 1024
+
+	if previousRank == nil && nextRank == nil {
+		return "", trip.ErrConflict
+	}
+	if previousRank == nil {
+		nextValue, ok := new(big.Int).SetString(*nextRank, 10)
+		if !ok {
+			return "", fmt.Errorf("parse next rank %q", *nextRank)
+		}
+		candidate := new(big.Int).Div(nextValue, big.NewInt(2))
+		if candidate.Sign() <= 0 || candidate.Cmp(nextValue) >= 0 {
+			return "", trip.ErrConflict
+		}
+		return formatRank(candidate), nil
+	}
+
+	previousValue, ok := new(big.Int).SetString(*previousRank, 10)
+	if !ok {
+		return "", fmt.Errorf("parse previous rank %q", *previousRank)
+	}
+	if nextRank == nil {
+		return formatRank(new(big.Int).Add(previousValue, big.NewInt(rankStep))), nil
+	}
+
+	nextValue, ok := new(big.Int).SetString(*nextRank, 10)
+	if !ok {
+		return "", fmt.Errorf("parse next rank %q", *nextRank)
+	}
+	gap := new(big.Int).Sub(nextValue, previousValue)
+	if gap.Cmp(big.NewInt(1)) <= 0 {
+		return "", trip.ErrConflict
+	}
+	return formatRank(new(big.Int).Add(previousValue, new(big.Int).Div(gap, big.NewInt(2)))), nil
+}
+
+func formatRank(value *big.Int) string {
+	return fmt.Sprintf("%019s", value.String())
+}
+
+func indexOrderedItineraryItem(items []orderedItineraryRow, itemID string) int {
+	for index, item := range items {
+		if item.ID == itemID {
+			return index
+		}
+	}
+	return -1
+}
+
+func mapDayItineraryItems(rows []db.ListItineraryItemsByTripAndDateRow) []trip.DayItineraryItem {
+	items := make([]trip.DayItineraryItem, 0, len(rows))
+	for index, row := range rows {
+		items = append(items, trip.DayItineraryItem{
+			ID:        row.ID,
+			ItemOrder: index + 1,
+			Version:   int(row.Version),
+			Place: trip.TripPlaceSummary{
+				ID:        row.TripPlaceID,
+				Name:      row.PlaceName,
+				PlaceType: row.PlaceType,
+				Address:   row.Address,
+			},
+		})
+	}
+	return items
 }
 
 func dateValue(value time.Time) pgtype.Date {

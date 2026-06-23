@@ -13,6 +13,7 @@ import {
 
 const item: DayItineraryRowViewModel = {
   id: 'item-1',
+  version: 2,
   orderLabel: '1',
   placeName: '우메다 공중정원',
   placeType: 'sights',

@@ -190,6 +190,7 @@ type DayItineraryItem struct {
 	Id        string           `json:"id"`
 	ItemOrder int              `json:"itemOrder"`
 	Place     TripPlaceSummary `json:"place"`
+	Version   int              `json:"version"`
 }
 
 // DeviceInfo defines model for DeviceInfo.
@@ -316,6 +317,35 @@ type RefreshTokenRequest struct {
 	RefreshToken string `json:"refreshToken"`
 }
 
+// ReorderDayItineraryItemsRequest defines model for ReorderDayItineraryItemsRequest.
+type ReorderDayItineraryItemsRequest struct {
+	// Moves Ordered same-Day move operations. Applying them sequentially must produce the client's final local order.
+	Moves []ReorderDayItineraryMove `json:"moves"`
+}
+
+// ReorderDayItineraryItemsResponse defines model for ReorderDayItineraryItemsResponse.
+type ReorderDayItineraryItemsResponse struct {
+	Day TripDay `json:"day"`
+
+	// Items Latest server source-of-truth itinerary items ordered by rank.
+	Items []DayItineraryItem `json:"items"`
+}
+
+// ReorderDayItineraryMove Ordered move operation. The server applies moves sequentially inside one transaction. `beforeItemId` and `afterItemId` cannot both be null, and all present ids must be distinct.
+type ReorderDayItineraryMove struct {
+	// AfterItemId The itinerary item that must be immediately after the moved item after this move, or null when moving to the last position.
+	AfterItemId *string `json:"afterItemId"`
+
+	// BeforeItemId The itinerary item that must be immediately before the moved item after this move, or null when moving to the first position.
+	BeforeItemId *string `json:"beforeItemId"`
+
+	// ClientVersion The moved item's optimistic locking version observed by the client.
+	ClientVersion int `json:"clientVersion"`
+
+	// ItemId The itinerary item being moved.
+	ItemId string `json:"itemId"`
+}
+
 // SearchGooglePlacesResponse defines model for SearchGooglePlacesResponse.
 type SearchGooglePlacesResponse struct {
 	Results []GooglePlaceSearchResult `json:"results"`
@@ -439,6 +469,9 @@ type UpdateTripJSONRequestBody = UpdateTripRequest
 // CreateManualDayItineraryItemJSONRequestBody defines body for CreateManualDayItineraryItem for application/json ContentType.
 type CreateManualDayItineraryItemJSONRequestBody = CreateManualDayItineraryItemRequest
 
+// ReorderDayItineraryItemsJSONRequestBody defines body for ReorderDayItineraryItems for application/json ContentType.
+type ReorderDayItineraryItemsJSONRequestBody = ReorderDayItineraryItemsRequest
+
 // UpdateDayItineraryItemJSONRequestBody defines body for UpdateDayItineraryItem for application/json ContentType.
 type UpdateDayItineraryItemJSONRequestBody = UpdateDayItineraryItemRequest
 
@@ -486,6 +519,9 @@ type ServerInterface interface {
 	// Add a manual place to a trip day itinerary
 	// (POST /trips/{tripId}/days/{date}/itinerary-items)
 	CreateManualDayItineraryItem(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date)
+	// Reorder a trip day itinerary
+	// (PATCH /trips/{tripId}/days/{date}/itinerary-items/order)
+	ReorderDayItineraryItems(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date)
 	// Delete a trip day itinerary item
 	// (DELETE /trips/{tripId}/days/{date}/itinerary/items/{itemId})
 	DeleteDayItineraryItem(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, itemId string)
@@ -582,6 +618,12 @@ func (_ Unimplemented) GetDayItinerary(w http.ResponseWriter, r *http.Request, t
 // Add a manual place to a trip day itinerary
 // (POST /trips/{tripId}/days/{date}/itinerary-items)
 func (_ Unimplemented) CreateManualDayItineraryItem(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Reorder a trip day itinerary
+// (PATCH /trips/{tripId}/days/{date}/itinerary-items/order)
+func (_ Unimplemented) ReorderDayItineraryItems(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -941,6 +983,46 @@ func (siw *ServerInterfaceWrapper) CreateManualDayItineraryItem(w http.ResponseW
 	handler.ServeHTTP(w, r)
 }
 
+// ReorderDayItineraryItems operation middleware
+func (siw *ServerInterfaceWrapper) ReorderDayItineraryItems(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "date" -------------
+	var date openapi_types.Date
+
+	err = runtime.BindStyledParameterWithOptions("simple", "date", chi.URLParam(r, "date"), &date, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "date", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReorderDayItineraryItems(w, r, tripId, date)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // DeleteDayItineraryItem operation middleware
 func (siw *ServerInterfaceWrapper) DeleteDayItineraryItem(w http.ResponseWriter, r *http.Request) {
 
@@ -1259,6 +1341,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/trips/{tripId}/days/{date}/itinerary-items", wrapper.CreateManualDayItineraryItem)
+	})
+	r.Group(func(r chi.Router) {
+		r.Patch(options.BaseURL+"/trips/{tripId}/days/{date}/itinerary-items/order", wrapper.ReorderDayItineraryItems)
 	})
 	r.Group(func(r chi.Router) {
 		r.Delete(options.BaseURL+"/trips/{tripId}/days/{date}/itinerary/items/{itemId}", wrapper.DeleteDayItineraryItem)

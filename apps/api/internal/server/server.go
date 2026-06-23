@@ -232,6 +232,41 @@ func (s apiServer) CreateManualDayItineraryItem(w http.ResponseWriter, r *http.R
 	writeJSON(w, http.StatusCreated, createManualDayItineraryItemResponseToOpenAPI(result))
 }
 
+func (s apiServer) ReorderDayItineraryItems(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date) {
+	if s.auth == nil || s.trips == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "day itinerary reorder is not configured", nil)
+		return
+	}
+
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	var body openapi.ReorderDayItineraryItemsJSONRequestBody
+	if !decodeJSON(w, r, &body) {
+		return
+	}
+
+	moves := make([]trip.ReorderDayItineraryMoveInput, 0, len(body.Moves))
+	for _, move := range body.Moves {
+		moves = append(moves, trip.ReorderDayItineraryMoveInput{
+			ItemID:        move.ItemId,
+			BeforeItemID:  move.BeforeItemId,
+			AfterItemID:   move.AfterItemId,
+			ClientVersion: move.ClientVersion,
+		})
+	}
+
+	result, err := s.trips.ReorderDayItineraryItems(r.Context(), authContext.UserID, tripId, dateFromOpenAPI(date), moves)
+	if err != nil {
+		writeDayItineraryReorderError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, reorderDayItineraryItemsResponseToOpenAPI(result))
+}
+
 func (s apiServer) UpdateDayItineraryItem(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, itemId string) {
 	if s.auth == nil || s.trips == nil {
 		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "day itinerary update is not configured", nil)
@@ -556,6 +591,23 @@ func writeTripDayItineraryError(w http.ResponseWriter, err error) {
 	}
 }
 
+func writeDayItineraryReorderError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, trip.ErrValidation):
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid day itinerary reorder request", nil)
+	case errors.Is(err, trip.ErrUnauthorized):
+		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "unauthorized", nil)
+	case errors.Is(err, trip.ErrForbidden):
+		writeError(w, http.StatusForbidden, "FORBIDDEN", "forbidden", nil)
+	case errors.Is(err, trip.ErrNotFound):
+		writeError(w, http.StatusNotFound, "NOT_FOUND", "day itinerary not found", nil)
+	case errors.Is(err, trip.ErrConflict):
+		writeError(w, http.StatusConflict, "CONFLICT", "itinerary reorder conflict", nil)
+	default:
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error", nil)
+	}
+}
+
 func writeTripUpdateError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, trip.ErrValidation):
@@ -737,6 +789,20 @@ func updateDayItineraryItemResponseToOpenAPI(result trip.UpdateDayItineraryItemR
 	return openapi.UpdateDayItineraryItemResponse{Item: dayItineraryItemToOpenAPI(result.Item)}
 }
 
+func reorderDayItineraryItemsResponseToOpenAPI(result trip.ReorderDayItineraryItemsResult) openapi.ReorderDayItineraryItemsResponse {
+	items := make([]openapi.DayItineraryItem, 0, len(result.Items))
+	for _, item := range result.Items {
+		items = append(items, dayItineraryItemToOpenAPI(item))
+	}
+	return openapi.ReorderDayItineraryItemsResponse{
+		Day: openapi.TripDay{
+			Date:     dateToOpenAPI(result.Day.Date),
+			DayOrder: result.Day.DayOrder,
+		},
+		Items: items,
+	}
+}
+
 func searchGooglePlacesResponseToOpenAPI(results []place.SearchResult) openapi.SearchGooglePlacesResponse {
 	items := make([]openapi.GooglePlaceSearchResult, 0, len(results))
 	for _, result := range results {
@@ -754,6 +820,7 @@ func dayItineraryItemToOpenAPI(item trip.DayItineraryItem) openapi.DayItineraryI
 	return openapi.DayItineraryItem{
 		Id:        item.ID,
 		ItemOrder: item.ItemOrder,
+		Version:   item.Version,
 		Place: openapi.TripPlaceSummary{
 			Id:        item.Place.ID,
 			Name:      item.Place.Name,

@@ -5,6 +5,7 @@ import { formatTripDayDate } from './days';
 
 export type DayItineraryRowViewModel = {
   id: string;
+  version: number;
   orderLabel: string;
   placeName: string;
   placeType: TripPlaceType;
@@ -69,6 +70,7 @@ export function buildDayItineraryViewModel(response: GetDayItineraryResponse): D
       .sort((left, right) => left.itemOrder - right.itemOrder)
       .map((item) => ({
         id: item.id,
+        version: item.version,
         orderLabel: String(item.itemOrder),
         placeName: item.place.name,
         placeType: item.place.placeType,

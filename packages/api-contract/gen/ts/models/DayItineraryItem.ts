@@ -6,6 +6,7 @@ import type { TripPlaceSummary } from './TripPlaceSummary';
 export type DayItineraryItem = {
     id: string;
     itemOrder: number;
+    version: number;
     place: TripPlaceSummary;
 };
 

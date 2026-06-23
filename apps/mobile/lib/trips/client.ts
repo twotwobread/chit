@@ -7,6 +7,8 @@ import {
   type GetDayItineraryResponse,
   type GetTripDetailResponse,
   type ListTripsResponse,
+  type ReorderDayItineraryItemsRequest,
+  type ReorderDayItineraryItemsResponse,
   type UpdateDayItineraryItemRequest,
   type UpdateDayItineraryItemResponse,
   type UpdateTripRequest,
@@ -37,6 +39,15 @@ export async function createManualDayItineraryItem(
 ): Promise<CreateManualDayItineraryItemResponse> {
   await getCurrentUserWithRefresh();
   return TripsService.createManualDayItineraryItem(tripId, date, request);
+}
+
+export async function reorderDayItineraryItems(
+  tripId: string,
+  date: string,
+  request: ReorderDayItineraryItemsRequest,
+): Promise<ReorderDayItineraryItemsResponse> {
+  await getCurrentUserWithRefresh();
+  return TripsService.reorderDayItineraryItems(tripId, date, request);
 }
 
 export async function updateDayItineraryItem(

@@ -50,6 +50,8 @@ type ItineraryItem struct {
 	ScheduledDate pgtype.Date
 	TripPlaceID   pgtype.UUID
 	ItemOrder     int32
+	Rank          string
+	Version       int32
 	CreatedAt     pgtype.Timestamptz
 	UpdatedAt     pgtype.Timestamptz
 }
