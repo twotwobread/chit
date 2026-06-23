@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Linking,
   PanResponder,
   Pressable,
   ScrollView,
@@ -10,6 +11,7 @@ import {
   View,
   type LayoutChangeEvent,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 
 import { ApiError, type TripPlaceType } from '@i-um/api-contract';
@@ -22,6 +24,12 @@ import {
   type DayItineraryRowViewModel,
   type DayItineraryViewModel,
 } from '../../../../lib/trips/day-itinerary';
+import {
+  buildDayItineraryMapRowActions,
+  dayItineraryMapActionFailureState,
+  dayItineraryMapActionSuccessState,
+  type DayItineraryMapActionFeedback,
+} from '../../../../lib/trips/day-itinerary-map-actions';
 import {
   buildDayItineraryReorderAction,
   buildDayItineraryReorderConflictViewModel,
@@ -99,6 +107,7 @@ export default function TripDayItineraryScreen() {
   const [reorderState, setReorderState] = useState<ReorderState>({ status: 'idle' });
   const [lodgingState, setLodgingState] = useState<LodgingState>({ status: 'idle' });
   const [reorderFeedback, setReorderFeedback] = useState<string | null>(null);
+  const [mapActionFeedback, setMapActionFeedback] = useState<DayItineraryMapActionFeedback | null>(null);
   const reorderStateRef = useRef<ReorderState>({ status: 'idle' });
 
   useEffect(() => {
@@ -112,6 +121,7 @@ export default function TripDayItineraryScreen() {
       return;
     }
 
+    setMapActionFeedback(null);
     setState({ status: 'loading' });
     try {
       const response = await getTripDayItinerary(tripId, date);
@@ -170,6 +180,7 @@ export default function TripDayItineraryScreen() {
     const values = buildDayItineraryEditForm(item);
     setDeleteState({ status: 'idle' });
     setLodgingState({ status: 'idle' });
+    setMapActionFeedback(null);
     setEditState({ status: 'editing', item, original: values, values, errors: {} });
   };
 
@@ -183,6 +194,7 @@ export default function TripDayItineraryScreen() {
     setEditState({ status: 'idle' });
     setDeleteState({ status: 'idle' });
     setLodgingState({ status: 'idle' });
+    setMapActionFeedback(null);
     setReorderState({ status: 'editing', draft });
   };
 
@@ -255,6 +267,7 @@ export default function TripDayItineraryScreen() {
     discardReorder();
     setEditState({ status: 'idle' });
     setLodgingState({ status: 'idle' });
+    setMapActionFeedback(null);
     setDeleteState({ status: 'confirming', item });
   };
 
@@ -317,6 +330,7 @@ export default function TripDayItineraryScreen() {
     discardReorder();
     setEditState({ status: 'idle' });
     setDeleteState({ status: 'idle' });
+    setMapActionFeedback(null);
     setLodgingState({ status: 'setting', itemId: item.id });
     try {
       await setDayLodgingPlace(tripId, date, buildSetDayLodgingPlaceRequest(item.placeId));
@@ -350,6 +364,7 @@ export default function TripDayItineraryScreen() {
     discardReorder();
     setEditState({ status: 'idle' });
     setDeleteState({ status: 'idle' });
+    setMapActionFeedback(null);
     setLodgingState({ status: 'clearing', itemId: item.id });
     try {
       await clearDayLodgingPlace(tripId, date);
@@ -372,6 +387,34 @@ export default function TripDayItineraryScreen() {
         }
       }
       setLodgingState({ status: 'error', error: dayLodgingMutationFailureState() });
+    }
+  };
+
+  const openPlaceMap = async (item: DayItineraryRowViewModel) => {
+    discardReorder();
+    const actions = buildDayItineraryMapRowActions(item);
+    setMapActionFeedback(null);
+
+    try {
+      await Linking.openURL(actions.map.url);
+    } catch {
+      setMapActionFeedback(dayItineraryMapActionFailureState('map'));
+    }
+  };
+
+  const copyPlaceAddress = async (item: DayItineraryRowViewModel) => {
+    discardReorder();
+    const actions = buildDayItineraryMapRowActions(item);
+    if (actions.copy.disabled || !actions.copy.address) {
+      return;
+    }
+
+    setMapActionFeedback(null);
+    try {
+      await Clipboard.setStringAsync(actions.copy.address);
+      setMapActionFeedback(dayItineraryMapActionSuccessState('copy'));
+    } catch {
+      setMapActionFeedback(dayItineraryMapActionFailureState('copy'));
     }
   };
 
@@ -428,6 +471,7 @@ export default function TripDayItineraryScreen() {
                 router.push(buildManualPlaceRoute(tripId, date));
               }
             }}
+            onCopyAddress={(item) => void copyPlaceAddress(item)}
             onDeletePlace={beginDelete}
             onEditPlace={beginEdit}
             onEnterReorderMode={() => beginReorder(state.viewModel)}
@@ -435,6 +479,7 @@ export default function TripDayItineraryScreen() {
             lodgingState={lodgingState}
             onClearLodging={(item) => void submitClearLodging(item)}
             onMoveReorderItem={moveReorderItem}
+            onOpenMap={(item) => void openPlaceMap(item)}
             onSearchPlace={() => {
               if (tripId && date) {
                 router.push(buildGooglePlaceSearchRoute(tripId, date));
@@ -442,6 +487,7 @@ export default function TripDayItineraryScreen() {
             }}
             onSaveReorder={() => void submitReorder()}
             onSetLodging={(item) => void submitSetLodging(item)}
+            mapActionFeedback={mapActionFeedback}
             reorderFeedback={reorderFeedback}
             reorderState={reorderState}
             viewModel={state.viewModel}
@@ -500,14 +546,17 @@ function DayItineraryContent({
   lodgingState,
   onAddPlace,
   onClearLodging,
+  onCopyAddress,
   onDeletePlace,
   onEditPlace,
   onEnterReorderMode,
   onExitReorderMode,
   onMoveReorderItem,
+  onOpenMap,
   onSearchPlace,
   onSaveReorder,
   onSetLodging,
+  mapActionFeedback,
   reorderFeedback,
   reorderState,
   viewModel,
@@ -515,14 +564,17 @@ function DayItineraryContent({
   lodgingState: LodgingState;
   onAddPlace: () => void;
   onClearLodging: (item: DayItineraryRowViewModel) => void;
+  onCopyAddress: (item: DayItineraryRowViewModel) => void;
   onDeletePlace: (item: DayItineraryRowViewModel) => void;
   onEditPlace: (item: DayItineraryRowViewModel) => void;
   onEnterReorderMode: () => void;
   onExitReorderMode: () => void;
   onMoveReorderItem: (fromIndex: number, toIndex: number) => void;
+  onOpenMap: (item: DayItineraryRowViewModel) => void;
   onSearchPlace: () => void;
   onSaveReorder: () => void;
   onSetLodging: (item: DayItineraryRowViewModel) => void;
+  mapActionFeedback: DayItineraryMapActionFeedback | null;
   reorderFeedback: string | null;
   reorderState: ReorderState;
   viewModel: DayItineraryViewModel;
@@ -563,6 +615,7 @@ function DayItineraryContent({
               )
             : viewModel.items.map((item) => {
                 const lodging = buildDayLodgingRowViewModel(item, lodgingSubmittingState);
+                const mapActions = buildDayItineraryMapRowActions(item);
                 return (
                   <View key={item.id} style={styles.placeRow}>
                     <View style={styles.orderBadge}>
@@ -580,6 +633,25 @@ function DayItineraryContent({
                       </View>
                       <Text style={styles.address}>{item.address}</Text>
                       <View style={styles.rowActionGroup}>
+                        <Pressable
+                          accessibilityLabel={`${item.placeName} 지도 열기`}
+                          accessibilityRole="button"
+                          onPress={() => onOpenMap(item)}
+                          style={styles.rowActionButton}
+                        >
+                          <Text style={styles.rowActionText}>{mapActions.map.label}</Text>
+                        </Pressable>
+                        <Pressable
+                          accessibilityHint={mapActions.copy.disabled ? mapActions.copy.disabledHelper : undefined}
+                          accessibilityLabel={`${item.placeName} 주소 복사`}
+                          accessibilityRole="button"
+                          accessibilityState={{ disabled: mapActions.copy.disabled }}
+                          disabled={mapActions.copy.disabled}
+                          onPress={() => onCopyAddress(item)}
+                          style={[styles.rowActionButton, mapActions.copy.disabled ? styles.rowActionButtonDisabled : null]}
+                        >
+                          <Text style={styles.rowActionText}>{mapActions.copy.label}</Text>
+                        </Pressable>
                         <Pressable
                           accessibilityRole="button"
                           disabled={lodging.action.disabled}
@@ -604,6 +676,12 @@ function DayItineraryContent({
       ) : null}
 
       <View style={styles.actionGroup}>
+        {mapActionFeedback ? (
+          <View style={mapActionFeedback.kind === 'error' ? styles.errorBox : styles.reorderNotice}>
+            <Text style={styles.message}>{mapActionFeedback.message}</Text>
+          </View>
+        ) : null}
+
         {lodgingState.status === 'error' ? (
           <View style={styles.errorBox}>
             <Text style={styles.errorTitle}>{lodgingState.error.title}</Text>
