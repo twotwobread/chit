@@ -8,6 +8,7 @@ import { MobileAuthError } from '../../../../lib/auth/client';
 import { theme } from '../../../../lib/design';
 import { buildDayItineraryViewModel, dayItineraryFailureState, type DayItineraryViewModel } from '../../../../lib/trips/day-itinerary';
 import { buildManualPlaceRoute } from '../../../../lib/trips/manual-place';
+import { buildGooglePlaceSearchRoute } from '../../../../lib/places/google-search';
 import { getTripDayItinerary } from '../../../../lib/trips/client';
 
 type DayItineraryState =
@@ -91,6 +92,11 @@ export default function TripDayItineraryScreen() {
               router.push(buildManualPlaceRoute(tripId, date));
             }
           }}
+          onSearchPlace={() => {
+            if (tripId && date) {
+              router.push(buildGooglePlaceSearchRoute(tripId, date));
+            }
+          }}
           viewModel={state.viewModel}
         />
       ) : null}
@@ -127,7 +133,7 @@ export default function TripDayItineraryScreen() {
   );
 }
 
-function DayItineraryContent({ onAddPlace, viewModel }: { onAddPlace: () => void; viewModel: DayItineraryViewModel }) {
+function DayItineraryContent({ onAddPlace, onSearchPlace, viewModel }: { onAddPlace: () => void; onSearchPlace: () => void; viewModel: DayItineraryViewModel }) {
   return (
     <View style={styles.card}>
       <View style={styles.dayHeader}>
@@ -161,9 +167,14 @@ function DayItineraryContent({ onAddPlace, viewModel }: { onAddPlace: () => void
         </View>
       ) : null}
 
-      <Pressable accessibilityRole="button" onPress={onAddPlace} style={styles.button}>
-        <Text style={styles.buttonText}>장소 추가</Text>
-      </Pressable>
+      <View style={styles.actionGroup}>
+        <Pressable accessibilityRole="button" onPress={onSearchPlace} style={styles.secondaryButton}>
+          <Text style={styles.secondaryButtonText}>장소 검색</Text>
+        </Pressable>
+        <Pressable accessibilityRole="button" onPress={onAddPlace} style={styles.button}>
+          <Text style={styles.buttonText}>장소 추가</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -297,6 +308,9 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.bold,
     textAlign: 'center',
   },
+  actionGroup: {
+    gap: theme.space[3],
+  },
   button: {
     alignItems: 'center',
     backgroundColor: theme.color.primary,
@@ -306,10 +320,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.space[5],
     paddingVertical: theme.space[4],
   },
+  secondaryButton: {
+    alignItems: 'center',
+    backgroundColor: theme.color.surface,
+    borderColor: theme.color.borderDefault,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    justifyContent: 'center',
+    minHeight: theme.layout.controlH,
+    paddingHorizontal: theme.space[5],
+    paddingVertical: theme.space[4],
+  },
   buttonText: {
     color: theme.color.onPrimary,
     fontFamily: theme.font.family.bold,
     fontWeight: theme.font.weight.bold,
+    textAlign: 'center',
+  },
+  secondaryButtonText: {
+    color: theme.color.textBody,
+    fontFamily: theme.font.family.semibold,
+    fontWeight: theme.font.weight.semibold,
     textAlign: 'center',
   },
 });

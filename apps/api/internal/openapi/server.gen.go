@@ -220,6 +220,14 @@ type GetTripDetailResponse struct {
 	Trip               Trip                   `json:"trip"`
 }
 
+// GooglePlaceSearchResult defines model for GooglePlaceSearchResult.
+type GooglePlaceSearchResult struct {
+	DisplayName      string `json:"displayName"`
+	FormattedAddress string `json:"formattedAddress"`
+	GooglePlaceId    string `json:"googlePlaceId"`
+	PrimaryType      string `json:"primaryType"`
+}
+
 // HealthResponse defines model for HealthResponse.
 type HealthResponse struct {
 	Status HealthResponseStatus `json:"status"`
@@ -308,6 +316,11 @@ type RefreshTokenRequest struct {
 	RefreshToken string `json:"refreshToken"`
 }
 
+// SearchGooglePlacesResponse defines model for SearchGooglePlacesResponse.
+type SearchGooglePlacesResponse struct {
+	Results []GooglePlaceSearchResult `json:"results"`
+}
+
 // SupportedCurrency defines model for SupportedCurrency.
 type SupportedCurrency string
 
@@ -390,6 +403,12 @@ type UpdateTripResponse struct {
 	Trip Trip `json:"trip"`
 }
 
+// SearchGooglePlacesParams defines parameters for SearchGooglePlaces.
+type SearchGooglePlacesParams struct {
+	Query string `form:"query" json:"query"`
+	Limit *int   `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
 // LinkOAuthProviderJSONRequestBody defines body for LinkOAuthProvider for application/json ContentType.
 type LinkOAuthProviderJSONRequestBody = OAuthLinkRequest
 
@@ -452,6 +471,9 @@ type ServerInterface interface {
 	// Add a manual place to a trip day itinerary
 	// (POST /trips/{tripId}/days/{date}/itinerary-items)
 	CreateManualDayItineraryItem(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date)
+	// Search Google Places for a trip day
+	// (GET /trips/{tripId}/days/{date}/places/google/search)
+	SearchGooglePlaces(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, params SearchGooglePlacesParams)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
@@ -539,6 +561,12 @@ func (_ Unimplemented) GetDayItinerary(w http.ResponseWriter, r *http.Request, t
 // Add a manual place to a trip day itinerary
 // (POST /trips/{tripId}/days/{date}/itinerary-items)
 func (_ Unimplemented) CreateManualDayItineraryItem(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Search Google Places for a trip day
+// (GET /trips/{tripId}/days/{date}/places/google/search)
+func (_ Unimplemented) SearchGooglePlaces(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, params SearchGooglePlacesParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -880,6 +908,72 @@ func (siw *ServerInterfaceWrapper) CreateManualDayItineraryItem(w http.ResponseW
 	handler.ServeHTTP(w, r)
 }
 
+// SearchGooglePlaces operation middleware
+func (siw *ServerInterfaceWrapper) SearchGooglePlaces(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "date" -------------
+	var date openapi_types.Date
+
+	err = runtime.BindStyledParameterWithOptions("simple", "date", chi.URLParam(r, "date"), &date, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "date", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SearchGooglePlacesParams
+
+	// ------------- Required query parameter "query" -------------
+
+	if paramValue := r.URL.Query().Get("query"); paramValue != "" {
+
+	} else {
+		siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "query"})
+		return
+	}
+
+	err = runtime.BindQueryParameter("form", true, true, "query", r.URL.Query(), &params.Query)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "query", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "limit", r.URL.Query(), &params.Limit)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SearchGooglePlaces(w, r, tripId, date, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 type UnescapedCookieParamError struct {
 	ParamName string
 	Err       error
@@ -1034,6 +1128,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/trips/{tripId}/days/{date}/itinerary-items", wrapper.CreateManualDayItineraryItem)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/trips/{tripId}/days/{date}/places/google/search", wrapper.SearchGooglePlaces)
 	})
 
 	return r
