@@ -1,13 +1,14 @@
-import { useState, type ReactNode } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
-import { Calendar, type DateData } from 'react-native-calendars';
 
 import type { CreateTripResponse, SupportedCurrency } from '@i-um/api-contract';
 
 import { MobileAuthError } from '../../lib/auth/client';
-import { theme } from '../../lib/design';
+import { Card, PrimaryButton, SecondaryButton, theme } from '../../lib/design';
 import { createTrip } from '../../lib/trips/client';
+import { dateFromString, isValidDate, monthStringFromDate, todayString } from '../../lib/trips/date';
+import { TripDateFieldButton, TripDatePicker, TripFormField } from '../../lib/trips/date-picker';
 
 type FormState = {
   name: string;
@@ -17,10 +18,7 @@ type FormState = {
 };
 
 type DateField = 'startDate' | 'endDate';
-type CalendarDropdown = 'year' | 'month' | null;
-
 const currencies: SupportedCurrency[] = ['KRW', 'JPY', 'USD', 'EUR'];
-const months = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 const yearOptionCount = 10;
 
 const initialForm: FormState = {
@@ -103,7 +101,7 @@ export default function NewTripScreen() {
   if (created) {
     return (
       <View style={styles.container}>
-        <View style={styles.card}>
+        <Card>
           <Text style={styles.successTitle}>여행이 만들어졌어요.</Text>
           <View style={styles.summaryBox}>
             <Text style={styles.summaryTitle}>{created.trip.name}</Text>
@@ -112,19 +110,11 @@ export default function NewTripScreen() {
             </Text>
             <Text style={styles.summaryText}>기본 통화: {created.trip.defaultCurrency}</Text>
           </View>
-          <Pressable accessibilityRole="button" onPress={() => router.push(`/trips/${created.trip.id}`)} style={styles.button}>
-            <Text style={styles.buttonText}>여행 상세 보기</Text>
-          </Pressable>
-          <Pressable accessibilityRole="button" onPress={() => router.push('/mypage')} style={styles.secondaryButton}>
-            <Text style={styles.secondaryButtonText}>마이페이지에서 보기</Text>
-          </Pressable>
-          <Pressable accessibilityRole="button" onPress={reset} style={styles.secondaryButton}>
-            <Text style={styles.secondaryButtonText}>새 여행 만들기</Text>
-          </Pressable>
-          <Pressable accessibilityRole="button" onPress={() => router.replace('/')} style={styles.secondaryButton}>
-            <Text style={styles.secondaryButtonText}>홈으로</Text>
-          </Pressable>
-        </View>
+          <PrimaryButton label="여행 상세 보기" onPress={() => router.push(`/trips/${created.trip.id}`)} />
+          <SecondaryButton label="마이페이지에서 보기" onPress={() => router.push('/mypage')} />
+          <SecondaryButton label="새 여행 만들기" onPress={reset} />
+          <SecondaryButton label="홈으로" onPress={() => router.replace('/')} />
+        </Card>
       </View>
     );
   }
@@ -136,8 +126,8 @@ export default function NewTripScreen() {
         <Text style={styles.subtitle}>이름과 기간만 정하면 바로 시작할 수 있어요.</Text>
       </View>
 
-      <View style={styles.card}>
-        <Field label="여행 이름">
+      <Card>
+        <TripFormField label="여행 이름">
           <TextInput
             editable={!submitting}
             onChangeText={(name) => setForm((current) => ({ ...current, name }))}
@@ -146,28 +136,27 @@ export default function NewTripScreen() {
             style={styles.input}
             value={form.name}
           />
-        </Field>
+        </TripFormField>
 
-        <Field label="시작일">
-          <DateFieldButton
+        <TripFormField label="시작일">
+          <TripDateFieldButton
             disabled={submitting}
             onPress={() => openDatePicker('startDate')}
-            placeholder="날짜 선택"
             value={form.startDate}
           />
-        </Field>
+        </TripFormField>
 
-        <Field label="종료일">
-          <DateFieldButton
+        <TripFormField label="종료일">
+          <TripDateFieldButton
             disabled={submitting}
             onPress={() => openDatePicker('endDate')}
-            placeholder="날짜 선택"
             value={form.endDate}
           />
-        </Field>
+        </TripFormField>
 
         {activeDateField ? (
-          <CalendarPicker
+          <TripDatePicker
+            helperText="오늘 이전 날짜는 선택할 수 없어요."
             label={activeDateField === 'startDate' ? '시작일 선택' : '종료일 선택'}
             minDate={minDateForField(activeDateField, form.startDate, today)}
             month={calendarMonth}
@@ -175,6 +164,7 @@ export default function NewTripScreen() {
             onMonthChange={setCalendarMonth}
             onSelect={selectDate}
             selectedDate={activeDateField === 'startDate' ? form.startDate : form.endDate}
+            yearOptionCount={yearOptionCount}
           />
         ) : null}
 
@@ -200,228 +190,15 @@ export default function NewTripScreen() {
 
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-        <Pressable
-          accessibilityRole="button"
+        <PrimaryButton
           disabled={submitting}
+          label="여행 만들기"
+          loading={submitting}
+          loadingLabel="여행 만드는 중..."
           onPress={() => void submit()}
-          style={[styles.button, submitting ? styles.disabledButton : null]}
-        >
-          {submitting ? (
-            <View style={styles.loadingRow}>
-              <ActivityIndicator color={theme.color.onPrimary} />
-              <Text style={styles.buttonText}>여행 만드는 중...</Text>
-            </View>
-          ) : (
-            <Text style={styles.buttonText}>여행 만들기</Text>
-          )}
-        </Pressable>
-      </View>
+        />
+      </Card>
     </ScrollView>
-  );
-}
-
-function Field({ children, label }: { children: ReactNode; label: string }) {
-  return (
-    <View style={styles.field}>
-      <Text style={styles.label}>{label}</Text>
-      {children}
-    </View>
-  );
-}
-
-function DateFieldButton({
-  disabled,
-  onPress,
-  placeholder,
-  value,
-}: {
-  disabled: boolean;
-  onPress: () => void;
-  placeholder: string;
-  value: string;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      disabled={disabled}
-      onPress={onPress}
-      style={[styles.dateButton, disabled ? styles.disabledButton : null]}
-    >
-      <Text style={value ? styles.dateButtonText : styles.datePlaceholderText}>{value || placeholder}</Text>
-    </Pressable>
-  );
-}
-
-function CalendarPicker({
-  label,
-  minDate,
-  month,
-  onClose,
-  onMonthChange,
-  onSelect,
-  selectedDate,
-}: {
-  label: string;
-  minDate: string;
-  month: string;
-  onClose: () => void;
-  onMonthChange: (month: string) => void;
-  onSelect: (date: string) => void;
-  selectedDate: string;
-}) {
-  const [openDropdown, setOpenDropdown] = useState<CalendarDropdown>(null);
-  const monthDate = dateFromString(month);
-  const minDateValue = dateFromString(minDate);
-  const selectedYear = monthDate.getFullYear();
-  const selectedMonth = monthDate.getMonth() + 1;
-  const minYear = minDateValue.getFullYear();
-  const minMonth = minDateValue.getMonth() + 1;
-  const yearOptions = Array.from({ length: yearOptionCount }, (_, index) => minYear + index);
-  const canGoPrevious = month > monthStringFromDate(minDateValue);
-  const markedDates = selectedDate
-    ? {
-        [selectedDate]: {
-          selected: true,
-          selectedColor: theme.color.primary,
-          selectedTextColor: theme.color.onPrimary,
-        },
-      }
-    : undefined;
-
-  const changeMonth = (nextMonth: string) => {
-    onMonthChange(normalizeMonth(nextMonth, minDate));
-    setOpenDropdown(null);
-  };
-
-  const selectYear = (year: number) => {
-    changeMonth(monthString(year, selectedMonth));
-  };
-
-  const selectMonth = (nextMonth: number) => {
-    changeMonth(monthString(selectedYear, nextMonth));
-  };
-
-  const onCalendarMonthChange = (date: DateData) => {
-    onMonthChange(monthString(date.year, date.month));
-  };
-
-  return (
-    <View style={styles.calendarCard}>
-      <View style={styles.calendarHeader}>
-        <Pressable
-          accessibilityRole="button"
-          disabled={!canGoPrevious}
-          onPress={() => changeMonth(addMonths(month, -1))}
-          style={[styles.calendarNavButton, !canGoPrevious ? styles.disabledButton : null]}
-        >
-          <Text style={styles.calendarNavText}>이전</Text>
-        </Pressable>
-        <View style={styles.calendarTitleGroup}>
-          <Text style={styles.calendarLabel}>{label}</Text>
-          <View style={styles.dropdownRow}>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => setOpenDropdown(openDropdown === 'year' ? null : 'year')}
-              style={styles.dropdownButton}
-            >
-              <Text style={styles.dropdownButtonText}>{selectedYear}년</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => setOpenDropdown(openDropdown === 'month' ? null : 'month')}
-              style={styles.dropdownButton}
-            >
-              <Text style={styles.dropdownButtonText}>{selectedMonth}월</Text>
-            </Pressable>
-          </View>
-        </View>
-        <Pressable accessibilityRole="button" onPress={() => changeMonth(addMonths(month, 1))} style={styles.calendarNavButton}>
-          <Text style={styles.calendarNavText}>다음</Text>
-        </Pressable>
-      </View>
-
-      {openDropdown === 'year' ? (
-        <View style={styles.optionGrid}>
-          {yearOptions.map((year) => {
-            const selected = year === selectedYear;
-            return (
-              <Pressable
-                accessibilityRole="button"
-                key={year}
-                onPress={() => selectYear(year)}
-                style={[styles.optionChip, selected ? styles.optionChipSelected : null]}
-              >
-                <Text style={[styles.optionChipText, selected ? styles.optionChipTextSelected : null]}>{year}년</Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      ) : null}
-
-      {openDropdown === 'month' ? (
-        <View style={styles.optionGrid}>
-          {months.map((monthOption) => {
-            const disabled = selectedYear === minYear && monthOption < minMonth;
-            const selected = monthOption === selectedMonth;
-            return (
-              <Pressable
-                accessibilityRole="button"
-                disabled={disabled}
-                key={monthOption}
-                onPress={() => selectMonth(monthOption)}
-                style={[
-                  styles.optionChip,
-                  selected ? styles.optionChipSelected : null,
-                  disabled ? styles.disabledButton : null,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.optionChipText,
-                    selected ? styles.optionChipTextSelected : null,
-                    disabled ? styles.optionChipTextDisabled : null,
-                  ]}
-                >
-                  {monthOption}월
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      ) : null}
-
-      <Calendar
-        current={month}
-        enableSwipeMonths
-        hideArrows
-        hideExtraDays
-        key={month}
-        markedDates={markedDates}
-        minDate={minDate}
-        onDayPress={(date) => onSelect(date.dateString)}
-        onMonthChange={onCalendarMonthChange}
-        renderHeader={() => null}
-        style={styles.calendar}
-        theme={{
-          backgroundColor: theme.color.surfaceSunken,
-          calendarBackground: theme.color.surfaceSunken,
-          dayTextColor: theme.color.textBody,
-          selectedDayBackgroundColor: theme.color.primary,
-          selectedDayTextColor: theme.color.onPrimary,
-          textDayFontFamily: theme.font.family.regular,
-          textDayHeaderFontFamily: theme.font.family.semibold,
-          textDayHeaderFontWeight: theme.font.weight.semibold,
-          textDisabledColor: theme.color.textFaint,
-          textSectionTitleColor: theme.color.textMuted,
-          todayTextColor: theme.color.primary,
-        }}
-      />
-
-      <Text style={styles.helperText}>오늘 이전 날짜는 선택할 수 없어요.</Text>
-      <Pressable accessibilityRole="button" onPress={onClose} style={styles.secondaryButton}>
-        <Text style={styles.secondaryButtonText}>닫기</Text>
-      </Pressable>
-    </View>
   );
 }
 
@@ -451,52 +228,11 @@ function validateForm(form: FormState, today: string): string | null {
   return null;
 }
 
-function isValidDate(value: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return false;
-  }
-  const date = new Date(`${value}T00:00:00.000Z`);
-  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
-}
-
 function minDateForField(field: DateField, startDate: string, today: string): string {
   if (field === 'endDate' && isValidDate(startDate) && startDate > today) {
     return startDate;
   }
   return today;
-}
-
-function todayString(): string {
-  return formatLocalDate(new Date());
-}
-
-function formatLocalDate(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-function dateFromString(value: string): Date {
-  const [year, month, day] = value.split('-').map(Number);
-  return new Date(year, month - 1, day || 1);
-}
-
-function monthStringFromDate(date: Date): string {
-  return monthString(date.getFullYear(), date.getMonth() + 1);
-}
-
-function monthString(year: number, month: number): string {
-  return `${year}-${String(month).padStart(2, '0')}-01`;
-}
-
-function normalizeMonth(month: string, minDate: string): string {
-  return month < monthStringFromDate(dateFromString(minDate)) ? monthStringFromDate(dateFromString(minDate)) : month;
-}
-
-function addMonths(month: string, amount: number): string {
-  const date = dateFromString(month);
-  return monthStringFromDate(new Date(date.getFullYear(), date.getMonth() + amount, 1));
 }
 
 const styles = StyleSheet.create({
@@ -535,17 +271,6 @@ const styles = StyleSheet.create({
     fontFamily: theme.font.family.regular,
     textAlign: 'center',
   },
-  card: {
-    width: '100%',
-    maxWidth: theme.layout.cardMaxW,
-    backgroundColor: theme.color.surface,
-    borderColor: theme.color.borderSubtle,
-    borderRadius: theme.radius.lg,
-    borderWidth: 1,
-    gap: theme.layout.gapCard,
-    padding: theme.space[7],
-    ...theme.shadow.sm,
-  },
   field: {
     gap: theme.space[3],
   },
@@ -564,117 +289,6 @@ const styles = StyleSheet.create({
     fontFamily: theme.font.family.regular,
     minHeight: theme.layout.controlH,
     paddingHorizontal: theme.space[5],
-  },
-  dateButton: {
-    backgroundColor: theme.color.surfaceSunken,
-    borderColor: theme.color.borderDefault,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    justifyContent: 'center',
-    minHeight: theme.layout.controlH,
-    paddingHorizontal: theme.space[5],
-  },
-  dateButtonText: {
-    color: theme.color.textStrong,
-    fontFamily: theme.font.family.regular,
-  },
-  datePlaceholderText: {
-    color: theme.color.textFaint,
-    fontFamily: theme.font.family.regular,
-  },
-  calendarCard: {
-    backgroundColor: theme.color.surfaceSunken,
-    borderColor: theme.color.borderSubtle,
-    borderRadius: theme.radius.lg,
-    borderWidth: 1,
-    gap: theme.space[4],
-    padding: theme.space[5],
-  },
-  calendarHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: theme.space[3],
-    justifyContent: 'space-between',
-  },
-  calendarTitleGroup: {
-    alignItems: 'center',
-    flex: 1,
-    gap: theme.space[3],
-  },
-  calendarLabel: {
-    color: theme.color.textStrong,
-    fontFamily: theme.font.family.bold,
-    fontWeight: theme.font.weight.bold,
-    textAlign: 'center',
-  },
-  dropdownRow: {
-    flexDirection: 'row',
-    gap: theme.space[3],
-  },
-  dropdownButton: {
-    backgroundColor: theme.color.surface,
-    borderColor: theme.color.borderDefault,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    justifyContent: 'center',
-    minHeight: theme.layout.tapMin,
-    paddingHorizontal: theme.space[4],
-  },
-  dropdownButtonText: {
-    color: theme.color.primary,
-    fontFamily: theme.font.family.bold,
-    fontWeight: theme.font.weight.bold,
-  },
-  calendarNavButton: {
-    borderColor: theme.color.borderDefault,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    justifyContent: 'center',
-    minHeight: theme.layout.tapMin,
-    paddingHorizontal: theme.space[4],
-  },
-  calendarNavText: {
-    color: theme.color.primary,
-    fontFamily: theme.font.family.bold,
-    fontWeight: theme.font.weight.bold,
-  },
-  optionGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: theme.space[3],
-  },
-  optionChip: {
-    backgroundColor: theme.color.surface,
-    borderColor: theme.color.borderDefault,
-    borderRadius: theme.radius.pill,
-    borderWidth: 1,
-    justifyContent: 'center',
-    minHeight: theme.layout.tapMin,
-    paddingHorizontal: theme.space[4],
-  },
-  optionChipSelected: {
-    backgroundColor: theme.color.primarySoft,
-    borderColor: theme.color.primary,
-  },
-  optionChipText: {
-    color: theme.color.textBody,
-    fontFamily: theme.font.family.bold,
-    fontWeight: theme.font.weight.bold,
-  },
-  optionChipTextSelected: {
-    color: theme.color.primary,
-  },
-  optionChipTextDisabled: {
-    color: theme.color.textFaint,
-  },
-  calendar: {
-    backgroundColor: theme.color.surfaceSunken,
-  },
-  helperText: {
-    color: theme.color.textMuted,
-    fontFamily: theme.font.family.regular,
-    fontSize: theme.font.size.caption,
-    textAlign: 'center',
   },
   currencyRow: {
     flexDirection: 'row',
@@ -705,45 +319,6 @@ const styles = StyleSheet.create({
     color: theme.color.danger,
     fontFamily: theme.font.family.regular,
     textAlign: 'center',
-  },
-  button: {
-    alignItems: 'center',
-    backgroundColor: theme.color.primary,
-    borderRadius: theme.radius.md,
-    justifyContent: 'center',
-    minHeight: theme.layout.controlH,
-    paddingHorizontal: theme.space[5],
-    paddingVertical: theme.space[4],
-  },
-  buttonText: {
-    color: theme.color.onPrimary,
-    fontFamily: theme.font.family.bold,
-    fontWeight: theme.font.weight.bold,
-    textAlign: 'center',
-  },
-  secondaryButton: {
-    alignItems: 'center',
-    borderColor: theme.color.primary,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    justifyContent: 'center',
-    minHeight: theme.layout.controlH,
-    paddingHorizontal: theme.space[5],
-    paddingVertical: theme.space[4],
-  },
-  secondaryButtonText: {
-    color: theme.color.primary,
-    fontFamily: theme.font.family.bold,
-    fontWeight: theme.font.weight.bold,
-    textAlign: 'center',
-  },
-  disabledButton: {
-    opacity: 0.5,
-  },
-  loadingRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: theme.space[3],
   },
   successTitle: {
     color: theme.color.success,
