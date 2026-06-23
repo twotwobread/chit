@@ -42,6 +42,8 @@ export type { ReorderDayItineraryItemsRequest } from './models/ReorderDayItinera
 export type { ReorderDayItineraryItemsResponse } from './models/ReorderDayItineraryItemsResponse';
 export type { ReorderDayItineraryMove } from './models/ReorderDayItineraryMove';
 export type { SearchGooglePlacesResponse } from './models/SearchGooglePlacesResponse';
+export type { SetDayLodgingPlaceRequest } from './models/SetDayLodgingPlaceRequest';
+export type { SetDayLodgingPlaceResponse } from './models/SetDayLodgingPlaceResponse';
 export type { SupportedCurrency } from './models/SupportedCurrency';
 export type { Trip } from './models/Trip';
 export type { TripDay } from './models/TripDay';

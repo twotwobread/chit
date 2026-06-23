@@ -20,18 +20,20 @@ describe('day itinerary helpers', () => {
 
   it('formats day header and ordered rows from the generated response type', () => {
     const response: GetDayItineraryResponse = {
-      day: { date: '2026-07-10', dayOrder: 1 },
+      day: { date: '2026-07-10', dayOrder: 1, lodgingPlace: { id: 'place-1', name: '우메다 공중정원', placeType: 'sights', address: 'Umeda' } },
       items: [
         {
           id: 'item-2',
           itemOrder: 2,
           version: 3,
+          isLodging: false,
           place: { id: 'place-2', name: '도톤보리', placeType: 'food', address: 'Dotonbori' },
         },
         {
           id: 'item-1',
           itemOrder: 1,
           version: 7,
+          isLodging: true,
           place: { id: 'place-1', name: '우메다 공중정원', placeType: 'sights', address: 'Umeda' },
         },
       ],
@@ -42,15 +44,15 @@ describe('day itinerary helpers', () => {
       dayLabel: 'Day 1',
       formattedDate: '2026.07.10',
       items: [
-        { id: 'item-1', version: 7, orderLabel: '1', placeName: '우메다 공중정원', placeType: 'sights', placeTypeLabel: '관광지', address: 'Umeda' },
-        { id: 'item-2', version: 3, orderLabel: '2', placeName: '도톤보리', placeType: 'food', placeTypeLabel: '식당', address: 'Dotonbori' },
+        { id: 'item-1', version: 7, orderLabel: '1', isLodging: true, placeId: 'place-1', placeName: '우메다 공중정원', placeType: 'sights', placeTypeLabel: '관광지', address: 'Umeda' },
+        { id: 'item-2', version: 3, orderLabel: '2', isLodging: false, placeId: 'place-2', placeName: '도톤보리', placeType: 'food', placeTypeLabel: '식당', address: 'Dotonbori' },
       ],
     });
   });
 
   it('returns empty state for an in-range day with no items', () => {
     const response: GetDayItineraryResponse = {
-      day: { date: '2026-07-10', dayOrder: 1 },
+      day: { date: '2026-07-10', dayOrder: 1, lodgingPlace: null },
       items: [],
     };
 

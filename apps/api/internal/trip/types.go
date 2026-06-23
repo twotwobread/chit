@@ -44,6 +44,10 @@ type CreateManualDayItineraryItemInput struct {
 	PlaceType string
 }
 
+type SetDayLodgingPlaceInput struct {
+	TripPlaceID string
+}
+
 type UpdateDayItineraryItemInput struct {
 	Name      *string
 	Address   *string
@@ -104,6 +108,12 @@ type ReorderDayItineraryItemsRecord struct {
 	Moves         []ReorderDayItineraryMoveRecord
 }
 
+type SetDayLodgingPlaceRecord struct {
+	TripID        string
+	ScheduledDate string
+	TripPlaceID   string
+}
+
 type Trip struct {
 	ID              string
 	Name            string
@@ -132,8 +142,9 @@ type ParticipantListItem struct {
 }
 
 type TripDay struct {
-	Date     string
-	DayOrder int
+	Date         string
+	DayOrder     int
+	LodgingPlace *TripPlaceSummary
 }
 
 type CreateResult struct {
@@ -168,12 +179,18 @@ type DayItineraryItem struct {
 	ID        string
 	ItemOrder int
 	Version   int
+	IsLodging bool
 	Place     TripPlaceSummary
 }
 
 type GetDayItineraryResult struct {
 	Day   TripDay
 	Items []DayItineraryItem
+}
+
+type SetDayLodgingPlaceResult struct {
+	Day          TripDay
+	LodgingPlace TripPlaceSummary
 }
 
 type CreateManualDayItineraryItemResult struct {
@@ -188,6 +205,11 @@ type UpdateDayItineraryItemResult struct {
 type ReorderDayItineraryItemsResult struct {
 	Day   TripDay
 	Items []DayItineraryItem
+}
+
+type DayLodgingPlace struct {
+	Date  string
+	Place TripPlaceSummary
 }
 
 type ListItem struct {
@@ -214,6 +236,11 @@ type Repository interface {
 	ListTripParticipantPreviewNames(ctx context.Context, tripID string) ([]string, error)
 	ListTripParticipants(ctx context.Context, tripID string) ([]ParticipantListItem, error)
 	ListTripsByParticipantUser(ctx context.Context, userID string) ([]ListItem, error)
+	ListDayLodgingPlacesByTrip(ctx context.Context, tripID string) ([]DayLodgingPlace, error)
+	GetDayLodgingPlaceByTripAndDate(ctx context.Context, tripID string, date string) (TripPlaceSummary, bool, error)
+	GetTripPlaceSummaryByTripAndPlace(ctx context.Context, tripID string, tripPlaceID string) (TripPlaceSummary, bool, error)
+	SetDayLodgingPlace(ctx context.Context, record SetDayLodgingPlaceRecord) (TripPlaceSummary, error)
+	DeleteDayLodgingPlace(ctx context.Context, tripID string, date string) error
 	ListItineraryItemsByTripAndDate(ctx context.Context, tripID string, date string) ([]DayItineraryItem, error)
 	CreateManualDayItineraryItem(ctx context.Context, record CreateManualDayItineraryItemRecord) (DayItineraryItem, error)
 	GetItineraryItemByTripDateAndID(ctx context.Context, tripID string, date string, itemID string) (DayItineraryItem, bool, error)

@@ -234,24 +234,27 @@ describe('reorder itinerary helpers', () => {
 
   it('exits edit mode and shows the latest itinerary order after a successful save', () => {
     const response: GetDayItineraryResponse = {
-      day: { date: '2026-07-10', dayOrder: 1 },
+      day: { date: '2026-07-10', dayOrder: 1, lodgingPlace: null },
       items: [
         {
           id: 'item-3',
           itemOrder: 1,
           version: 9,
+          isLodging: false,
           place: { id: 'place-3', name: '오사카성', placeType: 'sights', address: 'Osaka' },
         },
         {
           id: 'item-1',
           itemOrder: 2,
           version: 3,
+          isLodging: false,
           place: { id: 'place-1', name: '우메다 공중정원', placeType: 'sights', address: 'Umeda' },
         },
         {
           id: 'item-2',
           itemOrder: 3,
           version: 5,
+          isLodging: false,
           place: { id: 'place-2', name: '도톤보리', placeType: 'food', address: 'Dotonbori' },
         },
       ],
@@ -265,9 +268,9 @@ describe('reorder itinerary helpers', () => {
         dayLabel: 'Day 1',
         formattedDate: '2026.07.10',
         items: [
-          { id: 'item-3', version: 9, orderLabel: '1', placeName: '오사카성', placeType: 'sights', placeTypeLabel: '관광지', address: 'Osaka' },
-          { id: 'item-1', version: 3, orderLabel: '2', placeName: '우메다 공중정원', placeType: 'sights', placeTypeLabel: '관광지', address: 'Umeda' },
-          { id: 'item-2', version: 5, orderLabel: '3', placeName: '도톤보리', placeType: 'food', placeTypeLabel: '식당', address: 'Dotonbori' },
+          { id: 'item-3', version: 9, orderLabel: '1', isLodging: false, placeId: 'place-3', placeName: '오사카성', placeType: 'sights', placeTypeLabel: '관광지', address: 'Osaka' },
+          { id: 'item-1', version: 3, orderLabel: '2', isLodging: false, placeId: 'place-1', placeName: '우메다 공중정원', placeType: 'sights', placeTypeLabel: '관광지', address: 'Umeda' },
+          { id: 'item-2', version: 5, orderLabel: '3', isLodging: false, placeId: 'place-2', placeName: '도톤보리', placeType: 'food', placeTypeLabel: '식당', address: 'Dotonbori' },
         ],
       },
     });

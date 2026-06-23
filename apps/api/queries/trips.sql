@@ -143,6 +143,7 @@ RETURNING id::text;
 SELECT
   ii.id::text AS id,
   ii.version,
+  (dlp.trip_place_id IS NOT NULL) AS is_lodging,
   tp.id::text AS trip_place_id,
   tp.name AS place_name,
   tp.place_type,
@@ -151,9 +152,75 @@ FROM itinerary_items ii
 JOIN trip_places tp
   ON tp.id = ii.trip_place_id
  AND tp.trip_id = ii.trip_id
+LEFT JOIN day_lodging_places dlp
+  ON dlp.trip_id = ii.trip_id
+ AND dlp.lodging_date = ii.scheduled_date
+ AND dlp.trip_place_id = ii.trip_place_id
 WHERE ii.trip_id = $1::uuid
   AND ii.scheduled_date = $2
 ORDER BY ii.rank ASC, ii.id ASC;
+
+-- name: ListDayLodgingPlacesByTrip :many
+SELECT
+  dlp.lodging_date,
+  tp.id::text AS id,
+  tp.name,
+  tp.place_type,
+  tp.address
+FROM day_lodging_places dlp
+JOIN trip_places tp
+  ON tp.id = dlp.trip_place_id
+ AND tp.trip_id = dlp.trip_id
+WHERE dlp.trip_id = $1::uuid
+ORDER BY dlp.lodging_date ASC;
+
+-- name: GetDayLodgingPlaceByTripAndDate :one
+SELECT
+  tp.id::text AS id,
+  tp.name,
+  tp.place_type,
+  tp.address
+FROM day_lodging_places dlp
+JOIN trip_places tp
+  ON tp.id = dlp.trip_place_id
+ AND tp.trip_id = dlp.trip_id
+WHERE dlp.trip_id = sqlc.arg(trip_id)::uuid
+  AND dlp.lodging_date = sqlc.arg(lodging_date);
+
+-- name: GetTripPlaceSummaryByTripAndPlace :one
+SELECT
+  id::text AS id,
+  name,
+  place_type,
+  address
+FROM trip_places
+WHERE trip_id = sqlc.arg(trip_id)::uuid
+  AND id = sqlc.arg(trip_place_id)::uuid;
+
+-- name: SetDayLodgingPlace :one
+WITH upserted AS (
+  INSERT INTO day_lodging_places (trip_id, lodging_date, trip_place_id)
+  VALUES (sqlc.arg(trip_id)::uuid, sqlc.arg(lodging_date), sqlc.arg(trip_place_id)::uuid)
+  ON CONFLICT (trip_id, lodging_date) DO UPDATE
+  SET
+    trip_place_id = EXCLUDED.trip_place_id,
+    updated_at = now()
+  RETURNING trip_id, trip_place_id
+)
+SELECT
+  tp.id::text AS id,
+  tp.name,
+  tp.place_type,
+  tp.address
+FROM upserted
+JOIN trip_places tp
+  ON tp.id = upserted.trip_place_id
+ AND tp.trip_id = upserted.trip_id;
+
+-- name: DeleteDayLodgingPlace :exec
+DELETE FROM day_lodging_places
+WHERE trip_id = sqlc.arg(trip_id)::uuid
+  AND lodging_date = sqlc.arg(lodging_date);
 
 -- name: CreateTripPlace :one
 INSERT INTO trip_places (
@@ -211,6 +278,7 @@ SELECT
   ii.id::text AS id,
   ii.item_order,
   ii.version,
+  (dlp.trip_place_id IS NOT NULL) AS is_lodging,
   tp.id::text AS trip_place_id,
   tp.name AS place_name,
   tp.place_type,
@@ -219,6 +287,10 @@ FROM itinerary_items ii
 JOIN trip_places tp
   ON tp.id = ii.trip_place_id
  AND tp.trip_id = ii.trip_id
+LEFT JOIN day_lodging_places dlp
+  ON dlp.trip_id = ii.trip_id
+ AND dlp.lodging_date = ii.scheduled_date
+ AND dlp.trip_place_id = ii.trip_place_id
 WHERE ii.trip_id = sqlc.arg(trip_id)::uuid
   AND ii.scheduled_date = sqlc.arg(scheduled_date)
   AND ii.id = sqlc.arg(item_id)::uuid;
@@ -254,12 +326,17 @@ SELECT
   target.id::text AS id,
   target.item_order,
   target.version,
+  (dlp.trip_place_id IS NOT NULL) AS is_lodging,
   updated_place.id AS trip_place_id,
   updated_place.name AS place_name,
   updated_place.place_type,
   updated_place.address
 FROM target
-JOIN updated_place ON true;
+JOIN updated_place ON true
+LEFT JOIN day_lodging_places dlp
+  ON dlp.trip_id = sqlc.arg(trip_id)::uuid
+ AND dlp.lodging_date = sqlc.arg(scheduled_date)
+ AND dlp.trip_place_id = target.trip_place_id;
 
 -- name: DeleteItineraryItemByTripDateAndID :one
 DELETE FROM itinerary_items
@@ -271,6 +348,12 @@ RETURNING trip_place_id::text;
 -- name: CountItineraryItemsByTripPlaceID :one
 SELECT count(*)::int AS total_count
 FROM itinerary_items
+WHERE trip_id = sqlc.arg(trip_id)::uuid
+  AND trip_place_id = sqlc.arg(trip_place_id)::uuid;
+
+-- name: CountDayLodgingPlacesByTripPlaceID :one
+SELECT count(*)::int AS total_count
+FROM day_lodging_places
 WHERE trip_id = sqlc.arg(trip_id)::uuid
   AND trip_place_id = sqlc.arg(trip_place_id)::uuid;
 

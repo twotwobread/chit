@@ -7,6 +7,7 @@ export type DayItineraryItem = {
     id: string;
     itemOrder: number;
     version: number;
+    isLodging: boolean;
     place: TripPlaceSummary;
 };
 

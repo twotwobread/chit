@@ -252,8 +252,16 @@ function TripDayList({ days, tripId }: { days: GetTripDetailResponse['days']; tr
             onPress={() => router.push(buildDayItineraryRoute(tripId, day.date))}
             style={styles.dayRow}
           >
-            <Text style={styles.dayLabel}>{day.dayLabel}</Text>
-            <Text style={styles.dayDate}>{day.formattedDate}</Text>
+            <View style={styles.dayRowMain}>
+              <Text style={styles.dayLabel}>{day.dayLabel}</Text>
+              <Text style={styles.dayDate}>{day.formattedDate}</Text>
+            </View>
+            {day.lodgingSummary ? (
+              <View style={styles.dayLodgingSummary}>
+                <Text style={styles.dayLodgingLabel}>{day.lodgingSummary.label}</Text>
+                <Text style={styles.dayLodgingName}>{day.lodgingSummary.placeName}</Text>
+              </View>
+            ) : null}
           </Pressable>
         ))}
       </View>
@@ -349,16 +357,19 @@ const styles = StyleSheet.create({
     gap: theme.space[3],
   },
   dayRow: {
-    alignItems: 'center',
     backgroundColor: theme.color.surface,
     borderColor: theme.color.borderSubtle,
     borderRadius: theme.radius.md,
     borderWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    gap: theme.space[2],
     minHeight: theme.layout.tapMin,
     paddingHorizontal: theme.space[4],
     paddingVertical: theme.space[3],
+  },
+  dayRowMain: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
   dayLabel: {
     color: theme.color.primary,
@@ -370,6 +381,22 @@ const styles = StyleSheet.create({
     color: theme.color.textBody,
     fontFamily: theme.font.family.regular,
     fontSize: theme.font.size.body,
+  },
+  dayLodgingSummary: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.space[2],
+  },
+  dayLodgingLabel: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.semibold,
+    fontSize: theme.font.size.caption,
+    fontWeight: theme.font.weight.semibold,
+  },
+  dayLodgingName: {
+    color: theme.color.textBody,
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.caption,
   },
   label: {
     color: theme.color.textMuted,

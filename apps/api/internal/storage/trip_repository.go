@@ -219,6 +219,77 @@ func (s *Store) ListTripsByParticipantUser(ctx context.Context, userID string) (
 	return trips, nil
 }
 
+func (s *Store) ListDayLodgingPlacesByTrip(ctx context.Context, tripID string) ([]trip.DayLodgingPlace, error) {
+	rows, err := s.queries.ListDayLodgingPlacesByTrip(ctx, mustUUID(tripID))
+	if err != nil {
+		return nil, err
+	}
+
+	items := make([]trip.DayLodgingPlace, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, trip.DayLodgingPlace{
+			Date: dateString(row.LodgingDate),
+			Place: trip.TripPlaceSummary{
+				ID:        row.ID,
+				Name:      row.Name,
+				PlaceType: row.PlaceType,
+				Address:   row.Address,
+			},
+		})
+	}
+	return items, nil
+}
+
+func (s *Store) GetDayLodgingPlaceByTripAndDate(ctx context.Context, tripID string, date string) (trip.TripPlaceSummary, bool, error) {
+	row, err := s.queries.GetDayLodgingPlaceByTripAndDate(ctx, db.GetDayLodgingPlaceByTripAndDateParams{
+		TripID:      mustUUID(tripID),
+		LodgingDate: dateTextValue(date),
+	})
+	if err == pgx.ErrNoRows {
+		return trip.TripPlaceSummary{}, false, nil
+	}
+	if err != nil {
+		return trip.TripPlaceSummary{}, false, err
+	}
+	return tripPlaceSummary(row.ID, row.Name, row.PlaceType, row.Address), true, nil
+}
+
+func (s *Store) GetTripPlaceSummaryByTripAndPlace(ctx context.Context, tripID string, tripPlaceID string) (trip.TripPlaceSummary, bool, error) {
+	row, err := s.queries.GetTripPlaceSummaryByTripAndPlace(ctx, db.GetTripPlaceSummaryByTripAndPlaceParams{
+		TripID:      mustUUID(tripID),
+		TripPlaceID: mustUUID(tripPlaceID),
+	})
+	if err == pgx.ErrNoRows {
+		return trip.TripPlaceSummary{}, false, nil
+	}
+	if err != nil {
+		return trip.TripPlaceSummary{}, false, err
+	}
+	return tripPlaceSummary(row.ID, row.Name, row.PlaceType, row.Address), true, nil
+}
+
+func (s *Store) SetDayLodgingPlace(ctx context.Context, record trip.SetDayLodgingPlaceRecord) (trip.TripPlaceSummary, error) {
+	row, err := s.queries.SetDayLodgingPlace(ctx, db.SetDayLodgingPlaceParams{
+		TripID:      mustUUID(record.TripID),
+		LodgingDate: dateTextValue(record.ScheduledDate),
+		TripPlaceID: mustUUID(record.TripPlaceID),
+	})
+	if isForeignKeyConstraintViolation(err, "day_lodging_places_trip_place_fk") {
+		return trip.TripPlaceSummary{}, trip.ErrNotFound
+	}
+	if err != nil {
+		return trip.TripPlaceSummary{}, err
+	}
+	return tripPlaceSummary(row.ID, row.Name, row.PlaceType, row.Address), nil
+}
+
+func (s *Store) DeleteDayLodgingPlace(ctx context.Context, tripID string, date string) error {
+	return s.queries.DeleteDayLodgingPlace(ctx, db.DeleteDayLodgingPlaceParams{
+		TripID:      mustUUID(tripID),
+		LodgingDate: dateTextValue(date),
+	})
+}
+
 func (s *Store) ListItineraryItemsByTripAndDate(ctx context.Context, tripID string, date string) ([]trip.DayItineraryItem, error) {
 	rows, err := s.queries.ListItineraryItemsByTripAndDate(ctx, db.ListItineraryItemsByTripAndDateParams{
 		Column1:       mustUUID(tripID),
@@ -294,6 +365,7 @@ func (s *Store) GetItineraryItemByTripDateAndID(ctx context.Context, tripID stri
 		ID:        row.ID,
 		ItemOrder: int(row.ItemOrder),
 		Version:   int(row.Version),
+		IsLodging: boolFromSQL(row.IsLodging),
 		Place: trip.TripPlaceSummary{
 			ID:        row.TripPlaceID,
 			Name:      row.PlaceName,
@@ -357,6 +429,7 @@ func (s *Store) UpdateDayItineraryItemPlace(ctx context.Context, record trip.Upd
 		ID:        row.ID,
 		ItemOrder: int(row.ItemOrder),
 		Version:   int(row.Version),
+		IsLodging: boolFromSQL(row.IsLodging),
 		Place: trip.TripPlaceSummary{
 			ID:        row.TripPlaceID,
 			Name:      row.PlaceName,
@@ -394,11 +467,20 @@ func (s *Store) DeleteDayItineraryItem(ctx context.Context, tripID string, date 
 		return false, err
 	}
 	if remaining == 0 {
-		if err := qtx.DeleteTripPlaceByID(ctx, db.DeleteTripPlaceByIDParams{
+		lodgingReferences, err := qtx.CountDayLodgingPlacesByTripPlaceID(ctx, db.CountDayLodgingPlacesByTripPlaceIDParams{
 			TripID:      mustUUID(tripID),
 			TripPlaceID: mustUUID(placeID),
-		}); err != nil {
+		})
+		if err != nil {
 			return false, err
+		}
+		if lodgingReferences == 0 {
+			if err := qtx.DeleteTripPlaceByID(ctx, db.DeleteTripPlaceByIDParams{
+				TripID:      mustUUID(tripID),
+				TripPlaceID: mustUUID(placeID),
+			}); err != nil {
+				return false, err
+			}
 		}
 	}
 
@@ -629,6 +711,7 @@ func mapDayItineraryItems(rows []db.ListItineraryItemsByTripAndDateRow) []trip.D
 			ID:        row.ID,
 			ItemOrder: index + 1,
 			Version:   int(row.Version),
+			IsLodging: boolFromSQL(row.IsLodging),
 			Place: trip.TripPlaceSummary{
 				ID:        row.TripPlaceID,
 				Name:      row.PlaceName,
@@ -638,6 +721,15 @@ func mapDayItineraryItems(rows []db.ListItineraryItemsByTripAndDateRow) []trip.D
 		})
 	}
 	return items
+}
+
+func tripPlaceSummary(id string, name string, placeType string, address string) trip.TripPlaceSummary {
+	return trip.TripPlaceSummary{ID: id, Name: name, PlaceType: placeType, Address: address}
+}
+
+func boolFromSQL(value interface{}) bool {
+	result, _ := value.(bool)
+	return result
 }
 
 func dateValue(value time.Time) pgtype.Date {
@@ -659,4 +751,9 @@ func dateTextValue(value string) pgtype.Date {
 func isUniqueConstraintViolation(err error, constraintName string) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == constraintName
+}
+
+func isForeignKeyConstraintViolation(err error, constraintName string) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23503" && pgErr.ConstraintName == constraintName
 }

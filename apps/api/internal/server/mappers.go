@@ -119,20 +119,21 @@ func getDayItineraryResponseToOpenAPI(result trip.GetDayItineraryResult) openapi
 		items = append(items, dayItineraryItemToOpenAPI(item))
 	}
 	return openapi.GetDayItineraryResponse{
-		Day: openapi.TripDay{
-			Date:     dateToOpenAPI(result.Day.Date),
-			DayOrder: result.Day.DayOrder,
-		},
+		Day:   tripDayToOpenAPI(result.Day),
 		Items: items,
+	}
+}
+
+func setDayLodgingPlaceResponseToOpenAPI(result trip.SetDayLodgingPlaceResult) openapi.SetDayLodgingPlaceResponse {
+	return openapi.SetDayLodgingPlaceResponse{
+		Day:          tripDayToOpenAPI(result.Day),
+		LodgingPlace: tripPlaceSummaryToOpenAPI(result.LodgingPlace),
 	}
 }
 
 func createManualDayItineraryItemResponseToOpenAPI(result trip.CreateManualDayItineraryItemResult) openapi.CreateManualDayItineraryItemResponse {
 	return openapi.CreateManualDayItineraryItemResponse{
-		Day: openapi.TripDay{
-			Date:     dateToOpenAPI(result.Day.Date),
-			DayOrder: result.Day.DayOrder,
-		},
+		Day:  tripDayToOpenAPI(result.Day),
 		Item: dayItineraryItemToOpenAPI(result.Item),
 	}
 }
@@ -147,10 +148,7 @@ func reorderDayItineraryItemsResponseToOpenAPI(result trip.ReorderDayItineraryIt
 		items = append(items, dayItineraryItemToOpenAPI(item))
 	}
 	return openapi.ReorderDayItineraryItemsResponse{
-		Day: openapi.TripDay{
-			Date:     dateToOpenAPI(result.Day.Date),
-			DayOrder: result.Day.DayOrder,
-		},
+		Day:   tripDayToOpenAPI(result.Day),
 		Items: items,
 	}
 }
@@ -173,12 +171,33 @@ func dayItineraryItemToOpenAPI(item trip.DayItineraryItem) openapi.DayItineraryI
 		Id:        item.ID,
 		ItemOrder: item.ItemOrder,
 		Version:   item.Version,
-		Place: openapi.TripPlaceSummary{
-			Id:        item.Place.ID,
-			Name:      item.Place.Name,
-			PlaceType: openapi.TripPlaceType(item.Place.PlaceType),
-			Address:   item.Place.Address,
-		},
+		IsLodging: item.IsLodging,
+		Place:     tripPlaceSummaryToOpenAPI(item.Place),
+	}
+}
+
+func tripPlaceSummaryToOpenAPI(place trip.TripPlaceSummary) openapi.TripPlaceSummary {
+	return openapi.TripPlaceSummary{
+		Id:        place.ID,
+		Name:      place.Name,
+		PlaceType: openapi.TripPlaceType(place.PlaceType),
+		Address:   place.Address,
+	}
+}
+
+func optionalTripPlaceSummaryToOpenAPI(place *trip.TripPlaceSummary) *openapi.TripPlaceSummary {
+	if place == nil {
+		return nil
+	}
+	mapped := tripPlaceSummaryToOpenAPI(*place)
+	return &mapped
+}
+
+func tripDayToOpenAPI(day trip.TripDay) openapi.TripDay {
+	return openapi.TripDay{
+		Date:         dateToOpenAPI(day.Date),
+		DayOrder:     day.DayOrder,
+		LodgingPlace: optionalTripPlaceSummaryToOpenAPI(day.LodgingPlace),
 	}
 }
 
@@ -198,10 +217,7 @@ func tripToOpenAPI(value trip.Trip) openapi.Trip {
 func tripDaysToOpenAPI(days []trip.TripDay) []openapi.TripDay {
 	items := make([]openapi.TripDay, 0, len(days))
 	for _, day := range days {
-		items = append(items, openapi.TripDay{
-			Date:     dateToOpenAPI(day.Date),
-			DayOrder: day.DayOrder,
-		})
+		items = append(items, tripDayToOpenAPI(day))
 	}
 	return items
 }
