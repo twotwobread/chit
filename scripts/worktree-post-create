@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'USAGE'
+Usage:
+  scripts/worktree-post-create <worktree-path>
+
+Runs safe post-create setup for a feature worktree.
+
+Behavior:
+  - If repository root .env exists, link <worktree-path>/.env to ../../.env.
+  - If <worktree-path>/.env already exists, leave it untouched.
+USAGE
+}
+
+log() {
+  printf '[worktree-post-create] %s\n' "$*"
+}
+
+if [ "$#" -ne 1 ]; then
+  usage >&2
+  exit 1
+fi
+
+if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+  usage
+  exit 0
+fi
+
+WORKTREE_PATH="$1"
+
+if [ ! -d .git ] && ! git rev-parse --show-toplevel >/dev/null 2>&1; then
+  printf 'Run this script from inside the repository.\n' >&2
+  exit 1
+fi
+
+GIT_TOP=$(git rev-parse --show-toplevel)
+case "$GIT_TOP" in
+  */.worktrees/*)
+    REPO_ROOT="${GIT_TOP%%/.worktrees/*}"
+    ;;
+  *)
+    REPO_ROOT="$GIT_TOP"
+    ;;
+esac
+cd "$REPO_ROOT"
+
+if [[ "$WORKTREE_PATH" != .worktrees/* ]]; then
+  WORKTREE_PATH=".worktrees/$WORKTREE_PATH"
+fi
+
+if [ ! -d "$WORKTREE_PATH" ]; then
+  printf 'Worktree path does not exist: %s\n' "$WORKTREE_PATH" >&2
+  exit 1
+fi
+
+ROOT_ENV='.env'
+WORKTREE_ENV="$WORKTREE_PATH/.env"
+
+if [ ! -e "$ROOT_ENV" ]; then
+  log 'skip .env symlink: repository root .env not found'
+  exit 0
+fi
+
+if [ -e "$WORKTREE_ENV" ] || [ -L "$WORKTREE_ENV" ]; then
+  log "skip .env symlink: $WORKTREE_ENV already exists"
+  exit 0
+fi
+
+ln -s ../../.env "$WORKTREE_ENV"
+log "linked $WORKTREE_ENV -> ../../.env"

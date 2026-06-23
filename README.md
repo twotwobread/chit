@@ -91,20 +91,15 @@ set -a; source .env; set +a
 
 Feature worktree에서는 `.env`를 복사하지 말고 루트 `.env`로 symlink합니다. 이렇게 하면 key rotation이나 local URL 변경이 모든 worktree에 같이 반영됩니다.
 
-Worktree 안에서 실행:
+`scripts/worktree-create`는 worktree 생성 후 `scripts/worktree-post-create`를 실행해 루트 `.env`가 있으면 새 worktree의 `.env` symlink를 자동 생성합니다. 이미 worktree에 `.env` 파일이나 symlink가 있으면 덮어쓰지 않습니다.
+
+기존 worktree의 `.env` symlink를 수동으로 보정해야 하면 프로젝트 루트에서 실행합니다.
 
 ```bash
-cd .worktrees/<worktree-name>
-ln -s ../../.env .env
+scripts/worktree-post-create .worktrees/<worktree-name>
 ```
 
-또는 프로젝트 루트에서 실행:
-
-```bash
-ln -s ../../.env .worktrees/<worktree-name>/.env
-```
-
-이미 worktree에 `.env` 파일이 있다면 덮어쓰기 전에 내용을 확인하고 직접 정리합니다. 실제 API key, OAuth secret, DB URL은 git, GitHub issue, chat에 붙여넣지 않습니다.
+실제 API key, OAuth secret, DB URL은 git, GitHub issue, chat에 붙여넣지 않습니다.
 
 ## Local DB and Migration
 

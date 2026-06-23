@@ -81,7 +81,10 @@ export default function NewTripScreen() {
       });
       setCreated(response);
     } catch (submitError) {
-      if (submitError instanceof MobileAuthError && submitError.code === 'INVALID_REFRESH_TOKEN') {
+      if (
+        submitError instanceof MobileAuthError &&
+        (submitError.code === 'INVALID_REFRESH_TOKEN' || submitError.code === 'UNAUTHORIZED')
+      ) {
         setError('다시 로그인해주세요.');
       } else {
         setError('여행을 만들 수 없어요. 입력 내용을 확인하고 다시 시도해주세요.');

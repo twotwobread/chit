@@ -13,7 +13,7 @@ import {
   type LegalLinkOpenState,
 } from '../lib/app-info/legal';
 import { getCurrentUserWithRefresh, logoutCurrentSession, MobileAuthError } from '../lib/auth/client';
-import { clearStoredSession, getStoredSession } from '../lib/auth/session';
+import { clearStoredSession, readStoredSession } from '../lib/auth/session';
 import { theme } from '../lib/design';
 import { BottomMenu } from '../lib/navigation/BottomMenu';
 import { listMyTrips } from '../lib/trips/client';
@@ -73,9 +73,13 @@ export default function MyPageScreen() {
     updateLegalLinkState(initialLegalLinkOpenState);
 
     try {
-      const stored = await getStoredSession();
-      if (!stored) {
+      const stored = await readStoredSession();
+      if (stored.status === 'missing') {
         setState({ status: 'needsLogin' });
+        return;
+      }
+      if (stored.status === 'corrupt') {
+        setState({ status: 'needsLogin', message: '다시 로그인해주세요.' });
         return;
       }
 

@@ -5,7 +5,7 @@ import { router } from 'expo-router';
 import type { AuthMeResponse } from '@i-um/api-contract';
 
 import { getCurrentUserWithRefresh, MobileAuthError } from '../lib/auth/client';
-import { clearStoredSession, getStoredSession } from '../lib/auth/session';
+import { clearStoredSession, readStoredSession } from '../lib/auth/session';
 import { theme } from '../lib/design';
 import { BottomMenu } from '../lib/navigation/BottomMenu';
 
@@ -22,9 +22,13 @@ export default function HomeScreen() {
     setHomeState({ status: 'loading' });
 
     try {
-      const stored = await getStoredSession();
-      if (!stored) {
+      const stored = await readStoredSession();
+      if (stored.status === 'missing') {
         setHomeState({ status: 'needsLogin' });
+        return;
+      }
+      if (stored.status === 'corrupt') {
+        setHomeState({ status: 'needsLogin', message: '다시 로그인해주세요.' });
         return;
       }
 
