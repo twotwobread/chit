@@ -1,5 +1,7 @@
 import type { TripListItem } from '@i-um/api-contract';
 
+import { formatLocalDate } from './date';
+
 export type TripStatus = 'ongoing' | 'upcoming' | 'past';
 
 export type TripStatusSection = {
@@ -49,10 +51,7 @@ export function tripStatus(trip: TripListItem, today: string): TripStatus {
 }
 
 export function localDateString(date = new Date()): string {
-  const year = String(date.getFullYear());
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  return formatLocalDate(date);
 }
 
 function compareOngoingTrips(left: TripListItem, right: TripListItem): number {

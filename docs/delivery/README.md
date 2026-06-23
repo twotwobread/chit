@@ -18,6 +18,8 @@ Feature Slice = App UI + API Contract + API Server + DB + Tests + Deployable Sta
   - 기능을 완료로 볼 수 있는 기준
 - `testing_guidelines.md`
   - TDD, regression test, manual smoke 분리 기준
+- `code_quality_guardrails.md`
+  - 코드 중복, screen/file 비대화, layer 역할 혼선을 방지하는 리팩터링 기준
 - `staging_internal_deploy.md`
   - GCP Cloud Run staging API와 Expo internal build 배포 runbook
 - `../features/_template.md`
@@ -34,6 +36,7 @@ Feature Slice = App UI + API Contract + API Server + DB + Tests + Deployable Sta
 7. 기능 완료 시점에는 staging 또는 internal build에서 smoke 검증 가능한 상태여야 한다.
 8. Spec에 없는 기능은 구현하지 않는다.
 9. API 변경은 OpenAPI 계약을 먼저 수정한다.
+10. 반복되는 UI/state/error/date 로직은 `code_quality_guardrails.md` 기준으로 shared helper 또는 primitive를 검토한다.
 
 ## 빠른 시작
 
