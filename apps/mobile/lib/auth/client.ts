@@ -9,6 +9,7 @@ import {
 } from '@i-um/api-contract';
 
 import { configureApi } from '../api/config';
+import { clearKakaoNativeSession } from './kakao';
 import { clearStoredSession, getStoredSession, saveStoredSession, type StoredSession } from './session';
 
 export type AuthErrorCode =
@@ -104,6 +105,7 @@ export async function logoutCurrentSession(): Promise<void> {
   try {
     await AuthService.logout();
   } finally {
+    await clearKakaoNativeSession();
     await clearStoredSession();
     configureApi();
   }
