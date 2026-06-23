@@ -42,6 +42,7 @@ type DepsOptions = {
   refreshToken?: () => Promise<AuthRefreshResponse>;
   logout?: () => Promise<unknown>;
   saveStoredSession?: (session: StoredSession) => Promise<void>;
+  clearProviderLocalSessions?: () => Promise<void>;
 };
 
 function createDeps(options: DepsOptions = {}) {
@@ -53,7 +54,12 @@ function createDeps(options: DepsOptions = {}) {
       linkOAuthProvider: async () => ({ result: 'provider_link_success', linkedIdentity: { provider: 'kakao' } }),
       getCurrentUser: options.getCurrentUser ?? (async () => me),
       refreshToken: options.refreshToken ?? (async () => refreshResponse),
-      logout: options.logout ?? (async () => ({ result: 'logout_success' })),
+      logout:
+        options.logout ??
+        (async () => {
+          calls.push('logout');
+          return { result: 'logout_success' };
+        }),
     },
     configureApi: (accessToken?: string) => {
       calls.push(`configure:${accessToken ?? ''}`);
@@ -69,9 +75,11 @@ function createDeps(options: DepsOptions = {}) {
       calls.push('clear');
       stored = null;
     },
-    clearKakaoNativeSession: async () => {
-      calls.push('clearKakao');
-    },
+    clearProviderLocalSessions:
+      options.clearProviderLocalSessions ??
+      (async () => {
+        calls.push('clearProviders');
+      }),
   };
   return { deps, calls, getStored: () => stored };
 }
@@ -240,9 +248,28 @@ test('shares one in-flight refresh across concurrent current-user restore caller
   assert.equal(getMeCalls, 2);
 });
 
-test('logout clears local session and Kakao state even when server logout fails', async () => {
+test('logout attempts server revoke and clears provider, local session, and API auth', async () => {
+  const { deps, calls, getStored } = createDeps();
+
+  await logoutCurrentSession(deps);
+
+  assert.equal(getStored(), null);
+  assert.deepEqual(calls, ['configure:old-access-token', 'logout', 'clearProviders', 'clear', 'configure:']);
+});
+
+test('logout skips server revoke and provider cleanup when no session is stored', async () => {
+  const { deps, calls, getStored } = createDeps({ stored: null });
+
+  await logoutCurrentSession(deps);
+
+  assert.equal(getStored(), null);
+  assert.deepEqual(calls, []);
+});
+
+test('logout clears local session and provider state even when server logout fails', async () => {
   const { deps, calls, getStored } = createDeps({
     logout: async () => {
+      calls.push('logout');
       throw new Error('server unavailable');
     },
   });
@@ -250,5 +277,41 @@ test('logout clears local session and Kakao state even when server logout fails'
   await logoutCurrentSession(deps);
 
   assert.equal(getStored(), null);
-  assert.deepEqual(calls, ['configure:old-access-token', 'clearKakao', 'clear', 'configure:']);
+  assert.deepEqual(calls, ['configure:old-access-token', 'logout', 'clearProviders', 'clear', 'configure:']);
+});
+
+test('logout clears local session even when provider cleanup fails', async () => {
+  const { deps, calls, getStored } = createDeps({
+    clearProviderLocalSessions: async () => {
+      calls.push('clearProviders');
+      throw new Error('provider cleanup failed');
+    },
+  });
+
+  await logoutCurrentSession(deps);
+
+  assert.equal(getStored(), null);
+  assert.deepEqual(calls, ['configure:old-access-token', 'logout', 'clearProviders', 'clear', 'configure:']);
+});
+
+test('logout is single-flight for duplicate callers', async () => {
+  let releaseLogout: (() => void) | null = null;
+  const { deps, calls, getStored } = createDeps({
+    logout: async () => {
+      calls.push('logout');
+      await new Promise<void>((resolve) => {
+        releaseLogout = resolve;
+      });
+      return { result: 'logout_success' };
+    },
+  });
+
+  const first = logoutCurrentSession(deps);
+  const second = logoutCurrentSession(deps);
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  releaseLogout?.();
+  await Promise.all([first, second]);
+
+  assert.equal(getStored(), null);
+  assert.deepEqual(calls, ['configure:old-access-token', 'logout', 'clearProviders', 'clear', 'configure:']);
 });

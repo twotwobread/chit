@@ -9,7 +9,7 @@ import {
 } from '@i-um/api-contract';
 
 import { configureApi } from '../api/config';
-import { clearKakaoNativeSession } from './kakao';
+import { clearOAuthProviderLocalSessions } from './provider-cleanup';
 import {
   clearStoredSession,
   getStoredSession,
@@ -47,7 +47,7 @@ export type AuthClientDeps = {
   getStoredSession: () => Promise<StoredSession | null>;
   saveStoredSession: (session: StoredSession) => Promise<void>;
   clearStoredSession: () => Promise<void>;
-  clearKakaoNativeSession: () => Promise<void>;
+  clearProviderLocalSessions: () => Promise<void>;
 };
 
 const defaultAuthClientDeps: AuthClientDeps = {
@@ -57,10 +57,11 @@ const defaultAuthClientDeps: AuthClientDeps = {
   getStoredSession,
   saveStoredSession,
   clearStoredSession,
-  clearKakaoNativeSession,
+  clearProviderLocalSessions: clearOAuthProviderLocalSessions,
 };
 
 let currentUserWithRefreshInFlight: Promise<AuthMeResponse> | null = null;
+let logoutInFlight: Promise<void> | null = null;
 
 export class MobileAuthError extends Error {
   readonly code: AuthErrorCode;
@@ -175,7 +176,21 @@ export async function refreshStoredSession(
   return response;
 }
 
-export async function logoutCurrentSession(deps: AuthClientDeps = defaultAuthClientDeps): Promise<void> {
+export function logoutCurrentSession(deps: AuthClientDeps = defaultAuthClientDeps): Promise<void> {
+  if (logoutInFlight) {
+    return logoutInFlight;
+  }
+
+  const promise = logoutCurrentSessionOnce(deps).finally(() => {
+    if (logoutInFlight === promise) {
+      logoutInFlight = null;
+    }
+  });
+  logoutInFlight = promise;
+  return promise;
+}
+
+async function logoutCurrentSessionOnce(deps: AuthClientDeps): Promise<void> {
   const session = await deps.getStoredSession();
   if (!session) {
     return;
@@ -187,9 +202,16 @@ export async function logoutCurrentSession(deps: AuthClientDeps = defaultAuthCli
   } catch {
     // Device-local logout is prioritized even when server revocation cannot be confirmed.
   } finally {
-    await deps.clearKakaoNativeSession();
-    await deps.clearStoredSession();
-    deps.configureApi();
+    try {
+      await deps.clearProviderLocalSessions();
+    } catch {
+      // Provider-local cleanup is best-effort and must not block i-um local logout.
+    }
+    try {
+      await deps.clearStoredSession();
+    } finally {
+      deps.configureApi();
+    }
   }
 }
 
