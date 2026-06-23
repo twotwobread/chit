@@ -587,6 +587,113 @@ func TestGetTripDetailForbidden(t *testing.T) {
 	}
 }
 
+func TestListTripParticipantsHandler(t *testing.T) {
+	backend := newFakeAuthBackend()
+	ownerToken := loginTestUser(t, backend)
+	tripID := createTestTrip(t, backend, ownerToken)
+	memberToken := loginTestUserWithSubject(t, backend, "apple-2", "지영")
+	_ = memberToken
+	backend.participants[tripID] = append(backend.participants[tripID], tripdomain.Participant{
+		ID:          testUUID(2002),
+		TripID:      tripID,
+		UserID:      "user-2",
+		Role:        tripdomain.RoleMember,
+		DisplayName: "지영",
+		JoinedAt:    time.Date(2026, 6, 22, 9, 0, 0, 0, time.UTC),
+	})
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/trips/"+tripID+"/participants", nil)
+	request.Header.Set("Authorization", "Bearer "+ownerToken)
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusOK, recorder.Code, recorder.Body.String())
+	}
+
+	var body struct {
+		Participants []map[string]interface{} `json:"participants"`
+	}
+	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(body.Participants) != 2 {
+		t.Fatalf("expected two participants, got %#v", body.Participants)
+	}
+	if body.Participants[0]["participantId"] == "" || body.Participants[0]["displayName"] != "민수" || body.Participants[0]["role"] != "owner" || body.Participants[0]["joinedAt"] == "" {
+		t.Fatalf("unexpected owner participant: %#v", body.Participants[0])
+	}
+	if body.Participants[1]["displayName"] != "지영" || body.Participants[1]["role"] != "member" {
+		t.Fatalf("unexpected member participant: %#v", body.Participants[1])
+	}
+	for _, participant := range body.Participants {
+		if _, ok := participant["userId"]; ok {
+			t.Fatalf("participant list response must not include userId: %#v", participant)
+		}
+		if _, ok := participant["tripId"]; ok {
+			t.Fatalf("participant list response must not include tripId: %#v", participant)
+		}
+	}
+}
+
+func TestListTripParticipantsRequiresAuth(t *testing.T) {
+	backend := newFakeAuthBackend()
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/trips/00000000-0000-0000-0000-000000000001/participants", nil)
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusUnauthorized, recorder.Code, recorder.Body.String())
+	}
+}
+
+func TestListTripParticipantsValidation(t *testing.T) {
+	backend := newFakeAuthBackend()
+	accessToken := loginTestUser(t, backend)
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/trips/not-a-uuid/participants", nil)
+	request.Header.Set("Authorization", "Bearer "+accessToken)
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusBadRequest, recorder.Code, recorder.Body.String())
+	}
+}
+
+func TestListTripParticipantsNotFound(t *testing.T) {
+	backend := newFakeAuthBackend()
+	accessToken := loginTestUser(t, backend)
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/trips/00000000-0000-0000-0000-000000000404/participants", nil)
+	request.Header.Set("Authorization", "Bearer "+accessToken)
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusNotFound {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusNotFound, recorder.Code, recorder.Body.String())
+	}
+}
+
+func TestListTripParticipantsForbidden(t *testing.T) {
+	backend := newFakeAuthBackend()
+	ownerToken := loginTestUser(t, backend)
+	tripID := createTestTrip(t, backend, ownerToken)
+	nonParticipantToken := loginTestUserWithSubject(t, backend, "apple-2", "지영")
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/trips/"+tripID+"/participants", nil)
+	request.Header.Set("Authorization", "Bearer "+nonParticipantToken)
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusForbidden {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusForbidden, recorder.Code, recorder.Body.String())
+	}
+}
+
 func TestGetDayItineraryHandlerReturnsEmpty(t *testing.T) {
 	backend := newFakeAuthBackend()
 	accessToken := loginTestUser(t, backend)
@@ -2180,6 +2287,38 @@ func (b *fakeAuthBackend) DeleteDayItineraryItem(_ context.Context, tripID strin
 		return true, nil
 	}
 	return false, nil
+}
+
+func (b *fakeAuthBackend) ListTripParticipants(_ context.Context, tripID string) ([]tripdomain.ParticipantListItem, error) {
+	participants := append([]tripdomain.Participant(nil), b.participants[tripID]...)
+	sort.Slice(participants, func(i, j int) bool {
+		leftRoleRank := 1
+		if participants[i].Role == tripdomain.RoleOwner {
+			leftRoleRank = 0
+		}
+		rightRoleRank := 1
+		if participants[j].Role == tripdomain.RoleOwner {
+			rightRoleRank = 0
+		}
+		if leftRoleRank != rightRoleRank {
+			return leftRoleRank < rightRoleRank
+		}
+		if !participants[i].JoinedAt.Equal(participants[j].JoinedAt) {
+			return participants[i].JoinedAt.Before(participants[j].JoinedAt)
+		}
+		return participants[i].ID < participants[j].ID
+	})
+
+	items := make([]tripdomain.ParticipantListItem, 0, len(participants))
+	for _, participant := range participants {
+		items = append(items, tripdomain.ParticipantListItem{
+			ParticipantID: participant.ID,
+			DisplayName:   participant.DisplayName,
+			Role:          participant.Role,
+			JoinedAt:      participant.JoinedAt,
+		})
+	}
+	return items, nil
 }
 
 func (b *fakeAuthBackend) ListTripsByParticipantUser(_ context.Context, userID string) ([]tripdomain.ListItem, error) {

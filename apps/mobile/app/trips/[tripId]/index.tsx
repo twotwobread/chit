@@ -6,10 +6,11 @@ import { ApiError, type GetTripDetailResponse } from '@i-um/api-contract';
 
 import { MobileAuthError } from '../../../lib/auth/client';
 import { getStoredSession } from '../../../lib/auth/session';
-import { theme } from '../../../lib/design';
+import { SecondaryButton, theme } from '../../../lib/design';
 import { deleteTrip, getTripDetail } from '../../../lib/trips/client';
 import { buildDayItineraryRoute } from '../../../lib/trips/day-itinerary';
 import { buildTripDayViewModels, formatTripDayDate } from '../../../lib/trips/days';
+import { tripParticipantsPath } from '../../../lib/trips/participants';
 import {
   beginTripDelete,
   cancelTripDelete,
@@ -152,6 +153,7 @@ function TripDetailCard({ currentUserId, detail }: { currentUserId?: string; det
         <InfoRow label="기본 통화" value={detail.trip.defaultCurrency} />
         <InfoRow label="참여자" value={formatParticipantSummary(detail.participantSummary)} />
       </View>
+      <SecondaryButton label="참여자 모두 보기" onPress={() => router.push(tripParticipantsPath(detail.trip.id))} />
       <TripDayList days={detail.days} tripId={detail.trip.id} />
       {canManage ? (
         <>

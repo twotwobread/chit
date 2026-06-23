@@ -124,6 +124,13 @@ type Participant struct {
 	JoinedAt    time.Time
 }
 
+type ParticipantListItem struct {
+	ParticipantID string
+	DisplayName   string
+	Role          string
+	JoinedAt      time.Time
+}
+
 type TripDay struct {
 	Date     string
 	DayOrder int
@@ -205,6 +212,7 @@ type Repository interface {
 	DeleteTripByID(ctx context.Context, tripID string) (bool, error)
 	CountTripParticipants(ctx context.Context, tripID string) (int, error)
 	ListTripParticipantPreviewNames(ctx context.Context, tripID string) ([]string, error)
+	ListTripParticipants(ctx context.Context, tripID string) ([]ParticipantListItem, error)
 	ListTripsByParticipantUser(ctx context.Context, userID string) ([]ListItem, error)
 	ListItineraryItemsByTripAndDate(ctx context.Context, tripID string, date string) ([]DayItineraryItem, error)
 	CreateManualDayItineraryItem(ctx context.Context, record CreateManualDayItineraryItemRecord) (DayItineraryItem, error)

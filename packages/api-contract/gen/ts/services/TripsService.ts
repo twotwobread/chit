@@ -8,6 +8,7 @@ import type { CreateTripRequest } from '../models/CreateTripRequest';
 import type { CreateTripResponse } from '../models/CreateTripResponse';
 import type { GetDayItineraryResponse } from '../models/GetDayItineraryResponse';
 import type { GetTripDetailResponse } from '../models/GetTripDetailResponse';
+import type { ListTripParticipantsResponse } from '../models/ListTripParticipantsResponse';
 import type { ListTripsResponse } from '../models/ListTripsResponse';
 import type { ReorderDayItineraryItemsRequest } from '../models/ReorderDayItineraryItemsRequest';
 import type { ReorderDayItineraryItemsResponse } from '../models/ReorderDayItineraryItemsResponse';
@@ -124,6 +125,31 @@ export class TripsService {
         return __request(OpenAPI, {
             method: 'DELETE',
             url: '/trips/{tripId}',
+            path: {
+                'tripId': tripId,
+            },
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                403: `Forbidden.`,
+                404: `Trip not found.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
+     * List trip participants
+     * Returns the current accepted participants for a trip. Only authenticated current trip participants can access the list.
+     * @param tripId
+     * @returns ListTripParticipantsResponse Current trip participants.
+     * @throws ApiError
+     */
+    public static listTripParticipants(
+        tripId: string,
+    ): CancelablePromise<ListTripParticipantsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/trips/{tripId}/participants',
             path: {
                 'tripId': tripId,
             },

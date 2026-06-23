@@ -12,45 +12,47 @@ import (
 const testTripID = "00000000-0000-0000-0000-000000000001"
 
 type fakeRepository struct {
-	creator               Creator
-	creatorFound          bool
-	created               CreateRecord
-	trip                  Trip
-	tripFound             bool
-	isParticipant         bool
-	isOwner               bool
-	participantCount      int
-	previewNames          []string
-	listed                []ListItem
-	listedUserID          string
-	dayItineraryItems     []DayItineraryItem
-	listedItineraryTripID string
-	listedItineraryDate   string
-	createdManualRecords  []CreateManualDayItineraryItemRecord
-	createdManualItem     DayItineraryItem
-	createManualErr       error
-	dayItem               DayItineraryItem
-	dayItemFound          bool
-	dayItemLookupTripID   string
-	dayItemLookupDate     string
-	dayItemLookupItemID   string
-	reorderedRecord       ReorderDayItineraryItemsRecord
-	reorderedCalled       bool
-	reorderedItems        []DayItineraryItem
-	reorderErr            error
-	updatedDayItemRecord  UpdateDayItineraryItemRecord
-	updatedDayItemCalled  bool
-	updatedDayItem        DayItineraryItem
-	deletedDayItemTripID  string
-	deletedDayItemDate    string
-	deletedDayItemID      string
-	deletedDayItemCalled  bool
-	deletedDayItemOK      bool
-	updated               UpdateRecord
-	updatedCalled         bool
-	deletedID             string
-	deletedCalled         bool
-	deleteOK              bool
+	creator                Creator
+	creatorFound           bool
+	created                CreateRecord
+	trip                   Trip
+	tripFound              bool
+	isParticipant          bool
+	isOwner                bool
+	participantCount       int
+	previewNames           []string
+	listParticipants       []ParticipantListItem
+	listParticipantsTripID string
+	listed                 []ListItem
+	listedUserID           string
+	dayItineraryItems      []DayItineraryItem
+	listedItineraryTripID  string
+	listedItineraryDate    string
+	createdManualRecords   []CreateManualDayItineraryItemRecord
+	createdManualItem      DayItineraryItem
+	createManualErr        error
+	dayItem                DayItineraryItem
+	dayItemFound           bool
+	dayItemLookupTripID    string
+	dayItemLookupDate      string
+	dayItemLookupItemID    string
+	reorderedRecord        ReorderDayItineraryItemsRecord
+	reorderedCalled        bool
+	reorderedItems         []DayItineraryItem
+	reorderErr             error
+	updatedDayItemRecord   UpdateDayItineraryItemRecord
+	updatedDayItemCalled   bool
+	updatedDayItem         DayItineraryItem
+	deletedDayItemTripID   string
+	deletedDayItemDate     string
+	deletedDayItemID       string
+	deletedDayItemCalled   bool
+	deletedDayItemOK       bool
+	updated                UpdateRecord
+	updatedCalled          bool
+	deletedID              string
+	deletedCalled          bool
+	deleteOK               bool
 }
 
 func (r *fakeRepository) GetCreator(context.Context, string) (Creator, bool, error) {
@@ -120,6 +122,11 @@ func (r *fakeRepository) CountTripParticipants(context.Context, string) (int, er
 
 func (r *fakeRepository) ListTripParticipantPreviewNames(context.Context, string) ([]string, error) {
 	return r.previewNames, nil
+}
+
+func (r *fakeRepository) ListTripParticipants(_ context.Context, tripID string) ([]ParticipantListItem, error) {
+	r.listParticipantsTripID = tripID
+	return r.listParticipants, nil
 }
 
 func (r *fakeRepository) ListTripsByParticipantUser(_ context.Context, userID string) ([]ListItem, error) {
@@ -568,6 +575,73 @@ func TestServiceGetDetailForbidden(t *testing.T) {
 	service := newTestService(&fakeRepository{trip: Trip{ID: testTripID}, tripFound: true})
 
 	_, err := service.GetDetail(context.Background(), "user-1", testTripID)
+	if !errors.Is(err, ErrForbidden) {
+		t.Fatalf("expected ErrForbidden, got %v", err)
+	}
+}
+
+func TestServiceListParticipants(t *testing.T) {
+	joinedAt := time.Date(2026, 6, 21, 15, 0, 0, 0, time.UTC)
+	repo := &fakeRepository{
+		trip:          Trip{ID: testTripID, Name: "오사카"},
+		tripFound:     true,
+		isParticipant: true,
+		listParticipants: []ParticipantListItem{
+			{ParticipantID: "participant-1", DisplayName: " 민수 ", Role: RoleOwner, JoinedAt: joinedAt},
+			{ParticipantID: "participant-2", DisplayName: "", Role: RoleMember, JoinedAt: joinedAt.Add(time.Hour)},
+		},
+	}
+	service := newTestService(repo)
+
+	participants, err := service.ListParticipants(context.Background(), "user-1", testTripID)
+	if err != nil {
+		t.Fatalf("ListParticipants returned error: %v", err)
+	}
+	if repo.listParticipantsTripID != testTripID {
+		t.Fatalf("expected repository to list participants for %s, got %q", testTripID, repo.listParticipantsTripID)
+	}
+	if len(participants) != 2 {
+		t.Fatalf("expected two participants, got %#v", participants)
+	}
+	if participants[0].ParticipantID != "participant-1" || participants[0].DisplayName != "민수" || participants[0].Role != RoleOwner {
+		t.Fatalf("unexpected owner participant: %#v", participants[0])
+	}
+	if participants[1].DisplayName != "여행자" {
+		t.Fatalf("expected blank display name fallback, got %#v", participants[1])
+	}
+}
+
+func TestServiceListParticipantsValidation(t *testing.T) {
+	service := newTestService(&fakeRepository{})
+
+	_, err := service.ListParticipants(context.Background(), "user-1", "not-a-uuid")
+	if !errors.Is(err, ErrValidation) {
+		t.Fatalf("expected ErrValidation, got %v", err)
+	}
+}
+
+func TestServiceListParticipantsRequiresAuth(t *testing.T) {
+	service := newTestService(&fakeRepository{})
+
+	_, err := service.ListParticipants(context.Background(), " ", testTripID)
+	if !errors.Is(err, ErrUnauthorized) {
+		t.Fatalf("expected ErrUnauthorized, got %v", err)
+	}
+}
+
+func TestServiceListParticipantsNotFound(t *testing.T) {
+	service := newTestService(&fakeRepository{})
+
+	_, err := service.ListParticipants(context.Background(), "user-1", testTripID)
+	if !errors.Is(err, ErrNotFound) {
+		t.Fatalf("expected ErrNotFound, got %v", err)
+	}
+}
+
+func TestServiceListParticipantsForbidden(t *testing.T) {
+	service := newTestService(&fakeRepository{trip: Trip{ID: testTripID}, tripFound: true})
+
+	_, err := service.ListParticipants(context.Background(), "user-1", testTripID)
 	if !errors.Is(err, ErrForbidden) {
 		t.Fatalf("expected ErrForbidden, got %v", err)
 	}

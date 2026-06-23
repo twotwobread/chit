@@ -982,6 +982,110 @@ func TestDeleteTripByIDCascadesParticipants(t *testing.T) {
 	}
 }
 
+func TestListTripParticipantsOrdersOwnerFirstThenJoinedAt(t *testing.T) {
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("DATABASE_URL is required for storage integration test")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	store, err := Open(ctx, databaseURL)
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer store.Close()
+
+	var ownerUserID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO users (display_name)
+		VALUES ('참여자 목록 Owner')
+		RETURNING id::text
+	`).Scan(&ownerUserID); err != nil {
+		t.Fatalf("insert owner user: %v", err)
+	}
+	defer func() {
+		_, _ = store.pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1::uuid`, ownerUserID)
+	}()
+
+	var memberEarlyUserID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO users (display_name)
+		VALUES ('참여자 목록 Early')
+		RETURNING id::text
+	`).Scan(&memberEarlyUserID); err != nil {
+		t.Fatalf("insert early member user: %v", err)
+	}
+	defer func() {
+		_, _ = store.pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1::uuid`, memberEarlyUserID)
+	}()
+
+	var memberLateUserID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO users (display_name)
+		VALUES ('참여자 목록 Late')
+		RETURNING id::text
+	`).Scan(&memberLateUserID); err != nil {
+		t.Fatalf("insert late member user: %v", err)
+	}
+	defer func() {
+		_, _ = store.pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1::uuid`, memberLateUserID)
+	}()
+
+	var tripID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO trips (name, start_date, end_date, default_currency, created_by)
+		VALUES ('참여자 목록 테스트 여행', '2026-07-10', '2026-07-13', 'JPY', $1::uuid)
+		RETURNING id::text
+	`, ownerUserID).Scan(&tripID); err != nil {
+		t.Fatalf("insert trip: %v", err)
+	}
+
+	var ownerParticipantID string
+	var earlyParticipantID string
+	var lateParticipantID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO trip_participants (trip_id, user_id, role, display_name, joined_at)
+		VALUES ($1::uuid, $2::uuid, 'member', '늦게 합류', '2026-06-23T09:00:00Z')
+		RETURNING id::text
+	`, tripID, memberLateUserID).Scan(&lateParticipantID); err != nil {
+		t.Fatalf("insert late member participant: %v", err)
+	}
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO trip_participants (trip_id, user_id, role, display_name, joined_at)
+		VALUES ($1::uuid, $2::uuid, 'owner', '주최자', '2026-06-24T09:00:00Z')
+		RETURNING id::text
+	`, tripID, ownerUserID).Scan(&ownerParticipantID); err != nil {
+		t.Fatalf("insert owner participant: %v", err)
+	}
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO trip_participants (trip_id, user_id, role, display_name, joined_at)
+		VALUES ($1::uuid, $2::uuid, 'member', '먼저 합류', '2026-06-22T09:00:00Z')
+		RETURNING id::text
+	`, tripID, memberEarlyUserID).Scan(&earlyParticipantID); err != nil {
+		t.Fatalf("insert early member participant: %v", err)
+	}
+
+	participants, err := store.ListTripParticipants(ctx, tripID)
+	if err != nil {
+		t.Fatalf("list trip participants: %v", err)
+	}
+	if len(participants) != 3 {
+		t.Fatalf("expected three participants, got %#v", participants)
+	}
+	gotIDs := []string{participants[0].ParticipantID, participants[1].ParticipantID, participants[2].ParticipantID}
+	expectedIDs := []string{ownerParticipantID, earlyParticipantID, lateParticipantID}
+	for index, expectedID := range expectedIDs {
+		if gotIDs[index] != expectedID {
+			t.Fatalf("unexpected participant order: got %#v expected %#v", gotIDs, expectedIDs)
+		}
+	}
+	if participants[0].DisplayName != "주최자" || participants[0].Role != trip.RoleOwner {
+		t.Fatalf("unexpected owner mapping: %#v", participants[0])
+	}
+}
+
 func stringPtr(value string) *string {
 	return &value
 }

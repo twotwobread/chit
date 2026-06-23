@@ -535,6 +535,52 @@ func (q *Queries) ListTripParticipantPreviewByTripID(ctx context.Context, dollar
 	return items, nil
 }
 
+const listTripParticipantsByTripID = `-- name: ListTripParticipantsByTripID :many
+SELECT
+  id::text,
+  display_name,
+  role,
+  joined_at
+FROM trip_participants
+WHERE trip_id = $1::uuid
+ORDER BY
+  CASE WHEN role = 'owner' THEN 0 ELSE 1 END,
+  joined_at ASC,
+  id ASC
+`
+
+type ListTripParticipantsByTripIDRow struct {
+	ID          string
+	DisplayName string
+	Role        string
+	JoinedAt    pgtype.Timestamptz
+}
+
+func (q *Queries) ListTripParticipantsByTripID(ctx context.Context, dollar_1 pgtype.UUID) ([]ListTripParticipantsByTripIDRow, error) {
+	rows, err := q.db.Query(ctx, listTripParticipantsByTripID, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListTripParticipantsByTripIDRow
+	for rows.Next() {
+		var i ListTripParticipantsByTripIDRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.DisplayName,
+			&i.Role,
+			&i.JoinedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTripsByParticipantUser = `-- name: ListTripsByParticipantUser :many
 SELECT
   t.id::text AS id,
