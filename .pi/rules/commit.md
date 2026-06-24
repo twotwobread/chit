@@ -19,6 +19,8 @@ Make review and rollback easy with small logical commits.
 
 ## Good commit units
 
+- Draft or update one feature spec/plan.
+- Implement one vertical feature slice from an approved spec.
 - Add or update one task rule.
 - Add one workflow skill.
 - Move one helper script family.

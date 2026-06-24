@@ -58,7 +58,7 @@ i-um/
 
 ## Task rules
 
-- Feature spec/plan drafting: use `/skill:i-um-feature-spec-plan`; do not draft or substantially revise `docs/features/*` without Ouroboros clarification unless the user explicitly waives it.
+- Feature spec/plan drafting: use `/skill:i-um-feature-spec-plan`; create/select the feature worktree first so spec and implementation stay one PR by default; do not draft or substantially revise `docs/features/*` without Ouroboros clarification unless the user explicitly waives it.
 - Feature implementation: use `/skill:i-um-feature-start` or read `.pi/rules/feature-implement.md`.
 - PR creation/merge from an existing worktree: use `/skill:i-um-pr-lifecycle` or read `.pi/rules/pr-lifecycle.md`.
 - API/DB changes: read `.pi/rules/api-db.md`.

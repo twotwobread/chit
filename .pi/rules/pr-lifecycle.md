@@ -21,11 +21,12 @@ If PR metadata is missing, read only the top section of the feature spec with `o
 2. Run `git status --short`.
 3. Read `.pi/rules/commit.md` and confirm the commit stack is reviewable.
 4. Confirm commits/diff are ready: `git log`, `git diff --stat`, or PR branch comparison.
-5. Check existing PR state before creating a new one.
-6. Use `.github/pull_request_template.md` for PR descriptions.
-7. Use title prefixes: `Feature-0000:`, `Fix:`, or `Docs:`.
-8. Check CI/status before merge.
-9. Merge only when requested and checks are acceptable.
+5. Treat feature specs/plans plus implementation as one feature PR when they share the same feature branch; do not split them into separate PRs by default.
+6. Check existing PR state before creating a new one.
+7. Use `.github/pull_request_template.md` for PR descriptions.
+8. Use title prefixes: `Feature-0000:`, `Fix:`, or `Docs:`.
+9. Check CI/status before merge.
+10. Merge only when requested and checks are acceptable.
 
 ## Output discipline
 
