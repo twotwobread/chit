@@ -34,6 +34,7 @@ crash.*.log
 
 # Logs
 *.log
+.pi/harness-audit/
 npm-debug.log*
 pnpm-debug.log*
 yarn-debug.log*
