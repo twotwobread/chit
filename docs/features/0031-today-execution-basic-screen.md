@@ -189,7 +189,7 @@ Interaction:
 
 ### Design Guardrails
 
-- `docs/design/README.md`, `docs/design/mobile-ui-reference.md`, `apps/mobile/lib/design/theme.ts`를 따른다.
+- `.pi/rules/mobile-ui.md`와 `apps/mobile/lib/design/theme.ts`를 따른다.
 - Today 화면은 warm off-white background, white card, theme border/shadow, existing typography token을 사용한다.
 - raw hex color, 임의 spacing/radius, emoji, 임의 unicode icon을 추가하지 않는다.
 - 다음 장소 card는 기존 card/list row 패턴과 `theme.placeType` label을 재사용한다.

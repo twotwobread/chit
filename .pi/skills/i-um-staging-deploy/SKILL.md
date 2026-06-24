@@ -1,6 +1,17 @@
-# Staging API and Internal Build Runbook
+---
+name: i-um-staging-deploy
+description: Deploy, smoke-test, or roll back the i-um staging API and Expo internal builds. Use only when the user asks for Cloud Run staging deploy, EAS internal build, staging smoke verification, DB migration on staging, or rollback.
+---
 
-이 문서는 F-004 staging/internal 배포 기본 구성을 실행하는 절차를 기록한다.
+Use this skill for staging/internal deployment tasks only. Also follow `.pi/rules/deploy.md` for secret/log safety.
+
+Do not use this skill for normal feature implementation, PR creation, or local verification.
+
+# i-um Staging/Internal Deploy
+
+Use this skill only for staging API deploy, DB migration, Expo internal build, rollback, or environment smoke tasks.
+
+Secret values must not be pasted into git, issues, chat, or completion reports.
 
 ## Architecture
 

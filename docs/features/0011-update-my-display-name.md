@@ -125,7 +125,7 @@ API 관점에서는 canonical `PATCH /me`가 현재 사용자의 `displayName`�
 
 ### Design Requirements
 
-- `docs/design/README.md`, `docs/design/mobile-ui-reference.md`, `apps/mobile/lib/design/theme.ts`를 따른다.
+- `.pi/rules/mobile-ui.md`와 `apps/mobile/lib/design/theme.ts`를 따른다.
 - 화면 코드에 raw hex color, 임의 spacing/radius 값을 추가하지 않는다.
 - 기존 account card/button style을 유지하되 중복 UI가 늘어나면 공용 primitive 후보를 검토한다.
 - 제품 UI에 emoji를 사용하지 않는다.

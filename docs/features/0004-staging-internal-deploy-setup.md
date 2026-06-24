@@ -334,8 +334,8 @@ N/A
    - 작업: `eas.json`과 필요한 app config를 추가하고, preview/internal profile이 Cloud Run staging API base URL을 주입하도록 구성한다.
    - Verify: `eas build --profile <profile> --platform <target>` 또는 합의된 build command가 internal build artifact/link를 생성한다.
 
-9. Add deployment runbook
-   - 작업: GCP bootstrap, Terraform apply, Neon secret setup, Cloud Build deploy, migration, EAS build, smoke test, rollback/rebuild 절차를 README 또는 `docs/delivery` 문서에 기록한다.
+9. Add deployment skill
+   - 작업: GCP bootstrap, Terraform apply, Neon secret setup, Cloud Build deploy, migration, EAS build, smoke test, rollback/rebuild 절차를 deploy skill에 기록한다.
    - Verify: 문서의 명령 순서만 따라 staging API와 internal build smoke check를 재현할 수 있다.
 
 10. Run staging/internal verification
@@ -406,7 +406,7 @@ npx eas-cli@latest build --profile <preview-or-internal-profile> --platform <tar
 - `terraform -chdir=infra/terraform/gcp-staging plan`: pass, initially 18 resources to add
 - `terraform -chdir=infra/terraform/gcp-staging apply -auto-approve`: pass after one retry for a transient Cloud Run internal error
 - `gcloud builds submit ... --config=cloudbuild.api.yaml`: pass, initial build `48d7b399-13c1-4e15-ae0c-5f4a9e6cae06`, pushed `asia-northeast3-docker.pkg.dev/i-um-488511/i-um-staging/api:39049d4` and deployed Cloud Run
-- `pnpm db:migrate` with pooled Neon URL: failed with prepared statement conflict; runbook updated to use direct Neon URL for migrations
+- `pnpm db:migrate` with pooled Neon URL: failed with prepared statement conflict; deploy skill updated to use direct Neon URL for migrations
 - `pnpm db:migrate` with direct Neon URL derived from secret by removing `-pooler`: pass, applied `00001_create_app_metadata.sql`
 - `pnpm db:status` with direct Neon URL: pass, migration version 1 applied
 - `curl -i https://i-um-api-staging-uqpinpphlq-du.a.run.app/health`: pass, returned `200` and `{ "status": "ok" }`
@@ -444,7 +444,7 @@ npx eas-cli@latest build --profile <preview-or-internal-profile> --platform <tar
 - [ ] 선택한 target platform에 internal build를 설치한다. Follow-up: #67.
 - [ ] 앱 진단 화면이 Cloud Run staging API를 호출해 success 상태를 표시하는지 확인한다. Follow-up: #67.
 - [ ] staging API를 일시적으로 잘못된 URL로 설정하거나 API 장애를 재현해 error/retry 상태를 확인한다. Follow-up: #67에서 device smoke와 함께 확인한다.
-- [x] README/runbook에 실제 검증 결과와 제한사항을 기록한다.
+- [x] deploy skill과 feature verification record에 실제 검증 결과와 제한사항을 기록한다.
 
 ## Release Notes
 

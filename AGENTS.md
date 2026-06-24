@@ -1,114 +1,70 @@
-# Agent Working Principles
+# Agent Kernel
 
-## 1. Think Before Coding
+Always-loaded rules must stay small. Read task-specific `.pi/rules/*` files only when the current task needs them.
 
-**Don't assume. Don't hide confusion. Surface tradeoffs.**
+## Project map
 
-Before implementing:
-- State your assumptions explicitly. If uncertain, ask.
-- If multiple interpretations exist, present them - don't pick silently.
-- If a simpler approach exists, say so. Push back when warranted.
-- If something is unclear, stop. Name what's confusing. Ask.
-
-## 2. Simplicity First
-
-**Minimum code that solves the problem. Nothing speculative.**
-
-- No features beyond what was asked.
-- No abstractions for single-use code.
-- No "flexibility" or "configurability" that wasn't requested.
-- No error handling for impossible scenarios.
-- If you write 200 lines and it could be 50, rewrite it.
-
-Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
-
-## 3. Surgical Changes
-
-**Touch only what you must. Clean up only your own mess.**
-
-When editing existing code:
-- Don't "improve" adjacent code, comments, or formatting.
-- Don't refactor things that aren't broken.
-- Match existing style, even if you'd do it differently.
-- If you notice unrelated dead code, mention it - don't delete it.
-
-When your changes create orphans:
-- Remove imports/variables/functions that YOUR changes made unused.
-- Don't remove pre-existing dead code unless asked.
-
-The test: Every changed line should trace directly to the user's request.
-
-## 4. Goal-Driven Execution
-
-**Define success criteria. Loop until verified.**
-
-Transform tasks into verifiable goals:
-- "Add validation" → "Write tests for invalid inputs, then make them pass"
-- "Fix the bug" → "Write a test that reproduces it, then make it pass"
-- "Refactor X" → "Ensure tests pass before and after"
-
-For multi-step tasks, state a brief plan:
-```
-1. [Step] → verify: [check]
-2. [Step] → verify: [check]
-3. [Step] → verify: [check]
+```text
+i-um/
+├── apps/
+│   ├── mobile/              # Expo/React Native app
+│   │   ├── app/             # Expo Router screens
+│   │   └── lib/             # mobile API/state/domain/design helpers
+│   └── api/                 # Go API server
+│       ├── internal/server/ # HTTP handlers/router/error mapping
+│       ├── internal/<domain>/ # domain services
+│       ├── internal/storage/ # repositories/sqlc integration
+│       ├── migrations/      # goose DB migrations
+│       └── queries/         # sqlc SQL queries
+├── packages/api-contract/   # OpenAPI contract + generated TS client
+├── docs/
+│   ├── features/            # feature specs
+│   └── decisions/           # decision history; not default implementation context
+└── .pi/
+    ├── rules/               # small task-specific agent rules
+    ├── skills/              # progressive workflow skills
+    └── bin/                 # agent workflow helper scripts
 ```
 
-Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+## Context discipline
 
-## 5. Feature Delivery Workflow
+- Do not read broad docs by default.
+- Prefer the target file, target feature spec, relevant code, and one small rule file over umbrella documents.
+- If a matching skill exists, load that skill before reading additional docs.
+- If scope is unclear, stop and ask instead of reading unrelated docs to infer intent.
+- Read `docs/decisions/` only when changing or revisiting product/technical/domain/API/DB/ops direction.
+- For long commands, redirect full logs to a file and show only summaries or failure tails.
 
-**Build vertical slices. Keep the project deployable.**
+## Working principles
 
-For feature work:
-- Follow `docs/delivery/feature_delivery_workflow.md`.
-- Follow `docs/delivery/testing_guidelines.md` for TDD and regression test requirements.
-- Use `docs/delivery/definition_of_done.md` as the completion checklist.
-- Create or update a feature spec + plan under `docs/features/` before implementation.
-- Use `docs/features/_template.md` for new feature documents.
-- Manage feature work through GitHub Issues; link the feature spec from the issue.
-- Use Ouroboros to clarify ambiguous feature requirements before implementation.
-- If a feature appears complex or long-running, pause before implementation and ask whether to execute implementation through Ouroboros. Only use Ouroboros execution after explicit user approval; otherwise implement directly from the feature spec with Pi.
-- Do not start implementation while required product/API/DB/UI decisions remain unresolved.
-- Do not treat manual verification as a substitute for regression tests. Changed behavior must have code-based tests or an explicit Regression Gap with risk/follow-up.
+- State assumptions when they affect implementation.
+- Keep changes minimal and directly tied to the user request.
+- Do not implement future options or adjacent improvements.
+- Do not overwrite unrelated user changes.
+- Match existing style unless the task explicitly changes it.
 
-Worktree rule:
-- Create new worktrees through `scripts/worktree-create`; do not call `git worktree add` directly for feature/doc PR work.
-- `scripts/worktree-create` must clean stale merged/closed PR/MR worktrees before creating the new one.
-- Never remove a worktree with uncommitted changes, an open PR/MR, or unknown PR/MR status.
-- Create one `git worktree` per PR/MR.
-- All feature worktrees must live under the repository root `.worktrees/` directory.
-- Use `.worktrees/<feature-id>-<short-name>` as the local worktree path, e.g. `.worktrees/F001-monorepo-walking-skeleton`.
-- Do not create sibling-directory worktrees such as `../i-um-F001-*`.
-- Check `docs/delivery/feature_delivery_workflow.md` before creating a feature worktree.
+## Source of truth
 
-Vertical slice rule:
-- A feature is not done until App UI, API contract, API server, DB changes, tests, and deployability are handled as needed.
-- Avoid API-only or UI-only completion unless the user explicitly requested such a narrow task.
-- API changes must start from OpenAPI before server/mobile implementation.
-- Mobile UI should use the generated API client rather than hand-written duplicate types.
-- Spec changes discovered during implementation must be reflected in the feature document.
+- Feature behavior: target `docs/features/<id>.md` or user request.
+- API contract: `packages/api-contract/openapi.yaml`.
+- DB schema changes: `apps/api/migrations/` and generated `apps/api/schema.sql`.
+- SQL queries: `apps/api/queries/` and generated `apps/api/internal/db/`.
+- Mobile design tokens: `apps/mobile/lib/design/theme.ts`.
+- Shared mobile primitives: `apps/mobile/lib/design/components.tsx`.
+- Decision records are history, not current implementation truth.
 
-PR/MR rule:
-- When creating a PR/MR, use `.github/pull_request_template.md` for the description.
-- Use title prefixes from `docs/delivery/feature_delivery_workflow.md`: `Feature-0000: <title>`, `Fix: <title>`, or `Docs: <title>`.
+## Task rules
 
-Completion report:
-- Summarize what changed.
-- List regression test commands and results.
-- Mention manual smoke/staging/internal build verification separately when applicable.
-- Call out regression gaps, follow-up issues, or unresolved risks.
+- Feature implementation: use `/skill:i-um-feature-start` or read `.pi/rules/feature-implement.md`.
+- PR creation/merge from an existing worktree: use `/skill:i-um-pr-lifecycle` or read `.pi/rules/pr-lifecycle.md`.
+- API/DB changes: read `.pi/rules/api-db.md`.
+- Mobile UI changes: read `.pi/rules/mobile-ui.md`.
+- Testing changes or verification planning: read `.pi/rules/testing.md`.
+- Worktree creation: read `.pi/rules/worktree.md`.
+- Before committing or creating a PR: read `.pi/rules/commit.md`.
+- Docs/rules cleanup: read `.pi/rules/docs-cleanup.md`.
+- Staging/internal deploy: use `/skill:i-um-staging-deploy` or read `.pi/rules/deploy.md`.
 
-## 6. Design Guardrails
+## Completion
 
-**Keep UI consistent with the i-um design baseline.**
-
-For UI/design work:
-- Use `docs/design/README.md` as the canonical brand and UI direction.
-- Use `apps/mobile/lib/design/theme.ts` for mobile color, spacing, radius, shadow, typography, and domain color tokens.
-- Do not add raw hex colors or arbitrary spacing/radius values in screen code. If a value is needed, add or reuse a named token first.
-- External provider brand colors must also be represented as tokens before use.
-- When a UI pattern is needed in more than one place, extract/reuse a shared primitive first; do not duplicate button/list/card/etc. styles across screens.
-- Money UI must preserve semantic meaning: credit/받을 돈 = green `+`, debit/보낼 돈 = red `−`, with tabular numerals where supported.
-- Do not use emoji or arbitrary unicode as product icons. When iconography is introduced, keep one consistent line-icon source.
-- Reference screen patterns from `docs/design/mobile-ui-reference.md` instead of re-inventing visuals during feature work.
+Report what changed, what was verified, manual smoke/deploy status when relevant, and remaining gaps or risks.

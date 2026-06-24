@@ -167,7 +167,7 @@ id DESC
 
 ### Design Guardrails
 
-- `docs/design/README.md`, `docs/design/mobile-ui-reference.md`, `apps/mobile/lib/design/theme.ts`를 따른다.
+- `.pi/rules/mobile-ui.md`와 `apps/mobile/lib/design/theme.ts`를 따른다.
 - 기존 마이페이지 card/list-row 패턴, theme token, typography convention을 재사용한다.
 - shortcut card의 차별점은 top placement와 current-trip copy다.
 - raw hex color, 임의 spacing/radius, 이모지, 임의 unicode icon을 추가하지 않는다.

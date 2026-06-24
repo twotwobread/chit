@@ -128,7 +128,7 @@ F-020은 생성된 여행이 사용자에게 다시 보이는 최소 연결 slic
 
 ### Design Guardrails
 
-- `docs/design/README.md`, `docs/design/mobile-ui-reference.md`, `apps/mobile/lib/design/theme.ts`를 따른다.
+- `.pi/rules/mobile-ui.md`와 `apps/mobile/lib/design/theme.ts`를 따른다.
 - 화면 코드는 theme token의 color, spacing, radius, shadow, typography를 사용한다.
 - raw hex color, 임의 spacing/radius 값을 화면 코드에 추가하지 않는다.
 - 제품 UI에 emoji를 사용하지 않는다.
@@ -333,7 +333,7 @@ F-020에서는 새 index를 기본적으로 추가하지 않는다. 구현 중 q
 ## Implementation Plan
 
 1. Spec approval and worktree 준비
-   - 작업: 이 문서의 open questions가 없는지 확인하고 승인 후 `scripts/worktree-create F020 created-trip-in-mypage`로 구현 worktree를 만든다.
+   - 작업: 이 문서의 open questions가 없는지 확인하고 승인 후 `.pi/bin/worktree-create F020 created-trip-in-mypage`로 구현 worktree를 만든다.
    - Verify: worktree가 `.worktrees/F020-created-trip-in-mypage`에 생성되고 branch가 feature 규칙을 따른다.
 
 2. OpenAPI 계약 작성

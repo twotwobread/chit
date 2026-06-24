@@ -111,7 +111,7 @@ F-014는 실제 여행 목록 조회와 표시를 검증하는 최소 vertical s
 
 ### Layout
 
-- 디자인 기준은 `docs/design/README.md`, `docs/design/mobile-ui-reference.md`, `apps/mobile/lib/design/theme.ts`를 따른다.
+- 디자인 기준은 `.pi/rules/mobile-ui.md`와 `apps/mobile/lib/design/theme.ts`를 따른다.
 - 기존 F-013 마이페이지 card 패턴을 유지한다.
 - 화면 코드에 raw hex color, 임의 spacing/radius 값을 추가하지 않는다.
 - 제품 UI에 emoji를 사용하지 않는다.
@@ -345,7 +345,7 @@ If an implementation branch does not include the F-019 migration/indexes, F-014 
 ## Implementation Plan
 
 1. Spec approval 및 worktree 준비
-   - 작업: 이 문서의 scope/out of scope를 검토하고 승인 후 `scripts/worktree-create F014 my-trip-list`로 구현 worktree를 만든다.
+   - 작업: 이 문서의 scope/out of scope를 검토하고 승인 후 `.pi/bin/worktree-create F014 my-trip-list`로 구현 worktree를 만든다.
    - Verify: worktree가 `.worktrees/F014-my-trip-list`에 생성되고 branch가 feature 규칙을 따른다.
 
 2. OpenAPI 계약 작성

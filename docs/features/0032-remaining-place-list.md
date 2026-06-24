@@ -155,7 +155,7 @@ Future #95 compatibility:
 
 ### Design Guardrails
 
-- `docs/design/README.md`, `docs/design/mobile-ui-reference.md`, `apps/mobile/lib/design/theme.ts`를 따른다.
+- `.pi/rules/mobile-ui.md`와 `apps/mobile/lib/design/theme.ts`를 따른다.
 - Today 화면의 warm off-white background, white card, theme border/shadow, existing typography token을 사용한다.
 - raw hex color, 임의 spacing/radius, emoji, 임의 unicode icon을 추가하지 않는다.
 - 남은 장소 row는 기존 Day itinerary/Today card row 패턴과 `theme.placeType` label을 재사용한다.

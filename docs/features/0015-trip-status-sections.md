@@ -164,7 +164,7 @@ F-015의 여행 상태는 모바일에서 기존 date-only field로 계산한다
 
 ### Design Guardrails
 
-- `docs/design/README.md`, `docs/design/mobile-ui-reference.md`, `apps/mobile/lib/design/theme.ts`를 따른다.
+- `.pi/rules/mobile-ui.md`와 `apps/mobile/lib/design/theme.ts`를 따른다.
 - 기존 마이페이지 card/list row 패턴을 유지하고, status section header만 최소로 추가한다.
 - 화면 코드에 raw hex color, 임의 spacing/radius 값을 추가하지 않는다.
 - 제품 UI에 emoji를 사용하지 않는다.
@@ -299,7 +299,7 @@ F-015 reads existing trip list data only.
 ## Implementation Plan
 
 1. Spec approval 및 worktree 준비
-   - 작업: 이 문서의 scope/out of scope를 검토하고 승인 후 `scripts/worktree-create F015 trip-status-sections`로 구현 worktree를 만든다.
+   - 작업: 이 문서의 scope/out of scope를 검토하고 승인 후 `.pi/bin/worktree-create F015 trip-status-sections`로 구현 worktree를 만든다.
    - Verify: worktree가 `.worktrees/F015-trip-status-sections`에 생성되고 branch가 feature 규칙을 따른다.
 
 2. 현재 마이페이지 baseline 확인
