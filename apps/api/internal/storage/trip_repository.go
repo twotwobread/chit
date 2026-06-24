@@ -166,6 +166,63 @@ func (s *Store) DeleteTripByID(ctx context.Context, tripID string) (bool, error)
 	return true, nil
 }
 
+func (s *Store) CreateOrReturnTripInvite(ctx context.Context, record trip.CreateTripInviteRecord) (trip.CreateTripInviteResult, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return trip.CreateTripInviteResult{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	qtx := s.queries.WithTx(tx)
+	if _, err := qtx.LockTripForInvite(ctx, mustUUID(record.TripID)); err == pgx.ErrNoRows {
+		return trip.CreateTripInviteResult{}, trip.ErrNotFound
+	} else if err != nil {
+		return trip.CreateTripInviteResult{}, err
+	}
+
+	current, err := qtx.GetCurrentTripInviteForUpdate(ctx, mustUUID(record.TripID))
+	if err != nil && err != pgx.ErrNoRows {
+		return trip.CreateTripInviteResult{}, err
+	}
+	if err == nil {
+		invite := tripInviteFromRow(current.ID, current.TripID, current.Token, current.ExpiresAt, current.CreatedAt, current.CreatedBy)
+		if invite.ExpiresAt.After(record.Now) {
+			if err := tx.Commit(ctx); err != nil {
+				return trip.CreateTripInviteResult{}, err
+			}
+			return trip.CreateTripInviteResult{Invite: invite, Created: false}, nil
+		}
+		if err := qtx.DeactivateTripInvite(ctx, db.DeactivateTripInviteParams{
+			InviteID:      mustUUID(current.ID),
+			DeactivatedAt: timestamptzValue(record.Now),
+		}); err != nil {
+			return trip.CreateTripInviteResult{}, err
+		}
+	}
+
+	created, err := qtx.CreateTripInvite(ctx, db.CreateTripInviteParams{
+		TripID:    mustUUID(record.TripID),
+		Token:     record.Token,
+		CreatedBy: mustUUID(record.CreatedBy),
+		ExpiresAt: timestamptzValue(record.ExpiresAt),
+		CreatedAt: timestamptzValue(record.Now),
+	})
+	if isUniqueConstraintViolation(err, "trip_invites_token_unique") || isUniqueConstraintViolation(err, "trip_invites_one_current_per_trip") {
+		return trip.CreateTripInviteResult{}, trip.ErrConflict
+	}
+	if err != nil {
+		return trip.CreateTripInviteResult{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return trip.CreateTripInviteResult{}, err
+	}
+
+	return trip.CreateTripInviteResult{
+		Invite:  tripInviteFromRow(created.ID, created.TripID, created.Token, created.ExpiresAt, created.CreatedAt, created.CreatedBy),
+		Created: true,
+	}, nil
+}
+
 func (s *Store) CountTripParticipants(ctx context.Context, tripID string) (int, error) {
 	count, err := s.queries.CountTripParticipantsByTripID(ctx, mustUUID(tripID))
 	if err != nil {
@@ -746,6 +803,17 @@ func dateTextValue(value string) pgtype.Date {
 		return pgtype.Date{}
 	}
 	return pgtype.Date{Time: parsed, Valid: true}
+}
+
+func tripInviteFromRow(id string, tripID string, token string, expiresAt pgtype.Timestamptz, createdAt pgtype.Timestamptz, createdBy string) trip.TripInvite {
+	return trip.TripInvite{
+		ID:        id,
+		TripID:    tripID,
+		Token:     token,
+		ExpiresAt: expiresAt.Time,
+		CreatedAt: createdAt.Time,
+		CreatedBy: createdBy,
+	}
 }
 
 func isUniqueConstraintViolation(err error, constraintName string) bool {

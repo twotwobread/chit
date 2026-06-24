@@ -1147,6 +1147,109 @@ func TestDeleteDayItineraryItemRemovesSelectedItemAndCleansOrphanPlace(t *testin
 	}
 }
 
+func TestCreateOrReturnTripInviteReusesCurrentAndReplacesExpired(t *testing.T) {
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("DATABASE_URL is required for storage integration test")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	store, err := Open(ctx, databaseURL)
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer store.Close()
+
+	var hasTripInvites bool
+	if err := store.pool.QueryRow(ctx, `SELECT to_regclass('public.trip_invites') IS NOT NULL`).Scan(&hasTripInvites); err != nil {
+		t.Fatalf("check trip_invites table: %v", err)
+	}
+	if !hasTripInvites {
+		t.Skip("trip_invites migration is required for invite storage integration test")
+	}
+
+	var userID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO users (display_name)
+		VALUES ('초대 링크 저장소 테스트')
+		RETURNING id::text
+	`).Scan(&userID); err != nil {
+		t.Fatalf("insert user: %v", err)
+	}
+	defer func() { _, _ = store.pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1::uuid`, userID) }()
+
+	var tripID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO trips (name, start_date, end_date, default_currency, created_by)
+		VALUES ('초대 링크 저장소 테스트 여행', '2026-07-10', '2026-07-13', 'KRW', $1::uuid)
+		RETURNING id::text
+	`, userID).Scan(&tripID); err != nil {
+		t.Fatalf("insert trip: %v", err)
+	}
+	defer func() { _, _ = store.pool.Exec(context.Background(), `DELETE FROM trips WHERE id = $1::uuid`, tripID) }()
+
+	tokenSuffix := fmt.Sprintf("%d", time.Now().UnixNano())
+	firstToken := "first-token-" + tokenSuffix + "-abcdefghijklmnopqrstuvwxyz"
+	secondToken := "second-token-" + tokenSuffix + "-abcdefghijklmnopqrstuvwxyz"
+	replacementToken := "replacement-token-" + tokenSuffix + "-abcdefghijklmnopqrstuvwxyz"
+	now := time.Date(2026, 6, 23, 15, 0, 0, 0, time.UTC)
+	created, err := store.CreateOrReturnTripInvite(ctx, trip.CreateTripInviteRecord{
+		TripID:    tripID,
+		Token:     firstToken,
+		ExpiresAt: now.Add(7 * 24 * time.Hour),
+		CreatedBy: userID,
+		Now:       now,
+	})
+	if err != nil {
+		t.Fatalf("create invite: %v", err)
+	}
+	if !created.Created || created.Invite.Token != firstToken {
+		t.Fatalf("expected first invite creation, got %#v", created)
+	}
+
+	reused, err := store.CreateOrReturnTripInvite(ctx, trip.CreateTripInviteRecord{
+		TripID:    tripID,
+		Token:     secondToken,
+		ExpiresAt: now.Add(8 * 24 * time.Hour),
+		CreatedBy: userID,
+		Now:       now.Add(time.Hour),
+	})
+	if err != nil {
+		t.Fatalf("reuse invite: %v", err)
+	}
+	if reused.Created || reused.Invite.Token != firstToken {
+		t.Fatalf("expected active invite reuse, got %#v", reused)
+	}
+
+	if _, err := store.pool.Exec(ctx, `UPDATE trip_invites SET expires_at = $2, deactivated_at = NULL WHERE id = $1::uuid`, created.Invite.ID, now.Add(30*time.Minute)); err != nil {
+		t.Fatalf("expire invite: %v", err)
+	}
+	replacedNow := now.Add(time.Hour)
+	replaced, err := store.CreateOrReturnTripInvite(ctx, trip.CreateTripInviteRecord{
+		TripID:    tripID,
+		Token:     replacementToken,
+		ExpiresAt: replacedNow.Add(7 * 24 * time.Hour),
+		CreatedBy: userID,
+		Now:       replacedNow,
+	})
+	if err != nil {
+		t.Fatalf("replace expired invite: %v", err)
+	}
+	if !replaced.Created || replaced.Invite.Token != replacementToken || replaced.Invite.ID == created.Invite.ID {
+		t.Fatalf("expected replacement invite, got %#v", replaced)
+	}
+
+	var oldDeactivatedAt *time.Time
+	if err := store.pool.QueryRow(ctx, `SELECT deactivated_at FROM trip_invites WHERE id = $1::uuid`, created.Invite.ID).Scan(&oldDeactivatedAt); err != nil {
+		t.Fatalf("select old invite: %v", err)
+	}
+	if oldDeactivatedAt == nil {
+		t.Fatal("expected expired current invite to be deactivated before replacement")
+	}
+}
+
 func TestDeleteTripByIDCascadesParticipants(t *testing.T) {
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {

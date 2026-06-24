@@ -2,19 +2,49 @@ package trip
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"strings"
 	"time"
 )
 
-const dateLayout = "2006-01-02"
+const (
+	dateLayout             = "2006-01-02"
+	defaultInviteBaseURL   = "http://localhost:8080"
+	inviteExpiryDuration   = 7 * 24 * time.Hour
+	inviteTokenRandomBytes = 32
+)
 
 type Service struct {
-	repo  Repository
-	today func() time.Time
+	repo                Repository
+	today               func() time.Time
+	now                 func() time.Time
+	generateInviteToken func() (string, error)
+	inviteBaseURL       string
 }
 
-func NewService(repo Repository) *Service {
-	return &Service{repo: repo, today: time.Now}
+type ServiceOption func(*Service)
+
+func WithInviteBaseURL(value string) ServiceOption {
+	return func(s *Service) {
+		if strings.TrimSpace(value) != "" {
+			s.inviteBaseURL = strings.TrimRight(strings.TrimSpace(value), "/")
+		}
+	}
+}
+
+func NewService(repo Repository, options ...ServiceOption) *Service {
+	service := &Service{
+		repo:                repo,
+		today:               time.Now,
+		now:                 time.Now,
+		generateInviteToken: generateInviteToken,
+		inviteBaseURL:       defaultInviteBaseURL,
+	}
+	for _, option := range options {
+		option(service)
+	}
+	return service
 }
 
 func (s *Service) Create(ctx context.Context, userID string, input CreateInput) (CreateResult, error) {
@@ -153,6 +183,71 @@ func (s *Service) Delete(ctx context.Context, userID string, tripID string) erro
 	}
 
 	return nil
+}
+
+func (s *Service) CreateInvite(ctx context.Context, userID string, tripID string) (CreateTripInviteResult, error) {
+	if strings.TrimSpace(userID) == "" {
+		return CreateTripInviteResult{}, ErrUnauthorized
+	}
+
+	tripID = strings.TrimSpace(tripID)
+	if !isUUID(tripID) {
+		return CreateTripInviteResult{}, ErrValidation
+	}
+
+	_, ok, err := s.repo.GetTripByID(ctx, tripID)
+	if err != nil {
+		return CreateTripInviteResult{}, err
+	}
+	if !ok {
+		return CreateTripInviteResult{}, ErrNotFound
+	}
+
+	isOwner, err := s.repo.IsTripOwner(ctx, tripID, userID)
+	if err != nil {
+		return CreateTripInviteResult{}, err
+	}
+	if !isOwner {
+		return CreateTripInviteResult{}, ErrForbidden
+	}
+
+	now := s.now().UTC()
+	for attempt := 0; attempt < 3; attempt++ {
+		token, err := s.generateInviteToken()
+		if err != nil {
+			return CreateTripInviteResult{}, err
+		}
+
+		result, err := s.repo.CreateOrReturnTripInvite(ctx, CreateTripInviteRecord{
+			TripID:    tripID,
+			CreatedBy: userID,
+			Token:     token,
+			Now:       now,
+			ExpiresAt: now.Add(inviteExpiryDuration),
+		})
+		if err == ErrConflict {
+			continue
+		}
+		if err != nil {
+			return CreateTripInviteResult{}, err
+		}
+		result.Invite.InviteURL = s.inviteURL(result.Invite.Token)
+		return result, nil
+	}
+
+	return CreateTripInviteResult{}, ErrConflict
+}
+
+func (s *Service) inviteURL(token string) string {
+	return strings.TrimRight(s.inviteBaseURL, "/") + "/invite/" + token
+}
+
+func generateInviteToken() (string, error) {
+	buffer := make([]byte, inviteTokenRandomBytes)
+	if _, err := rand.Read(buffer); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(buffer), nil
 }
 
 func (s *Service) GetDetail(ctx context.Context, userID string, tripID string) (GetDetailResult, error) {

@@ -181,6 +181,69 @@ func (q *Queries) CreateTrip(ctx context.Context, arg CreateTripParams) (CreateT
 	return i, err
 }
 
+const createTripInvite = `-- name: CreateTripInvite :one
+INSERT INTO trip_invites (
+  trip_id,
+  token,
+  created_by,
+  expires_at,
+  created_at
+) VALUES (
+  $1::uuid,
+  $2,
+  $3::uuid,
+  $4,
+  $5
+)
+RETURNING
+  id::text,
+  trip_id::text,
+  token,
+  expires_at,
+  deactivated_at,
+  created_at,
+  created_by::text
+`
+
+type CreateTripInviteParams struct {
+	TripID    pgtype.UUID
+	Token     string
+	CreatedBy pgtype.UUID
+	ExpiresAt pgtype.Timestamptz
+	CreatedAt pgtype.Timestamptz
+}
+
+type CreateTripInviteRow struct {
+	ID            string
+	TripID        string
+	Token         string
+	ExpiresAt     pgtype.Timestamptz
+	DeactivatedAt pgtype.Timestamptz
+	CreatedAt     pgtype.Timestamptz
+	CreatedBy     string
+}
+
+func (q *Queries) CreateTripInvite(ctx context.Context, arg CreateTripInviteParams) (CreateTripInviteRow, error) {
+	row := q.db.QueryRow(ctx, createTripInvite,
+		arg.TripID,
+		arg.Token,
+		arg.CreatedBy,
+		arg.ExpiresAt,
+		arg.CreatedAt,
+	)
+	var i CreateTripInviteRow
+	err := row.Scan(
+		&i.ID,
+		&i.TripID,
+		&i.Token,
+		&i.ExpiresAt,
+		&i.DeactivatedAt,
+		&i.CreatedAt,
+		&i.CreatedBy,
+	)
+	return i, err
+}
+
 const createTripParticipant = `-- name: CreateTripParticipant :one
 INSERT INTO trip_participants (
   trip_id,
@@ -287,6 +350,22 @@ func (q *Queries) CreateTripPlace(ctx context.Context, arg CreateTripPlaceParams
 	return i, err
 }
 
+const deactivateTripInvite = `-- name: DeactivateTripInvite :exec
+UPDATE trip_invites
+SET deactivated_at = $1
+WHERE id = $2::uuid
+`
+
+type DeactivateTripInviteParams struct {
+	DeactivatedAt pgtype.Timestamptz
+	InviteID      pgtype.UUID
+}
+
+func (q *Queries) DeactivateTripInvite(ctx context.Context, arg DeactivateTripInviteParams) error {
+	_, err := q.db.Exec(ctx, deactivateTripInvite, arg.DeactivatedAt, arg.InviteID)
+	return err
+}
+
 const deleteDayLodgingPlace = `-- name: DeleteDayLodgingPlace :exec
 DELETE FROM day_lodging_places
 WHERE trip_id = $1::uuid
@@ -351,6 +430,46 @@ type DeleteTripPlaceByIDParams struct {
 func (q *Queries) DeleteTripPlaceByID(ctx context.Context, arg DeleteTripPlaceByIDParams) error {
 	_, err := q.db.Exec(ctx, deleteTripPlaceByID, arg.TripID, arg.TripPlaceID)
 	return err
+}
+
+const getCurrentTripInviteForUpdate = `-- name: GetCurrentTripInviteForUpdate :one
+SELECT
+  id::text,
+  trip_id::text,
+  token,
+  expires_at,
+  deactivated_at,
+  created_at,
+  created_by::text
+FROM trip_invites
+WHERE trip_id = $1::uuid
+  AND deactivated_at IS NULL
+FOR UPDATE
+`
+
+type GetCurrentTripInviteForUpdateRow struct {
+	ID            string
+	TripID        string
+	Token         string
+	ExpiresAt     pgtype.Timestamptz
+	DeactivatedAt pgtype.Timestamptz
+	CreatedAt     pgtype.Timestamptz
+	CreatedBy     string
+}
+
+func (q *Queries) GetCurrentTripInviteForUpdate(ctx context.Context, tripID pgtype.UUID) (GetCurrentTripInviteForUpdateRow, error) {
+	row := q.db.QueryRow(ctx, getCurrentTripInviteForUpdate, tripID)
+	var i GetCurrentTripInviteForUpdateRow
+	err := row.Scan(
+		&i.ID,
+		&i.TripID,
+		&i.Token,
+		&i.ExpiresAt,
+		&i.DeactivatedAt,
+		&i.CreatedAt,
+		&i.CreatedBy,
+	)
+	return i, err
 }
 
 const getDayLodgingPlaceByTripAndDate = `-- name: GetDayLodgingPlaceByTripAndDate :one
@@ -813,6 +932,20 @@ func (q *Queries) ListTripsByParticipantUser(ctx context.Context, dollar_1 pgtyp
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockTripForInvite = `-- name: LockTripForInvite :one
+SELECT id::text
+FROM trips
+WHERE id = $1::uuid
+FOR UPDATE
+`
+
+func (q *Queries) LockTripForInvite(ctx context.Context, tripID pgtype.UUID) (string, error) {
+	row := q.db.QueryRow(ctx, lockTripForInvite, tripID)
+	var id string
+	err := row.Scan(&id)
+	return id, err
 }
 
 const setDayLodgingPlace = `-- name: SetDayLodgingPlace :one

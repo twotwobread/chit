@@ -139,6 +139,54 @@ DELETE FROM trips
 WHERE id = $1::uuid
 RETURNING id::text;
 
+-- name: LockTripForInvite :one
+SELECT id::text
+FROM trips
+WHERE id = sqlc.arg(trip_id)::uuid
+FOR UPDATE;
+
+-- name: GetCurrentTripInviteForUpdate :one
+SELECT
+  id::text,
+  trip_id::text,
+  token,
+  expires_at,
+  deactivated_at,
+  created_at,
+  created_by::text
+FROM trip_invites
+WHERE trip_id = sqlc.arg(trip_id)::uuid
+  AND deactivated_at IS NULL
+FOR UPDATE;
+
+-- name: DeactivateTripInvite :exec
+UPDATE trip_invites
+SET deactivated_at = sqlc.arg(deactivated_at)
+WHERE id = sqlc.arg(invite_id)::uuid;
+
+-- name: CreateTripInvite :one
+INSERT INTO trip_invites (
+  trip_id,
+  token,
+  created_by,
+  expires_at,
+  created_at
+) VALUES (
+  sqlc.arg(trip_id)::uuid,
+  sqlc.arg(token),
+  sqlc.arg(created_by)::uuid,
+  sqlc.arg(expires_at),
+  sqlc.arg(created_at)
+)
+RETURNING
+  id::text,
+  trip_id::text,
+  token,
+  expires_at,
+  deactivated_at,
+  created_at,
+  created_by::text;
+
 -- name: ListItineraryItemsByTripAndDate :many
 SELECT
   ii.id::text AS id,

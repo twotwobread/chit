@@ -302,6 +302,70 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /trips/{tripId}/invites:
+    post:
+      operationId: createTripInvite
+      summary: Create or retrieve the current trip invite link
+      description: Creates a new invite link for a trip owner, or returns the existing unexpired current invite link.
+      tags:
+        - Trips
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '201':
+          description: New invite link created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateTripInviteResponse'
+        '200':
+          description: Existing active invite link returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateTripInviteResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Invite token conflict after retry.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /trips/{tripId}/participants:
     get:
       operationId: listTripParticipants
@@ -1618,6 +1682,51 @@ components:
           $ref: '#/components/schemas/Trip'
         ownerParticipant:
           $ref: '#/components/schemas/TripParticipant'
+    TripInvite:
+      type: object
+      required:
+        - id
+        - tripId
+        - token
+        - inviteUrl
+        - expiresAt
+        - createdAt
+        - createdBy
+      properties:
+        id:
+          type: string
+        tripId:
+          type: string
+        token:
+          type: string
+          minLength: 32
+          maxLength: 128
+          pattern: '^[A-Za-z0-9_-]+$'
+          description: Opaque base64url token. UI copies or shares inviteUrl instead of raw token.
+        inviteUrl:
+          type: string
+          format: uri
+        expiresAt:
+          type: string
+          format: date-time
+          description: UTC ISO 8601 timestamp.
+        createdAt:
+          type: string
+          format: date-time
+          description: UTC ISO 8601 timestamp.
+        createdBy:
+          type: string
+    CreateTripInviteResponse:
+      type: object
+      required:
+        - invite
+        - created
+      properties:
+        invite:
+          $ref: '#/components/schemas/TripInvite'
+        created:
+          type: boolean
+          description: true when this request created a new invite, false when an existing unexpired current invite was reused.
     TripParticipantSummary:
       type: object
       required:

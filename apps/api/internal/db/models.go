@@ -75,6 +75,16 @@ type Trip struct {
 	UpdatedAt       pgtype.Timestamptz
 }
 
+type TripInvite struct {
+	ID            pgtype.UUID
+	TripID        pgtype.UUID
+	Token         string
+	CreatedBy     pgtype.UUID
+	ExpiresAt     pgtype.Timestamptz
+	DeactivatedAt pgtype.Timestamptz
+	CreatedAt     pgtype.Timestamptz
+}
+
 type TripParticipant struct {
 	ID          pgtype.UUID
 	TripID      pgtype.UUID

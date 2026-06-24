@@ -678,6 +678,132 @@ func TestGetTripDetailForbidden(t *testing.T) {
 	}
 }
 
+func TestCreateTripInviteHandlerCreatesAndReusesCurrentInvite(t *testing.T) {
+	backend := newFakeAuthBackend()
+	accessToken := loginTestUser(t, backend)
+	tripID := createTestTrip(t, backend, accessToken)
+
+	firstRecorder := httptest.NewRecorder()
+	firstRequest := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/invites", nil)
+	firstRequest.Header.Set("Authorization", "Bearer "+accessToken)
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true, InviteBaseURL: "https://invite.i-um.test"}).ServeHTTP(firstRecorder, firstRequest)
+	if firstRecorder.Code != http.StatusCreated {
+		t.Fatalf("expected create invite status %d, got %d with body %s", http.StatusCreated, firstRecorder.Code, firstRecorder.Body.String())
+	}
+
+	var firstBody struct {
+		Created bool `json:"created"`
+		Invite  struct {
+			Token     string `json:"token"`
+			InviteURL string `json:"inviteUrl"`
+			TripID    string `json:"tripId"`
+		} `json:"invite"`
+	}
+	if err := json.NewDecoder(firstRecorder.Body).Decode(&firstBody); err != nil {
+		t.Fatalf("decode create invite response: %v", err)
+	}
+	if !firstBody.Created || firstBody.Invite.Token == "" || firstBody.Invite.TripID != tripID {
+		t.Fatalf("unexpected create invite body: %#v", firstBody)
+	}
+	if firstBody.Invite.InviteURL != "https://invite.i-um.test/invite/"+firstBody.Invite.Token {
+		t.Fatalf("unexpected invite url %q", firstBody.Invite.InviteURL)
+	}
+
+	secondRecorder := httptest.NewRecorder()
+	secondRequest := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/invites", nil)
+	secondRequest.Header.Set("Authorization", "Bearer "+accessToken)
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true, InviteBaseURL: "https://invite.i-um.test"}).ServeHTTP(secondRecorder, secondRequest)
+	if secondRecorder.Code != http.StatusOK {
+		t.Fatalf("expected reuse invite status %d, got %d with body %s", http.StatusOK, secondRecorder.Code, secondRecorder.Body.String())
+	}
+	var secondBody struct {
+		Created bool `json:"created"`
+		Invite  struct {
+			Token string `json:"token"`
+		} `json:"invite"`
+	}
+	if err := json.NewDecoder(secondRecorder.Body).Decode(&secondBody); err != nil {
+		t.Fatalf("decode reuse invite response: %v", err)
+	}
+	if secondBody.Created || secondBody.Invite.Token != firstBody.Invite.Token {
+		t.Fatalf("expected active invite reuse, got %#v", secondBody)
+	}
+}
+
+func TestCreateTripInviteValidationAuthAndAuthorization(t *testing.T) {
+	backend := newFakeAuthBackend()
+	ownerToken := loginTestUser(t, backend)
+	memberToken := loginTestUserWithSubject(t, backend, "apple-2", "지영")
+	tripID := createTestTrip(t, backend, ownerToken)
+	backend.participants[tripID] = append(backend.participants[tripID], tripdomain.Participant{
+		ID:          testUUID(2002),
+		TripID:      tripID,
+		UserID:      "user-2",
+		Role:        tripdomain.RoleMember,
+		DisplayName: "지영",
+		JoinedAt:    time.Date(2026, 6, 22, 9, 0, 0, 0, time.UTC),
+	})
+
+	cases := []struct {
+		name       string
+		path       string
+		token      string
+		expectCode int
+		expectErr  string
+	}{
+		{name: "auth required", path: "/trips/" + tripID + "/invites", expectCode: http.StatusUnauthorized, expectErr: "UNAUTHORIZED"},
+		{name: "invalid trip id", path: "/trips/not-a-uuid/invites", token: ownerToken, expectCode: http.StatusBadRequest, expectErr: "VALIDATION_ERROR"},
+		{name: "missing trip", path: "/trips/00000000-0000-0000-0000-000000000404/invites", token: ownerToken, expectCode: http.StatusNotFound, expectErr: "NOT_FOUND"},
+		{name: "member forbidden", path: "/trips/" + tripID + "/invites", token: memberToken, expectCode: http.StatusForbidden, expectErr: "FORBIDDEN"},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			request := httptest.NewRequest(http.MethodPost, tt.path, nil)
+			if tt.token != "" {
+				request.Header.Set("Authorization", "Bearer "+tt.token)
+			}
+			NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+			if recorder.Code != tt.expectCode {
+				t.Fatalf("expected status %d, got %d with body %s", tt.expectCode, recorder.Code, recorder.Body.String())
+			}
+			var body struct {
+				Error struct {
+					Code string `json:"code"`
+				} `json:"error"`
+			}
+			if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+				t.Fatalf("decode error response: %v", err)
+			}
+			if body.Error.Code != tt.expectErr {
+				t.Fatalf("expected error %q, got %q", tt.expectErr, body.Error.Code)
+			}
+		})
+	}
+}
+
+func TestInviteFallbackPageLinksToStore(t *testing.T) {
+	backend := newFakeAuthBackend()
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/invite/test-token", nil)
+	request.Header.Set("User-Agent", "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)")
+
+	NewRouterWithConfig(backend, Config{AppStoreURL: "https://apps.apple.com/app/test", PlayStoreURL: "https://play.google.com/store/apps/details?id=test"}).ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, recorder.Code)
+	}
+	body := recorder.Body.String()
+	if !strings.Contains(body, "https://apps.apple.com/app/test") || strings.Contains(body, "https://play.google.com/store/apps/details?id=test") {
+		t.Fatalf("expected iOS store-only fallback body, got %s", body)
+	}
+	if strings.Contains(body, "accept") {
+		t.Fatalf("fallback page must not attempt web invite acceptance, got %s", body)
+	}
+}
+
 func TestListTripParticipantsHandler(t *testing.T) {
 	backend := newFakeAuthBackend()
 	ownerToken := loginTestUser(t, backend)
@@ -2175,12 +2301,14 @@ type fakeAuthBackend struct {
 	tripPlaces        map[string]tripdomain.TripPlaceSummary
 	dayLodgingPlaces  map[string]tripdomain.TripPlaceSummary
 	dayItineraryItems map[string][]tripdomain.DayItineraryItem
+	tripInvites       map[string]tripdomain.TripInvite
 	reorderErr        error
 	listedTrips       []tripdomain.ListItem
 	listTripsUserID   string
 	nextUser          int
 	nextSession       int
 	nextTrip          int
+	nextInvite        int
 	nextPlace         int
 	nextItineraryItem int
 }
@@ -2304,6 +2432,7 @@ func newFakeAuthBackend() *fakeAuthBackend {
 		tripPlaces:        map[string]tripdomain.TripPlaceSummary{},
 		dayLodgingPlaces:  map[string]tripdomain.TripPlaceSummary{},
 		dayItineraryItems: map[string][]tripdomain.DayItineraryItem{},
+		tripInvites:       map[string]tripdomain.TripInvite{},
 	}
 }
 
@@ -2458,7 +2587,28 @@ func (b *fakeAuthBackend) DeleteTripByID(_ context.Context, tripID string) (bool
 	}
 	delete(b.trips, tripID)
 	delete(b.participants, tripID)
+	delete(b.tripInvites, tripID)
 	return true, nil
+}
+
+func (b *fakeAuthBackend) CreateOrReturnTripInvite(_ context.Context, record tripdomain.CreateTripInviteRecord) (tripdomain.CreateTripInviteResult, error) {
+	if _, ok := b.trips[record.TripID]; !ok {
+		return tripdomain.CreateTripInviteResult{}, tripdomain.ErrNotFound
+	}
+	if current, ok := b.tripInvites[record.TripID]; ok && current.ExpiresAt.After(record.Now) {
+		return tripdomain.CreateTripInviteResult{Invite: current, Created: false}, nil
+	}
+	b.nextInvite++
+	invite := tripdomain.TripInvite{
+		ID:        testUUID(4000 + b.nextInvite),
+		TripID:    record.TripID,
+		Token:     record.Token,
+		ExpiresAt: record.ExpiresAt,
+		CreatedAt: record.Now,
+		CreatedBy: record.CreatedBy,
+	}
+	b.tripInvites[record.TripID] = invite
+	return tripdomain.CreateTripInviteResult{Invite: invite, Created: true}, nil
 }
 
 func (b *fakeAuthBackend) CountTripParticipants(_ context.Context, tripID string) (int, error) {

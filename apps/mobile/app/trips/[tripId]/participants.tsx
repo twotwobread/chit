@@ -1,12 +1,24 @@
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import KakaoShareLink from 'react-native-kakao-share-link';
 
 import { ApiError } from '@i-um/api-contract';
 
-import { MobileAuthError } from '../../../lib/auth/client';
-import { Card, PrimaryButton, theme } from '../../../lib/design';
-import { listTripParticipants } from '../../../lib/trips/client';
+import { getMeWithRefresh, MobileAuthError } from '../../../lib/auth/client';
+import { Card, PrimaryButton, SecondaryButton, theme } from '../../../lib/design';
+import { createTripInvite, getTripDetail, listTripParticipants } from '../../../lib/trips/client';
+import {
+  buildFallbackShareContent,
+  buildInviteCopyText,
+  buildKakaoInviteTemplate,
+  canCreateTripInvite,
+  getInviteActionErrorMessage,
+  getKakaoShareFailureMessage,
+  toInviteViewModel,
+  type InviteViewModel,
+} from '../../../lib/trips/invite';
 import {
   buildParticipantListViewModel,
   participantListFailureStatus,
@@ -16,16 +28,27 @@ import {
 
 type ParticipantsState =
   | { status: 'loading' }
-  | { status: 'success'; viewModel: ParticipantListViewModel }
+  | { status: 'success'; viewModel: ParticipantListViewModel; canInvite: boolean; tripName: string }
   | { status: 'auth' }
   | { status: 'invalid' }
   | { status: 'notFound' }
   | { status: 'error' };
 
+type InviteState =
+  | { status: 'idle' }
+  | { status: 'creating' }
+  | { status: 'ready'; viewModel: InviteViewModel }
+  | { status: 'error'; message: string };
+
+type ShareBusyState = 'none' | 'copy' | 'kakao' | 'fallback';
+
 export default function TripParticipantsScreen() {
   const { tripId: tripIdParam } = useLocalSearchParams<{ tripId?: string | string[] }>();
   const tripId = Array.isArray(tripIdParam) ? tripIdParam[0] : tripIdParam;
   const [state, setState] = useState<ParticipantsState>({ status: 'loading' });
+  const [inviteState, setInviteState] = useState<InviteState>({ status: 'idle' });
+  const [shareBusy, setShareBusy] = useState<ShareBusyState>('none');
+  const [shareMessage, setShareMessage] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!tripId) {
@@ -34,9 +57,20 @@ export default function TripParticipantsScreen() {
     }
 
     setState({ status: 'loading' });
+    setInviteState({ status: 'idle' });
+    setShareMessage(null);
     try {
-      const response = await listTripParticipants(tripId);
-      setState({ status: 'success', viewModel: buildParticipantListViewModel(response.participants) });
+      const [currentUser, participantsResponse, tripDetail] = await Promise.all([
+        getMeWithRefresh(),
+        listTripParticipants(tripId),
+        getTripDetail(tripId),
+      ]);
+      setState({
+        status: 'success',
+        viewModel: buildParticipantListViewModel(participantsResponse.participants),
+        canInvite: canCreateTripInvite(tripDetail, currentUser.user.id),
+        tripName: tripDetail.trip.name,
+      });
     } catch (error) {
       if (error instanceof MobileAuthError) {
         setFailureState(setState, participantListFailureStatus({ mobileAuthCode: error.code }));
@@ -49,6 +83,66 @@ export default function TripParticipantsScreen() {
       setState({ status: 'error' });
     }
   }, [tripId]);
+
+  const createInvite = useCallback(async () => {
+    if (!tripId) {
+      return;
+    }
+
+    setInviteState({ status: 'creating' });
+    setShareMessage(null);
+    try {
+      const response = await createTripInvite(tripId);
+      setInviteState({ status: 'ready', viewModel: toInviteViewModel(response) });
+    } catch (error) {
+      if (error instanceof ApiError) {
+        const code = getApiErrorCode(error);
+        setInviteState({ status: 'error', message: getInviteActionErrorMessage(code ? { code } : error) });
+        return;
+      }
+      if (error instanceof MobileAuthError) {
+        setInviteState({ status: 'error', message: getInviteActionErrorMessage({ code: error.code }) });
+        return;
+      }
+      setInviteState({ status: 'error', message: getInviteActionErrorMessage(error) });
+    }
+  }, [tripId]);
+
+  const copyInvite = useCallback(async (inviteUrl: string) => {
+    setShareBusy('copy');
+    setShareMessage(null);
+    try {
+      await Clipboard.setStringAsync(buildInviteCopyText(inviteUrl));
+      setShareMessage('링크를 복사했어요.');
+    } catch {
+      setShareMessage('링크를 복사할 수 없어요. 잠시 후 다시 시도해주세요.');
+    } finally {
+      setShareBusy('none');
+    }
+  }, []);
+
+  const shareToKakao = useCallback(async (tripName: string, inviteUrl: string) => {
+    setShareBusy('kakao');
+    setShareMessage(null);
+    try {
+      await KakaoShareLink.sendText(buildKakaoInviteTemplate({ tripName, inviteUrl }));
+    } catch {
+      setShareMessage(getKakaoShareFailureMessage());
+    } finally {
+      setShareBusy('none');
+    }
+  }, []);
+
+  const shareFallback = useCallback(async (tripName: string, inviteUrl: string) => {
+    setShareBusy('fallback');
+    try {
+      await Share.share(buildFallbackShareContent({ tripName, inviteUrl }));
+    } catch {
+      setShareMessage('공유를 열 수 없어요. 링크 복사를 사용해보세요.');
+    } finally {
+      setShareBusy('none');
+    }
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -69,7 +163,22 @@ export default function TripParticipantsScreen() {
         </Card>
       ) : null}
 
-      {state.status === 'success' ? <ParticipantListCard viewModel={state.viewModel} /> : null}
+      {state.status === 'success' ? (
+        <>
+          {state.canInvite ? (
+            <InviteCard
+              inviteState={inviteState}
+              onCopy={(inviteUrl) => void copyInvite(inviteUrl)}
+              onCreate={() => void createInvite()}
+              onFallbackShare={(inviteUrl) => void shareFallback(state.tripName, inviteUrl)}
+              onKakaoShare={(inviteUrl) => void shareToKakao(state.tripName, inviteUrl)}
+              shareBusy={shareBusy}
+              shareMessage={shareMessage}
+            />
+          ) : null}
+          <ParticipantListCard viewModel={state.viewModel} />
+        </>
+      ) : null}
 
       {state.status === 'auth' ? (
         <Card>
@@ -108,6 +217,80 @@ function setFailureState(setState: (state: ParticipantsState) => void, status: P
   setState({ status });
 }
 
+function getApiErrorCode(error: ApiError): string | null {
+  const body = error.body as { error?: { code?: string } } | undefined;
+  return body?.error?.code ?? null;
+}
+
+function InviteCard({
+  inviteState,
+  onCopy,
+  onCreate,
+  onFallbackShare,
+  onKakaoShare,
+  shareBusy,
+  shareMessage,
+}: {
+  inviteState: InviteState;
+  onCopy: (inviteUrl: string) => void;
+  onCreate: () => void;
+  onFallbackShare: (inviteUrl: string) => void;
+  onKakaoShare: (inviteUrl: string) => void;
+  shareBusy: ShareBusyState;
+  shareMessage: string | null;
+}) {
+  const viewModel = inviteState.status === 'ready' ? inviteState.viewModel : null;
+  const busy = inviteState.status === 'creating' || shareBusy !== 'none';
+  const shareMessageStyle = shareMessage === '링크를 복사했어요.' ? styles.successMessage : styles.errorMessage;
+
+  return (
+    <Card>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>초대 링크</Text>
+        <Text style={styles.message}>동행자에게 보낼 링크를 만들 수 있어요.</Text>
+      </View>
+
+      {inviteState.status === 'error' ? <Text style={styles.errorMessage}>{inviteState.message}</Text> : null}
+
+      {viewModel ? (
+        <View style={styles.inviteResult}>
+          <Text style={styles.successMessage}>{viewModel.statusLabel}</Text>
+          <Text style={styles.inviteUrl} numberOfLines={2} selectable>
+            {viewModel.inviteUrl}
+          </Text>
+          <Text style={styles.message}>{viewModel.expiryLabel}</Text>
+        </View>
+      ) : null}
+
+      {shareMessage ? <Text style={shareMessageStyle}>{shareMessage}</Text> : null}
+
+      {viewModel ? (
+        <View style={styles.buttonStack}>
+          <PrimaryButton
+            disabled={busy}
+            label="카카오톡으로 공유"
+            loading={shareBusy === 'kakao'}
+            loadingLabel="카카오톡 여는 중..."
+            onPress={() => onKakaoShare(viewModel.inviteUrl)}
+          />
+          <SecondaryButton disabled={busy} label="링크 복사" onPress={() => onCopy(viewModel.inviteUrl)} />
+          {shareMessage === getKakaoShareFailureMessage() ? (
+            <SecondaryButton disabled={busy} label="다른 앱으로 공유" onPress={() => onFallbackShare(viewModel.inviteUrl)} />
+          ) : null}
+        </View>
+      ) : (
+        <PrimaryButton
+          disabled={busy}
+          label="초대 링크 만들기"
+          loading={inviteState.status === 'creating'}
+          loadingLabel="초대 링크 만드는 중..."
+          onPress={onCreate}
+        />
+      )}
+    </Card>
+  );
+}
+
 function ParticipantListCard({ viewModel }: { viewModel: ParticipantListViewModel }) {
   return (
     <Card>
@@ -133,6 +316,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     alignItems: 'center',
     flexGrow: 1,
+    gap: theme.space[5],
     justifyContent: 'center',
     padding: theme.space[7],
   },
@@ -147,6 +331,33 @@ const styles = StyleSheet.create({
     fontSize: theme.font.size.titleLg,
     fontWeight: theme.font.weight.bold,
     textAlign: 'center',
+  },
+  sectionHeader: {
+    gap: theme.space[2],
+  },
+  sectionTitle: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.headline,
+    fontWeight: theme.font.weight.bold,
+    textAlign: 'center',
+  },
+  inviteResult: {
+    backgroundColor: theme.color.surfaceSunken,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    gap: theme.space[2],
+    padding: theme.space[4],
+  },
+  inviteUrl: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.caption,
+    textAlign: 'center',
+  },
+  buttonStack: {
+    gap: theme.space[3],
   },
   participantList: {
     gap: theme.space[3],
@@ -200,6 +411,18 @@ const styles = StyleSheet.create({
   message: {
     color: theme.color.textBody,
     fontFamily: theme.font.family.regular,
+    textAlign: 'center',
+  },
+  successMessage: {
+    color: theme.color.success,
+    fontFamily: theme.font.family.semibold,
+    fontWeight: theme.font.weight.semibold,
+    textAlign: 'center',
+  },
+  errorMessage: {
+    color: theme.color.danger,
+    fontFamily: theme.font.family.semibold,
+    fontWeight: theme.font.weight.semibold,
     textAlign: 'center',
   },
   errorTitle: {
