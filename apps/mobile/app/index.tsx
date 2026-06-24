@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 
 import { ApiError, type GetDayItineraryResponse, type GetTripDetailResponse, type TripListItem } from '@i-um/api-contract';
@@ -20,6 +20,7 @@ import {
   type TodayAction,
   type TodayExecutionViewModel,
 } from '../lib/trips/today-execution';
+import { openTodayNavigationDestination } from '../lib/trips/today-navigation';
 
 type TodayExecutionContext = {
   selectedTrip: TripListItem;
@@ -37,6 +38,7 @@ export default function HomeScreen() {
   const [todayState, setTodayState] = useState<TodayState>({ status: 'loading' });
   const [arrivingItemId, setArrivingItemId] = useState<string | null>(null);
   const [arrivalError, setArrivalError] = useState<string | null>(null);
+  const [navigationError, setNavigationError] = useState<string | null>(null);
 
   const handleAuthError = useCallback(async (error: unknown) => {
     if (
@@ -58,6 +60,7 @@ export default function HomeScreen() {
   const load = useCallback(async () => {
     setArrivingItemId(null);
     setArrivalError(null);
+    setNavigationError(null);
     setTodayState({ status: 'loading' });
 
     try {
@@ -159,6 +162,7 @@ export default function HomeScreen() {
 
       setArrivingItemId(action.itemId);
       setArrivalError(null);
+      setNavigationError(null);
       try {
         const response = await markDayItineraryItemArrived(action.tripId, action.date, action.itemId);
         const itinerary: GetDayItineraryResponse = { day: response.day, items: response.items };
@@ -193,6 +197,20 @@ export default function HomeScreen() {
     [arrivingItemId, handleAuthError, todayState],
   );
 
+  const handleNavigate = useCallback(async (action: Extract<TodayAction, { kind: 'navigate' }>) => {
+    setArrivalError(null);
+    setNavigationError(null);
+    const result = await openTodayNavigationDestination({
+      destination: action.destination,
+      launcher: Linking,
+      platform: Platform.OS,
+    });
+
+    if (result.status === 'failed') {
+      setNavigationError(result.message);
+    }
+  }, []);
+
   const runAction = useCallback(
     (action: TodayAction) => {
       if (action.kind === 'retry') {
@@ -203,9 +221,13 @@ export default function HomeScreen() {
         void handleArrive(action);
         return;
       }
+      if (action.kind === 'navigate') {
+        void handleNavigate(action);
+        return;
+      }
       router.push(action.route);
     },
-    [handleArrive, load],
+    [handleArrive, handleNavigate, load],
   );
 
   return (
@@ -233,7 +255,13 @@ export default function HomeScreen() {
         ) : null}
 
         {todayState.status === 'ready' ? (
-          <TodayContent arrivalError={arrivalError} arrivingItemId={arrivingItemId} onAction={runAction} viewModel={todayState.viewModel} />
+          <TodayContent
+            arrivalError={arrivalError}
+            arrivingItemId={arrivingItemId}
+            navigationError={navigationError}
+            onAction={runAction}
+            viewModel={todayState.viewModel}
+          />
         ) : null}
       </ScrollView>
 
@@ -245,11 +273,13 @@ export default function HomeScreen() {
 function TodayContent({
   arrivalError,
   arrivingItemId,
+  navigationError,
   onAction,
   viewModel,
 }: {
   arrivalError: string | null;
   arrivingItemId: string | null;
+  navigationError: string | null;
   onAction: (action: TodayAction) => void;
   viewModel: TodayExecutionViewModel;
 }) {
@@ -319,7 +349,9 @@ function TodayContent({
           <Text style={styles.placeType}>{viewModel.nextPlace.placeTypeLabel}</Text>
         </View>
         <Text style={styles.address}>{viewModel.nextPlace.address}</Text>
+        <ActionButton action={viewModel.nextPlace.navigationAction} onAction={onAction} />
       </View>
+      {navigationError ? <Text style={styles.arrivalError}>{navigationError}</Text> : null}
       <RemainingPlacesSection section={viewModel.remainingSection} />
       {arrivalError ? <Text style={styles.arrivalError}>{arrivalError}</Text> : null}
       <ActionButton
