@@ -28,6 +28,13 @@ If PR metadata is missing, read only the top section of the feature spec with `o
 9. Check CI/status before merge.
 10. Merge only when requested and checks are acceptable.
 
+## Branch cleanup
+
+- Prefer repository-level GitHub auto-delete for merged PR head branches: `gh repo edit --delete-branch-on-merge`.
+- Do not require `gh pr merge --delete-branch` as the default merge path; remote cleanup should not depend on the merge command used.
+- Use `git config --global fetch.prune true` in agent/developer environments so deleted remote refs are pruned on fetch.
+- After merge, clean up local worktrees and local branches when they are no longer needed.
+
 ## Output discipline
 
 - Redirect long test/verify logs to a file.
