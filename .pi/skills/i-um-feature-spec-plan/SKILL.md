@@ -57,6 +57,22 @@ Before writing or substantially revising a feature spec/plan:
 
 Do not read delivery/DoD/testing umbrella docs. Read `docs/decisions/` only when the feature changes or revisits product/technical/domain/API/DB/ops direction.
 
+## Spec/Plan Context Budget
+
+For feature spec/plan tasks, keep context narrow by default.
+
+- Treat the work as spec/plan until the user approves implementation; avoid implementation-depth reads unless needed to prevent stale assumptions.
+- Source priority: user request, target issue/spec, template/rules, narrow current source files, directly linked docs, then neighboring docs only if still needed.
+- Use `rg`/`find` before `read`; for large files, read only endpoint/schema/action/state/copy blocks first with `offset`/`limit`.
+- Neighboring specs/docs: default maximum one, and only when directly referenced or needed to resolve a concrete blocker.
+- Do not read generated/vendor/build artifacts during spec planning unless source is unavailable or generated drift is the target.
+- Do not read `package.json`/lockfiles only to discover common verification commands; use `.pi/rules/*` verification sections first.
+- UI files: read route/action/state/copy blocks first; skip broad `StyleSheet` tails unless concrete UI implementation detail is the blocker.
+- API/DB: prefer OpenAPI endpoint/schema blocks, current migrations/schema, and relevant SQL queries; do not read generated Go/TS code just to restate the contract.
+- Stop after a fact is verified in the source of truth; do not duplicate-check the same fact across docs, code, and generated files.
+- If ambiguity is product/domain-level, ask the user or Ouroboros instead of inferring from unrelated code.
+- If expanding beyond this budget, have a named blocker/reason.
+
 ## Procedure
 
 1. Resolve target
