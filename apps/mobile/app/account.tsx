@@ -16,7 +16,7 @@ import { AccountDeletionSection } from '../lib/auth/account-deletion-section';
 import { createAccountDeletionFlow, type AccountDeletionFlow, type AccountDeletionStatus } from '../lib/auth/account-deletion-flow';
 import { normalizeDisplayNameInput } from '../lib/auth/display-name';
 import { createLogoutFlow, type LogoutFlow } from '../lib/auth/logout-flow';
-import { getOAuthCredential } from '../lib/auth/oauth';
+import { getOAuthCredential, getVisibleOAuthProviderConfigs } from '../lib/auth/oauth';
 import { theme } from '../lib/design';
 
 type AccountState =
@@ -24,7 +24,7 @@ type AccountState =
   | { status: 'ready'; me: AuthMeResponse; message?: string }
   | { status: 'error'; message: string };
 
-const providers: AuthProvider[] = ['apple', 'kakao'];
+const providers = getVisibleOAuthProviderConfigs();
 
 export default function AccountScreen() {
   const [state, setState] = useState<AccountState>({ status: 'loading' });
@@ -263,18 +263,16 @@ export default function AccountScreen() {
           <Text style={styles.message}>연결된 로그인: {state.me.linkedProviders.join(', ')}</Text>
 
           {providers.map((provider) => {
-            const linked = state.me.linkedProviders.includes(provider);
+            const linked = state.me.linkedProviders.includes(provider.id);
             return (
               <Pressable
                 accessibilityRole="button"
                 disabled={linked}
-                key={provider}
-                onPress={() => void linkProvider(provider)}
+                key={provider.id}
+                onPress={() => void linkProvider(provider.id)}
                 style={[styles.secondaryButton, linked ? styles.disabledButton : null]}
               >
-                <Text style={styles.secondaryButtonText}>
-                  {provider === 'apple' ? 'Apple' : 'Kakao'} {linked ? '연결됨' : '연결'}
-                </Text>
+                <Text style={styles.secondaryButtonText}>{provider.linkLabel(provider, linked)}</Text>
               </Pressable>
             );
           })}

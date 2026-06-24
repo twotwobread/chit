@@ -1,59 +1,127 @@
-import * as AppleAuthentication from 'expo-apple-authentication';
-
 import type { AuthProvider, OAuthCredential } from '@i-um/api-contract';
 
+import { theme } from '../design/theme';
+import { getAppleCredential } from './apple';
 import { getKakaoNativeCredential } from './kakao';
 
-export async function getOAuthCredential(provider: AuthProvider): Promise<OAuthCredential> {
-  if (process.env.EXPO_PUBLIC_AUTH_DEV_MODE === 'true') {
-    return getDevCredential(provider);
-  }
+export type OAuthProviderAvailability =
+  | { status: 'available' }
+  | { status: 'unavailable'; reason: string };
 
-  if (provider === 'apple') {
-    return getAppleCredential();
+export type OAuthProviderButtonStyle = {
+  backgroundColor: string;
+  textColor: string;
+};
+
+export type OAuthProviderConfig = {
+  id: AuthProvider;
+  label: string;
+  order: number;
+  availability: () => OAuthProviderAvailability;
+  buttonStyle: OAuthProviderButtonStyle;
+  loginLabel: (provider: OAuthProviderConfig) => string;
+  linkLabel: (provider: OAuthProviderConfig, linked: boolean) => string;
+  getCredential: () => Promise<OAuthCredential>;
+};
+
+type OAuthEnv = {
+  EXPO_PUBLIC_AUTH_DEV_MODE?: string;
+};
+
+type GetOAuthCredentialOptions = {
+  providers?: OAuthProviderConfig[];
+  env?: OAuthEnv;
+};
+
+export class UnsupportedOAuthProviderError extends Error {
+  readonly provider: string;
+
+  constructor(provider: string) {
+    super(`Unsupported OAuth provider: ${provider}`);
+    this.name = 'UnsupportedOAuthProviderError';
+    this.provider = provider;
   }
-  return getKakaoCredential();
 }
 
-async function getAppleCredential(): Promise<OAuthCredential> {
-  const available = await AppleAuthentication.isAvailableAsync();
-  if (!available) {
-    throw new Error('Apple login is not available on this device.');
+export class OAuthProviderUnavailableError extends Error {
+  readonly provider: AuthProvider;
+
+  constructor(provider: AuthProvider, reason: string) {
+    super(reason);
+    this.name = 'OAuthProviderUnavailableError';
+    this.provider = provider;
+  }
+}
+
+export const defaultOAuthProviderConfigs: OAuthProviderConfig[] = [
+  {
+    id: 'apple',
+    label: 'Apple',
+    order: 10,
+    availability: () => ({ status: 'available' }),
+    buttonStyle: {
+      backgroundColor: theme.providerColor.appleBg,
+      textColor: theme.providerColor.appleText,
+    },
+    loginLabel: ({ label }) => `${label}로 계속하기`,
+    linkLabel: ({ label }, linked) => `${label} ${linked ? '연결됨' : '연결'}`,
+    getCredential: getAppleCredential,
+  },
+  {
+    id: 'kakao',
+    label: 'Kakao',
+    order: 20,
+    availability: () => ({ status: 'available' }),
+    buttonStyle: {
+      backgroundColor: theme.providerColor.kakaoBg,
+      textColor: theme.providerColor.kakaoText,
+    },
+    loginLabel: ({ label }) => `${label}로 계속하기`,
+    linkLabel: ({ label }, linked) => `${label} ${linked ? '연결됨' : '연결'}`,
+    getCredential: getKakaoNativeCredential,
+  },
+];
+
+export function getOAuthProviderConfigs(
+  providers: OAuthProviderConfig[] = defaultOAuthProviderConfigs,
+): OAuthProviderConfig[] {
+  return [...providers].sort((left, right) => left.order - right.order);
+}
+
+export function getVisibleOAuthProviderConfigs(
+  providers: OAuthProviderConfig[] = defaultOAuthProviderConfigs,
+): OAuthProviderConfig[] {
+  return getOAuthProviderConfigs(providers).filter((provider) => provider.availability().status === 'available');
+}
+
+export async function getOAuthCredential(
+  provider: AuthProvider | string,
+  options: GetOAuthCredentialOptions = {},
+): Promise<OAuthCredential> {
+  const providers = options.providers ?? defaultOAuthProviderConfigs;
+  const config = providers.find((candidate) => candidate.id === provider);
+  if (!config) {
+    throw new UnsupportedOAuthProviderError(provider);
   }
 
-  const credential = await AppleAuthentication.signInAsync({
-    requestedScopes: [
-      AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
-      AppleAuthentication.AppleAuthenticationScope.EMAIL,
-    ],
-  });
-
-  if (!credential.identityToken) {
-    throw new Error('Apple identity token is missing.');
+  const availability = config.availability();
+  if (availability.status !== 'available') {
+    throw new OAuthProviderUnavailableError(config.id, availability.reason);
   }
 
-  const displayName = [credential.fullName?.givenName, credential.fullName?.familyName]
-    .filter(Boolean)
-    .join(' ');
+  const env = options.env ?? process.env;
+  if (env.EXPO_PUBLIC_AUTH_DEV_MODE === 'true') {
+    return getDevCredential(config);
+  }
 
+  return config.getCredential();
+}
+
+function getDevCredential(provider: OAuthProviderConfig): OAuthCredential {
   return {
-    identityToken: credential.identityToken,
-    authorizationCode: credential.authorizationCode ?? undefined,
-    email: credential.email ?? undefined,
-    emailVerified: credential.email ? true : undefined,
-    displayName: displayName || undefined,
-  };
-}
-
-async function getKakaoCredential(): Promise<OAuthCredential> {
-  return getKakaoNativeCredential();
-}
-
-function getDevCredential(provider: AuthProvider): OAuthCredential {
-  return {
-    devSubject: `${provider}-dev-user`,
+    devSubject: `${provider.id}-dev-user`,
     email: 'dev@example.com',
     emailVerified: true,
-    displayName: provider === 'apple' ? 'Apple Dev User' : 'Kakao Dev User',
+    displayName: `${provider.label} Dev User`,
   };
 }
