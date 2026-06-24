@@ -110,6 +110,12 @@ type ReorderDayItineraryItemsRecord struct {
 	Moves         []ReorderDayItineraryMoveRecord
 }
 
+type MarkDayItineraryItemArrivedRecord struct {
+	TripID        string
+	ScheduledDate string
+	ItemID        string
+}
+
 type SetDayLodgingPlaceRecord struct {
 	TripID        string
 	ScheduledDate string
@@ -218,6 +224,7 @@ type DayItineraryItem struct {
 	ItemOrder int
 	Version   int
 	IsLodging bool
+	ArrivedAt *time.Time
 	Place     TripPlaceSummary
 }
 
@@ -242,6 +249,17 @@ type UpdateDayItineraryItemResult struct {
 
 type ReorderDayItineraryItemsResult struct {
 	Day   TripDay
+	Items []DayItineraryItem
+}
+
+type MarkDayItineraryItemArrivedMutationResult struct {
+	Item  DayItineraryItem
+	Items []DayItineraryItem
+}
+
+type MarkDayItineraryItemArrivedResult struct {
+	Day   TripDay
+	Item  DayItineraryItem
 	Items []DayItineraryItem
 }
 
@@ -285,6 +303,7 @@ type Repository interface {
 	CreateManualDayItineraryItem(ctx context.Context, record CreateManualDayItineraryItemRecord) (DayItineraryItem, error)
 	GetItineraryItemByTripDateAndID(ctx context.Context, tripID string, date string, itemID string) (DayItineraryItem, bool, error)
 	ReorderDayItineraryItems(ctx context.Context, record ReorderDayItineraryItemsRecord) ([]DayItineraryItem, error)
+	MarkDayItineraryItemArrived(ctx context.Context, record MarkDayItineraryItemArrivedRecord) (MarkDayItineraryItemArrivedMutationResult, error)
 	UpdateDayItineraryItemPlace(ctx context.Context, record UpdateDayItineraryItemRecord) (DayItineraryItem, error)
 	DeleteDayItineraryItem(ctx context.Context, tripID string, date string, itemID string) (bool, error)
 }

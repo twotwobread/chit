@@ -203,6 +203,8 @@ type CreateTripResponse struct {
 
 // DayItineraryItem defines model for DayItineraryItem.
 type DayItineraryItem struct {
+	// ArrivedAt Server-generated arrival timestamp for this itinerary item instance. Null means pending.
+	ArrivedAt *time.Time       `json:"arrivedAt"`
 	Id        string           `json:"id"`
 	IsLodging bool             `json:"isLodging"`
 	ItemOrder int              `json:"itemOrder"`
@@ -269,6 +271,15 @@ type ListTripParticipantsResponse struct {
 // ListTripsResponse defines model for ListTripsResponse.
 type ListTripsResponse struct {
 	Trips []TripListItem `json:"trips"`
+}
+
+// MarkDayItineraryItemArrivedResponse defines model for MarkDayItineraryItemArrivedResponse.
+type MarkDayItineraryItemArrivedResponse struct {
+	Day  TripDay          `json:"day"`
+	Item DayItineraryItem `json:"item"`
+
+	// Items Latest server source-of-truth itinerary items for the selected day, ordered by itinerary order/rank.
+	Items []DayItineraryItem `json:"items"`
 }
 
 // MetadataReadinessCheck defines model for MetadataReadinessCheck.
@@ -610,6 +621,9 @@ type ServerInterface interface {
 	// Update a trip day itinerary item place snapshot
 	// (PATCH /trips/{tripId}/days/{date}/itinerary/items/{itemId})
 	UpdateDayItineraryItem(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, itemId string)
+	// Mark a trip day itinerary item arrived
+	// (POST /trips/{tripId}/days/{date}/itinerary/items/{itemId}/arrive)
+	MarkDayItineraryItemArrived(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, itemId string)
 	// Clear a trip day lodging place
 	// (DELETE /trips/{tripId}/days/{date}/lodging-place)
 	ClearDayLodgingPlace(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date)
@@ -754,6 +768,12 @@ func (_ Unimplemented) DeleteDayItineraryItem(w http.ResponseWriter, r *http.Req
 // Update a trip day itinerary item place snapshot
 // (PATCH /trips/{tripId}/days/{date}/itinerary/items/{itemId})
 func (_ Unimplemented) UpdateDayItineraryItem(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, itemId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Mark a trip day itinerary item arrived
+// (POST /trips/{tripId}/days/{date}/itinerary/items/{itemId}/arrive)
+func (_ Unimplemented) MarkDayItineraryItemArrived(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, itemId string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1354,6 +1374,55 @@ func (siw *ServerInterfaceWrapper) UpdateDayItineraryItem(w http.ResponseWriter,
 	handler.ServeHTTP(w, r)
 }
 
+// MarkDayItineraryItemArrived operation middleware
+func (siw *ServerInterfaceWrapper) MarkDayItineraryItemArrived(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "date" -------------
+	var date openapi_types.Date
+
+	err = runtime.BindStyledParameterWithOptions("simple", "date", chi.URLParam(r, "date"), &date, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "date", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "itemId" -------------
+	var itemId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "itemId", chi.URLParam(r, "itemId"), &itemId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "itemId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.MarkDayItineraryItemArrived(w, r, tripId, date, itemId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ClearDayLodgingPlace operation middleware
 func (siw *ServerInterfaceWrapper) ClearDayLodgingPlace(w http.ResponseWriter, r *http.Request) {
 
@@ -1737,6 +1806,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Patch(options.BaseURL+"/trips/{tripId}/days/{date}/itinerary/items/{itemId}", wrapper.UpdateDayItineraryItem)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/trips/{tripId}/days/{date}/itinerary/items/{itemId}/arrive", wrapper.MarkDayItineraryItemArrived)
 	})
 	r.Group(func(r chi.Router) {
 		r.Delete(options.BaseURL+"/trips/{tripId}/days/{date}/lodging-place", wrapper.ClearDayLodgingPlace)

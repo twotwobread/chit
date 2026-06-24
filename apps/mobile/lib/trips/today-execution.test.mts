@@ -69,6 +69,8 @@ function item(overrides: Partial<DayItineraryItem>): DayItineraryItem {
     id: 'item-a',
     itemOrder: 1,
     version: 1,
+    isLodging: false,
+    arrivedAt: null,
     place: {
       id: 'place-a',
       name: '우메다 공중정원',
@@ -224,6 +226,13 @@ test('maps the first ordered itinerary item to the next place and subsequent ite
         },
       ],
     },
+    arrivalAction: {
+      kind: 'arrive',
+      label: '도착했어요',
+      tripId: 'trip-current',
+      date: '2026-07-10',
+      itemId: 'item-next',
+    },
     primaryAction: { kind: 'route', label: '오늘 일정 보기', route: '/trips/trip-current/days/2026-07-10' },
     multipleOngoingTripNotice: null,
   });
@@ -234,6 +243,79 @@ test('maps the first ordered itinerary item to the next place and subsequent ite
   assert.ok(firstRemaining);
   assert.equal('route' in firstRemaining, false);
   assert.equal('action' in firstRemaining, false);
+});
+
+test('selects the first pending itinerary item and excludes arrived items from remaining places', () => {
+  const viewModel = buildTodayExecutionViewModel({
+    selectedTrip: trip({ id: 'trip-current' }),
+    tripDetail: tripDetail(),
+    itinerary: itinerary({
+      items: [
+        item({ id: 'item-arrived-first', itemOrder: 1, arrivedAt: '2026-07-10T00:30:00Z' }),
+        item({ id: 'item-next', itemOrder: 2, place: { id: 'place-next', name: '도톤보리', placeType: 'food', address: 'Dotonbori' } }),
+        item({ id: 'item-third', itemOrder: 3, place: { id: 'place-third', name: '오사카성', placeType: 'sights', address: 'Osakajo' } }),
+        item({ id: 'item-arrived-last', itemOrder: 4, arrivedAt: '2026-07-10T02:30:00Z' }),
+      ],
+    }),
+    today: '2026-07-10',
+    ongoingTripCount: 1,
+  });
+
+  assert.equal(viewModel.status, 'success');
+  if (viewModel.status !== 'success') {
+    return;
+  }
+
+  assert.equal(viewModel.nextPlace.itemId, 'item-next');
+  assert.deepEqual(viewModel.arrivalAction, {
+    kind: 'arrive',
+    label: '도착했어요',
+    tripId: 'trip-current',
+    date: '2026-07-10',
+    itemId: 'item-next',
+  });
+  assert.deepEqual(viewModel.remainingSection, {
+    status: 'list',
+    title: '남은 장소',
+    countLabel: '1곳 남았어요',
+    items: [
+      {
+        itemId: 'item-third',
+        orderLabel: '3',
+        placeName: '오사카성',
+        placeTypeLabel: '관광지',
+        address: 'Osakajo',
+        timeLabel: null,
+      },
+    ],
+  });
+});
+
+test('builds a completed Today state when every itinerary item is arrived', () => {
+  const viewModel = buildTodayExecutionViewModel({
+    selectedTrip: trip({ id: 'trip-current' }),
+    tripDetail: tripDetail(),
+    itinerary: itinerary({
+      items: [
+        item({ id: 'item-first', itemOrder: 1, arrivedAt: '2026-07-10T00:30:00Z' }),
+        item({ id: 'item-second', itemOrder: 2, arrivedAt: '2026-07-10T01:30:00Z' }),
+      ],
+    }),
+    today: '2026-07-10',
+    ongoingTripCount: 1,
+  });
+
+  assert.deepEqual(viewModel, {
+    status: 'completed',
+    tripName: '오사카 3박 4일',
+    dayLabel: 'Day 1',
+    formattedDate: '2026.07.10',
+    title: '오늘 일정을 모두 완료했어요.',
+    helper: '오늘 일정 화면에서 장소를 확인할 수 있어요.',
+    completedCountLabel: '완료한 장소 2곳',
+    primaryAction: { kind: 'route', label: '오늘 일정 보기', route: '/trips/trip-current/days/2026-07-10' },
+    multipleOngoingTripNotice: null,
+  });
 });
 
 test('keeps the remaining section visible with an empty message when only the next place exists', () => {

@@ -626,6 +626,53 @@ func (s *Service) UpdateDayItineraryItem(ctx context.Context, userID string, tri
 	return UpdateDayItineraryItemResult{Item: updatedItem}, nil
 }
 
+func (s *Service) MarkDayItineraryItemArrived(ctx context.Context, userID string, tripID string, date string, itemID string) (MarkDayItineraryItemArrivedResult, error) {
+	if strings.TrimSpace(userID) == "" {
+		return MarkDayItineraryItemArrivedResult{}, ErrUnauthorized
+	}
+
+	tripID = strings.TrimSpace(tripID)
+	date = strings.TrimSpace(date)
+	itemID = strings.TrimSpace(itemID)
+	if !isUUID(tripID) || !isUUID(itemID) {
+		return MarkDayItineraryItemArrivedResult{}, ErrValidation
+	}
+
+	selectedDate, err := parseDate(date)
+	if err != nil {
+		return MarkDayItineraryItemArrivedResult{}, ErrValidation
+	}
+
+	dayOrder, err := s.dayOrder(ctx, userID, tripID, selectedDate)
+	if err != nil {
+		return MarkDayItineraryItemArrivedResult{}, err
+	}
+
+	mutation, err := s.repo.MarkDayItineraryItemArrived(ctx, MarkDayItineraryItemArrivedRecord{
+		TripID:        tripID,
+		ScheduledDate: selectedDate.Format(dateLayout),
+		ItemID:        itemID,
+	})
+	if err != nil {
+		return MarkDayItineraryItemArrivedResult{}, err
+	}
+
+	lodgingPlace, hasLodgingPlace, err := s.repo.GetDayLodgingPlaceByTripAndDate(ctx, tripID, selectedDate.Format(dateLayout))
+	if err != nil {
+		return MarkDayItineraryItemArrivedResult{}, err
+	}
+
+	return MarkDayItineraryItemArrivedResult{
+		Day: TripDay{
+			Date:         selectedDate.Format(dateLayout),
+			DayOrder:     dayOrder,
+			LodgingPlace: optionalTripPlaceSummary(lodgingPlace, hasLodgingPlace),
+		},
+		Item:  mutation.Item,
+		Items: mutation.Items,
+	}, nil
+}
+
 func (s *Service) DeleteDayItineraryItem(ctx context.Context, userID string, tripID string, date string, itemID string) error {
 	if strings.TrimSpace(userID) == "" {
 		return ErrUnauthorized

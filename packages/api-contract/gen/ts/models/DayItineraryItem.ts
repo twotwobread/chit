@@ -8,6 +8,10 @@ export type DayItineraryItem = {
     itemOrder: number;
     version: number;
     isLodging: boolean;
+    /**
+     * Server-generated arrival timestamp for this itinerary item instance. Null means pending.
+     */
+    arrivedAt: string | null;
     place: TripPlaceSummary;
 };
 

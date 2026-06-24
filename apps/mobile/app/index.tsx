@@ -2,13 +2,13 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 
-import { ApiError } from '@i-um/api-contract';
+import { ApiError, type GetDayItineraryResponse, type GetTripDetailResponse, type TripListItem } from '@i-um/api-contract';
 
 import { MobileAuthError } from '../lib/auth/client';
 import { clearStoredSession, readStoredSession } from '../lib/auth/session';
 import { theme } from '../lib/design';
 import { BottomMenu } from '../lib/navigation/BottomMenu';
-import { getTripDayItinerary, getTripDetail, listMyTrips } from '../lib/trips/client';
+import { getTripDayItinerary, getTripDetail, listMyTrips, markDayItineraryItemArrived } from '../lib/trips/client';
 import { localDateString } from '../lib/trips/status';
 import {
   buildTodayExecutionViewModel,
@@ -21,13 +21,22 @@ import {
   type TodayExecutionViewModel,
 } from '../lib/trips/today-execution';
 
+type TodayExecutionContext = {
+  selectedTrip: TripListItem;
+  tripDetail: GetTripDetailResponse;
+  today: string;
+  ongoingTripCount: number;
+};
+
 type TodayState =
   | { status: 'loading' }
   | { status: 'needsLogin'; message?: string }
-  | { status: 'ready'; viewModel: TodayExecutionViewModel };
+  | { status: 'ready'; viewModel: TodayExecutionViewModel; context?: TodayExecutionContext };
 
 export default function HomeScreen() {
   const [todayState, setTodayState] = useState<TodayState>({ status: 'loading' });
+  const [arrivingItemId, setArrivingItemId] = useState<string | null>(null);
+  const [arrivalError, setArrivalError] = useState<string | null>(null);
 
   const handleAuthError = useCallback(async (error: unknown) => {
     if (
@@ -47,6 +56,8 @@ export default function HomeScreen() {
   }, []);
 
   const load = useCallback(async () => {
+    setArrivingItemId(null);
+    setArrivalError(null);
     setTodayState({ status: 'loading' });
 
     try {
@@ -92,14 +103,21 @@ export default function HomeScreen() {
 
       try {
         const itinerary = await getTripDayItinerary(selectedTrip.trip.id, currentDay.date);
+        const context: TodayExecutionContext = {
+          selectedTrip: selectedTrip.trip,
+          tripDetail: detail,
+          today,
+          ongoingTripCount: selectedTrip.ongoingTripCount,
+        };
         setTodayState({
           status: 'ready',
+          context,
           viewModel: buildTodayExecutionViewModel({
-            selectedTrip: selectedTrip.trip,
-            tripDetail: detail,
+            selectedTrip: context.selectedTrip,
+            tripDetail: context.tripDetail,
             itinerary,
-            today,
-            ongoingTripCount: selectedTrip.ongoingTripCount,
+            today: context.today,
+            ongoingTripCount: context.ongoingTripCount,
           }),
         });
       } catch (error) {
@@ -127,15 +145,67 @@ export default function HomeScreen() {
     }, [load]),
   );
 
+  const handleArrive = useCallback(
+    async (action: Extract<TodayAction, { kind: 'arrive' }>) => {
+      if (arrivingItemId) {
+        return;
+      }
+
+      const context = todayState.status === 'ready' ? todayState.context : undefined;
+      if (!context) {
+        setArrivalError('도착 처리할 수 없어요. 다시 시도해주세요.');
+        return;
+      }
+
+      setArrivingItemId(action.itemId);
+      setArrivalError(null);
+      try {
+        const response = await markDayItineraryItemArrived(action.tripId, action.date, action.itemId);
+        const itinerary: GetDayItineraryResponse = { day: response.day, items: response.items };
+        setTodayState({
+          status: 'ready',
+          context,
+          viewModel: buildTodayExecutionViewModel({
+            selectedTrip: context.selectedTrip,
+            tripDetail: context.tripDetail,
+            itinerary,
+            today: context.today,
+            ongoingTripCount: context.ongoingTripCount,
+          }),
+        });
+      } catch (error) {
+        if (await handleAuthError(error)) {
+          return;
+        }
+        if (error instanceof ApiError && error.status === 409) {
+          setArrivalError('일정 순서가 바뀌었어요. 다시 불러와주세요.');
+          return;
+        }
+        if (isUnavailableError(error)) {
+          setTodayState({ status: 'ready', context, viewModel: buildTodayUnavailableViewModel(action.tripId) });
+          return;
+        }
+        setArrivalError('도착 처리할 수 없어요. 다시 시도해주세요.');
+      } finally {
+        setArrivingItemId(null);
+      }
+    },
+    [arrivingItemId, handleAuthError, todayState],
+  );
+
   const runAction = useCallback(
     (action: TodayAction) => {
       if (action.kind === 'retry') {
         void load();
         return;
       }
+      if (action.kind === 'arrive') {
+        void handleArrive(action);
+        return;
+      }
       router.push(action.route);
     },
-    [load],
+    [handleArrive, load],
   );
 
   return (
@@ -162,7 +232,9 @@ export default function HomeScreen() {
           </View>
         ) : null}
 
-        {todayState.status === 'ready' ? <TodayContent onAction={runAction} viewModel={todayState.viewModel} /> : null}
+        {todayState.status === 'ready' ? (
+          <TodayContent arrivalError={arrivalError} arrivingItemId={arrivingItemId} onAction={runAction} viewModel={todayState.viewModel} />
+        ) : null}
       </ScrollView>
 
       {todayState.status === 'ready' ? <BottomMenu selected="home" /> : null}
@@ -170,7 +242,17 @@ export default function HomeScreen() {
   );
 }
 
-function TodayContent({ onAction, viewModel }: { onAction: (action: TodayAction) => void; viewModel: TodayExecutionViewModel }) {
+function TodayContent({
+  arrivalError,
+  arrivingItemId,
+  onAction,
+  viewModel,
+}: {
+  arrivalError: string | null;
+  arrivingItemId: string | null;
+  onAction: (action: TodayAction) => void;
+  viewModel: TodayExecutionViewModel;
+}) {
   if (viewModel.status === 'noOngoingTrip') {
     return (
       <View style={styles.card}>
@@ -211,6 +293,21 @@ function TodayContent({ onAction, viewModel }: { onAction: (action: TodayAction)
     );
   }
 
+  if (viewModel.status === 'completed') {
+    return (
+      <View style={styles.card}>
+        <TodayDayHeader dayLabel={viewModel.dayLabel} formattedDate={viewModel.formattedDate} tripName={viewModel.tripName} />
+        <View style={styles.emptyPanel}>
+          <Text style={styles.emptyTitle}>{viewModel.title}</Text>
+          <Text style={styles.message}>{viewModel.helper}</Text>
+          <Text style={styles.completedCount}>{viewModel.completedCountLabel}</Text>
+        </View>
+        <ActionButton action={viewModel.primaryAction} onAction={onAction} />
+        <MultipleOngoingNotice notice={viewModel.multipleOngoingTripNotice} onAction={onAction} />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.card}>
       <TodayDayHeader dayLabel={viewModel.dayLabel} formattedDate={viewModel.formattedDate} tripName={viewModel.tripName} />
@@ -224,7 +321,14 @@ function TodayContent({ onAction, viewModel }: { onAction: (action: TodayAction)
         <Text style={styles.address}>{viewModel.nextPlace.address}</Text>
       </View>
       <RemainingPlacesSection section={viewModel.remainingSection} />
-      <ActionButton action={viewModel.primaryAction} onAction={onAction} />
+      {arrivalError ? <Text style={styles.arrivalError}>{arrivalError}</Text> : null}
+      <ActionButton
+        action={viewModel.arrivalAction}
+        disabled={arrivingItemId === viewModel.arrivalAction.itemId}
+        label={arrivingItemId === viewModel.arrivalAction.itemId ? '도착 처리 중...' : undefined}
+        onAction={onAction}
+      />
+      <ActionButton action={viewModel.primaryAction} onAction={onAction} variant="secondary" />
       <MultipleOngoingNotice notice={viewModel.multipleOngoingTripNotice} onAction={onAction} />
     </View>
   );
@@ -277,7 +381,7 @@ function MultipleOngoingNotice({
   notice,
   onAction,
 }: {
-  notice: Extract<TodayExecutionViewModel, { status: 'success' | 'emptyItinerary' }>['multipleOngoingTripNotice'];
+  notice: Extract<TodayExecutionViewModel, { status: 'success' | 'emptyItinerary' | 'completed' }>['multipleOngoingTripNotice'];
   onAction: (action: TodayAction) => void;
 }) {
   if (!notice) {
@@ -296,20 +400,25 @@ function MultipleOngoingNotice({
 
 function ActionButton({
   action,
+  disabled = false,
+  label,
   onAction,
   variant = 'primary',
 }: {
   action: TodayAction;
+  disabled?: boolean;
+  label?: string;
   onAction: (action: TodayAction) => void;
   variant?: 'primary' | 'secondary';
 }) {
   return (
     <Pressable
       accessibilityRole="button"
+      disabled={disabled}
       onPress={() => onAction(action)}
-      style={variant === 'primary' ? styles.button : styles.secondaryButton}
+      style={[variant === 'primary' ? styles.button : styles.secondaryButton, disabled ? styles.disabledButton : null]}
     >
-      <Text style={variant === 'primary' ? styles.buttonText : styles.secondaryButtonText}>{action.label}</Text>
+      <Text style={variant === 'primary' ? styles.buttonText : styles.secondaryButtonText}>{label ?? action.label}</Text>
     </Pressable>
   );
 }
@@ -510,6 +619,20 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.bold,
     textAlign: 'center',
   },
+  arrivalError: {
+    color: theme.color.danger,
+    fontFamily: theme.font.family.semibold,
+    fontSize: theme.font.size.label,
+    fontWeight: theme.font.weight.semibold,
+    textAlign: 'center',
+  },
+  completedCount: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.semibold,
+    fontSize: theme.font.size.label,
+    fontWeight: theme.font.weight.semibold,
+    textAlign: 'center',
+  },
   actionRow: {
     flexDirection: 'row',
     gap: theme.space[4],
@@ -528,6 +651,9 @@ const styles = StyleSheet.create({
     fontFamily: theme.font.family.bold,
     fontWeight: theme.font.weight.bold,
     textAlign: 'center',
+  },
+  disabledButton: {
+    opacity: 0.6,
   },
   secondaryButton: {
     alignItems: 'center',

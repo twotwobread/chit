@@ -12,6 +12,7 @@ import type { GetDayItineraryResponse } from '../models/GetDayItineraryResponse'
 import type { GetTripDetailResponse } from '../models/GetTripDetailResponse';
 import type { ListTripParticipantsResponse } from '../models/ListTripParticipantsResponse';
 import type { ListTripsResponse } from '../models/ListTripsResponse';
+import type { MarkDayItineraryItemArrivedResponse } from '../models/MarkDayItineraryItemArrivedResponse';
 import type { ReorderDayItineraryItemsRequest } from '../models/ReorderDayItineraryItemsRequest';
 import type { ReorderDayItineraryItemsResponse } from '../models/ReorderDayItineraryItemsResponse';
 import type { SetDayLodgingPlaceRequest } from '../models/SetDayLodgingPlaceRequest';
@@ -367,6 +368,38 @@ export class TripsService {
                 403: `Forbidden.`,
                 404: `Trip or virtual day not found.`,
                 409: `Reorder conflict.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
+     * Mark a trip day itinerary item arrived
+     * Marks the selected itinerary item instance arrived when it is the first pending item for the selected Day, and returns the latest Day itinerary snapshot.
+     * @param tripId
+     * @param date
+     * @param itemId
+     * @returns MarkDayItineraryItemArrivedResponse Day itinerary item arrived, or already arrived idempotently.
+     * @throws ApiError
+     */
+    public static markDayItineraryItemArrived(
+        tripId: string,
+        date: string,
+        itemId: string,
+    ): CancelablePromise<MarkDayItineraryItemArrivedResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/trips/{tripId}/days/{date}/itinerary/items/{itemId}/arrive',
+            path: {
+                'tripId': tripId,
+                'date': date,
+                'itemId': itemId,
+            },
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                403: `Forbidden.`,
+                404: `Trip, virtual day, or itinerary item not found.`,
+                409: `Arrival conflict because the target pending item is not the first pending item for the selected Day.`,
                 500: `Unexpected server error.`,
             },
         });
