@@ -40,6 +40,73 @@ func TestLoginCreatesUserSessionAndRotatesRefreshToken(t *testing.T) {
 	}
 }
 
+func TestLoginWithExistingProviderSubjectWinsBeforeEmailConflict(t *testing.T) {
+	repo := newFakeRepository()
+	appleUser, err := repo.CreateUserWithIdentity(context.Background(), User{
+		DisplayName:   "애플 사용자",
+		Email:         ptr("old@example.com"),
+		EmailVerified: true,
+	}, Identity{
+		Provider:        ProviderApple,
+		ProviderSubject: "apple-1",
+		Email:           ptr("old@example.com"),
+		EmailVerified:   true,
+	})
+	if err != nil {
+		t.Fatalf("seed apple user: %v", err)
+	}
+	_, err = repo.CreateUserWithIdentity(context.Background(), User{
+		DisplayName:   "카카오 사용자",
+		Email:         ptr("shared@example.com"),
+		EmailVerified: true,
+	}, Identity{
+		Provider:        ProviderKakao,
+		ProviderSubject: "kakao-1",
+		Email:           ptr("shared@example.com"),
+		EmailVerified:   true,
+	})
+	if err != nil {
+		t.Fatalf("seed kakao user: %v", err)
+	}
+
+	service := NewService(repo, fakeVerifier{profile: ProviderProfile{
+		Provider:        ProviderApple,
+		ProviderSubject: "apple-1",
+		Email:           ptr("shared@example.com"),
+		EmailVerified:   true,
+	}}, NewTokenManager("test-secret"))
+
+	login, err := service.Login(context.Background(), ProviderApple, Credential{}, Device{})
+	if err != nil {
+		t.Fatalf("login existing apple identity: %v", err)
+	}
+	if login.User.ID != appleUser.ID {
+		t.Fatalf("expected existing apple identity user %q, got %q", appleUser.ID, login.User.ID)
+	}
+}
+
+func TestLoginWithMissingOptionalProviderProfileCreatesDefaultUser(t *testing.T) {
+	repo := newFakeRepository()
+	service := NewService(repo, fakeVerifier{profile: ProviderProfile{
+		Provider:        ProviderApple,
+		ProviderSubject: "apple-no-profile",
+	}}, NewTokenManager("test-secret"))
+
+	login, err := service.Login(context.Background(), ProviderApple, Credential{}, Device{})
+	if err != nil {
+		t.Fatalf("login without optional profile: %v", err)
+	}
+	if login.User.DisplayName != "이음 사용자" {
+		t.Fatalf("expected default display name, got %q", login.User.DisplayName)
+	}
+	if login.User.Email != nil || login.User.EmailVerified {
+		t.Fatalf("expected no email snapshot, got %#v", login.User)
+	}
+	if len(repo.providers[login.User.ID]) != 1 || repo.providers[login.User.ID][0] != ProviderApple {
+		t.Fatalf("expected apple identity to be created, got %#v", repo.providers[login.User.ID])
+	}
+}
+
 func TestLoginSameVerifiedEmailRequiresExplicitLinking(t *testing.T) {
 	repo := newFakeRepository()
 	_, err := repo.CreateUserWithIdentity(context.Background(), User{
