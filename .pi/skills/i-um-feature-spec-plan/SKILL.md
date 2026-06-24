@@ -1,13 +1,13 @@
 ---
 name: i-um-feature-spec-plan
-description: Create or substantially revise i-um feature specs and implementation plans in docs/features. Use when the user asks to write, draft, update, or plan a feature spec/plan for an issue or docs/features file. Always run Ouroboros clarification first unless the user explicitly waives it.
+description: Create or substantially revise i-um feature specs and implementation plans in docs/features. Use when the user asks to write, draft, update, or plan a feature spec/plan for an issue or docs/features file. Create/use a feature worktree so spec and implementation can ship in one PR. Always run Ouroboros clarification first unless the user explicitly waives it.
 ---
 
 # i-um Feature Spec / Plan
 
-Use when the task is to create or substantially revise a feature spec and implementation plan, especially `docs/features/<id>.md` or a GitHub Issue labeled `needs-spec`.
+Use when the task is to create or substantially revise a feature spec and implementation plan, especially `docs/features/<id>.md` or a GitHub Issue labeled `needs-spec`. Treat the spec/plan as the first phase of the same feature branch/PR that will later contain implementation.
 
-Do not use this for implementation from an already approved spec; use `i-um-feature-start` instead.
+Do not use this for implementation from an already approved spec; use `i-um-feature-start` in the same feature worktree/branch instead.
 
 ## Required input
 
@@ -44,16 +44,17 @@ Before writing or substantially revising a feature spec/plan:
    - `git status --short`
    - `git branch --show-current`
    - `git rev-parse --show-toplevel`
-2. Target issue/spec:
+2. Worktree rule before writing any feature spec/plan:
+   - `.pi/rules/worktree.md`
+3. Target issue/spec:
    - If issue number is provided, inspect with `gh issue view <number> --json number,title,body,comments,labels,url`.
    - If revising an existing spec, read that spec.
    - If creating a new spec, read `docs/features/_template.md`.
-3. Conditional small rules after Ouroboros clarifies touched areas:
+4. Conditional small rules after Ouroboros clarifies touched areas:
    - API/DB/domain schema: `.pi/rules/api-db.md`
    - Mobile UI: `.pi/rules/mobile-ui.md`
    - Tests/verification: `.pi/rules/testing.md`
-   - Worktree creation: `.pi/rules/worktree.md`
-4. Read current code or neighboring specs only to verify concrete implementation facts needed for the plan.
+5. Read current code or neighboring specs only to verify concrete implementation facts needed for the plan.
 
 Do not read delivery/DoD/testing umbrella docs. Read `docs/decisions/` only when the feature changes or revisits product/technical/domain/API/DB/ops direction.
 
@@ -80,24 +81,32 @@ For feature spec/plan tasks, keep context narrow by default.
    - Prefer issue-linked planned path; otherwise use `docs/features/NNNN-*.md`.
    - If the target filename is ambiguous, ask.
 
-2. Gather factual context
+2. Select or create the feature worktree
+   - If already inside the matching `.worktrees/*` feature branch, continue there.
+   - If an open worktree/branch already exists for the same feature, use it; do not create a second spec branch.
+   - Otherwise run `.pi/bin/worktree-create` from the repository root while the root remains on `develop`.
+   - Use a feature branch/worktree for `docs/features/*`; do not use `docs/*` process branches for feature specs.
+   - Continue all subsequent reads, edits, commits, and verification inside that feature worktree.
+
+3. Gather factual context
    - Read only the issue, existing target spec/template, and narrow current implementation files needed to avoid stale assumptions.
    - Keep assumptions visible when they affect the draft.
 
-3. Run Ouroboros
+4. Run Ouroboros
    - Start or resume the interview with the gathered context.
    - Ask the user any blocking questions surfaced by Ouroboros.
    - Generate and record a Seed when the interview is complete and eligible.
 
-4. Draft or update the spec
+5. Draft or update the spec
    - Follow `docs/features/_template.md` structure unless preserving an existing spec's established structure.
    - Include: goal, user flow, scope, out of scope, UI/UX, API contract, DB changes, business rules, acceptance criteria, regression test plan, regression gaps, TDD implementation plan, verification plan, release notes, open questions, follow-ups.
    - Keep status `Draft` or `Spec Review` unless the user explicitly approves readiness.
    - Keep unresolved ambiguity in `Open Questions`; do not convert guesses into implementation-ready scope.
 
-5. Stop before implementation
+6. Stop before implementation
    - Do not update OpenAPI, migrations, generated code, app/server code, or tests in this skill unless the user separately asks for implementation after approval.
+   - When implementation starts, use `i-um-feature-start` in the same feature worktree/branch so spec/plan and implementation remain one PR by default.
 
-6. Complete
+7. Complete
    - Read `.pi/rules/completion-report.md` before the final response.
-   - Report the feature spec path, Ouroboros session/seed, verification commands/results, and unresolved open questions.
+   - Report the worktree path/branch, feature spec path, Ouroboros session/seed, verification commands/results, and unresolved open questions.

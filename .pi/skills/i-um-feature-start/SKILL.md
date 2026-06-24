@@ -5,7 +5,7 @@ description: Start implementation for an approved i-um feature spec. Use for imp
 
 # i-um Feature Start
 
-Use when the user asks to implement/start coding from an approved specific GitHub Issue or feature spec.
+Use when the user asks to implement/start coding from an approved specific GitHub Issue or feature spec. If the spec/plan was drafted in a feature worktree, continue implementation in that same worktree/branch.
 
 Do not use this for feature spec/plan drafting; use `i-um-feature-spec-plan` instead.
 Do not use this for “create/merge PR from an existing worktree”; use `i-um-pr-lifecycle` instead.
@@ -57,8 +57,10 @@ Do not read delivery/DoD/testing umbrella docs. Read `docs/decisions/` only when
    - Stop if the request conflicts with the spec.
 
 5. Worktree
-   - Use `.pi/bin/worktree-create` from repository root.
-   - Continue all implementation inside the selected `.worktrees/*` path.
+   - Prefer the existing feature worktree/branch that contains or is meant to contain the target spec.
+   - Do not create a second implementation branch/worktree when the spec was drafted on an unmerged feature branch.
+   - If no matching feature worktree exists, use `.pi/bin/worktree-create` from the repository root while the root remains on `develop`.
+   - Continue all implementation inside the selected `.worktrees/*` path so spec/plan and implementation stay in one PR by default.
 
 6. Implement
    - Follow the target spec only.

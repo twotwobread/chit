@@ -31,6 +31,7 @@ Do not read feature specs, delivery docs, product docs, architecture docs, or de
 
 3. Create/update PR when requested
    - Use `.github/pull_request_template.md`.
+   - For feature PRs, keep `docs/features/*` spec/plan changes and implementation together when they are on the same feature branch.
    - Keep body concise; include verification summaries, not full logs.
    - Use title prefix `Feature-0000:`, `Fix:`, or `Docs:`.
 

@@ -29,6 +29,8 @@ Stop and ask if:
 ## Implementation
 
 - Implement only the approved spec.
+- Continue in the same feature worktree/branch where the spec/plan was drafted when it is unmerged.
+- Keep the feature spec/plan and implementation in one feature PR by default; do not create a separate implementation branch unless the user requests it.
 - Keep vertical-slice behavior deployable across the touched layers.
 - API changes start from OpenAPI.
 - DB changes use goose migrations and sqlc regeneration when needed.
