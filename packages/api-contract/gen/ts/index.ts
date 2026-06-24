@@ -17,6 +17,8 @@ export type { AuthRefreshResponse } from './models/AuthRefreshResponse';
 export type { AuthResult } from './models/AuthResult';
 export type { AuthTokens } from './models/AuthTokens';
 export type { AuthUser } from './models/AuthUser';
+export type { CreateGooglePlaceDayItineraryItemRequest } from './models/CreateGooglePlaceDayItineraryItemRequest';
+export type { CreateGooglePlaceDayItineraryItemResponse } from './models/CreateGooglePlaceDayItineraryItemResponse';
 export type { CreateManualDayItineraryItemRequest } from './models/CreateManualDayItineraryItemRequest';
 export type { CreateManualDayItineraryItemResponse } from './models/CreateManualDayItineraryItemResponse';
 export type { CreateTripInviteResponse } from './models/CreateTripInviteResponse';

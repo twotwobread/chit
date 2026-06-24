@@ -258,6 +258,17 @@ FROM trip_places
 WHERE trip_id = sqlc.arg(trip_id)::uuid
   AND id = sqlc.arg(trip_place_id)::uuid;
 
+-- name: GetGoogleTripPlaceByGooglePlaceID :one
+SELECT
+  id::text AS id,
+  name,
+  place_type,
+  address
+FROM trip_places
+WHERE trip_id = sqlc.arg(trip_id)::uuid
+  AND provider = 'google'
+  AND google_place_id = sqlc.arg(google_place_id);
+
 -- name: SetDayLodgingPlace :one
 WITH upserted AS (
   INSERT INTO day_lodging_places (trip_id, lodging_date, trip_place_id)
@@ -300,6 +311,45 @@ RETURNING
   name,
   place_type,
   address;
+
+-- name: UpsertGoogleTripPlace :one
+INSERT INTO trip_places (
+  trip_id,
+  name,
+  address,
+  place_type,
+  provider,
+  google_place_id,
+  latitude,
+  longitude,
+  google_primary_type,
+  google_types
+) VALUES (
+  sqlc.arg(trip_id)::uuid,
+  sqlc.arg(name),
+  sqlc.arg(address),
+  sqlc.arg(place_type),
+  'google',
+  sqlc.arg(google_place_id),
+  sqlc.arg(latitude),
+  sqlc.arg(longitude),
+  sqlc.arg(google_primary_type),
+  sqlc.arg(google_types)::text[]
+)
+ON CONFLICT (trip_id, google_place_id) WHERE provider = 'google' DO UPDATE
+SET google_place_id = EXCLUDED.google_place_id
+RETURNING
+  id::text,
+  name,
+  place_type,
+  address;
+
+-- name: CountItineraryItemsByTripDateAndPlace :one
+SELECT count(*)::int
+FROM itinerary_items
+WHERE trip_id = sqlc.arg(trip_id)::uuid
+  AND scheduled_date = sqlc.arg(scheduled_date)
+  AND trip_place_id = sqlc.arg(trip_place_id)::uuid;
 
 -- name: CreateItineraryItemAtEnd :one
 INSERT INTO itinerary_items (

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"net/http"
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
@@ -33,4 +34,41 @@ func (s apiServer) SearchGooglePlaces(w http.ResponseWriter, r *http.Request, tr
 	}
 
 	writeJSON(w, http.StatusOK, searchGooglePlacesResponseToOpenAPI(results))
+}
+
+func (s apiServer) CreateGooglePlaceDayItineraryItem(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date) {
+	if s.auth == nil || s.places == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "google place itinerary creation is not configured", nil)
+		return
+	}
+
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	var body openapi.CreateGooglePlaceDayItineraryItemJSONRequestBody
+	if !decodeJSON(w, r, &body) {
+		return
+	}
+
+	result, err := s.places.CreateGooglePlaceDayItineraryItem(r.Context(), authContext.UserID, tripId, dateFromOpenAPI(date), place.CreateGooglePlaceDayItineraryItemInput{
+		GooglePlaceID:      body.GooglePlaceId,
+		DuplicateConfirmed: body.DuplicateConfirmed,
+	})
+	if err != nil {
+		if errors.Is(err, place.ErrDuplicateDayPlaceConfirmationNeeded) {
+			details := map[string]interface{}{"googlePlaceId": body.GooglePlaceId}
+			var duplicateErr place.DuplicateDayPlaceConfirmationError
+			if errors.As(err, &duplicateErr) && duplicateErr.TripPlaceID != "" {
+				details["tripPlaceId"] = duplicateErr.TripPlaceID
+			}
+			writeError(w, http.StatusConflict, "DUPLICATE_DAY_PLACE_CONFIRMATION_REQUIRED", "duplicate day place confirmation required", []map[string]interface{}{details})
+			return
+		}
+		writeGooglePlaceDayItineraryError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, createGooglePlaceDayItineraryItemResponseToOpenAPI(result))
 }

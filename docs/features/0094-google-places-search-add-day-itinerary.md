@@ -266,7 +266,7 @@ Response shape mirrors manual create response so Day 화면 can reuse existing v
 
 ### DB Changes
 
-Migration: `apps/api/migrations/00009_add_google_place_metadata_to_trip_places.sql`
+Migration: `apps/api/migrations/00010_add_google_place_metadata_to_trip_places.sql`
 
 Extend `trip_places` instead of adding a separate provider cache table.
 
@@ -365,7 +365,7 @@ No DB column stores Google Maps URL, directions URL, rating, photos, phone, webs
 | Behavior / AC | Layer | Test File / Gate | Command |
 |---|---|---|---|
 | OpenAPI and generated code include Google add endpoint/request/response | Contract/generated | `packages/api-contract/openapi.yaml`, generated Go/TS | `pnpm generate && pnpm verify:generated` |
-| DB migration adds Google metadata constraints and partial unique index | DB | `apps/api/migrations/00009_add_google_place_metadata_to_trip_places.sql`, repository integration tests | `pnpm db:migrate && pnpm db:status && pnpm db:rollback && pnpm db:migrate` with test `DATABASE_URL` |
+| DB migration adds Google metadata constraints and partial unique index | DB | `apps/api/migrations/00010_add_google_place_metadata_to_trip_places.sql`, repository integration tests | `pnpm db:migrate && pnpm db:status && pnpm db:rollback && pnpm db:migrate` with test `DATABASE_URL` |
 | Google place details maps provider snapshot to internal `TripPlaceType` | API service | `apps/api/internal/place/service_test.go` or `apps/api/internal/trip/service_test.go` | `pnpm --filter @i-um/api test` |
 | Validation/auth/forbidden/not-found/provider errors for create endpoint | API handler/service | `apps/api/internal/server/server_test.go`, service tests | `pnpm --filter @i-um/api test` |
 | New Google place creates `trip_place` and appends itinerary item | Repository/API | `apps/api/internal/storage/trip_repository_test.go`, server tests | `pnpm --filter @i-um/api test` |

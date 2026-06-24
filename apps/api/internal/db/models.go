@@ -96,13 +96,19 @@ type TripParticipant struct {
 }
 
 type TripPlace struct {
-	ID        pgtype.UUID
-	TripID    pgtype.UUID
-	Name      string
-	Address   string
-	PlaceType string
-	CreatedAt pgtype.Timestamptz
-	UpdatedAt pgtype.Timestamptz
+	ID                pgtype.UUID
+	TripID            pgtype.UUID
+	Name              string
+	Address           string
+	PlaceType         string
+	Provider          string
+	GooglePlaceID     pgtype.Text
+	Latitude          pgtype.Float8
+	Longitude         pgtype.Float8
+	GooglePrimaryType pgtype.Text
+	GoogleTypes       []string
+	CreatedAt         pgtype.Timestamptz
+	UpdatedAt         pgtype.Timestamptz
 }
 
 type User struct {

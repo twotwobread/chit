@@ -52,7 +52,7 @@ import {
   type DayItineraryEditFormErrors,
   type DayItineraryEditFormValues,
 } from '../../../../lib/trips/day-itinerary-edit';
-import { buildManualPlaceRoute, manualPlaceTypeOptions } from '../../../../lib/trips/manual-place';
+import { manualPlaceTypeOptions } from '../../../../lib/trips/manual-place';
 import { buildGooglePlaceSearchRoute } from '../../../../lib/places/google-search';
 import { clearDayLodgingPlace, deleteDayItineraryItem, getTripDayItinerary, reorderDayItineraryItems, setDayLodgingPlace, updateDayItineraryItem } from '../../../../lib/trips/client';
 import {
@@ -468,7 +468,7 @@ export default function TripDayItineraryScreen() {
           <DayItineraryContent
             onAddPlace={() => {
               if (tripId && date) {
-                router.push(buildManualPlaceRoute(tripId, date));
+                router.push(buildGooglePlaceSearchRoute(tripId, date));
               }
             }}
             onCopyAddress={(item) => void copyPlaceAddress(item)}
@@ -480,11 +480,6 @@ export default function TripDayItineraryScreen() {
             onClearLodging={(item) => void submitClearLodging(item)}
             onMoveReorderItem={moveReorderItem}
             onOpenMap={(item) => void openPlaceMap(item)}
-            onSearchPlace={() => {
-              if (tripId && date) {
-                router.push(buildGooglePlaceSearchRoute(tripId, date));
-              }
-            }}
             onSaveReorder={() => void submitReorder()}
             onSetLodging={(item) => void submitSetLodging(item)}
             mapActionFeedback={mapActionFeedback}
@@ -553,7 +548,6 @@ function DayItineraryContent({
   onExitReorderMode,
   onMoveReorderItem,
   onOpenMap,
-  onSearchPlace,
   onSaveReorder,
   onSetLodging,
   mapActionFeedback,
@@ -571,7 +565,6 @@ function DayItineraryContent({
   onExitReorderMode: () => void;
   onMoveReorderItem: (fromIndex: number, toIndex: number) => void;
   onOpenMap: (item: DayItineraryRowViewModel) => void;
-  onSearchPlace: () => void;
   onSaveReorder: () => void;
   onSetLodging: (item: DayItineraryRowViewModel) => void;
   mapActionFeedback: DayItineraryMapActionFeedback | null;
@@ -731,9 +724,6 @@ function DayItineraryContent({
                 <Text style={styles.secondaryButtonText}>{reorderAction.label}</Text>
               </Pressable>
             ) : null}
-            <Pressable accessibilityRole="button" onPress={onSearchPlace} style={styles.secondaryButton}>
-              <Text style={styles.secondaryButtonText}>장소 검색</Text>
-            </Pressable>
             <Pressable accessibilityRole="button" onPress={onAddPlace} style={styles.button}>
               <Text style={styles.buttonText}>장소 추가</Text>
             </Pressable>

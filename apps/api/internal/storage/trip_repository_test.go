@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/twotwobread/i-um/apps/api/internal/place"
 	"github.com/twotwobread/i-um/apps/api/internal/trip"
 )
 
@@ -512,6 +513,107 @@ func TestCreateManualDayItineraryItemCreatesPlaceAndAppendsItem(t *testing.T) {
 	}
 	if placeCount != 2 {
 		t.Fatalf("expected duplicate manual additions to create separate places, got %d", placeCount)
+	}
+}
+
+func TestCreateGooglePlaceDayItineraryItemReusesTripPlaceAndHandlesDuplicateConfirmation(t *testing.T) {
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("DATABASE_URL is required for storage integration test")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	store, err := Open(ctx, databaseURL)
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer store.Close()
+
+	var hasGooglePlaceColumns bool
+	if err := store.pool.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM information_schema.columns
+			WHERE table_name = 'trip_places'
+			  AND column_name = 'provider'
+		)
+	`).Scan(&hasGooglePlaceColumns); err != nil {
+		t.Fatalf("check google place columns: %v", err)
+	}
+	if !hasGooglePlaceColumns {
+		t.Skip("trip_places google metadata migration is required for this storage integration test")
+	}
+
+	var userID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO users (display_name)
+		VALUES ('구글 장소 추가 테스트')
+		RETURNING id::text
+	`).Scan(&userID); err != nil {
+		t.Fatalf("insert user: %v", err)
+	}
+	defer func() { _, _ = store.pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1::uuid`, userID) }()
+
+	var tripID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO trips (name, start_date, end_date, default_currency, created_by)
+		VALUES ('구글 장소 추가 테스트 여행', '2026-07-10', '2026-07-13', 'JPY', $1::uuid)
+		RETURNING id::text
+	`, userID).Scan(&tripID); err != nil {
+		t.Fatalf("insert trip: %v", err)
+	}
+
+	record := place.CreateGooglePlaceDayItineraryItemRecord{
+		TripID:            tripID,
+		ScheduledDate:     "2026-07-11",
+		GooglePlaceID:     "google-place-1",
+		Name:              "도톤보리",
+		Address:           "Osaka",
+		PlaceType:         "sights",
+		Latitude:          34.6687,
+		Longitude:         135.5013,
+		GooglePrimaryType: "tourist_attraction",
+		GoogleTypes:       []string{"tourist_attraction", "point_of_interest"},
+	}
+	first, err := store.CreateGooglePlaceDayItineraryItem(ctx, record)
+	if err != nil {
+		t.Fatalf("create first google item: %v", err)
+	}
+	if first.ItemOrder != 1 || first.Place.Name != "도톤보리" || first.Place.PlaceType != "sights" {
+		t.Fatalf("unexpected first item: %#v", first)
+	}
+
+	_, err = store.CreateGooglePlaceDayItineraryItem(ctx, record)
+	if !errors.Is(err, place.ErrDuplicateDayPlaceConfirmationNeeded) {
+		t.Fatalf("expected duplicate confirmation error, got %v", err)
+	}
+
+	record.DuplicateConfirmed = true
+	second, err := store.CreateGooglePlaceDayItineraryItem(ctx, record)
+	if err != nil {
+		t.Fatalf("create confirmed duplicate google item: %v", err)
+	}
+	if second.ItemOrder != 2 || second.Place.ID != first.Place.ID {
+		t.Fatalf("expected duplicate to append with reused place, got first=%#v second=%#v", first, second)
+	}
+
+	var placeCount int
+	if err := store.pool.QueryRow(ctx, `SELECT count(*)::int FROM trip_places WHERE trip_id = $1::uuid AND provider = 'google'`, tripID).Scan(&placeCount); err != nil {
+		t.Fatalf("count google trip places: %v", err)
+	}
+	if placeCount != 1 {
+		t.Fatalf("expected one google trip place, got %d", placeCount)
+	}
+
+	var latitude float64
+	var googleTypes []string
+	if err := store.pool.QueryRow(ctx, `SELECT latitude, google_types FROM trip_places WHERE id = $1::uuid`, first.Place.ID).Scan(&latitude, &googleTypes); err != nil {
+		t.Fatalf("load google metadata: %v", err)
+	}
+	if latitude != 34.6687 || len(googleTypes) != 2 {
+		t.Fatalf("expected google metadata, got latitude=%v types=%#v", latitude, googleTypes)
 	}
 }
 

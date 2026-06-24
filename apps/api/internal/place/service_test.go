@@ -110,12 +110,131 @@ func TestServiceSearchGoogleProviderErrors(t *testing.T) {
 	}
 }
 
+func TestServiceCreateGooglePlaceDayItineraryItemCreatesSnapshotAndItem(t *testing.T) {
+	repo := &fakeRepository{trip: trip.Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"}, tripFound: true, isParticipant: true}
+	provider := &fakeProvider{details: GooglePlaceDetails{
+		GooglePlaceID:    "google-1",
+		DisplayName:      "도톤보리",
+		FormattedAddress: "Osaka",
+		Latitude:         34.6687,
+		Longitude:        135.5013,
+		PrimaryType:      "tourist_attraction",
+		Types:            []string{"tourist_attraction", "point_of_interest"},
+	}}
+	service := NewService(repo, provider)
+
+	result, err := service.CreateGooglePlaceDayItineraryItem(context.Background(), "user-1", testTripID, "2026-07-11", CreateGooglePlaceDayItineraryItemInput{GooglePlaceID: " google-1 "})
+	if err != nil {
+		t.Fatalf("CreateGooglePlaceDayItineraryItem returned error: %v", err)
+	}
+
+	if !provider.detailsCalled || provider.detailsInput.GooglePlaceID != "google-1" {
+		t.Fatalf("expected details lookup for trimmed google id, got called=%v input=%#v", provider.detailsCalled, provider.detailsInput)
+	}
+	if repo.createdGoogleRecord.GooglePlaceID != "google-1" || repo.createdGoogleRecord.Name != "도톤보리" || repo.createdGoogleRecord.PlaceType != "sights" {
+		t.Fatalf("unexpected created google record: %#v", repo.createdGoogleRecord)
+	}
+	if repo.createdGoogleRecord.Latitude != 34.6687 || repo.createdGoogleRecord.Longitude != 135.5013 || len(repo.createdGoogleRecord.GoogleTypes) != 2 {
+		t.Fatalf("expected provider metadata in record, got %#v", repo.createdGoogleRecord)
+	}
+	if result.Day.DayOrder != 2 || result.Item.Place.Name != "도톤보리" || result.Item.ItemOrder != 1 {
+		t.Fatalf("unexpected result %#v", result)
+	}
+}
+
+func TestServiceCreateGooglePlaceDayItineraryItemReusesExistingTripPlaceWithoutProviderRefresh(t *testing.T) {
+	repo := &fakeRepository{
+		trip:                trip.Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"},
+		tripFound:           true,
+		isParticipant:       true,
+		existingGooglePlace: trip.TripPlaceSummary{ID: "place-1", Name: "도톤보리", PlaceType: "sights", Address: "Osaka"},
+		existingGoogleFound: true,
+	}
+	provider := &fakeProvider{}
+	service := NewService(repo, provider)
+
+	result, err := service.CreateGooglePlaceDayItineraryItem(context.Background(), "user-1", testTripID, "2026-07-11", CreateGooglePlaceDayItineraryItemInput{GooglePlaceID: "google-1"})
+	if err != nil {
+		t.Fatalf("CreateGooglePlaceDayItineraryItem returned error: %v", err)
+	}
+
+	if provider.detailsCalled {
+		t.Fatal("expected existing Google-backed place to be reused without provider details call")
+	}
+	if repo.appendedGoogleRecord.TripPlaceID != "place-1" {
+		t.Fatalf("expected append to existing place, got %#v", repo.appendedGoogleRecord)
+	}
+	if result.Item.Place.ID != "place-1" {
+		t.Fatalf("expected item to use existing place, got %#v", result.Item)
+	}
+}
+
+func TestServiceCreateGooglePlaceDayItineraryItemDuplicateConfirmation(t *testing.T) {
+	repo := &fakeRepository{
+		trip:                trip.Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"},
+		tripFound:           true,
+		isParticipant:       true,
+		existingGooglePlace: trip.TripPlaceSummary{ID: "place-1", Name: "도톤보리", PlaceType: "sights", Address: "Osaka"},
+		existingGoogleFound: true,
+		appendErr:           ErrDuplicateDayPlaceConfirmationNeeded,
+	}
+	service := NewService(repo, &fakeProvider{})
+
+	_, err := service.CreateGooglePlaceDayItineraryItem(context.Background(), "user-1", testTripID, "2026-07-11", CreateGooglePlaceDayItineraryItemInput{GooglePlaceID: "google-1"})
+	if !errors.Is(err, ErrDuplicateDayPlaceConfirmationNeeded) {
+		t.Fatalf("expected duplicate confirmation error, got %v", err)
+	}
+
+	repo.appendErr = nil
+	_, err = service.CreateGooglePlaceDayItineraryItem(context.Background(), "user-1", testTripID, "2026-07-11", CreateGooglePlaceDayItineraryItemInput{GooglePlaceID: "google-1", DuplicateConfirmed: true})
+	if err != nil {
+		t.Fatalf("expected confirmed duplicate to append, got %v", err)
+	}
+	if !repo.appendedGoogleRecord.DuplicateConfirmed {
+		t.Fatalf("expected duplicate confirmation to reach repository, got %#v", repo.appendedGoogleRecord)
+	}
+}
+
+func TestServiceCreateGooglePlaceDayItineraryItemValidationAndProviderData(t *testing.T) {
+	validRepo := &fakeRepository{trip: trip.Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"}, tripFound: true, isParticipant: true}
+	service := NewService(validRepo, &fakeProvider{})
+
+	_, err := service.CreateGooglePlaceDayItineraryItem(context.Background(), "user-1", testTripID, "2026-07-10", CreateGooglePlaceDayItineraryItemInput{})
+	if !errors.Is(err, ErrValidation) {
+		t.Fatalf("expected invalid google place id validation error, got %v", err)
+	}
+
+	provider := &fakeProvider{details: GooglePlaceDetails{GooglePlaceID: "google-1", DisplayName: "도톤보리", FormattedAddress: "Osaka", Latitude: 0, Longitude: 181, PrimaryType: "cafe", Types: []string{"cafe"}}}
+	service = NewService(validRepo, provider)
+	_, err = service.CreateGooglePlaceDayItineraryItem(context.Background(), "user-1", testTripID, "2026-07-10", CreateGooglePlaceDayItineraryItemInput{GooglePlaceID: "google-1"})
+	if !errors.Is(err, ErrProviderUnavailable) {
+		t.Fatalf("expected invalid provider data to be unavailable, got %v", err)
+	}
+}
+
+func TestMapGooglePlaceType(t *testing.T) {
+	if got := mapGooglePlaceType("coffee_shop", nil); got != "cafe" {
+		t.Fatalf("expected coffee_shop to map to cafe, got %q", got)
+	}
+	if got := mapGooglePlaceType("unknown", []string{"restaurant"}); got != "food" {
+		t.Fatalf("expected raw type fallback to food, got %q", got)
+	}
+	if got := mapGooglePlaceType("unknown", []string{"point_of_interest"}); got != "etc" {
+		t.Fatalf("expected unknown type to map to etc, got %q", got)
+	}
+}
+
 type fakeRepository struct {
-	trip          trip.Trip
-	tripFound     bool
-	isParticipant bool
-	checkedTripID string
-	checkedUserID string
+	trip                 trip.Trip
+	tripFound            bool
+	isParticipant        bool
+	checkedTripID        string
+	checkedUserID        string
+	existingGooglePlace  trip.TripPlaceSummary
+	existingGoogleFound  bool
+	createdGoogleRecord  CreateGooglePlaceDayItineraryItemRecord
+	appendedGoogleRecord AppendGooglePlaceDayItineraryItemRecord
+	appendErr            error
 }
 
 func (r *fakeRepository) GetTripByID(context.Context, string) (trip.Trip, bool, error) {
@@ -128,15 +247,63 @@ func (r *fakeRepository) IsTripParticipant(_ context.Context, tripID string, use
 	return r.isParticipant, nil
 }
 
+func (r *fakeRepository) GetGoogleTripPlaceByGooglePlaceID(context.Context, string, string) (trip.TripPlaceSummary, bool, error) {
+	return r.existingGooglePlace, r.existingGoogleFound, nil
+}
+
+func (r *fakeRepository) GetDayLodgingPlaceByTripAndDate(context.Context, string, string) (trip.TripPlaceSummary, bool, error) {
+	return trip.TripPlaceSummary{}, false, nil
+}
+
+func (r *fakeRepository) AppendGooglePlaceDayItineraryItem(_ context.Context, record AppendGooglePlaceDayItineraryItemRecord) (trip.DayItineraryItem, error) {
+	r.appendedGoogleRecord = record
+	if r.appendErr != nil {
+		return trip.DayItineraryItem{}, r.appendErr
+	}
+	placeSummary := r.existingGooglePlace
+	if placeSummary.ID == "" {
+		placeSummary = trip.TripPlaceSummary{ID: record.TripPlaceID, Name: "도톤보리", PlaceType: "sights", Address: "Osaka"}
+	}
+	return trip.DayItineraryItem{ID: "item-1", ItemOrder: 1, Version: 1, Place: placeSummary}, nil
+}
+
+func (r *fakeRepository) CreateGooglePlaceDayItineraryItem(_ context.Context, record CreateGooglePlaceDayItineraryItemRecord) (trip.DayItineraryItem, error) {
+	r.createdGoogleRecord = record
+	if r.appendErr != nil {
+		return trip.DayItineraryItem{}, r.appendErr
+	}
+	return trip.DayItineraryItem{
+		ID:        "item-1",
+		ItemOrder: 1,
+		Version:   1,
+		Place: trip.TripPlaceSummary{
+			ID:        "place-1",
+			Name:      record.Name,
+			PlaceType: record.PlaceType,
+			Address:   record.Address,
+		},
+	}, nil
+}
+
 type fakeProvider struct {
-	called  bool
-	input   ProviderSearchInput
-	results []SearchResult
-	err     error
+	called        bool
+	input         ProviderSearchInput
+	results       []SearchResult
+	err           error
+	detailsCalled bool
+	detailsInput  ProviderDetailsInput
+	details       GooglePlaceDetails
+	detailsErr    error
 }
 
 func (p *fakeProvider) Search(_ context.Context, input ProviderSearchInput) ([]SearchResult, error) {
 	p.called = true
 	p.input = input
 	return p.results, p.err
+}
+
+func (p *fakeProvider) Details(_ context.Context, input ProviderDetailsInput) (GooglePlaceDetails, error) {
+	p.detailsCalled = true
+	p.detailsInput = input
+	return p.details, p.detailsErr
 }

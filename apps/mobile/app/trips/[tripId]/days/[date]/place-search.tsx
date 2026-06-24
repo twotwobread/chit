@@ -7,14 +7,21 @@ import { ApiError } from '@i-um/api-contract';
 import { MobileAuthError } from '../../../../../lib/auth/client';
 import { theme } from '../../../../../lib/design';
 import { buildDayItineraryRoute } from '../../../../../lib/trips/day-itinerary';
-import { searchGooglePlaces } from '../../../../../lib/places/client';
+import { createGooglePlaceDayItineraryItem, searchGooglePlaces } from '../../../../../lib/places/client';
 import {
+  addingGooglePlaceState,
   buildGooglePlaceSearchInputState,
   canSearchGooglePlaces,
+  confirmingDuplicateGooglePlaceState,
+  errorGooglePlaceAddState,
   errorGooglePlaceSearchState,
   googlePlaceSearchLoadingState,
+  idleGooglePlaceAddState,
+  isDuplicateDayPlaceConfirmationError,
   normalizeGooglePlaceSearchQuery,
   successGooglePlaceSearchState,
+  type GooglePlaceAddViewState,
+  type GooglePlaceSearchRowViewModel,
   type GooglePlaceSearchViewState,
 } from '../../../../../lib/places/google-search';
 
@@ -24,7 +31,10 @@ export default function GooglePlaceSearchScreen() {
   const date = Array.isArray(dateParam) ? dateParam[0] : dateParam;
   const [query, setQuery] = useState('');
   const [state, setState] = useState<GooglePlaceSearchViewState>(buildGooglePlaceSearchInputState(''));
+  const [addState, setAddState] = useState<GooglePlaceAddViewState>(idleGooglePlaceAddState());
   const isLoading = state.status === 'loading';
+  const isAdding = addState.status === 'adding';
+  const isBusy = isLoading || isAdding;
 
   const backToDay = () => {
     if (tripId && date) {
@@ -35,7 +45,7 @@ export default function GooglePlaceSearchScreen() {
   };
 
   const runSearch = async () => {
-    if (isLoading) {
+    if (isBusy) {
       return;
     }
     if (!tripId || !date) {
@@ -49,6 +59,7 @@ export default function GooglePlaceSearchScreen() {
       return;
     }
 
+    setAddState(idleGooglePlaceAddState());
     setState(googlePlaceSearchLoadingState());
     try {
       const response = await searchGooglePlaces(tripId, date, normalizeGooglePlaceSearchQuery(query));
@@ -72,8 +83,42 @@ export default function GooglePlaceSearchScreen() {
 
   const updateQuery = (nextQuery: string) => {
     setQuery(nextQuery);
-    if (!isLoading) {
+    if (!isBusy) {
+      setAddState(idleGooglePlaceAddState());
       setState(buildGooglePlaceSearchInputState(nextQuery));
+    }
+  };
+
+  const submitAdd = async (result: GooglePlaceSearchRowViewModel, duplicateConfirmed: boolean) => {
+    if (isBusy || !tripId || !date) {
+      return;
+    }
+
+    setAddState(addingGooglePlaceState(result.id));
+    try {
+      await createGooglePlaceDayItineraryItem(tripId, date, result.id, duplicateConfirmed);
+      router.replace(buildDayItineraryRoute(tripId, date));
+    } catch (error) {
+      if (error instanceof MobileAuthError && (error.code === 'UNAUTHORIZED' || error.code === 'INVALID_REFRESH_TOKEN')) {
+        router.replace('/login');
+        return;
+      }
+      if (error instanceof ApiError) {
+        if (error.status === 401) {
+          router.replace('/login');
+          return;
+        }
+        if (error.status === 403 || error.status === 404) {
+          setAddState(idleGooglePlaceAddState());
+          setState(errorGooglePlaceSearchState(error.status));
+          return;
+        }
+        if (error.status === 409 && isDuplicateDayPlaceConfirmationError(error.body)) {
+          setAddState(confirmingDuplicateGooglePlaceState(result));
+          return;
+        }
+      }
+      setAddState(errorGooglePlaceAddState());
     }
   };
 
@@ -83,7 +128,7 @@ export default function GooglePlaceSearchScreen() {
     return (
       <ScrollView contentContainerStyle={styles.scrollContent} style={styles.scroll}>
         <View style={styles.header}>
-          <Text style={styles.screenTitle}>장소 검색</Text>
+          <Text style={styles.screenTitle}>장소 추가</Text>
         </View>
         <View style={styles.card}>
           <Text style={styles.errorTitle}>{title}</Text>
@@ -99,15 +144,15 @@ export default function GooglePlaceSearchScreen() {
   return (
     <ScrollView contentContainerStyle={styles.scrollContent} style={styles.scroll}>
       <View style={styles.header}>
-        <Text style={styles.screenTitle}>장소 검색</Text>
-        <Text style={styles.screenHelper}>이 Day에 추가할 후보 장소를 검색해 보세요.</Text>
+        <Text style={styles.screenTitle}>장소 추가</Text>
+        <Text style={styles.screenHelper}>이 Day에 추가할 장소를 검색해 보세요.</Text>
       </View>
 
       <View style={styles.card}>
         <View style={styles.fieldGroup}>
           <Text style={styles.label}>장소 이름</Text>
           <TextInput
-            editable={!isLoading}
+            editable={!isBusy}
             onChangeText={updateQuery}
             onSubmitEditing={() => void runSearch()}
             placeholder="예: 도톤보리, 우메다 카페"
@@ -119,7 +164,7 @@ export default function GooglePlaceSearchScreen() {
           {'message' in state && state.message ? <Text style={state.status === 'minQuery' ? styles.fieldError : styles.helperText}>{state.message}</Text> : null}
         </View>
 
-        <Pressable accessibilityRole="button" disabled={isLoading} onPress={() => void runSearch()} style={[styles.button, isLoading ? styles.buttonDisabled : null]}>
+        <Pressable accessibilityRole="button" disabled={isBusy} onPress={() => void runSearch()} style={[styles.button, isBusy ? styles.buttonDisabled : null]}>
           {isLoading ? <ActivityIndicator color={theme.color.onPrimary} /> : null}
           <Text style={styles.buttonText}>{isLoading ? '장소를 검색하는 중...' : '검색'}</Text>
         </Pressable>
@@ -135,27 +180,62 @@ export default function GooglePlaceSearchScreen() {
         <View style={styles.card}>
           <Text style={styles.errorTitle}>{state.title}</Text>
           <Text style={styles.message}>{state.helper}</Text>
-          <Pressable accessibilityRole="button" onPress={() => void runSearch()} style={styles.secondaryButton}>
+          <Pressable accessibilityRole="button" disabled={isBusy} onPress={() => void runSearch()} style={[styles.secondaryButton, isBusy ? styles.secondaryButtonDisabled : null]}>
             <Text style={styles.secondaryButtonText}>다시 시도</Text>
           </Pressable>
         </View>
       ) : null}
 
-      {state.status === 'success' ? (
-        <View style={styles.resultList}>
-          {state.results.map((result) => (
-            <View key={result.id} style={styles.resultCard}>
-              <View style={styles.resultHeader}>
-                <Text style={styles.resultName}>{result.placeName}</Text>
-                <Text style={styles.resultType}>{result.typeHint}</Text>
-              </View>
-              <Text style={styles.resultAddress}>{result.address}</Text>
-            </View>
-          ))}
+      {addState.status === 'error' ? (
+        <View style={styles.card}>
+          <Text style={styles.errorTitle}>장소를 추가할 수 없어요.</Text>
+          <Text style={styles.message}>{addState.message}</Text>
         </View>
       ) : null}
 
-      <Pressable accessibilityRole="button" disabled={isLoading} onPress={backToDay} style={styles.backLink}>
+      {addState.status === 'confirmingDuplicate' ? (
+        <View style={styles.card}>
+          <Text style={styles.errorTitle}>이미 추가된 장소예요.</Text>
+          <Text style={styles.message}>{addState.message}</Text>
+          <View style={styles.confirmationActions}>
+            <Pressable accessibilityRole="button" disabled={isBusy} onPress={() => void submitAdd(addState.result, true)} style={[styles.button, isBusy ? styles.buttonDisabled : null]}>
+              {isAdding ? <ActivityIndicator color={theme.color.onPrimary} /> : null}
+              <Text style={styles.buttonText}>{isAdding ? '추가 중...' : '한 번 더 추가'}</Text>
+            </Pressable>
+            <Pressable accessibilityRole="button" disabled={isBusy} onPress={() => setAddState(idleGooglePlaceAddState())} style={[styles.secondaryButton, isBusy ? styles.secondaryButtonDisabled : null]}>
+              <Text style={styles.secondaryButtonText}>취소</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
+
+      {state.status === 'success' ? (
+        <View style={styles.resultList}>
+          {state.results.map((result) => {
+            const isAddingThisResult = addState.status === 'adding' && addState.googlePlaceId === result.id;
+            return (
+              <View key={result.id} style={styles.resultCard}>
+                <View style={styles.resultHeader}>
+                  <Text style={styles.resultName}>{result.placeName}</Text>
+                  <Text style={styles.resultType}>{result.typeHint}</Text>
+                </View>
+                <Text style={styles.resultAddress}>{result.address}</Text>
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={isBusy}
+                  onPress={() => void submitAdd(result, false)}
+                  style={[styles.secondaryButton, isBusy ? styles.secondaryButtonDisabled : null]}
+                >
+                  {isAddingThisResult ? <ActivityIndicator color={theme.color.primary} /> : null}
+                  <Text style={styles.secondaryButtonText}>{isAddingThisResult ? '추가 중...' : '추가'}</Text>
+                </Pressable>
+              </View>
+            );
+          })}
+        </View>
+      ) : null}
+
+      <Pressable accessibilityRole="button" disabled={isBusy} onPress={backToDay} style={styles.backLink}>
         <Text style={styles.backLinkText}>Day 일정으로</Text>
       </Pressable>
     </ScrollView>
@@ -271,16 +351,24 @@ const styles = StyleSheet.create({
     borderColor: theme.color.borderDefault,
     borderRadius: theme.radius.md,
     borderWidth: 1,
+    flexDirection: 'row',
+    gap: theme.space[3],
     justifyContent: 'center',
     minHeight: theme.layout.controlH,
     paddingHorizontal: theme.space[5],
     paddingVertical: theme.space[4],
+  },
+  secondaryButtonDisabled: {
+    backgroundColor: theme.color.surfaceSunken,
   },
   secondaryButtonText: {
     color: theme.color.textBody,
     fontFamily: theme.font.family.semibold,
     fontWeight: theme.font.weight.semibold,
     textAlign: 'center',
+  },
+  confirmationActions: {
+    gap: theme.space[3],
   },
   resultList: {
     width: '100%',

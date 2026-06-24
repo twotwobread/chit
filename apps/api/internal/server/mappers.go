@@ -162,6 +162,13 @@ func createManualDayItineraryItemResponseToOpenAPI(result trip.CreateManualDayIt
 	}
 }
 
+func createGooglePlaceDayItineraryItemResponseToOpenAPI(result place.CreateGooglePlaceDayItineraryItemResult) openapi.CreateGooglePlaceDayItineraryItemResponse {
+	return openapi.CreateGooglePlaceDayItineraryItemResponse{
+		Day:  tripDayToOpenAPI(result.Day),
+		Item: dayItineraryItemToOpenAPI(result.Item),
+	}
+}
+
 func updateDayItineraryItemResponseToOpenAPI(result trip.UpdateDayItineraryItemResult) openapi.UpdateDayItineraryItemResponse {
 	return openapi.UpdateDayItineraryItemResponse{Item: dayItineraryItemToOpenAPI(result.Item)}
 }
