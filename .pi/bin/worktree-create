@@ -1,22 +1,24 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 usage() {
   cat <<'USAGE'
 Usage:
-  scripts/worktree-create <feature-id> <short-name> [--base <base>] [--branch <branch>] [--path <path>] [--dry-run]
+  .pi/bin/worktree-create <feature-id> <short-name> [--base <base>] [--branch <branch>] [--path <path>] [--dry-run]
 
 Examples:
-  scripts/worktree-create F003 trip-create-and-list
-  scripts/worktree-create 0003 trip-create-and-list
-  scripts/worktree-create docs worktree-cleanup-rule --branch docs/worktree-cleanup-rule --path docs-worktree-cleanup-rule
+  .pi/bin/worktree-create F003 trip-create-and-list
+  .pi/bin/worktree-create 0003 trip-create-and-list
+  .pi/bin/worktree-create docs worktree-cleanup-rule --branch docs/worktree-cleanup-rule --path docs-worktree-cleanup-rule
 
 Behavior:
   1. Fetches origin and prunes deleted remote refs.
   2. Lists .worktrees entries.
   3. Removes clean worktrees whose GitHub PR is MERGED or CLOSED.
   4. Creates a new worktree from the base ref.
-  5. Runs scripts/worktree-post-create for safe local setup.
+  5. Runs .pi/bin/worktree-post-create for safe local setup.
 
 Safety:
   - Dirty worktrees are never removed.
@@ -260,6 +262,6 @@ else
   run git worktree add "$WORKTREE_PATH" -b "$BRANCH" "$BASE_REF"
 fi
 
-run scripts/worktree-post-create "$WORKTREE_PATH"
+run "$SCRIPT_DIR/worktree-post-create" "$WORKTREE_PATH"
 
 log 'done'

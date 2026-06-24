@@ -4,7 +4,7 @@ set -euo pipefail
 usage() {
   cat <<'USAGE'
 Usage:
-  scripts/worktree-post-create <worktree-path>
+  .pi/bin/worktree-post-create <worktree-path>
 
 Runs safe post-create setup for a feature worktree.
 
