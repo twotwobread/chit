@@ -14,6 +14,7 @@ CREATE TABLE users (
   email_normalized text NULL,
   email_verified boolean NOT NULL DEFAULT false,
   avatar_url text NULL,
+  deleted_at timestamptz NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
@@ -21,6 +22,10 @@ CREATE TABLE users (
 CREATE INDEX users_email_normalized_idx
   ON users (email_normalized)
   WHERE email_normalized IS NOT NULL;
+
+CREATE INDEX users_deleted_at_idx
+  ON users (deleted_at)
+  WHERE deleted_at IS NOT NULL;
 
 CREATE TABLE auth_identities (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

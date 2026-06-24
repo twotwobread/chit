@@ -159,6 +159,24 @@ func (s apiServer) UpdateMe(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, authMeToOpenAPI(result))
 }
 
+func (s apiServer) DeleteMe(w http.ResponseWriter, r *http.Request) {
+	if s.auth == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "auth is not configured", nil)
+		return
+	}
+
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+	if err := s.auth.DeleteAccount(r.Context(), authContext); err != nil {
+		writeAuthError(w, err, "")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func authMeToOpenAPI(result auth.MeResult) openapi.AuthMeResponse {
 	providers := make([]openapi.AuthProvider, 0, len(result.LinkedProviders))
 	for _, provider := range result.LinkedProviders {

@@ -38,6 +38,7 @@ type AuthServiceClient = {
   refreshToken: (request: { refreshToken: string }) => Promise<AuthRefreshResponse>;
   getMe: () => Promise<AuthMeResponse>;
   updateMe: (request: { displayName: string }) => Promise<AuthMeResponse>;
+  deleteMe: () => Promise<unknown>;
   logout: () => Promise<unknown>;
 };
 
@@ -62,6 +63,7 @@ const defaultAuthClientDeps: AuthClientDeps = {
 };
 
 let meWithRefreshInFlight: Promise<AuthMeResponse> | null = null;
+let deleteAccountInFlight: Promise<void> | null = null;
 let logoutInFlight: Promise<void> | null = null;
 
 export class MobileAuthError extends Error {
@@ -210,6 +212,49 @@ export async function refreshStoredSession(
   return response;
 }
 
+export function deleteAccountWithRefresh(deps: AuthClientDeps = defaultAuthClientDeps): Promise<void> {
+  if (deleteAccountInFlight) {
+    return deleteAccountInFlight;
+  }
+
+  const promise = deleteAccountWithRefreshOnce(deps).finally(() => {
+    if (deleteAccountInFlight === promise) {
+      deleteAccountInFlight = null;
+    }
+  });
+  deleteAccountInFlight = promise;
+  return promise;
+}
+
+async function deleteAccountWithRefreshOnce(deps: AuthClientDeps): Promise<void> {
+  const session = await requireSession(deps);
+  deps.configureApi(session.tokens.accessToken);
+
+  try {
+    await deps.authService.deleteMe();
+    await clearLocalAuthAfterConfirmedEnd(deps);
+    return;
+  } catch (error) {
+    if (getErrorCode(error) !== 'UNAUTHORIZED') {
+      throw toMobileAuthError(error);
+    }
+  }
+
+  const refreshed = await refreshStoredSession(session.tokens.refreshToken, deps, session);
+  deps.configureApi(refreshed.tokens.accessToken);
+
+  try {
+    await deps.authService.deleteMe();
+    await clearLocalAuthAfterConfirmedEnd(deps);
+  } catch (error) {
+    if (isNonRetryableAuthError(error)) {
+      await bestEffortClearStoredSession(deps);
+      deps.configureApi();
+    }
+    throw toMobileAuthError(error);
+  }
+}
+
 export function logoutCurrentSession(deps: AuthClientDeps = defaultAuthClientDeps): Promise<void> {
   if (logoutInFlight) {
     return logoutInFlight;
@@ -236,16 +281,20 @@ async function logoutCurrentSessionOnce(deps: AuthClientDeps): Promise<void> {
   } catch {
     // Device-local logout is prioritized even when server revocation cannot be confirmed.
   } finally {
-    try {
-      await deps.clearProviderLocalSessions();
-    } catch {
-      // Provider-local cleanup is best-effort and must not block i-um local logout.
-    }
-    try {
-      await deps.clearStoredSession();
-    } finally {
-      deps.configureApi();
-    }
+    await clearLocalAuthAfterConfirmedEnd(deps);
+  }
+}
+
+async function clearLocalAuthAfterConfirmedEnd(deps: AuthClientDeps): Promise<void> {
+  try {
+    await deps.clearProviderLocalSessions();
+  } catch {
+    // Provider-local cleanup is best-effort and must not block i-um local auth cleanup.
+  }
+  try {
+    await deps.clearStoredSession();
+  } finally {
+    deps.configureApi();
   }
 }
 

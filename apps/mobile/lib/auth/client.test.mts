@@ -4,6 +4,7 @@ import test from 'node:test';
 import type { AuthLoginResponse, AuthMeResponse, AuthRefreshResponse } from '@i-um/api-contract';
 
 import {
+  deleteAccountWithRefresh,
   getMeWithRefresh,
   logoutCurrentSession,
   MobileAuthError,
@@ -41,6 +42,7 @@ type DepsOptions = {
   readResult?: StoredSessionReadResult;
   getMe?: () => Promise<AuthMeResponse>;
   updateMe?: (request: { displayName: string }) => Promise<AuthMeResponse>;
+  deleteMe?: () => Promise<unknown>;
   refreshToken?: () => Promise<AuthRefreshResponse>;
   logout?: () => Promise<unknown>;
   saveStoredSession?: (session: StoredSession) => Promise<void>;
@@ -56,6 +58,7 @@ function createDeps(options: DepsOptions = {}) {
       linkOAuthProvider: async () => ({ result: 'provider_link_success', linkedIdentity: { provider: 'kakao' } }),
       getMe: options.getMe ?? (async () => me),
       updateMe: options.updateMe ?? (async () => me),
+      deleteMe: options.deleteMe ?? (async () => undefined),
       refreshToken: options.refreshToken ?? (async () => refreshResponse),
       logout:
         options.logout ??
@@ -329,6 +332,114 @@ test('keeps refreshed session when retried display-name update returns validatio
   });
   assert.equal(getStored()?.user.displayName, '민수');
   assert.equal(getStored()?.tokens.accessToken, 'new-access-token');
+});
+
+test('deletes account with a valid stored access token and clears provider, local session, and API auth', async () => {
+  let deleteCalls = 0;
+  const { deps, calls, getStored } = createDeps({
+    deleteMe: async () => {
+      deleteCalls += 1;
+    },
+  });
+
+  await deleteAccountWithRefresh(deps);
+
+  assert.equal(deleteCalls, 1);
+  assert.equal(getStored(), null);
+  assert.deepEqual(calls, ['configure:old-access-token', 'clearProviders', 'clear', 'configure:']);
+});
+
+test('refreshes once after unauthorized account deletion, retries, and clears local auth after success', async () => {
+  let deleteCalls = 0;
+  const { deps, calls, getStored } = createDeps({
+    deleteMe: async () => {
+      deleteCalls += 1;
+      if (deleteCalls === 1) {
+        throw apiError('UNAUTHORIZED');
+      }
+    },
+  });
+
+  await deleteAccountWithRefresh(deps);
+
+  assert.equal(deleteCalls, 2);
+  assert.equal(getStored(), null);
+  assert.deepEqual(calls, [
+    'configure:old-access-token',
+    'configure:',
+    'save:new-access-token',
+    'configure:new-access-token',
+    'clearProviders',
+    'clear',
+    'configure:',
+  ]);
+});
+
+test('keeps local session when account deletion fails with retryable server error', async () => {
+  const { deps, getStored } = createDeps({
+    deleteMe: async () => {
+      throw apiError('INTERNAL_ERROR', 500);
+    },
+  });
+
+  await assert.rejects(() => deleteAccountWithRefresh(deps), (error) => {
+    assert.ok(error instanceof MobileAuthError);
+    assert.equal(error.code, 'UNKNOWN');
+    return true;
+  });
+  assert.equal(getStored()?.tokens.accessToken, 'old-access-token');
+});
+
+test('account deletion clears local session when retry still returns unauthorized', async () => {
+  const { deps, getStored } = createDeps({
+    deleteMe: async () => {
+      throw apiError('UNAUTHORIZED');
+    },
+  });
+
+  await assert.rejects(() => deleteAccountWithRefresh(deps), (error) => {
+    assert.ok(error instanceof MobileAuthError);
+    assert.equal(error.code, 'UNAUTHORIZED');
+    return true;
+  });
+  assert.equal(getStored(), null);
+});
+
+test('account deletion ignores provider cleanup failure after confirmed server success', async () => {
+  const { deps, calls, getStored } = createDeps({
+    clearProviderLocalSessions: async () => {
+      calls.push('clearProviders');
+      throw new Error('provider cleanup failed');
+    },
+  });
+
+  await deleteAccountWithRefresh(deps);
+
+  assert.equal(getStored(), null);
+  assert.deepEqual(calls, ['configure:old-access-token', 'clearProviders', 'clear', 'configure:']);
+});
+
+test('account deletion is single-flight for duplicate callers', async () => {
+  let releaseDelete: (() => void) | null = null;
+  let deleteCalls = 0;
+  const { deps, calls, getStored } = createDeps({
+    deleteMe: async () => {
+      deleteCalls += 1;
+      await new Promise<void>((resolve) => {
+        releaseDelete = resolve;
+      });
+    },
+  });
+
+  const first = deleteAccountWithRefresh(deps);
+  const second = deleteAccountWithRefresh(deps);
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  releaseDelete?.();
+  await Promise.all([first, second]);
+
+  assert.equal(deleteCalls, 1);
+  assert.equal(getStored(), null);
+  assert.deepEqual(calls, ['configure:old-access-token', 'clearProviders', 'clear', 'configure:']);
 });
 
 test('logout attempts server revoke and clears provider, local session, and API auth', async () => {

@@ -111,6 +111,7 @@ type User struct {
 	EmailNormalized pgtype.Text
 	EmailVerified   bool
 	AvatarUrl       pgtype.Text
+	DeletedAt       pgtype.Timestamptz
 	CreatedAt       pgtype.Timestamptz
 	UpdatedAt       pgtype.Timestamptz
 }

@@ -407,6 +407,61 @@ func TestUpdateMeHandlerRequiresAuth(t *testing.T) {
 	}
 }
 
+func TestDeleteMeHandlerDeletesAccountAndInvalidatesTokens(t *testing.T) {
+	backend := newFakeAuthBackend()
+	session := loginTestUserSession(t, backend, "apple-1", "민수")
+
+	deleteRecorder := httptest.NewRecorder()
+	deleteRequest := httptest.NewRequest(http.MethodDelete, "/me", nil)
+	deleteRequest.Header.Set("Authorization", "Bearer "+session.AccessToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(deleteRecorder, deleteRequest)
+
+	if deleteRecorder.Code != http.StatusNoContent {
+		t.Fatalf("expected delete status %d, got %d with body %s", http.StatusNoContent, deleteRecorder.Code, deleteRecorder.Body.String())
+	}
+	if deleteRecorder.Body.String() != "" {
+		t.Fatalf("expected empty delete response body, got %q", deleteRecorder.Body.String())
+	}
+
+	deletedUser := backend.users[session.UserID]
+	if deletedUser.DisplayName != "탈퇴한 사용자" || deletedUser.Email != nil || deletedUser.EmailVerified || deletedUser.AvatarURL != nil {
+		t.Fatalf("expected deleted user PII wiped, got %#v", deletedUser)
+	}
+
+	meRecorder := httptest.NewRecorder()
+	meRequest := httptest.NewRequest(http.MethodGet, "/me", nil)
+	meRequest.Header.Set("Authorization", "Bearer "+session.AccessToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(meRecorder, meRequest)
+	if meRecorder.Code != http.StatusUnauthorized {
+		t.Fatalf("expected old access token status %d, got %d with body %s", http.StatusUnauthorized, meRecorder.Code, meRecorder.Body.String())
+	}
+
+	refreshRecorder := httptest.NewRecorder()
+	refreshRequest := httptest.NewRequest(http.MethodPost, "/auth/token/refresh", bytes.NewReader([]byte(fmt.Sprintf(`{"refreshToken":%q}`, session.RefreshToken))))
+	refreshRequest.Header.Set("Content-Type", "application/json")
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(refreshRecorder, refreshRequest)
+	if refreshRecorder.Code != http.StatusUnauthorized {
+		t.Fatalf("expected old refresh token status %d, got %d with body %s", http.StatusUnauthorized, refreshRecorder.Code, refreshRecorder.Body.String())
+	}
+
+	relogin := loginTestUserSession(t, backend, "apple-1", "민수")
+	if relogin.UserID == session.UserID {
+		t.Fatalf("expected same provider relogin to create a new user id, got %q", relogin.UserID)
+	}
+}
+
+func TestDeleteMeHandlerRequiresAuth(t *testing.T) {
+	backend := newFakeAuthBackend()
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodDelete, "/me", nil)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusUnauthorized {
+		t.Fatalf("expected delete unauthorized status %d, got %d with body %s", http.StatusUnauthorized, recorder.Code, recorder.Body.String())
+	}
+}
+
 func TestCreateTripHandler(t *testing.T) {
 	backend := newFakeAuthBackend()
 	accessToken := loginTestUser(t, backend)
@@ -2442,6 +2497,7 @@ type fakeAuthBackend struct {
 	users             map[string]auth.User
 	identityUser      map[string]string
 	sessions          map[string]auth.Session
+	deletedUsers      map[string]bool
 	trips             map[string]tripdomain.Trip
 	participants      map[string][]tripdomain.Participant
 	tripPlaces        map[string]tripdomain.TripPlaceSummary
@@ -2462,6 +2518,12 @@ type fakeAuthBackend struct {
 func loginTestUser(t *testing.T, backend *fakeAuthBackend) string {
 	t.Helper()
 	return loginTestUserWithSubject(t, backend, "apple-1", "민수")
+}
+
+type testUserSession struct {
+	AccessToken  string
+	RefreshToken string
+	UserID       string
 }
 
 func loginTestUserWithSubject(t *testing.T, backend *fakeAuthBackend, subject string, displayName string) string {
@@ -2499,6 +2561,47 @@ func loginTestUserWithSubject(t *testing.T, backend *fakeAuthBackend, subject st
 		t.Fatal("expected access token")
 	}
 	return body.Tokens.AccessToken
+}
+
+func loginTestUserSession(t *testing.T, backend *fakeAuthBackend, subject string, displayName string) testUserSession {
+	t.Helper()
+
+	requestBody := []byte(fmt.Sprintf(`{
+		"provider":"apple",
+		"credential":{
+			"devSubject":%q,
+			"email":%q,
+			"emailVerified":true,
+			"displayName":%q
+		},
+		"device":{"platform":"ios"}
+	}`, subject, subject+"@example.com", displayName))
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/auth/oauth/login", bytes.NewReader(requestBody))
+	request.Header.Set("Content-Type", "application/json")
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected login status %d, got %d with body %s", http.StatusOK, recorder.Code, recorder.Body.String())
+	}
+
+	var body struct {
+		User struct {
+			ID string `json:"id"`
+		} `json:"user"`
+		Tokens struct {
+			AccessToken  string `json:"accessToken"`
+			RefreshToken string `json:"refreshToken"`
+		} `json:"tokens"`
+	}
+	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+		t.Fatalf("decode login response: %v", err)
+	}
+	if body.Tokens.AccessToken == "" || body.Tokens.RefreshToken == "" || body.User.ID == "" {
+		t.Fatalf("expected user and tokens, got %#v", body)
+	}
+	return testUserSession{AccessToken: body.Tokens.AccessToken, RefreshToken: body.Tokens.RefreshToken, UserID: body.User.ID}
 }
 
 func createTestTrip(t *testing.T, backend *fakeAuthBackend, accessToken string) string {
@@ -2573,6 +2676,7 @@ func newFakeAuthBackend() *fakeAuthBackend {
 		users:             map[string]auth.User{},
 		identityUser:      map[string]string{},
 		sessions:          map[string]auth.Session{},
+		deletedUsers:      map[string]bool{},
 		trips:             map[string]tripdomain.Trip{},
 		participants:      map[string][]tripdomain.Participant{},
 		tripPlaces:        map[string]tripdomain.TripPlaceSummary{},
@@ -2584,7 +2688,7 @@ func newFakeAuthBackend() *fakeAuthBackend {
 
 func (b *fakeAuthBackend) FindUserByIdentity(_ context.Context, provider auth.Provider, providerSubject string) (auth.User, bool, error) {
 	userID, ok := b.identityUser[string(provider)+":"+providerSubject]
-	if !ok {
+	if !ok || b.deletedUsers[userID] {
 		return auth.User{}, false, nil
 	}
 	return b.users[userID], true, nil
@@ -2616,7 +2720,7 @@ func (b *fakeAuthBackend) CreateSession(_ context.Context, userID string, refres
 
 func (b *fakeAuthBackend) FindSessionByRefreshTokenHash(_ context.Context, refreshTokenHash string) (auth.Session, bool, error) {
 	for _, session := range b.sessions {
-		if session.RefreshTokenHash == refreshTokenHash {
+		if session.RefreshTokenHash == refreshTokenHash && !b.deletedUsers[session.UserID] {
 			return session, true, nil
 		}
 	}
@@ -2625,7 +2729,10 @@ func (b *fakeAuthBackend) FindSessionByRefreshTokenHash(_ context.Context, refre
 
 func (b *fakeAuthBackend) GetSession(_ context.Context, sessionID string) (auth.Session, bool, error) {
 	session, ok := b.sessions[sessionID]
-	return session, ok, nil
+	if !ok || b.deletedUsers[session.UserID] {
+		return auth.Session{}, false, nil
+	}
+	return session, true, nil
 }
 
 func (b *fakeAuthBackend) RotateSessionRefreshToken(_ context.Context, sessionID string, refreshTokenHash string, refreshTokenExpiresAt time.Time) (auth.Session, error) {
@@ -2646,7 +2753,7 @@ func (b *fakeAuthBackend) RevokeSession(_ context.Context, sessionID string) err
 
 func (b *fakeAuthBackend) UpdateUserDisplayName(_ context.Context, userID string, displayName string) (auth.User, bool, error) {
 	user, ok := b.users[userID]
-	if !ok {
+	if !ok || b.deletedUsers[userID] {
 		return auth.User{}, false, nil
 	}
 	user.DisplayName = displayName
@@ -2656,11 +2763,42 @@ func (b *fakeAuthBackend) UpdateUserDisplayName(_ context.Context, userID string
 
 func (b *fakeAuthBackend) GetUser(_ context.Context, userID string) (auth.User, bool, error) {
 	user, ok := b.users[userID]
-	return user, ok, nil
+	if !ok || b.deletedUsers[userID] {
+		return auth.User{}, false, nil
+	}
+	return user, true, nil
 }
 
-func (b *fakeAuthBackend) ListProviders(context.Context, string) ([]auth.Provider, error) {
+func (b *fakeAuthBackend) ListProviders(_ context.Context, userID string) ([]auth.Provider, error) {
+	if b.deletedUsers[userID] {
+		return nil, nil
+	}
 	return []auth.Provider{auth.ProviderApple}, nil
+}
+
+func (b *fakeAuthBackend) DeleteAccount(_ context.Context, userID string, _ time.Time) error {
+	user, ok := b.users[userID]
+	if !ok || b.deletedUsers[userID] {
+		return auth.ErrUnauthorized
+	}
+
+	for key, identityUserID := range b.identityUser {
+		if identityUserID == userID {
+			delete(b.identityUser, key)
+		}
+	}
+	for sessionID, session := range b.sessions {
+		if session.UserID == userID {
+			delete(b.sessions, sessionID)
+		}
+	}
+	user.DisplayName = "탈퇴한 사용자"
+	user.Email = nil
+	user.EmailVerified = false
+	user.AvatarURL = nil
+	b.users[userID] = user
+	b.deletedUsers[userID] = true
+	return nil
 }
 
 func (b *fakeAuthBackend) GetCreator(_ context.Context, userID string) (tripdomain.Creator, bool, error) {

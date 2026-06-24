@@ -183,6 +183,13 @@ func (s *Service) Logout(ctx context.Context, authContext AuthContext) error {
 	return s.repo.RevokeSession(ctx, authContext.SessionID)
 }
 
+func (s *Service) DeleteAccount(ctx context.Context, authContext AuthContext) error {
+	if authContext.UserID == "" || authContext.SessionID == "" {
+		return ErrUnauthorized
+	}
+	return s.repo.DeleteAccount(ctx, authContext.UserID, s.now().UTC())
+}
+
 func (s *Service) Me(ctx context.Context, authContext AuthContext) (MeResult, error) {
 	if authContext.UserID == "" {
 		return MeResult{}, ErrUnauthorized

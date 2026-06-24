@@ -1197,6 +1197,29 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      operationId: deleteMe
+      summary: Delete the current account
+      description: Immediately and permanently deletes the authenticated i-um account, invalidates all sessions, removes provider identities, anonymizes retained shared-trip participation, deletes solo trips, and deactivates active invites created by the deleted user.
+      tags:
+        - Auth
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Account deleted.
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /auth/me:
     get:
       operationId: getCurrentUser
