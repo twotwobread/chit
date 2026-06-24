@@ -1,16 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 
 import type { AuthMeResponse, AuthProvider } from '@i-um/api-contract';
 
 import {
+  deleteAccountWithRefresh,
   getMeWithRefresh,
   linkOAuthProvider,
   logoutCurrentSession,
   MobileAuthError,
   updateDisplayNameWithRefresh,
 } from '../lib/auth/client';
+import { AccountDeletionSection } from '../lib/auth/account-deletion-section';
+import { createAccountDeletionFlow, type AccountDeletionFlow, type AccountDeletionStatus } from '../lib/auth/account-deletion-flow';
 import { normalizeDisplayNameInput } from '../lib/auth/display-name';
 import { createLogoutFlow, type LogoutFlow } from '../lib/auth/logout-flow';
 import { getOAuthCredential } from '../lib/auth/oauth';
@@ -30,7 +33,10 @@ export default function AccountScreen() {
   const [isSavingName, setIsSavingName] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [deletionStatus, setDeletionStatus] = useState<AccountDeletionStatus>('idle');
+  const [deletionError, setDeletionError] = useState<string | null>(null);
   const logoutFlowRef = useRef<LogoutFlow | null>(null);
+  const accountDeletionFlowRef = useRef<AccountDeletionFlow | null>(null);
 
   if (logoutFlowRef.current === null) {
     logoutFlowRef.current = createLogoutFlow({
@@ -39,10 +45,24 @@ export default function AccountScreen() {
     });
   }
 
+  if (accountDeletionFlowRef.current === null) {
+    accountDeletionFlowRef.current = createAccountDeletionFlow({
+      deleteAccount: deleteAccountWithRefresh,
+      replace: (path) => {
+        if (router.canDismiss()) {
+          router.dismissAll();
+        }
+        router.replace(path);
+      },
+    });
+  }
+
   const load = useCallback(async () => {
     setState({ status: 'loading' });
     setIsEditingName(false);
     setNameError(null);
+    setDeletionStatus('idle');
+    setDeletionError(null);
     try {
       const me = await getMeWithRefresh();
       setState({ status: 'ready', me });
@@ -131,8 +151,51 @@ export default function AccountScreen() {
     }
   };
 
+  const requestAccountDeletion = () => {
+    if (state.status !== 'ready') {
+      return;
+    }
+    const flow = accountDeletionFlowRef.current;
+    if (!flow || flow.isDeleting()) {
+      return;
+    }
+    setDeletionError(null);
+    setDeletionStatus(flow.requestConfirmation());
+  };
+
+  const cancelAccountDeletion = () => {
+    const flow = accountDeletionFlowRef.current;
+    if (!flow || flow.isDeleting()) {
+      return;
+    }
+    setDeletionError(null);
+    setDeletionStatus(flow.cancelConfirmation());
+  };
+
+  const confirmAccountDeletion = async () => {
+    if (state.status !== 'ready') {
+      return;
+    }
+    const flow = accountDeletionFlowRef.current;
+    if (!flow || flow.isDeleting()) {
+      return;
+    }
+
+    setDeletionError(null);
+    setDeletionStatus('deleting');
+    const result = await flow.confirmDeletion();
+    setDeletionStatus(flow.getStatus());
+    if (result.status === 'authError') {
+      setState({ status: 'error', message: result.message });
+      return;
+    }
+    if (result.status === 'retryableError') {
+      setDeletionError(result.message);
+    }
+  };
+
   return (
-    <View style={styles.container}>
+    <ScrollView contentContainerStyle={styles.container} style={styles.screen}>
       <Text style={styles.title}>계정</Text>
 
       {state.status === 'loading' ? (
@@ -231,9 +294,17 @@ export default function AccountScreen() {
               <Text style={styles.buttonText}>{isLoggingOut ? '로그아웃 중...' : '로그아웃'}</Text>
             </Pressable>
           </View>
+
+          <AccountDeletionSection
+            error={deletionError}
+            onCancel={cancelAccountDeletion}
+            onConfirm={() => void confirmAccountDeletion()}
+            onRequest={requestAccountDeletion}
+            status={deletionStatus}
+          />
         </View>
       ) : null}
-    </View>
+    </ScrollView>
   );
 }
 
@@ -250,8 +321,11 @@ function linkErrorMessage(error: unknown): string {
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    backgroundColor: theme.color.bg,
+  },
   container: {
-    flex: 1,
+    flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: theme.color.bg,
