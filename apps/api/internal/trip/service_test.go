@@ -74,6 +74,9 @@ type fakeRepository struct {
 	inviteResult           CreateTripInviteResult
 	inviteErr              error
 	inviteErrs             []error
+	acceptInviteRecord     AcceptTripInviteRecord
+	acceptInviteResult     AcceptTripInviteResult
+	acceptInviteErr        error
 }
 
 func (r *fakeRepository) GetCreator(context.Context, string) (Creator, bool, error) {
@@ -164,6 +167,17 @@ func (r *fakeRepository) CreateOrReturnTripInvite(_ context.Context, record Crea
 		},
 		Created: true,
 	}, nil
+}
+
+func (r *fakeRepository) AcceptTripInvite(_ context.Context, record AcceptTripInviteRecord) (AcceptTripInviteResult, error) {
+	r.acceptInviteRecord = record
+	if r.acceptInviteErr != nil {
+		return AcceptTripInviteResult{}, r.acceptInviteErr
+	}
+	if r.acceptInviteResult.TripID != "" {
+		return r.acceptInviteResult, nil
+	}
+	return AcceptTripInviteResult{TripID: testTripID, TripName: "오사카", Role: RoleMember, AlreadyAccepted: false}, nil
 }
 
 func (r *fakeRepository) CountTripParticipants(context.Context, string) (int, error) {
@@ -774,6 +788,73 @@ func TestServiceCreateInviteFailures(t *testing.T) {
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := newTestService(tt.repo).CreateInvite(context.Background(), tt.userID, tt.tripID)
+			if !errors.Is(err, tt.expect) {
+				t.Fatalf("expected %v, got %v", tt.expect, err)
+			}
+		})
+	}
+}
+
+func TestServiceAcceptInviteCreatesMember(t *testing.T) {
+	now := time.Date(2026, 6, 24, 9, 0, 0, 0, time.UTC)
+	repo := &fakeRepository{}
+	service := newTestService(repo)
+	service.now = func() time.Time { return now }
+
+	result, err := service.AcceptInvite(context.Background(), "user-2", "valid-token-abcdefghijklmnopqrstuvwxyz123456")
+	if err != nil {
+		t.Fatalf("accept invite: %v", err)
+	}
+	if repo.acceptInviteRecord.Token != "valid-token-abcdefghijklmnopqrstuvwxyz123456" || repo.acceptInviteRecord.UserID != "user-2" || !repo.acceptInviteRecord.Now.Equal(now) {
+		t.Fatalf("unexpected accept record: %#v", repo.acceptInviteRecord)
+	}
+	if result.TripID != testTripID || result.Role != RoleMember || result.AlreadyAccepted {
+		t.Fatalf("unexpected accept result: %#v", result)
+	}
+}
+
+func TestServiceAcceptInviteReturnsAlreadyAcceptedRoles(t *testing.T) {
+	cases := []struct {
+		name   string
+		result AcceptTripInviteResult
+	}{
+		{name: "member", result: AcceptTripInviteResult{TripID: testTripID, TripName: "오사카", Role: RoleMember, AlreadyAccepted: true}},
+		{name: "owner", result: AcceptTripInviteResult{TripID: testTripID, TripName: "오사카", Role: RoleOwner, AlreadyAccepted: true}},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			service := newTestService(&fakeRepository{acceptInviteResult: tt.result})
+			result, err := service.AcceptInvite(context.Background(), "user-1", "valid-token-abcdefghijklmnopqrstuvwxyz123456")
+			if err != nil {
+				t.Fatalf("accept invite: %v", err)
+			}
+			if result != tt.result {
+				t.Fatalf("expected %#v, got %#v", tt.result, result)
+			}
+		})
+	}
+}
+
+func TestServiceAcceptInviteFailures(t *testing.T) {
+	cases := []struct {
+		name   string
+		userID string
+		token  string
+		repo   *fakeRepository
+		expect error
+	}{
+		{name: "auth required", token: "valid-token-abcdefghijklmnopqrstuvwxyz123456", repo: &fakeRepository{}, expect: ErrUnauthorized},
+		{name: "blank token", userID: "user-1", token: " ", repo: &fakeRepository{}, expect: ErrValidation},
+		{name: "short token", userID: "user-1", token: "short", repo: &fakeRepository{}, expect: ErrValidation},
+		{name: "bad charset", userID: "user-1", token: "invalid-token-with-dot.abcdefghijklmnopqrstuvwxyz", repo: &fakeRepository{}, expect: ErrValidation},
+		{name: "missing invite", userID: "user-1", token: "valid-token-abcdefghijklmnopqrstuvwxyz123456", repo: &fakeRepository{acceptInviteErr: ErrInviteNotFound}, expect: ErrInviteNotFound},
+		{name: "expired invite", userID: "user-1", token: "valid-token-abcdefghijklmnopqrstuvwxyz123456", repo: &fakeRepository{acceptInviteErr: ErrInviteExpired}, expect: ErrInviteExpired},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := newTestService(tt.repo).AcceptInvite(context.Background(), tt.userID, tt.token)
 			if !errors.Is(err, tt.expect) {
 				t.Fatalf("expected %v, got %v", tt.expect, err)
 			}

@@ -12,11 +12,13 @@ const (
 )
 
 var (
-	ErrValidation   = errors.New("validation error")
-	ErrUnauthorized = errors.New("unauthorized")
-	ErrForbidden    = errors.New("forbidden")
-	ErrNotFound     = errors.New("not found")
-	ErrConflict     = errors.New("conflict")
+	ErrValidation     = errors.New("validation error")
+	ErrUnauthorized   = errors.New("unauthorized")
+	ErrForbidden      = errors.New("forbidden")
+	ErrNotFound       = errors.New("not found")
+	ErrConflict       = errors.New("conflict")
+	ErrInviteNotFound = errors.New("invite not found")
+	ErrInviteExpired  = errors.New("invite expired")
 )
 
 type Creator struct {
@@ -122,6 +124,12 @@ type CreateTripInviteRecord struct {
 	ExpiresAt time.Time
 }
 
+type AcceptTripInviteRecord struct {
+	Token  string
+	UserID string
+	Now    time.Time
+}
+
 type Trip struct {
 	ID              string
 	Name            string
@@ -177,6 +185,13 @@ type TripInvite struct {
 type CreateTripInviteResult struct {
 	Invite  TripInvite
 	Created bool
+}
+
+type AcceptTripInviteResult struct {
+	TripID          string
+	TripName        string
+	Role            string
+	AlreadyAccepted bool
 }
 
 type ParticipantSummary struct {
@@ -256,6 +271,7 @@ type Repository interface {
 	UpdateTripBasicInfo(ctx context.Context, record UpdateRecord) (Trip, error)
 	DeleteTripByID(ctx context.Context, tripID string) (bool, error)
 	CreateOrReturnTripInvite(ctx context.Context, record CreateTripInviteRecord) (CreateTripInviteResult, error)
+	AcceptTripInvite(ctx context.Context, record AcceptTripInviteRecord) (AcceptTripInviteResult, error)
 	CountTripParticipants(ctx context.Context, tripID string) (int, error)
 	ListTripParticipantPreviewNames(ctx context.Context, tripID string) ([]string, error)
 	ListTripParticipants(ctx context.Context, tripID string) ([]ParticipantListItem, error)

@@ -1250,6 +1250,119 @@ func TestCreateOrReturnTripInviteReusesCurrentAndReplacesExpired(t *testing.T) {
 	}
 }
 
+func TestAcceptTripInviteCreatesAndReusesParticipant(t *testing.T) {
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("DATABASE_URL is required for storage integration test")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	store, err := Open(ctx, databaseURL)
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer store.Close()
+
+	var ownerUserID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO users (display_name)
+		VALUES ('초대 Owner')
+		RETURNING id::text
+	`).Scan(&ownerUserID); err != nil {
+		t.Fatalf("insert owner user: %v", err)
+	}
+	defer func() {
+		_, _ = store.pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1::uuid`, ownerUserID)
+	}()
+
+	var memberUserID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO users (display_name)
+		VALUES (' 초대 Member ')
+		RETURNING id::text
+	`).Scan(&memberUserID); err != nil {
+		t.Fatalf("insert member user: %v", err)
+	}
+	defer func() {
+		_, _ = store.pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1::uuid`, memberUserID)
+	}()
+
+	var tripID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO trips (name, start_date, end_date, default_currency, created_by)
+		VALUES ('초대 수락 테스트 여행', '2026-07-10', '2026-07-13', 'KRW', $1::uuid)
+		RETURNING id::text
+	`, ownerUserID).Scan(&tripID); err != nil {
+		t.Fatalf("insert trip: %v", err)
+	}
+	defer func() { _, _ = store.pool.Exec(context.Background(), `DELETE FROM trips WHERE id = $1::uuid`, tripID) }()
+
+	if _, err := store.pool.Exec(ctx, `
+		INSERT INTO trip_participants (trip_id, user_id, role, display_name)
+		VALUES ($1::uuid, $2::uuid, 'owner', '초대 Owner')
+	`, tripID, ownerUserID); err != nil {
+		t.Fatalf("insert owner participant: %v", err)
+	}
+
+	now := time.Date(2026, 6, 24, 9, 0, 0, 0, time.UTC)
+	token := "accept-token-" + fmt.Sprintf("%d", time.Now().UnixNano()) + "-abcdefghijklmnopqrstuvwxyz"
+	if _, err := store.pool.Exec(ctx, `
+		INSERT INTO trip_invites (trip_id, token, created_by, expires_at, created_at)
+		VALUES ($1::uuid, $2, $3::uuid, $4, $5)
+	`, tripID, token, ownerUserID, now.Add(7*24*time.Hour), now); err != nil {
+		t.Fatalf("insert invite: %v", err)
+	}
+
+	accepted, err := store.AcceptTripInvite(ctx, trip.AcceptTripInviteRecord{Token: token, UserID: memberUserID, Now: now})
+	if err != nil {
+		t.Fatalf("accept invite: %v", err)
+	}
+	if accepted.TripID != tripID || accepted.TripName != "초대 수락 테스트 여행" || accepted.Role != trip.RoleMember || accepted.AlreadyAccepted {
+		t.Fatalf("unexpected accepted result: %#v", accepted)
+	}
+
+	var displayName string
+	if err := store.pool.QueryRow(ctx, `
+		SELECT display_name FROM trip_participants WHERE trip_id = $1::uuid AND user_id = $2::uuid
+	`, tripID, memberUserID).Scan(&displayName); err != nil {
+		t.Fatalf("select member participant: %v", err)
+	}
+	if displayName != "초대 Member" {
+		t.Fatalf("expected trimmed display name snapshot, got %q", displayName)
+	}
+
+	reused, err := store.AcceptTripInvite(ctx, trip.AcceptTripInviteRecord{Token: token, UserID: memberUserID, Now: now})
+	if err != nil {
+		t.Fatalf("reuse accepted invite: %v", err)
+	}
+	if reused.Role != trip.RoleMember || !reused.AlreadyAccepted {
+		t.Fatalf("expected member idempotent success, got %#v", reused)
+	}
+
+	ownerResult, err := store.AcceptTripInvite(ctx, trip.AcceptTripInviteRecord{Token: token, UserID: ownerUserID, Now: now})
+	if err != nil {
+		t.Fatalf("owner accept invite: %v", err)
+	}
+	if ownerResult.Role != trip.RoleOwner || !ownerResult.AlreadyAccepted {
+		t.Fatalf("expected owner already accepted success, got %#v", ownerResult)
+	}
+
+	var participantCount int
+	if err := store.pool.QueryRow(ctx, `SELECT count(*)::int FROM trip_participants WHERE trip_id = $1::uuid`, tripID).Scan(&participantCount); err != nil {
+		t.Fatalf("count participants: %v", err)
+	}
+	if participantCount != 2 {
+		t.Fatalf("expected owner plus one member, got %d", participantCount)
+	}
+
+	_, err = store.AcceptTripInvite(ctx, trip.AcceptTripInviteRecord{Token: token, UserID: memberUserID, Now: now.Add(8 * 24 * time.Hour)})
+	if !errors.Is(err, trip.ErrInviteExpired) {
+		t.Fatalf("expected ErrInviteExpired, got %v", err)
+	}
+}
+
 func TestDeleteTripByIDCascadesParticipants(t *testing.T) {
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {

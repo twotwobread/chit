@@ -7,6 +7,7 @@ export { CancelablePromise, CancelError } from './core/CancelablePromise';
 export { OpenAPI } from './core/OpenAPI';
 export type { OpenAPIConfig } from './core/OpenAPI';
 
+export type { AcceptTripInviteResponse } from './models/AcceptTripInviteResponse';
 export type { AuthLinkResponse } from './models/AuthLinkResponse';
 export type { AuthLoginResponse } from './models/AuthLoginResponse';
 export type { AuthLogoutResponse } from './models/AuthLogoutResponse';

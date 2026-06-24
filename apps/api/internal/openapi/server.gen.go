@@ -93,6 +93,15 @@ const (
 	Sights   TripPlaceType = "sights"
 )
 
+// AcceptTripInviteResponse defines model for AcceptTripInviteResponse.
+type AcceptTripInviteResponse struct {
+	// AlreadyAccepted false when this request created a new member participant; true when the user was already a participant.
+	AlreadyAccepted bool                `json:"alreadyAccepted"`
+	Role            TripParticipantRole `json:"role"`
+	TripId          string              `json:"tripId"`
+	TripName        string              `json:"tripName"`
+}
+
 // AuthLinkResponse defines model for AuthLinkResponse.
 type AuthLinkResponse struct {
 	LinkedIdentity LinkedIdentity         `json:"linkedIdentity"`
@@ -556,6 +565,9 @@ type ServerInterface interface {
 	// Check API health
 	// (GET /health)
 	GetHealth(w http.ResponseWriter, r *http.Request)
+	// Accept a trip invite link
+	// (POST /invites/{token}/accept)
+	AcceptTripInvite(w http.ResponseWriter, r *http.Request, token string)
 	// Delete the current account
 	// (DELETE /me)
 	DeleteMe(w http.ResponseWriter, r *http.Request)
@@ -652,6 +664,12 @@ func (_ Unimplemented) RefreshToken(w http.ResponseWriter, r *http.Request) {
 // Check API health
 // (GET /health)
 func (_ Unimplemented) GetHealth(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Accept a trip invite link
+// (POST /invites/{token}/accept)
+func (_ Unimplemented) AcceptTripInvite(w http.ResponseWriter, r *http.Request, token string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -871,6 +889,37 @@ func (siw *ServerInterfaceWrapper) GetHealth(w http.ResponseWriter, r *http.Requ
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetHealth(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AcceptTripInvite operation middleware
+func (siw *ServerInterfaceWrapper) AcceptTripInvite(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "token" -------------
+	var token string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "token", chi.URLParam(r, "token"), &token, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "token", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AcceptTripInvite(w, r, token)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1643,6 +1692,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/health", wrapper.GetHealth)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/invites/{token}/accept", wrapper.AcceptTripInvite)
 	})
 	r.Group(func(r chi.Router) {
 		r.Delete(options.BaseURL+"/me", wrapper.DeleteMe)

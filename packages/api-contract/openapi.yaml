@@ -366,6 +366,61 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /invites/{token}/accept:
+    post:
+      operationId: acceptTripInvite
+      summary: Accept a trip invite link
+      description: Accepts a reusable active trip invite for the authenticated user. Existing participants receive an idempotent success response.
+      tags:
+        - Trips
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 32
+            maxLength: 128
+            pattern: '^[A-Za-z0-9_-]+$'
+      responses:
+        '200':
+          description: Invite accepted or already accepted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AcceptTripInviteResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Invite token not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '410':
+          description: Invite token expired or deactivated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /trips/{tripId}/participants:
     get:
       operationId: listTripParticipants
@@ -1789,6 +1844,23 @@ components:
         created:
           type: boolean
           description: true when this request created a new invite, false when an existing unexpired current invite was reused.
+    AcceptTripInviteResponse:
+      type: object
+      required:
+        - tripId
+        - tripName
+        - role
+        - alreadyAccepted
+      properties:
+        tripId:
+          type: string
+        tripName:
+          type: string
+        role:
+          $ref: '#/components/schemas/TripParticipantRole'
+        alreadyAccepted:
+          type: boolean
+          description: false when this request created a new member participant; true when the user was already a participant.
     TripParticipantSummary:
       type: object
       required:

@@ -223,6 +223,76 @@ func (s *Store) CreateOrReturnTripInvite(ctx context.Context, record trip.Create
 	}, nil
 }
 
+func (s *Store) AcceptTripInvite(ctx context.Context, record trip.AcceptTripInviteRecord) (trip.AcceptTripInviteResult, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return trip.AcceptTripInviteResult{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	qtx := s.queries.WithTx(tx)
+	invite, err := qtx.GetTripInviteForAccept(ctx, record.Token)
+	if err == pgx.ErrNoRows {
+		return trip.AcceptTripInviteResult{}, trip.ErrInviteNotFound
+	}
+	if err != nil {
+		return trip.AcceptTripInviteResult{}, err
+	}
+	if invite.DeactivatedAt.Valid || !invite.ExpiresAt.Time.After(record.Now) {
+		return trip.AcceptTripInviteResult{}, trip.ErrInviteExpired
+	}
+
+	participantRole, err := qtx.GetTripParticipantRole(ctx, db.GetTripParticipantRoleParams{
+		Column1: mustUUID(invite.TiTripID),
+		Column2: mustUUID(record.UserID),
+	})
+	if err == nil {
+		if err := tx.Commit(ctx); err != nil {
+			return trip.AcceptTripInviteResult{}, err
+		}
+		return trip.AcceptTripInviteResult{TripID: invite.TiTripID, TripName: invite.TripName, Role: participantRole, AlreadyAccepted: true}, nil
+	}
+	if err != pgx.ErrNoRows {
+		return trip.AcceptTripInviteResult{}, err
+	}
+
+	user, err := qtx.GetUserByID(ctx, mustUUID(record.UserID))
+	if err == pgx.ErrNoRows {
+		return trip.AcceptTripInviteResult{}, trip.ErrUnauthorized
+	}
+	if err != nil {
+		return trip.AcceptTripInviteResult{}, err
+	}
+
+	_, err = qtx.CreateTripParticipant(ctx, db.CreateTripParticipantParams{
+		Column1:     mustUUID(invite.TiTripID),
+		Column2:     mustUUID(record.UserID),
+		Role:        trip.RoleMember,
+		DisplayName: trip.NormalizeParticipantDisplayName(user.DisplayName),
+	})
+	if isUniqueConstraintViolation(err, "trip_participants_trip_user_unique") {
+		participantRole, err := qtx.GetTripParticipantRole(ctx, db.GetTripParticipantRoleParams{
+			Column1: mustUUID(invite.TiTripID),
+			Column2: mustUUID(record.UserID),
+		})
+		if err != nil {
+			return trip.AcceptTripInviteResult{}, err
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return trip.AcceptTripInviteResult{}, err
+		}
+		return trip.AcceptTripInviteResult{TripID: invite.TiTripID, TripName: invite.TripName, Role: participantRole, AlreadyAccepted: true}, nil
+	}
+	if err != nil {
+		return trip.AcceptTripInviteResult{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return trip.AcceptTripInviteResult{}, err
+	}
+	return trip.AcceptTripInviteResult{TripID: invite.TiTripID, TripName: invite.TripName, Role: trip.RoleMember, AlreadyAccepted: false}, nil
+}
+
 func (s *Store) CountTripParticipants(ctx context.Context, tripID string) (int, error) {
 	count, err := s.queries.CountTripParticipantsByTripID(ctx, mustUUID(tripID))
 	if err != nil {

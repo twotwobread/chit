@@ -2,6 +2,7 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
+import type { AcceptTripInviteResponse } from '../models/AcceptTripInviteResponse';
 import type { CreateManualDayItineraryItemRequest } from '../models/CreateManualDayItineraryItemRequest';
 import type { CreateManualDayItineraryItemResponse } from '../models/CreateManualDayItineraryItemResponse';
 import type { CreateTripInviteResponse } from '../models/CreateTripInviteResponse';
@@ -162,6 +163,31 @@ export class TripsService {
                 403: `Forbidden.`,
                 404: `Trip not found.`,
                 409: `Invite token conflict after retry.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
+     * Accept a trip invite link
+     * Accepts a reusable active trip invite for the authenticated user. Existing participants receive an idempotent success response.
+     * @param token
+     * @returns AcceptTripInviteResponse Invite accepted or already accepted.
+     * @throws ApiError
+     */
+    public static acceptTripInvite(
+        token: string,
+    ): CancelablePromise<AcceptTripInviteResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/invites/{token}/accept',
+            path: {
+                'token': token,
+            },
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                404: `Invite token not found.`,
+                410: `Invite token expired or deactivated.`,
                 500: `Unexpected server error.`,
             },
         });

@@ -607,6 +607,40 @@ func (q *Queries) GetTripByID(ctx context.Context, dollar_1 pgtype.UUID) (GetTri
 	return i, err
 }
 
+const getTripInviteForAccept = `-- name: GetTripInviteForAccept :one
+SELECT
+  ti.id::text,
+  ti.trip_id::text,
+  t.name AS trip_name,
+  ti.expires_at,
+  ti.deactivated_at
+FROM trip_invites ti
+JOIN trips t ON t.id = ti.trip_id
+WHERE ti.token = $1
+FOR UPDATE OF ti
+`
+
+type GetTripInviteForAcceptRow struct {
+	TiID          string
+	TiTripID      string
+	TripName      string
+	ExpiresAt     pgtype.Timestamptz
+	DeactivatedAt pgtype.Timestamptz
+}
+
+func (q *Queries) GetTripInviteForAccept(ctx context.Context, token string) (GetTripInviteForAcceptRow, error) {
+	row := q.db.QueryRow(ctx, getTripInviteForAccept, token)
+	var i GetTripInviteForAcceptRow
+	err := row.Scan(
+		&i.TiID,
+		&i.TiTripID,
+		&i.TripName,
+		&i.ExpiresAt,
+		&i.DeactivatedAt,
+	)
+	return i, err
+}
+
 const getTripParticipantMembership = `-- name: GetTripParticipantMembership :one
 SELECT id::text
 FROM trip_participants

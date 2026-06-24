@@ -986,6 +986,150 @@ func TestCreateTripInviteValidationAuthAndAuthorization(t *testing.T) {
 	}
 }
 
+func TestAcceptTripInviteHandlerCreatesAndReusesParticipant(t *testing.T) {
+	backend := newFakeAuthBackend()
+	ownerToken := loginTestUser(t, backend)
+	tripID := createTestTrip(t, backend, ownerToken)
+
+	inviteRecorder := httptest.NewRecorder()
+	inviteRequest := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/invites", nil)
+	inviteRequest.Header.Set("Authorization", "Bearer "+ownerToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true, InviteBaseURL: "https://invite.i-um.test"}).ServeHTTP(inviteRecorder, inviteRequest)
+	if inviteRecorder.Code != http.StatusCreated {
+		t.Fatalf("expected invite create status %d, got %d with body %s", http.StatusCreated, inviteRecorder.Code, inviteRecorder.Body.String())
+	}
+	var inviteBody struct {
+		Invite struct {
+			Token string `json:"token"`
+		} `json:"invite"`
+	}
+	if err := json.NewDecoder(inviteRecorder.Body).Decode(&inviteBody); err != nil {
+		t.Fatalf("decode invite response: %v", err)
+	}
+
+	memberSession := loginTestUserSession(t, backend, "apple-2", " 지영 ")
+	acceptRecorder := httptest.NewRecorder()
+	acceptRequest := httptest.NewRequest(http.MethodPost, "/invites/"+inviteBody.Invite.Token+"/accept", nil)
+	acceptRequest.Header.Set("Authorization", "Bearer "+memberSession.AccessToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(acceptRecorder, acceptRequest)
+	if acceptRecorder.Code != http.StatusOK {
+		t.Fatalf("expected accept status %d, got %d with body %s", http.StatusOK, acceptRecorder.Code, acceptRecorder.Body.String())
+	}
+	var acceptBody struct {
+		TripID          string `json:"tripId"`
+		TripName        string `json:"tripName"`
+		Role            string `json:"role"`
+		AlreadyAccepted bool   `json:"alreadyAccepted"`
+	}
+	if err := json.NewDecoder(acceptRecorder.Body).Decode(&acceptBody); err != nil {
+		t.Fatalf("decode accept response: %v", err)
+	}
+	if acceptBody.TripID != tripID || acceptBody.TripName != "오사카 3박 4일" || acceptBody.Role != "member" || acceptBody.AlreadyAccepted {
+		t.Fatalf("unexpected accept body: %#v", acceptBody)
+	}
+	if len(backend.participants[tripID]) != 2 || backend.participants[tripID][1].DisplayName != "지영" {
+		t.Fatalf("expected owner plus trimmed member participant, got %#v", backend.participants[tripID])
+	}
+
+	reuseRecorder := httptest.NewRecorder()
+	reuseRequest := httptest.NewRequest(http.MethodPost, "/invites/"+inviteBody.Invite.Token+"/accept", nil)
+	reuseRequest.Header.Set("Authorization", "Bearer "+memberSession.AccessToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(reuseRecorder, reuseRequest)
+	if reuseRecorder.Code != http.StatusOK {
+		t.Fatalf("expected reuse status %d, got %d with body %s", http.StatusOK, reuseRecorder.Code, reuseRecorder.Body.String())
+	}
+	var reuseBody struct {
+		Role            string `json:"role"`
+		AlreadyAccepted bool   `json:"alreadyAccepted"`
+	}
+	if err := json.NewDecoder(reuseRecorder.Body).Decode(&reuseBody); err != nil {
+		t.Fatalf("decode reuse response: %v", err)
+	}
+	if reuseBody.Role != "member" || !reuseBody.AlreadyAccepted || len(backend.participants[tripID]) != 2 {
+		t.Fatalf("expected idempotent member response without duplicate, got body=%#v participants=%#v", reuseBody, backend.participants[tripID])
+	}
+
+	ownerRecorder := httptest.NewRecorder()
+	ownerRequest := httptest.NewRequest(http.MethodPost, "/invites/"+inviteBody.Invite.Token+"/accept", nil)
+	ownerRequest.Header.Set("Authorization", "Bearer "+ownerToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(ownerRecorder, ownerRequest)
+	if ownerRecorder.Code != http.StatusOK {
+		t.Fatalf("expected owner status %d, got %d with body %s", http.StatusOK, ownerRecorder.Code, ownerRecorder.Body.String())
+	}
+	var ownerBody struct {
+		Role            string `json:"role"`
+		AlreadyAccepted bool   `json:"alreadyAccepted"`
+	}
+	if err := json.NewDecoder(ownerRecorder.Body).Decode(&ownerBody); err != nil {
+		t.Fatalf("decode owner response: %v", err)
+	}
+	if ownerBody.Role != "owner" || !ownerBody.AlreadyAccepted {
+		t.Fatalf("expected owner already accepted response, got %#v", ownerBody)
+	}
+}
+
+func TestAcceptTripInviteHandlerErrors(t *testing.T) {
+	backend := newFakeAuthBackend()
+	ownerToken := loginTestUser(t, backend)
+	tripID := createTestTrip(t, backend, ownerToken)
+	memberToken := loginTestUserWithSubject(t, backend, "apple-2", "지영")
+
+	inviteRecorder := httptest.NewRecorder()
+	inviteRequest := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/invites", nil)
+	inviteRequest.Header.Set("Authorization", "Bearer "+ownerToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(inviteRecorder, inviteRequest)
+	if inviteRecorder.Code != http.StatusCreated {
+		t.Fatalf("expected invite create status %d, got %d with body %s", http.StatusCreated, inviteRecorder.Code, inviteRecorder.Body.String())
+	}
+	backend.tripInvites[tripID] = tripdomain.TripInvite{
+		ID:        backend.tripInvites[tripID].ID,
+		TripID:    tripID,
+		Token:     backend.tripInvites[tripID].Token,
+		ExpiresAt: time.Now().Add(-time.Hour),
+		CreatedAt: backend.tripInvites[tripID].CreatedAt,
+		CreatedBy: backend.tripInvites[tripID].CreatedBy,
+	}
+	expiredToken := backend.tripInvites[tripID].Token
+
+	cases := []struct {
+		name       string
+		path       string
+		token      string
+		expectCode int
+		expectErr  string
+	}{
+		{name: "auth required", path: "/invites/valid-token-abcdefghijklmnopqrstuvwxyz123456/accept", expectCode: http.StatusUnauthorized, expectErr: "UNAUTHORIZED"},
+		{name: "malformed token", path: "/invites/short/accept", token: memberToken, expectCode: http.StatusBadRequest, expectErr: "VALIDATION_ERROR"},
+		{name: "missing invite", path: "/invites/missing-token-abcdefghijklmnopqrstuvwxyz1234/accept", token: memberToken, expectCode: http.StatusNotFound, expectErr: "INVITE_NOT_FOUND"},
+		{name: "expired invite", path: "/invites/" + expiredToken + "/accept", token: memberToken, expectCode: http.StatusGone, expectErr: "INVITE_EXPIRED"},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			request := httptest.NewRequest(http.MethodPost, tt.path, nil)
+			if tt.token != "" {
+				request.Header.Set("Authorization", "Bearer "+tt.token)
+			}
+			NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+			if recorder.Code != tt.expectCode {
+				t.Fatalf("expected status %d, got %d with body %s", tt.expectCode, recorder.Code, recorder.Body.String())
+			}
+			var body struct {
+				Error struct {
+					Code string `json:"code"`
+				} `json:"error"`
+			}
+			if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+				t.Fatalf("decode error response: %v", err)
+			}
+			if body.Error.Code != tt.expectErr {
+				t.Fatalf("expected error %q, got %q", tt.expectErr, body.Error.Code)
+			}
+		})
+	}
+}
+
 func TestInviteFallbackPageLinksToStore(t *testing.T) {
 	backend := newFakeAuthBackend()
 	recorder := httptest.NewRecorder()
@@ -2903,6 +3047,45 @@ func (b *fakeAuthBackend) CreateOrReturnTripInvite(_ context.Context, record tri
 	}
 	b.tripInvites[record.TripID] = invite
 	return tripdomain.CreateTripInviteResult{Invite: invite, Created: true}, nil
+}
+
+func (b *fakeAuthBackend) AcceptTripInvite(_ context.Context, record tripdomain.AcceptTripInviteRecord) (tripdomain.AcceptTripInviteResult, error) {
+	var foundInvite tripdomain.TripInvite
+	for _, invite := range b.tripInvites {
+		if invite.Token == record.Token {
+			foundInvite = invite
+			break
+		}
+	}
+	if foundInvite.ID == "" {
+		return tripdomain.AcceptTripInviteResult{}, tripdomain.ErrInviteNotFound
+	}
+	if !foundInvite.ExpiresAt.After(record.Now) {
+		return tripdomain.AcceptTripInviteResult{}, tripdomain.ErrInviteExpired
+	}
+	foundTrip, ok := b.trips[foundInvite.TripID]
+	if !ok {
+		return tripdomain.AcceptTripInviteResult{}, tripdomain.ErrInviteNotFound
+	}
+	for _, participant := range b.participants[foundInvite.TripID] {
+		if participant.UserID == record.UserID {
+			return tripdomain.AcceptTripInviteResult{TripID: foundInvite.TripID, TripName: foundTrip.Name, Role: participant.Role, AlreadyAccepted: true}, nil
+		}
+	}
+	user, ok := b.users[record.UserID]
+	if !ok {
+		return tripdomain.AcceptTripInviteResult{}, tripdomain.ErrUnauthorized
+	}
+	b.nextInvite++
+	b.participants[foundInvite.TripID] = append(b.participants[foundInvite.TripID], tripdomain.Participant{
+		ID:          testUUID(7000 + b.nextInvite),
+		TripID:      foundInvite.TripID,
+		UserID:      record.UserID,
+		Role:        tripdomain.RoleMember,
+		DisplayName: tripdomain.NormalizeParticipantDisplayName(user.DisplayName),
+		JoinedAt:    record.Now,
+	})
+	return tripdomain.AcceptTripInviteResult{TripID: foundInvite.TripID, TripName: foundTrip.Name, Role: tripdomain.RoleMember, AlreadyAccepted: false}, nil
 }
 
 func (b *fakeAuthBackend) CountTripParticipants(_ context.Context, tripID string) (int, error) {
