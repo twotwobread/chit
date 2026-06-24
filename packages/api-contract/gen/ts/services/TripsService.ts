@@ -4,6 +4,7 @@
 /* eslint-disable */
 import type { CreateManualDayItineraryItemRequest } from '../models/CreateManualDayItineraryItemRequest';
 import type { CreateManualDayItineraryItemResponse } from '../models/CreateManualDayItineraryItemResponse';
+import type { CreateTripInviteResponse } from '../models/CreateTripInviteResponse';
 import type { CreateTripRequest } from '../models/CreateTripRequest';
 import type { CreateTripResponse } from '../models/CreateTripResponse';
 import type { GetDayItineraryResponse } from '../models/GetDayItineraryResponse';
@@ -135,6 +136,32 @@ export class TripsService {
                 401: `Unauthorized.`,
                 403: `Forbidden.`,
                 404: `Trip not found.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
+     * Create or retrieve the current trip invite link
+     * Creates a new invite link for a trip owner, or returns the existing unexpired current invite link.
+     * @param tripId
+     * @returns CreateTripInviteResponse Existing active invite link returned.
+     * @throws ApiError
+     */
+    public static createTripInvite(
+        tripId: string,
+    ): CancelablePromise<CreateTripInviteResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/trips/{tripId}/invites',
+            path: {
+                'tripId': tripId,
+            },
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                403: `Forbidden.`,
+                404: `Trip not found.`,
+                409: `Invite token conflict after retry.`,
                 500: `Unexpected server error.`,
             },
         });

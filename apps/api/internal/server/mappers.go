@@ -109,6 +109,21 @@ func listTripParticipantsResponseToOpenAPI(participants []trip.ParticipantListIt
 	return openapi.ListTripParticipantsResponse{Participants: items}
 }
 
+func createTripInviteResponseToOpenAPI(result trip.CreateTripInviteResult) openapi.CreateTripInviteResponse {
+	return openapi.CreateTripInviteResponse{
+		Invite: openapi.TripInvite{
+			Id:        result.Invite.ID,
+			TripId:    result.Invite.TripID,
+			Token:     result.Invite.Token,
+			InviteUrl: result.Invite.InviteURL,
+			ExpiresAt: result.Invite.ExpiresAt,
+			CreatedAt: result.Invite.CreatedAt,
+			CreatedBy: result.Invite.CreatedBy,
+		},
+		Created: result.Created,
+	}
+}
+
 func updateTripResponseToOpenAPI(result trip.UpdateResult) openapi.UpdateTripResponse {
 	return openapi.UpdateTripResponse{Trip: tripToOpenAPI(result.Trip)}
 }

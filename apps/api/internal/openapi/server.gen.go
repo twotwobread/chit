@@ -167,6 +167,13 @@ type CreateManualDayItineraryItemResponse struct {
 	Item DayItineraryItem `json:"item"`
 }
 
+// CreateTripInviteResponse defines model for CreateTripInviteResponse.
+type CreateTripInviteResponse struct {
+	// Created true when this request created a new invite, false when an existing unexpired current invite was reused.
+	Created bool       `json:"created"`
+	Invite  TripInvite `json:"invite"`
+}
+
 // CreateTripRequest defines model for CreateTripRequest.
 type CreateTripRequest struct {
 	DefaultCurrency SupportedCurrency `json:"defaultCurrency"`
@@ -390,6 +397,22 @@ type TripDay struct {
 	LodgingPlace *TripPlaceSummary  `json:"lodgingPlace"`
 }
 
+// TripInvite defines model for TripInvite.
+type TripInvite struct {
+	// CreatedAt UTC ISO 8601 timestamp.
+	CreatedAt time.Time `json:"createdAt"`
+	CreatedBy string    `json:"createdBy"`
+
+	// ExpiresAt UTC ISO 8601 timestamp.
+	ExpiresAt time.Time `json:"expiresAt"`
+	Id        string    `json:"id"`
+	InviteUrl string    `json:"inviteUrl"`
+
+	// Token Opaque base64url token. UI copies or shares inviteUrl instead of raw token.
+	Token  string `json:"token"`
+	TripId string `json:"tripId"`
+}
+
 // TripListItem defines model for TripListItem.
 type TripListItem struct {
 	CreatedAt        time.Time           `json:"createdAt"`
@@ -569,6 +592,9 @@ type ServerInterface interface {
 	// Search Google Places for a trip day
 	// (GET /trips/{tripId}/days/{date}/places/google/search)
 	SearchGooglePlaces(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, params SearchGooglePlacesParams)
+	// Create or retrieve the current trip invite link
+	// (POST /trips/{tripId}/invites)
+	CreateTripInvite(w http.ResponseWriter, r *http.Request, tripId string)
 	// List trip participants
 	// (GET /trips/{tripId}/participants)
 	ListTripParticipants(w http.ResponseWriter, r *http.Request, tripId string)
@@ -701,6 +727,12 @@ func (_ Unimplemented) SetDayLodgingPlace(w http.ResponseWriter, r *http.Request
 // Search Google Places for a trip day
 // (GET /trips/{tripId}/days/{date}/places/google/search)
 func (_ Unimplemented) SearchGooglePlaces(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, params SearchGooglePlacesParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Create or retrieve the current trip invite link
+// (POST /trips/{tripId}/invites)
+func (_ Unimplemented) CreateTripInvite(w http.ResponseWriter, r *http.Request, tripId string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1352,6 +1384,37 @@ func (siw *ServerInterfaceWrapper) SearchGooglePlaces(w http.ResponseWriter, r *
 	handler.ServeHTTP(w, r)
 }
 
+// CreateTripInvite operation middleware
+func (siw *ServerInterfaceWrapper) CreateTripInvite(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateTripInvite(w, r, tripId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListTripParticipants operation middleware
 func (siw *ServerInterfaceWrapper) ListTripParticipants(w http.ResponseWriter, r *http.Request) {
 
@@ -1558,6 +1621,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/trips/{tripId}/days/{date}/places/google/search", wrapper.SearchGooglePlaces)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/trips/{tripId}/invites", wrapper.CreateTripInvite)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/trips/{tripId}/participants", wrapper.ListTripParticipants)

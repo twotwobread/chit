@@ -114,6 +114,14 @@ type SetDayLodgingPlaceRecord struct {
 	TripPlaceID   string
 }
 
+type CreateTripInviteRecord struct {
+	TripID    string
+	CreatedBy string
+	Token     string
+	Now       time.Time
+	ExpiresAt time.Time
+}
+
 type Trip struct {
 	ID              string
 	Name            string
@@ -154,6 +162,21 @@ type CreateResult struct {
 
 type UpdateResult struct {
 	Trip Trip
+}
+
+type TripInvite struct {
+	ID        string
+	TripID    string
+	Token     string
+	InviteURL string
+	ExpiresAt time.Time
+	CreatedAt time.Time
+	CreatedBy string
+}
+
+type CreateTripInviteResult struct {
+	Invite  TripInvite
+	Created bool
 }
 
 type ParticipantSummary struct {
@@ -232,6 +255,7 @@ type Repository interface {
 	IsTripOwner(ctx context.Context, tripID string, userID string) (bool, error)
 	UpdateTripBasicInfo(ctx context.Context, record UpdateRecord) (Trip, error)
 	DeleteTripByID(ctx context.Context, tripID string) (bool, error)
+	CreateOrReturnTripInvite(ctx context.Context, record CreateTripInviteRecord) (CreateTripInviteResult, error)
 	CountTripParticipants(ctx context.Context, tripID string) (int, error)
 	ListTripParticipantPreviewNames(ctx context.Context, tripID string) ([]string, error)
 	ListTripParticipants(ctx context.Context, tripID string) ([]ParticipantListItem, error)

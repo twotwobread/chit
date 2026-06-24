@@ -12,6 +12,9 @@ type Config struct {
 	AppleAudience      string
 	AllowDevOAuth      bool
 	GooglePlacesAPIKey string
+	InviteBaseURL      string
+	AppStoreURL        string
+	PlayStoreURL       string
 	PlaceProvider      place.Provider
 }
 
@@ -21,6 +24,9 @@ func ConfigFromEnv() Config {
 		AppleAudience:      firstNonEmpty(os.Getenv("APPLE_CLIENT_ID"), os.Getenv("APPLE_BUNDLE_ID")),
 		AllowDevOAuth:      envBool(os.Getenv("AUTH_ALLOW_DEV_OAUTH")),
 		GooglePlacesAPIKey: os.Getenv("GOOGLE_PLACES_API_KEY"),
+		InviteBaseURL:      os.Getenv("INVITE_BASE_URL"),
+		AppStoreURL:        os.Getenv("INVITE_APP_STORE_URL"),
+		PlayStoreURL:       os.Getenv("INVITE_PLAY_STORE_URL"),
 	}
 }
 

@@ -16,10 +16,12 @@ type readinessChecker interface {
 }
 
 type apiServer struct {
-	readiness readinessChecker
-	auth      *auth.Service
-	trips     *trip.Service
-	places    *place.Service
+	readiness    readinessChecker
+	auth         *auth.Service
+	trips        *trip.Service
+	places       *place.Service
+	appStoreURL  string
+	playStoreURL string
 }
 
 func NewRouter(readiness readinessChecker) http.Handler {
@@ -41,7 +43,7 @@ func NewRouterWithConfig(readiness readinessChecker, config Config) http.Handler
 
 	var tripService *trip.Service
 	if repo, ok := readiness.(trip.Repository); ok {
-		tripService = trip.NewService(repo)
+		tripService = trip.NewService(repo, trip.WithInviteBaseURL(config.InviteBaseURL))
 	}
 
 	var placeService *place.Service
@@ -54,7 +56,16 @@ func NewRouterWithConfig(readiness readinessChecker, config Config) http.Handler
 	}
 
 	router := chi.NewRouter()
-	return openapi.HandlerWithOptions(apiServer{readiness: readiness, auth: authService, trips: tripService, places: placeService}, openapi.ChiServerOptions{
+	server := apiServer{
+		readiness:    readiness,
+		auth:         authService,
+		trips:        tripService,
+		places:       placeService,
+		appStoreURL:  config.AppStoreURL,
+		playStoreURL: config.PlayStoreURL,
+	}
+	router.Get("/invite/{token}", server.InviteFallback)
+	return openapi.HandlerWithOptions(server, openapi.ChiServerOptions{
 		BaseRouter:       router,
 		ErrorHandlerFunc: writeOpenAPIRequestError,
 	})

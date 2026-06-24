@@ -78,6 +78,30 @@ func (s apiServer) GetTripDetail(w http.ResponseWriter, r *http.Request, tripId 
 	writeJSON(w, http.StatusOK, getTripDetailResponseToOpenAPI(result))
 }
 
+func (s apiServer) CreateTripInvite(w http.ResponseWriter, r *http.Request, tripId string) {
+	if s.auth == nil || s.trips == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "trip invite creation is not configured", nil)
+		return
+	}
+
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	result, err := s.trips.CreateInvite(r.Context(), authContext.UserID, tripId)
+	if err != nil {
+		writeTripInviteError(w, err)
+		return
+	}
+
+	status := http.StatusCreated
+	if !result.Created {
+		status = http.StatusOK
+	}
+	writeJSON(w, status, createTripInviteResponseToOpenAPI(result))
+}
+
 func (s apiServer) ListTripParticipants(w http.ResponseWriter, r *http.Request, tripId string) {
 	if s.auth == nil || s.trips == nil {
 		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "trip participants are not configured", nil)

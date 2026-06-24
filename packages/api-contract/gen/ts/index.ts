@@ -18,6 +18,7 @@ export type { AuthTokens } from './models/AuthTokens';
 export type { AuthUser } from './models/AuthUser';
 export type { CreateManualDayItineraryItemRequest } from './models/CreateManualDayItineraryItemRequest';
 export type { CreateManualDayItineraryItemResponse } from './models/CreateManualDayItineraryItemResponse';
+export type { CreateTripInviteResponse } from './models/CreateTripInviteResponse';
 export type { CreateTripRequest } from './models/CreateTripRequest';
 export type { CreateTripResponse } from './models/CreateTripResponse';
 export type { DayItineraryItem } from './models/DayItineraryItem';
@@ -47,6 +48,7 @@ export type { SetDayLodgingPlaceResponse } from './models/SetDayLodgingPlaceResp
 export type { SupportedCurrency } from './models/SupportedCurrency';
 export type { Trip } from './models/Trip';
 export type { TripDay } from './models/TripDay';
+export type { TripInvite } from './models/TripInvite';
 export type { TripListItem } from './models/TripListItem';
 export type { TripParticipant } from './models/TripParticipant';
 export type { TripParticipantListItem } from './models/TripParticipantListItem';

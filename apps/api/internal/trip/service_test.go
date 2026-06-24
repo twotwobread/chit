@@ -69,6 +69,11 @@ type fakeRepository struct {
 	deletedID              string
 	deletedCalled          bool
 	deleteOK               bool
+	inviteRecord           CreateTripInviteRecord
+	inviteRecords          []CreateTripInviteRecord
+	inviteResult           CreateTripInviteResult
+	inviteErr              error
+	inviteErrs             []error
 }
 
 func (r *fakeRepository) GetCreator(context.Context, string) (Creator, bool, error) {
@@ -130,6 +135,35 @@ func (r *fakeRepository) DeleteTripByID(_ context.Context, tripID string) (bool,
 	r.deletedID = tripID
 	r.deletedCalled = true
 	return r.deleteOK, nil
+}
+
+func (r *fakeRepository) CreateOrReturnTripInvite(_ context.Context, record CreateTripInviteRecord) (CreateTripInviteResult, error) {
+	r.inviteRecord = record
+	r.inviteRecords = append(r.inviteRecords, record)
+	if len(r.inviteErrs) > 0 {
+		err := r.inviteErrs[0]
+		r.inviteErrs = r.inviteErrs[1:]
+		if err != nil {
+			return CreateTripInviteResult{}, err
+		}
+	}
+	if r.inviteErr != nil {
+		return CreateTripInviteResult{}, r.inviteErr
+	}
+	if r.inviteResult.Invite.ID != "" {
+		return r.inviteResult, nil
+	}
+	return CreateTripInviteResult{
+		Invite: TripInvite{
+			ID:        "invite-1",
+			TripID:    record.TripID,
+			Token:     record.Token,
+			ExpiresAt: record.ExpiresAt,
+			CreatedAt: record.Now,
+			CreatedBy: record.CreatedBy,
+		},
+		Created: true,
+	}, nil
 }
 
 func (r *fakeRepository) CountTripParticipants(context.Context, string) (int, error) {
@@ -637,6 +671,113 @@ func TestServiceGetDetailForbidden(t *testing.T) {
 	_, err := service.GetDetail(context.Background(), "user-1", testTripID)
 	if !errors.Is(err, ErrForbidden) {
 		t.Fatalf("expected ErrForbidden, got %v", err)
+	}
+}
+
+func TestServiceCreateInviteCreatesNewInvite(t *testing.T) {
+	now := time.Date(2026, 6, 23, 15, 0, 0, 0, time.UTC)
+	repo := &fakeRepository{tripFound: true, isOwner: true}
+	service := newTestService(repo)
+	service.now = func() time.Time { return now }
+	service.generateInviteToken = func() (string, error) { return "test-token-abcdefghijklmnopqrstuvwxyz123456", nil }
+	service.inviteBaseURL = "https://invite.i-um.app"
+
+	result, err := service.CreateInvite(context.Background(), "user-1", testTripID)
+	if err != nil {
+		t.Fatalf("create invite: %v", err)
+	}
+	if !result.Created {
+		t.Fatal("expected invite to be marked created")
+	}
+	if repo.inviteRecord.TripID != testTripID || repo.inviteRecord.CreatedBy != "user-1" {
+		t.Fatalf("unexpected invite record: %#v", repo.inviteRecord)
+	}
+	if !repo.inviteRecord.ExpiresAt.Equal(now.Add(inviteExpiryDuration)) {
+		t.Fatalf("expected 7-day expiry, got %s", repo.inviteRecord.ExpiresAt)
+	}
+	if result.Invite.InviteURL != "https://invite.i-um.app/invite/test-token-abcdefghijklmnopqrstuvwxyz123456" {
+		t.Fatalf("unexpected invite url %q", result.Invite.InviteURL)
+	}
+}
+
+func TestServiceCreateInviteReusesExistingActiveInvite(t *testing.T) {
+	now := time.Date(2026, 6, 23, 15, 0, 0, 0, time.UTC)
+	repo := &fakeRepository{
+		tripFound: true,
+		isOwner:   true,
+		inviteResult: CreateTripInviteResult{
+			Invite: TripInvite{
+				ID:        "invite-existing",
+				TripID:    testTripID,
+				Token:     "existing-token-abcdefghijklmnopqrstuvwxyz12",
+				ExpiresAt: now.Add(24 * time.Hour),
+				CreatedAt: now.Add(-24 * time.Hour),
+				CreatedBy: "user-1",
+			},
+			Created: false,
+		},
+	}
+	service := newTestService(repo)
+	service.now = func() time.Time { return now }
+	service.generateInviteToken = func() (string, error) { return "unused-token-abcdefghijklmnopqrstuvwxyz1234", nil }
+	service.inviteBaseURL = "https://invite.i-um.app/"
+
+	result, err := service.CreateInvite(context.Background(), "user-1", testTripID)
+	if err != nil {
+		t.Fatalf("create invite: %v", err)
+	}
+	if result.Created {
+		t.Fatal("expected existing invite reuse")
+	}
+	if result.Invite.InviteURL != "https://invite.i-um.app/invite/existing-token-abcdefghijklmnopqrstuvwxyz12" {
+		t.Fatalf("unexpected invite url %q", result.Invite.InviteURL)
+	}
+}
+
+func TestServiceCreateInviteRetriesTokenConflict(t *testing.T) {
+	repo := &fakeRepository{tripFound: true, isOwner: true, inviteErrs: []error{ErrConflict, nil}}
+	service := newTestService(repo)
+	tokens := []string{"conflicting-token-abcdefghijklmnopqrstuvwxyz", "fresh-token-abcdefghijklmnopqrstuvwxyz1234"}
+	service.generateInviteToken = func() (string, error) {
+		token := tokens[0]
+		tokens = tokens[1:]
+		return token, nil
+	}
+	service.inviteBaseURL = "https://invite.i-um.app"
+
+	result, err := service.CreateInvite(context.Background(), "user-1", testTripID)
+	if err != nil {
+		t.Fatalf("create invite with retry: %v", err)
+	}
+	if len(repo.inviteRecords) != 2 {
+		t.Fatalf("expected two create attempts, got %#v", repo.inviteRecords)
+	}
+	if result.Invite.Token != "fresh-token-abcdefghijklmnopqrstuvwxyz1234" || result.Invite.InviteURL != "https://invite.i-um.app/invite/fresh-token-abcdefghijklmnopqrstuvwxyz1234" {
+		t.Fatalf("expected retried invite token/url, got %#v", result.Invite)
+	}
+}
+
+func TestServiceCreateInviteFailures(t *testing.T) {
+	cases := []struct {
+		name   string
+		userID string
+		tripID string
+		repo   *fakeRepository
+		expect error
+	}{
+		{name: "auth required", tripID: testTripID, repo: &fakeRepository{}, expect: ErrUnauthorized},
+		{name: "invalid trip id", userID: "user-1", tripID: "not-a-uuid", repo: &fakeRepository{}, expect: ErrValidation},
+		{name: "missing trip", userID: "user-1", tripID: testTripID, repo: &fakeRepository{}, expect: ErrNotFound},
+		{name: "non owner", userID: "user-1", tripID: testTripID, repo: &fakeRepository{tripFound: true}, expect: ErrForbidden},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := newTestService(tt.repo).CreateInvite(context.Background(), tt.userID, tt.tripID)
+			if !errors.Is(err, tt.expect) {
+				t.Fatalf("expected %v, got %v", tt.expect, err)
+			}
+		})
 	}
 }
 
