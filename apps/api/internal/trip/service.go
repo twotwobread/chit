@@ -185,6 +185,44 @@ func (s *Service) Delete(ctx context.Context, userID string, tripID string) erro
 	return nil
 }
 
+func (s *Service) RemoveParticipant(ctx context.Context, userID string, tripID string, participantID string) error {
+	if strings.TrimSpace(userID) == "" {
+		return ErrUnauthorized
+	}
+
+	tripID = strings.TrimSpace(tripID)
+	participantID = strings.TrimSpace(participantID)
+	if !isUUID(tripID) || !isUUID(participantID) {
+		return ErrValidation
+	}
+
+	_, ok, err := s.repo.GetTripByID(ctx, tripID)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return ErrNotFound
+	}
+
+	isOwner, err := s.repo.IsTripOwner(ctx, tripID, userID)
+	if err != nil {
+		return err
+	}
+	if !isOwner {
+		return ErrForbidden
+	}
+
+	deleted, err := s.repo.DeleteTripMemberParticipant(ctx, tripID, participantID)
+	if err != nil {
+		return err
+	}
+	if !deleted {
+		return ErrNotFound
+	}
+
+	return nil
+}
+
 func (s *Service) CreateInvite(ctx context.Context, userID string, tripID string) (CreateTripInviteResult, error) {
 	if strings.TrimSpace(userID) == "" {
 		return CreateTripInviteResult{}, ErrUnauthorized

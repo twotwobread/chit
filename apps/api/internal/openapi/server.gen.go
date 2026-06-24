@@ -658,6 +658,9 @@ type ServerInterface interface {
 	// List trip participants
 	// (GET /trips/{tripId}/participants)
 	ListTripParticipants(w http.ResponseWriter, r *http.Request, tripId string)
+	// Remove a trip participant
+	// (DELETE /trips/{tripId}/participants/{participantId})
+	RemoveTripParticipant(w http.ResponseWriter, r *http.Request, tripId string, participantId string)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
@@ -829,6 +832,12 @@ func (_ Unimplemented) CreateTripInvite(w http.ResponseWriter, r *http.Request, 
 // List trip participants
 // (GET /trips/{tripId}/participants)
 func (_ Unimplemented) ListTripParticipants(w http.ResponseWriter, r *http.Request, tripId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Remove a trip participant
+// (DELETE /trips/{tripId}/participants/{participantId})
+func (_ Unimplemented) RemoveTripParticipant(w http.ResponseWriter, r *http.Request, tripId string, participantId string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1696,6 +1705,46 @@ func (siw *ServerInterfaceWrapper) ListTripParticipants(w http.ResponseWriter, r
 	handler.ServeHTTP(w, r)
 }
 
+// RemoveTripParticipant operation middleware
+func (siw *ServerInterfaceWrapper) RemoveTripParticipant(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "participantId" -------------
+	var participantId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "participantId", chi.URLParam(r, "participantId"), &participantId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "participantId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RemoveTripParticipant(w, r, tripId, participantId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 type UnescapedCookieParamError struct {
 	ParamName string
 	Err       error
@@ -1892,6 +1941,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/trips/{tripId}/participants", wrapper.ListTripParticipants)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/trips/{tripId}/participants/{participantId}", wrapper.RemoveTripParticipant)
 	})
 
 	return r

@@ -7,26 +7,42 @@ export type ParticipantRowViewModel = {
   displayName: string;
   role: TripParticipantRole;
   roleLabel: string;
+  canRemove: boolean;
 };
 
 export type ParticipantListViewModel = {
   rows: ParticipantRowViewModel[];
 };
 
-export type ParticipantListFailureStatus = 'auth' | 'invalid' | 'notFound' | 'error';
+export type ParticipantListOptions = {
+  canRemoveMembers?: boolean;
+};
 
-export function buildParticipantListViewModel(participants: TripParticipantListItem[]): ParticipantListViewModel {
+export type ParticipantListFailureStatus = 'auth' | 'invalid' | 'notFound' | 'error';
+export type ParticipantRemovalFailureStatus = 'auth' | 'error';
+
+const participantRemovalGenericErrorMessage = '참여자를 제거할 수 없어요. 잠시 후 다시 시도해주세요.';
+const participantRemovalAuthErrorMessage = '다시 로그인해주세요.';
+
+export function buildParticipantListViewModel(participants: TripParticipantListItem[], options: ParticipantListOptions = {}): ParticipantListViewModel {
   return {
-    rows: participants.map(toParticipantRowViewModel),
+    rows: participants.map((participant) => toParticipantRowViewModel(participant, options)),
   };
 }
 
-export function toParticipantRowViewModel(participant: TripParticipantListItem): ParticipantRowViewModel {
+export function toParticipantRowViewModel(participant: TripParticipantListItem, options: ParticipantListOptions = {}): ParticipantRowViewModel {
   return {
     participantId: participant.participantId,
     displayName: participant.displayName.trim() || '여행자',
     role: participant.role,
     roleLabel: participantRoleLabel(participant.role),
+    canRemove: Boolean(options.canRemoveMembers && participant.role === 'member'),
+  };
+}
+
+export function removeParticipantFromViewModel(viewModel: ParticipantListViewModel, participantId: string): ParticipantListViewModel {
+  return {
+    rows: viewModel.rows.filter((participant) => participant.participantId !== participantId),
   };
 }
 
@@ -48,6 +64,23 @@ export function participantListFailureStatus(input: { httpStatus?: number; mobil
     return 'notFound';
   }
   return 'error';
+}
+
+export function participantRemovalFailureStatus(input: { httpStatus?: number; mobileAuthCode?: string }): ParticipantRemovalFailureStatus {
+  if (input.mobileAuthCode === 'UNAUTHORIZED' || input.mobileAuthCode === 'INVALID_REFRESH_TOKEN') {
+    return 'auth';
+  }
+  if (input.httpStatus === 401) {
+    return 'auth';
+  }
+  return 'error';
+}
+
+export function participantRemovalFailureMessage(input: { httpStatus?: number; mobileAuthCode?: string }): string {
+  if (participantRemovalFailureStatus(input) === 'auth') {
+    return participantRemovalAuthErrorMessage;
+  }
+  return participantRemovalGenericErrorMessage;
 }
 
 export function tripParticipantsPath(tripId: string): `/trips/${string}/participants` {

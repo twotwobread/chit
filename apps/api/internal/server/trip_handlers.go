@@ -142,6 +142,25 @@ func (s apiServer) ListTripParticipants(w http.ResponseWriter, r *http.Request, 
 	writeJSON(w, http.StatusOK, listTripParticipantsResponseToOpenAPI(participants))
 }
 
+func (s apiServer) RemoveTripParticipant(w http.ResponseWriter, r *http.Request, tripId string, participantId string) {
+	if s.auth == nil || s.trips == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "trip participant removal is not configured", nil)
+		return
+	}
+
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	if err := s.trips.RemoveParticipant(r.Context(), authContext.UserID, tripId, participantId); err != nil {
+		writeTripDetailError(w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (s apiServer) SetDayLodgingPlace(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date) {
 	if s.auth == nil || s.trips == nil {
 		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "day lodging place is not configured", nil)

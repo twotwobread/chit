@@ -38,6 +38,11 @@ export async function listTripParticipants(tripId: string): Promise<ListTripPart
   return TripsService.listTripParticipants(tripId);
 }
 
+export async function removeTripParticipant(tripId: string, participantId: string): Promise<void> {
+  await getMeWithRefresh();
+  return TripsService.removeTripParticipant(tripId, participantId);
+}
+
 export async function createTripInvite(tripId: string): Promise<CreateTripInviteResponse> {
   await getMeWithRefresh();
   return TripsService.createTripInvite(tripId);
