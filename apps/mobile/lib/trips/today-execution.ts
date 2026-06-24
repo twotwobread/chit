@@ -24,7 +24,16 @@ export type TodayArriveAction = {
   itemId: string;
 };
 
-export type TodayAction = TodayRouteAction | TodayRetryAction | TodayArriveAction;
+export type TodayNavigateAction = {
+  kind: 'navigate';
+  label: string;
+  destination: {
+    placeName: string;
+    address: string;
+  };
+};
+
+export type TodayAction = TodayRouteAction | TodayRetryAction | TodayArriveAction | TodayNavigateAction;
 
 export type TodayMultipleOngoingTripNotice = {
   message: string;
@@ -118,6 +127,7 @@ export type TodaySuccessViewModel = {
     placeName: string;
     placeTypeLabel: string;
     address: string;
+    navigationAction: TodayNavigateAction;
   };
   remainingSection: TodayRemainingSectionViewModel;
   arrivalAction: TodayArriveAction;
@@ -215,6 +225,7 @@ export function buildTodayExecutionViewModel({
       placeName: nextItem.place.name,
       placeTypeLabel: getPlaceTypeLabel(nextItem.place.placeType),
       address: nextItem.place.address,
+      navigationAction: navigateAction(nextItem.place.name, nextItem.place.address),
     },
     remainingSection: buildRemainingSection(pendingItems.slice(1)),
     arrivalAction: arriveAction(selectedTrip.id, currentDay.date, nextItem.id),
@@ -295,4 +306,8 @@ function retryAction(): TodayRetryAction {
 
 function arriveAction(tripId: string, date: string, itemId: string): TodayArriveAction {
   return { kind: 'arrive', label: '도착했어요', tripId, date, itemId };
+}
+
+function navigateAction(placeName: string, address: string): TodayNavigateAction {
+  return { kind: 'navigate', label: '길찾기', destination: { placeName, address } };
 }

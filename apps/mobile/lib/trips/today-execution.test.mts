@@ -202,6 +202,14 @@ test('maps the first ordered itinerary item to the next place and subsequent ite
       placeName: '도톤보리',
       placeTypeLabel: '식당',
       address: '1 Chome Dotonbori, Chuo Ward, Osaka',
+      navigationAction: {
+        kind: 'navigate',
+        label: '길찾기',
+        destination: {
+          placeName: '도톤보리',
+          address: '1 Chome Dotonbori, Chuo Ward, Osaka',
+        },
+      },
     },
     remainingSection: {
       status: 'list',
@@ -267,6 +275,14 @@ test('selects the first pending itinerary item and excludes arrived items from r
   }
 
   assert.equal(viewModel.nextPlace.itemId, 'item-next');
+  assert.deepEqual(viewModel.nextPlace.navigationAction, {
+    kind: 'navigate',
+    label: '길찾기',
+    destination: {
+      placeName: '도톤보리',
+      address: 'Dotonbori',
+    },
+  });
   assert.deepEqual(viewModel.arrivalAction, {
     kind: 'arrive',
     label: '도착했어요',
@@ -338,6 +354,29 @@ test('keeps the remaining section visible with an empty message when only the ne
     emptyTitle: '다음 장소 이후 남은 장소가 없어요.',
     helper: '도착하면 오늘 일정이 끝나요.',
   });
+});
+
+test('does not expose navigation action outside a next-place success state', () => {
+  const empty = buildTodayExecutionViewModel({
+    selectedTrip: trip({ id: 'trip-current' }),
+    tripDetail: tripDetail(),
+    itinerary: itinerary({ items: [] }),
+    today: '2026-07-10',
+    ongoingTripCount: 1,
+  });
+  const completed = buildTodayExecutionViewModel({
+    selectedTrip: trip({ id: 'trip-current' }),
+    tripDetail: tripDetail(),
+    itinerary: itinerary({ items: [item({ arrivedAt: '2026-07-10T00:30:00Z' })] }),
+    today: '2026-07-10',
+    ongoingTripCount: 1,
+  });
+
+  assert.equal('nextPlace' in empty, false);
+  assert.equal('nextPlace' in completed, false);
+  assert.equal('nextPlace' in buildTodayNoOngoingTripViewModel(), false);
+  assert.equal('nextPlace' in buildTodayRetryableErrorViewModel(), false);
+  assert.equal('nextPlace' in buildTodayUnavailableViewModel(), false);
 });
 
 test('builds retryable and unavailable failure states without crashing callers', () => {
