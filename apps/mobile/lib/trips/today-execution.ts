@@ -16,7 +16,15 @@ export type TodayRetryAction = {
   label: string;
 };
 
-export type TodayAction = TodayRouteAction | TodayRetryAction;
+export type TodayArriveAction = {
+  kind: 'arrive';
+  label: string;
+  tripId: string;
+  date: string;
+  itemId: string;
+};
+
+export type TodayAction = TodayRouteAction | TodayRetryAction | TodayArriveAction;
 
 export type TodayMultipleOngoingTripNotice = {
   message: string;
@@ -64,6 +72,18 @@ export type TodayEmptyItineraryViewModel = {
   multipleOngoingTripNotice: TodayMultipleOngoingTripNotice | null;
 };
 
+export type TodayCompletedViewModel = {
+  status: 'completed';
+  tripName: string;
+  dayLabel: string;
+  formattedDate: string;
+  title: string;
+  helper: string;
+  completedCountLabel: string;
+  primaryAction: TodayRouteAction;
+  multipleOngoingTripNotice: TodayMultipleOngoingTripNotice | null;
+};
+
 export type TodayRemainingPlaceRowViewModel = {
   itemId: string;
   orderLabel: string;
@@ -100,6 +120,7 @@ export type TodaySuccessViewModel = {
     address: string;
   };
   remainingSection: TodayRemainingSectionViewModel;
+  arrivalAction: TodayArriveAction;
   primaryAction: TodayRouteAction;
   multipleOngoingTripNotice: TodayMultipleOngoingTripNotice | null;
 };
@@ -109,6 +130,7 @@ export type TodayExecutionViewModel =
   | TodayUnavailableViewModel
   | TodayRetryableErrorViewModel
   | TodayEmptyItineraryViewModel
+  | TodayCompletedViewModel
   | TodaySuccessViewModel;
 
 export function selectTodayTrip(trips: TripListItem[], today: string): TodayTripSelection | null {
@@ -147,29 +169,40 @@ export function buildTodayExecutionViewModel({
   itinerary: GetDayItineraryResponse;
   today: string;
   ongoingTripCount: number;
-}): TodayUnavailableViewModel | TodayEmptyItineraryViewModel | TodaySuccessViewModel {
+}): TodayUnavailableViewModel | TodayEmptyItineraryViewModel | TodayCompletedViewModel | TodaySuccessViewModel {
   const currentDay = findTodayTripDay(tripDetail.days, today);
   if (!currentDay) {
     return buildTodayUnavailableViewModel(selectedTrip.id);
   }
 
   const dayRoute = buildDayItineraryRoute(selectedTrip.id, currentDay.date);
+  const orderedItems = orderedItineraryItems(itinerary.items);
   const common = {
     tripName: tripDetail.trip.name,
     dayLabel: `Day ${currentDay.dayOrder}`,
     formattedDate: formatTripDayDate(currentDay.date),
-    primaryAction: routeAction(itinerary.items.length === 0 ? '오늘 일정 열기' : '오늘 일정 보기', dayRoute),
+    primaryAction: routeAction(orderedItems.length === 0 ? '오늘 일정 열기' : '오늘 일정 보기', dayRoute),
     multipleOngoingTripNotice: buildMultipleOngoingTripNotice(ongoingTripCount),
   };
 
-  const orderedItems = orderedItineraryItems(itinerary.items);
-  const nextItem = orderedItems[0];
-  if (!nextItem) {
+  if (orderedItems.length === 0) {
     return {
       status: 'emptyItinerary',
       ...common,
       title: '오늘 일정에 아직 장소가 없어요.',
       helper: '오늘 일정 화면에서 첫 장소를 추가해보세요.',
+    };
+  }
+
+  const pendingItems = orderedItems.filter((item) => item.arrivedAt === null);
+  const nextItem = pendingItems[0];
+  if (!nextItem) {
+    return {
+      status: 'completed',
+      ...common,
+      title: '오늘 일정을 모두 완료했어요.',
+      helper: '오늘 일정 화면에서 장소를 확인할 수 있어요.',
+      completedCountLabel: `완료한 장소 ${orderedItems.length}곳`,
     };
   }
 
@@ -183,7 +216,8 @@ export function buildTodayExecutionViewModel({
       placeTypeLabel: getPlaceTypeLabel(nextItem.place.placeType),
       address: nextItem.place.address,
     },
-    remainingSection: buildRemainingSection(orderedItems.slice(1)),
+    remainingSection: buildRemainingSection(pendingItems.slice(1)),
+    arrivalAction: arriveAction(selectedTrip.id, currentDay.date, nextItem.id),
   };
 }
 
@@ -257,4 +291,8 @@ function routeAction(label: string, route: string): TodayRouteAction {
 
 function retryAction(): TodayRetryAction {
   return { kind: 'retry', label: '다시 시도' };
+}
+
+function arriveAction(tripId: string, date: string, itemId: string): TodayArriveAction {
+  return { kind: 'arrive', label: '도착했어요', tripId, date, itemId };
 }

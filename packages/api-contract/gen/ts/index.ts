@@ -32,6 +32,7 @@ export type { HealthResponse } from './models/HealthResponse';
 export type { LinkedIdentity } from './models/LinkedIdentity';
 export type { ListTripParticipantsResponse } from './models/ListTripParticipantsResponse';
 export type { ListTripsResponse } from './models/ListTripsResponse';
+export type { MarkDayItineraryItemArrivedResponse } from './models/MarkDayItineraryItemArrivedResponse';
 export type { MetadataReadinessCheck } from './models/MetadataReadinessCheck';
 export type { OAuthCredential } from './models/OAuthCredential';
 export type { OAuthLinkRequest } from './models/OAuthLinkRequest';

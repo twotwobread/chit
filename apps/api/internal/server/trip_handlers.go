@@ -272,6 +272,26 @@ func (s apiServer) ReorderDayItineraryItems(w http.ResponseWriter, r *http.Reque
 	writeJSON(w, http.StatusOK, reorderDayItineraryItemsResponseToOpenAPI(result))
 }
 
+func (s apiServer) MarkDayItineraryItemArrived(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, itemId string) {
+	if s.auth == nil || s.trips == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "day itinerary arrival is not configured", nil)
+		return
+	}
+
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	result, err := s.trips.MarkDayItineraryItemArrived(r.Context(), authContext.UserID, tripId, dateFromOpenAPI(date), itemId)
+	if err != nil {
+		writeDayItineraryArrivalError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, markDayItineraryItemArrivedResponseToOpenAPI(result))
+}
+
 func (s apiServer) UpdateDayItineraryItem(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, itemId string) {
 	if s.auth == nil || s.trips == nil {
 		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "day itinerary update is not configured", nil)

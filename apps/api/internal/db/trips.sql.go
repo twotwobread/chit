@@ -93,7 +93,8 @@ INSERT INTO itinerary_items (
 RETURNING
   id::text,
   item_order,
-  version
+  version,
+  arrived_at
 `
 
 type CreateItineraryItemAtEndParams struct {
@@ -106,12 +107,18 @@ type CreateItineraryItemAtEndRow struct {
 	ID        string
 	ItemOrder int32
 	Version   int32
+	ArrivedAt pgtype.Timestamptz
 }
 
 func (q *Queries) CreateItineraryItemAtEnd(ctx context.Context, arg CreateItineraryItemAtEndParams) (CreateItineraryItemAtEndRow, error) {
 	row := q.db.QueryRow(ctx, createItineraryItemAtEnd, arg.TripID, arg.ScheduledDate, arg.TripPlaceID)
 	var i CreateItineraryItemAtEndRow
-	err := row.Scan(&i.ID, &i.ItemOrder, &i.Version)
+	err := row.Scan(
+		&i.ID,
+		&i.ItemOrder,
+		&i.Version,
+		&i.ArrivedAt,
+	)
 	return i, err
 }
 
@@ -515,6 +522,7 @@ SELECT
   ii.id::text AS id,
   ii.item_order,
   ii.version,
+  ii.arrived_at,
   (dlp.trip_place_id IS NOT NULL) AS is_lodging,
   tp.id::text AS trip_place_id,
   tp.name AS place_name,
@@ -543,6 +551,7 @@ type GetItineraryItemByTripDateAndIDRow struct {
 	ID          string
 	ItemOrder   int32
 	Version     int32
+	ArrivedAt   pgtype.Timestamptz
 	IsLodging   interface{}
 	TripPlaceID string
 	PlaceName   string
@@ -557,6 +566,7 @@ func (q *Queries) GetItineraryItemByTripDateAndID(ctx context.Context, arg GetIt
 		&i.ID,
 		&i.ItemOrder,
 		&i.Version,
+		&i.ArrivedAt,
 		&i.IsLodging,
 		&i.TripPlaceID,
 		&i.PlaceName,
@@ -767,6 +777,7 @@ const listItineraryItemsByTripAndDate = `-- name: ListItineraryItemsByTripAndDat
 SELECT
   ii.id::text AS id,
   ii.version,
+  ii.arrived_at,
   (dlp.trip_place_id IS NOT NULL) AS is_lodging,
   tp.id::text AS trip_place_id,
   tp.name AS place_name,
@@ -793,6 +804,7 @@ type ListItineraryItemsByTripAndDateParams struct {
 type ListItineraryItemsByTripAndDateRow struct {
 	ID          string
 	Version     int32
+	ArrivedAt   pgtype.Timestamptz
 	IsLodging   interface{}
 	TripPlaceID string
 	PlaceName   string
@@ -812,6 +824,7 @@ func (q *Queries) ListItineraryItemsByTripAndDate(ctx context.Context, arg ListI
 		if err := rows.Scan(
 			&i.ID,
 			&i.Version,
+			&i.ArrivedAt,
 			&i.IsLodging,
 			&i.TripPlaceID,
 			&i.PlaceName,
@@ -1095,6 +1108,7 @@ WITH target AS (
     ii.id,
     ii.item_order,
     ii.version,
+    ii.arrived_at,
     ii.trip_place_id
   FROM itinerary_items ii
   WHERE ii.trip_id = $1::uuid
@@ -1120,6 +1134,7 @@ SELECT
   target.id::text AS id,
   target.item_order,
   target.version,
+  target.arrived_at,
   (dlp.trip_place_id IS NOT NULL) AS is_lodging,
   updated_place.id AS trip_place_id,
   updated_place.name AS place_name,
@@ -1146,6 +1161,7 @@ type UpdateTripPlaceSnapshotByItineraryItemRow struct {
 	ID          string
 	ItemOrder   int32
 	Version     int32
+	ArrivedAt   pgtype.Timestamptz
 	IsLodging   interface{}
 	TripPlaceID string
 	PlaceName   string
@@ -1167,6 +1183,7 @@ func (q *Queries) UpdateTripPlaceSnapshotByItineraryItem(ctx context.Context, ar
 		&i.ID,
 		&i.ItemOrder,
 		&i.Version,
+		&i.ArrivedAt,
 		&i.IsLodging,
 		&i.TripPlaceID,
 		&i.PlaceName,

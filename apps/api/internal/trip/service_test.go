@@ -56,6 +56,10 @@ type fakeRepository struct {
 	reorderedCalled        bool
 	reorderedItems         []DayItineraryItem
 	reorderErr             error
+	markedArrivedRecord    MarkDayItineraryItemArrivedRecord
+	markedArrivedCalled    bool
+	markedArrivedResult    MarkDayItineraryItemArrivedMutationResult
+	markedArrivedErr       error
 	updatedDayItemRecord   UpdateDayItineraryItemRecord
 	updatedDayItemCalled   bool
 	updatedDayItem         DayItineraryItem
@@ -282,6 +286,23 @@ func (r *fakeRepository) ReorderDayItineraryItems(_ context.Context, record Reor
 		return r.reorderedItems, nil
 	}
 	return r.dayItineraryItems, nil
+}
+
+func (r *fakeRepository) MarkDayItineraryItemArrived(_ context.Context, record MarkDayItineraryItemArrivedRecord) (MarkDayItineraryItemArrivedMutationResult, error) {
+	r.markedArrivedRecord = record
+	r.markedArrivedCalled = true
+	if r.markedArrivedErr != nil {
+		return MarkDayItineraryItemArrivedMutationResult{}, r.markedArrivedErr
+	}
+	if r.markedArrivedResult.Item.ID != "" || r.markedArrivedResult.Items != nil {
+		return r.markedArrivedResult, nil
+	}
+	for _, item := range r.dayItineraryItems {
+		if item.ID == record.ItemID {
+			return MarkDayItineraryItemArrivedMutationResult{Item: item, Items: r.dayItineraryItems}, nil
+		}
+	}
+	return MarkDayItineraryItemArrivedMutationResult{}, ErrNotFound
 }
 
 func (r *fakeRepository) UpdateDayItineraryItemPlace(_ context.Context, record UpdateDayItineraryItemRecord) (DayItineraryItem, error) {
@@ -1544,6 +1565,77 @@ func TestServiceReorderDayItineraryItemsSuccess(t *testing.T) {
 		if result.Items[index].ID != want.ID || result.Items[index].ItemOrder != want.ItemOrder || result.Items[index].Version != want.Version {
 			t.Fatalf("unexpected reordered result at %d: got %#v want %#v", index, result.Items[index], want)
 		}
+	}
+}
+
+func TestServiceMarkDayItineraryItemArrived(t *testing.T) {
+	arrivedAt := time.Date(2026, 7, 10, 9, 30, 0, 0, time.UTC)
+	items := []DayItineraryItem{
+		{ID: testUUID(7001), ItemOrder: 1, Version: 1, ArrivedAt: &arrivedAt, Place: TripPlaceSummary{ID: testUUID(8001), Name: "도톤보리", Address: "Dotonbori", PlaceType: "food"}},
+		{ID: testUUID(7002), ItemOrder: 2, Version: 1, Place: TripPlaceSummary{ID: testUUID(8002), Name: "오사카성", Address: "Osakajo", PlaceType: "sights"}},
+	}
+	repo := &fakeRepository{
+		trip:                Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"},
+		tripFound:           true,
+		isParticipant:       true,
+		dayLodgingPlace:     TripPlaceSummary{ID: testUUID(8003), Name: "호텔", Address: "Namba", PlaceType: "lodging"},
+		dayLodgingFound:     true,
+		markedArrivedResult: MarkDayItineraryItemArrivedMutationResult{Item: items[0], Items: items},
+	}
+	service := newTestService(repo)
+
+	result, err := service.MarkDayItineraryItemArrived(context.Background(), "user-1", testTripID, "2026-07-10", testUUID(7001))
+	if err != nil {
+		t.Fatalf("MarkDayItineraryItemArrived returned error: %v", err)
+	}
+
+	if !repo.markedArrivedCalled {
+		t.Fatal("expected repository arrival mutation to be called")
+	}
+	if repo.markedArrivedRecord.TripID != testTripID || repo.markedArrivedRecord.ScheduledDate != "2026-07-10" || repo.markedArrivedRecord.ItemID != testUUID(7001) {
+		t.Fatalf("unexpected arrival record: %#v", repo.markedArrivedRecord)
+	}
+	if result.Day.Date != "2026-07-10" || result.Day.DayOrder != 1 || result.Day.LodgingPlace == nil {
+		t.Fatalf("unexpected result day: %#v", result.Day)
+	}
+	if result.Item.ID != testUUID(7001) || result.Item.ArrivedAt == nil || !result.Item.ArrivedAt.Equal(arrivedAt) {
+		t.Fatalf("unexpected arrived item: %#v", result.Item)
+	}
+	if len(result.Items) != 2 || result.Items[1].ID != testUUID(7002) {
+		t.Fatalf("expected full latest day snapshot, got %#v", result.Items)
+	}
+}
+
+func TestServiceMarkDayItineraryItemArrivedFailures(t *testing.T) {
+	validTrip := Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"}
+	tests := []struct {
+		name   string
+		repo   *fakeRepository
+		user   string
+		tripID string
+		date   string
+		itemID string
+		want   error
+	}{
+		{name: "requires auth", repo: &fakeRepository{}, user: " ", tripID: testTripID, date: "2026-07-10", itemID: testUUID(7001), want: ErrUnauthorized},
+		{name: "invalid trip id", repo: &fakeRepository{}, user: "user-1", tripID: "not-a-uuid", date: "2026-07-10", itemID: testUUID(7001), want: ErrValidation},
+		{name: "invalid date", repo: &fakeRepository{}, user: "user-1", tripID: testTripID, date: "2026/07/10", itemID: testUUID(7001), want: ErrValidation},
+		{name: "invalid item id", repo: &fakeRepository{}, user: "user-1", tripID: testTripID, date: "2026-07-10", itemID: "not-a-uuid", want: ErrValidation},
+		{name: "missing trip", repo: &fakeRepository{}, user: "user-1", tripID: testTripID, date: "2026-07-10", itemID: testUUID(7001), want: ErrNotFound},
+		{name: "forbidden", repo: &fakeRepository{trip: validTrip, tripFound: true}, user: "user-1", tripID: testTripID, date: "2026-07-10", itemID: testUUID(7001), want: ErrForbidden},
+		{name: "out of range", repo: &fakeRepository{trip: validTrip, tripFound: true, isParticipant: true}, user: "user-1", tripID: testTripID, date: "2026-07-14", itemID: testUUID(7001), want: ErrNotFound},
+		{name: "item not found", repo: &fakeRepository{trip: validTrip, tripFound: true, isParticipant: true, markedArrivedErr: ErrNotFound}, user: "user-1", tripID: testTripID, date: "2026-07-10", itemID: testUUID(7001), want: ErrNotFound},
+		{name: "out of order conflict", repo: &fakeRepository{trip: validTrip, tripFound: true, isParticipant: true, markedArrivedErr: ErrConflict}, user: "user-1", tripID: testTripID, date: "2026-07-10", itemID: testUUID(7002), want: ErrConflict},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			service := newTestService(tt.repo)
+			_, err := service.MarkDayItineraryItemArrived(context.Background(), tt.user, tt.tripID, tt.date, tt.itemID)
+			if !errors.Is(err, tt.want) {
+				t.Fatalf("expected %v, got %v", tt.want, err)
+			}
+		})
 	}
 }
 

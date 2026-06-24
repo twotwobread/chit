@@ -1771,6 +1771,130 @@ func TestCreateManualDayItineraryItemNotFoundAndForbidden(t *testing.T) {
 	}
 }
 
+func TestMarkDayItineraryItemArrivedHandler(t *testing.T) {
+	backend := newFakeAuthBackend()
+	accessToken := loginTestUser(t, backend)
+	tripID := createTestTrip(t, backend, accessToken)
+	first := createTestDayItineraryItem(t, backend, accessToken, tripID, "2026-07-11", `{"name":"도톤보리","address":"Dotonbori","placeType":"food"}`)
+	second := createTestDayItineraryItem(t, backend, accessToken, tripID, "2026-07-11", `{"name":"오사카성","address":"Osakajo","placeType":"sights"}`)
+
+	path := "/trips/" + tripID + "/days/2026-07-11/itinerary/items/" + first.ID + "/arrive"
+	firstRecorder := httptest.NewRecorder()
+	firstRequest := httptest.NewRequest(http.MethodPost, path, nil)
+	firstRequest.Header.Set("Authorization", "Bearer "+accessToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(firstRecorder, firstRequest)
+
+	if firstRecorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusOK, firstRecorder.Code, firstRecorder.Body.String())
+	}
+
+	var firstBody struct {
+		Day struct {
+			Date     string `json:"date"`
+			DayOrder int    `json:"dayOrder"`
+		} `json:"day"`
+		Item struct {
+			ID        string  `json:"id"`
+			ArrivedAt *string `json:"arrivedAt"`
+		} `json:"item"`
+		Items []struct {
+			ID        string  `json:"id"`
+			ArrivedAt *string `json:"arrivedAt"`
+		} `json:"items"`
+	}
+	if err := json.NewDecoder(firstRecorder.Body).Decode(&firstBody); err != nil {
+		t.Fatalf("decode first response: %v", err)
+	}
+	if firstBody.Day.Date != "2026-07-11" || firstBody.Day.DayOrder != 2 {
+		t.Fatalf("unexpected day: %#v", firstBody.Day)
+	}
+	if firstBody.Item.ID != first.ID || firstBody.Item.ArrivedAt == nil {
+		t.Fatalf("expected arrived target item, got %#v", firstBody.Item)
+	}
+	if len(firstBody.Items) != 2 || firstBody.Items[0].ID != first.ID || firstBody.Items[0].ArrivedAt == nil || firstBody.Items[1].ID != second.ID || firstBody.Items[1].ArrivedAt != nil {
+		t.Fatalf("expected full latest snapshot with only first arrived, got %#v", firstBody.Items)
+	}
+
+	repeatRecorder := httptest.NewRecorder()
+	repeatRequest := httptest.NewRequest(http.MethodPost, path, nil)
+	repeatRequest.Header.Set("Authorization", "Bearer "+accessToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(repeatRecorder, repeatRequest)
+	if repeatRecorder.Code != http.StatusOK {
+		t.Fatalf("expected repeat status %d, got %d with body %s", http.StatusOK, repeatRecorder.Code, repeatRecorder.Body.String())
+	}
+	var repeatBody struct {
+		Item struct {
+			ArrivedAt *string `json:"arrivedAt"`
+		} `json:"item"`
+	}
+	if err := json.NewDecoder(repeatRecorder.Body).Decode(&repeatBody); err != nil {
+		t.Fatalf("decode repeat response: %v", err)
+	}
+	if repeatBody.Item.ArrivedAt == nil || *repeatBody.Item.ArrivedAt != *firstBody.Item.ArrivedAt {
+		t.Fatalf("expected idempotent repeat to preserve arrivedAt, first=%v repeat=%v", firstBody.Item.ArrivedAt, repeatBody.Item.ArrivedAt)
+	}
+}
+
+func TestMarkDayItineraryItemArrivedRequiresAuth(t *testing.T) {
+	backend := newFakeAuthBackend()
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/trips/00000000-0000-0000-0000-000000000001/days/2026-07-10/itinerary/items/00000000-0000-0000-0000-000000005001/arrive", nil)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusUnauthorized, recorder.Code, recorder.Body.String())
+	}
+}
+
+func TestMarkDayItineraryItemArrivedValidationNotFoundForbiddenAndConflict(t *testing.T) {
+	backend := newFakeAuthBackend()
+	ownerToken := loginTestUser(t, backend)
+	tripID := createTestTrip(t, backend, ownerToken)
+	first := createTestDayItineraryItem(t, backend, ownerToken, tripID, "2026-07-11", `{"name":"도톤보리","address":"Dotonbori","placeType":"food"}`)
+	second := createTestDayItineraryItem(t, backend, ownerToken, tripID, "2026-07-11", `{"name":"오사카성","address":"Osakajo","placeType":"sights"}`)
+	otherDay := createTestDayItineraryItem(t, backend, ownerToken, tripID, "2026-07-12", `{"name":"교토","address":"Kyoto","placeType":"sights"}`)
+	nonParticipantToken := loginTestUserWithSubject(t, backend, "apple-2", "지영")
+
+	tests := []struct {
+		name       string
+		path       string
+		token      string
+		expectCode int
+		expectErr  string
+	}{
+		{name: "invalid trip id", path: "/trips/not-a-uuid/days/2026-07-11/itinerary/items/" + first.ID + "/arrive", token: ownerToken, expectCode: http.StatusBadRequest, expectErr: "VALIDATION_ERROR"},
+		{name: "invalid date", path: "/trips/" + tripID + "/days/not-a-date/itinerary/items/" + first.ID + "/arrive", token: ownerToken, expectCode: http.StatusBadRequest, expectErr: "VALIDATION_ERROR"},
+		{name: "invalid item id", path: "/trips/" + tripID + "/days/2026-07-11/itinerary/items/not-a-uuid/arrive", token: ownerToken, expectCode: http.StatusBadRequest, expectErr: "VALIDATION_ERROR"},
+		{name: "missing trip", path: "/trips/00000000-0000-0000-0000-000000000404/days/2026-07-11/itinerary/items/" + first.ID + "/arrive", token: ownerToken, expectCode: http.StatusNotFound, expectErr: "NOT_FOUND"},
+		{name: "out of range", path: "/trips/" + tripID + "/days/2026-07-14/itinerary/items/" + first.ID + "/arrive", token: ownerToken, expectCode: http.StatusNotFound, expectErr: "NOT_FOUND"},
+		{name: "item not in selected day", path: "/trips/" + tripID + "/days/2026-07-11/itinerary/items/" + otherDay.ID + "/arrive", token: ownerToken, expectCode: http.StatusNotFound, expectErr: "NOT_FOUND"},
+		{name: "forbidden", path: "/trips/" + tripID + "/days/2026-07-11/itinerary/items/" + first.ID + "/arrive", token: nonParticipantToken, expectCode: http.StatusForbidden, expectErr: "FORBIDDEN"},
+		{name: "later pending conflict", path: "/trips/" + tripID + "/days/2026-07-11/itinerary/items/" + second.ID + "/arrive", token: ownerToken, expectCode: http.StatusConflict, expectErr: "CONFLICT"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			request := httptest.NewRequest(http.MethodPost, tt.path, nil)
+			request.Header.Set("Authorization", "Bearer "+tt.token)
+			NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+			if recorder.Code != tt.expectCode {
+				t.Fatalf("expected status %d, got %d with body %s", tt.expectCode, recorder.Code, recorder.Body.String())
+			}
+			var body struct {
+				Error struct {
+					Code string `json:"code"`
+				} `json:"error"`
+			}
+			if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+				t.Fatalf("decode response: %v", err)
+			}
+			if body.Error.Code != tt.expectErr {
+				t.Fatalf("expected error %q, got %q", tt.expectErr, body.Error.Code)
+			}
+		})
+	}
+}
+
 func TestUpdateDayItineraryItemHandler(t *testing.T) {
 	backend := newFakeAuthBackend()
 	accessToken := loginTestUser(t, backend)
@@ -2649,6 +2773,7 @@ type fakeAuthBackend struct {
 	dayItineraryItems map[string][]tripdomain.DayItineraryItem
 	tripInvites       map[string]tripdomain.TripInvite
 	reorderErr        error
+	arrivalErr        error
 	listedTrips       []tripdomain.ListItem
 	listTripsUserID   string
 	nextUser          int
@@ -3184,6 +3309,41 @@ func (b *fakeAuthBackend) ReorderDayItineraryItems(_ context.Context, record tri
 		return nil, b.reorderErr
 	}
 	return b.dayItineraryItems[record.TripID+":"+record.ScheduledDate], nil
+}
+
+func (b *fakeAuthBackend) MarkDayItineraryItemArrived(_ context.Context, record tripdomain.MarkDayItineraryItemArrivedRecord) (tripdomain.MarkDayItineraryItemArrivedMutationResult, error) {
+	if b.arrivalErr != nil {
+		return tripdomain.MarkDayItineraryItemArrivedMutationResult{}, b.arrivalErr
+	}
+
+	key := record.TripID + ":" + record.ScheduledDate
+	items := b.dayItineraryItems[key]
+	targetIndex := -1
+	firstPendingIndex := -1
+	for index, item := range items {
+		if targetIndex < 0 && item.ID == record.ItemID {
+			targetIndex = index
+		}
+		if firstPendingIndex < 0 && item.ArrivedAt == nil {
+			firstPendingIndex = index
+		}
+	}
+	if targetIndex < 0 {
+		return tripdomain.MarkDayItineraryItemArrivedMutationResult{}, tripdomain.ErrNotFound
+	}
+
+	if items[targetIndex].ArrivedAt == nil {
+		if firstPendingIndex < 0 || firstPendingIndex != targetIndex {
+			return tripdomain.MarkDayItineraryItemArrivedMutationResult{}, tripdomain.ErrConflict
+		}
+		arrivedAt := time.Date(2026, 7, 10, 9, 30, 0, 0, time.UTC)
+		items[targetIndex].ArrivedAt = &arrivedAt
+		b.dayItineraryItems[key] = items
+	}
+
+	b.markDayItineraryLodging(record.TripID, record.ScheduledDate)
+	items = b.dayItineraryItems[key]
+	return tripdomain.MarkDayItineraryItemArrivedMutationResult{Item: items[targetIndex], Items: items}, nil
 }
 
 func (b *fakeAuthBackend) UpdateDayItineraryItemPlace(_ context.Context, record tripdomain.UpdateDayItineraryItemRecord) (tripdomain.DayItineraryItem, error) {

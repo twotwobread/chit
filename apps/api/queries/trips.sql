@@ -203,6 +203,7 @@ FOR UPDATE OF ti;
 SELECT
   ii.id::text AS id,
   ii.version,
+  ii.arrived_at,
   (dlp.trip_place_id IS NOT NULL) AS is_lodging,
   tp.id::text AS trip_place_id,
   tp.name AS place_name,
@@ -331,13 +332,15 @@ INSERT INTO itinerary_items (
 RETURNING
   id::text,
   item_order,
-  version;
+  version,
+  arrived_at;
 
 -- name: GetItineraryItemByTripDateAndID :one
 SELECT
   ii.id::text AS id,
   ii.item_order,
   ii.version,
+  ii.arrived_at,
   (dlp.trip_place_id IS NOT NULL) AS is_lodging,
   tp.id::text AS trip_place_id,
   tp.name AS place_name,
@@ -361,6 +364,7 @@ WITH target AS (
     ii.id,
     ii.item_order,
     ii.version,
+    ii.arrived_at,
     ii.trip_place_id
   FROM itinerary_items ii
   WHERE ii.trip_id = sqlc.arg(trip_id)::uuid
@@ -386,6 +390,7 @@ SELECT
   target.id::text AS id,
   target.item_order,
   target.version,
+  target.arrived_at,
   (dlp.trip_place_id IS NOT NULL) AS is_lodging,
   updated_place.id AS trip_place_id,
   updated_place.name AS place_name,

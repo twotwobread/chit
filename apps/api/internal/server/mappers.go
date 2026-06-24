@@ -177,6 +177,18 @@ func reorderDayItineraryItemsResponseToOpenAPI(result trip.ReorderDayItineraryIt
 	}
 }
 
+func markDayItineraryItemArrivedResponseToOpenAPI(result trip.MarkDayItineraryItemArrivedResult) openapi.MarkDayItineraryItemArrivedResponse {
+	items := make([]openapi.DayItineraryItem, 0, len(result.Items))
+	for _, item := range result.Items {
+		items = append(items, dayItineraryItemToOpenAPI(item))
+	}
+	return openapi.MarkDayItineraryItemArrivedResponse{
+		Day:   tripDayToOpenAPI(result.Day),
+		Item:  dayItineraryItemToOpenAPI(result.Item),
+		Items: items,
+	}
+}
+
 func searchGooglePlacesResponseToOpenAPI(results []place.SearchResult) openapi.SearchGooglePlacesResponse {
 	items := make([]openapi.GooglePlaceSearchResult, 0, len(results))
 	for _, result := range results {
@@ -196,8 +208,17 @@ func dayItineraryItemToOpenAPI(item trip.DayItineraryItem) openapi.DayItineraryI
 		ItemOrder: item.ItemOrder,
 		Version:   item.Version,
 		IsLodging: item.IsLodging,
+		ArrivedAt: optionalTimeToOpenAPI(item.ArrivedAt),
 		Place:     tripPlaceSummaryToOpenAPI(item.Place),
 	}
+}
+
+func optionalTimeToOpenAPI(value *time.Time) *time.Time {
+	if value == nil {
+		return nil
+	}
+	mapped := value.UTC()
+	return &mapped
 }
 
 func tripPlaceSummaryToOpenAPI(place trip.TripPlaceSummary) openapi.TripPlaceSummary {

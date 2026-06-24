@@ -151,6 +151,7 @@ CREATE TABLE itinerary_items (
   item_order integer NOT NULL,
   rank text COLLATE "C" NOT NULL,
   version integer NOT NULL DEFAULT 1,
+  arrived_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT itinerary_items_item_order_check CHECK (item_order >= 1),

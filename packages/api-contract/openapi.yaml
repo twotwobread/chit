@@ -788,6 +788,75 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /trips/{tripId}/days/{date}/itinerary/items/{itemId}/arrive:
+    post:
+      operationId: markDayItineraryItemArrived
+      summary: Mark a trip day itinerary item arrived
+      description: Marks the selected itinerary item instance arrived when it is the first pending item for the selected Day, and returns the latest Day itinerary snapshot.
+      tags:
+        - Trips
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: date
+          in: path
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Day itinerary item arrived, or already arrived idempotently.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarkDayItineraryItemArrivedResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip, virtual day, or itinerary item not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Arrival conflict because the target pending item is not the first pending item for the selected Day.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /trips/{tripId}/days/{date}/itinerary/items/{itemId}:
     patch:
       operationId: updateDayItineraryItem
@@ -1489,6 +1558,7 @@ components:
         - itemOrder
         - version
         - isLodging
+        - arrivedAt
         - place
       properties:
         id:
@@ -1501,6 +1571,11 @@ components:
           minimum: 1
         isLodging:
           type: boolean
+        arrivedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Server-generated arrival timestamp for this itinerary item instance. Null means pending.
         place:
           $ref: '#/components/schemas/TripPlaceSummary'
     GetDayItineraryResponse:
@@ -1533,6 +1608,22 @@ components:
           $ref: '#/components/schemas/TripDay'
         lodgingPlace:
           $ref: '#/components/schemas/TripPlaceSummary'
+    MarkDayItineraryItemArrivedResponse:
+      type: object
+      required:
+        - day
+        - item
+        - items
+      properties:
+        day:
+          $ref: '#/components/schemas/TripDay'
+        item:
+          $ref: '#/components/schemas/DayItineraryItem'
+        items:
+          type: array
+          description: Latest server source-of-truth itinerary items for the selected day, ordered by itinerary order/rank.
+          items:
+            $ref: '#/components/schemas/DayItineraryItem'
     ReorderDayItineraryMove:
       type: object
       additionalProperties: false
