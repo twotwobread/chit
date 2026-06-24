@@ -28,33 +28,41 @@ type ProviderConfig struct {
 	AllowDevOAuth bool
 }
 
+type providerVerifierFunc func(context.Context, Credential) (ProviderProfile, error)
+
 type HTTPProviderVerifier struct {
-	config ProviderConfig
-	client *http.Client
-	now    func() time.Time
+	config           ProviderConfig
+	client           *http.Client
+	now              func() time.Time
+	appleJWKSURL     string
+	kakaoUserInfoURL string
+	verifiers        map[Provider]providerVerifierFunc
 }
 
 func NewHTTPProviderVerifier(config ProviderConfig) *HTTPProviderVerifier {
-	return &HTTPProviderVerifier{
-		config: config,
-		client: &http.Client{Timeout: defaultHTTPTimeout},
-		now:    time.Now,
+	verifier := &HTTPProviderVerifier{
+		config:           config,
+		client:           &http.Client{Timeout: defaultHTTPTimeout},
+		now:              time.Now,
+		appleJWKSURL:     appleJWKSURL,
+		kakaoUserInfoURL: kakaoUserInfoURL,
 	}
+	verifier.verifiers = map[Provider]providerVerifierFunc{
+		ProviderApple: verifier.verifyApple,
+		ProviderKakao: verifier.verifyKakao,
+	}
+	return verifier
 }
 
 func (v *HTTPProviderVerifier) Verify(ctx context.Context, provider Provider, credential Credential) (ProviderProfile, error) {
+	verify, ok := v.verifiers[provider]
+	if !ok {
+		return ProviderProfile{}, ErrValidation
+	}
 	if v.config.AllowDevOAuth && credential.DevSubject != nil && *credential.DevSubject != "" {
 		return devProfile(provider, credential), nil
 	}
-
-	switch provider {
-	case ProviderApple:
-		return v.verifyApple(ctx, credential)
-	case ProviderKakao:
-		return v.verifyKakao(ctx, credential)
-	default:
-		return ProviderProfile{}, ErrValidation
-	}
+	return verify(ctx, credential)
 }
 
 func devProfile(provider Provider, credential Credential) ProviderProfile {
@@ -102,7 +110,7 @@ func (v *HTTPProviderVerifier) verifyApple(ctx context.Context, credential Crede
 		ProviderSubject: subject,
 		Email:           optionalString(email),
 		EmailVerified:   parseBoolClaim(claims["email_verified"]),
-		DisplayName:     nil,
+		DisplayName:     trimStringPtr(credential.DisplayName),
 		AvatarURL:       nil,
 	}
 	return profile, nil
@@ -147,7 +155,7 @@ func (v *HTTPProviderVerifier) verifyAppleIdentityToken(ctx context.Context, tok
 }
 
 func (v *HTTPProviderVerifier) fetchAppleKey(ctx context.Context, kid string) (*rsa.PublicKey, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, appleJWKSURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, v.appleJWKSURL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +218,7 @@ func (v *HTTPProviderVerifier) verifyKakao(ctx context.Context, credential Crede
 		return ProviderProfile{}, ErrInvalidProviderToken
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, kakaoUserInfoURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, v.kakaoUserInfoURL, nil)
 	if err != nil {
 		return ProviderProfile{}, err
 	}

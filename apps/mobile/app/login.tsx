@@ -5,13 +5,15 @@ import { router } from 'expo-router';
 import type { AuthProvider } from '@i-um/api-contract';
 
 import { loginWithOAuth, MobileAuthError } from '../lib/auth/client';
-import { getOAuthCredential } from '../lib/auth/oauth';
+import { getOAuthCredential, getVisibleOAuthProviderConfigs } from '../lib/auth/oauth';
 import { theme } from '../lib/design';
 
 type LoginState =
   | { status: 'idle' }
   | { status: 'loading'; provider: AuthProvider }
   | { status: 'error'; message: string; conflict: boolean };
+
+const providers = getVisibleOAuthProviderConfigs();
 
 export default function LoginScreen() {
   const [state, setState] = useState<LoginState>({ status: 'idle' });
@@ -35,23 +37,23 @@ export default function LoginScreen() {
       <Text style={styles.subtitle}>여행을 함께 이어가려면 로그인해주세요.</Text>
 
       <View style={styles.card}>
-        <Pressable
-          accessibilityRole="button"
-          disabled={isLoading}
-          onPress={() => void login('apple')}
-          style={[styles.button, isLoading ? styles.disabledButton : null]}
-        >
-          <Text style={styles.buttonText}>Apple로 계속하기</Text>
-        </Pressable>
-
-        <Pressable
-          accessibilityRole="button"
-          disabled={isLoading}
-          onPress={() => void login('kakao')}
-          style={[styles.kakaoButton, isLoading ? styles.disabledButton : null]}
-        >
-          <Text style={styles.kakaoButtonText}>Kakao로 계속하기</Text>
-        </Pressable>
+        {providers.map((provider) => (
+          <Pressable
+            accessibilityRole="button"
+            disabled={isLoading}
+            key={provider.id}
+            onPress={() => void login(provider.id)}
+            style={[
+              styles.providerButton,
+              { backgroundColor: provider.buttonStyle.backgroundColor },
+              isLoading ? styles.disabledButton : null,
+            ]}
+          >
+            <Text style={[styles.providerButtonText, { color: provider.buttonStyle.textColor }]}>
+              {provider.loginLabel(provider)}
+            </Text>
+          </Pressable>
+        ))}
 
         {isLoading ? (
           <View style={styles.loadingRow}>
@@ -123,31 +125,15 @@ const styles = StyleSheet.create({
     padding: theme.space[7],
     ...theme.shadow.sm,
   },
-  button: {
+  providerButton: {
     alignItems: 'center',
-    backgroundColor: theme.providerColor.appleBg,
     borderRadius: theme.radius.md,
     justifyContent: 'center',
     minHeight: theme.layout.controlH,
     paddingHorizontal: theme.space[5],
     paddingVertical: theme.space[4],
   },
-  buttonText: {
-    color: theme.providerColor.appleText,
-    fontFamily: theme.font.family.bold,
-    fontWeight: theme.font.weight.bold,
-  },
-  kakaoButton: {
-    alignItems: 'center',
-    backgroundColor: theme.providerColor.kakaoBg,
-    borderRadius: theme.radius.md,
-    justifyContent: 'center',
-    minHeight: theme.layout.controlH,
-    paddingHorizontal: theme.space[5],
-    paddingVertical: theme.space[4],
-  },
-  kakaoButtonText: {
-    color: theme.providerColor.kakaoText,
+  providerButtonText: {
     fontFamily: theme.font.family.bold,
     fontWeight: theme.font.weight.bold,
   },
