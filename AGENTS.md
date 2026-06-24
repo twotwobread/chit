@@ -29,9 +29,12 @@ i-um/
 ## Context discipline
 
 - Do not read broad docs by default.
+- Classify the task phase before expanding context; spec/plan, implementation, debug, PR, and deploy tasks need different depth.
 - Prefer the target file, target feature spec, relevant code, and one small rule file over umbrella documents.
 - If a matching skill exists, load that skill before reading additional docs.
-- If scope is unclear, stop and ask instead of reading unrelated docs to infer intent.
+- Expand context progressively: use `rg`/`find` first, read narrow blocks, and expand only for a named blocker.
+- Prefer one source of truth over duplicate representations; avoid generated/vendor/build artifacts unless they are the target or source is unavailable.
+- If scope is unclear or ambiguity is product/domain-level, stop and ask instead of reading unrelated docs to infer intent.
 - Read `docs/decisions/` only when changing or revisiting product/technical/domain/API/DB/ops direction.
 - For long commands, redirect full logs to a file and show only summaries or failure tails.
 
