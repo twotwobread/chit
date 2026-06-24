@@ -238,6 +238,23 @@ func (s *Service) CreateInvite(ctx context.Context, userID string, tripID string
 	return CreateTripInviteResult{}, ErrConflict
 }
 
+func (s *Service) AcceptInvite(ctx context.Context, userID string, token string) (AcceptTripInviteResult, error) {
+	if strings.TrimSpace(userID) == "" {
+		return AcceptTripInviteResult{}, ErrUnauthorized
+	}
+
+	token = strings.TrimSpace(token)
+	if !isInviteToken(token) {
+		return AcceptTripInviteResult{}, ErrValidation
+	}
+
+	return s.repo.AcceptTripInvite(ctx, AcceptTripInviteRecord{
+		Token:  token,
+		UserID: userID,
+		Now:    s.now().UTC(),
+	})
+}
+
 func (s *Service) inviteURL(token string) string {
 	return strings.TrimRight(s.inviteBaseURL, "/") + "/invite/" + token
 }
@@ -999,6 +1016,19 @@ func referencedMoveItemIDs(itemID string, beforeItemID *string, afterItemID *str
 	return referenced
 }
 
+func isInviteToken(value string) bool {
+	if len(value) < 32 || len(value) > 128 {
+		return false
+	}
+	for _, char := range value {
+		if (char >= '0' && char <= '9') || (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') || char == '_' || char == '-' {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
 func isUUID(value string) bool {
 	if len(value) != 36 {
 		return false
@@ -1022,10 +1052,14 @@ func isHex(char rune) bool {
 	return (char >= '0' && char <= '9') || (char >= 'a' && char <= 'f') || (char >= 'A' && char <= 'F')
 }
 
-func participantDisplayName(value string) string {
+func NormalizeParticipantDisplayName(value string) string {
 	name := strings.TrimSpace(value)
 	if name == "" {
 		return "여행자"
 	}
 	return name
+}
+
+func participantDisplayName(value string) string {
+	return NormalizeParticipantDisplayName(value)
 }

@@ -187,6 +187,18 @@ RETURNING
   created_at,
   created_by::text;
 
+-- name: GetTripInviteForAccept :one
+SELECT
+  ti.id::text,
+  ti.trip_id::text,
+  t.name AS trip_name,
+  ti.expires_at,
+  ti.deactivated_at
+FROM trip_invites ti
+JOIN trips t ON t.id = ti.trip_id
+WHERE ti.token = sqlc.arg(token)
+FOR UPDATE OF ti;
+
 -- name: ListItineraryItemsByTripAndDate :many
 SELECT
   ii.id::text AS id,

@@ -102,6 +102,26 @@ func (s apiServer) CreateTripInvite(w http.ResponseWriter, r *http.Request, trip
 	writeJSON(w, status, createTripInviteResponseToOpenAPI(result))
 }
 
+func (s apiServer) AcceptTripInvite(w http.ResponseWriter, r *http.Request, token string) {
+	if s.auth == nil || s.trips == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "trip invite acceptance is not configured", nil)
+		return
+	}
+
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	result, err := s.trips.AcceptInvite(r.Context(), authContext.UserID, token)
+	if err != nil {
+		writeTripInviteAcceptError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, acceptTripInviteResponseToOpenAPI(result))
+}
+
 func (s apiServer) ListTripParticipants(w http.ResponseWriter, r *http.Request, tripId string) {
 	if s.auth == nil || s.trips == nil {
 		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "trip participants are not configured", nil)

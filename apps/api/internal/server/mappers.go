@@ -124,6 +124,15 @@ func createTripInviteResponseToOpenAPI(result trip.CreateTripInviteResult) opena
 	}
 }
 
+func acceptTripInviteResponseToOpenAPI(result trip.AcceptTripInviteResult) openapi.AcceptTripInviteResponse {
+	return openapi.AcceptTripInviteResponse{
+		TripId:          result.TripID,
+		TripName:        result.TripName,
+		Role:            openapi.TripParticipantRole(result.Role),
+		AlreadyAccepted: result.AlreadyAccepted,
+	}
+}
+
 func updateTripResponseToOpenAPI(result trip.UpdateResult) openapi.UpdateTripResponse {
 	return openapi.UpdateTripResponse{Trip: tripToOpenAPI(result.Trip)}
 }

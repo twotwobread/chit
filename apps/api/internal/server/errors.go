@@ -110,6 +110,21 @@ func writeTripInviteError(w http.ResponseWriter, err error) {
 	}
 }
 
+func writeTripInviteAcceptError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, trip.ErrValidation):
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid invite token", nil)
+	case errors.Is(err, trip.ErrUnauthorized):
+		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "unauthorized", nil)
+	case errors.Is(err, trip.ErrInviteNotFound):
+		writeError(w, http.StatusNotFound, "INVITE_NOT_FOUND", "invite not found", nil)
+	case errors.Is(err, trip.ErrInviteExpired):
+		writeError(w, http.StatusGone, "INVITE_EXPIRED", "invite expired", nil)
+	default:
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error", nil)
+	}
+}
+
 func writeTripUpdateError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, trip.ErrValidation):
