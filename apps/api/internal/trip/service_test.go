@@ -12,75 +12,79 @@ import (
 const testTripID = "00000000-0000-0000-0000-000000000001"
 
 type fakeRepository struct {
-	creator                Creator
-	creatorFound           bool
-	created                CreateRecord
-	trip                   Trip
-	tripFound              bool
-	isParticipant          bool
-	isOwner                bool
-	participantCount       int
-	previewNames           []string
-	listParticipants       []ParticipantListItem
-	listParticipantsTripID string
-	listed                 []ListItem
-	listedUserID           string
-	dayLodgingPlaces       []DayLodgingPlace
-	dayLodgingPlace        TripPlaceSummary
-	dayLodgingFound        bool
-	dayLodgingLookupTrip   string
-	dayLodgingLookupDate   string
-	tripPlaceSummary       TripPlaceSummary
-	tripPlaceFound         bool
-	tripPlaceLookupTripID  string
-	tripPlaceLookupID      string
-	setDayLodgingRecord    SetDayLodgingPlaceRecord
-	setDayLodgingCalled    bool
-	setDayLodgingPlace     TripPlaceSummary
-	setDayLodgingErr       error
-	deletedDayLodgingTrip  string
-	deletedDayLodgingDate  string
-	deletedDayLodgingCall  bool
-	dayItineraryItems      []DayItineraryItem
-	listedItineraryTripID  string
-	listedItineraryDate    string
-	createdManualRecords   []CreateManualDayItineraryItemRecord
-	createdManualItem      DayItineraryItem
-	createManualErr        error
-	dayItem                DayItineraryItem
-	dayItemFound           bool
-	dayItemLookupTripID    string
-	dayItemLookupDate      string
-	dayItemLookupItemID    string
-	reorderedRecord        ReorderDayItineraryItemsRecord
-	reorderedCalled        bool
-	reorderedItems         []DayItineraryItem
-	reorderErr             error
-	markedArrivedRecord    MarkDayItineraryItemArrivedRecord
-	markedArrivedCalled    bool
-	markedArrivedResult    MarkDayItineraryItemArrivedMutationResult
-	markedArrivedErr       error
-	updatedDayItemRecord   UpdateDayItineraryItemRecord
-	updatedDayItemCalled   bool
-	updatedDayItem         DayItineraryItem
-	deletedDayItemTripID   string
-	deletedDayItemDate     string
-	deletedDayItemID       string
-	deletedDayItemCalled   bool
-	deletedDayItemOK       bool
-	updated                UpdateRecord
-	updatedCalled          bool
-	deletedID              string
-	deletedCalled          bool
-	deleteOK               bool
-	inviteRecord           CreateTripInviteRecord
-	inviteRecords          []CreateTripInviteRecord
-	inviteResult           CreateTripInviteResult
-	inviteErr              error
-	inviteErrs             []error
-	acceptInviteRecord     AcceptTripInviteRecord
-	acceptInviteResult     AcceptTripInviteResult
-	acceptInviteErr        error
+	creator                  Creator
+	creatorFound             bool
+	created                  CreateRecord
+	trip                     Trip
+	tripFound                bool
+	isParticipant            bool
+	isOwner                  bool
+	participantCount         int
+	previewNames             []string
+	listParticipants         []ParticipantListItem
+	listParticipantsTripID   string
+	listed                   []ListItem
+	listedUserID             string
+	dayLodgingPlaces         []DayLodgingPlace
+	dayLodgingPlace          TripPlaceSummary
+	dayLodgingFound          bool
+	dayLodgingLookupTrip     string
+	dayLodgingLookupDate     string
+	tripPlaceSummary         TripPlaceSummary
+	tripPlaceFound           bool
+	tripPlaceLookupTripID    string
+	tripPlaceLookupID        string
+	setDayLodgingRecord      SetDayLodgingPlaceRecord
+	setDayLodgingCalled      bool
+	setDayLodgingPlace       TripPlaceSummary
+	setDayLodgingErr         error
+	deletedDayLodgingTrip    string
+	deletedDayLodgingDate    string
+	deletedDayLodgingCall    bool
+	dayItineraryItems        []DayItineraryItem
+	listedItineraryTripID    string
+	listedItineraryDate      string
+	createdManualRecords     []CreateManualDayItineraryItemRecord
+	createdManualItem        DayItineraryItem
+	createManualErr          error
+	dayItem                  DayItineraryItem
+	dayItemFound             bool
+	dayItemLookupTripID      string
+	dayItemLookupDate        string
+	dayItemLookupItemID      string
+	reorderedRecord          ReorderDayItineraryItemsRecord
+	reorderedCalled          bool
+	reorderedItems           []DayItineraryItem
+	reorderErr               error
+	markedArrivedRecord      MarkDayItineraryItemArrivedRecord
+	markedArrivedCalled      bool
+	markedArrivedResult      MarkDayItineraryItemArrivedMutationResult
+	markedArrivedErr         error
+	updatedDayItemRecord     UpdateDayItineraryItemRecord
+	updatedDayItemCalled     bool
+	updatedDayItem           DayItineraryItem
+	deletedDayItemTripID     string
+	deletedDayItemDate       string
+	deletedDayItemID         string
+	deletedDayItemCalled     bool
+	deletedDayItemOK         bool
+	updated                  UpdateRecord
+	updatedCalled            bool
+	deletedID                string
+	deletedCalled            bool
+	deleteOK                 bool
+	deletedParticipantTripID string
+	deletedParticipantID     string
+	deletedParticipantCalled bool
+	deleteParticipantOK      bool
+	inviteRecord             CreateTripInviteRecord
+	inviteRecords            []CreateTripInviteRecord
+	inviteResult             CreateTripInviteResult
+	inviteErr                error
+	inviteErrs               []error
+	acceptInviteRecord       AcceptTripInviteRecord
+	acceptInviteResult       AcceptTripInviteResult
+	acceptInviteErr          error
 }
 
 func (r *fakeRepository) GetCreator(context.Context, string) (Creator, bool, error) {
@@ -142,6 +146,13 @@ func (r *fakeRepository) DeleteTripByID(_ context.Context, tripID string) (bool,
 	r.deletedID = tripID
 	r.deletedCalled = true
 	return r.deleteOK, nil
+}
+
+func (r *fakeRepository) DeleteTripMemberParticipant(_ context.Context, tripID string, participantID string) (bool, error) {
+	r.deletedParticipantTripID = tripID
+	r.deletedParticipantID = participantID
+	r.deletedParticipantCalled = true
+	return r.deleteParticipantOK, nil
 }
 
 func (r *fakeRepository) CreateOrReturnTripInvite(_ context.Context, record CreateTripInviteRecord) (CreateTripInviteResult, error) {
@@ -628,6 +639,57 @@ func TestServiceDeleteMapsMissingFinalDeleteToNotFound(t *testing.T) {
 	err := service.Delete(context.Background(), "user-1", testTripID)
 	if !errors.Is(err, ErrNotFound) {
 		t.Fatalf("expected ErrNotFound, got %v", err)
+	}
+}
+
+func TestServiceRemoveParticipant(t *testing.T) {
+	participantID := "00000000-0000-0000-0000-000000000222"
+	repo := &fakeRepository{
+		trip:                Trip{ID: testTripID, Name: "오사카"},
+		tripFound:           true,
+		isOwner:             true,
+		deleteParticipantOK: true,
+	}
+	service := newTestService(repo)
+
+	err := service.RemoveParticipant(context.Background(), "user-1", testTripID, participantID)
+	if err != nil {
+		t.Fatalf("RemoveParticipant returned error: %v", err)
+	}
+	if !repo.deletedParticipantCalled || repo.deletedParticipantTripID != testTripID || repo.deletedParticipantID != participantID {
+		t.Fatalf("expected repository member participant delete, got called=%v trip=%q participant=%q", repo.deletedParticipantCalled, repo.deletedParticipantTripID, repo.deletedParticipantID)
+	}
+}
+
+func TestServiceRemoveParticipantValidation(t *testing.T) {
+	participantID := "00000000-0000-0000-0000-000000000222"
+	tests := []struct {
+		name           string
+		userID         string
+		tripID         string
+		participantID  string
+		repo           *fakeRepository
+		expect         error
+		wantDeleteCall bool
+	}{
+		{name: "auth required", userID: " ", tripID: testTripID, participantID: participantID, repo: &fakeRepository{}, expect: ErrUnauthorized},
+		{name: "invalid trip id", userID: "user-1", tripID: "not-a-uuid", participantID: participantID, repo: &fakeRepository{}, expect: ErrValidation},
+		{name: "invalid participant id", userID: "user-1", tripID: testTripID, participantID: "not-a-uuid", repo: &fakeRepository{}, expect: ErrValidation},
+		{name: "missing trip", userID: "user-1", tripID: testTripID, participantID: participantID, repo: &fakeRepository{}, expect: ErrNotFound},
+		{name: "non owner", userID: "user-2", tripID: testTripID, participantID: participantID, repo: &fakeRepository{trip: Trip{ID: testTripID}, tripFound: true}, expect: ErrForbidden},
+		{name: "missing or non-removable target", userID: "user-1", tripID: testTripID, participantID: participantID, repo: &fakeRepository{trip: Trip{ID: testTripID}, tripFound: true, isOwner: true}, expect: ErrNotFound, wantDeleteCall: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := newTestService(tt.repo).RemoveParticipant(context.Background(), tt.userID, tt.tripID, tt.participantID)
+			if !errors.Is(err, tt.expect) {
+				t.Fatalf("expected %v, got %v", tt.expect, err)
+			}
+			if tt.repo.deletedParticipantCalled != tt.wantDeleteCall {
+				t.Fatalf("expected delete call=%v, got %v", tt.wantDeleteCall, tt.repo.deletedParticipantCalled)
+			}
+		})
 	}
 }
 

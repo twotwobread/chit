@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import KakaoShareLink from 'react-native-kakao-share-link';
@@ -8,7 +8,7 @@ import { ApiError } from '@i-um/api-contract';
 
 import { getMeWithRefresh, MobileAuthError } from '../../../lib/auth/client';
 import { Card, PrimaryButton, SecondaryButton, theme } from '../../../lib/design';
-import { createTripInvite, getTripDetail, listTripParticipants } from '../../../lib/trips/client';
+import { createTripInvite, getTripDetail, listTripParticipants, removeTripParticipant } from '../../../lib/trips/client';
 import {
   buildFallbackShareContent,
   buildInviteCopyText,
@@ -22,8 +22,12 @@ import {
 import {
   buildParticipantListViewModel,
   participantListFailureStatus,
+  participantRemovalFailureMessage,
+  participantRemovalFailureStatus,
+  removeParticipantFromViewModel,
   type ParticipantListFailureStatus,
   type ParticipantListViewModel,
+  type ParticipantRowViewModel,
 } from '../../../lib/trips/participants';
 
 type ParticipantsState =
@@ -40,6 +44,12 @@ type InviteState =
   | { status: 'ready'; viewModel: InviteViewModel }
   | { status: 'error'; message: string };
 
+type RemoveState =
+  | { status: 'idle' }
+  | { status: 'confirming'; participant: ParticipantRowViewModel }
+  | { status: 'removing'; participant: ParticipantRowViewModel }
+  | { status: 'error'; message: string };
+
 type ShareBusyState = 'none' | 'copy' | 'kakao' | 'fallback';
 
 export default function TripParticipantsScreen() {
@@ -47,6 +57,7 @@ export default function TripParticipantsScreen() {
   const tripId = Array.isArray(tripIdParam) ? tripIdParam[0] : tripIdParam;
   const [state, setState] = useState<ParticipantsState>({ status: 'loading' });
   const [inviteState, setInviteState] = useState<InviteState>({ status: 'idle' });
+  const [removeState, setRemoveState] = useState<RemoveState>({ status: 'idle' });
   const [shareBusy, setShareBusy] = useState<ShareBusyState>('none');
   const [shareMessage, setShareMessage] = useState<string | null>(null);
 
@@ -58,6 +69,7 @@ export default function TripParticipantsScreen() {
 
     setState({ status: 'loading' });
     setInviteState({ status: 'idle' });
+    setRemoveState({ status: 'idle' });
     setShareMessage(null);
     try {
       const [currentUser, participantsResponse, tripDetail] = await Promise.all([
@@ -65,10 +77,11 @@ export default function TripParticipantsScreen() {
         listTripParticipants(tripId),
         getTripDetail(tripId),
       ]);
+      const canManageParticipants = canCreateTripInvite(tripDetail, currentUser.user.id);
       setState({
         status: 'success',
-        viewModel: buildParticipantListViewModel(participantsResponse.participants),
-        canInvite: canCreateTripInvite(tripDetail, currentUser.user.id),
+        viewModel: buildParticipantListViewModel(participantsResponse.participants, { canRemoveMembers: canManageParticipants }),
+        canInvite: canManageParticipants,
         tripName: tripDetail.trip.name,
       });
     } catch (error) {
@@ -107,6 +120,46 @@ export default function TripParticipantsScreen() {
       setInviteState({ status: 'error', message: getInviteActionErrorMessage(error) });
     }
   }, [tripId]);
+
+  const requestRemove = useCallback((participant: ParticipantRowViewModel) => {
+    setRemoveState({ status: 'confirming', participant });
+  }, []);
+
+  const cancelRemove = useCallback(() => {
+    setRemoveState((current) => (current.status === 'confirming' ? { status: 'idle' } : current));
+  }, []);
+
+  const confirmRemove = useCallback(async () => {
+    if (!tripId || removeState.status !== 'confirming') {
+      return;
+    }
+
+    const target = removeState.participant;
+    setRemoveState({ status: 'removing', participant: target });
+    try {
+      await removeTripParticipant(tripId, target.participantId);
+      setState((current) => {
+        if (current.status !== 'success') {
+          return current;
+        }
+        return {
+          ...current,
+          viewModel: removeParticipantFromViewModel(current.viewModel, target.participantId),
+        };
+      });
+      setRemoveState({ status: 'idle' });
+    } catch (error) {
+      if (error instanceof MobileAuthError) {
+        handleRemoveFailure({ mobileAuthCode: error.code }, setState, setRemoveState);
+        return;
+      }
+      if (error instanceof ApiError) {
+        handleRemoveFailure({ httpStatus: error.status }, setState, setRemoveState);
+        return;
+      }
+      setRemoveState({ status: 'error', message: participantRemovalFailureMessage({}) });
+    }
+  }, [removeState, tripId]);
 
   const copyInvite = useCallback(async (inviteUrl: string) => {
     setShareBusy('copy');
@@ -150,6 +203,9 @@ export default function TripParticipantsScreen() {
     }, [load]),
   );
 
+  const removingParticipantId = removeState.status === 'removing' ? removeState.participant.participantId : null;
+  const removeErrorMessage = removeState.status === 'error' ? removeState.message : null;
+
   return (
     <ScrollView contentContainerStyle={styles.scrollContent} style={styles.scroll}>
       <View style={styles.header}>
@@ -176,7 +232,13 @@ export default function TripParticipantsScreen() {
               shareMessage={shareMessage}
             />
           ) : null}
-          <ParticipantListCard viewModel={state.viewModel} />
+          <ParticipantListCard
+            onRequestRemove={requestRemove}
+            removeErrorMessage={removeErrorMessage}
+            removingParticipantId={removingParticipantId}
+            viewModel={state.viewModel}
+          />
+          <RemoveParticipantConfirmationModal onCancel={cancelRemove} onConfirm={() => void confirmRemove()} removeState={removeState} />
         </>
       ) : null}
 
@@ -215,6 +277,19 @@ export default function TripParticipantsScreen() {
 
 function setFailureState(setState: (state: ParticipantsState) => void, status: ParticipantListFailureStatus) {
   setState({ status });
+}
+
+function handleRemoveFailure(
+  input: { httpStatus?: number; mobileAuthCode?: string },
+  setState: (state: ParticipantsState) => void,
+  setRemoveState: (state: RemoveState) => void,
+) {
+  if (participantRemovalFailureStatus(input) === 'auth') {
+    setRemoveState({ status: 'idle' });
+    setState({ status: 'auth' });
+    return;
+  }
+  setRemoveState({ status: 'error', message: participantRemovalFailureMessage(input) });
 }
 
 function getApiErrorCode(error: ApiError): string | null {
@@ -291,20 +366,90 @@ function InviteCard({
   );
 }
 
-function ParticipantListCard({ viewModel }: { viewModel: ParticipantListViewModel }) {
+function ParticipantListCard({
+  onRequestRemove,
+  removeErrorMessage,
+  removingParticipantId,
+  viewModel,
+}: {
+  onRequestRemove: (participant: ParticipantRowViewModel) => void;
+  removeErrorMessage: string | null;
+  removingParticipantId: string | null;
+  viewModel: ParticipantListViewModel;
+}) {
   return (
     <Card>
+      {removeErrorMessage ? <Text style={styles.errorMessage}>{removeErrorMessage}</Text> : null}
+      {removingParticipantId ? <Text style={styles.message}>참여자를 제거하는 중...</Text> : null}
       <View style={styles.participantList}>
-        {viewModel.rows.map((participant) => (
-          <View key={participant.participantId} style={styles.participantRow}>
-            <Text style={styles.participantName}>{participant.displayName}</Text>
-            <View style={participant.role === 'owner' ? styles.ownerBadge : styles.memberBadge}>
-              <Text style={participant.role === 'owner' ? styles.ownerBadgeText : styles.memberBadgeText}>{participant.roleLabel}</Text>
+        {viewModel.rows.map((participant) => {
+          const isRemoving = removingParticipantId === participant.participantId;
+          return (
+            <View key={participant.participantId} style={styles.participantRow}>
+              <View style={styles.participantInfo}>
+                <Text style={styles.participantName}>{participant.displayName}</Text>
+                <View style={participant.role === 'owner' ? styles.ownerBadge : styles.memberBadge}>
+                  <Text style={participant.role === 'owner' ? styles.ownerBadgeText : styles.memberBadgeText}>{participant.roleLabel}</Text>
+                </View>
+              </View>
+              {participant.canRemove ? (
+                <Pressable
+                  accessibilityLabel={`${participant.displayName} 참여자 제거`}
+                  accessibilityRole="button"
+                  disabled={Boolean(removingParticipantId)}
+                  onPress={() => onRequestRemove(participant)}
+                  style={[styles.removeButton, isRemoving || removingParticipantId ? styles.disabled : null]}
+                >
+                  <Text style={styles.removeButtonText}>제거</Text>
+                </Pressable>
+              ) : null}
             </View>
-          </View>
-        ))}
+          );
+        })}
       </View>
     </Card>
+  );
+}
+
+function RemoveParticipantConfirmationModal({
+  onCancel,
+  onConfirm,
+  removeState,
+}: {
+  onCancel: () => void;
+  onConfirm: () => void;
+  removeState: RemoveState;
+}) {
+  const participant = removeState.status === 'confirming' || removeState.status === 'removing' ? removeState.participant : null;
+  const isRemoving = removeState.status === 'removing';
+
+  return (
+    <Modal animationType="fade" onRequestClose={onCancel} transparent visible={participant !== null}>
+      <View style={styles.modalBackdrop}>
+        <View style={styles.modalCard}>
+          <Text style={styles.modalTitle}>{participant ? `${participant.displayName}님을 여행에서 제거할까요?` : '참여자를 제거할까요?'}</Text>
+          <Text style={styles.message}>제거되면 이 여행 목록과 일정에 더 이상 접근할 수 없어요. 다시 초대하면 재참여할 수 있어요.</Text>
+          <View style={styles.actionRow}>
+            <SecondaryButton disabled={isRemoving} label="취소" onPress={onCancel} style={styles.modalActionButton} />
+            <Pressable
+              accessibilityRole="button"
+              disabled={isRemoving}
+              onPress={onConfirm}
+              style={[styles.dangerButton, styles.modalActionButton, isRemoving ? styles.disabled : null]}
+            >
+              {isRemoving ? (
+                <View style={styles.loadingRow}>
+                  <ActivityIndicator color={theme.color.onPrimary} />
+                  <Text style={styles.dangerButtonText}>참여자를 제거하는 중...</Text>
+                </View>
+              ) : (
+                <Text style={styles.dangerButtonText}>제거하기</Text>
+              )}
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -369,13 +514,22 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.md,
     borderWidth: 1,
     flexDirection: 'row',
+    gap: theme.space[3],
     justifyContent: 'space-between',
     minHeight: theme.layout.tapMin,
     paddingHorizontal: theme.space[4],
     paddingVertical: theme.space[3],
   },
+  participantInfo: {
+    alignItems: 'center',
+    flex: 1,
+    flexDirection: 'row',
+    gap: theme.space[3],
+    justifyContent: 'space-between',
+  },
   participantName: {
     color: theme.color.textStrong,
+    flex: 1,
     fontFamily: theme.font.family.semibold,
     fontSize: theme.font.size.body,
     fontWeight: theme.font.weight.semibold,
@@ -407,6 +561,77 @@ const styles = StyleSheet.create({
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.caption,
     fontWeight: theme.font.weight.bold,
+  },
+  removeButton: {
+    alignItems: 'center',
+    borderColor: theme.color.danger,
+    borderRadius: theme.radius.pill,
+    borderWidth: 1,
+    justifyContent: 'center',
+    minHeight: theme.layout.controlHSm,
+    paddingHorizontal: theme.space[4],
+    paddingVertical: theme.space[2],
+  },
+  removeButtonText: {
+    color: theme.color.danger,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.caption,
+    fontWeight: theme.font.weight.bold,
+  },
+  modalBackdrop: {
+    alignItems: 'center',
+    backgroundColor: theme.color.bg,
+    flex: 1,
+    justifyContent: 'center',
+    padding: theme.space[7],
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: theme.layout.cardMaxW,
+    backgroundColor: theme.color.surface,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    gap: theme.space[5],
+    padding: theme.space[7],
+    ...theme.shadow.md,
+  },
+  modalTitle: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.headline,
+    fontWeight: theme.font.weight.bold,
+    textAlign: 'center',
+  },
+  actionRow: {
+    flexDirection: 'row',
+    gap: theme.space[3],
+  },
+  modalActionButton: {
+    flex: 1,
+  },
+  dangerButton: {
+    alignItems: 'center',
+    backgroundColor: theme.color.danger,
+    borderRadius: theme.radius.md,
+    justifyContent: 'center',
+    minHeight: theme.layout.controlH,
+    paddingHorizontal: theme.space[5],
+    paddingVertical: theme.space[4],
+  },
+  dangerButtonText: {
+    color: theme.color.onPrimary,
+    fontFamily: theme.font.family.bold,
+    fontWeight: theme.font.weight.bold,
+    textAlign: 'center',
+  },
+  loadingRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: theme.space[3],
+  },
+  disabled: {
+    opacity: 0.5,
   },
   message: {
     color: theme.color.textBody,

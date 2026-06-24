@@ -167,6 +167,20 @@ func (s *Store) DeleteTripByID(ctx context.Context, tripID string) (bool, error)
 	return true, nil
 }
 
+func (s *Store) DeleteTripMemberParticipant(ctx context.Context, tripID string, participantID string) (bool, error) {
+	_, err := s.queries.DeleteTripMemberParticipant(ctx, db.DeleteTripMemberParticipantParams{
+		Column1: mustUUID(tripID),
+		Column2: mustUUID(participantID),
+	})
+	if err == pgx.ErrNoRows {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 func (s *Store) CreateOrReturnTripInvite(ctx context.Context, record trip.CreateTripInviteRecord) (trip.CreateTripInviteResult, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {

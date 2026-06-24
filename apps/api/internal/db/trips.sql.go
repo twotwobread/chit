@@ -444,6 +444,33 @@ func (q *Queries) DeleteTripByID(ctx context.Context, dollar_1 pgtype.UUID) (str
 	return id, err
 }
 
+const deleteTripMemberParticipant = `-- name: DeleteTripMemberParticipant :one
+DELETE FROM trip_participants
+WHERE trip_id = $1::uuid
+  AND id = $2::uuid
+  AND role = 'member'
+RETURNING
+  id::text,
+  user_id::text
+`
+
+type DeleteTripMemberParticipantParams struct {
+	Column1 pgtype.UUID
+	Column2 pgtype.UUID
+}
+
+type DeleteTripMemberParticipantRow struct {
+	ID     string
+	UserID string
+}
+
+func (q *Queries) DeleteTripMemberParticipant(ctx context.Context, arg DeleteTripMemberParticipantParams) (DeleteTripMemberParticipantRow, error) {
+	row := q.db.QueryRow(ctx, deleteTripMemberParticipant, arg.Column1, arg.Column2)
+	var i DeleteTripMemberParticipantRow
+	err := row.Scan(&i.ID, &i.UserID)
+	return i, err
+}
+
 const deleteTripPlaceByID = `-- name: DeleteTripPlaceByID :exec
 DELETE FROM trip_places
 WHERE trip_id = $1::uuid

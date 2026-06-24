@@ -219,6 +219,34 @@ export class TripsService {
         });
     }
     /**
+     * Remove a trip participant
+     * Removes a member participant from a trip when requested by the authenticated trip owner. Removed members immediately lose trip access and may rejoin through a valid invite link.
+     * @param tripId
+     * @param participantId
+     * @returns void
+     * @throws ApiError
+     */
+    public static removeTripParticipant(
+        tripId: string,
+        participantId: string,
+    ): CancelablePromise<void> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/trips/{tripId}/participants/{participantId}',
+            path: {
+                'tripId': tripId,
+                'participantId': participantId,
+            },
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                403: `Forbidden.`,
+                404: `Trip or removable participant not found.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
      * Set a trip day lodging place
      * Stores or replaces the selected Day lodging target for an authenticated trip participant.
      * @param tripId

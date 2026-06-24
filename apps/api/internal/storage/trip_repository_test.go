@@ -1665,6 +1665,80 @@ func TestDeleteTripByIDCascadesParticipants(t *testing.T) {
 	}
 }
 
+func TestDeleteTripMemberParticipantDeletesOnlyTargetMember(t *testing.T) {
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("DATABASE_URL is required for storage integration test")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	store, err := Open(ctx, databaseURL)
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer store.Close()
+
+	ownerUserID := insertTripRepositoryTestUser(t, ctx, store, "참여자 제거 Owner")
+	targetUserID := insertTripRepositoryTestUser(t, ctx, store, "참여자 제거 Target")
+	otherUserID := insertTripRepositoryTestUser(t, ctx, store, "참여자 제거 Other")
+	defer func() {
+		_, _ = store.pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1::uuid`, ownerUserID)
+		_, _ = store.pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1::uuid`, targetUserID)
+		_, _ = store.pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1::uuid`, otherUserID)
+	}()
+
+	tripID := insertTripRepositoryTestTrip(t, ctx, store, "참여자 제거 테스트 여행", ownerUserID)
+	otherTripID := insertTripRepositoryTestTrip(t, ctx, store, "참여자 제거 다른 여행", ownerUserID)
+	defer func() {
+		_, _ = store.pool.Exec(context.Background(), `DELETE FROM trips WHERE id = $1::uuid`, tripID)
+		_, _ = store.pool.Exec(context.Background(), `DELETE FROM trips WHERE id = $1::uuid`, otherTripID)
+	}()
+
+	ownerParticipantID := insertTripRepositoryTestParticipant(t, ctx, store, tripID, ownerUserID, trip.RoleOwner, "주최자")
+	targetParticipantID := insertTripRepositoryTestParticipant(t, ctx, store, tripID, targetUserID, trip.RoleMember, "제거 대상")
+	otherParticipantID := insertTripRepositoryTestParticipant(t, ctx, store, tripID, otherUserID, trip.RoleMember, "유지 대상")
+	wrongTripParticipantID := insertTripRepositoryTestParticipant(t, ctx, store, otherTripID, targetUserID, trip.RoleMember, "다른 여행")
+
+	deleted, err := store.DeleteTripMemberParticipant(ctx, tripID, targetParticipantID)
+	if err != nil {
+		t.Fatalf("delete trip member participant: %v", err)
+	}
+	if !deleted {
+		t.Fatal("expected target member participant to be deleted")
+	}
+
+	assertTripRepositoryParticipantCount(t, ctx, store, tripID, targetParticipantID, 0)
+	assertTripRepositoryParticipantCount(t, ctx, store, tripID, ownerParticipantID, 1)
+	assertTripRepositoryParticipantCount(t, ctx, store, tripID, otherParticipantID, 1)
+	assertTripRepositoryParticipantCount(t, ctx, store, otherTripID, wrongTripParticipantID, 1)
+
+	deletedAgain, err := store.DeleteTripMemberParticipant(ctx, tripID, targetParticipantID)
+	if err != nil {
+		t.Fatalf("delete already removed participant: %v", err)
+	}
+	if deletedAgain {
+		t.Fatal("expected already removed participant to report false")
+	}
+
+	deletedOwner, err := store.DeleteTripMemberParticipant(ctx, tripID, ownerParticipantID)
+	if err != nil {
+		t.Fatalf("delete owner participant: %v", err)
+	}
+	if deletedOwner {
+		t.Fatal("expected owner participant not to be removable")
+	}
+
+	deletedWrongTrip, err := store.DeleteTripMemberParticipant(ctx, tripID, wrongTripParticipantID)
+	if err != nil {
+		t.Fatalf("delete wrong-trip participant: %v", err)
+	}
+	if deletedWrongTrip {
+		t.Fatal("expected wrong-trip participant not to be removable")
+	}
+}
+
 func TestListTripParticipantsOrdersOwnerFirstThenJoinedAt(t *testing.T) {
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
@@ -1766,6 +1840,65 @@ func TestListTripParticipantsOrdersOwnerFirstThenJoinedAt(t *testing.T) {
 	}
 	if participants[0].DisplayName != "주최자" || participants[0].Role != trip.RoleOwner {
 		t.Fatalf("unexpected owner mapping: %#v", participants[0])
+	}
+}
+
+func insertTripRepositoryTestUser(t *testing.T, ctx context.Context, store *Store, displayName string) string {
+	t.Helper()
+
+	var userID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO users (display_name)
+		VALUES ($1)
+		RETURNING id::text
+	`, displayName).Scan(&userID); err != nil {
+		t.Fatalf("insert user %q: %v", displayName, err)
+	}
+	return userID
+}
+
+func insertTripRepositoryTestTrip(t *testing.T, ctx context.Context, store *Store, name string, createdBy string) string {
+	t.Helper()
+
+	var tripID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO trips (name, start_date, end_date, default_currency, created_by)
+		VALUES ($1, '2026-07-10', '2026-07-13', 'JPY', $2::uuid)
+		RETURNING id::text
+	`, name, createdBy).Scan(&tripID); err != nil {
+		t.Fatalf("insert trip %q: %v", name, err)
+	}
+	return tripID
+}
+
+func insertTripRepositoryTestParticipant(t *testing.T, ctx context.Context, store *Store, tripID string, userID string, role string, displayName string) string {
+	t.Helper()
+
+	var participantID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO trip_participants (trip_id, user_id, role, display_name)
+		VALUES ($1::uuid, $2::uuid, $3, $4)
+		RETURNING id::text
+	`, tripID, userID, role, displayName).Scan(&participantID); err != nil {
+		t.Fatalf("insert participant %q: %v", displayName, err)
+	}
+	return participantID
+}
+
+func assertTripRepositoryParticipantCount(t *testing.T, ctx context.Context, store *Store, tripID string, participantID string, want int) {
+	t.Helper()
+
+	var count int
+	if err := store.pool.QueryRow(ctx, `
+		SELECT count(*)::int
+		FROM trip_participants
+		WHERE trip_id = $1::uuid
+		  AND id = $2::uuid
+	`, tripID, participantID).Scan(&count); err != nil {
+		t.Fatalf("count participant %s: %v", participantID, err)
+	}
+	if count != want {
+		t.Fatalf("expected participant %s count %d, got %d", participantID, want, count)
 	}
 }
 

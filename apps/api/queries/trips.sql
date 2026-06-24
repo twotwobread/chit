@@ -95,6 +95,15 @@ ORDER BY
   joined_at ASC,
   id ASC;
 
+-- name: DeleteTripMemberParticipant :one
+DELETE FROM trip_participants
+WHERE trip_id = $1::uuid
+  AND id = $2::uuid
+  AND role = 'member'
+RETURNING
+  id::text,
+  user_id::text;
+
 -- name: ListTripsByParticipantUser :many
 SELECT
   t.id::text AS id,

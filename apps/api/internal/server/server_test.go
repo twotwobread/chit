@@ -1281,6 +1281,175 @@ func TestListTripParticipantsForbidden(t *testing.T) {
 	}
 }
 
+func TestRemoveTripParticipantHandlerRemovesMemberAndAllowsReinvite(t *testing.T) {
+	backend := newFakeAuthBackend()
+	ownerToken := loginTestUser(t, backend)
+	tripID := createTestTrip(t, backend, ownerToken)
+	memberSession := loginTestUserSession(t, backend, "apple-2", "지영")
+	memberParticipantID := testUUID(2002)
+	backend.participants[tripID] = append(backend.participants[tripID], tripdomain.Participant{
+		ID:          memberParticipantID,
+		TripID:      tripID,
+		UserID:      memberSession.UserID,
+		Role:        tripdomain.RoleMember,
+		DisplayName: "지영",
+		JoinedAt:    time.Date(2026, 6, 22, 9, 0, 0, 0, time.UTC),
+	})
+
+	inviteRecorder := httptest.NewRecorder()
+	inviteRequest := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/invites", nil)
+	inviteRequest.Header.Set("Authorization", "Bearer "+ownerToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(inviteRecorder, inviteRequest)
+	if inviteRecorder.Code != http.StatusCreated {
+		t.Fatalf("expected invite create status %d, got %d with body %s", http.StatusCreated, inviteRecorder.Code, inviteRecorder.Body.String())
+	}
+	var inviteBody struct {
+		Invite struct {
+			Token string `json:"token"`
+		} `json:"invite"`
+	}
+	if err := json.NewDecoder(inviteRecorder.Body).Decode(&inviteBody); err != nil {
+		t.Fatalf("decode invite response: %v", err)
+	}
+
+	removeRecorder := httptest.NewRecorder()
+	removeRequest := httptest.NewRequest(http.MethodDelete, "/trips/"+tripID+"/participants/"+memberParticipantID, nil)
+	removeRequest.Header.Set("Authorization", "Bearer "+ownerToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(removeRecorder, removeRequest)
+	if removeRecorder.Code != http.StatusNoContent {
+		t.Fatalf("expected remove status %d, got %d with body %s", http.StatusNoContent, removeRecorder.Code, removeRecorder.Body.String())
+	}
+	if removeRecorder.Body.Len() != 0 {
+		t.Fatalf("expected empty remove body, got %q", removeRecorder.Body.String())
+	}
+	if len(backend.participants[tripID]) != 1 || backend.participants[tripID][0].Role != tripdomain.RoleOwner {
+		t.Fatalf("expected only owner participant after removal, got %#v", backend.participants[tripID])
+	}
+
+	retryRecorder := httptest.NewRecorder()
+	retryRequest := httptest.NewRequest(http.MethodDelete, "/trips/"+tripID+"/participants/"+memberParticipantID, nil)
+	retryRequest.Header.Set("Authorization", "Bearer "+ownerToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(retryRecorder, retryRequest)
+	if retryRecorder.Code != http.StatusNotFound {
+		t.Fatalf("expected retry after successful removal status %d, got %d with body %s", http.StatusNotFound, retryRecorder.Code, retryRecorder.Body.String())
+	}
+
+	listRecorder := httptest.NewRecorder()
+	listRequest := httptest.NewRequest(http.MethodGet, "/trips", nil)
+	listRequest.Header.Set("Authorization", "Bearer "+memberSession.AccessToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(listRecorder, listRequest)
+	if listRecorder.Code != http.StatusOK {
+		t.Fatalf("expected member list status %d, got %d with body %s", http.StatusOK, listRecorder.Code, listRecorder.Body.String())
+	}
+	var listBody struct {
+		Trips []interface{} `json:"trips"`
+	}
+	if err := json.NewDecoder(listRecorder.Body).Decode(&listBody); err != nil {
+		t.Fatalf("decode member list response: %v", err)
+	}
+	if len(listBody.Trips) != 0 {
+		t.Fatalf("expected removed member trip list to be empty, got %#v", listBody.Trips)
+	}
+
+	detailRecorder := httptest.NewRecorder()
+	detailRequest := httptest.NewRequest(http.MethodGet, "/trips/"+tripID, nil)
+	detailRequest.Header.Set("Authorization", "Bearer "+memberSession.AccessToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(detailRecorder, detailRequest)
+	if detailRecorder.Code != http.StatusForbidden {
+		t.Fatalf("expected removed member detail status %d, got %d with body %s", http.StatusForbidden, detailRecorder.Code, detailRecorder.Body.String())
+	}
+
+	acceptRecorder := httptest.NewRecorder()
+	acceptRequest := httptest.NewRequest(http.MethodPost, "/invites/"+inviteBody.Invite.Token+"/accept", nil)
+	acceptRequest.Header.Set("Authorization", "Bearer "+memberSession.AccessToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(acceptRecorder, acceptRequest)
+	if acceptRecorder.Code != http.StatusOK {
+		t.Fatalf("expected re-accept status %d, got %d with body %s", http.StatusOK, acceptRecorder.Code, acceptRecorder.Body.String())
+	}
+	var acceptBody struct {
+		Role            string `json:"role"`
+		AlreadyAccepted bool   `json:"alreadyAccepted"`
+	}
+	if err := json.NewDecoder(acceptRecorder.Body).Decode(&acceptBody); err != nil {
+		t.Fatalf("decode re-accept response: %v", err)
+	}
+	if acceptBody.Role != "member" || acceptBody.AlreadyAccepted || len(backend.participants[tripID]) != 2 {
+		t.Fatalf("expected removed member to rejoin as a new member, got body=%#v participants=%#v", acceptBody, backend.participants[tripID])
+	}
+}
+
+func TestRemoveTripParticipantErrors(t *testing.T) {
+	backend := newFakeAuthBackend()
+	ownerToken := loginTestUser(t, backend)
+	tripID := createTestTrip(t, backend, ownerToken)
+	memberToken := loginTestUserWithSubject(t, backend, "apple-2", "지영")
+	memberParticipantID := testUUID(2002)
+	backend.participants[tripID] = append(backend.participants[tripID], tripdomain.Participant{
+		ID:          memberParticipantID,
+		TripID:      tripID,
+		UserID:      "user-2",
+		Role:        tripdomain.RoleMember,
+		DisplayName: "지영",
+		JoinedAt:    time.Date(2026, 6, 22, 9, 0, 0, 0, time.UTC),
+	})
+	otherTripID := createTestTrip(t, backend, ownerToken)
+	wrongTripParticipantID := testUUID(2003)
+	backend.participants[otherTripID] = append(backend.participants[otherTripID], tripdomain.Participant{
+		ID:          wrongTripParticipantID,
+		TripID:      otherTripID,
+		UserID:      "user-2",
+		Role:        tripdomain.RoleMember,
+		DisplayName: "지영",
+		JoinedAt:    time.Date(2026, 6, 23, 9, 0, 0, 0, time.UTC),
+	})
+	ownerParticipantID := backend.participants[tripID][0].ID
+
+	cases := []struct {
+		name       string
+		path       string
+		token      string
+		expectCode int
+		expectErr  string
+	}{
+		{name: "auth required", path: "/trips/" + tripID + "/participants/" + memberParticipantID, expectCode: http.StatusUnauthorized, expectErr: "UNAUTHORIZED"},
+		{name: "invalid trip id", path: "/trips/not-a-uuid/participants/" + memberParticipantID, token: ownerToken, expectCode: http.StatusBadRequest, expectErr: "VALIDATION_ERROR"},
+		{name: "invalid participant id", path: "/trips/" + tripID + "/participants/not-a-uuid", token: ownerToken, expectCode: http.StatusBadRequest, expectErr: "VALIDATION_ERROR"},
+		{name: "missing trip", path: "/trips/00000000-0000-0000-0000-000000000404/participants/" + memberParticipantID, token: ownerToken, expectCode: http.StatusNotFound, expectErr: "NOT_FOUND"},
+		{name: "member forbidden", path: "/trips/" + tripID + "/participants/" + memberParticipantID, token: memberToken, expectCode: http.StatusForbidden, expectErr: "FORBIDDEN"},
+		{name: "owner target not removable", path: "/trips/" + tripID + "/participants/" + ownerParticipantID, token: ownerToken, expectCode: http.StatusNotFound, expectErr: "NOT_FOUND"},
+		{name: "missing participant", path: "/trips/" + tripID + "/participants/00000000-0000-0000-0000-000000000999", token: ownerToken, expectCode: http.StatusNotFound, expectErr: "NOT_FOUND"},
+		{name: "wrong trip participant", path: "/trips/" + tripID + "/participants/" + wrongTripParticipantID, token: ownerToken, expectCode: http.StatusNotFound, expectErr: "NOT_FOUND"},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			request := httptest.NewRequest(http.MethodDelete, tt.path, nil)
+			if tt.token != "" {
+				request.Header.Set("Authorization", "Bearer "+tt.token)
+			}
+			NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+			if recorder.Code != tt.expectCode {
+				t.Fatalf("expected status %d, got %d with body %s", tt.expectCode, recorder.Code, recorder.Body.String())
+			}
+			var body struct {
+				Error struct {
+					Code string `json:"code"`
+				} `json:"error"`
+			}
+			if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+				t.Fatalf("decode error response: %v", err)
+			}
+			if body.Error.Code != tt.expectErr {
+				t.Fatalf("expected error %q, got %q", tt.expectErr, body.Error.Code)
+			}
+		})
+	}
+	if len(backend.participants[tripID]) != 2 {
+		t.Fatalf("expected failed removals not to mutate participants, got %#v", backend.participants[tripID])
+	}
+}
+
 func TestGetDayItineraryHandlerReturnsEmpty(t *testing.T) {
 	backend := newFakeAuthBackend()
 	accessToken := loginTestUser(t, backend)
@@ -3354,6 +3523,18 @@ func (b *fakeAuthBackend) DeleteTripByID(_ context.Context, tripID string) (bool
 	delete(b.participants, tripID)
 	delete(b.tripInvites, tripID)
 	return true, nil
+}
+
+func (b *fakeAuthBackend) DeleteTripMemberParticipant(_ context.Context, tripID string, participantID string) (bool, error) {
+	participants := b.participants[tripID]
+	for index, participant := range participants {
+		if participant.ID != participantID || participant.Role != tripdomain.RoleMember {
+			continue
+		}
+		b.participants[tripID] = append(participants[:index], participants[index+1:]...)
+		return true, nil
+	}
+	return false, nil
 }
 
 func (b *fakeAuthBackend) CreateOrReturnTripInvite(_ context.Context, record tripdomain.CreateTripInviteRecord) (tripdomain.CreateTripInviteResult, error) {
