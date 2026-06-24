@@ -104,6 +104,29 @@ test('adds role and participant count labels to cards in every status section', 
   assert.equal(viewModel.currentTrip?.participantCountLabel, '참여자 2명');
 });
 
+test('shows an invited member trip with the existing member role label', () => {
+  const viewModel = buildMyTripsSuccessViewModel(
+    [
+      trip({
+        id: 'trip-invited',
+        name: '초대받은 여행',
+        startDate: '2026-07-10',
+        endDate: '2026-07-13',
+        myRole: 'member',
+        participantCount: 2,
+      }),
+    ],
+    '2026-06-24',
+  );
+
+  const invitedTrip = viewModel.sections.flatMap((section) => section.trips).find((item) => item.id === 'trip-invited');
+
+  assert.equal(invitedTrip?.name, '초대받은 여행');
+  assert.equal(invitedTrip?.roleLabel, '동행자');
+  assert.equal(invitedTrip?.participantCountLabel, '참여자 2명');
+  assert.equal(tripDetailPath(invitedTrip?.id ?? ''), '/trips/trip-invited');
+});
+
 test('builds the existing trip detail route for current trip shortcut navigation', () => {
   assert.equal(tripDetailPath('trip_123'), '/trips/trip_123');
 });

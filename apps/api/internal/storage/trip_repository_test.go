@@ -1472,6 +1472,17 @@ func TestAcceptTripInviteCreatesAndReusesParticipant(t *testing.T) {
 		t.Fatalf("expected owner plus one member, got %d", participantCount)
 	}
 
+	memberTrips, err := store.ListTripsByParticipantUser(ctx, memberUserID)
+	if err != nil {
+		t.Fatalf("list member trips after accept: %v", err)
+	}
+	if len(memberTrips) != 1 {
+		t.Fatalf("expected accepted trip in member trip list, got %#v", memberTrips)
+	}
+	if memberTrips[0].ID != tripID || memberTrips[0].Name != "초대 수락 테스트 여행" || memberTrips[0].MyRole != trip.RoleMember || memberTrips[0].ParticipantCount != 2 {
+		t.Fatalf("expected accepted trip to be listed as member, got %#v", memberTrips[0])
+	}
+
 	_, err = store.AcceptTripInvite(ctx, trip.AcceptTripInviteRecord{Token: token, UserID: memberUserID, Now: now.Add(8 * 24 * time.Hour)})
 	if !errors.Is(err, trip.ErrInviteExpired) {
 		t.Fatalf("expected ErrInviteExpired, got %v", err)

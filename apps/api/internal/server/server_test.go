@@ -1031,6 +1031,31 @@ func TestAcceptTripInviteHandlerCreatesAndReusesParticipant(t *testing.T) {
 		t.Fatalf("expected owner plus trimmed member participant, got %#v", backend.participants[tripID])
 	}
 
+	listRecorder := httptest.NewRecorder()
+	listRequest := httptest.NewRequest(http.MethodGet, "/trips", nil)
+	listRequest.Header.Set("Authorization", "Bearer "+memberSession.AccessToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(listRecorder, listRequest)
+	if listRecorder.Code != http.StatusOK {
+		t.Fatalf("expected member list status %d, got %d with body %s", http.StatusOK, listRecorder.Code, listRecorder.Body.String())
+	}
+	var listBody struct {
+		Trips []struct {
+			ID               string `json:"id"`
+			Name             string `json:"name"`
+			MyRole           string `json:"myRole"`
+			ParticipantCount int    `json:"participantCount"`
+		} `json:"trips"`
+	}
+	if err := json.NewDecoder(listRecorder.Body).Decode(&listBody); err != nil {
+		t.Fatalf("decode member list response: %v", err)
+	}
+	if len(listBody.Trips) != 1 {
+		t.Fatalf("expected accepted trip in member list, got %#v", listBody.Trips)
+	}
+	if listBody.Trips[0].ID != tripID || listBody.Trips[0].Name != "오사카 3박 4일" || listBody.Trips[0].MyRole != "member" || listBody.Trips[0].ParticipantCount != 2 {
+		t.Fatalf("expected accepted trip to be listed as member, got %#v", listBody.Trips[0])
+	}
+
 	reuseRecorder := httptest.NewRecorder()
 	reuseRequest := httptest.NewRequest(http.MethodPost, "/invites/"+inviteBody.Invite.Token+"/accept", nil)
 	reuseRequest.Header.Set("Authorization", "Bearer "+memberSession.AccessToken)
