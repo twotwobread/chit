@@ -58,6 +58,7 @@ export type { TripPlaceSummary } from './models/TripPlaceSummary';
 export type { TripPlaceType } from './models/TripPlaceType';
 export type { UpdateDayItineraryItemRequest } from './models/UpdateDayItineraryItemRequest';
 export type { UpdateDayItineraryItemResponse } from './models/UpdateDayItineraryItemResponse';
+export type { UpdateMeRequest } from './models/UpdateMeRequest';
 export type { UpdateTripRequest } from './models/UpdateTripRequest';
 export type { UpdateTripResponse } from './models/UpdateTripResponse';
 

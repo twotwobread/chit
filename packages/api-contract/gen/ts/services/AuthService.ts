@@ -10,6 +10,7 @@ import type { AuthRefreshResponse } from '../models/AuthRefreshResponse';
 import type { OAuthLinkRequest } from '../models/OAuthLinkRequest';
 import type { OAuthLoginRequest } from '../models/OAuthLoginRequest';
 import type { RefreshTokenRequest } from '../models/RefreshTokenRequest';
+import type { UpdateMeRequest } from '../models/UpdateMeRequest';
 import type { CancelablePromise } from '../core/CancelablePromise';
 import { OpenAPI } from '../core/OpenAPI';
 import { request as __request } from '../core/request';
@@ -105,6 +106,28 @@ export class AuthService {
             method: 'GET',
             url: '/me',
             errors: {
+                401: `Unauthorized.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
+     * Update the current user's display name
+     * Updates the authenticated user's canonical display name. Server trims leading/trailing whitespace, then validates 1-20 Unicode code points before storing the value.
+     * @param requestBody
+     * @returns AuthMeResponse Current user after display-name update.
+     * @throws ApiError
+     */
+    public static updateMe(
+        requestBody: UpdateMeRequest,
+    ): CancelablePromise<AuthMeResponse> {
+        return __request(OpenAPI, {
+            method: 'PATCH',
+            url: '/me',
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: `Validation error.`,
                 401: `Unauthorized.`,
                 500: `Unexpected server error.`,
             },

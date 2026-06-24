@@ -175,6 +175,26 @@ func (s *Store) RevokeSession(ctx context.Context, sessionID string) error {
 	return s.queries.RevokeSession(ctx, mustUUID(sessionID))
 }
 
+func (s *Store) UpdateUserDisplayName(ctx context.Context, userID string, displayName string) (auth.User, bool, error) {
+	row, err := s.queries.UpdateUserDisplayName(ctx, db.UpdateUserDisplayNameParams{
+		Column1:     mustUUID(userID),
+		DisplayName: displayName,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return auth.User{}, false, nil
+	}
+	if err != nil {
+		return auth.User{}, false, err
+	}
+	return auth.User{
+		ID:            row.ID,
+		DisplayName:   row.DisplayName,
+		Email:         textPtr(row.Email),
+		EmailVerified: row.EmailVerified,
+		AvatarURL:     textPtr(row.AvatarUrl),
+	}, true, nil
+}
+
 func (s *Store) GetUser(ctx context.Context, userID string) (auth.User, bool, error) {
 	row, err := s.queries.GetUserByID(ctx, mustUUID(userID))
 	if errors.Is(err, pgx.ErrNoRows) {

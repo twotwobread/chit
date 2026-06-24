@@ -477,6 +477,12 @@ type UpdateDayItineraryItemResponse struct {
 	Item DayItineraryItem `json:"item"`
 }
 
+// UpdateMeRequest defines model for UpdateMeRequest.
+type UpdateMeRequest struct {
+	// DisplayName Server trims leading/trailing whitespace, counts Unicode code points after trim, then validates and persists the value.
+	DisplayName string `json:"displayName"`
+}
+
 // UpdateTripRequest defines model for UpdateTripRequest.
 type UpdateTripRequest struct {
 	DefaultCurrency *SupportedCurrency `json:"defaultCurrency,omitempty"`
@@ -508,6 +514,9 @@ type LoginWithOAuthJSONRequestBody = OAuthLoginRequest
 
 // RefreshTokenJSONRequestBody defines body for RefreshToken for application/json ContentType.
 type RefreshTokenJSONRequestBody = RefreshTokenRequest
+
+// UpdateMeJSONRequestBody defines body for UpdateMe for application/json ContentType.
+type UpdateMeJSONRequestBody = UpdateMeRequest
 
 // CreateTripJSONRequestBody defines body for CreateTrip for application/json ContentType.
 type CreateTripJSONRequestBody = CreateTripRequest
@@ -550,6 +559,9 @@ type ServerInterface interface {
 	// Return the current user and linked providers
 	// (GET /me)
 	GetMe(w http.ResponseWriter, r *http.Request)
+	// Update the current user's display name
+	// (PATCH /me)
+	UpdateMe(w http.ResponseWriter, r *http.Request)
 	// Check API readiness
 	// (GET /ready)
 	GetReady(w http.ResponseWriter, r *http.Request)
@@ -643,6 +655,12 @@ func (_ Unimplemented) GetHealth(w http.ResponseWriter, r *http.Request) {
 // Return the current user and linked providers
 // (GET /me)
 func (_ Unimplemented) GetMe(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Update the current user's display name
+// (PATCH /me)
+func (_ Unimplemented) UpdateMe(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -864,6 +882,26 @@ func (siw *ServerInterfaceWrapper) GetMe(w http.ResponseWriter, r *http.Request)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetMe(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateMe operation middleware
+func (siw *ServerInterfaceWrapper) UpdateMe(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateMe(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1579,6 +1617,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/me", wrapper.GetMe)
+	})
+	r.Group(func(r chi.Router) {
+		r.Patch(options.BaseURL+"/me", wrapper.UpdateMe)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/ready", wrapper.GetReady)

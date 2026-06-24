@@ -37,6 +37,7 @@ type AuthServiceClient = {
   linkOAuthProvider: (request: { provider: AuthProvider; credential: OAuthCredential }) => Promise<AuthLinkResponse>;
   refreshToken: (request: { refreshToken: string }) => Promise<AuthRefreshResponse>;
   getMe: () => Promise<AuthMeResponse>;
+  updateMe: (request: { displayName: string }) => Promise<AuthMeResponse>;
   logout: () => Promise<unknown>;
 };
 
@@ -143,6 +144,39 @@ async function getMeWithRefreshOnce(deps: AuthClientDeps): Promise<AuthMeRespons
     return await deps.authService.getMe();
   } catch (error) {
     if (isNonRetryableAuthError(error)) {
+      await bestEffortClearStoredSession(deps);
+    }
+    throw toMobileAuthError(error);
+  }
+}
+
+export async function updateDisplayNameWithRefresh(
+  displayName: string,
+  deps: AuthClientDeps = defaultAuthClientDeps,
+): Promise<AuthMeResponse> {
+  const session = await requireSession(deps);
+  deps.configureApi(session.tokens.accessToken);
+
+  try {
+    const response = await deps.authService.updateMe({ displayName });
+    await persistSessionOrThrow({ user: response.user, tokens: session.tokens }, deps);
+    return response;
+  } catch (error) {
+    if (getErrorCode(error) !== 'UNAUTHORIZED') {
+      throw toMobileAuthError(error);
+    }
+  }
+
+  const refreshed = await refreshStoredSession(session.tokens.refreshToken, deps, session);
+  deps.configureApi(refreshed.tokens.accessToken);
+
+  try {
+    const response = await deps.authService.updateMe({ displayName });
+    await persistSessionOrThrow({ user: response.user, tokens: refreshed.tokens }, deps);
+    return response;
+  } catch (error) {
+    const code = getErrorCode(error);
+    if (code === 'INVALID_REFRESH_TOKEN' || code === 'UNAUTHORIZED') {
       await bestEffortClearStoredSession(deps);
     }
     throw toMobileAuthError(error);
