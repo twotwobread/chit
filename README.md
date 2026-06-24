@@ -7,10 +7,25 @@
 이 저장소는 `pnpm` workspace 기반 monorepo입니다.
 
 ```text
-apps/mobile             Expo app
+apps/mobile             Expo + React Native app
 apps/api                Go API server
 packages/api-contract   OpenAPI contract and generated TypeScript client
 ```
+
+## Stack and Source of Truth
+
+| Area | Technology / Source |
+|---|---|
+| Mobile | Expo, React Native, Expo Router |
+| API | Go, chi, `net/http` |
+| API Contract | `packages/api-contract/openapi.yaml` |
+| API generated code | `apps/api/internal/openapi/`, `packages/api-contract/gen/ts/` |
+| DB | PostgreSQL, goose migrations, sqlc + pgx |
+| DB schema/query source | `apps/api/migrations/`, `apps/api/schema.sql`, `apps/api/queries/` |
+| Mobile design tokens | `apps/mobile/lib/design/theme.ts` |
+| Shared mobile primitives | `apps/mobile/lib/design/components.tsx` |
+| Agent workflow rules | `.pi/rules/` |
+
 
 ## Prerequisites
 
@@ -35,9 +50,9 @@ asdf install
 pnpm install
 ```
 
-## Design System
+## Mobile UI
 
-UI 작업은 `docs/design/README.md`와 모바일 토큰 `apps/mobile/lib/design/theme.ts`를 기준으로 합니다. 브랜드 SVG 에셋은 `apps/mobile/assets/brand/`에 있습니다.
+모바일 UI 구현 규칙은 `.pi/rules/mobile-ui.md`, 토큰은 `apps/mobile/lib/design/theme.ts`, 공용 primitive는 `apps/mobile/lib/design/components.tsx`를 기준으로 합니다. 브랜드 에셋은 `apps/mobile/assets/brand/`에 있습니다.
 
 ## OpenAPI/codegen Workflow
 
@@ -91,12 +106,14 @@ set -a; source .env; set +a
 
 Feature worktree에서는 `.env`를 복사하지 말고 루트 `.env`로 symlink합니다. 이렇게 하면 key rotation이나 local URL 변경이 모든 worktree에 같이 반영됩니다.
 
-`scripts/worktree-create`는 worktree 생성 후 `scripts/worktree-post-create`를 실행해 루트 `.env`가 있으면 새 worktree의 `.env` symlink를 자동 생성합니다. 이미 worktree에 `.env` 파일이나 symlink가 있으면 덮어쓰지 않습니다.
+Agent workflow 전용 helper는 `.pi/bin/`에 둡니다. `scripts/`는 앱/인프라/CI처럼 agent 밖에서도 쓰는 범용 스크립트에만 사용합니다.
+
+`.pi/bin/worktree-create`는 worktree 생성 후 `.pi/bin/worktree-post-create`를 실행해 루트 `.env`가 있으면 새 worktree의 `.env` symlink를 자동 생성합니다. 이미 worktree에 `.env` 파일이나 symlink가 있으면 덮어쓰지 않습니다.
 
 기존 worktree의 `.env` symlink를 수동으로 보정해야 하면 프로젝트 루트에서 실행합니다.
 
 ```bash
-scripts/worktree-post-create .worktrees/<worktree-name>
+.pi/bin/worktree-post-create .worktrees/<worktree-name>
 ```
 
 실제 API key, OAuth secret, DB URL은 git, GitHub issue, chat에 붙여넣지 않습니다.
@@ -215,53 +232,4 @@ Generated artifact가 current source와 drift되거나, regenerated artifact가 
 
 ## Staging / Internal Deployment
 
-F-004부터 staging API는 GCP Cloud Run에 배포하고, Expo iOS internal build는 Cloud Run staging URL을 `EXPO_PUBLIC_API_BASE_URL`로 사용합니다. Android internal build는 Android tester/device가 생겼을 때 선택적으로 생성합니다.
-
-Fixed staging resources:
-
-```text
-GCP project: i-um-488511
-Region: asia-northeast3
-Cloud Run service: i-um-api-staging
-Artifact Registry repository: i-um-staging
-Secret Manager secret: i-um-staging-database-url
-Cloud Build trigger: i-um-api-staging-deploy
-Terraform state bucket: i-um-488511-terraform-state
-```
-
-Terraform validation:
-
-```bash
-terraform -chdir=infra/terraform/gcp-staging init
-terraform -chdir=infra/terraform/gcp-staging fmt -check
-terraform -chdir=infra/terraform/gcp-staging validate
-terraform -chdir=infra/terraform/gcp-staging plan
-```
-
-Deploy staging API through the manual Cloud Build trigger:
-
-```bash
-gcloud builds triggers run i-um-api-staging-deploy \
-  --region=asia-northeast3 \
-  --branch=develop
-```
-
-Run staging smoke checks:
-
-```bash
-CLOUD_RUN_URL="$(gcloud run services describe i-um-api-staging \
-  --region=asia-northeast3 \
-  --format='value(status.url)')"
-
-curl -i "$CLOUD_RUN_URL/health"
-curl -i "$CLOUD_RUN_URL/ready"
-```
-
-iOS internal build uses `apps/mobile/eas.json` profile `preview` and EAS managed credentials:
-
-```bash
-cd apps/mobile
-npx eas-cli@latest build --profile preview --platform ios
-```
-
-Full bootstrap, migration, deploy, EAS environment, smoke test, and rollback steps are documented in `docs/delivery/staging_internal_deploy.md`.
+Staging/internal deployment is agent-owned workflow context. Use `/skill:i-um-staging-deploy` when the task explicitly asks for Cloud Run staging deploy, EAS internal build, staging smoke verification, DB migration on staging, or rollback.

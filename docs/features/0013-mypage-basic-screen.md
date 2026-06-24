@@ -110,7 +110,7 @@ F-013은 이후 내 여행 목록과 마이페이지 고도화 기능을 얹기 
 
 ### Layout
 
-- 디자인 기준은 `docs/design/README.md`, `docs/design/mobile-ui-reference.md`, `apps/mobile/lib/design/theme.ts`를 따른다.
+- 디자인 기준은 `.pi/rules/mobile-ui.md`와 `apps/mobile/lib/design/theme.ts`를 따른다.
 - 단일 컬럼 portrait mobile 화면으로 구성한다.
 - 하단 메뉴가 주요 콘텐츠를 가리지 않도록 content padding 또는 safe area를 확보한다.
 - 화면 좌우 padding은 theme spacing/token을 사용한다.

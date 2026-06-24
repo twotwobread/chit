@@ -143,7 +143,7 @@ F-026은 F-025 읽기 전용 Day 일정 화면에 첫 번째 쓰기 흐름을 �
 
 ### Design Guardrails
 
-- `docs/design/README.md`, `docs/design/mobile-ui-reference.md`, `apps/mobile/lib/design/theme.ts`를 따른다.
+- `.pi/rules/mobile-ui.md`와 `apps/mobile/lib/design/theme.ts`를 따른다.
 - 화면 코드는 theme token의 color, spacing, radius, shadow, typography를 사용한다.
 - raw hex color, 임의 spacing/radius 값을 화면 코드에 추가하지 않는다.
 - 제품 UI에 emoji를 사용하지 않는다.

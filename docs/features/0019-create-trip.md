@@ -343,7 +343,7 @@ CREATE TABLE trip_participants (
 ## Implementation Plan
 
 1. Spec approval and worktree 준비
-   - 작업: 이 문서의 open questions가 없는지 확인하고 승인 후 `scripts/worktree-create F019 create-trip`로 구현 worktree를 만든다.
+   - 작업: 이 문서의 open questions가 없는지 확인하고 승인 후 `.pi/bin/worktree-create F019 create-trip`로 구현 worktree를 만든다.
    - Verify: worktree가 `.worktrees/F019-create-trip`에 생성되고 branch가 feature 규칙을 따른다.
 
 2. OpenAPI 계약 작성

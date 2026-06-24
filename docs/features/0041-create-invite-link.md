@@ -214,7 +214,7 @@ Fallback payload도 `inviteUrl`을 사용하고 raw token을 공유하지 않는
 
 ### Design Guardrails
 
-- `docs/design/README.md`, `docs/design/mobile-ui-reference.md`, `apps/mobile/lib/design/theme.ts`를 따른다.
+- `.pi/rules/mobile-ui.md`와 `apps/mobile/lib/design/theme.ts`를 따른다.
 - 화면 코드는 theme token의 color, spacing, radius, shadow, typography를 사용한다.
 - raw hex color, 임의 spacing/radius 값을 화면 코드에 추가하지 않는다.
 - 제품 UI에 emoji를 사용하지 않는다.

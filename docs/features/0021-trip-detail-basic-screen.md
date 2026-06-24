@@ -117,7 +117,7 @@ F-021은 여행 상세 화면의 최소 vertical slice다. 여행 목록에서 �
 
 ### Design Guardrails
 
-- `docs/design/README.md`와 `apps/mobile/lib/design/theme.ts`의 color, spacing, radius, typography token을 사용한다.
+- `.pi/rules/mobile-ui.md`와 `apps/mobile/lib/design/theme.ts`의 color, spacing, radius, typography token을 사용한다.
 - 화면 코드는 raw hex color나 arbitrary spacing/radius 값을 추가하지 않는다.
 - 제품 UI에는 emoji를 사용하지 않는다.
 - 상세 화면은 warm off-white background, white card, subtle border/shadow의 기존 디자인 방향을 따른다.
@@ -335,7 +335,7 @@ F-019에서 추가된 다음 index/constraint를 재사용한다.
 ## Implementation Plan
 
 1. Spec approval and worktree 준비
-   - 작업: 이 문서의 open questions가 없는지 확인하고 승인 후 `scripts/worktree-create F021 trip-detail-basic-screen`로 구현 worktree를 만든다.
+   - 작업: 이 문서의 open questions가 없는지 확인하고 승인 후 `.pi/bin/worktree-create F021 trip-detail-basic-screen`로 구현 worktree를 만든다.
    - Verify: worktree가 `.worktrees/F021-trip-detail-basic-screen`에 생성되고 branch가 feature 규칙을 따른다.
 
 2. OpenAPI 계약 작성
