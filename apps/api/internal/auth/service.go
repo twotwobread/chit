@@ -7,6 +7,8 @@ import (
 	"time"
 )
 
+const maxDisplayNameCodePoints = 20
+
 type Service struct {
 	repo     Repository
 	verifier ProviderVerifier
@@ -199,6 +201,31 @@ func (s *Service) Me(ctx context.Context, authContext AuthContext) (MeResult, er
 	return MeResult{User: user, LinkedProviders: providers}, nil
 }
 
+func (s *Service) UpdateDisplayName(ctx context.Context, authContext AuthContext, displayName string) (MeResult, error) {
+	if authContext.UserID == "" {
+		return MeResult{}, ErrUnauthorized
+	}
+
+	normalized, err := normalizeDisplayNameForUpdate(displayName)
+	if err != nil {
+		return MeResult{}, err
+	}
+
+	user, ok, err := s.repo.UpdateUserDisplayName(ctx, authContext.UserID, normalized)
+	if err != nil {
+		return MeResult{}, err
+	}
+	if !ok {
+		return MeResult{}, ErrUnauthorized
+	}
+
+	providers, err := s.repo.ListProviders(ctx, authContext.UserID)
+	if err != nil {
+		return MeResult{}, err
+	}
+	return MeResult{User: user, LinkedProviders: providers}, nil
+}
+
 func (s *Service) Authenticate(ctx context.Context, authorizationHeader string) (AuthContext, error) {
 	const prefix = "Bearer "
 	if !strings.HasPrefix(authorizationHeader, prefix) {
@@ -266,6 +293,14 @@ func displayNameOrDefault(displayName *string) string {
 		return strings.TrimSpace(*displayName)
 	}
 	return "이음 사용자"
+}
+
+func normalizeDisplayNameForUpdate(displayName string) (string, error) {
+	normalized := strings.TrimSpace(displayName)
+	if normalized == "" || len([]rune(normalized)) > maxDisplayNameCodePoints {
+		return "", ErrValidation
+	}
+	return normalized, nil
 }
 
 func normalizeEmailPtr(email *string) string {

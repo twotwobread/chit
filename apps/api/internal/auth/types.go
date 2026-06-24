@@ -97,6 +97,7 @@ type Repository interface {
 	GetSession(ctx context.Context, sessionID string) (Session, bool, error)
 	RotateSessionRefreshToken(ctx context.Context, sessionID string, refreshTokenHash string, refreshTokenExpiresAt time.Time) (Session, error)
 	RevokeSession(ctx context.Context, sessionID string) error
+	UpdateUserDisplayName(ctx context.Context, userID string, displayName string) (User, bool, error)
 	GetUser(ctx context.Context, userID string) (User, bool, error)
 	ListProviders(ctx context.Context, userID string) ([]Provider, error)
 }

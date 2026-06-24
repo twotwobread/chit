@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 )
@@ -115,6 +116,107 @@ func TestLogoutRevokesOnlyCurrentSession(t *testing.T) {
 	}
 }
 
+func TestUpdateDisplayNameNormalizesAndValidates(t *testing.T) {
+	repo := newFakeRepository()
+	user, err := repo.CreateUserWithIdentity(context.Background(), User{DisplayName: "민수"}, Identity{Provider: ProviderApple, ProviderSubject: "apple-1"})
+	if err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+	service := NewService(repo, fakeVerifier{}, NewTokenManager("test-secret"))
+
+	result, err := service.UpdateDisplayName(context.Background(), AuthContext{UserID: user.ID}, "  지  영  ")
+	if err != nil {
+		t.Fatalf("update display name: %v", err)
+	}
+	if result.User.DisplayName != "지  영" {
+		t.Fatalf("expected trimmed display name preserving internal whitespace, got %q", result.User.DisplayName)
+	}
+	stored, _, _ := repo.GetUser(context.Background(), user.ID)
+	if stored.DisplayName != "지  영" {
+		t.Fatalf("expected stored display name 지  영, got %q", stored.DisplayName)
+	}
+	if len(result.LinkedProviders) != 1 || result.LinkedProviders[0] != ProviderApple {
+		t.Fatalf("expected linked provider apple, got %#v", result.LinkedProviders)
+	}
+}
+
+func TestUpdateDisplayNameValidationKeepsPreviousValue(t *testing.T) {
+	repo := newFakeRepository()
+	user, err := repo.CreateUserWithIdentity(context.Background(), User{DisplayName: "민수"}, Identity{Provider: ProviderApple, ProviderSubject: "apple-1"})
+	if err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+	service := NewService(repo, fakeVerifier{}, NewTokenManager("test-secret"))
+
+	cases := []struct {
+		name  string
+		input string
+	}{
+		{name: "empty after trim", input: "  \t  "},
+		{name: "over 20 code points", input: strings.Repeat("가", 21)},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := service.UpdateDisplayName(context.Background(), AuthContext{UserID: user.ID}, tt.input)
+			if !errors.Is(err, ErrValidation) {
+				t.Fatalf("expected ErrValidation, got %v", err)
+			}
+			stored, _, _ := repo.GetUser(context.Background(), user.ID)
+			if stored.DisplayName != "민수" {
+				t.Fatalf("expected previous display name to remain 민수, got %q", stored.DisplayName)
+			}
+		})
+	}
+}
+
+func TestUpdateDisplayNameAcceptsUnicodeCodePointBoundary(t *testing.T) {
+	repo := newFakeRepository()
+	user, err := repo.CreateUserWithIdentity(context.Background(), User{DisplayName: "민수"}, Identity{Provider: ProviderApple, ProviderSubject: "apple-1"})
+	if err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+	service := NewService(repo, fakeVerifier{}, NewTokenManager("test-secret"))
+
+	name := strings.Repeat("가", 20)
+	result, err := service.UpdateDisplayName(context.Background(), AuthContext{UserID: user.ID}, name)
+	if err != nil {
+		t.Fatalf("expected 20 Korean code points to be accepted, got %v", err)
+	}
+	if result.User.DisplayName != name {
+		t.Fatalf("expected %q, got %q", name, result.User.DisplayName)
+	}
+}
+
+func TestUpdateDisplayNameAllowsDuplicatesAndSameValue(t *testing.T) {
+	repo := newFakeRepository()
+	user1, err := repo.CreateUserWithIdentity(context.Background(), User{DisplayName: "민수"}, Identity{Provider: ProviderApple, ProviderSubject: "apple-1"})
+	if err != nil {
+		t.Fatalf("seed user1: %v", err)
+	}
+	_, err = repo.CreateUserWithIdentity(context.Background(), User{DisplayName: "지영"}, Identity{Provider: ProviderKakao, ProviderSubject: "kakao-1"})
+	if err != nil {
+		t.Fatalf("seed user2: %v", err)
+	}
+	service := NewService(repo, fakeVerifier{}, NewTokenManager("test-secret"))
+
+	duplicate, err := service.UpdateDisplayName(context.Background(), AuthContext{UserID: user1.ID}, "지영")
+	if err != nil {
+		t.Fatalf("expected duplicate display name to be allowed, got %v", err)
+	}
+	if duplicate.User.DisplayName != "지영" {
+		t.Fatalf("expected duplicate display name 지영, got %q", duplicate.User.DisplayName)
+	}
+
+	sameValue, err := service.UpdateDisplayName(context.Background(), AuthContext{UserID: user1.ID}, "  지영  ")
+	if err != nil {
+		t.Fatalf("expected same value update to be idempotent success, got %v", err)
+	}
+	if sameValue.User.DisplayName != "지영" {
+		t.Fatalf("expected same value display name 지영, got %q", sameValue.User.DisplayName)
+	}
+}
+
 type fakeVerifier struct {
 	profile ProviderProfile
 	err     error
@@ -224,6 +326,16 @@ func (r *fakeRepository) RevokeSession(_ context.Context, sessionID string) erro
 	session.RevokedAt = &now
 	r.sessions[sessionID] = session
 	return nil
+}
+
+func (r *fakeRepository) UpdateUserDisplayName(_ context.Context, userID string, displayName string) (User, bool, error) {
+	user, ok := r.users[userID]
+	if !ok {
+		return User{}, false, nil
+	}
+	user.DisplayName = displayName
+	r.users[userID] = user
+	return user, true, nil
 }
 
 func (r *fakeRepository) GetUser(_ context.Context, userID string) (User, bool, error) {

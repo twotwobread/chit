@@ -1,11 +1,14 @@
 package server
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/twotwobread/i-um/apps/api/internal/auth"
 	"github.com/twotwobread/i-um/apps/api/internal/openapi"
 )
+
+const displayNameValidationMessage = "이름은 1~20자로 입력해주세요."
 
 func (s apiServer) LoginWithOAuth(w http.ResponseWriter, r *http.Request) {
 	if s.auth == nil {
@@ -124,15 +127,48 @@ func (s apiServer) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	writeJSON(w, http.StatusOK, authMeToOpenAPI(result))
+}
+
+func (s apiServer) UpdateMe(w http.ResponseWriter, r *http.Request) {
+	if s.auth == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "auth is not configured", nil)
+		return
+	}
+
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	var body openapi.UpdateMeJSONRequestBody
+	if !decodeJSON(w, r, &body) {
+		return
+	}
+
+	result, err := s.auth.UpdateDisplayName(r.Context(), authContext, body.DisplayName)
+	if err != nil {
+		if errors.Is(err, auth.ErrValidation) {
+			writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid auth request", []map[string]interface{}{{"field": "displayName", "message": displayNameValidationMessage}})
+			return
+		}
+		writeAuthError(w, err, "")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, authMeToOpenAPI(result))
+}
+
+func authMeToOpenAPI(result auth.MeResult) openapi.AuthMeResponse {
 	providers := make([]openapi.AuthProvider, 0, len(result.LinkedProviders))
 	for _, provider := range result.LinkedProviders {
 		providers = append(providers, openapi.AuthProvider(provider))
 	}
 
-	writeJSON(w, http.StatusOK, openapi.AuthMeResponse{
+	return openapi.AuthMeResponse{
 		User:            userToOpenAPI(result.User),
 		LinkedProviders: providers,
-	})
+	}
 }
 
 func (s apiServer) requireAuth(w http.ResponseWriter, r *http.Request) (auth.AuthContext, bool) {

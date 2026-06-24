@@ -591,3 +591,52 @@ func (q *Queries) RotateSessionRefreshToken(ctx context.Context, arg RotateSessi
 	)
 	return i, err
 }
+
+const updateUserDisplayName = `-- name: UpdateUserDisplayName :one
+UPDATE users
+SET
+  display_name = $2,
+  updated_at = now()
+WHERE id = $1::uuid
+RETURNING
+  id::text,
+  display_name,
+  email,
+  email_normalized,
+  email_verified,
+  avatar_url,
+  created_at,
+  updated_at
+`
+
+type UpdateUserDisplayNameParams struct {
+	Column1     pgtype.UUID
+	DisplayName string
+}
+
+type UpdateUserDisplayNameRow struct {
+	ID              string
+	DisplayName     string
+	Email           pgtype.Text
+	EmailNormalized pgtype.Text
+	EmailVerified   bool
+	AvatarUrl       pgtype.Text
+	CreatedAt       pgtype.Timestamptz
+	UpdatedAt       pgtype.Timestamptz
+}
+
+func (q *Queries) UpdateUserDisplayName(ctx context.Context, arg UpdateUserDisplayNameParams) (UpdateUserDisplayNameRow, error) {
+	row := q.db.QueryRow(ctx, updateUserDisplayName, arg.Column1, arg.DisplayName)
+	var i UpdateUserDisplayNameRow
+	err := row.Scan(
+		&i.ID,
+		&i.DisplayName,
+		&i.Email,
+		&i.EmailNormalized,
+		&i.EmailVerified,
+		&i.AvatarUrl,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}

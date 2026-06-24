@@ -1158,6 +1158,45 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+    patch:
+      operationId: updateMe
+      summary: Update the current user's display name
+      description: Updates the authenticated user's canonical display name. Server trims leading/trailing whitespace, then validates 1-20 Unicode code points before storing the value.
+      tags:
+        - Auth
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateMeRequest'
+      responses:
+        '200':
+          description: Current user after display-name update.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthMeResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /auth/me:
     get:
       operationId: getCurrentUser
@@ -1941,6 +1980,17 @@ components:
             - provider_link_success
         linkedIdentity:
           $ref: '#/components/schemas/LinkedIdentity'
+    UpdateMeRequest:
+      type: object
+      required:
+        - displayName
+      additionalProperties: false
+      properties:
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 20
+          description: Server trims leading/trailing whitespace, counts Unicode code points after trim, then validates and persists the value.
     AuthMeResponse:
       type: object
       required:

@@ -261,6 +261,152 @@ func TestGetMeHandlerMatchesDeprecatedAuthMeUnauthorized(t *testing.T) {
 	}
 }
 
+func TestUpdateMeHandlerUpdatesDisplayName(t *testing.T) {
+	backend := newFakeAuthBackend()
+	accessToken := loginTestUser(t, backend)
+
+	patchBody := []byte(`{"displayName":"  지  영  "}`)
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPatch, "/me", bytes.NewReader(patchBody))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", "Bearer "+accessToken)
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected update status %d, got %d with body %s", http.StatusOK, recorder.Code, recorder.Body.String())
+	}
+
+	var body struct {
+		User struct {
+			DisplayName string `json:"displayName"`
+		} `json:"user"`
+		LinkedProviders []string `json:"linkedProviders"`
+	}
+	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+		t.Fatalf("decode update response: %v", err)
+	}
+	if body.User.DisplayName != "지  영" {
+		t.Fatalf("expected trimmed display name 지  영, got %q", body.User.DisplayName)
+	}
+	if len(body.LinkedProviders) != 1 || body.LinkedProviders[0] != "apple" {
+		t.Fatalf("expected linked provider apple, got %#v", body.LinkedProviders)
+	}
+
+	getRecorder := httptest.NewRecorder()
+	getRequest := httptest.NewRequest(http.MethodGet, "/me", nil)
+	getRequest.Header.Set("Authorization", "Bearer "+accessToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(getRecorder, getRequest)
+	if getRecorder.Code != http.StatusOK {
+		t.Fatalf("expected get /me status %d, got %d with body %s", http.StatusOK, getRecorder.Code, getRecorder.Body.String())
+	}
+	var meBody struct {
+		User struct {
+			DisplayName string `json:"displayName"`
+		} `json:"user"`
+	}
+	if err := json.NewDecoder(getRecorder.Body).Decode(&meBody); err != nil {
+		t.Fatalf("decode /me response: %v", err)
+	}
+	if meBody.User.DisplayName != "지  영" {
+		t.Fatalf("expected /me display name 지  영, got %q", meBody.User.DisplayName)
+	}
+}
+
+func TestUpdateMeHandlerAllowsSameValueNoop(t *testing.T) {
+	backend := newFakeAuthBackend()
+	accessToken := loginTestUser(t, backend)
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPatch, "/me", bytes.NewReader([]byte(`{"displayName":"  민수  "}`)))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", "Bearer "+accessToken)
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected same-value status %d, got %d with body %s", http.StatusOK, recorder.Code, recorder.Body.String())
+	}
+	var body struct {
+		User struct {
+			DisplayName string `json:"displayName"`
+		} `json:"user"`
+	}
+	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+		t.Fatalf("decode same-value response: %v", err)
+	}
+	if body.User.DisplayName != "민수" {
+		t.Fatalf("expected same-value display name 민수, got %q", body.User.DisplayName)
+	}
+}
+
+func TestUpdateMeHandlerRejectsInvalidDisplayName(t *testing.T) {
+	backend := newFakeAuthBackend()
+	accessToken := loginTestUser(t, backend)
+
+	cases := []struct {
+		name string
+		body string
+	}{
+		{name: "empty after trim", body: `{"displayName":"   "}`},
+		{name: "over 20 code points", body: fmt.Sprintf(`{"displayName":%q}`, strings.Repeat("가", 21))},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			request := httptest.NewRequest(http.MethodPatch, "/me", bytes.NewReader([]byte(tt.body)))
+			request.Header.Set("Content-Type", "application/json")
+			request.Header.Set("Authorization", "Bearer "+accessToken)
+
+			NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+			if recorder.Code != http.StatusBadRequest {
+				t.Fatalf("expected validation status %d, got %d with body %s", http.StatusBadRequest, recorder.Code, recorder.Body.String())
+			}
+			var body struct {
+				Error struct {
+					Code    string `json:"code"`
+					Details []struct {
+						Field   string `json:"field"`
+						Message string `json:"message"`
+					} `json:"details"`
+				} `json:"error"`
+			}
+			if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+				t.Fatalf("decode validation response: %v", err)
+			}
+			if body.Error.Code != "VALIDATION_ERROR" {
+				t.Fatalf("expected VALIDATION_ERROR, got %q", body.Error.Code)
+			}
+			if len(body.Error.Details) != 1 || body.Error.Details[0].Field != "displayName" || body.Error.Details[0].Message != "이름은 1~20자로 입력해주세요." {
+				t.Fatalf("unexpected validation details: %#v", body.Error.Details)
+			}
+			if backend.users["user-1"].DisplayName != "민수" {
+				t.Fatalf("expected previous display name to remain 민수, got %q", backend.users["user-1"].DisplayName)
+			}
+		})
+	}
+}
+
+func TestUpdateMeHandlerRequiresAuth(t *testing.T) {
+	backend := newFakeAuthBackend()
+	_ = loginTestUser(t, backend)
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPatch, "/me", bytes.NewReader([]byte(`{"displayName":"지영"}`)))
+	request.Header.Set("Content-Type", "application/json")
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusUnauthorized {
+		t.Fatalf("expected unauthorized status %d, got %d with body %s", http.StatusUnauthorized, recorder.Code, recorder.Body.String())
+	}
+	if backend.users["user-1"].DisplayName != "민수" {
+		t.Fatalf("expected display name to remain 민수, got %q", backend.users["user-1"].DisplayName)
+	}
+}
+
 func TestCreateTripHandler(t *testing.T) {
 	backend := newFakeAuthBackend()
 	accessToken := loginTestUser(t, backend)
@@ -2496,6 +2642,16 @@ func (b *fakeAuthBackend) RevokeSession(_ context.Context, sessionID string) err
 	session.RevokedAt = &now
 	b.sessions[sessionID] = session
 	return nil
+}
+
+func (b *fakeAuthBackend) UpdateUserDisplayName(_ context.Context, userID string, displayName string) (auth.User, bool, error) {
+	user, ok := b.users[userID]
+	if !ok {
+		return auth.User{}, false, nil
+	}
+	user.DisplayName = displayName
+	b.users[userID] = user
+	return user, true, nil
 }
 
 func (b *fakeAuthBackend) GetUser(_ context.Context, userID string) (auth.User, bool, error) {

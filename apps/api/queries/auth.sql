@@ -35,6 +35,22 @@ SELECT
 FROM users
 WHERE id = $1::uuid;
 
+-- name: UpdateUserDisplayName :one
+UPDATE users
+SET
+  display_name = $2,
+  updated_at = now()
+WHERE id = $1::uuid
+RETURNING
+  id::text,
+  display_name,
+  email,
+  email_normalized,
+  email_verified,
+  avatar_url,
+  created_at,
+  updated_at;
+
 -- name: FindIdentityByProviderSubject :one
 SELECT
   u.id::text AS user_id,

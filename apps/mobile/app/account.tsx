@@ -1,10 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 
 import type { AuthMeResponse, AuthProvider } from '@i-um/api-contract';
 
-import { getMeWithRefresh, linkOAuthProvider, logoutCurrentSession, MobileAuthError } from '../lib/auth/client';
+import {
+  getMeWithRefresh,
+  linkOAuthProvider,
+  logoutCurrentSession,
+  MobileAuthError,
+  updateDisplayNameWithRefresh,
+} from '../lib/auth/client';
+import { normalizeDisplayNameInput } from '../lib/auth/display-name';
 import { createLogoutFlow, type LogoutFlow } from '../lib/auth/logout-flow';
 import { getOAuthCredential } from '../lib/auth/oauth';
 import { theme } from '../lib/design';
@@ -18,6 +25,10 @@ const providers: AuthProvider[] = ['apple', 'kakao'];
 
 export default function AccountScreen() {
   const [state, setState] = useState<AccountState>({ status: 'loading' });
+  const [draftDisplayName, setDraftDisplayName] = useState('');
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [isSavingName, setIsSavingName] = useState(false);
+  const [nameError, setNameError] = useState<string | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const logoutFlowRef = useRef<LogoutFlow | null>(null);
 
@@ -30,6 +41,8 @@ export default function AccountScreen() {
 
   const load = useCallback(async () => {
     setState({ status: 'loading' });
+    setIsEditingName(false);
+    setNameError(null);
     try {
       const me = await getMeWithRefresh();
       setState({ status: 'ready', me });
@@ -54,6 +67,53 @@ export default function AccountScreen() {
       setState({ status: 'ready', me, message: '로그인 방법이 연결되었습니다.' });
     } catch (error) {
       setState({ status: 'ready', me: state.me, message: linkErrorMessage(error) });
+    }
+  };
+
+  const startEditingName = () => {
+    if (state.status !== 'ready') {
+      return;
+    }
+    setDraftDisplayName(state.me.user.displayName);
+    setNameError(null);
+    setIsEditingName(true);
+  };
+
+  const cancelEditingName = () => {
+    setIsEditingName(false);
+    setNameError(null);
+  };
+
+  const saveDisplayName = async () => {
+    if (state.status !== 'ready' || isSavingName) {
+      return;
+    }
+
+    const currentMe = state.me;
+    const validation = normalizeDisplayNameInput(draftDisplayName);
+    if (!validation.valid) {
+      setNameError(validation.message);
+      return;
+    }
+
+    setNameError(null);
+    setIsSavingName(true);
+    setState({ status: 'ready', me: currentMe });
+    try {
+      const me = await updateDisplayNameWithRefresh(validation.value);
+      setIsEditingName(false);
+      setState({ status: 'ready', me, message: '이름이 수정되었어요.' });
+    } catch (error) {
+      if (error instanceof MobileAuthError && (error.code === 'UNAUTHORIZED' || error.code === 'INVALID_REFRESH_TOKEN')) {
+        setState({ status: 'error', message: '다시 로그인해주세요.' });
+      } else if (error instanceof MobileAuthError && error.code === 'VALIDATION_ERROR') {
+        setNameError('이름은 1~20자로 입력해주세요.');
+        setState({ status: 'ready', me: currentMe });
+      } else {
+        setState({ status: 'ready', me: currentMe, message: '이름을 수정할 수 없어요. 다시 시도해주세요.' });
+      }
+    } finally {
+      setIsSavingName(false);
     }
   };
 
@@ -93,7 +153,50 @@ export default function AccountScreen() {
 
       {state.status === 'ready' ? (
         <View style={styles.card}>
-          <Text style={styles.message}>사용자: {state.me.user.displayName}</Text>
+          <View style={styles.nameSection}>
+            <Text style={styles.sectionTitle}>내 이름</Text>
+            {isEditingName ? (
+              <>
+                <Text style={styles.inputLabel}>이름</Text>
+                <TextInput
+                  accessibilityLabel="이름"
+                  editable={!isSavingName}
+                  onChangeText={setDraftDisplayName}
+                  placeholder="이름"
+                  placeholderTextColor={theme.color.textMuted}
+                  style={styles.input}
+                  value={draftDisplayName}
+                />
+                {nameError ? <Text style={styles.errorMessage}>{nameError}</Text> : null}
+                <View style={styles.row}>
+                  <Pressable
+                    accessibilityRole="button"
+                    disabled={isSavingName}
+                    onPress={() => void saveDisplayName()}
+                    style={[styles.button, isSavingName ? styles.disabledButton : null]}
+                  >
+                    <Text style={styles.buttonText}>{isSavingName ? '저장 중...' : '저장'}</Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    disabled={isSavingName}
+                    onPress={cancelEditingName}
+                    style={[styles.secondaryButton, isSavingName ? styles.disabledButton : null]}
+                  >
+                    <Text style={styles.secondaryButtonText}>취소</Text>
+                  </Pressable>
+                </View>
+              </>
+            ) : (
+              <>
+                <Text style={styles.profileName}>{state.me.user.displayName}</Text>
+                <Pressable accessibilityRole="button" onPress={startEditingName} style={styles.secondaryButton}>
+                  <Text style={styles.secondaryButtonText}>이름 수정</Text>
+                </Pressable>
+              </>
+            )}
+          </View>
+
           <Text style={styles.message}>연결된 로그인: {state.me.linkedProviders.join(', ')}</Text>
 
           {providers.map((provider) => {
@@ -177,6 +280,43 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: theme.space[4],
   },
+  nameSection: {
+    alignItems: 'center',
+    gap: theme.space[3],
+    width: '100%',
+  },
+  sectionTitle: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.headline,
+    fontWeight: theme.font.weight.bold,
+    textAlign: 'center',
+  },
+  profileName: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.title,
+    fontWeight: theme.font.weight.bold,
+    textAlign: 'center',
+  },
+  inputLabel: {
+    alignSelf: 'stretch',
+    color: theme.color.textBody,
+    fontFamily: theme.font.family.bold,
+    fontWeight: theme.font.weight.bold,
+  },
+  input: {
+    alignSelf: 'stretch',
+    backgroundColor: theme.color.surfaceSunken,
+    borderColor: theme.color.borderDefault,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.regular,
+    minHeight: theme.layout.controlH,
+    paddingHorizontal: theme.space[4],
+    paddingVertical: theme.space[3],
+  },
   message: {
     color: theme.color.textBody,
     fontFamily: theme.font.family.regular,
@@ -187,6 +327,11 @@ const styles = StyleSheet.create({
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.headline,
     fontWeight: theme.font.weight.bold,
+    textAlign: 'center',
+  },
+  errorMessage: {
+    color: theme.color.danger,
+    fontFamily: theme.font.family.regular,
     textAlign: 'center',
   },
   button: {
