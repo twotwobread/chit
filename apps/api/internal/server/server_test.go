@@ -2390,6 +2390,181 @@ func TestSearchGooglePlacesProviderErrors(t *testing.T) {
 	}
 }
 
+func TestCreateGooglePlaceDayItineraryItemHandler(t *testing.T) {
+	backend := newFakeAuthBackend()
+	accessToken := loginTestUser(t, backend)
+	tripID := createTestTrip(t, backend, accessToken)
+	provider := &fakePlaceProvider{details: placedomain.GooglePlaceDetails{
+		GooglePlaceID:    "google-1",
+		DisplayName:      "도톤보리",
+		FormattedAddress: "Osaka",
+		Latitude:         34.6687,
+		Longitude:        135.5013,
+		PrimaryType:      "tourist_attraction",
+		Types:            []string{"tourist_attraction", "point_of_interest"},
+	}}
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/days/2026-07-11/places/google/itinerary-items", bytes.NewReader([]byte(`{"googlePlaceId":"google-1","duplicateConfirmed":false}`)))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", "Bearer "+accessToken)
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true, PlaceProvider: provider}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusCreated, recorder.Code, recorder.Body.String())
+	}
+	if !provider.detailsCalled || provider.detailsInput.GooglePlaceID != "google-1" {
+		t.Fatalf("expected provider details call, got called=%v input=%#v", provider.detailsCalled, provider.detailsInput)
+	}
+
+	var body struct {
+		Day struct {
+			Date     string `json:"date"`
+			DayOrder int    `json:"dayOrder"`
+		} `json:"day"`
+		Item struct {
+			ItemOrder int `json:"itemOrder"`
+			Place     struct {
+				ID        string `json:"id"`
+				Name      string `json:"name"`
+				PlaceType string `json:"placeType"`
+				Address   string `json:"address"`
+			} `json:"place"`
+		} `json:"item"`
+	}
+	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Day.Date != "2026-07-11" || body.Day.DayOrder != 2 || body.Item.ItemOrder != 1 || body.Item.Place.Name != "도톤보리" || body.Item.Place.PlaceType != "sights" {
+		t.Fatalf("unexpected response %#v", body)
+	}
+	if len(backend.dayItineraryItems[tripID+":2026-07-11"]) != 1 {
+		t.Fatalf("expected created itinerary item, got %#v", backend.dayItineraryItems)
+	}
+
+	provider.detailsCalled = false
+	recorder = httptest.NewRecorder()
+	request = httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/days/2026-07-12/places/google/itinerary-items", bytes.NewReader([]byte(`{"googlePlaceId":"google-1","duplicateConfirmed":false}`)))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", "Bearer "+accessToken)
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true, PlaceProvider: provider}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("expected reuse status %d, got %d with body %s", http.StatusCreated, recorder.Code, recorder.Body.String())
+	}
+	if provider.detailsCalled {
+		t.Fatal("expected existing trip Google place to be reused without provider details call")
+	}
+	if len(backend.tripPlaces) != 1 {
+		t.Fatalf("expected one trip place reused across days, got %#v", backend.tripPlaces)
+	}
+}
+
+func TestCreateGooglePlaceDayItineraryItemDuplicateConfirmation(t *testing.T) {
+	backend := newFakeAuthBackend()
+	accessToken := loginTestUser(t, backend)
+	tripID := createTestTrip(t, backend, accessToken)
+	provider := &fakePlaceProvider{details: placedomain.GooglePlaceDetails{
+		GooglePlaceID:    "google-dup",
+		DisplayName:      "도톤보리",
+		FormattedAddress: "Osaka",
+		Latitude:         34.6687,
+		Longitude:        135.5013,
+		PrimaryType:      "tourist_attraction",
+		Types:            []string{"tourist_attraction"},
+	}}
+
+	create := func(body string) *httptest.ResponseRecorder {
+		recorder := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/days/2026-07-11/places/google/itinerary-items", bytes.NewReader([]byte(body)))
+		request.Header.Set("Content-Type", "application/json")
+		request.Header.Set("Authorization", "Bearer "+accessToken)
+		NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true, PlaceProvider: provider}).ServeHTTP(recorder, request)
+		return recorder
+	}
+
+	if recorder := create(`{"googlePlaceId":"google-dup","duplicateConfirmed":false}`); recorder.Code != http.StatusCreated {
+		t.Fatalf("expected first create status %d, got %d with body %s", http.StatusCreated, recorder.Code, recorder.Body.String())
+	}
+
+	recorder := create(`{"googlePlaceId":"google-dup","duplicateConfirmed":false}`)
+	if recorder.Code != http.StatusConflict {
+		t.Fatalf("expected duplicate status %d, got %d with body %s", http.StatusConflict, recorder.Code, recorder.Body.String())
+	}
+	var errorBody struct {
+		Error struct {
+			Code    string                   `json:"code"`
+			Details []map[string]interface{} `json:"details"`
+		} `json:"error"`
+	}
+	if err := json.NewDecoder(recorder.Body).Decode(&errorBody); err != nil {
+		t.Fatalf("decode duplicate error: %v", err)
+	}
+	if errorBody.Error.Code != "DUPLICATE_DAY_PLACE_CONFIRMATION_REQUIRED" || len(errorBody.Error.Details) != 1 || errorBody.Error.Details[0]["googlePlaceId"] != "google-dup" || errorBody.Error.Details[0]["tripPlaceId"] == "" {
+		t.Fatalf("unexpected duplicate error %#v", errorBody)
+	}
+
+	if recorder := create(`{"googlePlaceId":"google-dup","duplicateConfirmed":true}`); recorder.Code != http.StatusCreated {
+		t.Fatalf("expected confirmed duplicate status %d, got %d with body %s", http.StatusCreated, recorder.Code, recorder.Body.String())
+	}
+	if len(backend.dayItineraryItems[tripID+":2026-07-11"]) != 2 {
+		t.Fatalf("expected confirmed duplicate to create second item, got %#v", backend.dayItineraryItems[tripID+":2026-07-11"])
+	}
+}
+
+func TestCreateGooglePlaceDayItineraryItemValidationAuthAndProviderErrors(t *testing.T) {
+	backend := newFakeAuthBackend()
+	accessToken := loginTestUser(t, backend)
+	tripID := createTestTrip(t, backend, accessToken)
+	nonParticipantToken := loginTestUserWithSubject(t, backend, "apple-2", "지영")
+	tests := []struct {
+		name       string
+		path       string
+		token      string
+		body       string
+		provider   *fakePlaceProvider
+		expectCode int
+		expectErr  string
+	}{
+		{name: "requires auth", path: "/trips/" + tripID + "/days/2026-07-10/places/google/itinerary-items", token: "", body: `{"googlePlaceId":"google-1","duplicateConfirmed":false}`, provider: &fakePlaceProvider{}, expectCode: http.StatusUnauthorized, expectErr: "UNAUTHORIZED"},
+		{name: "invalid trip id", path: "/trips/not-a-uuid/days/2026-07-10/places/google/itinerary-items", token: accessToken, body: `{"googlePlaceId":"google-1","duplicateConfirmed":false}`, provider: &fakePlaceProvider{}, expectCode: http.StatusBadRequest, expectErr: "VALIDATION_ERROR"},
+		{name: "blank google place id", path: "/trips/" + tripID + "/days/2026-07-10/places/google/itinerary-items", token: accessToken, body: `{"googlePlaceId":" ","duplicateConfirmed":false}`, provider: &fakePlaceProvider{}, expectCode: http.StatusBadRequest, expectErr: "VALIDATION_ERROR"},
+		{name: "out of range", path: "/trips/" + tripID + "/days/2026-07-14/places/google/itinerary-items", token: accessToken, body: `{"googlePlaceId":"google-1","duplicateConfirmed":false}`, provider: &fakePlaceProvider{}, expectCode: http.StatusNotFound, expectErr: "NOT_FOUND"},
+		{name: "forbidden", path: "/trips/" + tripID + "/days/2026-07-10/places/google/itinerary-items", token: nonParticipantToken, body: `{"googlePlaceId":"google-1","duplicateConfirmed":false}`, provider: &fakePlaceProvider{}, expectCode: http.StatusForbidden, expectErr: "FORBIDDEN"},
+		{name: "provider unavailable", path: "/trips/" + tripID + "/days/2026-07-10/places/google/itinerary-items", token: accessToken, body: `{"googlePlaceId":"google-1","duplicateConfirmed":false}`, provider: &fakePlaceProvider{detailsErr: placedomain.ErrProviderUnavailable}, expectCode: http.StatusBadGateway, expectErr: "PLACE_PROVIDER_UNAVAILABLE"},
+		{name: "provider rate limited", path: "/trips/" + tripID + "/days/2026-07-10/places/google/itinerary-items", token: accessToken, body: `{"googlePlaceId":"google-1","duplicateConfirmed":false}`, provider: &fakePlaceProvider{detailsErr: placedomain.ErrProviderRateLimited}, expectCode: http.StatusTooManyRequests, expectErr: "PLACE_PROVIDER_RATE_LIMITED"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			request := httptest.NewRequest(http.MethodPost, tt.path, bytes.NewReader([]byte(tt.body)))
+			request.Header.Set("Content-Type", "application/json")
+			if tt.token != "" {
+				request.Header.Set("Authorization", "Bearer "+tt.token)
+			}
+
+			NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true, PlaceProvider: tt.provider}).ServeHTTP(recorder, request)
+
+			if recorder.Code != tt.expectCode {
+				t.Fatalf("expected status %d, got %d with body %s", tt.expectCode, recorder.Code, recorder.Body.String())
+			}
+			var body struct {
+				Error struct {
+					Code string `json:"code"`
+				} `json:"error"`
+			}
+			if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+				t.Fatalf("decode response: %v", err)
+			}
+			if body.Error.Code != tt.expectErr {
+				t.Fatalf("expected error code %q, got %q", tt.expectErr, body.Error.Code)
+			}
+		})
+	}
+}
+
 func TestUpdateTripHandler(t *testing.T) {
 	backend := newFakeAuthBackend()
 	accessToken := loginTestUser(t, backend)
@@ -2794,6 +2969,7 @@ type fakeAuthBackend struct {
 	trips             map[string]tripdomain.Trip
 	participants      map[string][]tripdomain.Participant
 	tripPlaces        map[string]tripdomain.TripPlaceSummary
+	googleTripPlaces  map[string]string
 	dayLodgingPlaces  map[string]tripdomain.TripPlaceSummary
 	dayItineraryItems map[string][]tripdomain.DayItineraryItem
 	tripInvites       map[string]tripdomain.TripInvite
@@ -2974,6 +3150,7 @@ func newFakeAuthBackend() *fakeAuthBackend {
 		trips:             map[string]tripdomain.Trip{},
 		participants:      map[string][]tripdomain.Participant{},
 		tripPlaces:        map[string]tripdomain.TripPlaceSummary{},
+		googleTripPlaces:  map[string]string{},
 		dayLodgingPlaces:  map[string]tripdomain.TripPlaceSummary{},
 		dayItineraryItems: map[string][]tripdomain.DayItineraryItem{},
 		tripInvites:       map[string]tripdomain.TripInvite{},
@@ -3277,6 +3454,15 @@ func (b *fakeAuthBackend) GetTripPlaceSummaryByTripAndPlace(_ context.Context, t
 	return place, ok, nil
 }
 
+func (b *fakeAuthBackend) GetGoogleTripPlaceByGooglePlaceID(_ context.Context, tripID string, googlePlaceID string) (tripdomain.TripPlaceSummary, bool, error) {
+	placeID, ok := b.googleTripPlaces[tripID+":"+googlePlaceID]
+	if !ok {
+		return tripdomain.TripPlaceSummary{}, false, nil
+	}
+	place, ok := b.tripPlaces[tripID+":"+placeID]
+	return place, ok, nil
+}
+
 func (b *fakeAuthBackend) SetDayLodgingPlace(_ context.Context, record tripdomain.SetDayLodgingPlaceRecord) (tripdomain.TripPlaceSummary, error) {
 	place, ok := b.tripPlaces[record.TripID+":"+record.TripPlaceID]
 	if !ok {
@@ -3318,6 +3504,58 @@ func (b *fakeAuthBackend) CreateManualDayItineraryItem(_ context.Context, record
 	b.dayItineraryItems[key] = append(b.dayItineraryItems[key], item)
 	b.markDayItineraryLodging(record.TripID, record.ScheduledDate)
 	return item, nil
+}
+
+func (b *fakeAuthBackend) AppendGooglePlaceDayItineraryItem(_ context.Context, record placedomain.AppendGooglePlaceDayItineraryItemRecord) (tripdomain.DayItineraryItem, error) {
+	place, ok := b.tripPlaces[record.TripID+":"+record.TripPlaceID]
+	if !ok {
+		return tripdomain.DayItineraryItem{}, placedomain.ErrNotFound
+	}
+	key := record.TripID + ":" + record.ScheduledDate
+	if !record.DuplicateConfirmed {
+		for _, item := range b.dayItineraryItems[key] {
+			if item.Place.ID == record.TripPlaceID {
+				return tripdomain.DayItineraryItem{}, placedomain.DuplicateDayPlaceConfirmationError{TripPlaceID: record.TripPlaceID}
+			}
+		}
+	}
+	b.nextItineraryItem++
+	item := tripdomain.DayItineraryItem{
+		ID:        testUUID(5000 + b.nextItineraryItem),
+		ItemOrder: len(b.dayItineraryItems[key]) + 1,
+		Version:   1,
+		Place:     place,
+	}
+	b.dayItineraryItems[key] = append(b.dayItineraryItems[key], item)
+	b.markDayItineraryLodging(record.TripID, record.ScheduledDate)
+	return item, nil
+}
+
+func (b *fakeAuthBackend) CreateGooglePlaceDayItineraryItem(ctx context.Context, record placedomain.CreateGooglePlaceDayItineraryItemRecord) (tripdomain.DayItineraryItem, error) {
+	if placeID, ok := b.googleTripPlaces[record.TripID+":"+record.GooglePlaceID]; ok {
+		return b.AppendGooglePlaceDayItineraryItem(ctx, placedomain.AppendGooglePlaceDayItineraryItemRecord{
+			TripID:             record.TripID,
+			ScheduledDate:      record.ScheduledDate,
+			TripPlaceID:        placeID,
+			DuplicateConfirmed: record.DuplicateConfirmed,
+		})
+	}
+
+	b.nextPlace++
+	place := tripdomain.TripPlaceSummary{
+		ID:        testUUID(6000 + b.nextPlace),
+		Name:      record.Name,
+		PlaceType: record.PlaceType,
+		Address:   record.Address,
+	}
+	b.tripPlaces[record.TripID+":"+place.ID] = place
+	b.googleTripPlaces[record.TripID+":"+record.GooglePlaceID] = place.ID
+	return b.AppendGooglePlaceDayItineraryItem(ctx, placedomain.AppendGooglePlaceDayItineraryItemRecord{
+		TripID:             record.TripID,
+		ScheduledDate:      record.ScheduledDate,
+		TripPlaceID:        place.ID,
+		DuplicateConfirmed: record.DuplicateConfirmed,
+	})
 }
 
 func (b *fakeAuthBackend) GetItineraryItemByTripDateAndID(_ context.Context, tripID string, date string, itemID string) (tripdomain.DayItineraryItem, bool, error) {
@@ -3541,16 +3779,26 @@ func (b *fakeAuthBackend) ListTripsByParticipantUser(_ context.Context, userID s
 }
 
 type fakePlaceProvider struct {
-	called  bool
-	input   placedomain.ProviderSearchInput
-	results []placedomain.SearchResult
-	err     error
+	called        bool
+	input         placedomain.ProviderSearchInput
+	results       []placedomain.SearchResult
+	err           error
+	detailsCalled bool
+	detailsInput  placedomain.ProviderDetailsInput
+	details       placedomain.GooglePlaceDetails
+	detailsErr    error
 }
 
 func (p *fakePlaceProvider) Search(_ context.Context, input placedomain.ProviderSearchInput) ([]placedomain.SearchResult, error) {
 	p.called = true
 	p.input = input
 	return p.results, p.err
+}
+
+func (p *fakePlaceProvider) Details(_ context.Context, input placedomain.ProviderDetailsInput) (placedomain.GooglePlaceDetails, error) {
+	p.detailsCalled = true
+	p.detailsInput = input
+	return p.details, p.detailsErr
 }
 
 func testUUID(value int) string {

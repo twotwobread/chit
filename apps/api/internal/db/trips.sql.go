@@ -30,6 +30,27 @@ func (q *Queries) CountDayLodgingPlacesByTripPlaceID(ctx context.Context, arg Co
 	return total_count, err
 }
 
+const countItineraryItemsByTripDateAndPlace = `-- name: CountItineraryItemsByTripDateAndPlace :one
+SELECT count(*)::int
+FROM itinerary_items
+WHERE trip_id = $1::uuid
+  AND scheduled_date = $2
+  AND trip_place_id = $3::uuid
+`
+
+type CountItineraryItemsByTripDateAndPlaceParams struct {
+	TripID        pgtype.UUID
+	ScheduledDate pgtype.Date
+	TripPlaceID   pgtype.UUID
+}
+
+func (q *Queries) CountItineraryItemsByTripDateAndPlace(ctx context.Context, arg CountItineraryItemsByTripDateAndPlaceParams) (int32, error) {
+	row := q.db.QueryRow(ctx, countItineraryItemsByTripDateAndPlace, arg.TripID, arg.ScheduledDate, arg.TripPlaceID)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const countItineraryItemsByTripPlaceID = `-- name: CountItineraryItemsByTripPlaceID :one
 SELECT count(*)::int AS total_count
 FROM itinerary_items
@@ -508,6 +529,42 @@ type GetDayLodgingPlaceByTripAndDateRow struct {
 func (q *Queries) GetDayLodgingPlaceByTripAndDate(ctx context.Context, arg GetDayLodgingPlaceByTripAndDateParams) (GetDayLodgingPlaceByTripAndDateRow, error) {
 	row := q.db.QueryRow(ctx, getDayLodgingPlaceByTripAndDate, arg.TripID, arg.LodgingDate)
 	var i GetDayLodgingPlaceByTripAndDateRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.PlaceType,
+		&i.Address,
+	)
+	return i, err
+}
+
+const getGoogleTripPlaceByGooglePlaceID = `-- name: GetGoogleTripPlaceByGooglePlaceID :one
+SELECT
+  id::text AS id,
+  name,
+  place_type,
+  address
+FROM trip_places
+WHERE trip_id = $1::uuid
+  AND provider = 'google'
+  AND google_place_id = $2
+`
+
+type GetGoogleTripPlaceByGooglePlaceIDParams struct {
+	TripID        pgtype.UUID
+	GooglePlaceID pgtype.Text
+}
+
+type GetGoogleTripPlaceByGooglePlaceIDRow struct {
+	ID        string
+	Name      string
+	PlaceType string
+	Address   string
+}
+
+func (q *Queries) GetGoogleTripPlaceByGooglePlaceID(ctx context.Context, arg GetGoogleTripPlaceByGooglePlaceIDParams) (GetGoogleTripPlaceByGooglePlaceIDRow, error) {
+	row := q.db.QueryRow(ctx, getGoogleTripPlaceByGooglePlaceID, arg.TripID, arg.GooglePlaceID)
+	var i GetGoogleTripPlaceByGooglePlaceIDRow
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
@@ -1187,6 +1244,80 @@ func (q *Queries) UpdateTripPlaceSnapshotByItineraryItem(ctx context.Context, ar
 		&i.IsLodging,
 		&i.TripPlaceID,
 		&i.PlaceName,
+		&i.PlaceType,
+		&i.Address,
+	)
+	return i, err
+}
+
+const upsertGoogleTripPlace = `-- name: UpsertGoogleTripPlace :one
+INSERT INTO trip_places (
+  trip_id,
+  name,
+  address,
+  place_type,
+  provider,
+  google_place_id,
+  latitude,
+  longitude,
+  google_primary_type,
+  google_types
+) VALUES (
+  $1::uuid,
+  $2,
+  $3,
+  $4,
+  'google',
+  $5,
+  $6,
+  $7,
+  $8,
+  $9::text[]
+)
+ON CONFLICT (trip_id, google_place_id) WHERE provider = 'google' DO UPDATE
+SET google_place_id = EXCLUDED.google_place_id
+RETURNING
+  id::text,
+  name,
+  place_type,
+  address
+`
+
+type UpsertGoogleTripPlaceParams struct {
+	TripID            pgtype.UUID
+	Name              string
+	Address           string
+	PlaceType         string
+	GooglePlaceID     pgtype.Text
+	Latitude          pgtype.Float8
+	Longitude         pgtype.Float8
+	GooglePrimaryType pgtype.Text
+	GoogleTypes       []string
+}
+
+type UpsertGoogleTripPlaceRow struct {
+	ID        string
+	Name      string
+	PlaceType string
+	Address   string
+}
+
+func (q *Queries) UpsertGoogleTripPlace(ctx context.Context, arg UpsertGoogleTripPlaceParams) (UpsertGoogleTripPlaceRow, error) {
+	row := q.db.QueryRow(ctx, upsertGoogleTripPlace,
+		arg.TripID,
+		arg.Name,
+		arg.Address,
+		arg.PlaceType,
+		arg.GooglePlaceID,
+		arg.Latitude,
+		arg.Longitude,
+		arg.GooglePrimaryType,
+		arg.GoogleTypes,
+	)
+	var i UpsertGoogleTripPlaceRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
 		&i.PlaceType,
 		&i.Address,
 	)

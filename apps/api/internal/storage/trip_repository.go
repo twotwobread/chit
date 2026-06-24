@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/twotwobread/i-um/apps/api/internal/db"
+	"github.com/twotwobread/i-um/apps/api/internal/place"
 	"github.com/twotwobread/i-um/apps/api/internal/trip"
 )
 
@@ -395,6 +396,20 @@ func (s *Store) GetTripPlaceSummaryByTripAndPlace(ctx context.Context, tripID st
 	return tripPlaceSummary(row.ID, row.Name, row.PlaceType, row.Address), true, nil
 }
 
+func (s *Store) GetGoogleTripPlaceByGooglePlaceID(ctx context.Context, tripID string, googlePlaceID string) (trip.TripPlaceSummary, bool, error) {
+	row, err := s.queries.GetGoogleTripPlaceByGooglePlaceID(ctx, db.GetGoogleTripPlaceByGooglePlaceIDParams{
+		TripID:        mustUUID(tripID),
+		GooglePlaceID: textValue(googlePlaceID),
+	})
+	if err == pgx.ErrNoRows {
+		return trip.TripPlaceSummary{}, false, nil
+	}
+	if err != nil {
+		return trip.TripPlaceSummary{}, false, err
+	}
+	return tripPlaceSummary(row.ID, row.Name, row.PlaceType, row.Address), true, nil
+}
+
 func (s *Store) SetDayLodgingPlace(ctx context.Context, record trip.SetDayLodgingPlaceRecord) (trip.TripPlaceSummary, error) {
 	row, err := s.queries.SetDayLodgingPlace(ctx, db.SetDayLodgingPlaceParams{
 		TripID:      mustUUID(record.TripID),
@@ -474,6 +489,120 @@ func (s *Store) CreateManualDayItineraryItem(ctx context.Context, record trip.Cr
 			PlaceType: place.PlaceType,
 			Address:   place.Address,
 		},
+	}, nil
+}
+
+func (s *Store) AppendGooglePlaceDayItineraryItem(ctx context.Context, record place.AppendGooglePlaceDayItineraryItemRecord) (trip.DayItineraryItem, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return trip.DayItineraryItem{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	qtx := s.queries.WithTx(tx)
+	placeRow, err := qtx.GetTripPlaceSummaryByTripAndPlace(ctx, db.GetTripPlaceSummaryByTripAndPlaceParams{
+		TripID:      mustUUID(record.TripID),
+		TripPlaceID: mustUUID(record.TripPlaceID),
+	})
+	if err == pgx.ErrNoRows {
+		return trip.DayItineraryItem{}, place.ErrNotFound
+	}
+	if err != nil {
+		return trip.DayItineraryItem{}, err
+	}
+
+	duplicateCount, err := qtx.CountItineraryItemsByTripDateAndPlace(ctx, db.CountItineraryItemsByTripDateAndPlaceParams{
+		TripID:        mustUUID(record.TripID),
+		ScheduledDate: dateTextValue(record.ScheduledDate),
+		TripPlaceID:   mustUUID(record.TripPlaceID),
+	})
+	if err != nil {
+		return trip.DayItineraryItem{}, err
+	}
+	if duplicateCount > 0 && !record.DuplicateConfirmed {
+		return trip.DayItineraryItem{}, place.DuplicateDayPlaceConfirmationError{TripPlaceID: record.TripPlaceID}
+	}
+
+	item, err := qtx.CreateItineraryItemAtEnd(ctx, db.CreateItineraryItemAtEndParams{
+		TripID:        mustUUID(record.TripID),
+		ScheduledDate: dateTextValue(record.ScheduledDate),
+		TripPlaceID:   mustUUID(record.TripPlaceID),
+	})
+	if err != nil {
+		if isUniqueConstraintViolation(err, "itinerary_items_trip_date_order_unique") || isUniqueConstraintViolation(err, "itinerary_items_trip_date_rank_unique") {
+			return trip.DayItineraryItem{}, place.ErrConflict
+		}
+		return trip.DayItineraryItem{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return trip.DayItineraryItem{}, err
+	}
+
+	return trip.DayItineraryItem{
+		ID:        item.ID,
+		ItemOrder: int(item.ItemOrder),
+		Version:   int(item.Version),
+		Place:     tripPlaceSummary(placeRow.ID, placeRow.Name, placeRow.PlaceType, placeRow.Address),
+	}, nil
+}
+
+func (s *Store) CreateGooglePlaceDayItineraryItem(ctx context.Context, record place.CreateGooglePlaceDayItineraryItemRecord) (trip.DayItineraryItem, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return trip.DayItineraryItem{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	qtx := s.queries.WithTx(tx)
+	placeRow, err := qtx.UpsertGoogleTripPlace(ctx, db.UpsertGoogleTripPlaceParams{
+		TripID:            mustUUID(record.TripID),
+		Name:              record.Name,
+		Address:           record.Address,
+		PlaceType:         record.PlaceType,
+		GooglePlaceID:     textValue(record.GooglePlaceID),
+		Latitude:          float8Value(record.Latitude),
+		Longitude:         float8Value(record.Longitude),
+		GooglePrimaryType: textValue(record.GooglePrimaryType),
+		GoogleTypes:       record.GoogleTypes,
+	})
+	if err != nil {
+		return trip.DayItineraryItem{}, err
+	}
+
+	duplicateCount, err := qtx.CountItineraryItemsByTripDateAndPlace(ctx, db.CountItineraryItemsByTripDateAndPlaceParams{
+		TripID:        mustUUID(record.TripID),
+		ScheduledDate: dateTextValue(record.ScheduledDate),
+		TripPlaceID:   mustUUID(placeRow.ID),
+	})
+	if err != nil {
+		return trip.DayItineraryItem{}, err
+	}
+	if duplicateCount > 0 && !record.DuplicateConfirmed {
+		return trip.DayItineraryItem{}, place.DuplicateDayPlaceConfirmationError{TripPlaceID: placeRow.ID}
+	}
+
+	item, err := qtx.CreateItineraryItemAtEnd(ctx, db.CreateItineraryItemAtEndParams{
+		TripID:        mustUUID(record.TripID),
+		ScheduledDate: dateTextValue(record.ScheduledDate),
+		TripPlaceID:   mustUUID(placeRow.ID),
+	})
+	if err != nil {
+		if isUniqueConstraintViolation(err, "itinerary_items_trip_date_order_unique") || isUniqueConstraintViolation(err, "itinerary_items_trip_date_rank_unique") {
+			return trip.DayItineraryItem{}, place.ErrConflict
+		}
+		return trip.DayItineraryItem{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return trip.DayItineraryItem{}, err
+	}
+
+	return trip.DayItineraryItem{
+		ID:        item.ID,
+		ItemOrder: int(item.ItemOrder),
+		Version:   int(item.Version),
+		Place:     tripPlaceSummary(placeRow.ID, placeRow.Name, placeRow.PlaceType, placeRow.Address),
 	}, nil
 }
 
@@ -989,6 +1118,10 @@ func timePtrFromTimestamptz(value pgtype.Timestamptz) *time.Time {
 	}
 	timestamp := value.Time.UTC()
 	return &timestamp
+}
+
+func float8Value(value float64) pgtype.Float8 {
+	return pgtype.Float8{Float64: value, Valid: true}
 }
 
 func dateValue(value time.Time) pgtype.Date {

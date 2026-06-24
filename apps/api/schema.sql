@@ -120,12 +120,46 @@ CREATE TABLE trip_places (
   name text NOT NULL,
   address text NOT NULL,
   place_type text NOT NULL,
+  provider text NOT NULL DEFAULT 'manual',
+  google_place_id text,
+  latitude double precision,
+  longitude double precision,
+  google_primary_type text,
+  google_types text[] NOT NULL DEFAULT ARRAY[]::text[],
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT trip_places_name_length_check CHECK (char_length(name) BETWEEN 1 AND 120),
   CONSTRAINT trip_places_place_type_check CHECK (place_type IN ('sights', 'food', 'lodging', 'cafe', 'shopping', 'etc')),
+  CONSTRAINT trip_places_provider_check CHECK (provider IN ('manual', 'google')),
+  CONSTRAINT trip_places_google_metadata_check CHECK (
+    (
+      provider = 'manual'
+      AND google_place_id IS NULL
+      AND latitude IS NULL
+      AND longitude IS NULL
+      AND google_primary_type IS NULL
+      AND cardinality(google_types) = 0
+    )
+    OR
+    (
+      provider = 'google'
+      AND google_place_id IS NOT NULL
+      AND char_length(btrim(google_place_id)) BETWEEN 1 AND 255
+      AND latitude IS NOT NULL
+      AND latitude BETWEEN -90 AND 90
+      AND longitude IS NOT NULL
+      AND longitude BETWEEN -180 AND 180
+      AND google_primary_type IS NOT NULL
+      AND char_length(btrim(google_primary_type)) > 0
+      AND cardinality(google_types) > 0
+    )
+  ),
   CONSTRAINT trip_places_id_trip_unique UNIQUE (id, trip_id)
 );
+
+CREATE UNIQUE INDEX trip_places_trip_google_place_unique
+  ON trip_places (trip_id, google_place_id)
+  WHERE provider = 'google';
 
 CREATE TABLE day_lodging_places (
   trip_id uuid NOT NULL REFERENCES trips(id) ON DELETE CASCADE,

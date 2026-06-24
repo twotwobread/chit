@@ -163,6 +163,19 @@ type AuthUser struct {
 	Id          string  `json:"id"`
 }
 
+// CreateGooglePlaceDayItineraryItemRequest defines model for CreateGooglePlaceDayItineraryItemRequest.
+type CreateGooglePlaceDayItineraryItemRequest struct {
+	// DuplicateConfirmed Set true only after the user confirms adding the same Google place to the same Day again.
+	DuplicateConfirmed bool   `json:"duplicateConfirmed"`
+	GooglePlaceId      string `json:"googlePlaceId"`
+}
+
+// CreateGooglePlaceDayItineraryItemResponse defines model for CreateGooglePlaceDayItineraryItemResponse.
+type CreateGooglePlaceDayItineraryItemResponse struct {
+	Day  TripDay          `json:"day"`
+	Item DayItineraryItem `json:"item"`
+}
+
 // CreateManualDayItineraryItemRequest defines model for CreateManualDayItineraryItemRequest.
 type CreateManualDayItineraryItemRequest struct {
 	Address   string        `json:"address"`
@@ -556,6 +569,9 @@ type UpdateDayItineraryItemJSONRequestBody = UpdateDayItineraryItemRequest
 // SetDayLodgingPlaceJSONRequestBody defines body for SetDayLodgingPlace for application/json ContentType.
 type SetDayLodgingPlaceJSONRequestBody = SetDayLodgingPlaceRequest
 
+// CreateGooglePlaceDayItineraryItemJSONRequestBody defines body for CreateGooglePlaceDayItineraryItem for application/json ContentType.
+type CreateGooglePlaceDayItineraryItemJSONRequestBody = CreateGooglePlaceDayItineraryItemRequest
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// Revoke the current session
@@ -630,6 +646,9 @@ type ServerInterface interface {
 	// Set a trip day lodging place
 	// (PUT /trips/{tripId}/days/{date}/lodging-place)
 	SetDayLodgingPlace(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date)
+	// Add a Google Place result to a trip day itinerary
+	// (POST /trips/{tripId}/days/{date}/places/google/itinerary-items)
+	CreateGooglePlaceDayItineraryItem(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date)
 	// Search Google Places for a trip day
 	// (GET /trips/{tripId}/days/{date}/places/google/search)
 	SearchGooglePlaces(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, params SearchGooglePlacesParams)
@@ -786,6 +805,12 @@ func (_ Unimplemented) ClearDayLodgingPlace(w http.ResponseWriter, r *http.Reque
 // Set a trip day lodging place
 // (PUT /trips/{tripId}/days/{date}/lodging-place)
 func (_ Unimplemented) SetDayLodgingPlace(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Add a Google Place result to a trip day itinerary
+// (POST /trips/{tripId}/days/{date}/places/google/itinerary-items)
+func (_ Unimplemented) CreateGooglePlaceDayItineraryItem(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1503,6 +1528,46 @@ func (siw *ServerInterfaceWrapper) SetDayLodgingPlace(w http.ResponseWriter, r *
 	handler.ServeHTTP(w, r)
 }
 
+// CreateGooglePlaceDayItineraryItem operation middleware
+func (siw *ServerInterfaceWrapper) CreateGooglePlaceDayItineraryItem(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "date" -------------
+	var date openapi_types.Date
+
+	err = runtime.BindStyledParameterWithOptions("simple", "date", chi.URLParam(r, "date"), &date, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "date", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateGooglePlaceDayItineraryItem(w, r, tripId, date)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // SearchGooglePlaces operation middleware
 func (siw *ServerInterfaceWrapper) SearchGooglePlaces(w http.ResponseWriter, r *http.Request) {
 
@@ -1815,6 +1880,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Put(options.BaseURL+"/trips/{tripId}/days/{date}/lodging-place", wrapper.SetDayLodgingPlace)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/trips/{tripId}/days/{date}/places/google/itinerary-items", wrapper.CreateGooglePlaceDayItineraryItem)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/trips/{tripId}/days/{date}/places/google/search", wrapper.SearchGooglePlaces)

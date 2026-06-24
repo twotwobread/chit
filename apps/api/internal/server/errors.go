@@ -176,6 +176,29 @@ func writePlaceSearchError(w http.ResponseWriter, err error) {
 	}
 }
 
+func writeGooglePlaceDayItineraryError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, place.ErrValidation):
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid google place itinerary request", nil)
+	case errors.Is(err, place.ErrUnauthorized):
+		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "unauthorized", nil)
+	case errors.Is(err, place.ErrForbidden):
+		writeError(w, http.StatusForbidden, "FORBIDDEN", "forbidden", nil)
+	case errors.Is(err, place.ErrNotFound):
+		writeError(w, http.StatusNotFound, "NOT_FOUND", "google place itinerary context not found", nil)
+	case errors.Is(err, place.ErrDuplicateDayPlaceConfirmationNeeded):
+		writeError(w, http.StatusConflict, "DUPLICATE_DAY_PLACE_CONFIRMATION_REQUIRED", "duplicate day place confirmation required", nil)
+	case errors.Is(err, place.ErrConflict):
+		writeError(w, http.StatusConflict, "CONFLICT", "day itinerary append conflict", nil)
+	case errors.Is(err, place.ErrProviderRateLimited):
+		writeError(w, http.StatusTooManyRequests, "PLACE_PROVIDER_RATE_LIMITED", "place provider rate limited", nil)
+	case errors.Is(err, place.ErrProviderUnavailable):
+		writeError(w, http.StatusBadGateway, "PLACE_PROVIDER_UNAVAILABLE", "place provider unavailable", nil)
+	default:
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error", nil)
+	}
+}
+
 func writeAuthError(w http.ResponseWriter, err error, provider auth.Provider) {
 	switch {
 	case errors.Is(err, auth.ErrValidation):

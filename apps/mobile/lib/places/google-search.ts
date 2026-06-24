@@ -1,7 +1,10 @@
-import type { GooglePlaceSearchResult } from '@i-um/api-contract';
+import type { CreateGooglePlaceDayItineraryItemRequest, GooglePlaceSearchResult } from '@i-um/api-contract';
 
 export const googlePlaceSearchMinLength = 2;
 export const googlePlaceSearchDefaultLimit = 5;
+export const duplicateDayPlaceConfirmationCode = 'DUPLICATE_DAY_PLACE_CONFIRMATION_REQUIRED';
+export const duplicateDayPlaceConfirmationMessage = '이미 이 Day에 추가된 장소입니다. 같은 장소를 한 번 더 일정에 추가할까요?';
+export const googlePlaceAddFailureMessage = '장소를 추가할 수 없어요. 다시 검색한 뒤 시도해 주세요.';
 
 export type GooglePlaceSearchStatus = 'initial' | 'minQuery' | 'loading' | 'empty' | 'error' | 'notFound' | 'success';
 
@@ -20,6 +23,12 @@ export type GooglePlaceSearchViewState =
   | { status: 'error'; title: string; helper: string; canRetry: true; results: [] }
   | { status: 'notFound'; title: string; helper: string; results: [] }
   | { status: 'success'; results: GooglePlaceSearchRowViewModel[] };
+
+export type GooglePlaceAddViewState =
+  | { status: 'idle' }
+  | { status: 'adding'; googlePlaceId: string }
+  | { status: 'confirmingDuplicate'; result: GooglePlaceSearchRowViewModel; message: string }
+  | { status: 'error'; message: string };
 
 const typeHintByPrimaryType: Record<string, string> = {
   tourist_attraction: '관광지',
@@ -61,6 +70,34 @@ export function buildGooglePlaceSearchInputState(query: string): GooglePlaceSear
 
 export function googlePlaceSearchLoadingState(): GooglePlaceSearchViewState {
   return { status: 'loading', message: '장소를 검색하는 중...', results: [] };
+}
+
+export function idleGooglePlaceAddState(): GooglePlaceAddViewState {
+  return { status: 'idle' };
+}
+
+export function addingGooglePlaceState(googlePlaceId: string): GooglePlaceAddViewState {
+  return { status: 'adding', googlePlaceId };
+}
+
+export function confirmingDuplicateGooglePlaceState(result: GooglePlaceSearchRowViewModel): GooglePlaceAddViewState {
+  return { status: 'confirmingDuplicate', result, message: duplicateDayPlaceConfirmationMessage };
+}
+
+export function errorGooglePlaceAddState(): GooglePlaceAddViewState {
+  return { status: 'error', message: googlePlaceAddFailureMessage };
+}
+
+export function buildCreateGooglePlaceDayItineraryItemRequest(googlePlaceId: string, duplicateConfirmed: boolean): CreateGooglePlaceDayItineraryItemRequest {
+  return { googlePlaceId: googlePlaceId.trim(), duplicateConfirmed };
+}
+
+export function isDuplicateDayPlaceConfirmationError(errorBody: unknown): boolean {
+  if (!errorBody || typeof errorBody !== 'object' || !('error' in errorBody)) {
+    return false;
+  }
+  const error = (errorBody as { error?: { code?: unknown } }).error;
+  return error?.code === duplicateDayPlaceConfirmationCode;
 }
 
 export function successGooglePlaceSearchState(results: GooglePlaceSearchResult[]): GooglePlaceSearchViewState {

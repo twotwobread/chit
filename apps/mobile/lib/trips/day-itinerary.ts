@@ -60,7 +60,7 @@ export function buildDayItineraryViewModel(response: GetDayItineraryResponse): D
       dayLabel,
       formattedDate,
       title: '아직 등록된 장소가 없어요.',
-      helper: '장소 추가를 눌러 첫 장소를 등록해보세요.',
+      helper: '장소 추가를 눌러 방문할 장소를 검색해보세요.',
     };
   }
 

@@ -57,6 +57,47 @@ func TestGoogleProviderSearch(t *testing.T) {
 	}
 }
 
+func TestGoogleProviderDetails(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Fatalf("expected GET, got %s", r.Method)
+		}
+		if r.URL.Path != "/places/google-1" {
+			t.Fatalf("expected details path, got %q", r.URL.Path)
+		}
+		if got := r.Header.Get("X-Goog-Api-Key"); got != "test-key" {
+			t.Fatalf("expected api key header, got %q", got)
+		}
+		if got := r.Header.Get("X-Goog-FieldMask"); got != "id,displayName,formattedAddress,location,primaryType,types" {
+			t.Fatalf("unexpected field mask %q", got)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"id":"google-1",
+			"displayName":{"text":"도톤보리"},
+			"formattedAddress":"Osaka",
+			"location":{"latitude":34.6687,"longitude":135.5013},
+			"primaryType":"tourist_attraction",
+			"types":["tourist_attraction","point_of_interest"]
+		}`))
+	}))
+	defer server.Close()
+
+	provider := NewGoogleProviderWithEndpoints(" test-key ", server.URL+"/search", server.URL+"/places", server.Client())
+	details, err := provider.Details(context.Background(), ProviderDetailsInput{GooglePlaceID: "google-1"})
+	if err != nil {
+		t.Fatalf("Details returned error: %v", err)
+	}
+
+	if details.GooglePlaceID != "google-1" || details.DisplayName != "도톤보리" || details.FormattedAddress != "Osaka" || details.PrimaryType != "tourist_attraction" {
+		t.Fatalf("unexpected details %#v", details)
+	}
+	if details.Latitude != 34.6687 || details.Longitude != 135.5013 || len(details.Types) != 2 {
+		t.Fatalf("unexpected details metadata %#v", details)
+	}
+}
+
 func TestGoogleProviderSearchMissingKey(t *testing.T) {
 	provider := NewGoogleProviderWithClient(" ", "https://example.test", http.DefaultClient)
 	_, err := provider.Search(context.Background(), ProviderSearchInput{Query: "도톤보리", Limit: 5})

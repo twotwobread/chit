@@ -2,12 +2,20 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import {
+  addingGooglePlaceState,
+  buildCreateGooglePlaceDayItineraryItemRequest,
   buildGooglePlaceSearchInputState,
   buildGooglePlaceSearchRoute,
   canSearchGooglePlaces,
+  confirmingDuplicateGooglePlaceState,
+  duplicateDayPlaceConfirmationMessage,
+  errorGooglePlaceAddState,
   errorGooglePlaceSearchState,
   getGooglePlaceTypeHint,
+  googlePlaceAddFailureMessage,
   googlePlaceSearchLoadingState,
+  idleGooglePlaceAddState,
+  isDuplicateDayPlaceConfirmationError,
   normalizeGooglePlaceSearchQuery,
   successGooglePlaceSearchState,
 } from './google-search';
@@ -60,6 +68,29 @@ describe('google place search helpers', () => {
       helper: '삭제되었거나 접근할 수 없는 여행 일정이에요.',
       results: [],
     });
+  });
+
+  it('builds add request and add states', () => {
+    const result = { id: 'google-1', placeName: '도톤보리', address: 'Osaka', typeHint: '관광지' };
+
+    assert.deepEqual(buildCreateGooglePlaceDayItineraryItemRequest(' google-1 ', false), {
+      googlePlaceId: 'google-1',
+      duplicateConfirmed: false,
+    });
+    assert.deepEqual(idleGooglePlaceAddState(), { status: 'idle' });
+    assert.deepEqual(addingGooglePlaceState('google-1'), { status: 'adding', googlePlaceId: 'google-1' });
+    assert.deepEqual(confirmingDuplicateGooglePlaceState(result), {
+      status: 'confirmingDuplicate',
+      result,
+      message: duplicateDayPlaceConfirmationMessage,
+    });
+    assert.deepEqual(errorGooglePlaceAddState(), { status: 'error', message: googlePlaceAddFailureMessage });
+  });
+
+  it('detects duplicate confirmation API errors', () => {
+    assert.equal(isDuplicateDayPlaceConfirmationError({ error: { code: 'DUPLICATE_DAY_PLACE_CONFIRMATION_REQUIRED' } }), true);
+    assert.equal(isDuplicateDayPlaceConfirmationError({ error: { code: 'CONFLICT' } }), false);
+    assert.equal(isDuplicateDayPlaceConfirmationError(undefined), false);
   });
 
   it('builds result row view models with Google primary type hints', () => {

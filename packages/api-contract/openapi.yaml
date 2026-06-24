@@ -1069,6 +1069,88 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /trips/{tripId}/days/{date}/places/google/itinerary-items:
+    post:
+      operationId: createGooglePlaceDayItineraryItem
+      summary: Add a Google Place result to a trip day itinerary
+      description: Resolves a Google-backed place server-side, reuses the trip-level place by googlePlaceId when present, and appends a Day itinerary item. Same-Day duplicates require explicit confirmation.
+      tags:
+        - Places
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: date
+          in: path
+          required: true
+          schema:
+            type: string
+            format: date
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGooglePlaceDayItineraryItemRequest'
+      responses:
+        '201':
+          description: Google-backed place added to the selected Day itinerary.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateGooglePlaceDayItineraryItemResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip or virtual day not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Same-Day duplicate confirmation required or concurrent append conflict.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Google Places provider rate limited.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Google Places provider unavailable or selected provider place is unusable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /auth/oauth/login:
     post:
       operationId: loginWithOAuth
@@ -1695,6 +1777,32 @@ components:
         placeType:
           $ref: '#/components/schemas/TripPlaceType'
     CreateManualDayItineraryItemResponse:
+      type: object
+      required:
+        - day
+        - item
+      properties:
+        day:
+          $ref: '#/components/schemas/TripDay'
+        item:
+          $ref: '#/components/schemas/DayItineraryItem'
+    CreateGooglePlaceDayItineraryItemRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - googlePlaceId
+        - duplicateConfirmed
+      properties:
+        googlePlaceId:
+          type: string
+          minLength: 1
+          maxLength: 255
+          example: ChIJ...
+        duplicateConfirmed:
+          type: boolean
+          description: Set true only after the user confirms adding the same Google place to the same Day again.
+          example: false
+    CreateGooglePlaceDayItineraryItemResponse:
       type: object
       required:
         - day
