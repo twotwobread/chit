@@ -100,6 +100,7 @@ type Repository interface {
 	UpdateUserDisplayName(ctx context.Context, userID string, displayName string) (User, bool, error)
 	GetUser(ctx context.Context, userID string) (User, bool, error)
 	ListProviders(ctx context.Context, userID string) ([]Provider, error)
+	DeleteAccount(ctx context.Context, userID string, now time.Time) error
 }
 
 type ProviderVerifier interface {

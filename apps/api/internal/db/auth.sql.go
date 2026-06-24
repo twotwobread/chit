@@ -11,6 +11,28 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const anonymizeTripParticipantsByUserID = `-- name: AnonymizeTripParticipantsByUserID :exec
+UPDATE trip_participants participant
+SET
+  display_name = '탈퇴한 사용자',
+  role = CASE WHEN participant.role = 'owner' THEN 'member' ELSE participant.role END
+WHERE participant.user_id = $1::uuid
+  AND EXISTS (
+    SELECT 1
+    FROM trip_participants other_participant
+    JOIN users other_user
+      ON other_user.id = other_participant.user_id
+     AND other_user.deleted_at IS NULL
+    WHERE other_participant.trip_id = participant.trip_id
+      AND other_participant.user_id <> $1::uuid
+  )
+`
+
+func (q *Queries) AnonymizeTripParticipantsByUserID(ctx context.Context, dollar_1 pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, anonymizeTripParticipantsByUserID, dollar_1)
+	return err
+}
+
 const createIdentity = `-- name: CreateIdentity :one
 INSERT INTO auth_identities (
   user_id,
@@ -248,6 +270,81 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateU
 	return i, err
 }
 
+const deactivateActiveInvitesCreatedByUserID = `-- name: DeactivateActiveInvitesCreatedByUserID :exec
+UPDATE trip_invites invite
+SET deactivated_at = $2
+WHERE invite.created_by = $1::uuid
+  AND invite.deactivated_at IS NULL
+  AND EXISTS (
+    SELECT 1
+    FROM trip_participants deleting_participant
+    WHERE deleting_participant.trip_id = invite.trip_id
+      AND deleting_participant.user_id = $1::uuid
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM trip_participants other_participant
+    JOIN users other_user
+      ON other_user.id = other_participant.user_id
+     AND other_user.deleted_at IS NULL
+    WHERE other_participant.trip_id = invite.trip_id
+      AND other_participant.user_id <> $1::uuid
+  )
+`
+
+type DeactivateActiveInvitesCreatedByUserIDParams struct {
+	Column1       pgtype.UUID
+	DeactivatedAt pgtype.Timestamptz
+}
+
+func (q *Queries) DeactivateActiveInvitesCreatedByUserID(ctx context.Context, arg DeactivateActiveInvitesCreatedByUserIDParams) error {
+	_, err := q.db.Exec(ctx, deactivateActiveInvitesCreatedByUserID, arg.Column1, arg.DeactivatedAt)
+	return err
+}
+
+const deleteAuthIdentitiesByUserID = `-- name: DeleteAuthIdentitiesByUserID :exec
+DELETE FROM auth_identities
+WHERE user_id = $1::uuid
+`
+
+func (q *Queries) DeleteAuthIdentitiesByUserID(ctx context.Context, dollar_1 pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteAuthIdentitiesByUserID, dollar_1)
+	return err
+}
+
+const deleteAuthSessionsByUserID = `-- name: DeleteAuthSessionsByUserID :exec
+DELETE FROM auth_sessions
+WHERE user_id = $1::uuid
+`
+
+func (q *Queries) DeleteAuthSessionsByUserID(ctx context.Context, dollar_1 pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteAuthSessionsByUserID, dollar_1)
+	return err
+}
+
+const deleteSoloTripsByUserID = `-- name: DeleteSoloTripsByUserID :exec
+DELETE FROM trips trip
+WHERE trip.id IN (
+  SELECT deleting_participant.trip_id
+  FROM trip_participants deleting_participant
+  WHERE deleting_participant.user_id = $1::uuid
+    AND NOT EXISTS (
+      SELECT 1
+      FROM trip_participants other_participant
+      JOIN users other_user
+        ON other_user.id = other_participant.user_id
+       AND other_user.deleted_at IS NULL
+      WHERE other_participant.trip_id = deleting_participant.trip_id
+        AND other_participant.user_id <> $1::uuid
+    )
+)
+`
+
+func (q *Queries) DeleteSoloTripsByUserID(ctx context.Context, dollar_1 pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteSoloTripsByUserID, dollar_1)
+	return err
+}
+
 const findIdentityByProviderSubject = `-- name: FindIdentityByProviderSubject :one
 SELECT
   u.id::text AS user_id,
@@ -259,7 +356,7 @@ SELECT
   i.provider,
   i.provider_subject
 FROM auth_identities i
-JOIN users u ON u.id = i.user_id
+JOIN users u ON u.id = i.user_id AND u.deleted_at IS NULL
 WHERE i.provider = $1 AND i.provider_subject = $2
 `
 
@@ -297,20 +394,21 @@ func (q *Queries) FindIdentityByProviderSubject(ctx context.Context, arg FindIde
 
 const findSessionByRefreshTokenHash = `-- name: FindSessionByRefreshTokenHash :one
 SELECT
-  id::text,
-  user_id::text,
-  refresh_token_hash,
-  refresh_token_expires_at,
-  revoked_at,
-  last_used_at,
-  rotated_at,
-  device_name,
-  platform,
-  user_agent,
-  created_at,
-  updated_at
-FROM auth_sessions
-WHERE refresh_token_hash = $1
+  s.id::text AS id,
+  s.user_id::text AS user_id,
+  s.refresh_token_hash,
+  s.refresh_token_expires_at,
+  s.revoked_at,
+  s.last_used_at,
+  s.rotated_at,
+  s.device_name,
+  s.platform,
+  s.user_agent,
+  s.created_at,
+  s.updated_at
+FROM auth_sessions s
+JOIN users u ON u.id = s.user_id AND u.deleted_at IS NULL
+WHERE s.refresh_token_hash = $1
 `
 
 type FindSessionByRefreshTokenHashRow struct {
@@ -359,7 +457,7 @@ SELECT DISTINCT
   u.created_at,
   u.updated_at
 FROM auth_identities i
-JOIN users u ON u.id = i.user_id
+JOIN users u ON u.id = i.user_id AND u.deleted_at IS NULL
 WHERE i.email_verified = true
   AND i.email_normalized = $1
 LIMIT 1
@@ -392,22 +490,38 @@ func (q *Queries) FindUserByVerifiedIdentityEmail(ctx context.Context, emailNorm
 	return i, err
 }
 
+const getActiveUserForUpdate = `-- name: GetActiveUserForUpdate :one
+SELECT id::text
+FROM users
+WHERE id = $1::uuid
+  AND deleted_at IS NULL
+FOR UPDATE
+`
+
+func (q *Queries) GetActiveUserForUpdate(ctx context.Context, dollar_1 pgtype.UUID) (string, error) {
+	row := q.db.QueryRow(ctx, getActiveUserForUpdate, dollar_1)
+	var id string
+	err := row.Scan(&id)
+	return id, err
+}
+
 const getSessionByID = `-- name: GetSessionByID :one
 SELECT
-  id::text,
-  user_id::text,
-  refresh_token_hash,
-  refresh_token_expires_at,
-  revoked_at,
-  last_used_at,
-  rotated_at,
-  device_name,
-  platform,
-  user_agent,
-  created_at,
-  updated_at
-FROM auth_sessions
-WHERE id = $1::uuid
+  s.id::text AS id,
+  s.user_id::text AS user_id,
+  s.refresh_token_hash,
+  s.refresh_token_expires_at,
+  s.revoked_at,
+  s.last_used_at,
+  s.rotated_at,
+  s.device_name,
+  s.platform,
+  s.user_agent,
+  s.created_at,
+  s.updated_at
+FROM auth_sessions s
+JOIN users u ON u.id = s.user_id AND u.deleted_at IS NULL
+WHERE s.id = $1::uuid
 `
 
 type GetSessionByIDRow struct {
@@ -457,6 +571,7 @@ SELECT
   updated_at
 FROM users
 WHERE id = $1::uuid
+  AND deleted_at IS NULL
 `
 
 type GetUserByIDRow struct {
@@ -511,6 +626,30 @@ func (q *Queries) ListProvidersByUserID(ctx context.Context, dollar_1 pgtype.UUI
 		return nil, err
 	}
 	return items, nil
+}
+
+const markUserDeleted = `-- name: MarkUserDeleted :exec
+UPDATE users
+SET
+  display_name = '탈퇴한 사용자',
+  email = NULL,
+  email_normalized = NULL,
+  email_verified = false,
+  avatar_url = NULL,
+  deleted_at = $2,
+  updated_at = $2
+WHERE id = $1::uuid
+  AND deleted_at IS NULL
+`
+
+type MarkUserDeletedParams struct {
+	Column1   pgtype.UUID
+	DeletedAt pgtype.Timestamptz
+}
+
+func (q *Queries) MarkUserDeleted(ctx context.Context, arg MarkUserDeletedParams) error {
+	_, err := q.db.Exec(ctx, markUserDeleted, arg.Column1, arg.DeletedAt)
+	return err
 }
 
 const revokeSession = `-- name: RevokeSession :exec
@@ -592,12 +731,68 @@ func (q *Queries) RotateSessionRefreshToken(ctx context.Context, arg RotateSessi
 	return i, err
 }
 
+const transferOwnedSharedTripsForAccountDeletion = `-- name: TransferOwnedSharedTripsForAccountDeletion :exec
+WITH retained_owned_trips AS (
+  SELECT t.id AS trip_id
+  FROM trips t
+  JOIN trip_participants deleting_participant
+    ON deleting_participant.trip_id = t.id
+   AND deleting_participant.user_id = $1::uuid
+   AND deleting_participant.role = 'owner'
+  WHERE EXISTS (
+    SELECT 1
+    FROM trip_participants other_participant
+    JOIN users other_user
+      ON other_user.id = other_participant.user_id
+     AND other_user.deleted_at IS NULL
+    WHERE other_participant.trip_id = t.id
+      AND other_participant.user_id <> $1::uuid
+  )
+), successor_participants AS (
+  SELECT DISTINCT ON (participant.trip_id)
+    participant.trip_id,
+    participant.user_id
+  FROM trip_participants participant
+  JOIN retained_owned_trips retained
+    ON retained.trip_id = participant.trip_id
+  JOIN users successor_user
+    ON successor_user.id = participant.user_id
+   AND successor_user.deleted_at IS NULL
+  WHERE participant.user_id <> $1::uuid
+  ORDER BY participant.trip_id, participant.joined_at ASC, participant.id ASC
+), updated_participants AS (
+  UPDATE trip_participants participant
+  SET role = 'owner'
+  FROM successor_participants successor
+  WHERE participant.trip_id = successor.trip_id
+    AND participant.user_id = successor.user_id
+  RETURNING participant.trip_id, participant.user_id
+)
+UPDATE trips trip
+SET
+  created_by = updated_participant.user_id,
+  updated_at = $2
+FROM updated_participants updated_participant
+WHERE trip.id = updated_participant.trip_id
+`
+
+type TransferOwnedSharedTripsForAccountDeletionParams struct {
+	Column1   pgtype.UUID
+	UpdatedAt pgtype.Timestamptz
+}
+
+func (q *Queries) TransferOwnedSharedTripsForAccountDeletion(ctx context.Context, arg TransferOwnedSharedTripsForAccountDeletionParams) error {
+	_, err := q.db.Exec(ctx, transferOwnedSharedTripsForAccountDeletion, arg.Column1, arg.UpdatedAt)
+	return err
+}
+
 const updateUserDisplayName = `-- name: UpdateUserDisplayName :one
 UPDATE users
 SET
   display_name = $2,
   updated_at = now()
 WHERE id = $1::uuid
+  AND deleted_at IS NULL
 RETURNING
   id::text,
   display_name,

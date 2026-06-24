@@ -134,6 +134,22 @@ export class AuthService {
         });
     }
     /**
+     * Delete the current account
+     * Immediately and permanently deletes the authenticated i-um account, invalidates all sessions, removes provider identities, anonymizes retained shared-trip participation, deletes solo trips, and deactivates active invites created by the deleted user.
+     * @returns void
+     * @throws ApiError
+     */
+    public static deleteMe(): CancelablePromise<void> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/me',
+            errors: {
+                401: `Unauthorized.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
      * @deprecated
      * Return the current user and linked providers
      * Deprecated compatibility alias for GET /me. Use GET /me for new clients.

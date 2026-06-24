@@ -224,6 +224,48 @@ func (s *Store) ListProviders(ctx context.Context, userID string) ([]auth.Provid
 	return providers, nil
 }
 
+func (s *Store) DeleteAccount(ctx context.Context, userID string, now time.Time) error {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	qtx := s.queries.WithTx(tx)
+	userUUID := mustUUID(userID)
+	if _, err := qtx.GetActiveUserForUpdate(ctx, userUUID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return auth.ErrUnauthorized
+		}
+		return err
+	}
+
+	deletedAt := timestamptzValue(now)
+	if err := qtx.DeleteSoloTripsByUserID(ctx, userUUID); err != nil {
+		return err
+	}
+	if err := qtx.TransferOwnedSharedTripsForAccountDeletion(ctx, db.TransferOwnedSharedTripsForAccountDeletionParams{Column1: userUUID, UpdatedAt: deletedAt}); err != nil {
+		return err
+	}
+	if err := qtx.AnonymizeTripParticipantsByUserID(ctx, userUUID); err != nil {
+		return err
+	}
+	if err := qtx.DeactivateActiveInvitesCreatedByUserID(ctx, db.DeactivateActiveInvitesCreatedByUserIDParams{Column1: userUUID, DeactivatedAt: deletedAt}); err != nil {
+		return err
+	}
+	if err := qtx.DeleteAuthIdentitiesByUserID(ctx, userUUID); err != nil {
+		return err
+	}
+	if err := qtx.DeleteAuthSessionsByUserID(ctx, userUUID); err != nil {
+		return err
+	}
+	if err := qtx.MarkUserDeleted(ctx, db.MarkUserDeletedParams{Column1: userUUID, DeletedAt: deletedAt}); err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
+}
+
 func userFromCreateRow(row db.CreateUserRow) auth.User {
 	return auth.User{
 		ID:            row.ID,

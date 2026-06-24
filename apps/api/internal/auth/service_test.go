@@ -116,6 +116,63 @@ func TestLogoutRevokesOnlyCurrentSession(t *testing.T) {
 	}
 }
 
+func TestDeleteAccountInvalidatesSessionsAndAllowsSameProviderSignup(t *testing.T) {
+	repo := newFakeRepository()
+	service := NewService(repo, fakeVerifier{profile: ProviderProfile{
+		Provider:        ProviderApple,
+		ProviderSubject: "apple-1",
+		Email:           ptr("minsu@example.com"),
+		EmailVerified:   true,
+		DisplayName:     ptr("민수"),
+		AvatarURL:       ptr("https://example.com/avatar.png"),
+	}}, NewTokenManager("test-secret"))
+
+	login, err := service.Login(context.Background(), ProviderApple, Credential{}, Device{})
+	if err != nil {
+		t.Fatalf("login: %v", err)
+	}
+	oldUserID := login.User.ID
+	authContext, err := service.Authenticate(context.Background(), "Bearer "+login.Tokens.AccessToken)
+	if err != nil {
+		t.Fatalf("authenticate before delete: %v", err)
+	}
+	if err := service.DeleteAccount(context.Background(), authContext); err != nil {
+		t.Fatalf("delete account: %v", err)
+	}
+
+	if _, err := service.Authenticate(context.Background(), "Bearer "+login.Tokens.AccessToken); !errors.Is(err, ErrUnauthorized) {
+		t.Fatalf("expected old access token unauthorized, got %v", err)
+	}
+	if _, err := service.Refresh(context.Background(), login.Tokens.RefreshToken); !errors.Is(err, ErrInvalidRefreshToken) {
+		t.Fatalf("expected old refresh token invalid, got %v", err)
+	}
+	if _, err := service.Me(context.Background(), AuthContext{UserID: oldUserID, SessionID: authContext.SessionID}); !errors.Is(err, ErrUnauthorized) {
+		t.Fatalf("expected deleted user hidden from me, got %v", err)
+	}
+
+	deletedUser := repo.users[oldUserID]
+	if deletedUser.DisplayName != "탈퇴한 사용자" || deletedUser.Email != nil || deletedUser.EmailVerified || deletedUser.AvatarURL != nil {
+		t.Fatalf("expected tombstoned user PII to be wiped, got %#v", deletedUser)
+	}
+
+	relogin, err := service.Login(context.Background(), ProviderApple, Credential{}, Device{})
+	if err != nil {
+		t.Fatalf("relogin with same provider: %v", err)
+	}
+	if relogin.User.ID == oldUserID {
+		t.Fatalf("expected same provider to create a new user id, got old id %q", oldUserID)
+	}
+}
+
+func TestDeleteAccountRequiresAuthContext(t *testing.T) {
+	repo := newFakeRepository()
+	service := NewService(repo, fakeVerifier{}, NewTokenManager("test-secret"))
+
+	if err := service.DeleteAccount(context.Background(), AuthContext{}); !errors.Is(err, ErrUnauthorized) {
+		t.Fatalf("expected unauthorized without auth context, got %v", err)
+	}
+}
+
 func TestUpdateDisplayNameNormalizesAndValidates(t *testing.T) {
 	repo := newFakeRepository()
 	user, err := repo.CreateUserWithIdentity(context.Background(), User{DisplayName: "민수"}, Identity{Provider: ProviderApple, ProviderSubject: "apple-1"})
@@ -235,6 +292,7 @@ type fakeRepository struct {
 	providers      map[string][]Provider
 	verifiedEmails map[string]string
 	sessions       map[string]Session
+	deleted        map[string]bool
 	nextUser       int
 	nextSession    int
 }
@@ -246,12 +304,13 @@ func newFakeRepository() *fakeRepository {
 		providers:      map[string][]Provider{},
 		verifiedEmails: map[string]string{},
 		sessions:       map[string]Session{},
+		deleted:        map[string]bool{},
 	}
 }
 
 func (r *fakeRepository) FindUserByIdentity(_ context.Context, provider Provider, providerSubject string) (User, bool, error) {
 	userID, ok := r.identityUser[identityKey(provider, providerSubject)]
-	if !ok {
+	if !ok || r.deleted[userID] {
 		return User{}, false, nil
 	}
 	return r.users[userID], true, nil
@@ -259,7 +318,7 @@ func (r *fakeRepository) FindUserByIdentity(_ context.Context, provider Provider
 
 func (r *fakeRepository) FindUserByVerifiedEmail(_ context.Context, emailNormalized string) (User, bool, error) {
 	userID, ok := r.verifiedEmails[emailNormalized]
-	if !ok {
+	if !ok || r.deleted[userID] {
 		return User{}, false, nil
 	}
 	return r.users[userID], true, nil
@@ -330,7 +389,7 @@ func (r *fakeRepository) RevokeSession(_ context.Context, sessionID string) erro
 
 func (r *fakeRepository) UpdateUserDisplayName(_ context.Context, userID string, displayName string) (User, bool, error) {
 	user, ok := r.users[userID]
-	if !ok {
+	if !ok || r.deleted[userID] {
 		return User{}, false, nil
 	}
 	user.DisplayName = displayName
@@ -340,11 +399,46 @@ func (r *fakeRepository) UpdateUserDisplayName(_ context.Context, userID string,
 
 func (r *fakeRepository) GetUser(_ context.Context, userID string) (User, bool, error) {
 	user, ok := r.users[userID]
-	return user, ok, nil
+	if !ok || r.deleted[userID] {
+		return User{}, false, nil
+	}
+	return user, true, nil
 }
 
 func (r *fakeRepository) ListProviders(_ context.Context, userID string) ([]Provider, error) {
 	return r.providers[userID], nil
+}
+
+func (r *fakeRepository) DeleteAccount(_ context.Context, userID string, _ time.Time) error {
+	user, ok := r.users[userID]
+	if !ok || r.deleted[userID] {
+		return ErrUnauthorized
+	}
+
+	for key, identityUserID := range r.identityUser {
+		if identityUserID == userID {
+			delete(r.identityUser, key)
+		}
+	}
+	for email, identityUserID := range r.verifiedEmails {
+		if identityUserID == userID {
+			delete(r.verifiedEmails, email)
+		}
+	}
+	for sessionID, session := range r.sessions {
+		if session.UserID == userID {
+			delete(r.sessions, sessionID)
+		}
+	}
+	delete(r.providers, userID)
+
+	user.DisplayName = "탈퇴한 사용자"
+	user.Email = nil
+	user.EmailVerified = false
+	user.AvatarURL = nil
+	r.users[userID] = user
+	r.deleted[userID] = true
+	return nil
 }
 
 func identityKey(provider Provider, subject string) string {
