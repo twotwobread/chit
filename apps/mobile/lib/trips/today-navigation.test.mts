@@ -87,7 +87,9 @@ describe('today navigation helpers', () => {
       status: 'openedDirections',
       url: 'comgooglemaps://?daddr=%EB%8F%84%ED%86%A4%EB%B3%B4%EB%A6%AC%20Dotonbori&directionsmode=driving',
     });
-    assert.deepEqual(opened, ['comgooglemaps://?daddr=%EB%8F%84%ED%86%A4%EB%B3%B4%EB%A6%AC%20Dotonbori&directionsmode=driving']);
+    assert.deepEqual(opened, [
+      'comgooglemaps://?daddr=%EB%8F%84%ED%86%A4%EB%B3%B4%EB%A6%AC%20Dotonbori&directionsmode=driving',
+    ]);
   });
 
   it('opens the platform install page when Google Maps cannot be opened', async () => {

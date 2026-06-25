@@ -35,7 +35,11 @@ describe('today navigation fallback helpers', () => {
       { destination, feedback: null },
     );
     assert.deepEqual(
-      todayNavigationFallbackStateForResult({ status: 'failed', message: todayNavigationFailureMessage }, destination, 'walking'),
+      todayNavigationFallbackStateForResult(
+        { status: 'failed', message: todayNavigationFailureMessage },
+        destination,
+        'walking',
+      ),
       { destination, feedback: null, travelMode: 'walking' },
     );
   });

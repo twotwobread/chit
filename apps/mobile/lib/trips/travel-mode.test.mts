@@ -12,7 +12,10 @@ import {
   type TravelModeStore,
 } from './travel-mode';
 
-function memoryStore(initial: string | null, options: { failGet?: boolean; failSet?: boolean; failDelete?: boolean } = {}) {
+function memoryStore(
+  initial: string | null,
+  options: { failGet?: boolean; failSet?: boolean; failDelete?: boolean } = {},
+) {
   let value = initial;
   const setValues: string[] = [];
   let deleteCount = 0;
