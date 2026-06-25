@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 
 import {
@@ -21,9 +21,10 @@ import {
 import {
   buildCreateQuickExpenseRequest,
   buildQuickExpenseViewModel,
-  formatMoney,
+  buildSavedEqualSplitSummary,
   quickExpenseFailureMessage,
   type QuickExpenseFormErrors,
+  type QuickExpenseSavedSplitSummary,
   type QuickExpenseViewModel,
 } from '../../../../../../lib/trips/quick-expense';
 
@@ -59,6 +60,7 @@ export default function QuickExpenseScreen() {
   const [errors, setErrors] = useState<QuickExpenseFormErrors>({});
   const [saving, setSaving] = useState(false);
   const [formMessage, setFormMessage] = useState<string | null>(null);
+  const [savedSummary, setSavedSummary] = useState<QuickExpenseSavedSplitSummary | null>(null);
 
   const handleAuthError = useCallback(async (error: unknown) => {
     if (error instanceof MobileAuthError && (error.code === 'UNAUTHORIZED' || error.code === 'INVALID_REFRESH_TOKEN')) {
@@ -84,6 +86,7 @@ export default function QuickExpenseScreen() {
     setSaving(false);
     setErrors({});
     setFormMessage(null);
+    setSavedSummary(null);
     try {
       const [tripDetail, itinerary, participantsResponse] = await Promise.all([
         getTripDetail(tripId),
@@ -165,9 +168,13 @@ export default function QuickExpenseScreen() {
     setErrors({});
     try {
       const response = await createQuickExpense(tripId, date, validation.request);
-      Alert.alert('지출을 저장했어요.', formatMoney(response.expense.amountMinor, response.expense.currency), [
-        { text: '확인', onPress: () => router.replace('/') },
-      ]);
+      setSavedSummary(
+        buildSavedEqualSplitSummary({
+          amountMinor: response.expense.amountMinor,
+          currency: response.expense.currency,
+          splits: response.expense.splits,
+        }),
+      );
     } catch (error) {
       if (await handleAuthError(error)) {
         return;
@@ -203,7 +210,11 @@ export default function QuickExpenseScreen() {
         </Card>
       ) : null}
 
-      {state.status === 'success' ? (
+      {state.status === 'success' && savedSummary ? (
+        <QuickExpenseSavedSummaryCard onDone={backToToday} summary={savedSummary} />
+      ) : null}
+
+      {state.status === 'success' && !savedSummary ? (
         <QuickExpenseForm
           amountInput={amountInput}
           errors={errors}
@@ -218,6 +229,7 @@ export default function QuickExpenseScreen() {
           selectedItemId={selectedItemId}
           tripName={state.tripName}
           viewModel={buildQuickExpenseViewModel({
+            amountInput,
             currency: state.currency,
             itinerary: state.itinerary,
             participants: state.participants,
@@ -385,6 +397,16 @@ function QuickExpenseForm({
         {errors.payer ? <Text style={styles.errorMessage}>{errors.payer}</Text> : null}
       </View>
 
+      {viewModel.splitPreviewRows.length > 0 ? (
+        <SplitRowsSection
+          helper="저장하면 모든 참여자에게 아래 금액으로 나눠져요."
+          rows={viewModel.splitPreviewRows}
+          title="기본 1/N 분할"
+        />
+      ) : null}
+
+      {viewModel.splitPreviewMessage ? <Text style={styles.errorMessage}>{viewModel.splitPreviewMessage}</Text> : null}
+
       {formMessage ? <Text style={styles.errorMessage}>{formMessage}</Text> : null}
 
       <PrimaryButton
@@ -396,6 +418,52 @@ function QuickExpenseForm({
       />
       <SecondaryButton disabled={saving} label="오늘로 돌아가기" onPress={onBack} />
     </Card>
+  );
+}
+
+function QuickExpenseSavedSummaryCard({
+  onDone,
+  summary,
+}: {
+  onDone: () => void;
+  summary: QuickExpenseSavedSplitSummary;
+}) {
+  return (
+    <Card>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.successTitle}>지출을 저장했어요.</Text>
+        <Text style={styles.message}>총 {summary.amountLabel}</Text>
+      </View>
+      <SplitRowsSection helper="서버에 저장된 결과 기준이에요." rows={summary.splitRows} title="실제 저장된 분할" />
+      <PrimaryButton label="확인" onPress={onDone} />
+    </Card>
+  );
+}
+
+function SplitRowsSection({
+  helper,
+  rows,
+  title,
+}: {
+  helper: string;
+  rows: QuickExpenseViewModel['splitPreviewRows'];
+  title: string;
+}) {
+  return (
+    <View style={styles.splitSection}>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.label}>{title}</Text>
+        <Text style={styles.splitHelper}>{helper}</Text>
+      </View>
+      <View style={styles.splitRowList}>
+        {rows.map((row, index) => (
+          <View key={`${row.participantId ?? 'removed'}-${index}`} style={styles.splitRow}>
+            <Text style={styles.splitName}>{row.displayName}</Text>
+            <Text style={styles.splitAmount}>{row.amountLabel}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
   );
 }
 
@@ -459,6 +527,13 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.bold,
     textAlign: 'center',
   },
+  successTitle: {
+    color: theme.color.primary,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.headline,
+    fontWeight: theme.font.weight.bold,
+    textAlign: 'center',
+  },
   errorMessage: {
     color: theme.color.danger,
     fontFamily: theme.font.family.semibold,
@@ -472,6 +547,39 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: theme.space[2],
     padding: theme.space[4],
+  },
+  splitSection: {
+    backgroundColor: theme.color.surfaceSunken,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    gap: theme.space[4],
+    padding: theme.space[4],
+  },
+  splitHelper: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.label,
+  },
+  splitRowList: {
+    gap: theme.space[3],
+  },
+  splitRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: theme.space[3],
+  },
+  splitName: {
+    color: theme.color.textBody,
+    flex: 1,
+    fontFamily: theme.font.family.semibold,
+    fontWeight: theme.font.weight.semibold,
+  },
+  splitAmount: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontWeight: theme.font.weight.bold,
   },
   fieldGroup: {
     gap: theme.space[3],

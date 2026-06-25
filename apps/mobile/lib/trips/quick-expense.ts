@@ -3,6 +3,7 @@ import type { Href } from 'expo-router';
 import type {
   CreateQuickExpenseRequest,
   DayItineraryItem,
+  ExpenseSplit,
   GetDayItineraryResponse,
   SupportedCurrency,
   TripParticipantListItem,
@@ -32,6 +33,18 @@ export type QuickExpensePayerOption = {
   selected: boolean;
 };
 
+export type QuickExpenseSplitRow = {
+  participantId: string | null;
+  displayName: string;
+  amountMinor: number;
+  amountLabel: string;
+};
+
+export type QuickExpenseSavedSplitSummary = {
+  amountLabel: string;
+  splitRows: QuickExpenseSplitRow[];
+};
+
 export type QuickExpenseViewModel = {
   dayLabel: string;
   formattedDate: string;
@@ -40,6 +53,8 @@ export type QuickExpenseViewModel = {
   selectedItem: QuickExpenseItemOption | null;
   itemOptions: QuickExpenseItemOption[];
   payerOptions: QuickExpensePayerOption[];
+  splitPreviewRows: QuickExpenseSplitRow[];
+  splitPreviewMessage: string | null;
   showItemSelector: boolean;
   helper: string | null;
   emptyMessage: string | null;
@@ -61,12 +76,14 @@ export function hasQuickExpenseEntry(items: DayItineraryItem[]): boolean {
 }
 
 export function buildQuickExpenseViewModel({
+  amountInput,
   currency,
   itinerary,
   participants,
   selectedItemId,
   shouldChooseItem,
 }: {
+  amountInput?: string;
   currency: SupportedCurrency;
   itinerary: GetDayItineraryResponse;
   participants: TripParticipantListItem[];
@@ -76,6 +93,11 @@ export function buildQuickExpenseViewModel({
   const itemOptions = orderedItems(itinerary.items).map((item) => toItemOption(item, selectedItemId));
   const selectedItem = itemOptions.find((item) => item.selected) ?? null;
   const showItemSelector = shouldChooseItem || selectedItem === null;
+  const parsedAmount =
+    amountInput === undefined || amountInput.trim() === '' ? null : parseAmountMinor(amountInput, currency);
+  const splitPreviewRows = parsedAmount?.ok
+    ? buildDefaultEqualSplitPreview({ amountMinor: parsedAmount.amountMinor, currency, participants })
+    : [];
   return {
     dayLabel: `Day ${itinerary.day.dayOrder}`,
     formattedDate: formatTripDayDate(itinerary.day.date),
@@ -85,9 +107,12 @@ export function buildQuickExpenseViewModel({
     itemOptions,
     payerOptions: participants.map((participant) => ({
       participantId: participant.participantId,
-      displayName: participant.displayName.trim() || '여행자',
+      displayName: normalizeParticipantDisplayName(participant.displayName),
       selected: false,
     })),
+    splitPreviewRows,
+    splitPreviewMessage:
+      parsedAmount?.ok && participants.length === 0 ? '참여자 정보를 불러오지 못해 분할을 계산할 수 없어요.' : null,
     showItemSelector,
     helper:
       showItemSelector && itemOptions.length > 0
@@ -139,6 +164,54 @@ export function formatMoney(amountMinor: number, currency: SupportedCurrency): s
   const [major, fraction] = amount.split('.');
   const prefix = currency === 'USD' ? '$' : '€';
   return `${prefix}${formatInteger(Number(major))}.${fraction}`;
+}
+
+export function buildDefaultEqualSplitPreview({
+  amountMinor,
+  currency,
+  participants,
+}: {
+  amountMinor: number;
+  currency: SupportedCurrency;
+  participants: TripParticipantListItem[];
+}): QuickExpenseSplitRow[] {
+  if (!Number.isSafeInteger(amountMinor) || amountMinor < 1 || participants.length === 0) {
+    return [];
+  }
+
+  const orderedParticipants = [...participants].sort(compareParticipantsForSplit);
+  const participantCount = orderedParticipants.length;
+  const base = Math.floor(amountMinor / participantCount);
+  const remainder = amountMinor % participantCount;
+  return orderedParticipants.map((participant, index) => {
+    const splitAmount = base + (index < remainder ? 1 : 0);
+    return {
+      participantId: participant.participantId,
+      displayName: normalizeParticipantDisplayName(participant.displayName),
+      amountMinor: splitAmount,
+      amountLabel: formatMoney(splitAmount, currency),
+    };
+  });
+}
+
+export function buildSavedEqualSplitSummary({
+  amountMinor,
+  currency,
+  splits,
+}: {
+  amountMinor: number;
+  currency: SupportedCurrency;
+  splits: ExpenseSplit[];
+}): QuickExpenseSavedSplitSummary {
+  return {
+    amountLabel: formatMoney(amountMinor, currency),
+    splitRows: splits.map((split) => ({
+      participantId: split.participantId,
+      displayName: normalizeParticipantDisplayName(split.displayName),
+      amountMinor: split.amountMinor,
+      amountLabel: formatMoney(split.amountMinor, currency),
+    })),
+  };
 }
 
 export function buildCreateQuickExpenseRequest({
@@ -204,6 +277,29 @@ function toItemOption(item: DayItineraryItem, selectedItemId: string | null): Qu
 
 function orderedItems(items: DayItineraryItem[]): DayItineraryItem[] {
   return [...items].sort((left, right) => left.itemOrder - right.itemOrder);
+}
+
+function compareParticipantsForSplit(left: TripParticipantListItem, right: TripParticipantListItem): number {
+  const joinedDiff = joinedAtTime(left.joinedAt) - joinedAtTime(right.joinedAt);
+  if (joinedDiff !== 0) {
+    return joinedDiff;
+  }
+  if (left.participantId < right.participantId) {
+    return -1;
+  }
+  if (left.participantId > right.participantId) {
+    return 1;
+  }
+  return 0;
+}
+
+function joinedAtTime(value: string): number {
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+function normalizeParticipantDisplayName(value: string): string {
+  return value.trim() || '여행자';
 }
 
 function currencyLabel(currency: SupportedCurrency): string {

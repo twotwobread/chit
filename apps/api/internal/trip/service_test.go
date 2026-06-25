@@ -2,14 +2,36 @@ package trip
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 )
 
 const testTripID = "00000000-0000-0000-0000-000000000001"
+
+type equalSplitFixtureCase struct {
+	Name           string                         `json:"name"`
+	AmountMinor    int64                          `json:"amountMinor"`
+	Participants   []equalSplitFixtureParticipant `json:"participants"`
+	ExpectedSplits []equalSplitFixtureSplit       `json:"expectedSplits"`
+}
+
+type equalSplitFixtureParticipant struct {
+	ParticipantID string `json:"participantId"`
+	DisplayName   string `json:"displayName"`
+	JoinedAt      string `json:"joinedAt"`
+}
+
+type equalSplitFixtureSplit struct {
+	ParticipantID string `json:"participantId"`
+	DisplayName   string `json:"displayName"`
+	AmountMinor   int64  `json:"amountMinor"`
+}
 
 type fakeRepository struct {
 	creator                  Creator
@@ -1314,6 +1336,64 @@ func TestAllocateEqualExpenseSplits(t *testing.T) {
 	if total != 1000 {
 		t.Fatalf("expected split total 1000, got %d", total)
 	}
+}
+
+func TestAllocateEqualExpenseSplitsMatchesGoldenFixture(t *testing.T) {
+	for _, fixtureCase := range loadEqualSplitFixtureCases(t) {
+		t.Run(fixtureCase.Name, func(t *testing.T) {
+			participants := make([]ExpenseSplitParticipant, 0, len(fixtureCase.Participants))
+			for _, fixtureParticipant := range fixtureCase.Participants {
+				joinedAt, err := time.Parse(time.RFC3339, fixtureParticipant.JoinedAt)
+				if err != nil {
+					t.Fatalf("parse joinedAt %q: %v", fixtureParticipant.JoinedAt, err)
+				}
+				participants = append(participants, ExpenseSplitParticipant{
+					ParticipantID: fixtureParticipant.ParticipantID,
+					DisplayName:   fixtureParticipant.DisplayName,
+					JoinedAt:      joinedAt,
+				})
+			}
+
+			splits, err := AllocateEqualExpenseSplits(fixtureCase.AmountMinor, participants)
+			if err != nil {
+				t.Fatalf("AllocateEqualExpenseSplits returned error: %v", err)
+			}
+			if len(splits) != len(fixtureCase.ExpectedSplits) {
+				t.Fatalf("expected %d splits, got %#v", len(fixtureCase.ExpectedSplits), splits)
+			}
+
+			var total int64
+			for index, expectedSplit := range fixtureCase.ExpectedSplits {
+				got := splits[index]
+				if got.ParticipantID != expectedSplit.ParticipantID || got.ParticipantDisplayName != expectedSplit.DisplayName || got.AmountMinor != expectedSplit.AmountMinor || got.SplitOrder != index+1 {
+					t.Fatalf("unexpected split at %d: got %#v expected %#v", index, got, expectedSplit)
+				}
+				total += got.AmountMinor
+			}
+			if total != fixtureCase.AmountMinor {
+				t.Fatalf("expected split total %d, got %d", fixtureCase.AmountMinor, total)
+			}
+		})
+	}
+}
+
+func loadEqualSplitFixtureCases(t *testing.T) []equalSplitFixtureCase {
+	t.Helper()
+
+	fixturePath := filepath.Join("..", "..", "..", "..", "packages", "api-contract", "fixtures", "equal-split-cases.json")
+	data, err := os.ReadFile(fixturePath)
+	if err != nil {
+		t.Fatalf("read equal split fixture: %v", err)
+	}
+
+	var fixtureCases []equalSplitFixtureCase
+	if err := json.Unmarshal(data, &fixtureCases); err != nil {
+		t.Fatalf("parse equal split fixture: %v", err)
+	}
+	if len(fixtureCases) == 0 {
+		t.Fatal("expected at least one equal split fixture case")
+	}
+	return fixtureCases
 }
 
 func TestAllocateEqualExpenseSplitsAllowsZeroMinorUnitShares(t *testing.T) {

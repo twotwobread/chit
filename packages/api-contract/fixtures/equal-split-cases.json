@@ -1,0 +1,106 @@
+[
+  {
+    "name": "even split uses joined order",
+    "amountMinor": 900,
+    "participants": [
+      {
+        "participantId": "00000000-0000-0000-0000-000000002002",
+        "displayName": "지영",
+        "joinedAt": "2026-07-10T10:00:00Z"
+      },
+      {
+        "participantId": "00000000-0000-0000-0000-000000002001",
+        "displayName": "민수",
+        "joinedAt": "2026-07-10T09:00:00Z"
+      },
+      {
+        "participantId": "00000000-0000-0000-0000-000000002003",
+        "displayName": "현우",
+        "joinedAt": "2026-07-10T11:00:00Z"
+      }
+    ],
+    "expectedSplits": [
+      {
+        "participantId": "00000000-0000-0000-0000-000000002001",
+        "displayName": "민수",
+        "amountMinor": 300
+      },
+      {
+        "participantId": "00000000-0000-0000-0000-000000002002",
+        "displayName": "지영",
+        "amountMinor": 300
+      },
+      {
+        "participantId": "00000000-0000-0000-0000-000000002003",
+        "displayName": "현우",
+        "amountMinor": 300
+      }
+    ]
+  },
+  {
+    "name": "remainder tie and blank display name",
+    "amountMinor": 1000,
+    "participants": [
+      {
+        "participantId": "00000000-0000-0000-0000-000000002003",
+        "displayName": "현우",
+        "joinedAt": "2026-07-10T11:00:00Z"
+      },
+      {
+        "participantId": "00000000-0000-0000-0000-000000002002",
+        "displayName": "",
+        "joinedAt": "2026-07-10T09:00:00Z"
+      },
+      {
+        "participantId": "00000000-0000-0000-0000-000000002001",
+        "displayName": " 민수 ",
+        "joinedAt": "2026-07-10T09:00:00Z"
+      }
+    ],
+    "expectedSplits": [
+      {
+        "participantId": "00000000-0000-0000-0000-000000002001",
+        "displayName": "민수",
+        "amountMinor": 334
+      },
+      {
+        "participantId": "00000000-0000-0000-0000-000000002002",
+        "displayName": "여행자",
+        "amountMinor": 333
+      },
+      {
+        "participantId": "00000000-0000-0000-0000-000000002003",
+        "displayName": "현우",
+        "amountMinor": 333
+      }
+    ]
+  },
+  {
+    "name": "amount smaller than participant count allows zero shares",
+    "amountMinor": 1,
+    "participants": [
+      {
+        "participantId": "00000000-0000-0000-0000-000000002002",
+        "displayName": "지영",
+        "joinedAt": "2026-07-10T10:00:00Z"
+      },
+      {
+        "participantId": "00000000-0000-0000-0000-000000002001",
+        "displayName": "민수",
+        "joinedAt": "2026-07-10T09:00:00Z"
+      }
+    ],
+    "expectedSplits": [
+      {
+        "participantId": "00000000-0000-0000-0000-000000002001",
+        "displayName": "민수",
+        "amountMinor": 1
+      },
+      {
+        "participantId": "00000000-0000-0000-0000-000000002002",
+        "displayName": "지영",
+        "amountMinor": 0
+      }
+    ]
+  }
+]
