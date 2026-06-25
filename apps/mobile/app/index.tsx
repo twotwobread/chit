@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { router, useFocusEffect } from 'expo-router';
 
 import { ApiError, type GetDayItineraryResponse, type GetTripDetailResponse, type TripListItem } from '@i-um/api-contract';
@@ -20,7 +21,14 @@ import {
   type TodayAction,
   type TodayExecutionViewModel,
 } from '../lib/trips/today-execution';
-import { openTodayNavigationDestination } from '../lib/trips/today-navigation';
+import { openTodayNavigationDestination, type TodayNavigationDestination } from '../lib/trips/today-navigation';
+import {
+  buildTodayNavigationFallbackPanel,
+  copyTodayNavigationFallbackDestination,
+  resetTodayNavigationFallbackState,
+  todayNavigationFallbackStateForResult,
+  type TodayNavigationFallbackState,
+} from '../lib/trips/today-navigation-fallback';
 
 type TodayExecutionContext = {
   selectedTrip: TripListItem;
@@ -38,7 +46,8 @@ export default function HomeScreen() {
   const [todayState, setTodayState] = useState<TodayState>({ status: 'loading' });
   const [arrivingItemId, setArrivingItemId] = useState<string | null>(null);
   const [arrivalError, setArrivalError] = useState<string | null>(null);
-  const [navigationError, setNavigationError] = useState<string | null>(null);
+  const [navigationFallback, setNavigationFallback] = useState<TodayNavigationFallbackState | null>(null);
+  const [navigationRetrying, setNavigationRetrying] = useState(false);
 
   const handleAuthError = useCallback(async (error: unknown) => {
     if (
@@ -60,7 +69,8 @@ export default function HomeScreen() {
   const load = useCallback(async () => {
     setArrivingItemId(null);
     setArrivalError(null);
-    setNavigationError(null);
+    setNavigationFallback(resetTodayNavigationFallbackState());
+    setNavigationRetrying(false);
     setTodayState({ status: 'loading' });
 
     try {
@@ -162,7 +172,8 @@ export default function HomeScreen() {
 
       setArrivingItemId(action.itemId);
       setArrivalError(null);
-      setNavigationError(null);
+      setNavigationFallback(resetTodayNavigationFallbackState());
+      setNavigationRetrying(false);
       try {
         const response = await markDayItineraryItemArrived(action.tripId, action.date, action.itemId);
         const itinerary: GetDayItineraryResponse = { day: response.day, items: response.items };
@@ -197,18 +208,64 @@ export default function HomeScreen() {
     [arrivingItemId, handleAuthError, todayState],
   );
 
-  const handleNavigate = useCallback(async (action: Extract<TodayAction, { kind: 'navigate' }>) => {
-    setArrivalError(null);
-    setNavigationError(null);
-    const result = await openTodayNavigationDestination({
-      destination: action.destination,
-      launcher: Linking,
-      platform: Platform.OS,
-    });
+  const openNavigationDestination = useCallback(
+    async (destination: TodayNavigationDestination, options?: { retry?: boolean }) => {
+      const retry = options?.retry === true;
+      setArrivalError(null);
 
-    if (result.status === 'failed') {
-      setNavigationError(result.message);
+      if (retry) {
+        setNavigationRetrying(true);
+      } else {
+        setNavigationFallback(resetTodayNavigationFallbackState());
+      }
+
+      try {
+        const result = await openTodayNavigationDestination({
+          destination,
+          launcher: Linking,
+          platform: Platform.OS,
+        });
+        setNavigationFallback(todayNavigationFallbackStateForResult(result, destination));
+      } finally {
+        if (retry) {
+          setNavigationRetrying(false);
+        }
+      }
+    },
+    [],
+  );
+
+  const handleNavigate = useCallback(
+    async (action: Extract<TodayAction, { kind: 'navigate' }>) => {
+      await openNavigationDestination(action.destination);
+    },
+    [openNavigationDestination],
+  );
+
+  const handleNavigationFallbackCopy = useCallback(async (destination: TodayNavigationDestination) => {
+    const result = await copyTodayNavigationFallbackDestination(destination, Clipboard);
+    if (!result.feedback) {
+      return;
     }
+
+    setNavigationFallback((current) => (current ? { ...current, feedback: result.feedback } : current));
+  }, []);
+
+  const handleNavigationFallbackRetry = useCallback(
+    async (destination: TodayNavigationDestination) => {
+      if (navigationRetrying) {
+        return;
+      }
+
+      await openNavigationDestination(destination, { retry: true });
+    },
+    [navigationRetrying, openNavigationDestination],
+  );
+
+  const handleNavigationFallbackOpenItinerary = useCallback((action: Extract<TodayAction, { kind: 'route' }>) => {
+    setNavigationFallback(resetTodayNavigationFallbackState());
+    setNavigationRetrying(false);
+    router.push(action.route);
   }, []);
 
   const runAction = useCallback(
@@ -258,8 +315,12 @@ export default function HomeScreen() {
           <TodayContent
             arrivalError={arrivalError}
             arrivingItemId={arrivingItemId}
-            navigationError={navigationError}
+            navigationFallback={navigationFallback}
+            navigationRetrying={navigationRetrying}
             onAction={runAction}
+            onNavigationFallbackCopy={handleNavigationFallbackCopy}
+            onNavigationFallbackOpenItinerary={handleNavigationFallbackOpenItinerary}
+            onNavigationFallbackRetry={handleNavigationFallbackRetry}
             viewModel={todayState.viewModel}
           />
         ) : null}
@@ -273,14 +334,22 @@ export default function HomeScreen() {
 function TodayContent({
   arrivalError,
   arrivingItemId,
-  navigationError,
+  navigationFallback,
+  navigationRetrying,
   onAction,
+  onNavigationFallbackCopy,
+  onNavigationFallbackOpenItinerary,
+  onNavigationFallbackRetry,
   viewModel,
 }: {
   arrivalError: string | null;
   arrivingItemId: string | null;
-  navigationError: string | null;
+  navigationFallback: TodayNavigationFallbackState | null;
+  navigationRetrying: boolean;
   onAction: (action: TodayAction) => void;
+  onNavigationFallbackCopy: (destination: TodayNavigationDestination) => void;
+  onNavigationFallbackOpenItinerary: (action: Extract<TodayAction, { kind: 'route' }>) => void;
+  onNavigationFallbackRetry: (destination: TodayNavigationDestination) => void;
   viewModel: TodayExecutionViewModel;
 }) {
   if (viewModel.status === 'noOngoingTrip') {
@@ -351,7 +420,16 @@ function TodayContent({
         <Text style={styles.address}>{viewModel.nextPlace.address}</Text>
         <ActionButton action={viewModel.nextPlace.navigationAction} onAction={onAction} />
       </View>
-      {navigationError ? <Text style={styles.arrivalError}>{navigationError}</Text> : null}
+      {navigationFallback ? (
+        <TodayNavigationFallbackPanel
+          itineraryAction={viewModel.primaryAction}
+          onCopy={onNavigationFallbackCopy}
+          onOpenItinerary={onNavigationFallbackOpenItinerary}
+          onRetry={onNavigationFallbackRetry}
+          retrying={navigationRetrying}
+          state={navigationFallback}
+        />
+      ) : null}
       <RemainingPlacesSection section={viewModel.remainingSection} />
       {arrivalError ? <Text style={styles.arrivalError}>{arrivalError}</Text> : null}
       <ActionButton
@@ -409,6 +487,69 @@ function RemainingPlacesSection({ section }: { section: Extract<TodayExecutionVi
   );
 }
 
+function TodayNavigationFallbackPanel({
+  itineraryAction,
+  onCopy,
+  onOpenItinerary,
+  onRetry,
+  retrying,
+  state,
+}: {
+  itineraryAction: Extract<TodayAction, { kind: 'route' }>;
+  onCopy: (destination: TodayNavigationDestination) => void;
+  onOpenItinerary: (action: Extract<TodayAction, { kind: 'route' }>) => void;
+  onRetry: (destination: TodayNavigationDestination) => void;
+  retrying: boolean;
+  state: TodayNavigationFallbackState;
+}) {
+  const panel = buildTodayNavigationFallbackPanel({
+    destination: state.destination,
+    feedback: state.feedback,
+    retrying,
+  });
+
+  return (
+    <View style={styles.navigationFallbackPanel}>
+      <Text style={styles.navigationFallbackMessage}>{panel.message}</Text>
+      {panel.feedback ? (
+        <Text
+          style={
+            panel.feedback.kind === 'success'
+              ? styles.navigationFallbackFeedbackSuccess
+              : styles.navigationFallbackFeedbackError
+          }
+        >
+          {panel.feedback.message}
+        </Text>
+      ) : null}
+      <View style={styles.navigationFallbackActions}>
+        <Pressable
+          accessibilityHint={panel.copyAction.disabled ? panel.copyAction.disabledHelper : undefined}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: panel.copyAction.disabled }}
+          disabled={panel.copyAction.disabled}
+          onPress={() => onCopy(state.destination)}
+          style={[styles.button, styles.navigationFallbackAction, panel.copyAction.disabled ? styles.disabledButton : null]}
+        >
+          <Text style={styles.buttonText}>{panel.copyAction.label}</Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ disabled: panel.retryAction.disabled }}
+          disabled={panel.retryAction.disabled}
+          onPress={() => onRetry(state.destination)}
+          style={[styles.secondaryButton, styles.navigationFallbackAction, panel.retryAction.disabled ? styles.disabledButton : null]}
+        >
+          <Text style={styles.secondaryButtonText}>{panel.retryAction.label}</Text>
+        </Pressable>
+      </View>
+      <Pressable accessibilityRole="button" onPress={() => onOpenItinerary(itineraryAction)} style={styles.secondaryButton}>
+        <Text style={styles.secondaryButtonText}>{panel.itineraryAction.label}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 function MultipleOngoingNotice({
   notice,
   onAction,
@@ -446,6 +587,7 @@ function ActionButton({
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={() => onAction(action)}
       style={[variant === 'primary' ? styles.button : styles.secondaryButton, disabled ? styles.disabledButton : null]}
@@ -657,6 +799,42 @@ const styles = StyleSheet.create({
     fontSize: theme.font.size.label,
     fontWeight: theme.font.weight.semibold,
     textAlign: 'center',
+  },
+  navigationFallbackPanel: {
+    backgroundColor: theme.color.accentSoft,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    gap: theme.space[3],
+    padding: theme.space[5],
+  },
+  navigationFallbackMessage: {
+    color: theme.color.danger,
+    fontFamily: theme.font.family.semibold,
+    fontSize: theme.font.size.label,
+    fontWeight: theme.font.weight.semibold,
+    textAlign: 'center',
+  },
+  navigationFallbackFeedbackSuccess: {
+    color: theme.color.success,
+    fontFamily: theme.font.family.semibold,
+    fontSize: theme.font.size.label,
+    fontWeight: theme.font.weight.semibold,
+    textAlign: 'center',
+  },
+  navigationFallbackFeedbackError: {
+    color: theme.color.danger,
+    fontFamily: theme.font.family.semibold,
+    fontSize: theme.font.size.label,
+    fontWeight: theme.font.weight.semibold,
+    textAlign: 'center',
+  },
+  navigationFallbackActions: {
+    flexDirection: 'row',
+    gap: theme.space[3],
+  },
+  navigationFallbackAction: {
+    flex: 1,
   },
   completedCount: {
     color: theme.color.textMuted,
