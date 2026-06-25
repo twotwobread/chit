@@ -1,12 +1,21 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import type { DayItineraryItem, GetDayItineraryResponse, TripParticipantListItem } from '@i-um/api-contract';
+import type {
+  DayItineraryItem,
+  ExpenseSplit,
+  GetDayItineraryResponse,
+  TripParticipantListItem,
+} from '@i-um/api-contract';
+
+import equalSplitCases from '../../../../packages/api-contract/fixtures/equal-split-cases.json' with { type: 'json' };
 
 import {
   buildCreateQuickExpenseRequest,
+  buildDefaultEqualSplitPreview,
   buildQuickExpenseRoute,
   buildQuickExpenseViewModel,
+  buildSavedEqualSplitSummary,
   formatMoney,
   inferCurrentQuickExpenseItem,
   parseAmountMinor,
@@ -45,6 +54,23 @@ function participant(overrides: Partial<TripParticipantListItem>): TripParticipa
     ...overrides,
   };
 }
+
+type EqualSplitFixtureCase = {
+  name: string;
+  amountMinor: number;
+  participants: Array<{
+    participantId: string;
+    displayName: string;
+    joinedAt: string;
+  }>;
+  expectedSplits: Array<{
+    participantId: string;
+    displayName: string;
+    amountMinor: number;
+  }>;
+};
+
+const goldenEqualSplitCases = equalSplitCases as EqualSplitFixtureCase[];
 
 test('infers the first pending itinerary item by item order', () => {
   const current = inferCurrentQuickExpenseItem([
@@ -118,6 +144,111 @@ test('formats money with Korean-friendly currency labels', () => {
   assert.equal(formatMoney(3200, 'JPY'), '3,200엔');
   assert.equal(formatMoney(1234, 'USD'), '$12.34');
   assert.equal(formatMoney(1234, 'EUR'), '€12.34');
+});
+
+for (const fixtureCase of goldenEqualSplitCases) {
+  test(`builds default equal split preview from golden fixture: ${fixtureCase.name}`, () => {
+    const rows = buildDefaultEqualSplitPreview({
+      amountMinor: fixtureCase.amountMinor,
+      currency: 'JPY',
+      participants: fixtureCase.participants.map((fixtureParticipant) =>
+        participant({
+          participantId: fixtureParticipant.participantId,
+          displayName: fixtureParticipant.displayName,
+          joinedAt: fixtureParticipant.joinedAt,
+        }),
+      ),
+    });
+
+    assert.deepEqual(
+      rows.map((row) => ({
+        participantId: row.participantId,
+        displayName: row.displayName,
+        amountMinor: row.amountMinor,
+      })),
+      fixtureCase.expectedSplits,
+    );
+    assert.equal(
+      rows.reduce((total, row) => total + row.amountMinor, 0),
+      fixtureCase.amountMinor,
+    );
+  });
+}
+
+test('builds split preview in the quick expense view model for valid amount and participants', () => {
+  const viewModel = buildQuickExpenseViewModel({
+    amountInput: '1000',
+    currency: 'JPY',
+    itinerary: itinerary([item({ id: 'item-a' })]),
+    participants: [
+      participant({
+        participantId: '00000000-0000-0000-0000-000000002003',
+        displayName: '현우',
+        joinedAt: '2026-07-10T11:00:00Z',
+      }),
+      participant({
+        participantId: '00000000-0000-0000-0000-000000002001',
+        displayName: ' 민수 ',
+        joinedAt: '2026-07-10T09:00:00Z',
+      }),
+      participant({
+        participantId: '00000000-0000-0000-0000-000000002002',
+        displayName: '',
+        joinedAt: '2026-07-10T09:00:00Z',
+      }),
+    ],
+    selectedItemId: 'item-a',
+    shouldChooseItem: false,
+  });
+
+  assert.deepEqual(
+    viewModel.splitPreviewRows.map((row) => [row.participantId, row.displayName, row.amountLabel]),
+    [
+      ['00000000-0000-0000-0000-000000002001', '민수', '334엔'],
+      ['00000000-0000-0000-0000-000000002002', '여행자', '333엔'],
+      ['00000000-0000-0000-0000-000000002003', '현우', '333엔'],
+    ],
+  );
+  assert.equal(viewModel.splitPreviewMessage, null);
+});
+
+test('hides split preview for invalid amount and reports missing participants for valid amount', () => {
+  const invalidAmount = buildQuickExpenseViewModel({
+    amountInput: '1.5',
+    currency: 'JPY',
+    itinerary: itinerary([item({ id: 'item-a' })]),
+    participants: [participant({ participantId: 'participant-a' })],
+    selectedItemId: 'item-a',
+    shouldChooseItem: false,
+  });
+  assert.deepEqual(invalidAmount.splitPreviewRows, []);
+  assert.equal(invalidAmount.splitPreviewMessage, null);
+
+  const noParticipants = buildQuickExpenseViewModel({
+    amountInput: '1000',
+    currency: 'JPY',
+    itinerary: itinerary([item({ id: 'item-a' })]),
+    participants: [],
+    selectedItemId: 'item-a',
+    shouldChooseItem: false,
+  });
+  assert.deepEqual(noParticipants.splitPreviewRows, []);
+  assert.equal(noParticipants.splitPreviewMessage, '참여자 정보를 불러오지 못해 분할을 계산할 수 없어요.');
+});
+
+test('builds saved split summary from server response splits', () => {
+  const splits: ExpenseSplit[] = [
+    { participantId: 'participant-a', displayName: ' 민수 ', amountMinor: 334 },
+    { participantId: null, displayName: '', amountMinor: 333 },
+  ];
+
+  assert.deepEqual(buildSavedEqualSplitSummary({ amountMinor: 667, currency: 'JPY', splits }), {
+    amountLabel: '667엔',
+    splitRows: [
+      { participantId: 'participant-a', displayName: '민수', amountMinor: 334, amountLabel: '334엔' },
+      { participantId: null, displayName: '여행자', amountMinor: 333, amountLabel: '333엔' },
+    ],
+  });
 });
 
 test('builds create quick expense request and validation errors', () => {
