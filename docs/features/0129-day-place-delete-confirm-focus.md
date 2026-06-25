@@ -3,7 +3,7 @@
 ## Metadata
 
 - GitHub Issue: #129
-- Status: Spec Review
+- Status: In Progress
 - Created: 2026-06-25
 - Updated: 2026-06-25
 
@@ -151,15 +151,15 @@ Day 일정에서 장소 삭제를 누르면 확인 UI가 즉시 보이고 스크
 
 ### Automated Regression
 
-- `pnpm --filter @i-um/mobile test`: Not run — spec/plan only.
-- `pnpm --filter @i-um/mobile typecheck`: Not run — spec/plan only.
+- `pnpm --filter @i-um/mobile test`: Pass — 188 tests, 12 suites.
+- `pnpm --filter @i-um/mobile typecheck`: Pass.
 
 ### Manual Smoke
 
-- Expo에서 Day 일정 장소 `삭제` 탭 시 모달 즉시 표시: Not run — implementation pending.
-- 모달 focus 진입/취소 focus 반환/실패 오류 focus/성공 후 focus priority: Not run — implementation pending.
-- Android back은 confirming에서 취소, deleting에서 ignored: Not run — implementation pending.
-- Backdrop tap으로 닫히지 않음: Not run — implementation pending.
+- Expo에서 Day 일정 장소 `삭제` 탭 시 모달 즉시 표시: Not run — local device/simulator smoke not requested.
+- 모달 focus 진입/취소 focus 반환/실패 오류 focus/성공 후 focus priority: Not run — local device/simulator smoke not requested.
+- Android back은 confirming에서 취소, deleting에서 ignored: Not run — local Android smoke not requested.
+- Backdrop tap으로 닫히지 않음: Not run — local device/simulator smoke not requested.
 
 ## Release Notes
 

@@ -26,6 +26,20 @@ export type DayItineraryMutationFailureViewModel = {
   helper: string;
 };
 
+export type DayItineraryDeleteModalStatus = 'idle' | 'confirming' | 'deleting';
+
+export type DayItineraryDeleteConfirmationViewModel = {
+  title: string;
+  helper: string;
+  itemLabel: string;
+  contextLabel: string;
+};
+
+export type DayItineraryDeleteFocusTarget =
+  | { kind: 'placeRow'; itemId: string }
+  | { kind: 'emptyState' }
+  | { kind: 'dayHeading' };
+
 export function buildDayItineraryEditForm(item: DayItineraryRowViewModel): DayItineraryEditFormValues {
   return {
     name: item.placeName,
@@ -90,12 +104,44 @@ export function buildDayItineraryDeleteSubmitState(isDeleting: boolean): { disab
   return isDeleting ? { disabled: true, label: '삭제 중...' } : { disabled: false, label: '삭제' };
 }
 
-export function buildDayItineraryDeleteConfirmation(item: DayItineraryRowViewModel): { title: string; helper: string; itemLabel: string } {
+export function buildDayItineraryDeleteConfirmation(item: DayItineraryRowViewModel): DayItineraryDeleteConfirmationViewModel {
   return {
     title: '이 장소를 삭제할까요?',
     helper: '이 Day 일정에서만 삭제돼요.',
-    itemLabel: item.placeName,
+    itemLabel: `${item.orderLabel}번째 장소 · ${item.placeName}`,
+    contextLabel: `${item.placeTypeLabel} · ${item.address}`,
   };
+}
+
+export function canSubmitDayItineraryDelete(status: DayItineraryDeleteModalStatus): status is 'confirming' {
+  return status === 'confirming';
+}
+
+export function canDismissDayItineraryDeleteModal(status: DayItineraryDeleteModalStatus): status is 'confirming' {
+  return status === 'confirming';
+}
+
+export function resolveDayItineraryDeleteSuccessFocusTarget(
+  items: readonly Pick<DayItineraryRowViewModel, 'id'>[],
+  deletedItemId: string,
+): DayItineraryDeleteFocusTarget {
+  const deletedIndex = items.findIndex((item) => item.id === deletedItemId);
+
+  if (deletedIndex >= 0) {
+    const nextItem = items[deletedIndex + 1];
+    if (nextItem) {
+      return { kind: 'placeRow', itemId: nextItem.id };
+    }
+
+    const previousItem = items[deletedIndex - 1];
+    if (previousItem) {
+      return { kind: 'placeRow', itemId: previousItem.id };
+    }
+
+    return { kind: 'emptyState' };
+  }
+
+  return items.length === 0 ? { kind: 'emptyState' } : { kind: 'dayHeading' };
 }
 
 export function dayItineraryMutationFailureState(action: 'update' | 'delete'): DayItineraryMutationFailureViewModel {

@@ -89,7 +89,8 @@ describe('day itinerary edit/delete helpers', () => {
     assert.deepEqual(buildDayItineraryDeleteConfirmation(item), {
       title: '이 장소를 삭제할까요?',
       helper: '이 Day 일정에서만 삭제돼요.',
-      itemLabel: '우메다 공중정원',
+      itemLabel: '1번째 장소 · 우메다 공중정원',
+      contextLabel: '관광지 · Umeda',
     });
   });
 

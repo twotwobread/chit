@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  AccessibilityInfo,
   ActivityIndicator,
+  findNodeHandle,
   Linking,
+  Modal,
   PanResponder,
   Pressable,
   ScrollView,
@@ -47,8 +50,12 @@ import {
   buildDayItineraryDeleteSubmitState,
   buildDayItineraryEditForm,
   buildDayItineraryEditSubmitState,
+  canDismissDayItineraryDeleteModal,
+  canSubmitDayItineraryDelete,
   dayItineraryMutationFailureState,
+  resolveDayItineraryDeleteSuccessFocusTarget,
   validateDayItineraryEditForm,
+  type DayItineraryDeleteFocusTarget,
   type DayItineraryEditFormErrors,
   type DayItineraryEditFormValues,
 } from '../../../../lib/trips/day-itinerary-edit';
@@ -97,6 +104,32 @@ type LodgingState =
   | { status: 'setting' | 'clearing'; itemId: string }
   | { status: 'error'; error: { title: string; helper: string } };
 
+type DayItineraryContentFocusTarget = DayItineraryDeleteFocusTarget | { kind: 'deleteTrigger'; itemId: string };
+
+type DayItineraryContentFocusRequest = {
+  id: number;
+  target: DayItineraryContentFocusTarget;
+};
+
+type AccessibilityFocusable = Parameters<typeof findNodeHandle>[0];
+
+const accessibilityFocusDelayMs = 120;
+
+function focusAccessibilityHandle(handle?: number | null): boolean {
+  if (typeof handle !== 'number') {
+    return false;
+  }
+
+  setTimeout(() => {
+    AccessibilityInfo.setAccessibilityFocus(handle);
+  }, accessibilityFocusDelayMs);
+  return true;
+}
+
+function focusAccessibilityNode(node: AccessibilityFocusable): boolean {
+  return focusAccessibilityHandle(findNodeHandle(node));
+}
+
 export default function TripDayItineraryScreen() {
   const { tripId: tripIdParam, date: dateParam } = useLocalSearchParams<{ tripId?: string | string[]; date?: string | string[] }>();
   const tripId = Array.isArray(tripIdParam) ? tripIdParam[0] : tripIdParam;
@@ -108,7 +141,10 @@ export default function TripDayItineraryScreen() {
   const [lodgingState, setLodgingState] = useState<LodgingState>({ status: 'idle' });
   const [reorderFeedback, setReorderFeedback] = useState<string | null>(null);
   const [mapActionFeedback, setMapActionFeedback] = useState<DayItineraryMapActionFeedback | null>(null);
+  const [contentFocusRequest, setContentFocusRequest] = useState<DayItineraryContentFocusRequest | null>(null);
   const reorderStateRef = useRef<ReorderState>({ status: 'idle' });
+  const deleteOriginFocusTargetRef = useRef<number | null>(null);
+  const focusRequestIdRef = useRef(0);
 
   useEffect(() => {
     reorderStateRef.current = reorderState;
@@ -167,6 +203,24 @@ export default function TripDayItineraryScreen() {
     setReorderState({ status: 'idle' });
   }, []);
 
+  const requestContentFocus = useCallback((target: DayItineraryContentFocusTarget) => {
+    focusRequestIdRef.current += 1;
+    setContentFocusRequest({ id: focusRequestIdRef.current, target });
+  }, []);
+
+  const clearContentFocusRequest = useCallback(() => {
+    setContentFocusRequest(null);
+  }, []);
+
+  const focusDeleteOrigin = useCallback((itemId: string) => {
+    const originFocusTarget = deleteOriginFocusTargetRef.current;
+    deleteOriginFocusTargetRef.current = null;
+    if (focusAccessibilityHandle(originFocusTarget)) {
+      return;
+    }
+    requestContentFocus({ kind: 'deleteTrigger', itemId });
+  }, [requestContentFocus]);
+
   const backToTripDetail = () => {
     if (tripId) {
       router.replace(`/trips/${tripId}`);
@@ -178,6 +232,7 @@ export default function TripDayItineraryScreen() {
   const beginEdit = (item: DayItineraryRowViewModel) => {
     discardReorder();
     const values = buildDayItineraryEditForm(item);
+    deleteOriginFocusTargetRef.current = null;
     setDeleteState({ status: 'idle' });
     setLodgingState({ status: 'idle' });
     setMapActionFeedback(null);
@@ -192,6 +247,7 @@ export default function TripDayItineraryScreen() {
 
     setReorderFeedback(null);
     setEditState({ status: 'idle' });
+    deleteOriginFocusTargetRef.current = null;
     setDeleteState({ status: 'idle' });
     setLodgingState({ status: 'idle' });
     setMapActionFeedback(null);
@@ -263,12 +319,23 @@ export default function TripDayItineraryScreen() {
     }
   };
 
-  const beginDelete = (item: DayItineraryRowViewModel) => {
+  const beginDelete = (item: DayItineraryRowViewModel, originFocusTarget?: number | null) => {
     discardReorder();
+    deleteOriginFocusTargetRef.current = typeof originFocusTarget === 'number' ? originFocusTarget : null;
     setEditState({ status: 'idle' });
     setLodgingState({ status: 'idle' });
     setMapActionFeedback(null);
     setDeleteState({ status: 'confirming', item });
+  };
+
+  const cancelDelete = () => {
+    if (deleteState.status !== 'confirming' || !canDismissDayItineraryDeleteModal(deleteState.status)) {
+      return;
+    }
+
+    const itemId = deleteState.item.id;
+    setDeleteState({ status: 'idle' });
+    focusDeleteOrigin(itemId);
   };
 
   const submitReorder = async () => {
@@ -329,6 +396,7 @@ export default function TripDayItineraryScreen() {
 
     discardReorder();
     setEditState({ status: 'idle' });
+    deleteOriginFocusTargetRef.current = null;
     setDeleteState({ status: 'idle' });
     setMapActionFeedback(null);
     setLodgingState({ status: 'setting', itemId: item.id });
@@ -363,6 +431,7 @@ export default function TripDayItineraryScreen() {
 
     discardReorder();
     setEditState({ status: 'idle' });
+    deleteOriginFocusTargetRef.current = null;
     setDeleteState({ status: 'idle' });
     setMapActionFeedback(null);
     setLodgingState({ status: 'clearing', itemId: item.id });
@@ -419,23 +488,30 @@ export default function TripDayItineraryScreen() {
   };
 
   const submitDelete = async () => {
-    if (!tripId || !date || (deleteState.status !== 'confirming' && deleteState.status !== 'deleting') || deleteState.status === 'deleting') {
+    if (!tripId || !date || deleteState.status !== 'confirming' || !canSubmitDayItineraryDelete(deleteState.status)) {
       return;
     }
 
+    const successFocusTarget: DayItineraryDeleteFocusTarget = state.status === 'success' && state.viewModel.status === 'success'
+      ? resolveDayItineraryDeleteSuccessFocusTarget(state.viewModel.items, deleteState.item.id)
+      : { kind: 'dayHeading' };
     const deletingState: DeleteState = { ...deleteState, status: 'deleting', error: undefined };
     setDeleteState(deletingState);
     try {
       await deleteDayItineraryItem(tripId, date, deleteState.item.id);
-      setDeleteState({ status: 'idle' });
       await load();
+      setDeleteState({ status: 'idle' });
+      deleteOriginFocusTargetRef.current = null;
+      requestContentFocus(successFocusTarget);
     } catch (error) {
       if (error instanceof MobileAuthError && (error.code === 'UNAUTHORIZED' || error.code === 'INVALID_REFRESH_TOKEN')) {
+        setDeleteState({ status: 'idle' });
         setState({ status: 'auth' });
         return;
       }
       if (error instanceof ApiError) {
         if (error.status === 401) {
+          setDeleteState({ status: 'idle' });
           setState({ status: 'auth' });
           return;
         }
@@ -450,95 +526,108 @@ export default function TripDayItineraryScreen() {
     }
   };
 
+  const isDeleteModalVisible = deleteState.status === 'confirming' || deleteState.status === 'deleting';
+
   return (
-    <ScrollView contentContainerStyle={styles.scrollContent} style={styles.scroll}>
-      <View style={styles.header}>
-        <Text style={styles.screenTitle}>Day 일정</Text>
-      </View>
-
-      {state.status === 'loading' ? (
-        <View style={styles.card}>
-          <ActivityIndicator color={theme.color.primary} />
-          <Text style={styles.message}>일정을 불러오는 중...</Text>
+    <>
+      <ScrollView
+        accessibilityElementsHidden={isDeleteModalVisible}
+        contentContainerStyle={styles.scrollContent}
+        importantForAccessibility={isDeleteModalVisible ? 'no-hide-descendants' : 'auto'}
+        style={styles.scroll}
+      >
+        <View style={styles.header}>
+          <Text style={styles.screenTitle}>Day 일정</Text>
         </View>
-      ) : null}
 
-      {state.status === 'success' ? (
-        <>
-          <DayItineraryContent
-            onAddPlace={() => {
-              if (tripId && date) {
-                router.push(buildGooglePlaceSearchRoute(tripId, date));
-              }
-            }}
-            onCopyAddress={(item) => void copyPlaceAddress(item)}
-            onDeletePlace={beginDelete}
-            onEditPlace={beginEdit}
-            onEnterReorderMode={() => beginReorder(state.viewModel)}
-            onExitReorderMode={cancelReorder}
-            lodgingState={lodgingState}
-            onClearLodging={(item) => void submitClearLodging(item)}
-            onMoveReorderItem={moveReorderItem}
-            onOpenMap={(item) => void openPlaceMap(item)}
-            onSaveReorder={() => void submitReorder()}
-            onSetLodging={(item) => void submitSetLodging(item)}
-            mapActionFeedback={mapActionFeedback}
-            reorderFeedback={reorderFeedback}
-            reorderState={reorderState}
-            viewModel={state.viewModel}
-          />
-          {editState.status === 'editing' || editState.status === 'saving' ? (
-            <EditPlacePanel
-              editState={editState}
-              onCancel={() => setEditState({ status: 'idle' })}
-              onSubmit={() => void submitEdit()}
-              onUpdateValues={updateEditValues}
+        {state.status === 'loading' ? (
+          <View style={styles.card}>
+            <ActivityIndicator color={theme.color.primary} />
+            <Text style={styles.message}>일정을 불러오는 중...</Text>
+          </View>
+        ) : null}
+
+        {state.status === 'success' ? (
+          <>
+            <DayItineraryContent
+              focusRequest={contentFocusRequest}
+              onFocusRequestHandled={clearContentFocusRequest}
+              onAddPlace={() => {
+                if (tripId && date) {
+                  router.push(buildGooglePlaceSearchRoute(tripId, date));
+                }
+              }}
+              onCopyAddress={(item) => void copyPlaceAddress(item)}
+              onDeletePlace={beginDelete}
+              onEditPlace={beginEdit}
+              onEnterReorderMode={() => beginReorder(state.viewModel)}
+              onExitReorderMode={cancelReorder}
+              lodgingState={lodgingState}
+              onClearLodging={(item) => void submitClearLodging(item)}
+              onMoveReorderItem={moveReorderItem}
+              onOpenMap={(item) => void openPlaceMap(item)}
+              onSaveReorder={() => void submitReorder()}
+              onSetLodging={(item) => void submitSetLodging(item)}
+              mapActionFeedback={mapActionFeedback}
+              reorderFeedback={reorderFeedback}
+              reorderState={reorderState}
+              viewModel={state.viewModel}
             />
-          ) : null}
-          {deleteState.status === 'confirming' || deleteState.status === 'deleting' ? (
-            <DeletePlacePanel
-              deleteState={deleteState}
-              onCancel={() => setDeleteState({ status: 'idle' })}
-              onConfirm={() => void submitDelete()}
-            />
-          ) : null}
-        </>
-      ) : null}
+            {editState.status === 'editing' || editState.status === 'saving' ? (
+              <EditPlacePanel
+                editState={editState}
+                onCancel={() => setEditState({ status: 'idle' })}
+                onSubmit={() => void submitEdit()}
+                onUpdateValues={updateEditValues}
+              />
+            ) : null}
+          </>
+        ) : null}
 
-      {state.status === 'auth' ? (
-        <View style={styles.card}>
-          <Text style={styles.errorTitle}>다시 로그인해주세요.</Text>
-          <Pressable accessibilityRole="button" onPress={() => router.replace('/login')} style={styles.button}>
-            <Text style={styles.buttonText}>로그인하기</Text>
-          </Pressable>
-        </View>
-      ) : null}
+        {state.status === 'auth' ? (
+          <View style={styles.card}>
+            <Text style={styles.errorTitle}>다시 로그인해주세요.</Text>
+            <Pressable accessibilityRole="button" onPress={() => router.replace('/login')} style={styles.button}>
+              <Text style={styles.buttonText}>로그인하기</Text>
+            </Pressable>
+          </View>
+        ) : null}
 
-      {state.status === 'notFound' ? (
-        <View style={styles.card}>
-          <Text style={styles.errorTitle}>{state.title}</Text>
-          <Text style={styles.message}>{state.helper}</Text>
-          <Pressable accessibilityRole="button" onPress={backToTripDetail} style={styles.button}>
-            <Text style={styles.buttonText}>여행 상세로</Text>
-          </Pressable>
-        </View>
-      ) : null}
+        {state.status === 'notFound' ? (
+          <View style={styles.card}>
+            <Text style={styles.errorTitle}>{state.title}</Text>
+            <Text style={styles.message}>{state.helper}</Text>
+            <Pressable accessibilityRole="button" onPress={backToTripDetail} style={styles.button}>
+              <Text style={styles.buttonText}>여행 상세로</Text>
+            </Pressable>
+          </View>
+        ) : null}
 
-      {state.status === 'error' ? (
-        <View style={styles.card}>
-          <Text style={styles.errorTitle}>{state.title}</Text>
-          <Text style={styles.message}>{state.helper}</Text>
-          <Pressable accessibilityRole="button" onPress={() => void load()} style={styles.button}>
-            <Text style={styles.buttonText}>다시 시도</Text>
-          </Pressable>
-        </View>
+        {state.status === 'error' ? (
+          <View style={styles.card}>
+            <Text style={styles.errorTitle}>{state.title}</Text>
+            <Text style={styles.message}>{state.helper}</Text>
+            <Pressable accessibilityRole="button" onPress={() => void load()} style={styles.button}>
+              <Text style={styles.buttonText}>다시 시도</Text>
+            </Pressable>
+          </View>
+        ) : null}
+      </ScrollView>
+      {isDeleteModalVisible ? (
+        <DeletePlaceConfirmationModal
+          deleteState={deleteState}
+          onCancel={cancelDelete}
+          onConfirm={() => void submitDelete()}
+        />
       ) : null}
-    </ScrollView>
+    </>
   );
 }
 
 function DayItineraryContent({
+  focusRequest,
   lodgingState,
+  onFocusRequestHandled,
   onAddPlace,
   onClearLodging,
   onCopyAddress,
@@ -555,11 +644,13 @@ function DayItineraryContent({
   reorderState,
   viewModel,
 }: {
+  focusRequest: DayItineraryContentFocusRequest | null;
   lodgingState: LodgingState;
+  onFocusRequestHandled: () => void;
   onAddPlace: () => void;
   onClearLodging: (item: DayItineraryRowViewModel) => void;
   onCopyAddress: (item: DayItineraryRowViewModel) => void;
-  onDeletePlace: (item: DayItineraryRowViewModel) => void;
+  onDeletePlace: (item: DayItineraryRowViewModel, originFocusTarget?: number | null) => void;
   onEditPlace: (item: DayItineraryRowViewModel) => void;
   onEnterReorderMode: () => void;
   onExitReorderMode: () => void;
@@ -581,16 +672,53 @@ function DayItineraryContent({
     : lodgingState.status === 'clearing'
       ? { kind: 'clear', itemId: lodgingState.itemId }
       : null;
+  const dayHeadingRef = useRef<Text>(null);
+  const emptyStateRef = useRef<View>(null);
+  const rowRefs = useRef<Record<string, Text | null>>({});
+  const deleteTriggerRefs = useRef<Record<string, View | null>>({});
+
+  useEffect(() => {
+    if (!focusRequest) {
+      return;
+    }
+
+    if (focusRequest.target.kind === 'deleteTrigger') {
+      if (!focusAccessibilityNode(deleteTriggerRefs.current[focusRequest.target.itemId])) {
+        focusAccessibilityNode(rowRefs.current[focusRequest.target.itemId]);
+      }
+      onFocusRequestHandled();
+      return;
+    }
+
+    if (focusRequest.target.kind === 'placeRow') {
+      if (!focusAccessibilityNode(rowRefs.current[focusRequest.target.itemId])) {
+        focusAccessibilityNode(dayHeadingRef.current);
+      }
+      onFocusRequestHandled();
+      return;
+    }
+
+    if (focusRequest.target.kind === 'emptyState') {
+      if (!focusAccessibilityNode(emptyStateRef.current)) {
+        focusAccessibilityNode(dayHeadingRef.current);
+      }
+      onFocusRequestHandled();
+      return;
+    }
+
+    focusAccessibilityNode(dayHeadingRef.current);
+    onFocusRequestHandled();
+  }, [focusRequest, onFocusRequestHandled]);
 
   return (
     <View style={styles.card}>
       <View style={styles.dayHeader}>
-        <Text style={styles.dayLabel}>{viewModel.dayLabel}</Text>
+        <Text ref={dayHeadingRef} accessibilityRole="header" style={styles.dayLabel}>{viewModel.dayLabel}</Text>
         <Text style={styles.dayDate}>{viewModel.formattedDate}</Text>
       </View>
 
       {viewModel.status === 'empty' ? (
-        <View style={styles.emptyBox}>
+        <View ref={emptyStateRef} accessible accessibilityLabel={`${viewModel.title}. ${viewModel.helper}`} style={styles.emptyBox}>
           <Text style={styles.emptyTitle}>{viewModel.title}</Text>
           <Text style={styles.message}>{viewModel.helper}</Text>
         </View>
@@ -616,7 +744,15 @@ function DayItineraryContent({
                     </View>
                     <View style={styles.placeContent}>
                       <View style={styles.placeTitleRow}>
-                        <Text style={styles.placeName}>{item.placeName}</Text>
+                        <Text
+                          ref={(node) => {
+                            rowRefs.current[item.id] = node;
+                          }}
+                          accessibilityLabel={`${item.orderLabel}번째 장소 ${item.placeName}. ${item.placeTypeLabel}. ${item.address}`}
+                          style={styles.placeName}
+                        >
+                          {item.placeName}
+                        </Text>
                         <Text style={styles.placeType}>{item.placeTypeLabel}</Text>
                         {lodging.badgeLabel ? (
                           <View style={styles.lodgingBadge}>
@@ -657,7 +793,15 @@ function DayItineraryContent({
                         <Pressable accessibilityRole="button" onPress={() => onEditPlace(item)} style={styles.rowActionButton}>
                           <Text style={styles.rowActionText}>수정</Text>
                         </Pressable>
-                        <Pressable accessibilityRole="button" onPress={() => onDeletePlace(item)} style={styles.rowDangerActionButton}>
+                        <Pressable
+                          ref={(node) => {
+                            deleteTriggerRefs.current[item.id] = node;
+                          }}
+                          accessibilityLabel={`${item.placeName} 삭제`}
+                          accessibilityRole="button"
+                          onPress={() => onDeletePlace(item, findNodeHandle(deleteTriggerRefs.current[item.id]))}
+                          style={styles.rowDangerActionButton}
+                        >
                           <Text style={styles.rowDangerActionText}>삭제</Text>
                         </Pressable>
                       </View>
@@ -932,7 +1076,7 @@ function EditPlacePanel({
   );
 }
 
-function DeletePlacePanel({
+function DeletePlaceConfirmationModal({
   deleteState,
   onCancel,
   onConfirm,
@@ -944,28 +1088,76 @@ function DeletePlacePanel({
   const isDeleting = deleteState.status === 'deleting';
   const confirmation = buildDayItineraryDeleteConfirmation(deleteState.item);
   const submitView = buildDayItineraryDeleteSubmitState(isDeleting);
+  const titleRef = useRef<Text>(null);
+  const errorRef = useRef<View>(null);
+
+  useEffect(() => {
+    if (isDeleting) {
+      return;
+    }
+
+    if (deleteState.error) {
+      focusAccessibilityNode(errorRef.current);
+      AccessibilityInfo.announceForAccessibility(`${deleteState.error.title}. ${deleteState.error.helper}`);
+      return;
+    }
+
+    focusAccessibilityNode(titleRef.current);
+  }, [deleteState.error, deleteState.item.id, isDeleting]);
 
   return (
-    <View style={styles.card}>
-      <Text style={styles.errorTitle}>{confirmation.title}</Text>
-      <Text style={styles.message}>{confirmation.itemLabel}</Text>
-      <Text style={styles.message}>{confirmation.helper}</Text>
-      {deleteState.error ? (
-        <View style={styles.errorBox}>
-          <Text style={styles.errorTitle}>{deleteState.error.title}</Text>
-          <Text style={styles.message}>{deleteState.error.helper}</Text>
+    <Modal
+      animationType="fade"
+      onRequestClose={() => {
+        if (canDismissDayItineraryDeleteModal(deleteState.status)) {
+          onCancel();
+        }
+      }}
+      transparent
+      visible
+    >
+      <View style={styles.modalBackdrop}>
+        <View accessibilityViewIsModal importantForAccessibility="yes" style={styles.modalCard}>
+          <Text ref={titleRef} accessibilityRole="header" style={styles.modalTitle}>{confirmation.title}</Text>
+          <View style={styles.deleteTargetBox}>
+            <Text style={styles.deleteTargetText}>{confirmation.itemLabel}</Text>
+            <Text style={styles.deleteTargetContext}>{confirmation.contextLabel}</Text>
+          </View>
+          <Text style={styles.message}>{confirmation.helper}</Text>
+          {deleteState.error ? (
+            <View
+              ref={errorRef}
+              accessible
+              accessibilityLabel={`${deleteState.error.title}. ${deleteState.error.helper}`}
+              accessibilityLiveRegion="assertive"
+              style={styles.errorBox}
+            >
+              <Text style={styles.errorTitle}>{deleteState.error.title}</Text>
+              <Text style={styles.message}>{deleteState.error.helper}</Text>
+            </View>
+          ) : null}
+          <View style={styles.actionGroup}>
+            <Pressable
+              accessibilityRole="button"
+              disabled={submitView.disabled}
+              onPress={onConfirm}
+              style={[styles.dangerButton, submitView.disabled ? styles.buttonDisabled : null]}
+            >
+              {isDeleting ? <ActivityIndicator color={theme.color.onPrimary} /> : null}
+              <Text style={styles.buttonText}>{submitView.label}</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              disabled={isDeleting}
+              onPress={onCancel}
+              style={[styles.secondaryButton, isDeleting ? styles.secondaryButtonDisabled : null]}
+            >
+              <Text style={styles.secondaryButtonText}>취소</Text>
+            </Pressable>
+          </View>
         </View>
-      ) : null}
-      <View style={styles.actionGroup}>
-        <Pressable accessibilityRole="button" disabled={submitView.disabled} onPress={onConfirm} style={[styles.dangerButton, submitView.disabled ? styles.buttonDisabled : null]}>
-          {isDeleting ? <ActivityIndicator color={theme.color.onPrimary} /> : null}
-          <Text style={styles.buttonText}>{submitView.label}</Text>
-        </Pressable>
-        <Pressable accessibilityRole="button" disabled={isDeleting} onPress={onCancel} style={styles.secondaryButton}>
-          <Text style={styles.secondaryButtonText}>취소</Text>
-        </Pressable>
       </View>
-    </View>
+    </Modal>
   );
 }
 
@@ -1002,6 +1194,52 @@ const styles = StyleSheet.create({
     gap: theme.layout.gapCard,
     padding: theme.space[7],
     ...theme.shadow.sm,
+  },
+  modalBackdrop: {
+    alignItems: 'center',
+    backgroundColor: theme.color.bg,
+    flex: 1,
+    justifyContent: 'center',
+    padding: theme.space[7],
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: theme.layout.cardMaxW,
+    backgroundColor: theme.color.surface,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    gap: theme.layout.gapCard,
+    padding: theme.space[7],
+    ...theme.shadow.md,
+  },
+  modalTitle: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.headline,
+    fontWeight: theme.font.weight.bold,
+    textAlign: 'center',
+  },
+  deleteTargetBox: {
+    backgroundColor: theme.color.surfaceSunken,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    gap: theme.space[2],
+    padding: theme.space[5],
+  },
+  deleteTargetText: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.subhead,
+    fontWeight: theme.font.weight.bold,
+    textAlign: 'center',
+  },
+  deleteTargetContext: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.caption,
+    textAlign: 'center',
   },
   dayHeader: {
     alignItems: 'center',
