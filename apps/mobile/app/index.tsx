@@ -33,6 +33,7 @@ import {
   selectTodayTrip,
   type TodayAction,
   type TodayExecutionViewModel,
+  type TodayLodgingNavigationActionViewModel,
 } from '../lib/trips/today-execution';
 import { openTodayNavigationDestination, type TodayNavigationDestination } from '../lib/trips/today-navigation';
 import {
@@ -555,6 +556,15 @@ function TodayContent({
           <Text style={styles.message}>{viewModel.helper}</Text>
         </View>
         <ActionButton action={viewModel.primaryAction} onAction={onAction} />
+        <LodgingNavigationActionBlock action={viewModel.lodgingNavigationAction} onAction={onAction} />
+        <NavigationFallbackSlot
+          itineraryAction={viewModel.primaryAction}
+          navigationFallback={navigationFallback}
+          navigationRetrying={navigationRetrying}
+          onCopy={onNavigationFallbackCopy}
+          onOpenItinerary={onNavigationFallbackOpenItinerary}
+          onRetry={onNavigationFallbackRetry}
+        />
         <MultipleOngoingNotice notice={viewModel.multipleOngoingTripNotice} onAction={onAction} />
       </View>
     );
@@ -575,6 +585,15 @@ function TodayContent({
         </View>
         <ActionButton action={viewModel.quickExpenseAction} onAction={onAction} />
         <ActionButton action={viewModel.primaryAction} onAction={onAction} variant="secondary" />
+        <LodgingNavigationActionBlock action={viewModel.lodgingNavigationAction} onAction={onAction} />
+        <NavigationFallbackSlot
+          itineraryAction={viewModel.primaryAction}
+          navigationFallback={navigationFallback}
+          navigationRetrying={navigationRetrying}
+          onCopy={onNavigationFallbackCopy}
+          onOpenItinerary={onNavigationFallbackOpenItinerary}
+          onRetry={onNavigationFallbackRetry}
+        />
         <MultipleOngoingNotice notice={viewModel.multipleOngoingTripNotice} onAction={onAction} />
       </View>
     );
@@ -599,6 +618,15 @@ function TodayContent({
         />
         {actionError ? <Text style={styles.actionError}>{actionError}</Text> : null}
         <ActionButton action={viewModel.primaryAction} onAction={onAction} />
+        <LodgingNavigationActionBlock action={viewModel.lodgingNavigationAction} onAction={onAction} />
+        <NavigationFallbackSlot
+          itineraryAction={viewModel.primaryAction}
+          navigationFallback={navigationFallback}
+          navigationRetrying={navigationRetrying}
+          onCopy={onNavigationFallbackCopy}
+          onOpenItinerary={onNavigationFallbackOpenItinerary}
+          onRetry={onNavigationFallbackRetry}
+        />
         <MultipleOngoingNotice notice={viewModel.multipleOngoingTripNotice} onAction={onAction} />
       </View>
     );
@@ -623,16 +651,14 @@ function TodayContent({
         <ActionButton action={viewModel.nextPlace.navigationAction} onAction={onAction} />
       </View>
       <ActionButton action={viewModel.quickExpenseAction} onAction={onAction} />
-      {navigationFallback ? (
-        <TodayNavigationFallbackPanel
-          itineraryAction={viewModel.primaryAction}
-          onCopy={onNavigationFallbackCopy}
-          onOpenItinerary={onNavigationFallbackOpenItinerary}
-          onRetry={onNavigationFallbackRetry}
-          retrying={navigationRetrying}
-          state={navigationFallback}
-        />
-      ) : null}
+      <NavigationFallbackSlot
+        itineraryAction={viewModel.primaryAction}
+        navigationFallback={navigationFallback}
+        navigationRetrying={navigationRetrying}
+        onCopy={onNavigationFallbackCopy}
+        onOpenItinerary={onNavigationFallbackOpenItinerary}
+        onRetry={onNavigationFallbackRetry}
+      />
       {viewModel.skippedSection ? (
         <SkippedPlacesSection
           onAction={onAction}
@@ -655,6 +681,7 @@ function TodayContent({
         variant="secondary"
       />
       <ActionButton action={viewModel.primaryAction} onAction={onAction} variant="secondary" />
+      <LodgingNavigationActionBlock action={viewModel.lodgingNavigationAction} onAction={onAction} />
       <MultipleOngoingNotice notice={viewModel.multipleOngoingTripNotice} onAction={onAction} />
     </View>
   );
@@ -821,6 +848,63 @@ function TodayNavigationFallbackPanel({
       >
         <Text style={styles.secondaryButtonText}>{panel.itineraryAction.label}</Text>
       </Pressable>
+    </View>
+  );
+}
+
+function NavigationFallbackSlot({
+  itineraryAction,
+  navigationFallback,
+  navigationRetrying,
+  onCopy,
+  onOpenItinerary,
+  onRetry,
+}: {
+  itineraryAction: Extract<TodayAction, { kind: 'route' }>;
+  navigationFallback: TodayNavigationFallbackState | null;
+  navigationRetrying: boolean;
+  onCopy: (destination: TodayNavigationDestination) => void;
+  onOpenItinerary: (action: Extract<TodayAction, { kind: 'route' }>) => void;
+  onRetry: (destination: TodayNavigationDestination, travelMode?: TravelMode) => void;
+}) {
+  if (!navigationFallback) {
+    return null;
+  }
+
+  return (
+    <TodayNavigationFallbackPanel
+      itineraryAction={itineraryAction}
+      onCopy={onCopy}
+      onOpenItinerary={onOpenItinerary}
+      onRetry={onRetry}
+      retrying={navigationRetrying}
+      state={navigationFallback}
+    />
+  );
+}
+
+function LodgingNavigationActionBlock({
+  action,
+  onAction,
+}: {
+  action: TodayLodgingNavigationActionViewModel;
+  onAction: (action: TodayAction) => void;
+}) {
+  const runnableAction = action.action;
+  const disabled = action.disabled || !runnableAction;
+
+  return (
+    <View style={styles.lodgingActionBlock}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ disabled }}
+        disabled={disabled}
+        onPress={runnableAction ? () => onAction(runnableAction) : undefined}
+        style={[styles.secondaryButton, disabled ? styles.disabledButton : null]}
+      >
+        <Text style={styles.secondaryButtonText}>{action.label}</Text>
+      </Pressable>
+      {action.helper ? <Text style={styles.lodgingHelper}>{action.helper}</Text> : null}
     </View>
   );
 }
@@ -1097,6 +1181,15 @@ const styles = StyleSheet.create({
     fontFamily: theme.font.family.semibold,
     fontSize: theme.font.size.label,
     fontWeight: theme.font.weight.semibold,
+    textAlign: 'center',
+  },
+  lodgingActionBlock: {
+    gap: theme.space[2],
+  },
+  lodgingHelper: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.label,
     textAlign: 'center',
   },
   navigationFallbackPanel: {

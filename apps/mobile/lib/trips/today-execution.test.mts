@@ -60,9 +60,39 @@ function day(overrides: Partial<TripDay>): TripDay {
   return {
     date: '2026-07-10',
     dayOrder: 1,
+    lodgingPlace: null,
     ...overrides,
   };
 }
+
+const hotelNikko = {
+  id: 'place-lodging',
+  name: '호텔 니코 오사카',
+  placeType: 'lodging' as const,
+  address: '1 Chome-3-3 Nishi-Shinsaibashi, Chuo Ward, Osaka',
+};
+
+const disabledLodgingNavigationAction = {
+  label: '숙소로 이동',
+  disabled: true,
+  helper: '오늘 일정에서 대표 숙소를 지정하면 바로 이동할 수 있어요.',
+  action: null,
+};
+
+const enabledHotelNavigationAction = {
+  label: '숙소로 이동',
+  disabled: false,
+  helper: null,
+  action: {
+    kind: 'navigate' as const,
+    label: '숙소로 이동',
+    destination: {
+      placeName: '호텔 니코 오사카',
+      address: '1 Chome-3-3 Nishi-Shinsaibashi, Chuo Ward, Osaka',
+    },
+    travelMode: 'transit' as const,
+  },
+};
 
 function itinerary(overrides: Partial<GetDayItineraryResponse> = {}): GetDayItineraryResponse {
   return {
@@ -150,11 +180,86 @@ test('builds an empty-itinerary Today state with current day context and day iti
     title: '오늘 일정에 아직 장소가 없어요.',
     helper: '오늘 일정 화면에서 첫 장소를 추가해보세요.',
     primaryAction: { kind: 'route', label: '오늘 일정 열기', route: '/trips/trip-current/days/2026-07-10' },
+    lodgingNavigationAction: disabledLodgingNavigationAction,
     multipleOngoingTripNotice: {
       message: '다른 진행 중인 여행은 내 여행에서 볼 수 있어요.',
       action: { kind: 'route', label: '내 여행 보기', route: '/mypage' },
     },
   });
+});
+
+test('exposes enabled lodging navigation in resolved current-day states with lodging', () => {
+  const empty = buildTodayExecutionViewModel({
+    selectedTrip: trip({ id: 'trip-current' }),
+    tripDetail: tripDetail(),
+    itinerary: itinerary({ day: day({ lodgingPlace: hotelNikko }), items: [] }),
+    today: '2026-07-10',
+    ongoingTripCount: 1,
+  });
+  const success = buildTodayExecutionViewModel({
+    selectedTrip: trip({ id: 'trip-current' }),
+    tripDetail: tripDetail(),
+    itinerary: itinerary({ day: day({ lodgingPlace: hotelNikko }), items: [item({ id: 'item-next' })] }),
+    today: '2026-07-10',
+    ongoingTripCount: 1,
+  });
+  const completed = buildTodayExecutionViewModel({
+    selectedTrip: trip({ id: 'trip-current' }),
+    tripDetail: tripDetail(),
+    itinerary: itinerary({
+      day: day({ lodgingPlace: hotelNikko }),
+      items: [item({ id: 'item-arrived', arrivedAt: '2026-07-10T00:30:00Z' })],
+    }),
+    today: '2026-07-10',
+    ongoingTripCount: 1,
+  });
+  const recoverNeeded = buildTodayExecutionViewModel({
+    selectedTrip: trip({ id: 'trip-current' }),
+    tripDetail: tripDetail(),
+    itinerary: itinerary({
+      day: day({ lodgingPlace: hotelNikko }),
+      items: [item({ id: 'item-skipped', skippedAt: '2026-07-10T01:00:00Z' })],
+    }),
+    today: '2026-07-10',
+    ongoingTripCount: 1,
+  });
+
+  for (const viewModel of [empty, success, completed, recoverNeeded]) {
+    assert.equal('lodgingNavigationAction' in viewModel, true);
+    if (!('lodgingNavigationAction' in viewModel)) {
+      return;
+    }
+    assert.deepEqual(viewModel.lodgingNavigationAction, enabledHotelNavigationAction);
+  }
+});
+
+test('keeps next-place and lodging navigation when the next place is the lodging destination', () => {
+  const viewModel = buildTodayExecutionViewModel({
+    selectedTrip: trip({ id: 'trip-current' }),
+    tripDetail: tripDetail(),
+    itinerary: itinerary({
+      day: day({ lodgingPlace: hotelNikko }),
+      items: [item({ id: 'item-lodging-next', place: hotelNikko })],
+    }),
+    today: '2026-07-10',
+    ongoingTripCount: 1,
+  });
+
+  assert.equal(viewModel.status, 'success');
+  if (viewModel.status !== 'success') {
+    return;
+  }
+
+  assert.deepEqual(viewModel.nextPlace.navigationAction, {
+    kind: 'navigate',
+    label: '길찾기',
+    destination: {
+      placeName: '호텔 니코 오사카',
+      address: '1 Chome-3-3 Nishi-Shinsaibashi, Chuo Ward, Osaka',
+    },
+    travelMode: 'transit',
+  });
+  assert.deepEqual(viewModel.lodgingNavigationAction, enabledHotelNavigationAction);
 });
 
 test('maps the first ordered itinerary item to the next place without exposing subsequent places on Today', () => {
@@ -243,6 +348,7 @@ test('maps the first ordered itinerary item to the next place without exposing s
       itemId: 'item-next',
     },
     primaryAction: { kind: 'route', label: '오늘 일정 보기', route: '/trips/trip-current/days/2026-07-10' },
+    lodgingNavigationAction: disabledLodgingNavigationAction,
     multipleOngoingTripNotice: null,
   });
 
@@ -390,6 +496,7 @@ test('builds a completed Today state when every itinerary item is arrived', () =
       route: '/trips/trip-current/days/2026-07-10/expenses/quick',
     },
     primaryAction: { kind: 'route', label: '오늘 일정 보기', route: '/trips/trip-current/days/2026-07-10' },
+    lodgingNavigationAction: disabledLodgingNavigationAction,
     multipleOngoingTripNotice: null,
   });
 });
@@ -461,6 +568,7 @@ test('builds a recover-needed state when all non-arrived items are skipped', () 
       ],
     },
     primaryAction: { kind: 'route', label: '오늘 일정 보기', route: '/trips/trip-current/days/2026-07-10' },
+    lodgingNavigationAction: disabledLodgingNavigationAction,
     multipleOngoingTripNotice: null,
   });
 });
@@ -487,7 +595,7 @@ test('does not expose a remaining section when only the next place exists', () =
   });
 });
 
-test('does not expose navigation action outside a next-place success state', () => {
+test('does not expose next-place navigation outside a next-place success state', () => {
   const empty = buildTodayExecutionViewModel({
     selectedTrip: trip({ id: 'trip-current' }),
     tripDetail: tripDetail(),
@@ -505,14 +613,19 @@ test('does not expose navigation action outside a next-place success state', () 
 
   assert.equal('nextPlace' in empty, false);
   assert.equal('quickExpenseAction' in empty, false);
+  assert.equal('lodgingNavigationAction' in empty, true);
   assert.equal('nextPlace' in completed, false);
   assert.equal('quickExpenseAction' in completed, true);
+  assert.equal('lodgingNavigationAction' in completed, true);
   assert.equal('nextPlace' in buildTodayNoOngoingTripViewModel(), false);
   assert.equal('quickExpenseAction' in buildTodayNoOngoingTripViewModel(), false);
+  assert.equal('lodgingNavigationAction' in buildTodayNoOngoingTripViewModel(), false);
   assert.equal('nextPlace' in buildTodayRetryableErrorViewModel(), false);
   assert.equal('quickExpenseAction' in buildTodayRetryableErrorViewModel(), false);
+  assert.equal('lodgingNavigationAction' in buildTodayRetryableErrorViewModel(), false);
   assert.equal('nextPlace' in buildTodayUnavailableViewModel(), false);
   assert.equal('quickExpenseAction' in buildTodayUnavailableViewModel(), false);
+  assert.equal('lodgingNavigationAction' in buildTodayUnavailableViewModel(), false);
 });
 
 test('builds retryable and unavailable failure states without crashing callers', () => {
