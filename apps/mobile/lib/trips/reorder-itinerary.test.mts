@@ -80,7 +80,7 @@ describe('reorder itinerary helpers', () => {
     assert.deepEqual(buildDayItineraryReorderAction(viewModel), { status: 'enabled', label: '순서 변경' });
     assert.deepEqual(buildDayItineraryReorderDraft(viewModel), {
       title: '순서 변경',
-      helper: '드래그앤드롭으로 방문 순서를 바꿔보세요.',
+      helper: '핸들을 잡고 위아래로 끌어서 순서를 바꿔요.',
       originalItems: [
         {
           id: 'item-1',
