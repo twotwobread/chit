@@ -34,6 +34,14 @@ describe('today navigation fallback helpers', () => {
       todayNavigationFallbackStateForResult({ status: 'failed', message: todayNavigationFailureMessage }, destination),
       { destination, feedback: null },
     );
+    assert.deepEqual(
+      todayNavigationFallbackStateForResult(
+        { status: 'failed', message: todayNavigationFailureMessage },
+        destination,
+        'walking',
+      ),
+      { destination, feedback: null, travelMode: 'walking' },
+    );
   });
 
   it('composes one-line destination copy payload from trimmed non-empty fields', () => {

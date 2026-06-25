@@ -3,6 +3,7 @@ import {
   type TodayNavigationDestination,
   type TodayNavigationResult,
 } from './today-navigation';
+import type { TravelMode } from './travel-mode';
 
 export type TodayNavigationFallbackFeedback = {
   kind: 'success' | 'error';
@@ -12,6 +13,7 @@ export type TodayNavigationFallbackFeedback = {
 export type TodayNavigationFallbackState = {
   destination: TodayNavigationDestination;
   feedback: TodayNavigationFallbackFeedback | null;
+  travelMode?: TravelMode;
 };
 
 export type TodayNavigationFallbackPanel = {
@@ -50,12 +52,13 @@ const copyDisabledHelper = '복사할 장소 정보가 없어요.';
 export function todayNavigationFallbackStateForResult(
   result: TodayNavigationResult,
   destination: TodayNavigationDestination,
+  travelMode?: TravelMode,
 ): TodayNavigationFallbackState | null {
   if (result.status !== 'failed') {
     return null;
   }
 
-  return { destination, feedback: null };
+  return { destination, feedback: null, ...(travelMode ? { travelMode } : {}) };
 }
 
 export function resetTodayNavigationFallbackState(): null {

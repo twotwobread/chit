@@ -36,6 +36,35 @@ describe('today navigation helpers', () => {
     );
   });
 
+  it('adds exact supported travel-mode parameters and falls back to generic directions without mode substitution', () => {
+    const destination = { placeName: '도톤보리', address: '1 Chome Dotonbori, Chuo Ward, Osaka' };
+
+    assert.equal(
+      buildGoogleMapsDirectionsUrl(destination, 'ios', 'transit'),
+      'comgooglemaps://?daddr=%EB%8F%84%ED%86%A4%EB%B3%B4%EB%A6%AC%201%20Chome%20Dotonbori%2C%20Chuo%20Ward%2C%20Osaka&directionsmode=transit',
+    );
+    assert.equal(
+      buildGoogleMapsDirectionsUrl(destination, 'ios', 'walking'),
+      'comgooglemaps://?daddr=%EB%8F%84%ED%86%A4%EB%B3%B4%EB%A6%AC%201%20Chome%20Dotonbori%2C%20Chuo%20Ward%2C%20Osaka&directionsmode=walking',
+    );
+    assert.equal(
+      buildGoogleMapsDirectionsUrl(destination, 'android', 'walking'),
+      'google.navigation:q=%EB%8F%84%ED%86%A4%EB%B3%B4%EB%A6%AC%201%20Chome%20Dotonbori%2C%20Chuo%20Ward%2C%20Osaka&mode=w',
+    );
+    assert.equal(
+      buildGoogleMapsDirectionsUrl(destination, 'android', 'driving'),
+      'google.navigation:q=%EB%8F%84%ED%86%A4%EB%B3%B4%EB%A6%AC%201%20Chome%20Dotonbori%2C%20Chuo%20Ward%2C%20Osaka&mode=d',
+    );
+    assert.equal(
+      buildGoogleMapsDirectionsUrl(destination, 'android', 'transit'),
+      'google.navigation:q=%EB%8F%84%ED%86%A4%EB%B3%B4%EB%A6%AC%201%20Chome%20Dotonbori%2C%20Chuo%20Ward%2C%20Osaka',
+    );
+    assert.equal(
+      buildGoogleMapsDirectionsUrl(destination, 'web', 'transit'),
+      'https://www.google.com/maps/dir/?api=1&destination=%EB%8F%84%ED%86%A4%EB%B3%B4%EB%A6%AC%201%20Chome%20Dotonbori%2C%20Chuo%20Ward%2C%20Osaka&travelmode=transit',
+    );
+  });
+
   it('builds platform Google Maps install URLs', () => {
     assert.equal(buildGoogleMapsInstallUrl('ios'), 'itms-apps://apps.apple.com/app/google-maps/id585027354');
     assert.equal(buildGoogleMapsInstallUrl('android'), 'market://details?id=com.google.android.apps.maps');
@@ -51,13 +80,16 @@ describe('today navigation helpers', () => {
           opened.push(url);
         },
       },
+      travelMode: 'driving',
     });
 
     assert.deepEqual(result, {
       status: 'openedDirections',
-      url: 'comgooglemaps://?daddr=%EB%8F%84%ED%86%A4%EB%B3%B4%EB%A6%AC%20Dotonbori',
+      url: 'comgooglemaps://?daddr=%EB%8F%84%ED%86%A4%EB%B3%B4%EB%A6%AC%20Dotonbori&directionsmode=driving',
     });
-    assert.deepEqual(opened, ['comgooglemaps://?daddr=%EB%8F%84%ED%86%A4%EB%B3%B4%EB%A6%AC%20Dotonbori']);
+    assert.deepEqual(opened, [
+      'comgooglemaps://?daddr=%EB%8F%84%ED%86%A4%EB%B3%B4%EB%A6%AC%20Dotonbori&directionsmode=driving',
+    ]);
   });
 
   it('opens the platform install page when Google Maps cannot be opened', async () => {

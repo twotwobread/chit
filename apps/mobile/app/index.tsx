@@ -24,6 +24,7 @@ import {
 } from '../lib/trips/client';
 import { localDateString } from '../lib/trips/status';
 import {
+  applyTravelModeToTodayViewModel,
   buildTodayExecutionViewModel,
   buildTodayNoOngoingTripViewModel,
   buildTodayRetryableErrorViewModel,
@@ -41,6 +42,12 @@ import {
   todayNavigationFallbackStateForResult,
   type TodayNavigationFallbackState,
 } from '../lib/trips/today-navigation-fallback';
+import {
+  defaultTravelMode,
+  readStoredTravelMode,
+  saveSelectedTravelMode,
+  type TravelMode,
+} from '../lib/trips/travel-mode';
 
 type TodayExecutionContext = {
   selectedTrip: TripListItem;
@@ -97,6 +104,7 @@ export default function HomeScreen() {
         return;
       }
 
+      const currentTravelMode = (await readStoredTravelMode()).mode;
       const today = localDateString();
       const trips = await listMyTrips();
       const selectedTrip = selectTodayTrip(trips.trips, today);
@@ -144,6 +152,7 @@ export default function HomeScreen() {
             itinerary,
             today: context.today,
             ongoingTripCount: context.ongoingTripCount,
+            travelMode: currentTravelMode,
           }),
         });
       } catch (error) {
@@ -172,7 +181,11 @@ export default function HomeScreen() {
   );
 
   const applyTodayItineraryResponse = useCallback(
-    (context: TodayExecutionContext, response: Pick<GetDayItineraryResponse, 'day' | 'items'>) => {
+    (
+      context: TodayExecutionContext,
+      response: Pick<GetDayItineraryResponse, 'day' | 'items'>,
+      travelMode: TravelMode = defaultTravelMode,
+    ) => {
       const itinerary: GetDayItineraryResponse = { day: response.day, items: response.items };
       setTodayState({
         status: 'ready',
@@ -183,6 +196,7 @@ export default function HomeScreen() {
           itinerary,
           today: context.today,
           ongoingTripCount: context.ongoingTripCount,
+          travelMode,
         }),
       });
     },
@@ -201,13 +215,18 @@ export default function HomeScreen() {
         return;
       }
 
+      const currentTravelMode =
+        todayState.status === 'ready' && todayState.viewModel.status === 'success'
+          ? todayState.viewModel.nextPlace.navigationAction.travelMode
+          : defaultTravelMode;
+
       setArrivingItemId(action.itemId);
       setActionError(null);
       setNavigationFallback(resetTodayNavigationFallbackState());
       setNavigationRetrying(false);
       try {
         const response = await markDayItineraryItemArrived(action.tripId, action.date, action.itemId);
-        applyTodayItineraryResponse(context, response);
+        applyTodayItineraryResponse(context, response, currentTravelMode);
       } catch (error) {
         if (await handleAuthError(error)) {
           return;
@@ -240,13 +259,18 @@ export default function HomeScreen() {
         return;
       }
 
+      const currentTravelMode =
+        todayState.status === 'ready' && todayState.viewModel.status === 'success'
+          ? todayState.viewModel.nextPlace.navigationAction.travelMode
+          : defaultTravelMode;
+
       setSkippingItemId(action.itemId);
       setActionError(null);
       setNavigationFallback(resetTodayNavigationFallbackState());
       setNavigationRetrying(false);
       try {
         const response = await markDayItineraryItemSkipped(action.tripId, action.date, action.itemId);
-        applyTodayItineraryResponse(context, response);
+        applyTodayItineraryResponse(context, response, currentTravelMode);
       } catch (error) {
         if (await handleAuthError(error)) {
           return;
@@ -279,13 +303,18 @@ export default function HomeScreen() {
         return;
       }
 
+      const currentTravelMode =
+        todayState.status === 'ready' && todayState.viewModel.status === 'success'
+          ? todayState.viewModel.nextPlace.navigationAction.travelMode
+          : defaultTravelMode;
+
       setRestoringItemId(action.itemId);
       setActionError(null);
       setNavigationFallback(resetTodayNavigationFallbackState());
       setNavigationRetrying(false);
       try {
         const response = await restoreDayItineraryItem(action.tripId, action.date, action.itemId);
-        applyTodayItineraryResponse(context, response);
+        applyTodayItineraryResponse(context, response, currentTravelMode);
       } catch (error) {
         if (await handleAuthError(error)) {
           return;
@@ -307,7 +336,7 @@ export default function HomeScreen() {
   );
 
   const openNavigationDestination = useCallback(
-    async (destination: TodayNavigationDestination, options?: { retry?: boolean }) => {
+    async (destination: TodayNavigationDestination, travelMode: TravelMode, options?: { retry?: boolean }) => {
       const retry = options?.retry === true;
       setActionError(null);
 
@@ -322,8 +351,9 @@ export default function HomeScreen() {
           destination,
           launcher: Linking,
           platform: Platform.OS,
+          travelMode,
         });
-        setNavigationFallback(todayNavigationFallbackStateForResult(result, destination));
+        setNavigationFallback(todayNavigationFallbackStateForResult(result, destination, travelMode));
       } finally {
         if (retry) {
           setNavigationRetrying(false);
@@ -335,7 +365,7 @@ export default function HomeScreen() {
 
   const handleNavigate = useCallback(
     async (action: Extract<TodayAction, { kind: 'navigate' }>) => {
-      await openNavigationDestination(action.destination);
+      await openNavigationDestination(action.destination, action.travelMode);
     },
     [openNavigationDestination],
   );
@@ -350,12 +380,12 @@ export default function HomeScreen() {
   }, []);
 
   const handleNavigationFallbackRetry = useCallback(
-    async (destination: TodayNavigationDestination) => {
+    async (destination: TodayNavigationDestination, travelMode?: TravelMode) => {
       if (navigationRetrying) {
         return;
       }
 
-      await openNavigationDestination(destination, { retry: true });
+      await openNavigationDestination(destination, travelMode ?? defaultTravelMode, { retry: true });
     },
     [navigationRetrying, openNavigationDestination],
   );
@@ -364,6 +394,23 @@ export default function HomeScreen() {
     setNavigationFallback(resetTodayNavigationFallbackState());
     setNavigationRetrying(false);
     router.push(action.route);
+  }, []);
+
+  const handleTravelModeSelect = useCallback((travelMode: TravelMode) => {
+    setActionError(null);
+    setNavigationFallback(resetTodayNavigationFallbackState());
+    setNavigationRetrying(false);
+    setTodayState((current) => {
+      if (current.status !== 'ready') {
+        return current;
+      }
+
+      return {
+        ...current,
+        viewModel: applyTravelModeToTodayViewModel(current.viewModel, travelMode),
+      };
+    });
+    void saveSelectedTravelMode(travelMode);
   }, []);
 
   const runAction = useCallback(
@@ -429,6 +476,7 @@ export default function HomeScreen() {
             onNavigationFallbackCopy={handleNavigationFallbackCopy}
             onNavigationFallbackOpenItinerary={handleNavigationFallbackOpenItinerary}
             onNavigationFallbackRetry={handleNavigationFallbackRetry}
+            onTravelModeSelect={handleTravelModeSelect}
             viewModel={todayState.viewModel}
           />
         ) : null}
@@ -450,6 +498,7 @@ function TodayContent({
   onNavigationFallbackCopy,
   onNavigationFallbackOpenItinerary,
   onNavigationFallbackRetry,
+  onTravelModeSelect,
   viewModel,
 }: {
   actionError: string | null;
@@ -461,7 +510,8 @@ function TodayContent({
   onAction: (action: TodayAction) => void;
   onNavigationFallbackCopy: (destination: TodayNavigationDestination) => void;
   onNavigationFallbackOpenItinerary: (action: Extract<TodayAction, { kind: 'route' }>) => void;
-  onNavigationFallbackRetry: (destination: TodayNavigationDestination) => void;
+  onNavigationFallbackRetry: (destination: TodayNavigationDestination, travelMode?: TravelMode) => void;
+  onTravelModeSelect: (travelMode: TravelMode) => void;
   viewModel: TodayExecutionViewModel;
 }) {
   if (viewModel.status === 'noOngoingTrip') {
@@ -569,6 +619,7 @@ function TodayContent({
           <Text style={styles.placeType}>{viewModel.nextPlace.placeTypeLabel}</Text>
         </View>
         <Text style={styles.address}>{viewModel.nextPlace.address}</Text>
+        <TravelModeSelector selector={viewModel.nextPlace.travelModeSelector} onSelect={onTravelModeSelect} />
         <ActionButton action={viewModel.nextPlace.navigationAction} onAction={onAction} />
       </View>
       <ActionButton action={viewModel.quickExpenseAction} onAction={onAction} />
@@ -628,6 +679,36 @@ function TodayDayHeader({
   );
 }
 
+function TravelModeSelector({
+  onSelect,
+  selector,
+}: {
+  onSelect: (travelMode: TravelMode) => void;
+  selector: Extract<TodayExecutionViewModel, { status: 'success' }>['nextPlace']['travelModeSelector'];
+}) {
+  return (
+    <View accessibilityLabel={selector.accessibilityLabel} style={styles.travelModeSection}>
+      <Text style={styles.travelModeLabel}>{selector.label}</Text>
+      <View style={styles.travelModeOptions}>
+        {selector.options.map((option) => (
+          <Pressable
+            accessibilityLabel={option.accessibilityLabel}
+            accessibilityRole="button"
+            accessibilityState={option.accessibilityState}
+            key={option.mode}
+            onPress={() => onSelect(option.mode)}
+            style={[styles.travelModeOption, option.selected ? styles.travelModeOptionSelected : null]}
+          >
+            <Text style={option.selected ? styles.travelModeOptionTextSelected : styles.travelModeOptionText}>
+              {option.label}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 function SkippedPlacesSection({
   onAction,
   restoringItemId,
@@ -680,7 +761,7 @@ function TodayNavigationFallbackPanel({
   itineraryAction: Extract<TodayAction, { kind: 'route' }>;
   onCopy: (destination: TodayNavigationDestination) => void;
   onOpenItinerary: (action: Extract<TodayAction, { kind: 'route' }>) => void;
-  onRetry: (destination: TodayNavigationDestination) => void;
+  onRetry: (destination: TodayNavigationDestination, travelMode?: TravelMode) => void;
   retrying: boolean;
   state: TodayNavigationFallbackState;
 }) {
@@ -723,7 +804,7 @@ function TodayNavigationFallbackPanel({
           accessibilityRole="button"
           accessibilityState={{ disabled: panel.retryAction.disabled }}
           disabled={panel.retryAction.disabled}
-          onPress={() => onRetry(state.destination)}
+          onPress={() => onRetry(state.destination, state.travelMode)}
           style={[
             styles.secondaryButton,
             styles.navigationFallbackAction,
@@ -902,6 +983,50 @@ const styles = StyleSheet.create({
     color: theme.color.textMuted,
     fontFamily: theme.font.family.regular,
     fontSize: theme.font.size.body,
+  },
+  travelModeSection: {
+    gap: theme.space[2],
+  },
+  travelModeLabel: {
+    color: theme.color.textBody,
+    fontFamily: theme.font.family.semibold,
+    fontSize: theme.font.size.label,
+    fontWeight: theme.font.weight.semibold,
+  },
+  travelModeOptions: {
+    backgroundColor: theme.color.surface,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.pill,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: theme.space[1],
+    padding: theme.space[1],
+  },
+  travelModeOption: {
+    alignItems: 'center',
+    borderRadius: theme.radius.pill,
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: theme.layout.controlHSm,
+    paddingHorizontal: theme.space[3],
+    paddingVertical: theme.space[2],
+  },
+  travelModeOptionSelected: {
+    backgroundColor: theme.color.primary,
+  },
+  travelModeOptionText: {
+    color: theme.color.textBody,
+    fontFamily: theme.font.family.semibold,
+    fontSize: theme.font.size.label,
+    fontWeight: theme.font.weight.semibold,
+    textAlign: 'center',
+  },
+  travelModeOptionTextSelected: {
+    color: theme.color.onPrimary,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.label,
+    fontWeight: theme.font.weight.bold,
+    textAlign: 'center',
   },
   skippedSection: {
     gap: theme.space[4],

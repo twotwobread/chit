@@ -13,6 +13,12 @@ import { formatTripDayDate } from './days';
 import { tripDetailPath } from './mypage';
 import { buildQuickExpenseRoute } from './quick-expense';
 import { groupTripsByStatus } from './status';
+import {
+  buildTravelModeSelectorViewModel,
+  defaultTravelMode,
+  type TravelMode,
+  type TravelModeSelectorViewModel,
+} from './travel-mode';
 
 export type TodayRouteAction = {
   kind: 'route';
@@ -56,6 +62,7 @@ export type TodayNavigateAction = {
     placeName: string;
     address: string;
   };
+  travelMode: TravelMode;
 };
 
 export type TodayAction =
@@ -152,6 +159,7 @@ export type TodaySuccessViewModel = {
     placeTypeLabel: string;
     address: string;
     navigationAction: TodayNavigateAction;
+    travelModeSelector: TravelModeSelectorViewModel;
   };
   skippedSection: TodaySkippedPlacesSectionViewModel | null;
   arrivalAction: TodayArriveAction;
@@ -212,12 +220,14 @@ export function buildTodayExecutionViewModel({
   itinerary,
   today,
   ongoingTripCount,
+  travelMode = defaultTravelMode,
 }: {
   selectedTrip: TripListItem;
   tripDetail: GetTripDetailResponse;
   itinerary: GetDayItineraryResponse;
   today: string;
   ongoingTripCount: number;
+  travelMode?: TravelMode;
 }):
   | TodayUnavailableViewModel
   | TodayEmptyItineraryViewModel
@@ -281,13 +291,35 @@ export function buildTodayExecutionViewModel({
       placeName: nextItem.place.name,
       placeTypeLabel: getPlaceTypeLabel(nextItem.place.placeType),
       address: nextItem.place.address,
-      navigationAction: navigateAction(nextItem.place.name, nextItem.place.address),
+      navigationAction: navigateAction(nextItem.place.name, nextItem.place.address, travelMode),
+      travelModeSelector: buildTravelModeSelectorViewModel(travelMode),
     },
     skippedSection:
       skippedItems.length > 0 ? buildSkippedSection(skippedItems, selectedTrip.id, currentDay.date) : null,
     arrivalAction: arriveAction(selectedTrip.id, currentDay.date, nextItem.id),
     quickExpenseAction: routeAction('지출 등록', buildQuickExpenseRoute(selectedTrip.id, currentDay.date, nextItem.id)),
     skipAction: skipAction(selectedTrip.id, currentDay.date, nextItem.id),
+  };
+}
+
+export function applyTravelModeToTodayViewModel(
+  viewModel: TodayExecutionViewModel,
+  travelMode: TravelMode,
+): TodayExecutionViewModel {
+  if (viewModel.status !== 'success') {
+    return viewModel;
+  }
+
+  return {
+    ...viewModel,
+    nextPlace: {
+      ...viewModel.nextPlace,
+      navigationAction: {
+        ...viewModel.nextPlace.navigationAction,
+        travelMode,
+      },
+      travelModeSelector: buildTravelModeSelectorViewModel(travelMode),
+    },
   };
 }
 
@@ -377,6 +409,6 @@ function restoreAction(tripId: string, date: string, itemId: string): TodayResto
   return { kind: 'restore', label: '복구', tripId, date, itemId };
 }
 
-function navigateAction(placeName: string, address: string): TodayNavigateAction {
-  return { kind: 'navigate', label: '길찾기', destination: { placeName, address } };
+function navigateAction(placeName: string, address: string, travelMode: TravelMode): TodayNavigateAction {
+  return { kind: 'navigate', label: '길찾기', destination: { placeName, address }, travelMode };
 }

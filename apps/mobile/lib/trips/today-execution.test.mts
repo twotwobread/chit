@@ -10,12 +10,14 @@ import type {
 } from '@i-um/api-contract';
 
 import {
+  applyTravelModeToTodayViewModel,
   buildTodayExecutionViewModel,
   buildTodayNoOngoingTripViewModel,
   buildTodayRetryableErrorViewModel,
   buildTodayUnavailableViewModel,
   selectTodayTrip,
 } from './today-execution.ts';
+import { buildTravelModeSelectorViewModel } from './travel-mode';
 
 function trip(overrides: Partial<TripListItem>): TripListItem {
   return {
@@ -216,7 +218,9 @@ test('maps the first ordered itinerary item to the next place without exposing s
           placeName: '도톤보리',
           address: '1 Chome Dotonbori, Chuo Ward, Osaka',
         },
+        travelMode: 'transit',
       },
+      travelModeSelector: buildTravelModeSelectorViewModel('transit'),
     },
     skippedSection: null,
     arrivalAction: {
@@ -245,6 +249,33 @@ test('maps the first ordered itinerary item to the next place without exposing s
   assert.equal('remainingSection' in viewModel, false);
   assert.equal(JSON.stringify(viewModel).includes('호텔 니코 오사카'), false);
   assert.equal(JSON.stringify(viewModel).includes('오사카성'), false);
+});
+
+test('threads the selected travel mode into Today navigation and selector state', () => {
+  const viewModel = buildTodayExecutionViewModel({
+    selectedTrip: trip({ id: 'trip-current' }),
+    tripDetail: tripDetail(),
+    itinerary: itinerary({ items: [item({ id: 'item-next', itemOrder: 1 })] }),
+    today: '2026-07-10',
+    ongoingTripCount: 1,
+    travelMode: 'walking',
+  });
+
+  assert.equal(viewModel.status, 'success');
+  if (viewModel.status !== 'success') {
+    return;
+  }
+
+  assert.equal(viewModel.nextPlace.navigationAction.travelMode, 'walking');
+  assert.deepEqual(viewModel.nextPlace.travelModeSelector, buildTravelModeSelectorViewModel('walking'));
+
+  const updated = applyTravelModeToTodayViewModel(viewModel, 'driving');
+  assert.equal(updated.status, 'success');
+  if (updated.status !== 'success') {
+    return;
+  }
+  assert.equal(updated.nextPlace.navigationAction.travelMode, 'driving');
+  assert.deepEqual(updated.nextPlace.travelModeSelector, buildTravelModeSelectorViewModel('driving'));
 });
 
 test('selects the first pending itinerary item without exposing later pending places', () => {
@@ -290,7 +321,9 @@ test('selects the first pending itinerary item without exposing later pending pl
       placeName: '도톤보리',
       address: 'Dotonbori',
     },
+    travelMode: 'transit',
   });
+  assert.deepEqual(viewModel.nextPlace.travelModeSelector, buildTravelModeSelectorViewModel('transit'));
   assert.deepEqual(viewModel.arrivalAction, {
     kind: 'arrive',
     label: '도착했어요',
