@@ -2033,6 +2033,91 @@ func TestCreateQuickExpenseHandler(t *testing.T) {
 	}
 }
 
+func TestCreateQuickExpenseLinksRepeatedPlaceByItineraryItemOccurrence(t *testing.T) {
+	backend := newFakeAuthBackend()
+	ownerToken := loginTestUser(t, backend)
+	tripID := createTestTrip(t, backend, ownerToken)
+	provider := &fakePlaceProvider{details: placedomain.GooglePlaceDetails{
+		GooglePlaceID:    "google-lodging-repeat",
+		DisplayName:      "호텔 니코 오사카",
+		FormattedAddress: "Nishi-Shinsaibashi",
+		Latitude:         34.6721,
+		Longitude:        135.4983,
+		PrimaryType:      "lodging",
+		Types:            []string{"lodging", "point_of_interest"},
+	}}
+
+	createGoogleItem := func(body string) createdDayItineraryItem {
+		t.Helper()
+
+		recorder := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/days/2026-07-11/places/google/itinerary-items", bytes.NewReader([]byte(body)))
+		request.Header.Set("Content-Type", "application/json")
+		request.Header.Set("Authorization", "Bearer "+ownerToken)
+
+		NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true, PlaceProvider: provider}).ServeHTTP(recorder, request)
+		if recorder.Code != http.StatusCreated {
+			t.Fatalf("expected create Google itinerary item status %d, got %d with body %s", http.StatusCreated, recorder.Code, recorder.Body.String())
+		}
+
+		var response struct {
+			Item struct {
+				ID    string `json:"id"`
+				Place struct {
+					ID string `json:"id"`
+				} `json:"place"`
+			} `json:"item"`
+		}
+		if err := json.NewDecoder(recorder.Body).Decode(&response); err != nil {
+			t.Fatalf("decode create Google itinerary item response: %v", err)
+		}
+		return createdDayItineraryItem{ID: response.Item.ID, PlaceID: response.Item.Place.ID}
+	}
+
+	first := createGoogleItem(`{"googlePlaceId":"google-lodging-repeat","duplicateConfirmed":false}`)
+	second := createGoogleItem(`{"googlePlaceId":"google-lodging-repeat","duplicateConfirmed":true}`)
+	if first.ID == second.ID || first.PlaceID != second.PlaceID {
+		t.Fatalf("expected two itinerary item occurrences for one trip place, got first=%#v second=%#v", first, second)
+	}
+
+	payerID := backend.participants[tripID][0].ID
+	requestBody := []byte(fmt.Sprintf(`{"itineraryItemId":%q,"amountMinor":4500,"payerParticipantId":%q}`, second.ID, payerID))
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/days/2026-07-11/expenses/quick", bytes.NewReader(requestBody))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", "Bearer "+ownerToken)
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true, PlaceProvider: provider}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusCreated, recorder.Code, recorder.Body.String())
+	}
+
+	var body struct {
+		Expense struct {
+			ItineraryItemID string `json:"itineraryItemId"`
+			TripPlaceID     string `json:"tripPlaceId"`
+			Place           struct {
+				Name      string `json:"name"`
+				Address   string `json:"address"`
+				PlaceType string `json:"placeType"`
+			} `json:"place"`
+		} `json:"expense"`
+	}
+	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Expense.ItineraryItemID != second.ID || body.Expense.ItineraryItemID == first.ID {
+		t.Fatalf("expected expense to link to second occurrence %q, got %#v", second.ID, body.Expense)
+	}
+	if body.Expense.TripPlaceID != second.PlaceID {
+		t.Fatalf("expected derived shared trip place %q, got %#v", second.PlaceID, body.Expense)
+	}
+	if body.Expense.Place.Name != "호텔 니코 오사카" || body.Expense.Place.Address != "Nishi-Shinsaibashi" || body.Expense.Place.PlaceType != "lodging" {
+		t.Fatalf("unexpected place snapshot: %#v", body.Expense.Place)
+	}
+}
+
 func TestCreateQuickExpenseRequiresAuth(t *testing.T) {
 	backend := newFakeAuthBackend()
 	recorder := httptest.NewRecorder()
