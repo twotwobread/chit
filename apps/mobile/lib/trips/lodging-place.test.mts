@@ -26,23 +26,32 @@ describe('day lodging place helpers', () => {
   });
 
   it('disables duplicate lodging actions while setting or clearing without optimistic replacement', () => {
-    assert.deepEqual(buildDayLodgingRowViewModel({ id: 'item-1', isLodging: false }, { kind: 'set', itemId: 'item-1' }), {
-      isLodging: false,
-      badgeLabel: null,
-      action: { kind: 'set', label: '숙소로 지정 중...', disabled: true, isSubmitting: true },
-    });
+    assert.deepEqual(
+      buildDayLodgingRowViewModel({ id: 'item-1', isLodging: false }, { kind: 'set', itemId: 'item-1' }),
+      {
+        isLodging: false,
+        badgeLabel: null,
+        action: { kind: 'set', label: '숙소로 지정 중...', disabled: true, isSubmitting: true },
+      },
+    );
 
-    assert.deepEqual(buildDayLodgingRowViewModel({ id: 'item-2', isLodging: false }, { kind: 'set', itemId: 'item-1' }), {
-      isLodging: false,
-      badgeLabel: null,
-      action: { kind: 'set', label: '숙소로 지정', disabled: true, isSubmitting: false },
-    });
+    assert.deepEqual(
+      buildDayLodgingRowViewModel({ id: 'item-2', isLodging: false }, { kind: 'set', itemId: 'item-1' }),
+      {
+        isLodging: false,
+        badgeLabel: null,
+        action: { kind: 'set', label: '숙소로 지정', disabled: true, isSubmitting: false },
+      },
+    );
 
-    assert.deepEqual(buildDayLodgingRowViewModel({ id: 'item-3', isLodging: true }, { kind: 'clear', itemId: 'item-3' }), {
-      isLodging: true,
-      badgeLabel: '대표 숙소',
-      action: { kind: 'clear', label: '숙소 해제 중...', disabled: true, isSubmitting: true },
-    });
+    assert.deepEqual(
+      buildDayLodgingRowViewModel({ id: 'item-3', isLodging: true }, { kind: 'clear', itemId: 'item-3' }),
+      {
+        isLodging: true,
+        badgeLabel: '대표 숙소',
+        action: { kind: 'clear', label: '숙소 해제 중...', disabled: true, isSubmitting: true },
+      },
+    );
   });
 
   it('builds generated set request shape from a trip place id', () => {

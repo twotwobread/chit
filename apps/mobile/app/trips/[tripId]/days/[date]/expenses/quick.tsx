@@ -2,12 +2,22 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 
-import { ApiError, type GetDayItineraryResponse, type SupportedCurrency, type TripParticipantListItem } from '@i-um/api-contract';
+import {
+  ApiError,
+  type GetDayItineraryResponse,
+  type SupportedCurrency,
+  type TripParticipantListItem,
+} from '@i-um/api-contract';
 
 import { MobileAuthError } from '../../../../../../lib/auth/client';
 import { clearStoredSession } from '../../../../../../lib/auth/session';
 import { Card, PrimaryButton, SecondaryButton, theme } from '../../../../../../lib/design';
-import { createQuickExpense, getTripDayItinerary, getTripDetail, listTripParticipants } from '../../../../../../lib/trips/client';
+import {
+  createQuickExpense,
+  getTripDayItinerary,
+  getTripDetail,
+  listTripParticipants,
+} from '../../../../../../lib/trips/client';
 import {
   buildCreateQuickExpenseRequest,
   buildQuickExpenseViewModel,
@@ -19,7 +29,14 @@ import {
 
 type QuickExpenseState =
   | { status: 'loading' }
-  | { status: 'success'; tripName: string; currency: SupportedCurrency; itinerary: GetDayItineraryResponse; participants: TripParticipantListItem[]; shouldChooseItem: boolean }
+  | {
+      status: 'success';
+      tripName: string;
+      currency: SupportedCurrency;
+      itinerary: GetDayItineraryResponse;
+      participants: TripParticipantListItem[];
+      shouldChooseItem: boolean;
+    }
   | { status: 'auth' }
   | { status: 'invalid' }
   | { status: 'notFound'; message: string }
@@ -73,9 +90,12 @@ export default function QuickExpenseScreen() {
         getTripDayItinerary(tripId, date),
         listTripParticipants(tripId),
       ]);
-      const validRouteItem = routeItemId && itinerary.items.some((item) => item.id === routeItemId) ? routeItemId : null;
+      const validRouteItem =
+        routeItemId && itinerary.items.some((item) => item.id === routeItemId) ? routeItemId : null;
       setSelectedItemId(validRouteItem);
-      setPayerParticipantId(participantsResponse.participants.length === 1 ? participantsResponse.participants[0].participantId : null);
+      setPayerParticipantId(
+        participantsResponse.participants.length === 1 ? participantsResponse.participants[0].participantId : null,
+      );
       setAmountInput('');
       setState({
         status: 'success',
@@ -93,7 +113,10 @@ export default function QuickExpenseScreen() {
         setState({ status: 'notFound', message: quickExpenseFailureMessage(error.status) });
         return;
       }
-      setState({ status: 'error', message: quickExpenseFailureMessage(error instanceof ApiError ? error.status : undefined) });
+      setState({
+        status: 'error',
+        message: quickExpenseFailureMessage(error instanceof ApiError ? error.status : undefined),
+      });
     }
   }, [date, handleAuthError, routeItemId, tripId]);
 
@@ -220,7 +243,9 @@ export default function QuickExpenseScreen() {
 
       {state.status === 'notFound' || state.status === 'error' ? (
         <Card>
-          <Text style={styles.errorTitle}>{state.status === 'notFound' ? '지출을 저장할 수 없어요.' : '불러올 수 없어요.'}</Text>
+          <Text style={styles.errorTitle}>
+            {state.status === 'notFound' ? '지출을 저장할 수 없어요.' : '불러올 수 없어요.'}
+          </Text>
           <Text style={styles.message}>{state.message}</Text>
           <PrimaryButton label="다시 시도" onPress={() => void load()} />
           <SecondaryButton label="오늘로 돌아가기" onPress={backToToday} />
@@ -266,13 +291,18 @@ function QuickExpenseForm({
     payerParticipantId,
   });
   const canSubmit = validation.ok && !saving && !viewModel.emptyMessage;
-  const selectedPayerOptions = viewModel.payerOptions.map((option) => ({ ...option, selected: option.participantId === payerParticipantId }));
+  const selectedPayerOptions = viewModel.payerOptions.map((option) => ({
+    ...option,
+    selected: option.participantId === payerParticipantId,
+  }));
 
   return (
     <Card>
       <View style={styles.sectionHeader}>
         <Text style={styles.tripName}>{tripName}</Text>
-        <Text style={styles.dayText}>{viewModel.dayLabel} · {viewModel.formattedDate}</Text>
+        <Text style={styles.dayText}>
+          {viewModel.dayLabel} · {viewModel.formattedDate}
+        </Text>
       </View>
 
       {viewModel.emptyMessage ? (
@@ -346,7 +376,9 @@ function QuickExpenseForm({
               onPress={() => onSelectPayer(option.participantId)}
               style={[styles.payerChip, option.selected ? styles.optionCardSelected : null]}
             >
-              <Text style={option.selected ? styles.payerChipTextSelected : styles.payerChipText}>{option.displayName}</Text>
+              <Text style={option.selected ? styles.payerChipTextSelected : styles.payerChipText}>
+                {option.displayName}
+              </Text>
             </Pressable>
           ))}
         </View>
@@ -355,7 +387,13 @@ function QuickExpenseForm({
 
       {formMessage ? <Text style={styles.errorMessage}>{formMessage}</Text> : null}
 
-      <PrimaryButton disabled={!canSubmit} label="저장하기" loading={saving} loadingLabel="저장 중..." onPress={onSubmit} />
+      <PrimaryButton
+        disabled={!canSubmit}
+        label="저장하기"
+        loading={saving}
+        loadingLabel="저장 중..."
+        onPress={onSubmit}
+      />
       <SecondaryButton disabled={saving} label="오늘로 돌아가기" onPress={onBack} />
     </Card>
   );

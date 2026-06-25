@@ -4,9 +4,7 @@ import { theme } from '../design/theme';
 import { getAppleCredential } from './apple';
 import { getKakaoNativeCredential } from './kakao';
 
-export type OAuthProviderAvailability =
-  | { status: 'available' }
-  | { status: 'unavailable'; reason: string };
+export type OAuthProviderAvailability = { status: 'available' } | { status: 'unavailable'; reason: string };
 
 export type OAuthProviderButtonStyle = {
   backgroundColor: string;

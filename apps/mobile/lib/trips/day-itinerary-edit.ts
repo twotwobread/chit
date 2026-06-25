@@ -48,7 +48,10 @@ export function buildDayItineraryEditForm(item: DayItineraryRowViewModel): DayIt
   };
 }
 
-export function validateDayItineraryEditForm(original: DayItineraryEditFormValues, current: DayItineraryEditFormValues): DayItineraryEditValidationResult {
+export function validateDayItineraryEditForm(
+  original: DayItineraryEditFormValues,
+  current: DayItineraryEditFormValues,
+): DayItineraryEditValidationResult {
   const name = current.name.trim();
   const address = current.address.trim();
   const placeType = isTripPlaceType(current.placeType) ? current.placeType : undefined;
@@ -104,7 +107,9 @@ export function buildDayItineraryDeleteSubmitState(isDeleting: boolean): { disab
   return isDeleting ? { disabled: true, label: '삭제 중...' } : { disabled: false, label: '삭제' };
 }
 
-export function buildDayItineraryDeleteConfirmation(item: DayItineraryRowViewModel): DayItineraryDeleteConfirmationViewModel {
+export function buildDayItineraryDeleteConfirmation(
+  item: DayItineraryRowViewModel,
+): DayItineraryDeleteConfirmationViewModel {
   return {
     title: '이 장소를 삭제할까요?',
     helper: '이 Day 일정에서만 삭제돼요.',

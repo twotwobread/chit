@@ -25,22 +25,10 @@ function sectionIds(sections: ReturnType<typeof groupTripsByStatus>): Array<[str
 }
 
 test('computes status using inclusive start and end date boundaries', () => {
-  assert.equal(
-    tripStatus(trip({ startDate: '2026-06-22', endDate: '2026-06-24' }), '2026-06-22'),
-    'ongoing',
-  );
-  assert.equal(
-    tripStatus(trip({ startDate: '2026-06-20', endDate: '2026-06-22' }), '2026-06-22'),
-    'ongoing',
-  );
-  assert.equal(
-    tripStatus(trip({ startDate: '2026-06-23', endDate: '2026-06-25' }), '2026-06-22'),
-    'upcoming',
-  );
-  assert.equal(
-    tripStatus(trip({ startDate: '2026-06-18', endDate: '2026-06-21' }), '2026-06-22'),
-    'past',
-  );
+  assert.equal(tripStatus(trip({ startDate: '2026-06-22', endDate: '2026-06-24' }), '2026-06-22'), 'ongoing');
+  assert.equal(tripStatus(trip({ startDate: '2026-06-20', endDate: '2026-06-22' }), '2026-06-22'), 'ongoing');
+  assert.equal(tripStatus(trip({ startDate: '2026-06-23', endDate: '2026-06-25' }), '2026-06-22'), 'upcoming');
+  assert.equal(tripStatus(trip({ startDate: '2026-06-18', endDate: '2026-06-21' }), '2026-06-22'), 'past');
 });
 
 test('groups trips in ongoing, upcoming, past order and hides empty sections', () => {
@@ -96,23 +84,36 @@ test('sorts ongoing trips by endDate, startDate, joinedAt, createdAt, and id', (
     '2026-06-22',
   );
 
-  assert.deepEqual(sections[0]?.trips.map((item) => item.id), [
-    'earliest-end',
-    'earlier-start',
-    'later-start',
-    'same-dates-newer-created-b',
-    'same-dates-newer-created-a',
-    'same-dates-older-created',
-    'same-dates-old',
-  ]);
+  assert.deepEqual(
+    sections[0]?.trips.map((item) => item.id),
+    [
+      'earliest-end',
+      'earlier-start',
+      'later-start',
+      'same-dates-newer-created-b',
+      'same-dates-newer-created-a',
+      'same-dates-older-created',
+      'same-dates-old',
+    ],
+  );
 });
 
 test('sorts upcoming trips by startDate, endDate, joinedAt, createdAt, and id', () => {
   const sections = groupTripsByStatus(
     [
       trip({ id: 'same-dates-old', startDate: '2026-06-25', endDate: '2026-06-29', joinedAt: '2026-06-20T00:00:00Z' }),
-      trip({ id: 'same-dates-new-b', startDate: '2026-06-25', endDate: '2026-06-29', joinedAt: '2026-06-22T00:00:00Z' }),
-      trip({ id: 'same-dates-new-a', startDate: '2026-06-25', endDate: '2026-06-29', joinedAt: '2026-06-22T00:00:00Z' }),
+      trip({
+        id: 'same-dates-new-b',
+        startDate: '2026-06-25',
+        endDate: '2026-06-29',
+        joinedAt: '2026-06-22T00:00:00Z',
+      }),
+      trip({
+        id: 'same-dates-new-a',
+        startDate: '2026-06-25',
+        endDate: '2026-06-29',
+        joinedAt: '2026-06-22T00:00:00Z',
+      }),
       trip({ id: 'later-end', startDate: '2026-06-24', endDate: '2026-06-28' }),
       trip({ id: 'earlier-end', startDate: '2026-06-24', endDate: '2026-06-27' }),
       trip({ id: 'earliest-start', startDate: '2026-06-23', endDate: '2026-06-30' }),
@@ -120,22 +121,28 @@ test('sorts upcoming trips by startDate, endDate, joinedAt, createdAt, and id', 
     '2026-06-22',
   );
 
-  assert.deepEqual(sections[0]?.trips.map((item) => item.id), [
-    'earliest-start',
-    'earlier-end',
-    'later-end',
-    'same-dates-new-b',
-    'same-dates-new-a',
-    'same-dates-old',
-  ]);
+  assert.deepEqual(
+    sections[0]?.trips.map((item) => item.id),
+    ['earliest-start', 'earlier-end', 'later-end', 'same-dates-new-b', 'same-dates-new-a', 'same-dates-old'],
+  );
 });
 
 test('sorts past trips by endDate, startDate, joinedAt, createdAt, and id descending', () => {
   const sections = groupTripsByStatus(
     [
       trip({ id: 'same-dates-old', startDate: '2026-06-10', endDate: '2026-06-18', joinedAt: '2026-06-18T00:00:00Z' }),
-      trip({ id: 'same-dates-new-b', startDate: '2026-06-10', endDate: '2026-06-18', joinedAt: '2026-06-20T00:00:00Z' }),
-      trip({ id: 'same-dates-new-a', startDate: '2026-06-10', endDate: '2026-06-18', joinedAt: '2026-06-20T00:00:00Z' }),
+      trip({
+        id: 'same-dates-new-b',
+        startDate: '2026-06-10',
+        endDate: '2026-06-18',
+        joinedAt: '2026-06-20T00:00:00Z',
+      }),
+      trip({
+        id: 'same-dates-new-a',
+        startDate: '2026-06-10',
+        endDate: '2026-06-18',
+        joinedAt: '2026-06-20T00:00:00Z',
+      }),
       trip({ id: 'earlier-start', startDate: '2026-06-09', endDate: '2026-06-19' }),
       trip({ id: 'later-start', startDate: '2026-06-10', endDate: '2026-06-19' }),
       trip({ id: 'latest-end', startDate: '2026-06-10', endDate: '2026-06-21' }),
@@ -143,14 +150,10 @@ test('sorts past trips by endDate, startDate, joinedAt, createdAt, and id descen
     '2026-06-22',
   );
 
-  assert.deepEqual(sections[0]?.trips.map((item) => item.id), [
-    'latest-end',
-    'later-start',
-    'earlier-start',
-    'same-dates-new-b',
-    'same-dates-new-a',
-    'same-dates-old',
-  ]);
+  assert.deepEqual(
+    sections[0]?.trips.map((item) => item.id),
+    ['latest-end', 'later-start', 'earlier-start', 'same-dates-new-b', 'same-dates-new-a', 'same-dates-old'],
+  );
 });
 
 test('selects no current trip when no trip is ongoing', () => {
@@ -167,13 +170,11 @@ test('selects no current trip when no trip is ongoing', () => {
 
 test('selects the only ongoing trip including start and end date boundaries', () => {
   assert.equal(
-    selectCurrentTrip([trip({ id: 'starts-today', startDate: '2026-06-22', endDate: '2026-06-24' })], '2026-06-22')
-      ?.id,
+    selectCurrentTrip([trip({ id: 'starts-today', startDate: '2026-06-22', endDate: '2026-06-24' })], '2026-06-22')?.id,
     'starts-today',
   );
   assert.equal(
-    selectCurrentTrip([trip({ id: 'ends-today', startDate: '2026-06-20', endDate: '2026-06-22' })], '2026-06-22')
-      ?.id,
+    selectCurrentTrip([trip({ id: 'ends-today', startDate: '2026-06-20', endDate: '2026-06-22' })], '2026-06-22')?.id,
     'ends-today',
   );
 });

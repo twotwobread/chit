@@ -82,8 +82,14 @@ test('copy and share helpers use inviteUrl rather than the raw token', () => {
 test('failure copy separates invite API errors from Kakao share fallback guidance', () => {
   assert.equal(getInviteActionErrorMessage({ code: 'FORBIDDEN' }), '여행 Owner만 초대 링크를 만들 수 있어요.');
   assert.equal(getInviteActionErrorMessage({ code: 'NOT_FOUND' }), '여행을 찾을 수 없어요.');
-  assert.equal(getInviteActionErrorMessage(new Error('network')), '초대 링크를 만들 수 없어요. 잠시 후 다시 시도해주세요.');
-  assert.equal(getKakaoShareFailureMessage(), '카카오톡 공유를 열 수 없어요. 링크를 복사하거나 다른 앱으로 공유해보세요.');
+  assert.equal(
+    getInviteActionErrorMessage(new Error('network')),
+    '초대 링크를 만들 수 없어요. 잠시 후 다시 시도해주세요.',
+  );
+  assert.equal(
+    getKakaoShareFailureMessage(),
+    '카카오톡 공유를 열 수 없어요. 링크를 복사하거나 다른 앱으로 공유해보세요.',
+  );
 });
 
 test('invite accept token validation follows API token format', () => {
@@ -135,10 +141,22 @@ test('invite accept login and invalid helpers expose required CTA copy', () => {
 });
 
 test('invite accept API errors map to expired invalid auth and retryable states', () => {
-  assert.equal(getInviteAcceptErrorViewModel({ status: 410, body: { error: { code: 'INVITE_EXPIRED' } } }).kind, 'expired');
-  assert.equal(getInviteAcceptErrorViewModel({ status: 404, body: { error: { code: 'INVITE_NOT_FOUND' } } }).kind, 'invalid');
-  assert.equal(getInviteAcceptErrorViewModel({ status: 400, body: { error: { code: 'VALIDATION_ERROR' } } }).kind, 'invalid');
-  assert.equal(getInviteAcceptErrorViewModel({ status: 401, body: { error: { code: 'UNAUTHORIZED' } } }).kind, 'authRequired');
+  assert.equal(
+    getInviteAcceptErrorViewModel({ status: 410, body: { error: { code: 'INVITE_EXPIRED' } } }).kind,
+    'expired',
+  );
+  assert.equal(
+    getInviteAcceptErrorViewModel({ status: 404, body: { error: { code: 'INVITE_NOT_FOUND' } } }).kind,
+    'invalid',
+  );
+  assert.equal(
+    getInviteAcceptErrorViewModel({ status: 400, body: { error: { code: 'VALIDATION_ERROR' } } }).kind,
+    'invalid',
+  );
+  assert.equal(
+    getInviteAcceptErrorViewModel({ status: 401, body: { error: { code: 'UNAUTHORIZED' } } }).kind,
+    'authRequired',
+  );
   assert.equal(getInviteAcceptErrorViewModel({ code: 'INVALID_REFRESH_TOKEN' }).kind, 'authRequired');
   assert.equal(getInviteAcceptErrorViewModel(new Error('network')).kind, 'retryableError');
 });

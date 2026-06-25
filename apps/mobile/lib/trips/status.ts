@@ -10,7 +10,7 @@ export type TripStatusSection = {
   trips: TripListItem[];
 };
 
-const SECTION_ORDER: Array<{ status: TripStatus; title: string }> = [
+const SECTION_ORDER: { status: TripStatus; title: string }[] = [
   { status: 'ongoing', title: '진행 중인 여행' },
   { status: 'upcoming', title: '예정된 여행' },
   { status: 'past', title: '지난 여행' },

@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import type { DayItineraryItem, GetDayItineraryResponse, GetTripDetailResponse, TripDay, TripListItem } from '@i-um/api-contract';
+import type {
+  DayItineraryItem,
+  GetDayItineraryResponse,
+  GetTripDetailResponse,
+  TripDay,
+  TripListItem,
+} from '@i-um/api-contract';
 
 import {
   buildTodayExecutionViewModel,
@@ -250,9 +256,10 @@ test('maps the first ordered itinerary item to the next place and subsequent ite
     multipleOngoingTripNotice: null,
   });
 
-  const firstRemaining = viewModel.status === 'success' && viewModel.remainingSection.status === 'list'
-    ? viewModel.remainingSection.items[0]
-    : null;
+  const firstRemaining =
+    viewModel.status === 'success' && viewModel.remainingSection.status === 'list'
+      ? viewModel.remainingSection.items[0]
+      : null;
   assert.ok(firstRemaining);
   assert.equal('route' in firstRemaining, false);
   assert.equal('action' in firstRemaining, false);
@@ -265,8 +272,16 @@ test('selects the first pending itinerary item and excludes arrived items from r
     itinerary: itinerary({
       items: [
         item({ id: 'item-arrived-first', itemOrder: 1, arrivedAt: '2026-07-10T00:30:00Z' }),
-        item({ id: 'item-next', itemOrder: 2, place: { id: 'place-next', name: '도톤보리', placeType: 'food', address: 'Dotonbori' } }),
-        item({ id: 'item-third', itemOrder: 3, place: { id: 'place-third', name: '오사카성', placeType: 'sights', address: 'Osakajo' } }),
+        item({
+          id: 'item-next',
+          itemOrder: 2,
+          place: { id: 'place-next', name: '도톤보리', placeType: 'food', address: 'Dotonbori' },
+        }),
+        item({
+          id: 'item-third',
+          itemOrder: 3,
+          place: { id: 'place-third', name: '오사카성', placeType: 'sights', address: 'Osakajo' },
+        }),
         item({ id: 'item-arrived-last', itemOrder: 4, arrivedAt: '2026-07-10T02:30:00Z' }),
       ],
     }),

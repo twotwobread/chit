@@ -22,29 +22,16 @@ describe('day itinerary delete modal flow helpers', () => {
 
   it('focuses the next row after deleting a middle item', () => {
     assert.deepEqual(
-      resolveDayItineraryDeleteSuccessFocusTarget(
-        [
-          { id: 'item-1' },
-          { id: 'item-2' },
-          { id: 'item-3' },
-        ],
-        'item-2',
-      ),
+      resolveDayItineraryDeleteSuccessFocusTarget([{ id: 'item-1' }, { id: 'item-2' }, { id: 'item-3' }], 'item-2'),
       { kind: 'placeRow', itemId: 'item-3' },
     );
   });
 
   it('focuses the previous row after deleting the last item', () => {
-    assert.deepEqual(
-      resolveDayItineraryDeleteSuccessFocusTarget(
-        [
-          { id: 'item-1' },
-          { id: 'item-2' },
-        ],
-        'item-2',
-      ),
-      { kind: 'placeRow', itemId: 'item-1' },
-    );
+    assert.deepEqual(resolveDayItineraryDeleteSuccessFocusTarget([{ id: 'item-1' }, { id: 'item-2' }], 'item-2'), {
+      kind: 'placeRow',
+      itemId: 'item-1',
+    });
   });
 
   it('focuses the empty state after deleting the only item', () => {

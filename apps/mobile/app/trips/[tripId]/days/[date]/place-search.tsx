@@ -26,7 +26,10 @@ import {
 } from '../../../../../lib/places/google-search';
 
 export default function GooglePlaceSearchScreen() {
-  const { tripId: tripIdParam, date: dateParam } = useLocalSearchParams<{ tripId?: string | string[]; date?: string | string[] }>();
+  const { tripId: tripIdParam, date: dateParam } = useLocalSearchParams<{
+    tripId?: string | string[];
+    date?: string | string[];
+  }>();
   const tripId = Array.isArray(tripIdParam) ? tripIdParam[0] : tripIdParam;
   const date = Array.isArray(dateParam) ? dateParam[0] : dateParam;
   const [query, setQuery] = useState('');
@@ -65,7 +68,10 @@ export default function GooglePlaceSearchScreen() {
       const response = await searchGooglePlaces(tripId, date, normalizeGooglePlaceSearchQuery(query));
       setState(successGooglePlaceSearchState(response.results));
     } catch (error) {
-      if (error instanceof MobileAuthError && (error.code === 'UNAUTHORIZED' || error.code === 'INVALID_REFRESH_TOKEN')) {
+      if (
+        error instanceof MobileAuthError &&
+        (error.code === 'UNAUTHORIZED' || error.code === 'INVALID_REFRESH_TOKEN')
+      ) {
         router.replace('/login');
         return;
       }
@@ -99,7 +105,10 @@ export default function GooglePlaceSearchScreen() {
       await createGooglePlaceDayItineraryItem(tripId, date, result.id, duplicateConfirmed);
       router.replace(buildDayItineraryRoute(tripId, date));
     } catch (error) {
-      if (error instanceof MobileAuthError && (error.code === 'UNAUTHORIZED' || error.code === 'INVALID_REFRESH_TOKEN')) {
+      if (
+        error instanceof MobileAuthError &&
+        (error.code === 'UNAUTHORIZED' || error.code === 'INVALID_REFRESH_TOKEN')
+      ) {
         router.replace('/login');
         return;
       }
@@ -161,10 +170,17 @@ export default function GooglePlaceSearchScreen() {
             style={styles.input}
             value={query}
           />
-          {'message' in state && state.message ? <Text style={state.status === 'minQuery' ? styles.fieldError : styles.helperText}>{state.message}</Text> : null}
+          {'message' in state && state.message ? (
+            <Text style={state.status === 'minQuery' ? styles.fieldError : styles.helperText}>{state.message}</Text>
+          ) : null}
         </View>
 
-        <Pressable accessibilityRole="button" disabled={isBusy} onPress={() => void runSearch()} style={[styles.button, isBusy ? styles.buttonDisabled : null]}>
+        <Pressable
+          accessibilityRole="button"
+          disabled={isBusy}
+          onPress={() => void runSearch()}
+          style={[styles.button, isBusy ? styles.buttonDisabled : null]}
+        >
           {isLoading ? <ActivityIndicator color={theme.color.onPrimary} /> : null}
           <Text style={styles.buttonText}>{isLoading ? '장소를 검색하는 중...' : '검색'}</Text>
         </Pressable>
@@ -180,7 +196,12 @@ export default function GooglePlaceSearchScreen() {
         <View style={styles.card}>
           <Text style={styles.errorTitle}>{state.title}</Text>
           <Text style={styles.message}>{state.helper}</Text>
-          <Pressable accessibilityRole="button" disabled={isBusy} onPress={() => void runSearch()} style={[styles.secondaryButton, isBusy ? styles.secondaryButtonDisabled : null]}>
+          <Pressable
+            accessibilityRole="button"
+            disabled={isBusy}
+            onPress={() => void runSearch()}
+            style={[styles.secondaryButton, isBusy ? styles.secondaryButtonDisabled : null]}
+          >
             <Text style={styles.secondaryButtonText}>다시 시도</Text>
           </Pressable>
         </View>
@@ -198,11 +219,21 @@ export default function GooglePlaceSearchScreen() {
           <Text style={styles.errorTitle}>이미 추가된 장소예요.</Text>
           <Text style={styles.message}>{addState.message}</Text>
           <View style={styles.confirmationActions}>
-            <Pressable accessibilityRole="button" disabled={isBusy} onPress={() => void submitAdd(addState.result, true)} style={[styles.button, isBusy ? styles.buttonDisabled : null]}>
+            <Pressable
+              accessibilityRole="button"
+              disabled={isBusy}
+              onPress={() => void submitAdd(addState.result, true)}
+              style={[styles.button, isBusy ? styles.buttonDisabled : null]}
+            >
               {isAdding ? <ActivityIndicator color={theme.color.onPrimary} /> : null}
               <Text style={styles.buttonText}>{isAdding ? '추가 중...' : '한 번 더 추가'}</Text>
             </Pressable>
-            <Pressable accessibilityRole="button" disabled={isBusy} onPress={() => setAddState(idleGooglePlaceAddState())} style={[styles.secondaryButton, isBusy ? styles.secondaryButtonDisabled : null]}>
+            <Pressable
+              accessibilityRole="button"
+              disabled={isBusy}
+              onPress={() => setAddState(idleGooglePlaceAddState())}
+              style={[styles.secondaryButton, isBusy ? styles.secondaryButtonDisabled : null]}
+            >
               <Text style={styles.secondaryButtonText}>취소</Text>
             </Pressable>
           </View>

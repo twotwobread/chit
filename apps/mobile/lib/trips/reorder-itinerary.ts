@@ -2,9 +2,7 @@ import type { GetDayItineraryResponse, ReorderDayItineraryItemsRequest } from '@
 
 import { buildDayItineraryViewModel, type DayItineraryRowViewModel, type DayItineraryViewModel } from './day-itinerary';
 
-export type DayItineraryReorderActionViewModel =
-  | { status: 'hidden' }
-  | { status: 'enabled'; label: '순서 변경' };
+export type DayItineraryReorderActionViewModel = { status: 'hidden' } | { status: 'enabled'; label: '순서 변경' };
 
 export type DayItineraryReorderRowViewModel = DayItineraryRowViewModel & {
   dragHandleLabel: '드래그';
@@ -27,7 +25,8 @@ export type DayItineraryReorderFailureViewModel = {
   helper: '잠시 후 다시 시도해주세요.';
 };
 
-export const DAY_ITINERARY_REORDER_CONFLICT_MESSAGE = '다른 변경이 있어 저장되지 않았어요. 최신 일정으로 다시 불러왔어요.';
+export const DAY_ITINERARY_REORDER_CONFLICT_MESSAGE =
+  '다른 변경이 있어 저장되지 않았어요. 최신 일정으로 다시 불러왔어요.';
 
 export type DayItineraryReorderSuccessViewModel = {
   reorderFeedback: null;
@@ -67,7 +66,9 @@ export function buildDayItineraryReorderAction(viewModel: DayItineraryViewModel)
   return { status: 'enabled', label: '순서 변경' };
 }
 
-export function buildDayItineraryReorderDraft(viewModel: DayItineraryViewModel): DayItineraryReorderDraftViewModel | null {
+export function buildDayItineraryReorderDraft(
+  viewModel: DayItineraryViewModel,
+): DayItineraryReorderDraftViewModel | null {
   if (viewModel.status !== 'success' || viewModel.items.length < 2) {
     return null;
   }

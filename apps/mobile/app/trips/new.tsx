@@ -150,11 +150,7 @@ export default function NewTripScreen() {
         </TripFormField>
 
         <TripFormField label="종료일">
-          <TripDateFieldButton
-            disabled={submitting}
-            onPress={() => openDatePicker('endDate')}
-            value={form.endDate}
-          />
+          <TripDateFieldButton disabled={submitting} onPress={() => openDatePicker('endDate')} value={form.endDate} />
         </TripFormField>
 
         {activeDateField ? (

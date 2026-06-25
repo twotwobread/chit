@@ -8,7 +8,7 @@ import {
   buildAppInfoLegalRows,
   initialLegalLinkOpenState,
   openLegalLink,
-  type AppInfoLegalRow,
+  type AppInfoLegalRow as AppInfoLegalRowViewModel,
   type LegalLinkId,
   type LegalLinkOpenState,
 } from '../lib/app-info/legal';
@@ -26,10 +26,7 @@ type MyPageState =
   | { status: 'needsLogin'; message?: string }
   | { status: 'error' };
 
-type TripListState =
-  | { status: 'loading' }
-  | { status: 'ready'; trips: TripListItem[] }
-  | { status: 'error' };
+type TripListState = { status: 'loading' } | { status: 'ready'; trips: TripListItem[] } | { status: 'error' };
 
 export default function MyPageScreen() {
   const [state, setState] = useState<MyPageState>({ status: 'loading' });
@@ -52,10 +49,7 @@ export default function MyPageScreen() {
   }, []);
 
   const handleAuthError = useCallback(async (error: unknown) => {
-    if (
-      error instanceof MobileAuthError &&
-      (error.code === 'INVALID_REFRESH_TOKEN' || error.code === 'UNAUTHORIZED')
-    ) {
+    if (error instanceof MobileAuthError && (error.code === 'INVALID_REFRESH_TOKEN' || error.code === 'UNAUTHORIZED')) {
       await clearStoredSession();
       setState({ status: 'needsLogin', message: '다시 로그인해주세요.' });
       return true;
@@ -184,7 +178,11 @@ export default function MyPageScreen() {
 
             <View style={styles.card}>
               <Text style={styles.sectionTitle}>설정</Text>
-              <Pressable accessibilityRole="button" onPress={() => router.push('/account')} style={styles.secondaryButton}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => router.push('/account')}
+                style={styles.secondaryButton}
+              >
                 <Text style={styles.secondaryButtonText}>계정 관리</Text>
               </Pressable>
               <AppInfoLegalGroup state={legalLinkState} onOpen={openLegalLinkRow} />
@@ -222,7 +220,7 @@ function AppInfoLegalRow({
   state,
   onOpen,
 }: {
-  row: AppInfoLegalRow;
+  row: AppInfoLegalRowViewModel;
   state: LegalLinkOpenState;
   onOpen: (id: LegalLinkId) => void;
 }) {
@@ -255,7 +253,8 @@ function AppInfoLegalRow({
 }
 
 function MyTripsSection({ state, onRetry }: { state: TripListState; onRetry: () => void }) {
-  const viewModel = state.status === 'ready' && state.trips.length > 0 ? buildMyTripsSuccessViewModel(state.trips) : null;
+  const viewModel =
+    state.status === 'ready' && state.trips.length > 0 ? buildMyTripsSuccessViewModel(state.trips) : null;
   const currentTrip = viewModel?.currentTrip ?? null;
   const groupedTrips = viewModel?.sections ?? [];
 
@@ -337,7 +336,11 @@ function MyTripsSection({ state, onRetry }: { state: TripListState; onRetry: () 
               </View>
             ))}
           </View>
-          <Pressable accessibilityRole="button" onPress={() => router.push('/trips/new')} style={styles.secondaryButton}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push('/trips/new')}
+            style={styles.secondaryButton}
+          >
             <Text style={styles.secondaryButtonText}>새 여행 만들기</Text>
           </Pressable>
         </>

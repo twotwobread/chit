@@ -54,7 +54,10 @@ export default function EditTripScreen() {
       setForm(nextForm);
       setLoadState('ready');
     } catch (error) {
-      if (error instanceof MobileAuthError && (error.code === 'UNAUTHORIZED' || error.code === 'INVALID_REFRESH_TOKEN')) {
+      if (
+        error instanceof MobileAuthError &&
+        (error.code === 'UNAUTHORIZED' || error.code === 'INVALID_REFRESH_TOKEN')
+      ) {
         setLoadState('auth');
         return;
       }
@@ -120,7 +123,10 @@ export default function EditTripScreen() {
       await updateTrip(tripId, request);
       router.replace(`/trips/${tripId}`);
     } catch (error) {
-      if (error instanceof MobileAuthError && (error.code === 'UNAUTHORIZED' || error.code === 'INVALID_REFRESH_TOKEN')) {
+      if (
+        error instanceof MobileAuthError &&
+        (error.code === 'UNAUTHORIZED' || error.code === 'INVALID_REFRESH_TOKEN')
+      ) {
         setSaveError('다시 로그인해주세요.');
         return;
       }
@@ -202,7 +208,11 @@ export default function EditTripScreen() {
           </TripFormField>
 
           <TripFormField label="시작일">
-            <TripDateFieldButton disabled={submitting} onPress={() => openDatePicker('startDate')} value={form.startDate} />
+            <TripDateFieldButton
+              disabled={submitting}
+              onPress={() => openDatePicker('startDate')}
+              value={form.startDate}
+            />
           </TripFormField>
 
           <TripFormField label="종료일">
@@ -236,7 +246,11 @@ export default function EditTripScreen() {
                       setForm((current) => (current ? { ...current, defaultCurrency: currency } : current));
                       setSaveError(null);
                     }}
-                    style={[styles.currencyChip, selected ? styles.currencyChipSelected : null, submitting ? styles.disabledButton : null]}
+                    style={[
+                      styles.currencyChip,
+                      selected ? styles.currencyChipSelected : null,
+                      submitting ? styles.disabledButton : null,
+                    ]}
                   >
                     <Text style={[styles.currencyText, selected ? styles.currencyTextSelected : null]}>{currency}</Text>
                   </Pressable>
@@ -246,7 +260,9 @@ export default function EditTripScreen() {
           </View>
 
           {validationError ? <Text style={styles.errorText}>{validationError}</Text> : null}
-          {!validationError && original && !canSave ? <Text style={styles.helperText}>변경된 내용이 없어요.</Text> : null}
+          {!validationError && original && !canSave ? (
+            <Text style={styles.helperText}>변경된 내용이 없어요.</Text>
+          ) : null}
           {saveError ? <Text style={styles.errorText}>{saveError}</Text> : null}
 
           <PrimaryButton

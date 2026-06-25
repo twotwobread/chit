@@ -36,7 +36,13 @@ test('builds participant rows without exposing joinedAt in the row view model', 
 
   assert.deepEqual(viewModel.rows, [
     { participantId: 'participant-owner', displayName: '민수', role: 'owner', roleLabel: '주최자', canRemove: false },
-    { participantId: 'participant-member', displayName: '여행자', role: 'member', roleLabel: '동행자', canRemove: false },
+    {
+      participantId: 'participant-member',
+      displayName: '여행자',
+      role: 'member',
+      roleLabel: '동행자',
+      canRemove: false,
+    },
   ]);
   assert.equal(Object.prototype.hasOwnProperty.call(viewModel.rows[0], 'joinedAt'), false);
 });

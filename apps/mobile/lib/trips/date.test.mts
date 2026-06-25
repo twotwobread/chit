@@ -1,7 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { addMonths, dateFromString, formatLocalDate, isValidDate, monthString, monthStringFromDate, normalizeMonth, todayString } from './date.ts';
+import {
+  addMonths,
+  dateFromString,
+  formatLocalDate,
+  isValidDate,
+  monthString,
+  monthStringFromDate,
+  normalizeMonth,
+  todayString,
+} from './date.ts';
 
 test('formats local dates and today using YYYY-MM-DD', () => {
   const date = new Date(2026, 6, 9);

@@ -15,10 +15,42 @@ describe('reorder itinerary move batch generation', () => {
       dayLabel: 'Day 1',
       formattedDate: '2026.07.10',
       items: [
-        { id: 'item-1', version: 3, orderLabel: '1', placeName: '우메다 공중정원', placeType: 'sights', placeTypeLabel: '관광지', address: 'Umeda' },
-        { id: 'item-2', version: 5, orderLabel: '2', placeName: '도톤보리', placeType: 'food', placeTypeLabel: '식당', address: 'Dotonbori' },
-        { id: 'item-3', version: 8, orderLabel: '3', placeName: '오사카성', placeType: 'sights', placeTypeLabel: '관광지', address: 'Osaka' },
-        { id: 'item-4', version: 13, orderLabel: '4', placeName: '난바', placeType: 'shopping', placeTypeLabel: '쇼핑', address: 'Namba' },
+        {
+          id: 'item-1',
+          version: 3,
+          orderLabel: '1',
+          placeName: '우메다 공중정원',
+          placeType: 'sights',
+          placeTypeLabel: '관광지',
+          address: 'Umeda',
+        },
+        {
+          id: 'item-2',
+          version: 5,
+          orderLabel: '2',
+          placeName: '도톤보리',
+          placeType: 'food',
+          placeTypeLabel: '식당',
+          address: 'Dotonbori',
+        },
+        {
+          id: 'item-3',
+          version: 8,
+          orderLabel: '3',
+          placeName: '오사카성',
+          placeType: 'sights',
+          placeTypeLabel: '관광지',
+          address: 'Osaka',
+        },
+        {
+          id: 'item-4',
+          version: 13,
+          orderLabel: '4',
+          placeName: '난바',
+          placeType: 'shopping',
+          placeTypeLabel: '쇼핑',
+          address: 'Namba',
+        },
       ],
     };
 
@@ -28,7 +60,10 @@ describe('reorder itinerary move batch generation', () => {
     const movedOnce = moveDayItineraryReorderItem(draft, 3, 1);
     const finalDraft = moveDayItineraryReorderItem(movedOnce, 3, 0);
 
-    assert.deepEqual(finalDraft.items.map((item) => item.id), ['item-3', 'item-1', 'item-4', 'item-2']);
+    assert.deepEqual(
+      finalDraft.items.map((item) => item.id),
+      ['item-3', 'item-1', 'item-4', 'item-2'],
+    );
     assert.deepEqual(buildReorderDayItineraryItemsRequest(finalDraft), {
       moves: [
         {

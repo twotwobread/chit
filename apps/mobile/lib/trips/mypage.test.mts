@@ -93,12 +93,10 @@ test('adds role and participant count labels to cards in every status section', 
   );
 
   assert.deepEqual(
-    viewModel.sections.map((section) => section.trips.map((item) => [item.id, item.roleLabel, item.participantCountLabel])),
-    [
-      [['ongoing', '주최자', '참여자 2명']],
-      [['upcoming', '동행자', '참여자 3명']],
-      [['past', '동행자', '참여자 4명']],
-    ],
+    viewModel.sections.map((section) =>
+      section.trips.map((item) => [item.id, item.roleLabel, item.participantCountLabel]),
+    ),
+    [[['ongoing', '주최자', '참여자 2명']], [['upcoming', '동행자', '참여자 3명']], [['past', '동행자', '참여자 4명']]],
   );
   assert.equal(viewModel.currentTrip?.roleLabel, '주최자');
   assert.equal(viewModel.currentTrip?.participantCountLabel, '참여자 2명');

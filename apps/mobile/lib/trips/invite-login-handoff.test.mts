@@ -39,7 +39,11 @@ test('invite login return path accepts only exact invite token paths', () => {
     '/invite/%2e%2e%2flogin',
     `/invite/ ${validToken}`,
   ]) {
-    assert.equal(parseInviteLoginReturnPath(unsafePath), null, `expected unsafe path to be rejected: ${String(unsafePath)}`);
+    assert.equal(
+      parseInviteLoginReturnPath(unsafePath),
+      null,
+      `expected unsafe path to be rejected: ${String(unsafePath)}`,
+    );
   }
 });
 

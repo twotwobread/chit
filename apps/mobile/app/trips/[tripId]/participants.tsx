@@ -8,7 +8,12 @@ import { ApiError } from '@i-um/api-contract';
 
 import { getMeWithRefresh, MobileAuthError } from '../../../lib/auth/client';
 import { Card, PrimaryButton, SecondaryButton, theme } from '../../../lib/design';
-import { createTripInvite, getTripDetail, listTripParticipants, removeTripParticipant } from '../../../lib/trips/client';
+import {
+  createTripInvite,
+  getTripDetail,
+  listTripParticipants,
+  removeTripParticipant,
+} from '../../../lib/trips/client';
 import {
   buildFallbackShareContent,
   buildInviteCopyText,
@@ -80,7 +85,9 @@ export default function TripParticipantsScreen() {
       const canManageParticipants = canCreateTripInvite(tripDetail, currentUser.user.id);
       setState({
         status: 'success',
-        viewModel: buildParticipantListViewModel(participantsResponse.participants, { canRemoveMembers: canManageParticipants }),
+        viewModel: buildParticipantListViewModel(participantsResponse.participants, {
+          canRemoveMembers: canManageParticipants,
+        }),
         canInvite: canManageParticipants,
         tripName: tripDetail.trip.name,
       });
@@ -238,7 +245,11 @@ export default function TripParticipantsScreen() {
             removingParticipantId={removingParticipantId}
             viewModel={state.viewModel}
           />
-          <RemoveParticipantConfirmationModal onCancel={cancelRemove} onConfirm={() => void confirmRemove()} removeState={removeState} />
+          <RemoveParticipantConfirmationModal
+            onCancel={cancelRemove}
+            onConfirm={() => void confirmRemove()}
+            removeState={removeState}
+          />
         </>
       ) : null}
 
@@ -350,7 +361,11 @@ function InviteCard({
           />
           <SecondaryButton disabled={busy} label="링크 복사" onPress={() => onCopy(viewModel.inviteUrl)} />
           {shareMessage === getKakaoShareFailureMessage() ? (
-            <SecondaryButton disabled={busy} label="다른 앱으로 공유" onPress={() => onFallbackShare(viewModel.inviteUrl)} />
+            <SecondaryButton
+              disabled={busy}
+              label="다른 앱으로 공유"
+              onPress={() => onFallbackShare(viewModel.inviteUrl)}
+            />
           ) : null}
         </View>
       ) : (
@@ -389,7 +404,9 @@ function ParticipantListCard({
               <View style={styles.participantInfo}>
                 <Text style={styles.participantName}>{participant.displayName}</Text>
                 <View style={participant.role === 'owner' ? styles.ownerBadge : styles.memberBadge}>
-                  <Text style={participant.role === 'owner' ? styles.ownerBadgeText : styles.memberBadgeText}>{participant.roleLabel}</Text>
+                  <Text style={participant.role === 'owner' ? styles.ownerBadgeText : styles.memberBadgeText}>
+                    {participant.roleLabel}
+                  </Text>
                 </View>
               </View>
               {participant.canRemove ? (
@@ -420,15 +437,20 @@ function RemoveParticipantConfirmationModal({
   onConfirm: () => void;
   removeState: RemoveState;
 }) {
-  const participant = removeState.status === 'confirming' || removeState.status === 'removing' ? removeState.participant : null;
+  const participant =
+    removeState.status === 'confirming' || removeState.status === 'removing' ? removeState.participant : null;
   const isRemoving = removeState.status === 'removing';
 
   return (
     <Modal animationType="fade" onRequestClose={onCancel} transparent visible={participant !== null}>
       <View style={styles.modalBackdrop}>
         <View style={styles.modalCard}>
-          <Text style={styles.modalTitle}>{participant ? `${participant.displayName}님을 여행에서 제거할까요?` : '참여자를 제거할까요?'}</Text>
-          <Text style={styles.message}>제거되면 이 여행 목록과 일정에 더 이상 접근할 수 없어요. 다시 초대하면 재참여할 수 있어요.</Text>
+          <Text style={styles.modalTitle}>
+            {participant ? `${participant.displayName}님을 여행에서 제거할까요?` : '참여자를 제거할까요?'}
+          </Text>
+          <Text style={styles.message}>
+            제거되면 이 여행 목록과 일정에 더 이상 접근할 수 없어요. 다시 초대하면 재참여할 수 있어요.
+          </Text>
           <View style={styles.actionRow}>
             <SecondaryButton disabled={isRemoving} label="취소" onPress={onCancel} style={styles.modalActionButton} />
             <Pressable

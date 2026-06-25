@@ -1,4 +1,8 @@
-import { todayNavigationFailureMessage, type TodayNavigationDestination, type TodayNavigationResult } from './today-navigation';
+import {
+  todayNavigationFailureMessage,
+  type TodayNavigationDestination,
+  type TodayNavigationResult,
+} from './today-navigation';
 
 export type TodayNavigationFallbackFeedback = {
   kind: 'success' | 'error';

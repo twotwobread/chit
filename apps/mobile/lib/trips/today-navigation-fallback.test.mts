@@ -16,11 +16,17 @@ describe('today navigation fallback helpers', () => {
 
   it('builds fallback panel state only for terminal navigation failure', () => {
     assert.equal(
-      todayNavigationFallbackStateForResult({ status: 'openedDirections', url: 'comgooglemaps://?daddr=dotonbori' }, destination),
+      todayNavigationFallbackStateForResult(
+        { status: 'openedDirections', url: 'comgooglemaps://?daddr=dotonbori' },
+        destination,
+      ),
       null,
     );
     assert.equal(
-      todayNavigationFallbackStateForResult({ status: 'openedInstall', url: 'market://details?id=com.google.android.apps.maps' }, destination),
+      todayNavigationFallbackStateForResult(
+        { status: 'openedInstall', url: 'market://details?id=com.google.android.apps.maps' },
+        destination,
+      ),
       null,
     );
 
@@ -31,10 +37,7 @@ describe('today navigation fallback helpers', () => {
   });
 
   it('composes one-line destination copy payload from trimmed non-empty fields', () => {
-    assert.equal(
-      buildTodayNavigationFallbackCopyPayload(destination),
-      '도톤보리 1 Chome Dotonbori, Chuo Ward, Osaka',
-    );
+    assert.equal(buildTodayNavigationFallbackCopyPayload(destination), '도톤보리 1 Chome Dotonbori, Chuo Ward, Osaka');
     assert.equal(buildTodayNavigationFallbackCopyPayload({ placeName: ' 도톤보리 ', address: '   ' }), '도톤보리');
     assert.equal(buildTodayNavigationFallbackCopyPayload({ placeName: '   ', address: ' Dotonbori ' }), 'Dotonbori');
     assert.equal(buildTodayNavigationFallbackCopyPayload({ placeName: '   ', address: '   ' }), null);

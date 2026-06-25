@@ -76,7 +76,12 @@ export function legalLinkUrl(id: LegalLinkId): string {
   return row.url;
 }
 
-export async function openLegalLink({ id, getState, setState, opener }: LegalLinkOpenOptions): Promise<LegalLinkOpenState> {
+export async function openLegalLink({
+  id,
+  getState,
+  setState,
+  opener,
+}: LegalLinkOpenOptions): Promise<LegalLinkOpenState> {
   const currentState = getState();
   if (currentState.openingId === id) {
     return currentState;
