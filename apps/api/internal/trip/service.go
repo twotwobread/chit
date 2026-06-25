@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"sort"
 	"strings"
 	"time"
 )
@@ -465,6 +466,58 @@ func (s *Service) GetDayItinerary(ctx context.Context, userID string, tripID str
 		},
 		Items: items,
 	}, nil
+}
+
+func (s *Service) CreateQuickExpense(ctx context.Context, userID string, tripID string, date string, input CreateQuickExpenseInput) (CreateQuickExpenseResult, error) {
+	if strings.TrimSpace(userID) == "" {
+		return CreateQuickExpenseResult{}, ErrUnauthorized
+	}
+
+	tripID = strings.TrimSpace(tripID)
+	date = strings.TrimSpace(date)
+	itineraryItemID := strings.TrimSpace(input.ItineraryItemID)
+	payerParticipantID := strings.TrimSpace(input.PayerParticipantID)
+	if !isUUID(tripID) || !isUUID(itineraryItemID) || !isUUID(payerParticipantID) || input.AmountMinor < 1 {
+		return CreateQuickExpenseResult{}, ErrValidation
+	}
+
+	selectedDate, err := parseDate(date)
+	if err != nil {
+		return CreateQuickExpenseResult{}, ErrValidation
+	}
+
+	foundTrip, ok, err := s.repo.GetTripByID(ctx, tripID)
+	if err != nil {
+		return CreateQuickExpenseResult{}, err
+	}
+	if !ok {
+		return CreateQuickExpenseResult{}, ErrNotFound
+	}
+
+	isParticipant, err := s.repo.IsTripParticipant(ctx, tripID, userID)
+	if err != nil {
+		return CreateQuickExpenseResult{}, err
+	}
+	if !isParticipant {
+		return CreateQuickExpenseResult{}, ErrForbidden
+	}
+
+	dayOrder, err := dayOrderInRange(foundTrip.StartDate, foundTrip.EndDate, selectedDate)
+	if err != nil {
+		return CreateQuickExpenseResult{}, ErrValidation
+	}
+	if dayOrder == 0 {
+		return CreateQuickExpenseResult{}, ErrNotFound
+	}
+
+	return s.repo.CreateQuickExpense(ctx, CreateQuickExpenseRecord{
+		TripID:             tripID,
+		ScheduledDate:      selectedDate.Format(dateLayout),
+		ItineraryItemID:    itineraryItemID,
+		AmountMinor:        input.AmountMinor,
+		PayerParticipantID: payerParticipantID,
+		CreatedBy:          userID,
+	})
 }
 
 func (s *Service) SetDayLodgingPlace(ctx context.Context, userID string, tripID string, date string, input SetDayLodgingPlaceInput) (SetDayLodgingPlaceResult, error) {
@@ -1143,6 +1196,41 @@ func NormalizeParticipantDisplayName(value string) string {
 		return "여행자"
 	}
 	return name
+}
+
+func AllocateEqualExpenseSplits(amountMinor int64, participants []ExpenseSplitParticipant) ([]CreateExpenseSplitRecord, error) {
+	if amountMinor < 1 {
+		return nil, ErrValidation
+	}
+	if len(participants) == 0 {
+		return nil, ErrConflict
+	}
+
+	ordered := append([]ExpenseSplitParticipant(nil), participants...)
+	sort.SliceStable(ordered, func(i, j int) bool {
+		if !ordered[i].JoinedAt.Equal(ordered[j].JoinedAt) {
+			return ordered[i].JoinedAt.Before(ordered[j].JoinedAt)
+		}
+		return ordered[i].ParticipantID < ordered[j].ParticipantID
+	})
+
+	participantCount := int64(len(ordered))
+	base := amountMinor / participantCount
+	remainder := amountMinor % participantCount
+	splits := make([]CreateExpenseSplitRecord, 0, len(ordered))
+	for index, participant := range ordered {
+		amount := base
+		if int64(index) < remainder {
+			amount++
+		}
+		splits = append(splits, CreateExpenseSplitRecord{
+			ParticipantID:          participant.ParticipantID,
+			ParticipantDisplayName: participantDisplayName(participant.DisplayName),
+			AmountMinor:            amount,
+			SplitOrder:             index + 1,
+		})
+	}
+	return splits, nil
 }
 
 func participantDisplayName(value string) string {

@@ -44,6 +44,10 @@ type fakeRepository struct {
 	dayItineraryItems        []DayItineraryItem
 	listedItineraryTripID    string
 	listedItineraryDate      string
+	quickExpenseRecord       CreateQuickExpenseRecord
+	quickExpenseCalled       bool
+	quickExpenseResult       CreateQuickExpenseResult
+	quickExpenseErr          error
 	createdManualRecords     []CreateManualDayItineraryItemRecord
 	createdManualItem        DayItineraryItem
 	createManualErr          error
@@ -252,6 +256,34 @@ func (r *fakeRepository) ListItineraryItemsByTripAndDate(_ context.Context, trip
 	r.listedItineraryTripID = tripID
 	r.listedItineraryDate = date
 	return r.dayItineraryItems, nil
+}
+
+func (r *fakeRepository) CreateQuickExpense(_ context.Context, record CreateQuickExpenseRecord) (CreateQuickExpenseResult, error) {
+	r.quickExpenseRecord = record
+	r.quickExpenseCalled = true
+	if r.quickExpenseErr != nil {
+		return CreateQuickExpenseResult{}, r.quickExpenseErr
+	}
+	if r.quickExpenseResult.Expense.ID != "" {
+		return r.quickExpenseResult, nil
+	}
+	itemID := record.ItineraryItemID
+	placeID := testUUID(8001)
+	payerID := record.PayerParticipantID
+	return CreateQuickExpenseResult{Expense: Expense{
+		ID:                 testUUID(9001),
+		TripID:             record.TripID,
+		ScheduledDate:      record.ScheduledDate,
+		ItineraryItemID:    &itemID,
+		TripPlaceID:        &placeID,
+		Place:              ExpensePlaceSnapshot{Name: "도톤보리", Address: "Dotonbori", PlaceType: "food"},
+		AmountMinor:        record.AmountMinor,
+		Currency:           r.trip.DefaultCurrency,
+		PayerParticipantID: &payerID,
+		PayerDisplayName:   "민수",
+		Splits:             []ExpenseSplit{{ParticipantID: &payerID, DisplayName: "민수", AmountMinor: record.AmountMinor}},
+		CreatedAt:          time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC),
+	}}, nil
 }
 
 func (r *fakeRepository) CreateManualDayItineraryItem(_ context.Context, record CreateManualDayItineraryItemRecord) (DayItineraryItem, error) {
@@ -1141,6 +1173,117 @@ func TestServiceGetDayItineraryOutOfRange(t *testing.T) {
 	}
 	if repo.listedItineraryTripID != "" {
 		t.Fatal("expected out-of-range date not to query itinerary items")
+	}
+}
+
+func TestServiceCreateQuickExpense(t *testing.T) {
+	payerID := testUUID(2001)
+	itemID := testUUID(7001)
+	repo := &fakeRepository{
+		trip:          Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13", DefaultCurrency: "JPY"},
+		tripFound:     true,
+		isParticipant: true,
+	}
+	service := newTestService(repo)
+
+	result, err := service.CreateQuickExpense(context.Background(), "user-1", testTripID, "2026-07-11", CreateQuickExpenseInput{
+		ItineraryItemID:    itemID,
+		AmountMinor:        1001,
+		PayerParticipantID: payerID,
+	})
+	if err != nil {
+		t.Fatalf("CreateQuickExpense returned error: %v", err)
+	}
+
+	if !repo.quickExpenseCalled {
+		t.Fatal("expected repository quick expense creation to be called")
+	}
+	if repo.quickExpenseRecord.TripID != testTripID || repo.quickExpenseRecord.ScheduledDate != "2026-07-11" || repo.quickExpenseRecord.ItineraryItemID != itemID || repo.quickExpenseRecord.PayerParticipantID != payerID || repo.quickExpenseRecord.AmountMinor != 1001 || repo.quickExpenseRecord.CreatedBy != "user-1" {
+		t.Fatalf("unexpected quick expense record: %#v", repo.quickExpenseRecord)
+	}
+	if result.Expense.ID == "" || result.Expense.AmountMinor != 1001 || result.Expense.Currency != "JPY" || result.Expense.ItineraryItemID == nil || *result.Expense.ItineraryItemID != itemID {
+		t.Fatalf("unexpected quick expense result: %#v", result.Expense)
+	}
+}
+
+func TestServiceCreateQuickExpenseValidationAuthAndRange(t *testing.T) {
+	payerID := testUUID(2001)
+	itemID := testUUID(7001)
+	validTrip := Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13", DefaultCurrency: "JPY"}
+	tests := []struct {
+		name   string
+		repo   *fakeRepository
+		userID string
+		tripID string
+		date   string
+		input  CreateQuickExpenseInput
+		want   error
+	}{
+		{name: "requires auth", repo: &fakeRepository{}, userID: " ", tripID: testTripID, date: "2026-07-10", input: CreateQuickExpenseInput{ItineraryItemID: itemID, AmountMinor: 1, PayerParticipantID: payerID}, want: ErrUnauthorized},
+		{name: "invalid trip id", repo: &fakeRepository{}, userID: "user-1", tripID: "not-a-uuid", date: "2026-07-10", input: CreateQuickExpenseInput{ItineraryItemID: itemID, AmountMinor: 1, PayerParticipantID: payerID}, want: ErrValidation},
+		{name: "invalid date", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, date: "2026/07/10", input: CreateQuickExpenseInput{ItineraryItemID: itemID, AmountMinor: 1, PayerParticipantID: payerID}, want: ErrValidation},
+		{name: "invalid item id", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, date: "2026-07-10", input: CreateQuickExpenseInput{ItineraryItemID: "bad", AmountMinor: 1, PayerParticipantID: payerID}, want: ErrValidation},
+		{name: "invalid payer id", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, date: "2026-07-10", input: CreateQuickExpenseInput{ItineraryItemID: itemID, AmountMinor: 1, PayerParticipantID: "bad"}, want: ErrValidation},
+		{name: "invalid amount", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, date: "2026-07-10", input: CreateQuickExpenseInput{ItineraryItemID: itemID, AmountMinor: 0, PayerParticipantID: payerID}, want: ErrValidation},
+		{name: "missing trip", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, date: "2026-07-10", input: CreateQuickExpenseInput{ItineraryItemID: itemID, AmountMinor: 1, PayerParticipantID: payerID}, want: ErrNotFound},
+		{name: "forbidden", repo: &fakeRepository{trip: validTrip, tripFound: true}, userID: "user-1", tripID: testTripID, date: "2026-07-10", input: CreateQuickExpenseInput{ItineraryItemID: itemID, AmountMinor: 1, PayerParticipantID: payerID}, want: ErrForbidden},
+		{name: "out of range", repo: &fakeRepository{trip: validTrip, tripFound: true, isParticipant: true}, userID: "user-1", tripID: testTripID, date: "2026-07-14", input: CreateQuickExpenseInput{ItineraryItemID: itemID, AmountMinor: 1, PayerParticipantID: payerID}, want: ErrNotFound},
+		{name: "repository not found", repo: &fakeRepository{trip: validTrip, tripFound: true, isParticipant: true, quickExpenseErr: ErrNotFound}, userID: "user-1", tripID: testTripID, date: "2026-07-10", input: CreateQuickExpenseInput{ItineraryItemID: itemID, AmountMinor: 1, PayerParticipantID: payerID}, want: ErrNotFound},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := newTestService(tt.repo).CreateQuickExpense(context.Background(), tt.userID, tt.tripID, tt.date, tt.input)
+			if !errors.Is(err, tt.want) {
+				t.Fatalf("expected %v, got %v", tt.want, err)
+			}
+			if (errors.Is(tt.want, ErrValidation) || errors.Is(tt.want, ErrUnauthorized) || tt.name == "missing trip" || tt.name == "forbidden" || tt.name == "out of range") && tt.repo.quickExpenseCalled {
+				t.Fatal("expected quick expense repository call not to happen")
+			}
+		})
+	}
+}
+
+func TestAllocateEqualExpenseSplits(t *testing.T) {
+	participants := []ExpenseSplitParticipant{
+		{ParticipantID: testUUID(2003), DisplayName: "현우", JoinedAt: time.Date(2026, 7, 10, 11, 0, 0, 0, time.UTC)},
+		{ParticipantID: testUUID(2001), DisplayName: " 민수 ", JoinedAt: time.Date(2026, 7, 10, 9, 0, 0, 0, time.UTC)},
+		{ParticipantID: testUUID(2002), DisplayName: "", JoinedAt: time.Date(2026, 7, 10, 9, 0, 0, 0, time.UTC)},
+	}
+
+	splits, err := AllocateEqualExpenseSplits(1000, participants)
+	if err != nil {
+		t.Fatalf("AllocateEqualExpenseSplits returned error: %v", err)
+	}
+
+	if len(splits) != 3 {
+		t.Fatalf("expected 3 splits, got %#v", splits)
+	}
+	expectedAmounts := []int64{334, 333, 333}
+	expectedIDs := []string{testUUID(2001), testUUID(2002), testUUID(2003)}
+	expectedNames := []string{"민수", "여행자", "현우"}
+	var total int64
+	for index, split := range splits {
+		if split.ParticipantID != expectedIDs[index] || split.AmountMinor != expectedAmounts[index] || split.SplitOrder != index+1 || split.ParticipantDisplayName != expectedNames[index] {
+			t.Fatalf("unexpected split at %d: %#v", index, split)
+		}
+		total += split.AmountMinor
+	}
+	if total != 1000 {
+		t.Fatalf("expected split total 1000, got %d", total)
+	}
+}
+
+func TestAllocateEqualExpenseSplitsAllowsZeroMinorUnitShares(t *testing.T) {
+	splits, err := AllocateEqualExpenseSplits(1, []ExpenseSplitParticipant{
+		{ParticipantID: testUUID(2001), DisplayName: "민수", JoinedAt: time.Date(2026, 7, 10, 9, 0, 0, 0, time.UTC)},
+		{ParticipantID: testUUID(2002), DisplayName: "지영", JoinedAt: time.Date(2026, 7, 10, 10, 0, 0, 0, time.UTC)},
+	})
+	if err != nil {
+		t.Fatalf("AllocateEqualExpenseSplits returned error: %v", err)
+	}
+	if splits[0].AmountMinor != 1 || splits[1].AmountMinor != 0 {
+		t.Fatalf("expected one minor unit assigned by order, got %#v", splits)
 	}
 }
 

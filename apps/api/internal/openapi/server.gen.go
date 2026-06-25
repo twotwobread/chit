@@ -189,6 +189,23 @@ type CreateManualDayItineraryItemResponse struct {
 	Item DayItineraryItem `json:"item"`
 }
 
+// CreateQuickExpenseRequest defines model for CreateQuickExpenseRequest.
+type CreateQuickExpenseRequest struct {
+	// AmountMinor Positive amount in currency minor units.
+	AmountMinor int64 `json:"amountMinor"`
+
+	// ItineraryItemId Required itinerary item for the selected Day. Must belong to tripId/date.
+	ItineraryItemId string `json:"itineraryItemId"`
+
+	// PayerParticipantId Active trip participant who paid the expense.
+	PayerParticipantId string `json:"payerParticipantId"`
+}
+
+// CreateQuickExpenseResponse defines model for CreateQuickExpenseResponse.
+type CreateQuickExpenseResponse struct {
+	Expense Expense `json:"expense"`
+}
+
 // CreateTripInviteResponse defines model for CreateTripInviteResponse.
 type CreateTripInviteResponse struct {
 	// Created true when this request created a new invite, false when an existing unexpired current invite was reused.
@@ -238,6 +255,40 @@ type ErrorResponse struct {
 		Details []map[string]interface{} `json:"details"`
 		Message string                   `json:"message"`
 	} `json:"error"`
+}
+
+// Expense defines model for Expense.
+type Expense struct {
+	AmountMinor int64             `json:"amountMinor"`
+	CreatedAt   time.Time         `json:"createdAt"`
+	Currency    SupportedCurrency `json:"currency"`
+	Id          string            `json:"id"`
+
+	// ItineraryItemId Source itinerary item. Present at creation; may become null later if the source item is deleted and history is retained.
+	ItineraryItemId    *string              `json:"itineraryItemId"`
+	PayerDisplayName   string               `json:"payerDisplayName"`
+	PayerParticipantId *string              `json:"payerParticipantId"`
+	Place              ExpensePlaceSnapshot `json:"place"`
+	ScheduledDate      openapi_types.Date   `json:"scheduledDate"`
+	Splits             []ExpenseSplit       `json:"splits"`
+	TripId             string               `json:"tripId"`
+
+	// TripPlaceId Source trip place. Present at creation; may become null later if the source place is deleted and history is retained.
+	TripPlaceId *string `json:"tripPlaceId"`
+}
+
+// ExpensePlaceSnapshot defines model for ExpensePlaceSnapshot.
+type ExpensePlaceSnapshot struct {
+	Address   string        `json:"address"`
+	Name      string        `json:"name"`
+	PlaceType TripPlaceType `json:"placeType"`
+}
+
+// ExpenseSplit defines model for ExpenseSplit.
+type ExpenseSplit struct {
+	AmountMinor   int64   `json:"amountMinor"`
+	DisplayName   string  `json:"displayName"`
+	ParticipantId *string `json:"participantId"`
 }
 
 // GetDayItineraryResponse defines model for GetDayItineraryResponse.
@@ -557,6 +608,9 @@ type CreateTripJSONRequestBody = CreateTripRequest
 // UpdateTripJSONRequestBody defines body for UpdateTrip for application/json ContentType.
 type UpdateTripJSONRequestBody = UpdateTripRequest
 
+// CreateQuickExpenseJSONRequestBody defines body for CreateQuickExpense for application/json ContentType.
+type CreateQuickExpenseJSONRequestBody = CreateQuickExpenseRequest
+
 // CreateManualDayItineraryItemJSONRequestBody defines body for CreateManualDayItineraryItem for application/json ContentType.
 type CreateManualDayItineraryItemJSONRequestBody = CreateManualDayItineraryItemRequest
 
@@ -622,6 +676,9 @@ type ServerInterface interface {
 	// Update trip basic information
 	// (PATCH /trips/{tripId})
 	UpdateTrip(w http.ResponseWriter, r *http.Request, tripId string)
+	// Create a quick expense for a trip day place
+	// (POST /trips/{tripId}/days/{date}/expenses/quick)
+	CreateQuickExpense(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date)
 	// Get a trip day itinerary
 	// (GET /trips/{tripId}/days/{date}/itinerary)
 	GetDayItinerary(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date)
@@ -760,6 +817,12 @@ func (_ Unimplemented) GetTripDetail(w http.ResponseWriter, r *http.Request, tri
 // Update trip basic information
 // (PATCH /trips/{tripId})
 func (_ Unimplemented) UpdateTrip(w http.ResponseWriter, r *http.Request, tripId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Create a quick expense for a trip day place
+// (POST /trips/{tripId}/days/{date}/expenses/quick)
+func (_ Unimplemented) CreateQuickExpense(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1181,6 +1244,46 @@ func (siw *ServerInterfaceWrapper) UpdateTrip(w http.ResponseWriter, r *http.Req
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateTrip(w, r, tripId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateQuickExpense operation middleware
+func (siw *ServerInterfaceWrapper) CreateQuickExpense(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "date" -------------
+	var date openapi_types.Date
+
+	err = runtime.BindStyledParameterWithOptions("simple", "date", chi.URLParam(r, "date"), &date, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "date", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateQuickExpense(w, r, tripId, date)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1905,6 +2008,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Patch(options.BaseURL+"/trips/{tripId}", wrapper.UpdateTrip)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/trips/{tripId}/days/{date}/expenses/quick", wrapper.CreateQuickExpense)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/trips/{tripId}/days/{date}/itinerary", wrapper.GetDayItinerary)

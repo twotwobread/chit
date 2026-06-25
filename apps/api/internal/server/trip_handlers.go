@@ -227,6 +227,35 @@ func (s apiServer) GetDayItinerary(w http.ResponseWriter, r *http.Request, tripI
 	writeJSON(w, http.StatusOK, getDayItineraryResponseToOpenAPI(result))
 }
 
+func (s apiServer) CreateQuickExpense(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date) {
+	if s.auth == nil || s.trips == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "quick expense creation is not configured", nil)
+		return
+	}
+
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	var body openapi.CreateQuickExpenseJSONRequestBody
+	if !decodeJSON(w, r, &body) {
+		return
+	}
+
+	result, err := s.trips.CreateQuickExpense(r.Context(), authContext.UserID, tripId, dateFromOpenAPI(date), trip.CreateQuickExpenseInput{
+		ItineraryItemID:    body.ItineraryItemId,
+		AmountMinor:        body.AmountMinor,
+		PayerParticipantID: body.PayerParticipantId,
+	})
+	if err != nil {
+		writeQuickExpenseError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, createQuickExpenseResponseToOpenAPI(result))
+}
+
 func (s apiServer) CreateManualDayItineraryItem(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date) {
 	if s.auth == nil || s.trips == nil {
 		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "day itinerary creation is not configured", nil)

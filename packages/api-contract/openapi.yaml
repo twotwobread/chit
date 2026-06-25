@@ -701,6 +701,76 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /trips/{tripId}/days/{date}/expenses/quick:
+    post:
+      operationId: createQuickExpense
+      summary: Create a quick expense for a trip day place
+      description: Creates an expense from a selected itinerary item, using the trip default currency and equal splits across current trip participants.
+      tags:
+        - Trips
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: date
+          in: path
+          required: true
+          schema:
+            type: string
+            format: date
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateQuickExpenseRequest'
+      responses:
+        '201':
+          description: Quick expense created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateQuickExpenseResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip, virtual day, itinerary item, or payer participant not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Participant or itinerary state changed during creation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /trips/{tripId}/days/{date}/itinerary-items:
     post:
       operationId: createManualDayItineraryItem
@@ -1725,6 +1795,111 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/DayItineraryItem'
+    CreateQuickExpenseRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - itineraryItemId
+        - amountMinor
+        - payerParticipantId
+      properties:
+        itineraryItemId:
+          type: string
+          description: Required itinerary item for the selected Day. Must belong to tripId/date.
+        amountMinor:
+          type: integer
+          format: int64
+          minimum: 1
+          description: Positive amount in currency minor units.
+        payerParticipantId:
+          type: string
+          description: Active trip participant who paid the expense.
+    CreateQuickExpenseResponse:
+      type: object
+      required:
+        - expense
+      properties:
+        expense:
+          $ref: '#/components/schemas/Expense'
+    Expense:
+      type: object
+      required:
+        - id
+        - tripId
+        - scheduledDate
+        - itineraryItemId
+        - tripPlaceId
+        - place
+        - amountMinor
+        - currency
+        - payerParticipantId
+        - payerDisplayName
+        - splits
+        - createdAt
+      properties:
+        id:
+          type: string
+        tripId:
+          type: string
+        scheduledDate:
+          type: string
+          format: date
+        itineraryItemId:
+          type: string
+          nullable: true
+          description: Source itinerary item. Present at creation; may become null later if the source item is deleted and history is retained.
+        tripPlaceId:
+          type: string
+          nullable: true
+          description: Source trip place. Present at creation; may become null later if the source place is deleted and history is retained.
+        place:
+          $ref: '#/components/schemas/ExpensePlaceSnapshot'
+        amountMinor:
+          type: integer
+          format: int64
+        currency:
+          $ref: '#/components/schemas/SupportedCurrency'
+        payerParticipantId:
+          type: string
+          nullable: true
+        payerDisplayName:
+          type: string
+        splits:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExpenseSplit'
+        createdAt:
+          type: string
+          format: date-time
+    ExpensePlaceSnapshot:
+      type: object
+      required:
+        - name
+        - address
+        - placeType
+      properties:
+        name:
+          type: string
+        address:
+          type: string
+        placeType:
+          $ref: '#/components/schemas/TripPlaceType'
+    ExpenseSplit:
+      type: object
+      required:
+        - participantId
+        - displayName
+        - amountMinor
+      properties:
+        participantId:
+          type: string
+          nullable: true
+        displayName:
+          type: string
+        amountMinor:
+          type: integer
+          format: int64
+          minimum: 0
     SetDayLodgingPlaceRequest:
       type: object
       additionalProperties: false

@@ -21,12 +21,17 @@ export type { CreateGooglePlaceDayItineraryItemRequest } from './models/CreateGo
 export type { CreateGooglePlaceDayItineraryItemResponse } from './models/CreateGooglePlaceDayItineraryItemResponse';
 export type { CreateManualDayItineraryItemRequest } from './models/CreateManualDayItineraryItemRequest';
 export type { CreateManualDayItineraryItemResponse } from './models/CreateManualDayItineraryItemResponse';
+export type { CreateQuickExpenseRequest } from './models/CreateQuickExpenseRequest';
+export type { CreateQuickExpenseResponse } from './models/CreateQuickExpenseResponse';
 export type { CreateTripInviteResponse } from './models/CreateTripInviteResponse';
 export type { CreateTripRequest } from './models/CreateTripRequest';
 export type { CreateTripResponse } from './models/CreateTripResponse';
 export type { DayItineraryItem } from './models/DayItineraryItem';
 export type { DeviceInfo } from './models/DeviceInfo';
 export type { ErrorResponse } from './models/ErrorResponse';
+export type { Expense } from './models/Expense';
+export type { ExpensePlaceSnapshot } from './models/ExpensePlaceSnapshot';
+export type { ExpenseSplit } from './models/ExpenseSplit';
 export type { GetDayItineraryResponse } from './models/GetDayItineraryResponse';
 export type { GetTripDetailResponse } from './models/GetTripDetailResponse';
 export type { GooglePlaceSearchResult } from './models/GooglePlaceSearchResult';

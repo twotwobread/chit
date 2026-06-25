@@ -3,6 +3,8 @@ import {
   type AcceptTripInviteResponse,
   type CreateManualDayItineraryItemRequest,
   type CreateManualDayItineraryItemResponse,
+  type CreateQuickExpenseRequest,
+  type CreateQuickExpenseResponse,
   type CreateTripInviteResponse,
   type CreateTripRequest,
   type CreateTripResponse,
@@ -65,6 +67,15 @@ export async function createManualDayItineraryItem(
 ): Promise<CreateManualDayItineraryItemResponse> {
   await getMeWithRefresh();
   return TripsService.createManualDayItineraryItem(tripId, date, request);
+}
+
+export async function createQuickExpense(
+  tripId: string,
+  date: string,
+  request: CreateQuickExpenseRequest,
+): Promise<CreateQuickExpenseResponse> {
+  await getMeWithRefresh();
+  return TripsService.createQuickExpense(tripId, date, request);
 }
 
 export async function setDayLodgingPlace(
