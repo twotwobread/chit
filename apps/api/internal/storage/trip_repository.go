@@ -621,6 +621,7 @@ func (s *Store) CreateManualDayItineraryItem(ctx context.Context, record trip.Cr
 		ItemOrder: int(item.ItemOrder),
 		Version:   int(item.Version),
 		ArrivedAt: timePtrFromTimestamptz(item.ArrivedAt),
+		SkippedAt: timePtrFromTimestamptz(item.SkippedAt),
 		Place: trip.TripPlaceSummary{
 			ID:        place.ID,
 			Name:      place.Name,
@@ -681,6 +682,8 @@ func (s *Store) AppendGooglePlaceDayItineraryItem(ctx context.Context, record pl
 		ID:        item.ID,
 		ItemOrder: int(item.ItemOrder),
 		Version:   int(item.Version),
+		ArrivedAt: timePtrFromTimestamptz(item.ArrivedAt),
+		SkippedAt: timePtrFromTimestamptz(item.SkippedAt),
 		Place:     tripPlaceSummary(placeRow.ID, placeRow.Name, placeRow.PlaceType, placeRow.Address),
 	}, nil
 }
@@ -740,6 +743,8 @@ func (s *Store) CreateGooglePlaceDayItineraryItem(ctx context.Context, record pl
 		ID:        item.ID,
 		ItemOrder: int(item.ItemOrder),
 		Version:   int(item.Version),
+		ArrivedAt: timePtrFromTimestamptz(item.ArrivedAt),
+		SkippedAt: timePtrFromTimestamptz(item.SkippedAt),
 		Place:     tripPlaceSummary(placeRow.ID, placeRow.Name, placeRow.PlaceType, placeRow.Address),
 	}, nil
 }
@@ -762,6 +767,7 @@ func (s *Store) GetItineraryItemByTripDateAndID(ctx context.Context, tripID stri
 		Version:   int(row.Version),
 		IsLodging: boolFromSQL(row.IsLodging),
 		ArrivedAt: timePtrFromTimestamptz(row.ArrivedAt),
+		SkippedAt: timePtrFromTimestamptz(row.SkippedAt),
 		Place: trip.TripPlaceSummary{
 			ID:        row.TripPlaceID,
 			Name:      row.PlaceName,
@@ -813,18 +819,21 @@ func (s *Store) MarkDayItineraryItemArrived(ctx context.Context, record trip.Mar
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	current, err := loadArrivalItineraryRowsForUpdate(ctx, tx, record.TripID, record.ScheduledDate)
+	current, err := loadExecutionItineraryRowsForUpdate(ctx, tx, record.TripID, record.ScheduledDate)
 	if err != nil {
 		return trip.MarkDayItineraryItemArrivedMutationResult{}, err
 	}
 
-	targetIndex := indexArrivalItineraryItem(current, record.ItemID)
+	targetIndex := indexExecutionItineraryItem(current, record.ItemID)
 	if targetIndex < 0 {
 		return trip.MarkDayItineraryItemArrivedMutationResult{}, trip.ErrNotFound
 	}
+	if current[targetIndex].SkippedAt.Valid {
+		return trip.MarkDayItineraryItemArrivedMutationResult{}, trip.ErrConflict
+	}
 
 	if !current[targetIndex].ArrivedAt.Valid {
-		firstPendingIndex := firstPendingArrivalItineraryItem(current)
+		firstPendingIndex := firstPendingExecutionItineraryItem(current)
 		if firstPendingIndex < 0 || current[firstPendingIndex].ID != record.ItemID {
 			return trip.MarkDayItineraryItemArrivedMutationResult{}, trip.ErrConflict
 		}
@@ -836,6 +845,7 @@ func (s *Store) MarkDayItineraryItemArrived(ctx context.Context, record trip.Mar
 			  AND scheduled_date = $2
 			  AND id = $3::uuid
 			  AND arrived_at IS NULL
+			  AND skipped_at IS NULL
 		`, mustUUID(record.TripID), dateTextValue(record.ScheduledDate), mustUUID(record.ItemID))
 		if err != nil {
 			return trip.MarkDayItineraryItemArrivedMutationResult{}, err
@@ -845,18 +855,9 @@ func (s *Store) MarkDayItineraryItemArrived(ctx context.Context, record trip.Mar
 		}
 	}
 
-	qtx := s.queries.WithTx(tx)
-	rows, err := qtx.ListItineraryItemsByTripAndDate(ctx, db.ListItineraryItemsByTripAndDateParams{
-		Column1:       mustUUID(record.TripID),
-		ScheduledDate: dateTextValue(record.ScheduledDate),
-	})
+	targetItem, items, err := s.latestDayItineraryMutationSnapshot(ctx, tx, record.TripID, record.ScheduledDate, record.ItemID)
 	if err != nil {
 		return trip.MarkDayItineraryItemArrivedMutationResult{}, err
-	}
-	items := mapDayItineraryItems(rows)
-	targetItem, ok := findDayItineraryItem(items, record.ItemID)
-	if !ok {
-		return trip.MarkDayItineraryItemArrivedMutationResult{}, trip.ErrNotFound
 	}
 
 	if err := tx.Commit(ctx); err != nil {
@@ -864,6 +865,128 @@ func (s *Store) MarkDayItineraryItemArrived(ctx context.Context, record trip.Mar
 	}
 
 	return trip.MarkDayItineraryItemArrivedMutationResult{Item: targetItem, Items: items}, nil
+}
+
+func (s *Store) MarkDayItineraryItemSkipped(ctx context.Context, record trip.MarkDayItineraryItemSkippedRecord) (trip.MarkDayItineraryItemSkippedMutationResult, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return trip.MarkDayItineraryItemSkippedMutationResult{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	current, err := loadExecutionItineraryRowsForUpdate(ctx, tx, record.TripID, record.ScheduledDate)
+	if err != nil {
+		return trip.MarkDayItineraryItemSkippedMutationResult{}, err
+	}
+
+	targetIndex := indexExecutionItineraryItem(current, record.ItemID)
+	if targetIndex < 0 {
+		return trip.MarkDayItineraryItemSkippedMutationResult{}, trip.ErrNotFound
+	}
+	if current[targetIndex].ArrivedAt.Valid {
+		return trip.MarkDayItineraryItemSkippedMutationResult{}, trip.ErrConflict
+	}
+
+	if !current[targetIndex].SkippedAt.Valid {
+		firstPendingIndex := firstPendingExecutionItineraryItem(current)
+		if firstPendingIndex < 0 || current[firstPendingIndex].ID != record.ItemID {
+			return trip.MarkDayItineraryItemSkippedMutationResult{}, trip.ErrConflict
+		}
+
+		commandTag, err := tx.Exec(ctx, `
+			UPDATE itinerary_items
+			SET skipped_at = now(), updated_at = now()
+			WHERE trip_id = $1::uuid
+			  AND scheduled_date = $2
+			  AND id = $3::uuid
+			  AND arrived_at IS NULL
+			  AND skipped_at IS NULL
+		`, mustUUID(record.TripID), dateTextValue(record.ScheduledDate), mustUUID(record.ItemID))
+		if err != nil {
+			return trip.MarkDayItineraryItemSkippedMutationResult{}, err
+		}
+		if commandTag.RowsAffected() != 1 {
+			return trip.MarkDayItineraryItemSkippedMutationResult{}, trip.ErrConflict
+		}
+	}
+
+	targetItem, items, err := s.latestDayItineraryMutationSnapshot(ctx, tx, record.TripID, record.ScheduledDate, record.ItemID)
+	if err != nil {
+		return trip.MarkDayItineraryItemSkippedMutationResult{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return trip.MarkDayItineraryItemSkippedMutationResult{}, err
+	}
+
+	return trip.MarkDayItineraryItemSkippedMutationResult{Item: targetItem, Items: items}, nil
+}
+
+func (s *Store) RestoreDayItineraryItem(ctx context.Context, record trip.RestoreDayItineraryItemRecord) (trip.RestoreDayItineraryItemMutationResult, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return trip.RestoreDayItineraryItemMutationResult{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	current, err := loadExecutionItineraryRowsForUpdate(ctx, tx, record.TripID, record.ScheduledDate)
+	if err != nil {
+		return trip.RestoreDayItineraryItemMutationResult{}, err
+	}
+
+	targetIndex := indexExecutionItineraryItem(current, record.ItemID)
+	if targetIndex < 0 {
+		return trip.RestoreDayItineraryItemMutationResult{}, trip.ErrNotFound
+	}
+	if current[targetIndex].ArrivedAt.Valid {
+		return trip.RestoreDayItineraryItemMutationResult{}, trip.ErrConflict
+	}
+
+	if current[targetIndex].SkippedAt.Valid {
+		commandTag, err := tx.Exec(ctx, `
+			UPDATE itinerary_items
+			SET skipped_at = NULL, updated_at = now()
+			WHERE trip_id = $1::uuid
+			  AND scheduled_date = $2
+			  AND id = $3::uuid
+			  AND arrived_at IS NULL
+			  AND skipped_at IS NOT NULL
+		`, mustUUID(record.TripID), dateTextValue(record.ScheduledDate), mustUUID(record.ItemID))
+		if err != nil {
+			return trip.RestoreDayItineraryItemMutationResult{}, err
+		}
+		if commandTag.RowsAffected() != 1 {
+			return trip.RestoreDayItineraryItemMutationResult{}, trip.ErrConflict
+		}
+	}
+
+	targetItem, items, err := s.latestDayItineraryMutationSnapshot(ctx, tx, record.TripID, record.ScheduledDate, record.ItemID)
+	if err != nil {
+		return trip.RestoreDayItineraryItemMutationResult{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return trip.RestoreDayItineraryItemMutationResult{}, err
+	}
+
+	return trip.RestoreDayItineraryItemMutationResult{Item: targetItem, Items: items}, nil
+}
+
+func (s *Store) latestDayItineraryMutationSnapshot(ctx context.Context, tx pgx.Tx, tripID string, scheduledDate string, itemID string) (trip.DayItineraryItem, []trip.DayItineraryItem, error) {
+	qtx := s.queries.WithTx(tx)
+	rows, err := qtx.ListItineraryItemsByTripAndDate(ctx, db.ListItineraryItemsByTripAndDateParams{
+		Column1:       mustUUID(tripID),
+		ScheduledDate: dateTextValue(scheduledDate),
+	})
+	if err != nil {
+		return trip.DayItineraryItem{}, nil, err
+	}
+	items := mapDayItineraryItems(rows)
+	targetItem, ok := findDayItineraryItem(items, itemID)
+	if !ok {
+		return trip.DayItineraryItem{}, nil, trip.ErrNotFound
+	}
+	return targetItem, items, nil
 }
 
 func (s *Store) UpdateDayItineraryItemPlace(ctx context.Context, record trip.UpdateDayItineraryItemRecord) (trip.DayItineraryItem, error) {
@@ -887,6 +1010,7 @@ func (s *Store) UpdateDayItineraryItemPlace(ctx context.Context, record trip.Upd
 		Version:   int(row.Version),
 		IsLodging: boolFromSQL(row.IsLodging),
 		ArrivedAt: timePtrFromTimestamptz(row.ArrivedAt),
+		SkippedAt: timePtrFromTimestamptz(row.SkippedAt),
 		Place: trip.TripPlaceSummary{
 			ID:        row.TripPlaceID,
 			Name:      row.PlaceName,
@@ -953,14 +1077,15 @@ type orderedItineraryRow struct {
 	Version int
 }
 
-type arrivalItineraryRow struct {
+type executionItineraryRow struct {
 	ID        string
 	ArrivedAt pgtype.Timestamptz
+	SkippedAt pgtype.Timestamptz
 }
 
-func loadArrivalItineraryRowsForUpdate(ctx context.Context, tx pgx.Tx, tripID string, date string) ([]arrivalItineraryRow, error) {
+func loadExecutionItineraryRowsForUpdate(ctx context.Context, tx pgx.Tx, tripID string, date string) ([]executionItineraryRow, error) {
 	rows, err := tx.Query(ctx, `
-		SELECT id::text, arrived_at
+		SELECT id::text, arrived_at, skipped_at
 		FROM itinerary_items
 		WHERE trip_id = $1::uuid
 		  AND scheduled_date = $2
@@ -972,10 +1097,10 @@ func loadArrivalItineraryRowsForUpdate(ctx context.Context, tx pgx.Tx, tripID st
 	}
 	defer rows.Close()
 
-	ordered := make([]arrivalItineraryRow, 0)
+	ordered := make([]executionItineraryRow, 0)
 	for rows.Next() {
-		var item arrivalItineraryRow
-		if err := rows.Scan(&item.ID, &item.ArrivedAt); err != nil {
+		var item executionItineraryRow
+		if err := rows.Scan(&item.ID, &item.ArrivedAt, &item.SkippedAt); err != nil {
 			return nil, err
 		}
 		ordered = append(ordered, item)
@@ -1194,7 +1319,7 @@ func indexOrderedItineraryItem(items []orderedItineraryRow, itemID string) int {
 	return -1
 }
 
-func indexArrivalItineraryItem(items []arrivalItineraryRow, itemID string) int {
+func indexExecutionItineraryItem(items []executionItineraryRow, itemID string) int {
 	for index, item := range items {
 		if item.ID == itemID {
 			return index
@@ -1203,9 +1328,9 @@ func indexArrivalItineraryItem(items []arrivalItineraryRow, itemID string) int {
 	return -1
 }
 
-func firstPendingArrivalItineraryItem(items []arrivalItineraryRow) int {
+func firstPendingExecutionItineraryItem(items []executionItineraryRow) int {
 	for index, item := range items {
-		if !item.ArrivedAt.Valid {
+		if !item.ArrivedAt.Valid && !item.SkippedAt.Valid {
 			return index
 		}
 	}
@@ -1221,6 +1346,7 @@ func mapDayItineraryItems(rows []db.ListItineraryItemsByTripAndDateRow) []trip.D
 			Version:   int(row.Version),
 			IsLodging: boolFromSQL(row.IsLodging),
 			ArrivedAt: timePtrFromTimestamptz(row.ArrivedAt),
+			SkippedAt: timePtrFromTimestamptz(row.SkippedAt),
 			Place: trip.TripPlaceSummary{
 				ID:        row.TripPlaceID,
 				Name:      row.PlaceName,

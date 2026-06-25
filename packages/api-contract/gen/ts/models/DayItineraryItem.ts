@@ -9,9 +9,13 @@ export type DayItineraryItem = {
     version: number;
     isLodging: boolean;
     /**
-     * Server-generated arrival timestamp for this itinerary item instance. Null means pending.
+     * Server-generated arrival timestamp for this itinerary item instance. Null means pending when skippedAt is also null.
      */
     arrivedAt: string | null;
+    /**
+     * Server-generated skip timestamp for this itinerary item instance. Null means the item is not currently skipped.
+     */
+    skippedAt: string | null;
     place: TripPlaceSummary;
 };
 

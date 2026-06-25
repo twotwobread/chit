@@ -14,7 +14,14 @@ import { MobileAuthError } from '../lib/auth/client';
 import { clearStoredSession, readStoredSession } from '../lib/auth/session';
 import { theme } from '../lib/design';
 import { BottomMenu } from '../lib/navigation/BottomMenu';
-import { getTripDayItinerary, getTripDetail, listMyTrips, markDayItineraryItemArrived } from '../lib/trips/client';
+import {
+  getTripDayItinerary,
+  getTripDetail,
+  listMyTrips,
+  markDayItineraryItemArrived,
+  markDayItineraryItemSkipped,
+  restoreDayItineraryItem,
+} from '../lib/trips/client';
 import { localDateString } from '../lib/trips/status';
 import {
   buildTodayExecutionViewModel,
@@ -50,7 +57,9 @@ type TodayState =
 export default function HomeScreen() {
   const [todayState, setTodayState] = useState<TodayState>({ status: 'loading' });
   const [arrivingItemId, setArrivingItemId] = useState<string | null>(null);
-  const [arrivalError, setArrivalError] = useState<string | null>(null);
+  const [skippingItemId, setSkippingItemId] = useState<string | null>(null);
+  const [restoringItemId, setRestoringItemId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [navigationFallback, setNavigationFallback] = useState<TodayNavigationFallbackState | null>(null);
   const [navigationRetrying, setNavigationRetrying] = useState(false);
 
@@ -70,7 +79,9 @@ export default function HomeScreen() {
 
   const load = useCallback(async () => {
     setArrivingItemId(null);
-    setArrivalError(null);
+    setSkippingItemId(null);
+    setRestoringItemId(null);
+    setActionError(null);
     setNavigationFallback(resetTodayNavigationFallbackState());
     setNavigationRetrying(false);
     setTodayState({ status: 'loading' });
@@ -160,6 +171,24 @@ export default function HomeScreen() {
     }, [load]),
   );
 
+  const applyTodayItineraryResponse = useCallback(
+    (context: TodayExecutionContext, response: Pick<GetDayItineraryResponse, 'day' | 'items'>) => {
+      const itinerary: GetDayItineraryResponse = { day: response.day, items: response.items };
+      setTodayState({
+        status: 'ready',
+        context,
+        viewModel: buildTodayExecutionViewModel({
+          selectedTrip: context.selectedTrip,
+          tripDetail: context.tripDetail,
+          itinerary,
+          today: context.today,
+          ongoingTripCount: context.ongoingTripCount,
+        }),
+      });
+    },
+    [],
+  );
+
   const handleArrive = useCallback(
     async (action: Extract<TodayAction, { kind: 'arrive' }>) => {
       if (arrivingItemId) {
@@ -168,52 +197,119 @@ export default function HomeScreen() {
 
       const context = todayState.status === 'ready' ? todayState.context : undefined;
       if (!context) {
-        setArrivalError('도착 처리할 수 없어요. 다시 시도해주세요.');
+        setActionError('도착 처리할 수 없어요. 다시 시도해주세요.');
         return;
       }
 
       setArrivingItemId(action.itemId);
-      setArrivalError(null);
+      setActionError(null);
       setNavigationFallback(resetTodayNavigationFallbackState());
       setNavigationRetrying(false);
       try {
         const response = await markDayItineraryItemArrived(action.tripId, action.date, action.itemId);
-        const itinerary: GetDayItineraryResponse = { day: response.day, items: response.items };
-        setTodayState({
-          status: 'ready',
-          context,
-          viewModel: buildTodayExecutionViewModel({
-            selectedTrip: context.selectedTrip,
-            tripDetail: context.tripDetail,
-            itinerary,
-            today: context.today,
-            ongoingTripCount: context.ongoingTripCount,
-          }),
-        });
+        applyTodayItineraryResponse(context, response);
       } catch (error) {
         if (await handleAuthError(error)) {
           return;
         }
         if (error instanceof ApiError && error.status === 409) {
-          setArrivalError('일정 순서가 바뀌었어요. 다시 불러와주세요.');
+          setActionError('일정 순서가 바뀌었어요. 다시 불러와주세요.');
           return;
         }
         if (isUnavailableError(error)) {
           setTodayState({ status: 'ready', context, viewModel: buildTodayUnavailableViewModel(action.tripId) });
           return;
         }
-        setArrivalError('도착 처리할 수 없어요. 다시 시도해주세요.');
+        setActionError('도착 처리할 수 없어요. 다시 시도해주세요.');
       } finally {
         setArrivingItemId(null);
       }
     },
-    [arrivingItemId, handleAuthError, todayState],
+    [applyTodayItineraryResponse, arrivingItemId, handleAuthError, todayState],
+  );
+
+  const handleSkip = useCallback(
+    async (action: Extract<TodayAction, { kind: 'skip' }>) => {
+      if (skippingItemId) {
+        return;
+      }
+
+      const context = todayState.status === 'ready' ? todayState.context : undefined;
+      if (!context) {
+        setActionError('스킵 처리할 수 없어요. 다시 시도해주세요.');
+        return;
+      }
+
+      setSkippingItemId(action.itemId);
+      setActionError(null);
+      setNavigationFallback(resetTodayNavigationFallbackState());
+      setNavigationRetrying(false);
+      try {
+        const response = await markDayItineraryItemSkipped(action.tripId, action.date, action.itemId);
+        applyTodayItineraryResponse(context, response);
+      } catch (error) {
+        if (await handleAuthError(error)) {
+          return;
+        }
+        if (error instanceof ApiError && error.status === 409) {
+          setActionError('일정 순서가 바뀌었어요. 다시 불러와주세요.');
+          return;
+        }
+        if (isUnavailableError(error)) {
+          setTodayState({ status: 'ready', context, viewModel: buildTodayUnavailableViewModel(action.tripId) });
+          return;
+        }
+        setActionError('스킵 처리할 수 없어요. 다시 시도해주세요.');
+      } finally {
+        setSkippingItemId(null);
+      }
+    },
+    [applyTodayItineraryResponse, handleAuthError, skippingItemId, todayState],
+  );
+
+  const handleRestore = useCallback(
+    async (action: Extract<TodayAction, { kind: 'restore' }>) => {
+      if (restoringItemId) {
+        return;
+      }
+
+      const context = todayState.status === 'ready' ? todayState.context : undefined;
+      if (!context) {
+        setActionError('스킵한 장소를 복구할 수 없어요. 다시 시도해주세요.');
+        return;
+      }
+
+      setRestoringItemId(action.itemId);
+      setActionError(null);
+      setNavigationFallback(resetTodayNavigationFallbackState());
+      setNavigationRetrying(false);
+      try {
+        const response = await restoreDayItineraryItem(action.tripId, action.date, action.itemId);
+        applyTodayItineraryResponse(context, response);
+      } catch (error) {
+        if (await handleAuthError(error)) {
+          return;
+        }
+        if (error instanceof ApiError && error.status === 409) {
+          setActionError('이미 완료된 장소예요. 다시 불러와주세요.');
+          return;
+        }
+        if (isUnavailableError(error)) {
+          setTodayState({ status: 'ready', context, viewModel: buildTodayUnavailableViewModel(action.tripId) });
+          return;
+        }
+        setActionError('스킵한 장소를 복구할 수 없어요. 다시 시도해주세요.');
+      } finally {
+        setRestoringItemId(null);
+      }
+    },
+    [applyTodayItineraryResponse, handleAuthError, restoringItemId, todayState],
   );
 
   const openNavigationDestination = useCallback(
     async (destination: TodayNavigationDestination, options?: { retry?: boolean }) => {
       const retry = options?.retry === true;
-      setArrivalError(null);
+      setActionError(null);
 
       if (retry) {
         setNavigationRetrying(true);
@@ -280,13 +376,21 @@ export default function HomeScreen() {
         void handleArrive(action);
         return;
       }
+      if (action.kind === 'skip') {
+        void handleSkip(action);
+        return;
+      }
+      if (action.kind === 'restore') {
+        void handleRestore(action);
+        return;
+      }
       if (action.kind === 'navigate') {
         void handleNavigate(action);
         return;
       }
       router.push(action.route);
     },
-    [handleArrive, handleNavigate, load],
+    [handleArrive, handleNavigate, handleRestore, handleSkip, load],
   );
 
   return (
@@ -315,8 +419,10 @@ export default function HomeScreen() {
 
         {todayState.status === 'ready' ? (
           <TodayContent
-            arrivalError={arrivalError}
+            actionError={actionError}
             arrivingItemId={arrivingItemId}
+            restoringItemId={restoringItemId}
+            skippingItemId={skippingItemId}
             navigationFallback={navigationFallback}
             navigationRetrying={navigationRetrying}
             onAction={runAction}
@@ -334,8 +440,10 @@ export default function HomeScreen() {
 }
 
 function TodayContent({
-  arrivalError,
+  actionError,
   arrivingItemId,
+  restoringItemId,
+  skippingItemId,
   navigationFallback,
   navigationRetrying,
   onAction,
@@ -344,8 +452,10 @@ function TodayContent({
   onNavigationFallbackRetry,
   viewModel,
 }: {
-  arrivalError: string | null;
+  actionError: string | null;
   arrivingItemId: string | null;
+  restoringItemId: string | null;
+  skippingItemId: string | null;
   navigationFallback: TodayNavigationFallbackState | null;
   navigationRetrying: boolean;
   onAction: (action: TodayAction) => void;
@@ -420,6 +530,30 @@ function TodayContent({
     );
   }
 
+  if (viewModel.status === 'recoverNeeded') {
+    return (
+      <View style={styles.card}>
+        <TodayDayHeader
+          dayLabel={viewModel.dayLabel}
+          formattedDate={viewModel.formattedDate}
+          tripName={viewModel.tripName}
+        />
+        <View style={styles.emptyPanel}>
+          <Text style={styles.emptyTitle}>{viewModel.title}</Text>
+          <Text style={styles.message}>{viewModel.helper}</Text>
+        </View>
+        <SkippedPlacesSection
+          onAction={onAction}
+          restoringItemId={restoringItemId}
+          section={viewModel.skippedSection}
+        />
+        {actionError ? <Text style={styles.actionError}>{actionError}</Text> : null}
+        <ActionButton action={viewModel.primaryAction} onAction={onAction} />
+        <MultipleOngoingNotice notice={viewModel.multipleOngoingTripNotice} onAction={onAction} />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.card}>
       <TodayDayHeader
@@ -449,12 +583,26 @@ function TodayContent({
         />
       ) : null}
       <RemainingPlacesSection section={viewModel.remainingSection} />
-      {arrivalError ? <Text style={styles.arrivalError}>{arrivalError}</Text> : null}
+      {viewModel.skippedSection ? (
+        <SkippedPlacesSection
+          onAction={onAction}
+          restoringItemId={restoringItemId}
+          section={viewModel.skippedSection}
+        />
+      ) : null}
+      {actionError ? <Text style={styles.actionError}>{actionError}</Text> : null}
       <ActionButton
         action={viewModel.arrivalAction}
         disabled={arrivingItemId === viewModel.arrivalAction.itemId}
         label={arrivingItemId === viewModel.arrivalAction.itemId ? '도착 처리 중...' : undefined}
         onAction={onAction}
+      />
+      <ActionButton
+        action={viewModel.skipAction}
+        disabled={skippingItemId === viewModel.skipAction.itemId}
+        label={skippingItemId === viewModel.skipAction.itemId ? '스킵 처리 중...' : undefined}
+        onAction={onAction}
+        variant="secondary"
       />
       <ActionButton action={viewModel.primaryAction} onAction={onAction} variant="secondary" />
       <MultipleOngoingNotice notice={viewModel.multipleOngoingTripNotice} onAction={onAction} />
@@ -515,6 +663,47 @@ function RemainingPlacesSection({
           ))}
         </View>
       ) : null}
+    </View>
+  );
+}
+
+function SkippedPlacesSection({
+  onAction,
+  restoringItemId,
+  section,
+}: {
+  onAction: (action: TodayAction) => void;
+  restoringItemId: string | null;
+  section: NonNullable<Extract<TodayExecutionViewModel, { status: 'success' }>['skippedSection']>;
+}) {
+  return (
+    <View style={styles.remainingSection}>
+      <View style={styles.remainingHeader}>
+        <Text style={styles.remainingTitle}>{section.title}</Text>
+        <Text style={styles.remainingCount}>{section.countLabel}</Text>
+      </View>
+      <View style={styles.remainingList}>
+        {section.items.map((item) => {
+          const isRestoring = restoringItemId === item.itemId;
+          return (
+            <View key={item.itemId} style={styles.remainingRow}>
+              <View style={styles.placeMetaRow}>
+                <Text style={styles.orderBadge}>{item.orderLabel}</Text>
+                <Text style={styles.placeType}>{item.placeTypeLabel}</Text>
+              </View>
+              <Text style={styles.remainingPlaceName}>{item.placeName}</Text>
+              <Text style={styles.address}>{item.address}</Text>
+              <ActionButton
+                action={item.restoreAction}
+                disabled={isRestoring}
+                label={isRestoring ? '복구 중...' : undefined}
+                onAction={onAction}
+                variant="secondary"
+              />
+            </View>
+          );
+        })}
+      </View>
     </View>
   );
 }
@@ -600,7 +789,7 @@ function MultipleOngoingNotice({
 }: {
   notice: Extract<
     TodayExecutionViewModel,
-    { status: 'success' | 'emptyItinerary' | 'completed' }
+    { status: 'success' | 'emptyItinerary' | 'completed' | 'recoverNeeded' }
   >['multipleOngoingTripNotice'];
   onAction: (action: TodayAction) => void;
 }) {
@@ -842,7 +1031,7 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.bold,
     textAlign: 'center',
   },
-  arrivalError: {
+  actionError: {
     color: theme.color.danger,
     fontFamily: theme.font.family.semibold,
     fontSize: theme.font.size.label,

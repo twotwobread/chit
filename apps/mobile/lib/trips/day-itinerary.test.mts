@@ -31,6 +31,8 @@ describe('day itinerary helpers', () => {
           itemOrder: 2,
           version: 3,
           isLodging: false,
+          arrivedAt: null,
+          skippedAt: null,
           place: { id: 'place-2', name: '도톤보리', placeType: 'food', address: 'Dotonbori' },
         },
         {
@@ -38,6 +40,8 @@ describe('day itinerary helpers', () => {
           itemOrder: 1,
           version: 7,
           isLodging: true,
+          arrivedAt: null,
+          skippedAt: null,
           place: { id: 'place-1', name: '우메다 공중정원', placeType: 'sights', address: 'Umeda' },
         },
       ],

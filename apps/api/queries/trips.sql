@@ -213,6 +213,7 @@ SELECT
   ii.id::text AS id,
   ii.version,
   ii.arrived_at,
+  ii.skipped_at,
   (dlp.trip_place_id IS NOT NULL) AS is_lodging,
   tp.id::text AS trip_place_id,
   tp.name AS place_name,
@@ -392,7 +393,8 @@ RETURNING
   id::text,
   item_order,
   version,
-  arrived_at;
+  arrived_at,
+  skipped_at;
 
 -- name: GetItineraryItemByTripDateAndID :one
 SELECT
@@ -400,6 +402,7 @@ SELECT
   ii.item_order,
   ii.version,
   ii.arrived_at,
+  ii.skipped_at,
   (dlp.trip_place_id IS NOT NULL) AS is_lodging,
   tp.id::text AS trip_place_id,
   tp.name AS place_name,
@@ -424,6 +427,7 @@ WITH target AS (
     ii.item_order,
     ii.version,
     ii.arrived_at,
+    ii.skipped_at,
     ii.trip_place_id
   FROM itinerary_items ii
   WHERE ii.trip_id = sqlc.arg(trip_id)::uuid
@@ -450,6 +454,7 @@ SELECT
   target.item_order,
   target.version,
   target.arrived_at,
+  target.skipped_at,
   (dlp.trip_place_id IS NOT NULL) AS is_lodging,
   updated_place.id AS trip_place_id,
   updated_place.name AS place_name,

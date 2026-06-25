@@ -77,6 +77,7 @@ function item(overrides: Partial<DayItineraryItem>): DayItineraryItem {
     version: 1,
     isLodging: false,
     arrivedAt: null,
+    skippedAt: null,
     place: {
       id: 'place-a',
       name: '우메다 공중정원',
@@ -240,6 +241,7 @@ test('maps the first ordered itinerary item to the next place and subsequent ite
         },
       ],
     },
+    skippedSection: null,
     arrivalAction: {
       kind: 'arrive',
       label: '도착했어요',
@@ -251,6 +253,13 @@ test('maps the first ordered itinerary item to the next place and subsequent ite
       kind: 'route',
       label: '지출 등록',
       route: '/trips/trip-current/days/2026-07-10/expenses/quick?itemId=item-next',
+    },
+    skipAction: {
+      kind: 'skip',
+      label: '스킵하기',
+      tripId: 'trip-current',
+      date: '2026-07-10',
+      itemId: 'item-next',
     },
     primaryAction: { kind: 'route', label: '오늘 일정 보기', route: '/trips/trip-current/days/2026-07-10' },
     multipleOngoingTripNotice: null,
@@ -273,16 +282,22 @@ test('selects the first pending itinerary item and excludes arrived items from r
       items: [
         item({ id: 'item-arrived-first', itemOrder: 1, arrivedAt: '2026-07-10T00:30:00Z' }),
         item({
-          id: 'item-next',
+          id: 'item-skipped',
           itemOrder: 2,
+          skippedAt: '2026-07-10T01:00:00Z',
+          place: { id: 'place-skipped', name: '우메다', placeType: 'sights', address: 'Umeda' },
+        }),
+        item({
+          id: 'item-next',
+          itemOrder: 3,
           place: { id: 'place-next', name: '도톤보리', placeType: 'food', address: 'Dotonbori' },
         }),
         item({
           id: 'item-third',
-          itemOrder: 3,
+          itemOrder: 4,
           place: { id: 'place-third', name: '오사카성', placeType: 'sights', address: 'Osakajo' },
         }),
-        item({ id: 'item-arrived-last', itemOrder: 4, arrivedAt: '2026-07-10T02:30:00Z' }),
+        item({ id: 'item-arrived-last', itemOrder: 5, arrivedAt: '2026-07-10T02:30:00Z' }),
       ],
     }),
     today: '2026-07-10',
@@ -310,6 +325,33 @@ test('selects the first pending itinerary item and excludes arrived items from r
     date: '2026-07-10',
     itemId: 'item-next',
   });
+  assert.deepEqual(viewModel.skipAction, {
+    kind: 'skip',
+    label: '스킵하기',
+    tripId: 'trip-current',
+    date: '2026-07-10',
+    itemId: 'item-next',
+  });
+  assert.deepEqual(viewModel.skippedSection, {
+    title: '스킵한 장소',
+    countLabel: '1곳을 나중에 다시 볼 수 있어요.',
+    items: [
+      {
+        itemId: 'item-skipped',
+        orderLabel: '2',
+        placeName: '우메다',
+        placeTypeLabel: '관광지',
+        address: 'Umeda',
+        restoreAction: {
+          kind: 'restore',
+          label: '복구',
+          tripId: 'trip-current',
+          date: '2026-07-10',
+          itemId: 'item-skipped',
+        },
+      },
+    ],
+  });
   assert.deepEqual(viewModel.remainingSection, {
     status: 'list',
     title: '남은 장소',
@@ -317,7 +359,7 @@ test('selects the first pending itinerary item and excludes arrived items from r
     items: [
       {
         itemId: 'item-third',
-        orderLabel: '3',
+        orderLabel: '4',
         placeName: '오사카성',
         placeTypeLabel: '관광지',
         address: 'Osakajo',
@@ -353,6 +395,77 @@ test('builds a completed Today state when every itinerary item is arrived', () =
       kind: 'route',
       label: '지출 등록',
       route: '/trips/trip-current/days/2026-07-10/expenses/quick',
+    },
+    primaryAction: { kind: 'route', label: '오늘 일정 보기', route: '/trips/trip-current/days/2026-07-10' },
+    multipleOngoingTripNotice: null,
+  });
+});
+
+test('builds a recover-needed state when all non-arrived items are skipped', () => {
+  const viewModel = buildTodayExecutionViewModel({
+    selectedTrip: trip({ id: 'trip-current' }),
+    tripDetail: tripDetail(),
+    itinerary: itinerary({
+      items: [
+        item({ id: 'item-arrived', itemOrder: 1, arrivedAt: '2026-07-10T00:30:00Z' }),
+        item({
+          id: 'item-skipped-first',
+          itemOrder: 2,
+          skippedAt: '2026-07-10T01:30:00Z',
+          place: { id: 'place-skipped-first', name: '도톤보리', placeType: 'food', address: 'Dotonbori' },
+        }),
+        item({
+          id: 'item-skipped-second',
+          itemOrder: 3,
+          skippedAt: '2026-07-10T02:30:00Z',
+          place: { id: 'place-skipped-second', name: '오사카성', placeType: 'sights', address: 'Osakajo' },
+        }),
+      ],
+    }),
+    today: '2026-07-10',
+    ongoingTripCount: 1,
+  });
+
+  assert.deepEqual(viewModel, {
+    status: 'recoverNeeded',
+    tripName: '오사카 3박 4일',
+    dayLabel: 'Day 1',
+    formattedDate: '2026.07.10',
+    title: '진행할 장소가 없어요.',
+    helper: '스킵한 장소를 복구하면 다시 진행할 수 있어요.',
+    skippedSection: {
+      title: '스킵한 장소',
+      countLabel: '2곳을 나중에 다시 볼 수 있어요.',
+      items: [
+        {
+          itemId: 'item-skipped-first',
+          orderLabel: '2',
+          placeName: '도톤보리',
+          placeTypeLabel: '식당',
+          address: 'Dotonbori',
+          restoreAction: {
+            kind: 'restore',
+            label: '복구',
+            tripId: 'trip-current',
+            date: '2026-07-10',
+            itemId: 'item-skipped-first',
+          },
+        },
+        {
+          itemId: 'item-skipped-second',
+          orderLabel: '3',
+          placeName: '오사카성',
+          placeTypeLabel: '관광지',
+          address: 'Osakajo',
+          restoreAction: {
+            kind: 'restore',
+            label: '복구',
+            tripId: 'trip-current',
+            date: '2026-07-10',
+            itemId: 'item-skipped-second',
+          },
+        },
+      ],
     },
     primaryAction: { kind: 'route', label: '오늘 일정 보기', route: '/trips/trip-current/days/2026-07-10' },
     multipleOngoingTripNotice: null,

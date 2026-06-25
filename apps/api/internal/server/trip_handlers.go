@@ -340,6 +340,46 @@ func (s apiServer) MarkDayItineraryItemArrived(w http.ResponseWriter, r *http.Re
 	writeJSON(w, http.StatusOK, markDayItineraryItemArrivedResponseToOpenAPI(result))
 }
 
+func (s apiServer) MarkDayItineraryItemSkipped(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, itemId string) {
+	if s.auth == nil || s.trips == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "day itinerary skip is not configured", nil)
+		return
+	}
+
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	result, err := s.trips.MarkDayItineraryItemSkipped(r.Context(), authContext.UserID, tripId, dateFromOpenAPI(date), itemId)
+	if err != nil {
+		writeDayItinerarySkipError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, markDayItineraryItemSkippedResponseToOpenAPI(result))
+}
+
+func (s apiServer) RestoreDayItineraryItem(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, itemId string) {
+	if s.auth == nil || s.trips == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "day itinerary restore is not configured", nil)
+		return
+	}
+
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	result, err := s.trips.RestoreDayItineraryItem(r.Context(), authContext.UserID, tripId, dateFromOpenAPI(date), itemId)
+	if err != nil {
+		writeDayItineraryRestoreError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, restoreDayItineraryItemResponseToOpenAPI(result))
+}
+
 func (s apiServer) UpdateDayItineraryItem(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, itemId string) {
 	if s.auth == nil || s.trips == nil {
 		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "day itinerary update is not configured", nil)

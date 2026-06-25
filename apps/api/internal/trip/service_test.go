@@ -64,6 +64,14 @@ type fakeRepository struct {
 	markedArrivedCalled      bool
 	markedArrivedResult      MarkDayItineraryItemArrivedMutationResult
 	markedArrivedErr         error
+	markedSkippedRecord      MarkDayItineraryItemSkippedRecord
+	markedSkippedCalled      bool
+	markedSkippedResult      MarkDayItineraryItemSkippedMutationResult
+	markedSkippedErr         error
+	restoredDayItemRecord    RestoreDayItineraryItemRecord
+	restoredDayItemCalled    bool
+	restoredDayItemResult    RestoreDayItineraryItemMutationResult
+	restoredDayItemErr       error
 	updatedDayItemRecord     UpdateDayItineraryItemRecord
 	updatedDayItemCalled     bool
 	updatedDayItem           DayItineraryItem
@@ -346,6 +354,40 @@ func (r *fakeRepository) MarkDayItineraryItemArrived(_ context.Context, record M
 		}
 	}
 	return MarkDayItineraryItemArrivedMutationResult{}, ErrNotFound
+}
+
+func (r *fakeRepository) MarkDayItineraryItemSkipped(_ context.Context, record MarkDayItineraryItemSkippedRecord) (MarkDayItineraryItemSkippedMutationResult, error) {
+	r.markedSkippedRecord = record
+	r.markedSkippedCalled = true
+	if r.markedSkippedErr != nil {
+		return MarkDayItineraryItemSkippedMutationResult{}, r.markedSkippedErr
+	}
+	if r.markedSkippedResult.Item.ID != "" || r.markedSkippedResult.Items != nil {
+		return r.markedSkippedResult, nil
+	}
+	for _, item := range r.dayItineraryItems {
+		if item.ID == record.ItemID {
+			return MarkDayItineraryItemSkippedMutationResult{Item: item, Items: r.dayItineraryItems}, nil
+		}
+	}
+	return MarkDayItineraryItemSkippedMutationResult{}, ErrNotFound
+}
+
+func (r *fakeRepository) RestoreDayItineraryItem(_ context.Context, record RestoreDayItineraryItemRecord) (RestoreDayItineraryItemMutationResult, error) {
+	r.restoredDayItemRecord = record
+	r.restoredDayItemCalled = true
+	if r.restoredDayItemErr != nil {
+		return RestoreDayItineraryItemMutationResult{}, r.restoredDayItemErr
+	}
+	if r.restoredDayItemResult.Item.ID != "" || r.restoredDayItemResult.Items != nil {
+		return r.restoredDayItemResult, nil
+	}
+	for _, item := range r.dayItineraryItems {
+		if item.ID == record.ItemID {
+			return RestoreDayItineraryItemMutationResult{Item: item, Items: r.dayItineraryItems}, nil
+		}
+	}
+	return RestoreDayItineraryItemMutationResult{}, ErrNotFound
 }
 
 func (r *fakeRepository) UpdateDayItineraryItemPlace(_ context.Context, record UpdateDayItineraryItemRecord) (DayItineraryItem, error) {
@@ -1837,6 +1879,120 @@ func TestServiceMarkDayItineraryItemArrivedFailures(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			service := newTestService(tt.repo)
 			_, err := service.MarkDayItineraryItemArrived(context.Background(), tt.user, tt.tripID, tt.date, tt.itemID)
+			if !errors.Is(err, tt.want) {
+				t.Fatalf("expected %v, got %v", tt.want, err)
+			}
+		})
+	}
+}
+
+func TestServiceMarkDayItineraryItemSkipped(t *testing.T) {
+	skippedAt := time.Date(2026, 7, 10, 10, 30, 0, 0, time.UTC)
+	items := []DayItineraryItem{
+		{ID: testUUID(7001), ItemOrder: 1, Version: 1, SkippedAt: &skippedAt, Place: TripPlaceSummary{ID: testUUID(8001), Name: "도톤보리", Address: "Dotonbori", PlaceType: "food"}},
+		{ID: testUUID(7002), ItemOrder: 2, Version: 1, Place: TripPlaceSummary{ID: testUUID(8002), Name: "오사카성", Address: "Osakajo", PlaceType: "sights"}},
+	}
+	repo := &fakeRepository{
+		trip:                Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"},
+		tripFound:           true,
+		isParticipant:       true,
+		markedSkippedResult: MarkDayItineraryItemSkippedMutationResult{Item: items[0], Items: items},
+	}
+	service := newTestService(repo)
+
+	result, err := service.MarkDayItineraryItemSkipped(context.Background(), "user-1", testTripID, "2026-07-10", testUUID(7001))
+	if err != nil {
+		t.Fatalf("MarkDayItineraryItemSkipped returned error: %v", err)
+	}
+
+	if !repo.markedSkippedCalled {
+		t.Fatal("expected repository skip mutation to be called")
+	}
+	if repo.markedSkippedRecord.TripID != testTripID || repo.markedSkippedRecord.ScheduledDate != "2026-07-10" || repo.markedSkippedRecord.ItemID != testUUID(7001) {
+		t.Fatalf("unexpected skip record: %#v", repo.markedSkippedRecord)
+	}
+	if result.Day.Date != "2026-07-10" || result.Day.DayOrder != 1 {
+		t.Fatalf("unexpected result day: %#v", result.Day)
+	}
+	if result.Item.ID != testUUID(7001) || result.Item.SkippedAt == nil || !result.Item.SkippedAt.Equal(skippedAt) {
+		t.Fatalf("unexpected skipped item: %#v", result.Item)
+	}
+	if len(result.Items) != 2 || result.Items[1].ID != testUUID(7002) {
+		t.Fatalf("expected full latest day snapshot, got %#v", result.Items)
+	}
+}
+
+func TestServiceRestoreDayItineraryItem(t *testing.T) {
+	items := []DayItineraryItem{
+		{ID: testUUID(7001), ItemOrder: 1, Version: 1, Place: TripPlaceSummary{ID: testUUID(8001), Name: "도톤보리", Address: "Dotonbori", PlaceType: "food"}},
+		{ID: testUUID(7002), ItemOrder: 2, Version: 1, Place: TripPlaceSummary{ID: testUUID(8002), Name: "오사카성", Address: "Osakajo", PlaceType: "sights"}},
+	}
+	repo := &fakeRepository{
+		trip:                  Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"},
+		tripFound:             true,
+		isParticipant:         true,
+		restoredDayItemResult: RestoreDayItineraryItemMutationResult{Item: items[0], Items: items},
+	}
+	service := newTestService(repo)
+
+	result, err := service.RestoreDayItineraryItem(context.Background(), "user-1", testTripID, "2026-07-10", testUUID(7001))
+	if err != nil {
+		t.Fatalf("RestoreDayItineraryItem returned error: %v", err)
+	}
+
+	if !repo.restoredDayItemCalled {
+		t.Fatal("expected repository restore mutation to be called")
+	}
+	if repo.restoredDayItemRecord.TripID != testTripID || repo.restoredDayItemRecord.ScheduledDate != "2026-07-10" || repo.restoredDayItemRecord.ItemID != testUUID(7001) {
+		t.Fatalf("unexpected restore record: %#v", repo.restoredDayItemRecord)
+	}
+	if result.Day.Date != "2026-07-10" || result.Day.DayOrder != 1 {
+		t.Fatalf("unexpected result day: %#v", result.Day)
+	}
+	if result.Item.ID != testUUID(7001) || result.Item.SkippedAt != nil {
+		t.Fatalf("unexpected restored item: %#v", result.Item)
+	}
+	if len(result.Items) != 2 || result.Items[1].ID != testUUID(7002) {
+		t.Fatalf("expected full latest day snapshot, got %#v", result.Items)
+	}
+}
+
+func TestServiceDayItinerarySkipAndRestoreFailures(t *testing.T) {
+	validTrip := Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"}
+	tests := []struct {
+		name   string
+		action string
+		repo   *fakeRepository
+		user   string
+		tripID string
+		date   string
+		itemID string
+		want   error
+	}{
+		{name: "skip requires auth", action: "skip", repo: &fakeRepository{}, user: " ", tripID: testTripID, date: "2026-07-10", itemID: testUUID(7001), want: ErrUnauthorized},
+		{name: "skip invalid trip id", action: "skip", repo: &fakeRepository{}, user: "user-1", tripID: "not-a-uuid", date: "2026-07-10", itemID: testUUID(7001), want: ErrValidation},
+		{name: "skip invalid date", action: "skip", repo: &fakeRepository{}, user: "user-1", tripID: testTripID, date: "2026/07/10", itemID: testUUID(7001), want: ErrValidation},
+		{name: "skip invalid item id", action: "skip", repo: &fakeRepository{}, user: "user-1", tripID: testTripID, date: "2026-07-10", itemID: "not-a-uuid", want: ErrValidation},
+		{name: "skip missing trip", action: "skip", repo: &fakeRepository{}, user: "user-1", tripID: testTripID, date: "2026-07-10", itemID: testUUID(7001), want: ErrNotFound},
+		{name: "skip forbidden", action: "skip", repo: &fakeRepository{trip: validTrip, tripFound: true}, user: "user-1", tripID: testTripID, date: "2026-07-10", itemID: testUUID(7001), want: ErrForbidden},
+		{name: "skip out of range", action: "skip", repo: &fakeRepository{trip: validTrip, tripFound: true, isParticipant: true}, user: "user-1", tripID: testTripID, date: "2026-07-14", itemID: testUUID(7001), want: ErrNotFound},
+		{name: "skip item not found", action: "skip", repo: &fakeRepository{trip: validTrip, tripFound: true, isParticipant: true, markedSkippedErr: ErrNotFound}, user: "user-1", tripID: testTripID, date: "2026-07-10", itemID: testUUID(7001), want: ErrNotFound},
+		{name: "skip conflict", action: "skip", repo: &fakeRepository{trip: validTrip, tripFound: true, isParticipant: true, markedSkippedErr: ErrConflict}, user: "user-1", tripID: testTripID, date: "2026-07-10", itemID: testUUID(7002), want: ErrConflict},
+		{name: "restore requires auth", action: "restore", repo: &fakeRepository{}, user: " ", tripID: testTripID, date: "2026-07-10", itemID: testUUID(7001), want: ErrUnauthorized},
+		{name: "restore invalid item id", action: "restore", repo: &fakeRepository{}, user: "user-1", tripID: testTripID, date: "2026-07-10", itemID: "not-a-uuid", want: ErrValidation},
+		{name: "restore item not found", action: "restore", repo: &fakeRepository{trip: validTrip, tripFound: true, isParticipant: true, restoredDayItemErr: ErrNotFound}, user: "user-1", tripID: testTripID, date: "2026-07-10", itemID: testUUID(7001), want: ErrNotFound},
+		{name: "restore conflict", action: "restore", repo: &fakeRepository{trip: validTrip, tripFound: true, isParticipant: true, restoredDayItemErr: ErrConflict}, user: "user-1", tripID: testTripID, date: "2026-07-10", itemID: testUUID(7001), want: ErrConflict},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			service := newTestService(tt.repo)
+			var err error
+			if tt.action == "skip" {
+				_, err = service.MarkDayItineraryItemSkipped(context.Background(), tt.user, tt.tripID, tt.date, tt.itemID)
+			} else {
+				_, err = service.RestoreDayItineraryItem(context.Background(), tt.user, tt.tripID, tt.date, tt.itemID)
+			}
 			if !errors.Is(err, tt.want) {
 				t.Fatalf("expected %v, got %v", tt.want, err)
 			}
