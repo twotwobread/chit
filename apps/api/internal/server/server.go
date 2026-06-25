@@ -8,6 +8,7 @@ import (
 	"github.com/twotwobread/i-um/apps/api/internal/auth"
 	"github.com/twotwobread/i-um/apps/api/internal/openapi"
 	"github.com/twotwobread/i-um/apps/api/internal/place"
+	"github.com/twotwobread/i-um/apps/api/internal/route"
 	"github.com/twotwobread/i-um/apps/api/internal/trip"
 )
 
@@ -20,6 +21,7 @@ type apiServer struct {
 	auth         *auth.Service
 	trips        *trip.Service
 	places       *place.Service
+	routes       *route.Service
 	appStoreURL  string
 	playStoreURL string
 }
@@ -55,12 +57,22 @@ func NewRouterWithConfig(readiness readinessChecker, config Config) http.Handler
 		placeService = place.NewService(repo, provider)
 	}
 
+	var routeService *route.Service
+	if repo, ok := readiness.(route.Repository); ok {
+		provider := config.RouteProvider
+		if provider == nil {
+			provider = route.NewGoogleProvider(config.GoogleRoutesAPIKey)
+		}
+		routeService = route.NewService(repo, provider)
+	}
+
 	router := chi.NewRouter()
 	server := apiServer{
 		readiness:    readiness,
 		auth:         authService,
 		trips:        tripService,
 		places:       placeService,
+		routes:       routeService,
 		appStoreURL:  config.AppStoreURL,
 		playStoreURL: config.PlayStoreURL,
 	}

@@ -5,6 +5,7 @@ import {
   type CreateManualDayItineraryItemResponse,
   type CreateQuickExpenseRequest,
   type CreateQuickExpenseResponse,
+  type CreateRoutePreviewRequest,
   type CreateTripInviteResponse,
   type CreateTripRequest,
   type CreateTripResponse,
@@ -16,6 +17,7 @@ import {
   type MarkDayItineraryItemSkippedResponse,
   type ReorderDayItineraryItemsRequest,
   type ReorderDayItineraryItemsResponse,
+  type RoutePreviewResponse,
   type SetDayLodgingPlaceRequest,
   type SetDayLodgingPlaceResponse,
   type RestoreDayItineraryItemResponse,
@@ -128,6 +130,16 @@ export async function restoreDayItineraryItem(
 ): Promise<RestoreDayItineraryItemResponse> {
   await getMeWithRefresh();
   return TripsService.restoreDayItineraryItem(tripId, date, itemId);
+}
+
+export async function createRoutePreview(
+  tripId: string,
+  date: string,
+  itemId: string,
+  request: CreateRoutePreviewRequest,
+): Promise<RoutePreviewResponse> {
+  await getMeWithRefresh();
+  return TripsService.createRoutePreview(tripId, date, itemId, request);
 }
 
 export async function updateDayItineraryItem(

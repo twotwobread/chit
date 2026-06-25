@@ -5,6 +5,7 @@ import (
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
 	"github.com/twotwobread/i-um/apps/api/internal/openapi"
+	"github.com/twotwobread/i-um/apps/api/internal/route"
 	"github.com/twotwobread/i-um/apps/api/internal/trip"
 )
 
@@ -267,22 +268,8 @@ func (s apiServer) CreateManualDayItineraryItem(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	var body openapi.CreateManualDayItineraryItemJSONRequestBody
-	if !decodeJSON(w, r, &body) {
-		return
-	}
-
-	result, err := s.trips.CreateManualDayItineraryItem(r.Context(), authContext.UserID, tripId, dateFromOpenAPI(date), trip.CreateManualDayItineraryItemInput{
-		Name:      body.Name,
-		Address:   body.Address,
-		PlaceType: string(body.PlaceType),
-	})
-	if err != nil {
-		writeTripDayItineraryError(w, err)
-		return
-	}
-
-	writeJSON(w, http.StatusCreated, createManualDayItineraryItemResponseToOpenAPI(result))
+	_ = authContext
+	writeError(w, http.StatusGone, "MANUAL_PLACE_CREATION_DISABLED", "manual place creation is disabled; use google place search", nil)
 }
 
 func (s apiServer) ReorderDayItineraryItems(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date) {
@@ -378,6 +365,33 @@ func (s apiServer) RestoreDayItineraryItem(w http.ResponseWriter, r *http.Reques
 	}
 
 	writeJSON(w, http.StatusOK, restoreDayItineraryItemResponseToOpenAPI(result))
+}
+
+func (s apiServer) CreateRoutePreview(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, itemId string) {
+	if s.auth == nil || s.routes == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "route preview is not configured", nil)
+		return
+	}
+
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	var body openapi.CreateRoutePreviewJSONRequestBody
+	if !decodeJSON(w, r, &body) {
+		return
+	}
+
+	result, err := s.routes.CreatePreview(r.Context(), authContext.UserID, tripId, dateFromOpenAPI(date), itemId, route.PreviewInput{
+		Origin: route.GeoPoint{Latitude: body.Origin.Latitude, Longitude: body.Origin.Longitude},
+	})
+	if err != nil {
+		writeRoutePreviewError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, routePreviewResponseToOpenAPI(result))
 }
 
 func (s apiServer) UpdateDayItineraryItem(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, itemId string) {

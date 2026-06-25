@@ -218,7 +218,11 @@ SELECT
   tp.id::text AS trip_place_id,
   tp.name AS place_name,
   tp.place_type,
-  tp.address
+  tp.address,
+  tp.provider,
+  tp.google_place_id,
+  tp.latitude,
+  tp.longitude
 FROM itinerary_items ii
 JOIN trip_places tp
   ON tp.id = ii.trip_place_id
@@ -237,7 +241,11 @@ SELECT
   tp.id::text AS id,
   tp.name,
   tp.place_type,
-  tp.address
+  tp.address,
+  tp.provider,
+  tp.google_place_id,
+  tp.latitude,
+  tp.longitude
 FROM day_lodging_places dlp
 JOIN trip_places tp
   ON tp.id = dlp.trip_place_id
@@ -250,7 +258,11 @@ SELECT
   tp.id::text AS id,
   tp.name,
   tp.place_type,
-  tp.address
+  tp.address,
+  tp.provider,
+  tp.google_place_id,
+  tp.latitude,
+  tp.longitude
 FROM day_lodging_places dlp
 JOIN trip_places tp
   ON tp.id = dlp.trip_place_id
@@ -263,7 +275,11 @@ SELECT
   id::text AS id,
   name,
   place_type,
-  address
+  address,
+  provider,
+  google_place_id,
+  latitude,
+  longitude
 FROM trip_places
 WHERE trip_id = sqlc.arg(trip_id)::uuid
   AND id = sqlc.arg(trip_place_id)::uuid;
@@ -273,7 +289,11 @@ SELECT
   id::text AS id,
   name,
   place_type,
-  address
+  address,
+  provider,
+  google_place_id,
+  latitude,
+  longitude
 FROM trip_places
 WHERE trip_id = sqlc.arg(trip_id)::uuid
   AND provider = 'google'
@@ -293,7 +313,11 @@ SELECT
   tp.id::text AS id,
   tp.name,
   tp.place_type,
-  tp.address
+  tp.address,
+  tp.provider,
+  tp.google_place_id,
+  tp.latitude,
+  tp.longitude
 FROM upserted
 JOIN trip_places tp
   ON tp.id = upserted.trip_place_id
@@ -320,7 +344,11 @@ RETURNING
   id::text,
   name,
   place_type,
-  address;
+  address,
+  provider,
+  google_place_id,
+  latitude,
+  longitude;
 
 -- name: UpsertGoogleTripPlace :one
 INSERT INTO trip_places (
@@ -352,7 +380,11 @@ RETURNING
   id::text,
   name,
   place_type,
-  address;
+  address,
+  provider,
+  google_place_id,
+  latitude,
+  longitude;
 
 -- name: CountItineraryItemsByTripDateAndPlace :one
 SELECT count(*)::int
@@ -407,7 +439,11 @@ SELECT
   tp.id::text AS trip_place_id,
   tp.name AS place_name,
   tp.place_type,
-  tp.address
+  tp.address,
+  tp.provider,
+  tp.google_place_id,
+  tp.latitude,
+  tp.longitude
 FROM itinerary_items ii
 JOIN trip_places tp
   ON tp.id = ii.trip_place_id
@@ -447,7 +483,11 @@ WITH target AS (
     tp.id::text AS id,
     tp.name,
     tp.place_type,
-    tp.address
+    tp.address,
+    tp.provider,
+    tp.google_place_id,
+    tp.latitude,
+    tp.longitude
 )
 SELECT
   target.id::text AS id,
@@ -459,7 +499,11 @@ SELECT
   updated_place.id AS trip_place_id,
   updated_place.name AS place_name,
   updated_place.place_type,
-  updated_place.address
+  updated_place.address,
+  updated_place.provider,
+  updated_place.google_place_id,
+  updated_place.latitude,
+  updated_place.longitude
 FROM target
 JOIN updated_place ON true
 LEFT JOIN day_lodging_places dlp

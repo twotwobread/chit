@@ -4,6 +4,7 @@ import type {
   DayItineraryItem,
   GetDayItineraryResponse,
   GetTripDetailResponse,
+  RoutablePlace,
   TripDay,
   TripListItem,
   TripPlaceSummary,
@@ -173,6 +174,7 @@ export type TodaySuccessViewModel = {
     placeName: string;
     placeTypeLabel: string;
     address: string;
+    routablePlace: RoutablePlace | null;
     navigationAction: TodayNavigateAction;
     travelModeSelector: TravelModeSelectorViewModel;
   };
@@ -310,6 +312,7 @@ export function buildTodayExecutionViewModel({
       placeName: nextItem.place.name,
       placeTypeLabel: getPlaceTypeLabel(nextItem.place.placeType),
       address: nextItem.place.address,
+      routablePlace: nextItem.place.routablePlace ?? null,
       navigationAction: navigateAction('길찾기', nextItem.place.name, nextItem.place.address, travelMode),
       travelModeSelector: buildTravelModeSelectorViewModel(travelMode),
     },

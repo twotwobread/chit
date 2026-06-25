@@ -252,11 +252,19 @@ type GetDetailResult struct {
 	Days               []TripDay
 }
 
+type RoutablePlace struct {
+	Provider      string
+	GooglePlaceID string
+	Latitude      float64
+	Longitude     float64
+}
+
 type TripPlaceSummary struct {
-	ID        string
-	Name      string
-	PlaceType string
-	Address   string
+	ID            string
+	Name          string
+	PlaceType     string
+	Address       string
+	RoutablePlace *RoutablePlace
 }
 
 type DayItineraryItem struct {

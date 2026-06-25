@@ -23,6 +23,7 @@ export type { CreateManualDayItineraryItemRequest } from './models/CreateManualD
 export type { CreateManualDayItineraryItemResponse } from './models/CreateManualDayItineraryItemResponse';
 export type { CreateQuickExpenseRequest } from './models/CreateQuickExpenseRequest';
 export type { CreateQuickExpenseResponse } from './models/CreateQuickExpenseResponse';
+export type { CreateRoutePreviewRequest } from './models/CreateRoutePreviewRequest';
 export type { CreateTripInviteResponse } from './models/CreateTripInviteResponse';
 export type { CreateTripRequest } from './models/CreateTripRequest';
 export type { CreateTripResponse } from './models/CreateTripResponse';
@@ -32,6 +33,8 @@ export type { ErrorResponse } from './models/ErrorResponse';
 export type { Expense } from './models/Expense';
 export type { ExpensePlaceSnapshot } from './models/ExpensePlaceSnapshot';
 export type { ExpenseSplit } from './models/ExpenseSplit';
+export type { GeoBounds } from './models/GeoBounds';
+export type { GeoPoint } from './models/GeoPoint';
 export type { GetDayItineraryResponse } from './models/GetDayItineraryResponse';
 export type { GetTripDetailResponse } from './models/GetTripDetailResponse';
 export type { GooglePlaceSearchResult } from './models/GooglePlaceSearchResult';
@@ -53,6 +56,10 @@ export type { ReorderDayItineraryItemsRequest } from './models/ReorderDayItinera
 export type { ReorderDayItineraryItemsResponse } from './models/ReorderDayItineraryItemsResponse';
 export type { ReorderDayItineraryMove } from './models/ReorderDayItineraryMove';
 export type { RestoreDayItineraryItemResponse } from './models/RestoreDayItineraryItemResponse';
+export type { RoutablePlace } from './models/RoutablePlace';
+export type { RoutePreviewMap } from './models/RoutePreviewMap';
+export type { RoutePreviewResponse } from './models/RoutePreviewResponse';
+export type { RoutePreviewSummary } from './models/RoutePreviewSummary';
 export type { SearchGooglePlacesResponse } from './models/SearchGooglePlacesResponse';
 export type { SetDayLodgingPlaceRequest } from './models/SetDayLodgingPlaceRequest';
 export type { SetDayLodgingPlaceResponse } from './models/SetDayLodgingPlaceResponse';

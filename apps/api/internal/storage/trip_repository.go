@@ -370,13 +370,8 @@ func (s *Store) ListDayLodgingPlacesByTrip(ctx context.Context, tripID string) (
 	items := make([]trip.DayLodgingPlace, 0, len(rows))
 	for _, row := range rows {
 		items = append(items, trip.DayLodgingPlace{
-			Date: dateString(row.LodgingDate),
-			Place: trip.TripPlaceSummary{
-				ID:        row.ID,
-				Name:      row.Name,
-				PlaceType: row.PlaceType,
-				Address:   row.Address,
-			},
+			Date:  dateString(row.LodgingDate),
+			Place: tripPlaceSummary(row.ID, row.Name, row.PlaceType, row.Address, row.Provider, row.GooglePlaceID, row.Latitude, row.Longitude),
 		})
 	}
 	return items, nil
@@ -393,7 +388,7 @@ func (s *Store) GetDayLodgingPlaceByTripAndDate(ctx context.Context, tripID stri
 	if err != nil {
 		return trip.TripPlaceSummary{}, false, err
 	}
-	return tripPlaceSummary(row.ID, row.Name, row.PlaceType, row.Address), true, nil
+	return tripPlaceSummary(row.ID, row.Name, row.PlaceType, row.Address, row.Provider, row.GooglePlaceID, row.Latitude, row.Longitude), true, nil
 }
 
 func (s *Store) GetTripPlaceSummaryByTripAndPlace(ctx context.Context, tripID string, tripPlaceID string) (trip.TripPlaceSummary, bool, error) {
@@ -407,7 +402,7 @@ func (s *Store) GetTripPlaceSummaryByTripAndPlace(ctx context.Context, tripID st
 	if err != nil {
 		return trip.TripPlaceSummary{}, false, err
 	}
-	return tripPlaceSummary(row.ID, row.Name, row.PlaceType, row.Address), true, nil
+	return tripPlaceSummary(row.ID, row.Name, row.PlaceType, row.Address, row.Provider, row.GooglePlaceID, row.Latitude, row.Longitude), true, nil
 }
 
 func (s *Store) GetGoogleTripPlaceByGooglePlaceID(ctx context.Context, tripID string, googlePlaceID string) (trip.TripPlaceSummary, bool, error) {
@@ -421,7 +416,7 @@ func (s *Store) GetGoogleTripPlaceByGooglePlaceID(ctx context.Context, tripID st
 	if err != nil {
 		return trip.TripPlaceSummary{}, false, err
 	}
-	return tripPlaceSummary(row.ID, row.Name, row.PlaceType, row.Address), true, nil
+	return tripPlaceSummary(row.ID, row.Name, row.PlaceType, row.Address, row.Provider, row.GooglePlaceID, row.Latitude, row.Longitude), true, nil
 }
 
 func (s *Store) SetDayLodgingPlace(ctx context.Context, record trip.SetDayLodgingPlaceRecord) (trip.TripPlaceSummary, error) {
@@ -436,7 +431,7 @@ func (s *Store) SetDayLodgingPlace(ctx context.Context, record trip.SetDayLodgin
 	if err != nil {
 		return trip.TripPlaceSummary{}, err
 	}
-	return tripPlaceSummary(row.ID, row.Name, row.PlaceType, row.Address), nil
+	return tripPlaceSummary(row.ID, row.Name, row.PlaceType, row.Address, row.Provider, row.GooglePlaceID, row.Latitude, row.Longitude), nil
 }
 
 func (s *Store) DeleteDayLodgingPlace(ctx context.Context, tripID string, date string) error {
@@ -622,12 +617,7 @@ func (s *Store) CreateManualDayItineraryItem(ctx context.Context, record trip.Cr
 		Version:   int(item.Version),
 		ArrivedAt: timePtrFromTimestamptz(item.ArrivedAt),
 		SkippedAt: timePtrFromTimestamptz(item.SkippedAt),
-		Place: trip.TripPlaceSummary{
-			ID:        place.ID,
-			Name:      place.Name,
-			PlaceType: place.PlaceType,
-			Address:   place.Address,
-		},
+		Place:     tripPlaceSummary(place.ID, place.Name, place.PlaceType, place.Address, place.Provider, place.GooglePlaceID, place.Latitude, place.Longitude),
 	}, nil
 }
 
@@ -684,7 +674,7 @@ func (s *Store) AppendGooglePlaceDayItineraryItem(ctx context.Context, record pl
 		Version:   int(item.Version),
 		ArrivedAt: timePtrFromTimestamptz(item.ArrivedAt),
 		SkippedAt: timePtrFromTimestamptz(item.SkippedAt),
-		Place:     tripPlaceSummary(placeRow.ID, placeRow.Name, placeRow.PlaceType, placeRow.Address),
+		Place:     tripPlaceSummary(placeRow.ID, placeRow.Name, placeRow.PlaceType, placeRow.Address, placeRow.Provider, placeRow.GooglePlaceID, placeRow.Latitude, placeRow.Longitude),
 	}, nil
 }
 
@@ -745,7 +735,7 @@ func (s *Store) CreateGooglePlaceDayItineraryItem(ctx context.Context, record pl
 		Version:   int(item.Version),
 		ArrivedAt: timePtrFromTimestamptz(item.ArrivedAt),
 		SkippedAt: timePtrFromTimestamptz(item.SkippedAt),
-		Place:     tripPlaceSummary(placeRow.ID, placeRow.Name, placeRow.PlaceType, placeRow.Address),
+		Place:     tripPlaceSummary(placeRow.ID, placeRow.Name, placeRow.PlaceType, placeRow.Address, placeRow.Provider, placeRow.GooglePlaceID, placeRow.Latitude, placeRow.Longitude),
 	}, nil
 }
 
@@ -768,12 +758,7 @@ func (s *Store) GetItineraryItemByTripDateAndID(ctx context.Context, tripID stri
 		IsLodging: boolFromSQL(row.IsLodging),
 		ArrivedAt: timePtrFromTimestamptz(row.ArrivedAt),
 		SkippedAt: timePtrFromTimestamptz(row.SkippedAt),
-		Place: trip.TripPlaceSummary{
-			ID:        row.TripPlaceID,
-			Name:      row.PlaceName,
-			PlaceType: row.PlaceType,
-			Address:   row.Address,
-		},
+		Place:     tripPlaceSummary(row.TripPlaceID, row.PlaceName, row.PlaceType, row.Address, row.Provider, row.GooglePlaceID, row.Latitude, row.Longitude),
 	}, true, nil
 }
 
@@ -1011,12 +996,7 @@ func (s *Store) UpdateDayItineraryItemPlace(ctx context.Context, record trip.Upd
 		IsLodging: boolFromSQL(row.IsLodging),
 		ArrivedAt: timePtrFromTimestamptz(row.ArrivedAt),
 		SkippedAt: timePtrFromTimestamptz(row.SkippedAt),
-		Place: trip.TripPlaceSummary{
-			ID:        row.TripPlaceID,
-			Name:      row.PlaceName,
-			PlaceType: row.PlaceType,
-			Address:   row.Address,
-		},
+		Place:     tripPlaceSummary(row.TripPlaceID, row.PlaceName, row.PlaceType, row.Address, row.Provider, row.GooglePlaceID, row.Latitude, row.Longitude),
 	}, nil
 }
 
@@ -1347,19 +1327,32 @@ func mapDayItineraryItems(rows []db.ListItineraryItemsByTripAndDateRow) []trip.D
 			IsLodging: boolFromSQL(row.IsLodging),
 			ArrivedAt: timePtrFromTimestamptz(row.ArrivedAt),
 			SkippedAt: timePtrFromTimestamptz(row.SkippedAt),
-			Place: trip.TripPlaceSummary{
-				ID:        row.TripPlaceID,
-				Name:      row.PlaceName,
-				PlaceType: row.PlaceType,
-				Address:   row.Address,
-			},
+			Place:     tripPlaceSummary(row.TripPlaceID, row.PlaceName, row.PlaceType, row.Address, row.Provider, row.GooglePlaceID, row.Latitude, row.Longitude),
 		})
 	}
 	return items
 }
 
-func tripPlaceSummary(id string, name string, placeType string, address string) trip.TripPlaceSummary {
-	return trip.TripPlaceSummary{ID: id, Name: name, PlaceType: placeType, Address: address}
+func tripPlaceSummary(id string, name string, placeType string, address string, provider string, googlePlaceID pgtype.Text, latitude pgtype.Float8, longitude pgtype.Float8) trip.TripPlaceSummary {
+	return trip.TripPlaceSummary{
+		ID:            id,
+		Name:          name,
+		PlaceType:     placeType,
+		Address:       address,
+		RoutablePlace: routablePlace(provider, googlePlaceID, latitude, longitude),
+	}
+}
+
+func routablePlace(provider string, googlePlaceID pgtype.Text, latitude pgtype.Float8, longitude pgtype.Float8) *trip.RoutablePlace {
+	if provider != "google" || !googlePlaceID.Valid || !latitude.Valid || !longitude.Valid {
+		return nil
+	}
+	return &trip.RoutablePlace{
+		Provider:      "google",
+		GooglePlaceID: googlePlaceID.String,
+		Latitude:      latitude.Float64,
+		Longitude:     longitude.Float64,
+	}
 }
 
 func findDayItineraryItem(items []trip.DayItineraryItem, itemID string) (trip.DayItineraryItem, bool) {

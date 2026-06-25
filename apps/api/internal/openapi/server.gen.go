@@ -69,6 +69,16 @@ const (
 	ReadinessResponseStatusOk ReadinessResponseStatus = "ok"
 )
 
+// Defines values for RoutablePlaceProvider.
+const (
+	Google RoutablePlaceProvider = "google"
+)
+
+// Defines values for RoutePreviewResponseMode.
+const (
+	Transit RoutePreviewResponseMode = "transit"
+)
+
 // Defines values for SupportedCurrency.
 const (
 	EUR SupportedCurrency = "EUR"
@@ -206,6 +216,11 @@ type CreateQuickExpenseResponse struct {
 	Expense Expense `json:"expense"`
 }
 
+// CreateRoutePreviewRequest defines model for CreateRoutePreviewRequest.
+type CreateRoutePreviewRequest struct {
+	Origin GeoPoint `json:"origin"`
+}
+
 // CreateTripInviteResponse defines model for CreateTripInviteResponse.
 type CreateTripInviteResponse struct {
 	// Created true when this request created a new invite, false when an existing unexpired current invite was reused.
@@ -292,6 +307,18 @@ type ExpenseSplit struct {
 	AmountMinor   int64   `json:"amountMinor"`
 	DisplayName   string  `json:"displayName"`
 	ParticipantId *string `json:"participantId"`
+}
+
+// GeoBounds defines model for GeoBounds.
+type GeoBounds struct {
+	Northeast GeoPoint `json:"northeast"`
+	Southwest GeoPoint `json:"southwest"`
+}
+
+// GeoPoint defines model for GeoPoint.
+type GeoPoint struct {
+	Latitude  float64 `json:"latitude"`
+	Longitude float64 `json:"longitude"`
 }
 
 // GetDayItineraryResponse defines model for GetDayItineraryResponse.
@@ -464,6 +491,45 @@ type RestoreDayItineraryItemResponse struct {
 	Items []DayItineraryItem `json:"items"`
 }
 
+// RoutablePlace defines model for RoutablePlace.
+type RoutablePlace struct {
+	GooglePlaceId string                `json:"googlePlaceId"`
+	Latitude      float64               `json:"latitude"`
+	Longitude     float64               `json:"longitude"`
+	Provider      RoutablePlaceProvider `json:"provider"`
+}
+
+// RoutablePlaceProvider defines model for RoutablePlace.Provider.
+type RoutablePlaceProvider string
+
+// RoutePreviewMap defines model for RoutePreviewMap.
+type RoutePreviewMap struct {
+	Bounds          GeoBounds `json:"bounds"`
+	Destination     GeoPoint  `json:"destination"`
+	EncodedPolyline string    `json:"encodedPolyline"`
+	Origin          GeoPoint  `json:"origin"`
+}
+
+// RoutePreviewResponse defines model for RoutePreviewResponse.
+type RoutePreviewResponse struct {
+	GeneratedAt time.Time                `json:"generatedAt"`
+	ItemId      string                   `json:"itemId"`
+	Map         *RoutePreviewMap         `json:"map"`
+	Mode        RoutePreviewResponseMode `json:"mode"`
+	Summary     RoutePreviewSummary      `json:"summary"`
+}
+
+// RoutePreviewResponseMode defines model for RoutePreviewResponse.Mode.
+type RoutePreviewResponseMode string
+
+// RoutePreviewSummary defines model for RoutePreviewSummary.
+type RoutePreviewSummary struct {
+	DistanceMeters  int    `json:"distanceMeters"`
+	DurationSeconds int    `json:"durationSeconds"`
+	SummaryText     string `json:"summaryText"`
+	TransferCount   *int   `json:"transferCount"`
+}
+
 // SearchGooglePlacesResponse defines model for SearchGooglePlacesResponse.
 type SearchGooglePlacesResponse struct {
 	Results []GooglePlaceSearchResult `json:"results"`
@@ -561,10 +627,11 @@ type TripParticipantSummary struct {
 
 // TripPlaceSummary defines model for TripPlaceSummary.
 type TripPlaceSummary struct {
-	Address   string        `json:"address"`
-	Id        string        `json:"id"`
-	Name      string        `json:"name"`
-	PlaceType TripPlaceType `json:"placeType"`
+	Address       string         `json:"address"`
+	Id            string         `json:"id"`
+	Name          string         `json:"name"`
+	PlaceType     TripPlaceType  `json:"placeType"`
+	RoutablePlace *RoutablePlace `json:"routablePlace"`
 }
 
 // TripPlaceType defines model for TripPlaceType.
@@ -640,6 +707,9 @@ type ReorderDayItineraryItemsJSONRequestBody = ReorderDayItineraryItemsRequest
 
 // UpdateDayItineraryItemJSONRequestBody defines body for UpdateDayItineraryItem for application/json ContentType.
 type UpdateDayItineraryItemJSONRequestBody = UpdateDayItineraryItemRequest
+
+// CreateRoutePreviewJSONRequestBody defines body for CreateRoutePreview for application/json ContentType.
+type CreateRoutePreviewJSONRequestBody = CreateRoutePreviewRequest
 
 // SetDayLodgingPlaceJSONRequestBody defines body for SetDayLodgingPlace for application/json ContentType.
 type SetDayLodgingPlaceJSONRequestBody = SetDayLodgingPlaceRequest
@@ -721,6 +791,9 @@ type ServerInterface interface {
 	// Restore a skipped trip day itinerary item
 	// (POST /trips/{tripId}/days/{date}/itinerary/items/{itemId}/restore)
 	RestoreDayItineraryItem(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, itemId string)
+	// Create an in-app route preview for a trip day itinerary item
+	// (POST /trips/{tripId}/days/{date}/itinerary/items/{itemId}/route-preview)
+	CreateRoutePreview(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, itemId string)
 	// Mark a trip day itinerary item skipped
 	// (POST /trips/{tripId}/days/{date}/itinerary/items/{itemId}/skip)
 	MarkDayItineraryItemSkipped(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, itemId string)
@@ -892,6 +965,12 @@ func (_ Unimplemented) MarkDayItineraryItemArrived(w http.ResponseWriter, r *htt
 // Restore a skipped trip day itinerary item
 // (POST /trips/{tripId}/days/{date}/itinerary/items/{itemId}/restore)
 func (_ Unimplemented) RestoreDayItineraryItem(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, itemId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Create an in-app route preview for a trip day itinerary item
+// (POST /trips/{tripId}/days/{date}/itinerary/items/{itemId}/route-preview)
+func (_ Unimplemented) CreateRoutePreview(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, itemId string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1648,6 +1727,55 @@ func (siw *ServerInterfaceWrapper) RestoreDayItineraryItem(w http.ResponseWriter
 	handler.ServeHTTP(w, r)
 }
 
+// CreateRoutePreview operation middleware
+func (siw *ServerInterfaceWrapper) CreateRoutePreview(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "date" -------------
+	var date openapi_types.Date
+
+	err = runtime.BindStyledParameterWithOptions("simple", "date", chi.URLParam(r, "date"), &date, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "date", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "itemId" -------------
+	var itemId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "itemId", chi.URLParam(r, "itemId"), &itemId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "itemId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateRoutePreview(w, r, tripId, date, itemId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // MarkDayItineraryItemSkipped operation middleware
 func (siw *ServerInterfaceWrapper) MarkDayItineraryItemSkipped(w http.ResponseWriter, r *http.Request) {
 
@@ -2169,6 +2297,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/trips/{tripId}/days/{date}/itinerary/items/{itemId}/restore", wrapper.RestoreDayItineraryItem)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/trips/{tripId}/days/{date}/itinerary/items/{itemId}/route-preview", wrapper.CreateRoutePreview)
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/trips/{tripId}/days/{date}/itinerary/items/{itemId}/skip", wrapper.MarkDayItineraryItemSkipped)

@@ -775,7 +775,8 @@ paths:
     post:
       operationId: createManualDayItineraryItem
       summary: Add a manual place to a trip day itinerary
-      description: Creates a manual trip place snapshot and appends a linked itinerary item to the selected virtual trip day.
+      description: Deprecated. Manual Day itinerary item creation is disabled for normal app use; add Google-backed places instead.
+      deprecated: true
       tags:
         - Trips
       security:
@@ -831,6 +832,12 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '409':
           description: Concurrent append conflict.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '410':
+          description: Manual place creation is disabled; use Google-backed place add flow.
           content:
             application/json:
               schema:
@@ -1108,6 +1115,93 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '409':
           description: Restore conflict because the target item is already arrived.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /trips/{tripId}/days/{date}/itinerary/items/{itemId}/route-preview:
+    post:
+      operationId: createRoutePreview
+      summary: Create an in-app route preview for a trip day itinerary item
+      description: Returns a lightweight current-location-to-next-place route preview for the selected first pending itinerary item. Detailed navigation remains delegated to Google Maps.
+      tags:
+        - Trips
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: date
+          in: path
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRoutePreviewRequest'
+      responses:
+        '200':
+          description: Route preview for the selected current next item.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoutePreviewResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip, virtual day, itinerary item, or provider route not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Target item is stale or destination place is not routable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Route provider rate limited.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Route provider unavailable or returned unusable route data.
           content:
             application/json:
               schema:
@@ -1885,6 +1979,7 @@ components:
         - name
         - placeType
         - address
+        - routablePlace
       properties:
         id:
           type: string
@@ -1894,6 +1989,128 @@ components:
           $ref: '#/components/schemas/TripPlaceType'
         address:
           type: string
+        routablePlace:
+          allOf:
+            - $ref: '#/components/schemas/RoutablePlace'
+          nullable: true
+    RoutablePlace:
+      type: object
+      required:
+        - provider
+        - googlePlaceId
+        - latitude
+        - longitude
+      properties:
+        provider:
+          type: string
+          enum:
+            - google
+        googlePlaceId:
+          type: string
+        latitude:
+          type: number
+          format: double
+          minimum: -90
+          maximum: 90
+        longitude:
+          type: number
+          format: double
+          minimum: -180
+          maximum: 180
+    GeoPoint:
+      type: object
+      required:
+        - latitude
+        - longitude
+      properties:
+        latitude:
+          type: number
+          format: double
+          minimum: -90
+          maximum: 90
+        longitude:
+          type: number
+          format: double
+          minimum: -180
+          maximum: 180
+    GeoBounds:
+      type: object
+      required:
+        - northeast
+        - southwest
+      properties:
+        northeast:
+          $ref: '#/components/schemas/GeoPoint'
+        southwest:
+          $ref: '#/components/schemas/GeoPoint'
+    CreateRoutePreviewRequest:
+      type: object
+      required:
+        - origin
+      additionalProperties: false
+      properties:
+        origin:
+          $ref: '#/components/schemas/GeoPoint'
+    RoutePreviewSummary:
+      type: object
+      required:
+        - durationSeconds
+        - distanceMeters
+        - summaryText
+        - transferCount
+      properties:
+        durationSeconds:
+          type: integer
+          minimum: 0
+        distanceMeters:
+          type: integer
+          minimum: 0
+        summaryText:
+          type: string
+        transferCount:
+          type: integer
+          nullable: true
+          minimum: 0
+    RoutePreviewMap:
+      type: object
+      required:
+        - encodedPolyline
+        - origin
+        - destination
+        - bounds
+      properties:
+        encodedPolyline:
+          type: string
+        origin:
+          $ref: '#/components/schemas/GeoPoint'
+        destination:
+          $ref: '#/components/schemas/GeoPoint'
+        bounds:
+          $ref: '#/components/schemas/GeoBounds'
+    RoutePreviewResponse:
+      type: object
+      required:
+        - itemId
+        - mode
+        - summary
+        - map
+        - generatedAt
+      properties:
+        itemId:
+          type: string
+        mode:
+          type: string
+          enum:
+            - transit
+        summary:
+          $ref: '#/components/schemas/RoutePreviewSummary'
+        map:
+          allOf:
+            - $ref: '#/components/schemas/RoutePreviewMap'
+          nullable: true
+        generatedAt:
+          type: string
+          format: date-time
     DayItineraryItem:
       type: object
       required:

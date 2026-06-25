@@ -8,6 +8,7 @@ import (
 	"github.com/twotwobread/i-um/apps/api/internal/auth"
 	"github.com/twotwobread/i-um/apps/api/internal/openapi"
 	"github.com/twotwobread/i-um/apps/api/internal/place"
+	"github.com/twotwobread/i-um/apps/api/internal/route"
 	"github.com/twotwobread/i-um/apps/api/internal/trip"
 )
 
@@ -257,6 +258,44 @@ func restoreDayItineraryItemResponseToOpenAPI(result trip.RestoreDayItineraryIte
 	}
 }
 
+func routePreviewResponseToOpenAPI(result route.PreviewResult) openapi.RoutePreviewResponse {
+	return openapi.RoutePreviewResponse{
+		ItemId:      result.ItemID,
+		Mode:        openapi.Transit,
+		Summary:     routePreviewSummaryToOpenAPI(result.Summary),
+		Map:         routePreviewMapToOpenAPI(result.Map),
+		GeneratedAt: result.GeneratedAt.UTC(),
+	}
+}
+
+func routePreviewSummaryToOpenAPI(summary route.PreviewSummary) openapi.RoutePreviewSummary {
+	return openapi.RoutePreviewSummary{
+		DurationSeconds: summary.DurationSeconds,
+		DistanceMeters:  summary.DistanceMeters,
+		SummaryText:     summary.SummaryText,
+		TransferCount:   summary.TransferCount,
+	}
+}
+
+func routePreviewMapToOpenAPI(routeMap *route.PreviewMap) *openapi.RoutePreviewMap {
+	if routeMap == nil {
+		return nil
+	}
+	return &openapi.RoutePreviewMap{
+		EncodedPolyline: routeMap.EncodedPolyline,
+		Origin:          geoPointToOpenAPI(routeMap.Origin),
+		Destination:     geoPointToOpenAPI(routeMap.Destination),
+		Bounds: openapi.GeoBounds{
+			Northeast: geoPointToOpenAPI(routeMap.Bounds.Northeast),
+			Southwest: geoPointToOpenAPI(routeMap.Bounds.Southwest),
+		},
+	}
+}
+
+func geoPointToOpenAPI(point route.GeoPoint) openapi.GeoPoint {
+	return openapi.GeoPoint{Latitude: point.Latitude, Longitude: point.Longitude}
+}
+
 func searchGooglePlacesResponseToOpenAPI(results []place.SearchResult) openapi.SearchGooglePlacesResponse {
 	items := make([]openapi.GooglePlaceSearchResult, 0, len(results))
 	for _, result := range results {
@@ -292,10 +331,23 @@ func optionalTimeToOpenAPI(value *time.Time) *time.Time {
 
 func tripPlaceSummaryToOpenAPI(place trip.TripPlaceSummary) openapi.TripPlaceSummary {
 	return openapi.TripPlaceSummary{
-		Id:        place.ID,
-		Name:      place.Name,
-		PlaceType: openapi.TripPlaceType(place.PlaceType),
-		Address:   place.Address,
+		Id:            place.ID,
+		Name:          place.Name,
+		PlaceType:     openapi.TripPlaceType(place.PlaceType),
+		Address:       place.Address,
+		RoutablePlace: routablePlaceToOpenAPI(place.RoutablePlace),
+	}
+}
+
+func routablePlaceToOpenAPI(place *trip.RoutablePlace) *openapi.RoutablePlace {
+	if place == nil {
+		return nil
+	}
+	return &openapi.RoutablePlace{
+		Provider:      openapi.Google,
+		GooglePlaceId: place.GooglePlaceID,
+		Latitude:      place.Latitude,
+		Longitude:     place.Longitude,
 	}
 }
 

@@ -1,7 +1,9 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
+import * as Location from 'expo-location';
 import { router, useFocusEffect } from 'expo-router';
+import MapView, { Marker, Polyline } from 'react-native-maps';
 
 import {
   ApiError,
@@ -15,6 +17,7 @@ import { clearStoredSession, readStoredSession } from '../lib/auth/session';
 import { theme } from '../lib/design';
 import { BottomMenu } from '../lib/navigation/BottomMenu';
 import {
+  createRoutePreview,
   getTripDayItinerary,
   getTripDetail,
   listMyTrips,
@@ -44,6 +47,19 @@ import {
   type TodayNavigationFallbackState,
 } from '../lib/trips/today-navigation-fallback';
 import {
+  buildRoutePreviewRequest,
+  routePreviewEligibility,
+  todayRoutePreviewCacheKey,
+  todayRoutePreviewLoadingState,
+  todayRoutePreviewPermissionNeededState,
+  todayRoutePreviewSuccessState,
+  todayRoutePreviewUnavailableState,
+  todayRoutePreviewUnsupportedState,
+  type TodayRoutePreviewOrigin,
+  type TodayRoutePreviewState,
+  type TodayRoutePreviewViewModel,
+} from '../lib/trips/today-route-preview';
+import {
   defaultTravelMode,
   readStoredTravelMode,
   saveSelectedTravelMode,
@@ -70,6 +86,8 @@ export default function HomeScreen() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [navigationFallback, setNavigationFallback] = useState<TodayNavigationFallbackState | null>(null);
   const [navigationRetrying, setNavigationRetrying] = useState(false);
+  const [routePreviewState, setRoutePreviewState] = useState<TodayRoutePreviewState>({ status: 'idle' });
+  const routePreviewCacheRef = useRef(new Map<string, TodayRoutePreviewState>());
 
   const handleAuthError = useCallback(async (error: unknown) => {
     if (error instanceof MobileAuthError && (error.code === 'INVALID_REFRESH_TOKEN' || error.code === 'UNAUTHORIZED')) {
@@ -92,6 +110,7 @@ export default function HomeScreen() {
     setActionError(null);
     setNavigationFallback(resetTodayNavigationFallbackState());
     setNavigationRetrying(false);
+    setRoutePreviewState({ status: 'idle' });
     setTodayState({ status: 'loading' });
 
     try {
@@ -204,6 +223,79 @@ export default function HomeScreen() {
     [],
   );
 
+  const loadRoutePreview = useCallback(
+    async (viewModel: Extract<TodayExecutionViewModel, { status: 'success' }>, options?: { force?: boolean }) => {
+      const destination = { itemId: viewModel.nextPlace.itemId, routablePlace: viewModel.nextPlace.routablePlace };
+      if (routePreviewEligibility(destination) === 'unsupported' || !viewModel.nextPlace.routablePlace) {
+        setRoutePreviewState(todayRoutePreviewUnsupportedState());
+        return;
+      }
+
+      setRoutePreviewState(todayRoutePreviewLoadingState());
+      try {
+        const permission = await Location.requestForegroundPermissionsAsync();
+        if (permission.status !== Location.PermissionStatus.GRANTED) {
+          setRoutePreviewState(todayRoutePreviewPermissionNeededState());
+          return;
+        }
+
+        const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        const origin: TodayRoutePreviewOrigin = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        };
+        const cacheKey = todayRoutePreviewCacheKey({
+          itemId: viewModel.nextPlace.itemId,
+          origin,
+          routablePlace: viewModel.nextPlace.routablePlace,
+        });
+        if (!options?.force) {
+          const cached = routePreviewCacheRef.current.get(cacheKey);
+          if (cached) {
+            setRoutePreviewState(cached);
+            return;
+          }
+        }
+
+        const response = await createRoutePreview(
+          viewModel.arrivalAction.tripId,
+          viewModel.arrivalAction.date,
+          viewModel.nextPlace.itemId,
+          buildRoutePreviewRequest(origin),
+        );
+        const successState = todayRoutePreviewSuccessState(response);
+        routePreviewCacheRef.current.set(cacheKey, successState);
+        setRoutePreviewState(successState);
+      } catch (error) {
+        if (await handleAuthError(error)) {
+          return;
+        }
+        if (error instanceof ApiError && error.body?.error?.code === 'ROUTE_PREVIEW_UNSUPPORTED_PLACE') {
+          setRoutePreviewState(todayRoutePreviewUnsupportedState());
+          return;
+        }
+        setRoutePreviewState(todayRoutePreviewUnavailableState());
+      }
+    },
+    [handleAuthError],
+  );
+
+  useEffect(() => {
+    if (todayState.status !== 'ready' || todayState.viewModel.status !== 'success') {
+      setRoutePreviewState({ status: 'idle' });
+      return;
+    }
+
+    void loadRoutePreview(todayState.viewModel);
+  }, [loadRoutePreview, todayState]);
+
+  const handleRoutePreviewRetry = useCallback(() => {
+    if (todayState.status !== 'ready' || todayState.viewModel.status !== 'success') {
+      return;
+    }
+    void loadRoutePreview(todayState.viewModel, { force: true });
+  }, [loadRoutePreview, todayState]);
+
   const handleArrive = useCallback(
     async (action: Extract<TodayAction, { kind: 'arrive' }>) => {
       if (arrivingItemId) {
@@ -225,6 +317,7 @@ export default function HomeScreen() {
       setActionError(null);
       setNavigationFallback(resetTodayNavigationFallbackState());
       setNavigationRetrying(false);
+      setRoutePreviewState({ status: 'idle' });
       try {
         const response = await markDayItineraryItemArrived(action.tripId, action.date, action.itemId);
         applyTodayItineraryResponse(context, response, currentTravelMode);
@@ -473,10 +566,12 @@ export default function HomeScreen() {
             skippingItemId={skippingItemId}
             navigationFallback={navigationFallback}
             navigationRetrying={navigationRetrying}
+            routePreviewState={routePreviewState}
             onAction={runAction}
             onNavigationFallbackCopy={handleNavigationFallbackCopy}
             onNavigationFallbackOpenItinerary={handleNavigationFallbackOpenItinerary}
             onNavigationFallbackRetry={handleNavigationFallbackRetry}
+            onRoutePreviewRetry={handleRoutePreviewRetry}
             onTravelModeSelect={handleTravelModeSelect}
             viewModel={todayState.viewModel}
           />
@@ -495,10 +590,12 @@ function TodayContent({
   skippingItemId,
   navigationFallback,
   navigationRetrying,
+  routePreviewState,
   onAction,
   onNavigationFallbackCopy,
   onNavigationFallbackOpenItinerary,
   onNavigationFallbackRetry,
+  onRoutePreviewRetry,
   onTravelModeSelect,
   viewModel,
 }: {
@@ -508,10 +605,12 @@ function TodayContent({
   skippingItemId: string | null;
   navigationFallback: TodayNavigationFallbackState | null;
   navigationRetrying: boolean;
+  routePreviewState: TodayRoutePreviewState;
   onAction: (action: TodayAction) => void;
   onNavigationFallbackCopy: (destination: TodayNavigationDestination) => void;
   onNavigationFallbackOpenItinerary: (action: Extract<TodayAction, { kind: 'route' }>) => void;
   onNavigationFallbackRetry: (destination: TodayNavigationDestination, travelMode?: TravelMode) => void;
+  onRoutePreviewRetry: () => void;
   onTravelModeSelect: (travelMode: TravelMode) => void;
   viewModel: TodayExecutionViewModel;
 }) {
@@ -667,6 +766,11 @@ function TodayContent({
         />
       ) : null}
       {actionError ? <Text style={styles.actionError}>{actionError}</Text> : null}
+      <TodayRoutePreviewCard
+        onDetail={() => onAction(viewModel.nextPlace.navigationAction)}
+        onRetry={onRoutePreviewRetry}
+        state={routePreviewState}
+      />
       <ActionButton
         action={viewModel.arrivalAction}
         disabled={arrivingItemId === viewModel.arrivalAction.itemId}
@@ -774,6 +878,115 @@ function SkippedPlacesSection({
         })}
       </View>
     </View>
+  );
+}
+
+function TodayRoutePreviewCard({
+  onDetail,
+  onRetry,
+  state,
+}: {
+  onDetail: () => void;
+  onRetry: () => void;
+  state: TodayRoutePreviewState;
+}) {
+  if (state.status === 'idle') {
+    return null;
+  }
+
+  if (state.status === 'loading') {
+    return (
+      <View style={styles.routePreviewCard}>
+        <ActivityIndicator color={theme.color.primary} />
+        <Text style={styles.routePreviewHelper}>{state.message}</Text>
+      </View>
+    );
+  }
+
+  if (state.status === 'success') {
+    return <TodayRoutePreviewSuccessCard onDetail={onDetail} viewModel={state.viewModel} />;
+  }
+
+  const canRetry = state.status === 'permissionNeeded' || state.status === 'unavailable';
+  return (
+    <View style={styles.routePreviewCard}>
+      <Text style={styles.routePreviewTitle}>{state.title}</Text>
+      <Text style={styles.routePreviewHelper}>{state.helper}</Text>
+      <View style={styles.routePreviewActions}>
+        {canRetry ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={onRetry}
+            style={[styles.secondaryButton, styles.routePreviewAction]}
+          >
+            <Text style={styles.secondaryButtonText}>{state.retryLabel}</Text>
+          </Pressable>
+        ) : null}
+        <Pressable accessibilityRole="button" onPress={onDetail} style={[styles.button, styles.routePreviewAction]}>
+          <Text style={styles.buttonText}>Google Maps에서 자세히</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+function TodayRoutePreviewSuccessCard({
+  onDetail,
+  viewModel,
+}: {
+  onDetail: () => void;
+  viewModel: TodayRoutePreviewViewModel;
+}) {
+  return (
+    <View style={styles.routePreviewCard}>
+      <View style={styles.routePreviewHeader}>
+        <Text style={styles.routePreviewTitle}>이동 미리보기</Text>
+        <Text style={styles.routePreviewMode}>{viewModel.modeLabel}</Text>
+      </View>
+      {viewModel.map ? <TodayRoutePreviewMap viewModel={viewModel} /> : null}
+      <View style={styles.routePreviewSummaryRow}>
+        <Text style={styles.routePreviewMetric}>{viewModel.durationLabel}</Text>
+        <Text style={styles.routePreviewMetric}>{viewModel.distanceLabel}</Text>
+      </View>
+      <Text style={styles.routePreviewHelper}>{viewModel.summaryText}</Text>
+      <Pressable accessibilityRole="button" onPress={onDetail} style={styles.secondaryButton}>
+        <Text style={styles.secondaryButtonText}>{viewModel.detailActionLabel}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function TodayRoutePreviewMap({ viewModel }: { viewModel: TodayRoutePreviewViewModel }) {
+  if (!viewModel.map) {
+    return null;
+  }
+  const latitudeDelta = Math.max(
+    0.01,
+    Math.abs(viewModel.map.bounds.northeast.latitude - viewModel.map.bounds.southwest.latitude) * 1.25,
+  );
+  const longitudeDelta = Math.max(
+    0.01,
+    Math.abs(viewModel.map.bounds.northeast.longitude - viewModel.map.bounds.southwest.longitude) * 1.25,
+  );
+  const region = {
+    latitude: (viewModel.map.bounds.northeast.latitude + viewModel.map.bounds.southwest.latitude) / 2,
+    longitude: (viewModel.map.bounds.northeast.longitude + viewModel.map.bounds.southwest.longitude) / 2,
+    latitudeDelta,
+    longitudeDelta,
+  };
+
+  return (
+    <MapView
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      initialRegion={region}
+      pointerEvents="none"
+      style={styles.routePreviewMap}
+    >
+      <Marker coordinate={viewModel.map.origin} />
+      <Marker coordinate={viewModel.map.destination} />
+      <Polyline coordinates={viewModel.map.coordinates} strokeColor={theme.color.primary} strokeWidth={4} />
+    </MapView>
   );
 }
 
@@ -1191,6 +1404,59 @@ const styles = StyleSheet.create({
     fontFamily: theme.font.family.regular,
     fontSize: theme.font.size.label,
     textAlign: 'center',
+  },
+  routePreviewCard: {
+    backgroundColor: theme.color.surfaceSunken,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    gap: theme.space[3],
+    overflow: 'hidden',
+    padding: theme.space[4],
+  },
+  routePreviewHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  routePreviewTitle: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.subhead,
+    fontWeight: theme.font.weight.bold,
+  },
+  routePreviewMode: {
+    color: theme.color.primary,
+    fontFamily: theme.font.family.semibold,
+    fontSize: theme.font.size.caption,
+    fontWeight: theme.font.weight.semibold,
+  },
+  routePreviewHelper: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.label,
+  },
+  routePreviewSummaryRow: {
+    flexDirection: 'row',
+    gap: theme.space[3],
+  },
+  routePreviewMetric: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.headline,
+    fontWeight: theme.font.weight.bold,
+  },
+  routePreviewActions: {
+    flexDirection: 'row',
+    gap: theme.space[3],
+  },
+  routePreviewAction: {
+    flex: 1,
+  },
+  routePreviewMap: {
+    borderRadius: theme.radius.md,
+    height: 148,
+    overflow: 'hidden',
   },
   navigationFallbackPanel: {
     backgroundColor: theme.color.accentSoft,
