@@ -1,3 +1,5 @@
+import type { TravelMode } from './travel-mode';
+
 export type TodayNavigationDestination = {
   placeName: string;
   address?: string | null;
@@ -21,18 +23,26 @@ export function buildGoogleMapsDestinationQuery(destination: TodayNavigationDest
   return address ? `${placeName} ${address}` : placeName;
 }
 
-export function buildGoogleMapsDirectionsUrl(destination: TodayNavigationDestination, platform: string): string {
+export function buildGoogleMapsDirectionsUrl(
+  destination: TodayNavigationDestination,
+  platform: string,
+  travelMode?: TravelMode,
+): string {
   const encodedDestination = encodeURIComponent(buildGoogleMapsDestinationQuery(destination));
 
   if (platform === 'ios') {
-    return `comgooglemaps://?daddr=${encodedDestination}`;
+    const modeParameter = travelMode ? `&directionsmode=${travelMode}` : '';
+    return `comgooglemaps://?daddr=${encodedDestination}${modeParameter}`;
   }
 
   if (platform === 'android') {
-    return `google.navigation:q=${encodedDestination}`;
+    const androidMode = googleNavigationModeParameter(travelMode);
+    const modeParameter = androidMode ? `&mode=${androidMode}` : '';
+    return `google.navigation:q=${encodedDestination}${modeParameter}`;
   }
 
-  return `https://www.google.com/maps/dir/?api=1&destination=${encodedDestination}`;
+  const modeParameter = travelMode ? `&travelmode=${travelMode}` : '';
+  return `https://www.google.com/maps/dir/?api=1&destination=${encodedDestination}${modeParameter}`;
 }
 
 export function buildGoogleMapsInstallUrl(platform: string): string {
@@ -51,12 +61,14 @@ export async function openTodayNavigationDestination({
   destination,
   launcher,
   platform,
+  travelMode,
 }: {
   destination: TodayNavigationDestination;
   launcher: TodayNavigationLauncher;
   platform: string;
+  travelMode?: TravelMode;
 }): Promise<TodayNavigationResult> {
-  const directionsUrl = buildGoogleMapsDirectionsUrl(destination, platform);
+  const directionsUrl = buildGoogleMapsDirectionsUrl(destination, platform, travelMode);
 
   try {
     await launcher.openURL(directionsUrl);
@@ -71,4 +83,16 @@ export async function openTodayNavigationDestination({
       return { status: 'failed', message: todayNavigationFailureMessage };
     }
   }
+}
+
+function googleNavigationModeParameter(travelMode: TravelMode | undefined): 'd' | 'w' | null {
+  if (travelMode === 'driving') {
+    return 'd';
+  }
+
+  if (travelMode === 'walking') {
+    return 'w';
+  }
+
+  return null;
 }
