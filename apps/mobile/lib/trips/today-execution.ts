@@ -6,6 +6,7 @@ import type {
   GetTripDetailResponse,
   TripDay,
   TripListItem,
+  TripPlaceSummary,
 } from '@i-um/api-contract';
 
 import { buildDayItineraryRoute, getPlaceTypeLabel } from './day-itinerary';
@@ -65,6 +66,18 @@ export type TodayNavigateAction = {
   travelMode: TravelMode;
 };
 
+export type TodayLodgingNavigationActionViewModel = {
+  label: string;
+  disabled: boolean;
+  helper: string | null;
+  action: TodayNavigateAction | null;
+};
+
+const todayLodgingNavigationCopy = {
+  action: '숙소로 이동',
+  missingHelper: '오늘 일정에서 대표 숙소를 지정하면 바로 이동할 수 있어요.',
+} as const;
+
 export type TodayAction =
   | TodayRouteAction
   | TodayRetryAction
@@ -116,6 +129,7 @@ export type TodayEmptyItineraryViewModel = {
   title: string;
   helper: string;
   primaryAction: TodayRouteAction;
+  lodgingNavigationAction: TodayLodgingNavigationActionViewModel;
   multipleOngoingTripNotice: TodayMultipleOngoingTripNotice | null;
 };
 
@@ -129,6 +143,7 @@ export type TodayCompletedViewModel = {
   completedCountLabel: string;
   quickExpenseAction: TodayRouteAction;
   primaryAction: TodayRouteAction;
+  lodgingNavigationAction: TodayLodgingNavigationActionViewModel;
   multipleOngoingTripNotice: TodayMultipleOngoingTripNotice | null;
 };
 
@@ -166,6 +181,7 @@ export type TodaySuccessViewModel = {
   quickExpenseAction: TodayRouteAction;
   skipAction: TodaySkipAction;
   primaryAction: TodayRouteAction;
+  lodgingNavigationAction: TodayLodgingNavigationActionViewModel;
   multipleOngoingTripNotice: TodayMultipleOngoingTripNotice | null;
 };
 
@@ -178,6 +194,7 @@ export type TodayRecoverNeededViewModel = {
   helper: string;
   skippedSection: TodaySkippedPlacesSectionViewModel;
   primaryAction: TodayRouteAction;
+  lodgingNavigationAction: TodayLodgingNavigationActionViewModel;
   multipleOngoingTripNotice: TodayMultipleOngoingTripNotice | null;
 };
 
@@ -241,11 +258,13 @@ export function buildTodayExecutionViewModel({
 
   const dayRoute = buildDayItineraryRoute(selectedTrip.id, currentDay.date);
   const orderedItems = orderedItineraryItems(itinerary.items);
+  const lodgingSourceDay = itinerary.day.date === currentDay.date ? itinerary.day : currentDay;
   const common = {
     tripName: tripDetail.trip.name,
     dayLabel: `Day ${currentDay.dayOrder}`,
     formattedDate: formatTripDayDate(currentDay.date),
     primaryAction: routeAction(orderedItems.length === 0 ? '오늘 일정 열기' : '오늘 일정 보기', dayRoute),
+    lodgingNavigationAction: buildLodgingNavigationAction(lodgingSourceDay.lodgingPlace, travelMode),
     multipleOngoingTripNotice: buildMultipleOngoingTripNotice(ongoingTripCount),
   };
 
@@ -291,7 +310,7 @@ export function buildTodayExecutionViewModel({
       placeName: nextItem.place.name,
       placeTypeLabel: getPlaceTypeLabel(nextItem.place.placeType),
       address: nextItem.place.address,
-      navigationAction: navigateAction(nextItem.place.name, nextItem.place.address, travelMode),
+      navigationAction: navigateAction('길찾기', nextItem.place.name, nextItem.place.address, travelMode),
       travelModeSelector: buildTravelModeSelectorViewModel(travelMode),
     },
     skippedSection:
@@ -320,6 +339,7 @@ export function applyTravelModeToTodayViewModel(
       },
       travelModeSelector: buildTravelModeSelectorViewModel(travelMode),
     },
+    lodgingNavigationAction: applyTravelModeToLodgingNavigationAction(viewModel.lodgingNavigationAction, travelMode),
   };
 }
 
@@ -409,6 +429,49 @@ function restoreAction(tripId: string, date: string, itemId: string): TodayResto
   return { kind: 'restore', label: '복구', tripId, date, itemId };
 }
 
-function navigateAction(placeName: string, address: string, travelMode: TravelMode): TodayNavigateAction {
-  return { kind: 'navigate', label: '길찾기', destination: { placeName, address }, travelMode };
+function buildLodgingNavigationAction(
+  lodgingPlace: TripPlaceSummary | null,
+  travelMode: TravelMode,
+): TodayLodgingNavigationActionViewModel {
+  if (!lodgingPlace) {
+    return {
+      label: todayLodgingNavigationCopy.action,
+      disabled: true,
+      helper: todayLodgingNavigationCopy.missingHelper,
+      action: null,
+    };
+  }
+
+  return {
+    label: todayLodgingNavigationCopy.action,
+    disabled: false,
+    helper: null,
+    action: navigateAction(todayLodgingNavigationCopy.action, lodgingPlace.name, lodgingPlace.address, travelMode),
+  };
+}
+
+function applyTravelModeToLodgingNavigationAction(
+  lodgingNavigationAction: TodayLodgingNavigationActionViewModel,
+  travelMode: TravelMode,
+): TodayLodgingNavigationActionViewModel {
+  if (!lodgingNavigationAction.action) {
+    return lodgingNavigationAction;
+  }
+
+  return {
+    ...lodgingNavigationAction,
+    action: {
+      ...lodgingNavigationAction.action,
+      travelMode,
+    },
+  };
+}
+
+function navigateAction(
+  label: string,
+  placeName: string,
+  address: string,
+  travelMode: TravelMode,
+): TodayNavigateAction {
+  return { kind: 'navigate', label, destination: { placeName, address }, travelMode };
 }
