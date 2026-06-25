@@ -38,7 +38,9 @@ export function parseInviteLoginReturnPath(path: string | null | undefined): Pen
   return { token, returnPath: `/invite/${token}` };
 }
 
-export function setPendingInviteLoginHandoffForToken(token: string | null | undefined): PendingInviteLoginHandoff | null {
+export function setPendingInviteLoginHandoffForToken(
+  token: string | null | undefined,
+): PendingInviteLoginHandoff | null {
   const returnPath = buildInviteLoginReturnPath(token);
   if (!returnPath) {
     return null;

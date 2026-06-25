@@ -1,4 +1,12 @@
-import type { DayItineraryItem, GetDayItineraryResponse, GetTripDetailResponse, TripDay, TripListItem } from '@i-um/api-contract';
+import type { Href } from 'expo-router';
+
+import type {
+  DayItineraryItem,
+  GetDayItineraryResponse,
+  GetTripDetailResponse,
+  TripDay,
+  TripListItem,
+} from '@i-um/api-contract';
 
 import { buildDayItineraryRoute, getPlaceTypeLabel } from './day-itinerary';
 import { formatTripDayDate } from './days';
@@ -9,7 +17,7 @@ import { groupTripsByStatus } from './status';
 export type TodayRouteAction = {
   kind: 'route';
   label: string;
-  route: string;
+  route: Href;
 };
 
 export type TodayRetryAction = {
@@ -301,7 +309,7 @@ function buildMultipleOngoingTripNotice(ongoingTripCount: number): TodayMultiple
   };
 }
 
-function routeAction(label: string, route: string): TodayRouteAction {
+function routeAction(label: string, route: Href): TodayRouteAction {
   return { kind: 'route', label, route };
 }
 

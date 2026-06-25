@@ -20,7 +20,15 @@ export type InviteViewModel = {
 export type InviteAcceptAction = 'viewTrip' | 'login' | 'home' | 'retry';
 
 export type InviteAcceptViewModel = {
-  kind: 'accepted' | 'alreadyMember' | 'ownerAlready' | 'loginRequired' | 'authRequired' | 'expired' | 'invalid' | 'retryableError';
+  kind:
+    | 'accepted'
+    | 'alreadyMember'
+    | 'ownerAlready'
+    | 'loginRequired'
+    | 'authRequired'
+    | 'expired'
+    | 'invalid'
+    | 'retryableError';
   title: string;
   message: string;
   primaryAction: InviteAcceptAction;
@@ -31,7 +39,10 @@ export type InviteAcceptViewModel = {
   tripName?: string;
 };
 
-export function canCreateTripInvite(tripDetail: GetTripDetailResponse | null, currentUserId: string | null | undefined): boolean {
+export function canCreateTripInvite(
+  tripDetail: GetTripDetailResponse | null,
+  currentUserId: string | null | undefined,
+): boolean {
   return Boolean(tripDetail && currentUserId && tripDetail.trip.createdBy === currentUserId);
 }
 

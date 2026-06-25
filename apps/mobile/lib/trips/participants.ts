@@ -24,13 +24,19 @@ export type ParticipantRemovalFailureStatus = 'auth' | 'error';
 const participantRemovalGenericErrorMessage = '참여자를 제거할 수 없어요. 잠시 후 다시 시도해주세요.';
 const participantRemovalAuthErrorMessage = '다시 로그인해주세요.';
 
-export function buildParticipantListViewModel(participants: TripParticipantListItem[], options: ParticipantListOptions = {}): ParticipantListViewModel {
+export function buildParticipantListViewModel(
+  participants: TripParticipantListItem[],
+  options: ParticipantListOptions = {},
+): ParticipantListViewModel {
   return {
     rows: participants.map((participant) => toParticipantRowViewModel(participant, options)),
   };
 }
 
-export function toParticipantRowViewModel(participant: TripParticipantListItem, options: ParticipantListOptions = {}): ParticipantRowViewModel {
+export function toParticipantRowViewModel(
+  participant: TripParticipantListItem,
+  options: ParticipantListOptions = {},
+): ParticipantRowViewModel {
   return {
     participantId: participant.participantId,
     displayName: participant.displayName.trim() || '여행자',
@@ -40,7 +46,10 @@ export function toParticipantRowViewModel(participant: TripParticipantListItem, 
   };
 }
 
-export function removeParticipantFromViewModel(viewModel: ParticipantListViewModel, participantId: string): ParticipantListViewModel {
+export function removeParticipantFromViewModel(
+  viewModel: ParticipantListViewModel,
+  participantId: string,
+): ParticipantListViewModel {
   return {
     rows: viewModel.rows.filter((participant) => participant.participantId !== participantId),
   };
@@ -50,7 +59,10 @@ export function participantRoleLabel(role: TripParticipantRole): string {
   return tripRoleLabel(role);
 }
 
-export function participantListFailureStatus(input: { httpStatus?: number; mobileAuthCode?: string }): ParticipantListFailureStatus {
+export function participantListFailureStatus(input: {
+  httpStatus?: number;
+  mobileAuthCode?: string;
+}): ParticipantListFailureStatus {
   if (input.mobileAuthCode === 'UNAUTHORIZED' || input.mobileAuthCode === 'INVALID_REFRESH_TOKEN') {
     return 'auth';
   }
@@ -66,7 +78,10 @@ export function participantListFailureStatus(input: { httpStatus?: number; mobil
   return 'error';
 }
 
-export function participantRemovalFailureStatus(input: { httpStatus?: number; mobileAuthCode?: string }): ParticipantRemovalFailureStatus {
+export function participantRemovalFailureStatus(input: {
+  httpStatus?: number;
+  mobileAuthCode?: string;
+}): ParticipantRemovalFailureStatus {
   if (input.mobileAuthCode === 'UNAUTHORIZED' || input.mobileAuthCode === 'INVALID_REFRESH_TOKEN') {
     return 'auth';
   }

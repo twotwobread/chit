@@ -32,7 +32,15 @@ describe('reorder itinerary helpers', () => {
       dayLabel: 'Day 1',
       formattedDate: '2026.07.10',
       items: [
-        { id: 'item-1', version: 1, orderLabel: '1', placeName: '우메다 공중정원', placeType: 'sights', placeTypeLabel: '관광지', address: 'Umeda' },
+        {
+          id: 'item-1',
+          version: 1,
+          orderLabel: '1',
+          placeName: '우메다 공중정원',
+          placeType: 'sights',
+          placeTypeLabel: '관광지',
+          address: 'Umeda',
+        },
       ],
     };
 
@@ -48,8 +56,24 @@ describe('reorder itinerary helpers', () => {
       dayLabel: 'Day 1',
       formattedDate: '2026.07.10',
       items: [
-        { id: 'item-1', version: 3, orderLabel: '1', placeName: '우메다 공중정원', placeType: 'sights', placeTypeLabel: '관광지', address: 'Umeda' },
-        { id: 'item-2', version: 5, orderLabel: '2', placeName: '도톤보리', placeType: 'food', placeTypeLabel: '식당', address: 'Dotonbori' },
+        {
+          id: 'item-1',
+          version: 3,
+          orderLabel: '1',
+          placeName: '우메다 공중정원',
+          placeType: 'sights',
+          placeTypeLabel: '관광지',
+          address: 'Umeda',
+        },
+        {
+          id: 'item-2',
+          version: 5,
+          orderLabel: '2',
+          placeName: '도톤보리',
+          placeType: 'food',
+          placeTypeLabel: '식당',
+          address: 'Dotonbori',
+        },
       ],
     };
 
@@ -110,9 +134,33 @@ describe('reorder itinerary helpers', () => {
       dayLabel: 'Day 1',
       formattedDate: '2026.07.10',
       items: [
-        { id: 'item-1', version: 3, orderLabel: '1', placeName: '우메다 공중정원', placeType: 'sights', placeTypeLabel: '관광지', address: 'Umeda' },
-        { id: 'item-2', version: 5, orderLabel: '2', placeName: '도톤보리', placeType: 'food', placeTypeLabel: '식당', address: 'Dotonbori' },
-        { id: 'item-3', version: 8, orderLabel: '3', placeName: '오사카성', placeType: 'sights', placeTypeLabel: '관광지', address: 'Osaka' },
+        {
+          id: 'item-1',
+          version: 3,
+          orderLabel: '1',
+          placeName: '우메다 공중정원',
+          placeType: 'sights',
+          placeTypeLabel: '관광지',
+          address: 'Umeda',
+        },
+        {
+          id: 'item-2',
+          version: 5,
+          orderLabel: '2',
+          placeName: '도톤보리',
+          placeType: 'food',
+          placeTypeLabel: '식당',
+          address: 'Dotonbori',
+        },
+        {
+          id: 'item-3',
+          version: 8,
+          orderLabel: '3',
+          placeName: '오사카성',
+          placeType: 'sights',
+          placeTypeLabel: '관광지',
+          address: 'Osaka',
+        },
       ],
     };
 
@@ -131,7 +179,10 @@ describe('reorder itinerary helpers', () => {
     );
     assert.equal(hasDayItineraryReorderChanges(reorderedDraft), true);
     assert.deepEqual(buildDayItineraryReorderSubmitState(false, reorderedDraft), { disabled: false, label: '저장' });
-    assert.deepEqual(buildDayItineraryReorderSubmitState(true, reorderedDraft), { disabled: true, label: '저장 중...' });
+    assert.deepEqual(buildDayItineraryReorderSubmitState(true, reorderedDraft), {
+      disabled: true,
+      label: '저장 중...',
+    });
     assert.deepEqual(buildReorderDayItineraryItemsRequest(reorderedDraft), {
       moves: [
         {
@@ -150,9 +201,33 @@ describe('reorder itinerary helpers', () => {
       dayLabel: 'Day 1',
       formattedDate: '2026.07.10',
       items: [
-        { id: 'item-1', version: 3, orderLabel: '1', placeName: '우메다 공중정원', placeType: 'sights', placeTypeLabel: '관광지', address: 'Umeda' },
-        { id: 'item-2', version: 5, orderLabel: '2', placeName: '도톤보리', placeType: 'food', placeTypeLabel: '식당', address: 'Dotonbori' },
-        { id: 'item-3', version: 8, orderLabel: '3', placeName: '오사카성', placeType: 'sights', placeTypeLabel: '관광지', address: 'Osaka' },
+        {
+          id: 'item-1',
+          version: 3,
+          orderLabel: '1',
+          placeName: '우메다 공중정원',
+          placeType: 'sights',
+          placeTypeLabel: '관광지',
+          address: 'Umeda',
+        },
+        {
+          id: 'item-2',
+          version: 5,
+          orderLabel: '2',
+          placeName: '도톤보리',
+          placeType: 'food',
+          placeTypeLabel: '식당',
+          address: 'Dotonbori',
+        },
+        {
+          id: 'item-3',
+          version: 8,
+          orderLabel: '3',
+          placeName: '오사카성',
+          placeType: 'sights',
+          placeTypeLabel: '관광지',
+          address: 'Osaka',
+        },
       ],
     };
 
@@ -189,9 +264,33 @@ describe('reorder itinerary helpers', () => {
       dayLabel: 'Day 1',
       formattedDate: '2026.07.10',
       items: [
-        { id: 'item-1', version: 3, orderLabel: '1', placeName: '우메다 공중정원', placeType: 'sights', placeTypeLabel: '관광지', address: 'Umeda' },
-        { id: 'item-2', version: 5, orderLabel: '2', placeName: '도톤보리', placeType: 'food', placeTypeLabel: '식당', address: 'Dotonbori' },
-        { id: 'item-3', version: 8, orderLabel: '3', placeName: '오사카성', placeType: 'sights', placeTypeLabel: '관광지', address: 'Osaka' },
+        {
+          id: 'item-1',
+          version: 3,
+          orderLabel: '1',
+          placeName: '우메다 공중정원',
+          placeType: 'sights',
+          placeTypeLabel: '관광지',
+          address: 'Umeda',
+        },
+        {
+          id: 'item-2',
+          version: 5,
+          orderLabel: '2',
+          placeName: '도톤보리',
+          placeType: 'food',
+          placeTypeLabel: '식당',
+          address: 'Dotonbori',
+        },
+        {
+          id: 'item-3',
+          version: 8,
+          orderLabel: '3',
+          placeName: '오사카성',
+          placeType: 'sights',
+          placeTypeLabel: '관광지',
+          address: 'Osaka',
+        },
       ],
     };
 
@@ -214,8 +313,24 @@ describe('reorder itinerary helpers', () => {
       dayLabel: 'Day 1',
       formattedDate: '2026.07.10',
       items: [
-        { id: 'item-1', version: 3, orderLabel: '1', placeName: '우메다 공중정원', placeType: 'sights', placeTypeLabel: '관광지', address: 'Umeda' },
-        { id: 'item-2', version: 5, orderLabel: '2', placeName: '도톤보리', placeType: 'food', placeTypeLabel: '식당', address: 'Dotonbori' },
+        {
+          id: 'item-1',
+          version: 3,
+          orderLabel: '1',
+          placeName: '우메다 공중정원',
+          placeType: 'sights',
+          placeTypeLabel: '관광지',
+          address: 'Umeda',
+        },
+        {
+          id: 'item-2',
+          version: 5,
+          orderLabel: '2',
+          placeName: '도톤보리',
+          placeType: 'food',
+          placeTypeLabel: '식당',
+          address: 'Dotonbori',
+        },
       ],
     };
 
@@ -268,9 +383,39 @@ describe('reorder itinerary helpers', () => {
         dayLabel: 'Day 1',
         formattedDate: '2026.07.10',
         items: [
-          { id: 'item-3', version: 9, orderLabel: '1', isLodging: false, placeId: 'place-3', placeName: '오사카성', placeType: 'sights', placeTypeLabel: '관광지', address: 'Osaka' },
-          { id: 'item-1', version: 3, orderLabel: '2', isLodging: false, placeId: 'place-1', placeName: '우메다 공중정원', placeType: 'sights', placeTypeLabel: '관광지', address: 'Umeda' },
-          { id: 'item-2', version: 5, orderLabel: '3', isLodging: false, placeId: 'place-2', placeName: '도톤보리', placeType: 'food', placeTypeLabel: '식당', address: 'Dotonbori' },
+          {
+            id: 'item-3',
+            version: 9,
+            orderLabel: '1',
+            isLodging: false,
+            placeId: 'place-3',
+            placeName: '오사카성',
+            placeType: 'sights',
+            placeTypeLabel: '관광지',
+            address: 'Osaka',
+          },
+          {
+            id: 'item-1',
+            version: 3,
+            orderLabel: '2',
+            isLodging: false,
+            placeId: 'place-1',
+            placeName: '우메다 공중정원',
+            placeType: 'sights',
+            placeTypeLabel: '관광지',
+            address: 'Umeda',
+          },
+          {
+            id: 'item-2',
+            version: 5,
+            orderLabel: '3',
+            isLodging: false,
+            placeId: 'place-2',
+            placeName: '도톤보리',
+            placeType: 'food',
+            placeTypeLabel: '식당',
+            address: 'Dotonbori',
+          },
         ],
       },
     });

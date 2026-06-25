@@ -13,7 +13,11 @@ import {
   updateDisplayNameWithRefresh,
 } from '../lib/auth/client';
 import { AccountDeletionSection } from '../lib/auth/account-deletion-section';
-import { createAccountDeletionFlow, type AccountDeletionFlow, type AccountDeletionStatus } from '../lib/auth/account-deletion-flow';
+import {
+  createAccountDeletionFlow,
+  type AccountDeletionFlow,
+  type AccountDeletionStatus,
+} from '../lib/auth/account-deletion-flow';
 import { normalizeDisplayNameInput } from '../lib/auth/display-name';
 import { createLogoutFlow, type LogoutFlow } from '../lib/auth/logout-flow';
 import { getOAuthCredential, getVisibleOAuthProviderConfigs } from '../lib/auth/oauth';
@@ -124,7 +128,10 @@ export default function AccountScreen() {
       setIsEditingName(false);
       setState({ status: 'ready', me, message: '이름이 수정되었어요.' });
     } catch (error) {
-      if (error instanceof MobileAuthError && (error.code === 'UNAUTHORIZED' || error.code === 'INVALID_REFRESH_TOKEN')) {
+      if (
+        error instanceof MobileAuthError &&
+        (error.code === 'UNAUTHORIZED' || error.code === 'INVALID_REFRESH_TOKEN')
+      ) {
         setState({ status: 'error', message: '다시 로그인해주세요.' });
       } else if (error instanceof MobileAuthError && error.code === 'VALIDATION_ERROR') {
         setNameError('이름은 1~20자로 입력해주세요.');

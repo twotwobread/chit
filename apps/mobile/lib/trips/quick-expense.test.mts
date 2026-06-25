@@ -77,7 +77,11 @@ test('builds item options only from today itinerary items and marks selected ite
   const viewModel = buildQuickExpenseViewModel({
     currency: 'JPY',
     itinerary: itinerary([
-      item({ id: 'item-b', itemOrder: 2, place: { id: 'place-b', name: '오사카성', placeType: 'sights', address: 'Osakajo' } }),
+      item({
+        id: 'item-b',
+        itemOrder: 2,
+        place: { id: 'place-b', name: '오사카성', placeType: 'sights', address: 'Osakajo' },
+      }),
       item({ id: 'item-a', itemOrder: 1 }),
     ]),
     participants: [participant({ participantId: 'participant-a', displayName: ' 민수 ' })],
@@ -87,7 +91,10 @@ test('builds item options only from today itinerary items and marks selected ite
 
   assert.equal(viewModel.showItemSelector, false);
   assert.equal(viewModel.selectedItem?.itemId, 'item-b');
-  assert.deepEqual(viewModel.itemOptions.map((option) => option.itemId), ['item-a', 'item-b']);
+  assert.deepEqual(
+    viewModel.itemOptions.map((option) => option.itemId),
+    ['item-a', 'item-b'],
+  );
   assert.equal(viewModel.itemOptions[1].selected, true);
   assert.equal(viewModel.payerOptions[0].displayName, '민수');
 });
@@ -114,32 +121,41 @@ test('formats money with Korean-friendly currency labels', () => {
 });
 
 test('builds create quick expense request and validation errors', () => {
-  assert.deepEqual(buildCreateQuickExpenseRequest({
-    amountInput: '18,500',
-    currency: 'KRW',
-    itineraryItemId: 'item-a',
-    payerParticipantId: 'participant-a',
-  }), {
-    ok: true,
-    request: { itineraryItemId: 'item-a', amountMinor: 18500, payerParticipantId: 'participant-a' },
-  });
-
-  assert.deepEqual(buildCreateQuickExpenseRequest({
-    amountInput: '0',
-    currency: 'KRW',
-    itineraryItemId: null,
-    payerParticipantId: null,
-  }), {
-    ok: false,
-    errors: {
-      amount: '금액을 1 이상 입력해주세요.',
-      item: '지출을 연결할 장소를 선택해주세요.',
-      payer: '결제자를 선택해주세요.',
+  assert.deepEqual(
+    buildCreateQuickExpenseRequest({
+      amountInput: '18,500',
+      currency: 'KRW',
+      itineraryItemId: 'item-a',
+      payerParticipantId: 'participant-a',
+    }),
+    {
+      ok: true,
+      request: { itineraryItemId: 'item-a', amountMinor: 18500, payerParticipantId: 'participant-a' },
     },
-  });
+  );
+
+  assert.deepEqual(
+    buildCreateQuickExpenseRequest({
+      amountInput: '0',
+      currency: 'KRW',
+      itineraryItemId: null,
+      payerParticipantId: null,
+    }),
+    {
+      ok: false,
+      errors: {
+        amount: '금액을 1 이상 입력해주세요.',
+        item: '지출을 연결할 장소를 선택해주세요.',
+        payer: '결제자를 선택해주세요.',
+      },
+    },
+  );
 });
 
 test('builds route with optional inferred item id', () => {
   assert.equal(buildQuickExpenseRoute('trip-a', '2026-07-10'), '/trips/trip-a/days/2026-07-10/expenses/quick');
-  assert.equal(buildQuickExpenseRoute('trip-a', '2026-07-10', 'item-a'), '/trips/trip-a/days/2026-07-10/expenses/quick?itemId=item-a');
+  assert.equal(
+    buildQuickExpenseRoute('trip-a', '2026-07-10', 'item-a'),
+    '/trips/trip-a/days/2026-07-10/expenses/quick?itemId=item-a',
+  );
 });

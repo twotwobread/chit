@@ -72,9 +72,10 @@ export function TripDatePicker({
   const selectedMonth = monthDate.getMonth() + 1;
   const minYear = minDateValue?.getFullYear();
   const minMonth = minDateValue ? minDateValue.getMonth() + 1 : undefined;
-  const yearOptions = minYear !== undefined && yearOptionCount
-    ? Array.from({ length: yearOptionCount }, (_, index) => minYear + index)
-    : Array.from({ length: yearOptionRadius * 2 + 1 }, (_, index) => selectedYear - yearOptionRadius + index);
+  const yearOptions =
+    minYear !== undefined && yearOptionCount
+      ? Array.from({ length: yearOptionCount }, (_, index) => minYear + index)
+      : Array.from({ length: yearOptionRadius * 2 + 1 }, (_, index) => selectedYear - yearOptionRadius + index);
   const canGoPrevious = minDate ? month > monthStringFromDate(dateFromString(minDate)) : true;
   const markedDates = selectedDate
     ? {
@@ -92,7 +93,9 @@ export function TripDatePicker({
   };
 
   const onCalendarMonthChange = (date: DateData) => {
-    onMonthChange(minDate ? normalizeMonth(monthString(date.year, date.month), minDate) : monthString(date.year, date.month));
+    onMonthChange(
+      minDate ? normalizeMonth(monthString(date.year, date.month), minDate) : monthString(date.year, date.month),
+    );
   };
 
   return (
@@ -125,7 +128,11 @@ export function TripDatePicker({
             </Pressable>
           </View>
         </View>
-        <Pressable accessibilityRole="button" onPress={() => changeMonth(addMonths(month, 1))} style={styles.calendarNavButton}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => changeMonth(addMonths(month, 1))}
+          style={styles.calendarNavButton}
+        >
           <Text style={styles.calendarNavText}>다음</Text>
         </Pressable>
       </View>
@@ -151,7 +158,8 @@ export function TripDatePicker({
       {openDropdown === 'month' ? (
         <View style={styles.optionGrid}>
           {months.map((monthOption) => {
-            const disabled = minYear !== undefined && minMonth !== undefined && selectedYear === minYear && monthOption < minMonth;
+            const disabled =
+              minYear !== undefined && minMonth !== undefined && selectedYear === minYear && monthOption < minMonth;
             const selected = monthOption === selectedMonth;
             return (
               <Pressable
@@ -159,7 +167,11 @@ export function TripDatePicker({
                 disabled={disabled}
                 key={monthOption}
                 onPress={() => changeMonth(monthString(selectedYear, monthOption))}
-                style={[styles.optionChip, selected ? styles.optionChipSelected : null, disabled ? styles.disabledButton : null]}
+                style={[
+                  styles.optionChip,
+                  selected ? styles.optionChipSelected : null,
+                  disabled ? styles.disabledButton : null,
+                ]}
               >
                 <Text
                   style={[

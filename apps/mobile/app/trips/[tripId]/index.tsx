@@ -43,7 +43,10 @@ export default function TripDetailScreen() {
       const session = await getStoredSession();
       setState({ status: 'success', detail, currentUserId: session?.user.id });
     } catch (error) {
-      if (error instanceof MobileAuthError && (error.code === 'UNAUTHORIZED' || error.code === 'INVALID_REFRESH_TOKEN')) {
+      if (
+        error instanceof MobileAuthError &&
+        (error.code === 'UNAUTHORIZED' || error.code === 'INVALID_REFRESH_TOKEN')
+      ) {
         setState({ status: 'auth' });
         return;
       }
@@ -131,7 +134,10 @@ function TripDetailCard({ currentUserId, detail }: { currentUserId?: string; det
       await deleteTrip(detail.trip.id);
       router.replace('/mypage');
     } catch (error) {
-      if (error instanceof MobileAuthError && (error.code === 'UNAUTHORIZED' || error.code === 'INVALID_REFRESH_TOKEN')) {
+      if (
+        error instanceof MobileAuthError &&
+        (error.code === 'UNAUTHORIZED' || error.code === 'INVALID_REFRESH_TOKEN')
+      ) {
         setDeleteState(deleteTripFailureState(401));
         return;
       }
@@ -149,7 +155,10 @@ function TripDetailCard({ currentUserId, detail }: { currentUserId?: string; det
     <View style={styles.card}>
       <Text style={styles.tripName}>{detail.trip.name}</Text>
       <View style={styles.infoList}>
-        <InfoRow label="기간" value={`${formatTripDayDate(detail.trip.startDate)} ~ ${formatTripDayDate(detail.trip.endDate)}`} />
+        <InfoRow
+          label="기간"
+          value={`${formatTripDayDate(detail.trip.startDate)} ~ ${formatTripDayDate(detail.trip.endDate)}`}
+        />
         <InfoRow label="기본 통화" value={detail.trip.defaultCurrency} />
         <InfoRow label="참여자" value={formatParticipantSummary(detail.participantSummary)} />
       </View>
@@ -157,7 +166,11 @@ function TripDetailCard({ currentUserId, detail }: { currentUserId?: string; det
       <TripDayList days={detail.days} tripId={detail.trip.id} />
       {canManage ? (
         <>
-          <Pressable accessibilityRole="button" onPress={() => router.push(`/trips/${detail.trip.id}/edit`)} style={styles.secondaryButton}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push(`/trips/${detail.trip.id}/edit`)}
+            style={styles.secondaryButton}
+          >
             <Text style={styles.secondaryButtonText}>여행 정보 수정</Text>
           </Pressable>
           {deleteState.status === 'idle' ? (
@@ -180,10 +193,18 @@ function TripDetailCard({ currentUserId, detail }: { currentUserId?: string; det
                 <Text style={styles.deleteTitle}>여행을 삭제할까요?</Text>
                 <Text style={styles.message}>이 여행은 모든 참여자에게서 삭제되고 되돌릴 수 없어요.</Text>
                 <View style={styles.actionRow}>
-                  <Pressable accessibilityRole="button" onPress={() => setDeleteState(cancelTripDelete(deleteState))} style={styles.secondaryActionButton}>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => setDeleteState(cancelTripDelete(deleteState))}
+                    style={styles.secondaryActionButton}
+                  >
                     <Text style={styles.secondaryButtonText}>취소</Text>
                   </Pressable>
-                  <Pressable accessibilityRole="button" onPress={() => void confirmDelete()} style={styles.dangerButton}>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => void confirmDelete()}
+                    style={styles.dangerButton}
+                  >
                     <Text style={styles.buttonText}>삭제하기</Text>
                   </Pressable>
                 </View>
@@ -215,7 +236,11 @@ function TripDetailCard({ currentUserId, detail }: { currentUserId?: string; det
           {deleteState.status === 'error' ? (
             <View style={styles.dangerPanel}>
               <Text style={styles.errorTitle}>{deleteState.message}</Text>
-              <Pressable accessibilityRole="button" onPress={() => setDeleteState(openTripDeleteConfirmation(deleteState))} style={styles.secondaryButton}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setDeleteState(openTripDeleteConfirmation(deleteState))}
+                style={styles.secondaryButton}
+              >
                 <Text style={styles.secondaryButtonText}>다시 시도</Text>
               </Pressable>
             </View>

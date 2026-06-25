@@ -45,9 +45,7 @@ export async function getAppleCredential(
     throw new Error('Apple identity token is missing.');
   }
 
-  const displayName = [credential.fullName?.givenName, credential.fullName?.familyName]
-    .filter(Boolean)
-    .join(' ');
+  const displayName = [credential.fullName?.givenName, credential.fullName?.familyName].filter(Boolean).join(' ');
 
   return {
     identityToken: credential.identityToken,

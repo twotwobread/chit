@@ -88,7 +88,10 @@ describe('google place search helpers', () => {
   });
 
   it('detects duplicate confirmation API errors', () => {
-    assert.equal(isDuplicateDayPlaceConfirmationError({ error: { code: 'DUPLICATE_DAY_PLACE_CONFIRMATION_REQUIRED' } }), true);
+    assert.equal(
+      isDuplicateDayPlaceConfirmationError({ error: { code: 'DUPLICATE_DAY_PLACE_CONFIRMATION_REQUIRED' } }),
+      true,
+    );
     assert.equal(isDuplicateDayPlaceConfirmationError({ error: { code: 'CONFLICT' } }), false);
     assert.equal(isDuplicateDayPlaceConfirmationError(undefined), false);
   });

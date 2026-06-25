@@ -25,7 +25,10 @@ type SubmitState =
   | { status: 'error'; title: string; helper: string };
 
 export default function NewManualPlaceScreen() {
-  const { tripId: tripIdParam, date: dateParam } = useLocalSearchParams<{ tripId?: string | string[]; date?: string | string[] }>();
+  const { tripId: tripIdParam, date: dateParam } = useLocalSearchParams<{
+    tripId?: string | string[];
+    date?: string | string[];
+  }>();
   const tripId = Array.isArray(tripIdParam) ? tripIdParam[0] : tripIdParam;
   const date = Array.isArray(dateParam) ? dateParam[0] : dateParam;
   const [values, setValues] = useState<ManualPlaceFormValues>({ name: '', address: '', placeType: undefined });
@@ -65,7 +68,10 @@ export default function NewManualPlaceScreen() {
       await createManualDayItineraryItem(tripId, date, validation.request);
       router.replace(buildDayItineraryRoute(tripId, date));
     } catch (error) {
-      if (error instanceof MobileAuthError && (error.code === 'UNAUTHORIZED' || error.code === 'INVALID_REFRESH_TOKEN')) {
+      if (
+        error instanceof MobileAuthError &&
+        (error.code === 'UNAUTHORIZED' || error.code === 'INVALID_REFRESH_TOKEN')
+      ) {
         setSubmitState({ status: 'auth' });
         return;
       }
@@ -75,7 +81,11 @@ export default function NewManualPlaceScreen() {
           return;
         }
         if (error.status === 400) {
-          setSubmitState({ status: 'error', title: '입력값을 확인해주세요.', helper: '장소명, 주소, 타입을 다시 확인해주세요.' });
+          setSubmitState({
+            status: 'error',
+            title: '입력값을 확인해주세요.',
+            helper: '장소명, 주소, 타입을 다시 확인해주세요.',
+          });
           return;
         }
         const failure = manualPlaceFailureState(error.status);
@@ -190,11 +200,21 @@ export default function NewManualPlaceScreen() {
           </View>
         ) : null}
 
-        <Pressable accessibilityRole="button" disabled={submitView.disabled} onPress={() => void submit()} style={[styles.button, submitView.disabled ? styles.buttonDisabled : null]}>
+        <Pressable
+          accessibilityRole="button"
+          disabled={submitView.disabled}
+          onPress={() => void submit()}
+          style={[styles.button, submitView.disabled ? styles.buttonDisabled : null]}
+        >
           {isSubmitting ? <ActivityIndicator color={theme.color.onPrimary} /> : null}
           <Text style={styles.buttonText}>{submitView.label}</Text>
         </Pressable>
-        <Pressable accessibilityRole="button" disabled={isSubmitting} onPress={backToDay} style={styles.secondaryButton}>
+        <Pressable
+          accessibilityRole="button"
+          disabled={isSubmitting}
+          onPress={backToDay}
+          style={styles.secondaryButton}
+        >
           <Text style={styles.secondaryButtonText}>Day 일정으로</Text>
         </Pressable>
       </View>

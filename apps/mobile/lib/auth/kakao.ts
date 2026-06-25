@@ -77,7 +77,10 @@ function shouldFallbackToKakaoAccount(error: unknown): boolean {
   }
 
   const message = error instanceof Error ? error.message.toLowerCase() : '';
-  return message.includes('kakaotalk') && (message.includes('not available') || message.includes('unavailable') || message.includes('not installed'));
+  return (
+    message.includes('kakaotalk') &&
+    (message.includes('not available') || message.includes('unavailable') || message.includes('not installed'))
+  );
 }
 
 function errorCode(error: unknown): string {

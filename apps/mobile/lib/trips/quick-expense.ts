@@ -1,3 +1,5 @@
+import type { Href } from 'expo-router';
+
 import type {
   CreateQuickExpenseRequest,
   DayItineraryItem,
@@ -45,9 +47,9 @@ export type QuickExpenseViewModel = {
 
 const zeroDecimalCurrencies = new Set<SupportedCurrency>(['KRW', 'JPY']);
 
-export function buildQuickExpenseRoute(tripId: string, date: string, itemId?: string | null): string {
+export function buildQuickExpenseRoute(tripId: string, date: string, itemId?: string | null): Href {
   const base = `/trips/${tripId}/days/${date}/expenses/quick`;
-  return itemId ? `${base}?itemId=${encodeURIComponent(itemId)}` : base;
+  return (itemId ? `${base}?itemId=${encodeURIComponent(itemId)}` : base) as Href;
 }
 
 export function inferCurrentQuickExpenseItem(items: DayItineraryItem[]): DayItineraryItem | null {
@@ -87,12 +89,18 @@ export function buildQuickExpenseViewModel({
       selected: false,
     })),
     showItemSelector,
-    helper: showItemSelector && itemOptions.length > 0 ? '현재 장소를 확정할 수 없어 오늘 일정에서 장소를 선택해주세요.' : null,
+    helper:
+      showItemSelector && itemOptions.length > 0
+        ? '현재 장소를 확정할 수 없어 오늘 일정에서 장소를 선택해주세요.'
+        : null,
     emptyMessage: itemOptions.length === 0 ? '오늘 일정에 등록된 장소가 없어 지출을 저장할 수 없어요.' : null,
   };
 }
 
-export function parseAmountMinor(input: string, currency: SupportedCurrency): { ok: true; amountMinor: number } | { ok: false; message: string } {
+export function parseAmountMinor(
+  input: string,
+  currency: SupportedCurrency,
+): { ok: true; amountMinor: number } | { ok: false; message: string } {
   const normalized = input.trim().replaceAll(',', '');
   if (normalized === '') {
     return amountError();

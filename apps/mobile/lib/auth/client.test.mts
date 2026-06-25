@@ -70,7 +70,8 @@ function createDeps(options: DepsOptions = {}) {
     configureApi: (accessToken?: string) => {
       calls.push(`configure:${accessToken ?? ''}`);
     },
-    readStoredSession: async () => options.readResult ?? (stored ? { status: 'ready', session: stored } : { status: 'missing' }),
+    readStoredSession: async () =>
+      options.readResult ?? (stored ? { status: 'ready', session: stored } : { status: 'missing' }),
     getStoredSession: async () => stored,
     saveStoredSession: async (session: StoredSession) => {
       calls.push(`save:${session.tokens.accessToken}`);
@@ -105,11 +106,14 @@ test('does not call auth API when stored session is missing', async () => {
     },
   });
 
-  await assert.rejects(() => getMeWithRefresh(deps), (error) => {
-    assert.ok(error instanceof MobileAuthError);
-    assert.equal(error.code, 'UNAUTHORIZED');
-    return true;
-  });
+  await assert.rejects(
+    () => getMeWithRefresh(deps),
+    (error) => {
+      assert.ok(error instanceof MobileAuthError);
+      assert.equal(error.code, 'UNAUTHORIZED');
+      return true;
+    },
+  );
   assert.deepEqual(calls, []);
 });
 
@@ -124,11 +128,14 @@ test('does not call auth API when stored session is corrupt', async () => {
     },
   });
 
-  await assert.rejects(() => getMeWithRefresh(deps), (error) => {
-    assert.ok(error instanceof MobileAuthError);
-    assert.equal(error.code, 'UNAUTHORIZED');
-    return true;
-  });
+  await assert.rejects(
+    () => getMeWithRefresh(deps),
+    (error) => {
+      assert.ok(error instanceof MobileAuthError);
+      assert.equal(error.code, 'UNAUTHORIZED');
+      return true;
+    },
+  );
   assert.deepEqual(calls, []);
 });
 
@@ -179,11 +186,14 @@ test('clears local session on non-retryable refresh failure', async () => {
     },
   });
 
-  await assert.rejects(() => getMeWithRefresh(deps), (error) => {
-    assert.ok(error instanceof MobileAuthError);
-    assert.equal(error.code, 'INVALID_REFRESH_TOKEN');
-    return true;
-  });
+  await assert.rejects(
+    () => getMeWithRefresh(deps),
+    (error) => {
+      assert.ok(error instanceof MobileAuthError);
+      assert.equal(error.code, 'INVALID_REFRESH_TOKEN');
+      return true;
+    },
+  );
   assert.equal(getStored(), null);
 });
 
@@ -197,11 +207,14 @@ test('keeps local session on retryable refresh transport failure', async () => {
     },
   });
 
-  await assert.rejects(() => getMeWithRefresh(deps), (error) => {
-    assert.ok(error instanceof MobileAuthError);
-    assert.equal(error.code, 'UNKNOWN');
-    return true;
-  });
+  await assert.rejects(
+    () => getMeWithRefresh(deps),
+    (error) => {
+      assert.ok(error instanceof MobileAuthError);
+      assert.equal(error.code, 'UNKNOWN');
+      return true;
+    },
+  );
   assert.equal(getStored()?.tokens.refreshToken, 'old-refresh-token');
 });
 
@@ -220,11 +233,14 @@ test('does not return authenticated success when saving rotated tokens fails', a
     },
   });
 
-  await assert.rejects(() => getMeWithRefresh(deps), (error) => {
-    assert.ok(error instanceof MobileAuthError);
-    assert.equal(error.code, 'UNAUTHORIZED');
-    return true;
-  });
+  await assert.rejects(
+    () => getMeWithRefresh(deps),
+    (error) => {
+      assert.ok(error instanceof MobileAuthError);
+      assert.equal(error.code, 'UNAUTHORIZED');
+      return true;
+    },
+  );
   assert.equal(getMeCalls, 1);
   assert.equal(getStored(), null);
 });
@@ -304,11 +320,14 @@ test('maps display-name validation errors and keeps local session unchanged', as
     },
   });
 
-  await assert.rejects(() => updateDisplayNameWithRefresh(' ', deps), (error) => {
-    assert.ok(error instanceof MobileAuthError);
-    assert.equal(error.code, 'VALIDATION_ERROR');
-    return true;
-  });
+  await assert.rejects(
+    () => updateDisplayNameWithRefresh(' ', deps),
+    (error) => {
+      assert.ok(error instanceof MobileAuthError);
+      assert.equal(error.code, 'VALIDATION_ERROR');
+      return true;
+    },
+  );
   assert.equal(getStored()?.user.displayName, '민수');
   assert.equal(getStored()?.tokens.accessToken, 'old-access-token');
 });
@@ -325,11 +344,14 @@ test('keeps refreshed session when retried display-name update returns validatio
     },
   });
 
-  await assert.rejects(() => updateDisplayNameWithRefresh(' ', deps), (error) => {
-    assert.ok(error instanceof MobileAuthError);
-    assert.equal(error.code, 'VALIDATION_ERROR');
-    return true;
-  });
+  await assert.rejects(
+    () => updateDisplayNameWithRefresh(' ', deps),
+    (error) => {
+      assert.ok(error instanceof MobileAuthError);
+      assert.equal(error.code, 'VALIDATION_ERROR');
+      return true;
+    },
+  );
   assert.equal(getStored()?.user.displayName, '민수');
   assert.equal(getStored()?.tokens.accessToken, 'new-access-token');
 });
@@ -382,11 +404,14 @@ test('keeps local session when account deletion fails with retryable server erro
     },
   });
 
-  await assert.rejects(() => deleteAccountWithRefresh(deps), (error) => {
-    assert.ok(error instanceof MobileAuthError);
-    assert.equal(error.code, 'UNKNOWN');
-    return true;
-  });
+  await assert.rejects(
+    () => deleteAccountWithRefresh(deps),
+    (error) => {
+      assert.ok(error instanceof MobileAuthError);
+      assert.equal(error.code, 'UNKNOWN');
+      return true;
+    },
+  );
   assert.equal(getStored()?.tokens.accessToken, 'old-access-token');
 });
 
@@ -397,11 +422,14 @@ test('account deletion clears local session when retry still returns unauthorize
     },
   });
 
-  await assert.rejects(() => deleteAccountWithRefresh(deps), (error) => {
-    assert.ok(error instanceof MobileAuthError);
-    assert.equal(error.code, 'UNAUTHORIZED');
-    return true;
-  });
+  await assert.rejects(
+    () => deleteAccountWithRefresh(deps),
+    (error) => {
+      assert.ok(error instanceof MobileAuthError);
+      assert.equal(error.code, 'UNAUTHORIZED');
+      return true;
+    },
+  );
   assert.equal(getStored(), null);
 });
 

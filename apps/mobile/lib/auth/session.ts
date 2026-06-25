@@ -57,7 +57,10 @@ export async function getStoredSession(store: SessionStore = secureSessionStore)
   return result.status === 'ready' ? result.session : null;
 }
 
-export async function saveStoredSession(session: StoredSession, store: SessionStore = secureSessionStore): Promise<void> {
+export async function saveStoredSession(
+  session: StoredSession,
+  store: SessionStore = secureSessionStore,
+): Promise<void> {
   await store.setItem(JSON.stringify(session));
 }
 

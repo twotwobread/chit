@@ -43,7 +43,10 @@ test('returns OAuth provider configs in supported provider order with shared lab
     providerConfig('apple', 'Apple', 10, async () => appleCredential),
   ]);
 
-  assert.deepEqual(configs.map((provider) => provider.id), ['apple', 'kakao']);
+  assert.deepEqual(
+    configs.map((provider) => provider.id),
+    ['apple', 'kakao'],
+  );
   assert.equal(configs[0].loginLabel(configs[0]), 'Apple로 계속하기');
   assert.equal(configs[0].linkLabel(configs[0], false), 'Apple 연결');
   assert.equal(configs[0].linkLabel(configs[0], true), 'Apple 연결됨');
@@ -56,7 +59,10 @@ test('filters unavailable providers for UI rendering without changing provider m
     providerConfig('kakao', 'Kakao', 20, async () => kakaoCredential),
   ]);
 
-  assert.deepEqual(configs.map((provider) => provider.id), ['kakao']);
+  assert.deepEqual(
+    configs.map((provider) => provider.id),
+    ['kakao'],
+  );
 });
 
 test('dispatches credential acquisition through the requested provider adapter', async () => {
@@ -104,10 +110,7 @@ test('rejects unavailable providers explicitly and never falls back to Kakao', a
     }),
   ];
 
-  await assert.rejects(
-    () => getOAuthCredential('apple', { providers, env: {} }),
-    OAuthProviderUnavailableError,
-  );
+  await assert.rejects(() => getOAuthCredential('apple', { providers, env: {} }), OAuthProviderUnavailableError);
   assert.equal(kakaoCalls, 0);
 });
 

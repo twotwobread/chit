@@ -1,0 +1,6 @@
+node_modules/
+.expo/
+apps/mobile/.expo/
+packages/api-contract/gen/
+apps/api/internal/db/
+apps/api/internal/openapi/

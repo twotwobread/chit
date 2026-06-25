@@ -81,4 +81,3 @@ export function canSubmitTripBasicInfoUpdate({
   }
   return validateTripBasicInfoForm(current) === null && hasTripBasicInfoChanges(original, current);
 }
-

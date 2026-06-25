@@ -3,7 +3,12 @@ import { ActivityIndicator, Linking, Platform, Pressable, ScrollView, StyleSheet
 import * as Clipboard from 'expo-clipboard';
 import { router, useFocusEffect } from 'expo-router';
 
-import { ApiError, type GetDayItineraryResponse, type GetTripDetailResponse, type TripListItem } from '@i-um/api-contract';
+import {
+  ApiError,
+  type GetDayItineraryResponse,
+  type GetTripDetailResponse,
+  type TripListItem,
+} from '@i-um/api-contract';
 
 import { MobileAuthError } from '../lib/auth/client';
 import { clearStoredSession, readStoredSession } from '../lib/auth/session';
@@ -50,10 +55,7 @@ export default function HomeScreen() {
   const [navigationRetrying, setNavigationRetrying] = useState(false);
 
   const handleAuthError = useCallback(async (error: unknown) => {
-    if (
-      error instanceof MobileAuthError &&
-      (error.code === 'INVALID_REFRESH_TOKEN' || error.code === 'UNAUTHORIZED')
-    ) {
+    if (error instanceof MobileAuthError && (error.code === 'INVALID_REFRESH_TOKEN' || error.code === 'UNAUTHORIZED')) {
       await clearStoredSession();
       setTodayState({ status: 'needsLogin', message: '다시 로그인해주세요.' });
       return true;
@@ -372,7 +374,9 @@ function TodayContent({
         <Text style={styles.message}>{viewModel.helper}</Text>
         <View style={styles.actionRow}>
           <ActionButton action={viewModel.primaryAction} onAction={onAction} />
-          {viewModel.secondaryAction ? <ActionButton action={viewModel.secondaryAction} onAction={onAction} variant="secondary" /> : null}
+          {viewModel.secondaryAction ? (
+            <ActionButton action={viewModel.secondaryAction} onAction={onAction} variant="secondary" />
+          ) : null}
         </View>
       </View>
     );
@@ -381,7 +385,11 @@ function TodayContent({
   if (viewModel.status === 'emptyItinerary') {
     return (
       <View style={styles.card}>
-        <TodayDayHeader dayLabel={viewModel.dayLabel} formattedDate={viewModel.formattedDate} tripName={viewModel.tripName} />
+        <TodayDayHeader
+          dayLabel={viewModel.dayLabel}
+          formattedDate={viewModel.formattedDate}
+          tripName={viewModel.tripName}
+        />
         <View style={styles.emptyPanel}>
           <Text style={styles.emptyTitle}>{viewModel.title}</Text>
           <Text style={styles.message}>{viewModel.helper}</Text>
@@ -395,7 +403,11 @@ function TodayContent({
   if (viewModel.status === 'completed') {
     return (
       <View style={styles.card}>
-        <TodayDayHeader dayLabel={viewModel.dayLabel} formattedDate={viewModel.formattedDate} tripName={viewModel.tripName} />
+        <TodayDayHeader
+          dayLabel={viewModel.dayLabel}
+          formattedDate={viewModel.formattedDate}
+          tripName={viewModel.tripName}
+        />
         <View style={styles.emptyPanel}>
           <Text style={styles.emptyTitle}>{viewModel.title}</Text>
           <Text style={styles.message}>{viewModel.helper}</Text>
@@ -410,7 +422,11 @@ function TodayContent({
 
   return (
     <View style={styles.card}>
-      <TodayDayHeader dayLabel={viewModel.dayLabel} formattedDate={viewModel.formattedDate} tripName={viewModel.tripName} />
+      <TodayDayHeader
+        dayLabel={viewModel.dayLabel}
+        formattedDate={viewModel.formattedDate}
+        tripName={viewModel.tripName}
+      />
       <View style={styles.nextPlaceCard}>
         <Text style={styles.overline}>다음 장소</Text>
         <Text style={styles.nextPlaceName}>{viewModel.nextPlace.placeName}</Text>
@@ -446,16 +462,30 @@ function TodayContent({
   );
 }
 
-function TodayDayHeader({ dayLabel, formattedDate, tripName }: { dayLabel: string; formattedDate: string; tripName: string }) {
+function TodayDayHeader({
+  dayLabel,
+  formattedDate,
+  tripName,
+}: {
+  dayLabel: string;
+  formattedDate: string;
+  tripName: string;
+}) {
   return (
     <View style={styles.dayHeader}>
       <Text style={styles.tripName}>{tripName}</Text>
-      <Text style={styles.dayText}>{dayLabel} · {formattedDate}</Text>
+      <Text style={styles.dayText}>
+        {dayLabel} · {formattedDate}
+      </Text>
     </View>
   );
 }
 
-function RemainingPlacesSection({ section }: { section: Extract<TodayExecutionViewModel, { status: 'success' }>['remainingSection'] }) {
+function RemainingPlacesSection({
+  section,
+}: {
+  section: Extract<TodayExecutionViewModel, { status: 'success' }>['remainingSection'];
+}) {
   return (
     <View style={styles.remainingSection}>
       <View style={styles.remainingHeader}>
@@ -531,7 +561,11 @@ function TodayNavigationFallbackPanel({
           accessibilityState={{ disabled: panel.copyAction.disabled }}
           disabled={panel.copyAction.disabled}
           onPress={() => onCopy(state.destination)}
-          style={[styles.button, styles.navigationFallbackAction, panel.copyAction.disabled ? styles.disabledButton : null]}
+          style={[
+            styles.button,
+            styles.navigationFallbackAction,
+            panel.copyAction.disabled ? styles.disabledButton : null,
+          ]}
         >
           <Text style={styles.buttonText}>{panel.copyAction.label}</Text>
         </Pressable>
@@ -540,12 +574,20 @@ function TodayNavigationFallbackPanel({
           accessibilityState={{ disabled: panel.retryAction.disabled }}
           disabled={panel.retryAction.disabled}
           onPress={() => onRetry(state.destination)}
-          style={[styles.secondaryButton, styles.navigationFallbackAction, panel.retryAction.disabled ? styles.disabledButton : null]}
+          style={[
+            styles.secondaryButton,
+            styles.navigationFallbackAction,
+            panel.retryAction.disabled ? styles.disabledButton : null,
+          ]}
         >
           <Text style={styles.secondaryButtonText}>{panel.retryAction.label}</Text>
         </Pressable>
       </View>
-      <Pressable accessibilityRole="button" onPress={() => onOpenItinerary(itineraryAction)} style={styles.secondaryButton}>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => onOpenItinerary(itineraryAction)}
+        style={styles.secondaryButton}
+      >
         <Text style={styles.secondaryButtonText}>{panel.itineraryAction.label}</Text>
       </Pressable>
     </View>
@@ -556,7 +598,10 @@ function MultipleOngoingNotice({
   notice,
   onAction,
 }: {
-  notice: Extract<TodayExecutionViewModel, { status: 'success' | 'emptyItinerary' | 'completed' }>['multipleOngoingTripNotice'];
+  notice: Extract<
+    TodayExecutionViewModel,
+    { status: 'success' | 'emptyItinerary' | 'completed' }
+  >['multipleOngoingTripNotice'];
   onAction: (action: TodayAction) => void;
 }) {
   if (!notice) {
@@ -594,7 +639,9 @@ function ActionButton({
       onPress={() => onAction(action)}
       style={[variant === 'primary' ? styles.button : styles.secondaryButton, disabled ? styles.disabledButton : null]}
     >
-      <Text style={variant === 'primary' ? styles.buttonText : styles.secondaryButtonText}>{label ?? action.label}</Text>
+      <Text style={variant === 'primary' ? styles.buttonText : styles.secondaryButtonText}>
+        {label ?? action.label}
+      </Text>
     </Pressable>
   );
 }

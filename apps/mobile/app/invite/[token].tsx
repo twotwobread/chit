@@ -116,7 +116,10 @@ function InviteAcceptResult({
       <View style={styles.actionGroup}>
         <PrimaryButton label={viewModel.primaryLabel} onPress={() => onAction(viewModel.primaryAction, viewModel)} />
         {viewModel.secondaryAction && viewModel.secondaryLabel ? (
-          <SecondaryButton label={viewModel.secondaryLabel} onPress={() => onAction(viewModel.secondaryAction!, viewModel)} />
+          <SecondaryButton
+            label={viewModel.secondaryLabel}
+            onPress={() => onAction(viewModel.secondaryAction!, viewModel)}
+          />
         ) : null}
       </View>
     </>

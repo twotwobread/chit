@@ -1,3 +1,5 @@
+import type { Href } from 'expo-router';
+
 import type { GetDayItineraryResponse, TripPlaceType } from '@i-um/api-contract';
 
 import { theme } from '../design/theme';
@@ -42,8 +44,8 @@ export type DayItineraryFailureViewModel =
       helper: string;
     };
 
-export function buildDayItineraryRoute(tripId: string, date: string): string {
-  return `/trips/${tripId}/days/${date}`;
+export function buildDayItineraryRoute(tripId: string, date: string): Href {
+  return `/trips/${tripId}/days/${date}` as Href;
 }
 
 export function getPlaceTypeLabel(placeType: TripPlaceType): string {

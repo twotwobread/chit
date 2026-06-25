@@ -61,7 +61,14 @@ import {
 } from '../../../../lib/trips/day-itinerary-edit';
 import { manualPlaceTypeOptions } from '../../../../lib/trips/manual-place';
 import { buildGooglePlaceSearchRoute } from '../../../../lib/places/google-search';
-import { clearDayLodgingPlace, deleteDayItineraryItem, getTripDayItinerary, reorderDayItineraryItems, setDayLodgingPlace, updateDayItineraryItem } from '../../../../lib/trips/client';
+import {
+  clearDayLodgingPlace,
+  deleteDayItineraryItem,
+  getTripDayItinerary,
+  reorderDayItineraryItems,
+  setDayLodgingPlace,
+  updateDayItineraryItem,
+} from '../../../../lib/trips/client';
 import {
   buildDayLodgingRowViewModel,
   buildSetDayLodgingPlaceRequest,
@@ -131,7 +138,10 @@ function focusAccessibilityNode(node: AccessibilityFocusable): boolean {
 }
 
 export default function TripDayItineraryScreen() {
-  const { tripId: tripIdParam, date: dateParam } = useLocalSearchParams<{ tripId?: string | string[]; date?: string | string[] }>();
+  const { tripId: tripIdParam, date: dateParam } = useLocalSearchParams<{
+    tripId?: string | string[];
+    date?: string | string[];
+  }>();
   const tripId = Array.isArray(tripIdParam) ? tripIdParam[0] : tripIdParam;
   const date = Array.isArray(dateParam) ? dateParam[0] : dateParam;
   const [state, setState] = useState<DayItineraryState>({ status: 'loading' });
@@ -163,7 +173,10 @@ export default function TripDayItineraryScreen() {
       const response = await getTripDayItinerary(tripId, date);
       setState({ status: 'success', viewModel: buildDayItineraryViewModel(response) });
     } catch (error) {
-      if (error instanceof MobileAuthError && (error.code === 'UNAUTHORIZED' || error.code === 'INVALID_REFRESH_TOKEN')) {
+      if (
+        error instanceof MobileAuthError &&
+        (error.code === 'UNAUTHORIZED' || error.code === 'INVALID_REFRESH_TOKEN')
+      ) {
         setState({ status: 'auth' });
         return;
       }
@@ -212,14 +225,17 @@ export default function TripDayItineraryScreen() {
     setContentFocusRequest(null);
   }, []);
 
-  const focusDeleteOrigin = useCallback((itemId: string) => {
-    const originFocusTarget = deleteOriginFocusTargetRef.current;
-    deleteOriginFocusTargetRef.current = null;
-    if (focusAccessibilityHandle(originFocusTarget)) {
-      return;
-    }
-    requestContentFocus({ kind: 'deleteTrigger', itemId });
-  }, [requestContentFocus]);
+  const focusDeleteOrigin = useCallback(
+    (itemId: string) => {
+      const originFocusTarget = deleteOriginFocusTargetRef.current;
+      deleteOriginFocusTargetRef.current = null;
+      if (focusAccessibilityHandle(originFocusTarget)) {
+        return;
+      }
+      requestContentFocus({ kind: 'deleteTrigger', itemId });
+    },
+    [requestContentFocus],
+  );
 
   const backToTripDetail = () => {
     if (tripId) {
@@ -282,7 +298,12 @@ export default function TripDayItineraryScreen() {
   };
 
   const submitEdit = async () => {
-    if (!tripId || !date || (editState.status !== 'editing' && editState.status !== 'saving') || editState.status === 'saving') {
+    if (
+      !tripId ||
+      !date ||
+      (editState.status !== 'editing' && editState.status !== 'saving') ||
+      editState.status === 'saving'
+    ) {
       return;
     }
 
@@ -299,7 +320,10 @@ export default function TripDayItineraryScreen() {
       setEditState({ status: 'idle' });
       await load();
     } catch (error) {
-      if (error instanceof MobileAuthError && (error.code === 'UNAUTHORIZED' || error.code === 'INVALID_REFRESH_TOKEN')) {
+      if (
+        error instanceof MobileAuthError &&
+        (error.code === 'UNAUTHORIZED' || error.code === 'INVALID_REFRESH_TOKEN')
+      ) {
         setState({ status: 'auth' });
         return;
       }
@@ -339,7 +363,12 @@ export default function TripDayItineraryScreen() {
   };
 
   const submitReorder = async () => {
-    if (!tripId || !date || (reorderState.status !== 'editing' && reorderState.status !== 'saving') || reorderState.status === 'saving') {
+    if (
+      !tripId ||
+      !date ||
+      (reorderState.status !== 'editing' && reorderState.status !== 'saving') ||
+      reorderState.status === 'saving'
+    ) {
       return;
     }
 
@@ -351,7 +380,9 @@ export default function TripDayItineraryScreen() {
     const submittingState: ReorderState = { ...reorderState, status: 'saving', error: undefined };
     setReorderState(submittingState);
     try {
-      const response = await submitDayItineraryReorder(draft, (request) => reorderDayItineraryItems(tripId, date, request));
+      const response = await submitDayItineraryReorder(draft, (request) =>
+        reorderDayItineraryItems(tripId, date, request),
+      );
       if (!response) {
         setReorderState({ status: 'editing', draft });
         return;
@@ -361,7 +392,10 @@ export default function TripDayItineraryScreen() {
       setReorderState(success.reorderState);
       setState({ status: 'success', viewModel: success.itinerary });
     } catch (error) {
-      if (error instanceof MobileAuthError && (error.code === 'UNAUTHORIZED' || error.code === 'INVALID_REFRESH_TOKEN')) {
+      if (
+        error instanceof MobileAuthError &&
+        (error.code === 'UNAUTHORIZED' || error.code === 'INVALID_REFRESH_TOKEN')
+      ) {
         setState({ status: 'auth' });
         return;
       }
@@ -385,7 +419,11 @@ export default function TripDayItineraryScreen() {
       }
 
       const failure = dayItineraryReorderFailureState();
-      setReorderState({ ...submittingState, status: 'editing', error: { title: failure.title, helper: failure.helper } });
+      setReorderState({
+        ...submittingState,
+        status: 'editing',
+        error: { title: failure.title, helper: failure.helper },
+      });
     }
   };
 
@@ -405,7 +443,10 @@ export default function TripDayItineraryScreen() {
       setLodgingState({ status: 'idle' });
       await load();
     } catch (error) {
-      if (error instanceof MobileAuthError && (error.code === 'UNAUTHORIZED' || error.code === 'INVALID_REFRESH_TOKEN')) {
+      if (
+        error instanceof MobileAuthError &&
+        (error.code === 'UNAUTHORIZED' || error.code === 'INVALID_REFRESH_TOKEN')
+      ) {
         setState({ status: 'auth' });
         return;
       }
@@ -440,7 +481,10 @@ export default function TripDayItineraryScreen() {
       setLodgingState({ status: 'idle' });
       await load();
     } catch (error) {
-      if (error instanceof MobileAuthError && (error.code === 'UNAUTHORIZED' || error.code === 'INVALID_REFRESH_TOKEN')) {
+      if (
+        error instanceof MobileAuthError &&
+        (error.code === 'UNAUTHORIZED' || error.code === 'INVALID_REFRESH_TOKEN')
+      ) {
         setState({ status: 'auth' });
         return;
       }
@@ -492,9 +536,10 @@ export default function TripDayItineraryScreen() {
       return;
     }
 
-    const successFocusTarget: DayItineraryDeleteFocusTarget = state.status === 'success' && state.viewModel.status === 'success'
-      ? resolveDayItineraryDeleteSuccessFocusTarget(state.viewModel.items, deleteState.item.id)
-      : { kind: 'dayHeading' };
+    const successFocusTarget: DayItineraryDeleteFocusTarget =
+      state.status === 'success' && state.viewModel.status === 'success'
+        ? resolveDayItineraryDeleteSuccessFocusTarget(state.viewModel.items, deleteState.item.id)
+        : { kind: 'dayHeading' };
     const deletingState: DeleteState = { ...deleteState, status: 'deleting', error: undefined };
     setDeleteState(deletingState);
     try {
@@ -504,7 +549,10 @@ export default function TripDayItineraryScreen() {
       deleteOriginFocusTargetRef.current = null;
       requestContentFocus(successFocusTarget);
     } catch (error) {
-      if (error instanceof MobileAuthError && (error.code === 'UNAUTHORIZED' || error.code === 'INVALID_REFRESH_TOKEN')) {
+      if (
+        error instanceof MobileAuthError &&
+        (error.code === 'UNAUTHORIZED' || error.code === 'INVALID_REFRESH_TOKEN')
+      ) {
         setDeleteState({ status: 'idle' });
         setState({ status: 'auth' });
         return;
@@ -522,7 +570,11 @@ export default function TripDayItineraryScreen() {
         }
       }
       const failure = dayItineraryMutationFailureState('delete');
-      setDeleteState({ ...deletingState, status: 'confirming', error: { title: failure.title, helper: failure.helper } });
+      setDeleteState({
+        ...deletingState,
+        status: 'confirming',
+        error: { title: failure.title, helper: failure.helper },
+      });
     }
   };
 
@@ -664,14 +716,16 @@ function DayItineraryContent({
   viewModel: DayItineraryViewModel;
 }) {
   const reorderAction = buildDayItineraryReorderAction(viewModel);
-  const reorderSubmitState = reorderState.status === 'editing' || reorderState.status === 'saving'
-    ? buildDayItineraryReorderSubmitState(reorderState.status === 'saving', reorderState.draft)
-    : null;
-  const lodgingSubmittingState: DayLodgingSubmittingState | null = lodgingState.status === 'setting'
-    ? { kind: 'set', itemId: lodgingState.itemId }
-    : lodgingState.status === 'clearing'
-      ? { kind: 'clear', itemId: lodgingState.itemId }
+  const reorderSubmitState =
+    reorderState.status === 'editing' || reorderState.status === 'saving'
+      ? buildDayItineraryReorderSubmitState(reorderState.status === 'saving', reorderState.draft)
       : null;
+  const lodgingSubmittingState: DayLodgingSubmittingState | null =
+    lodgingState.status === 'setting'
+      ? { kind: 'set', itemId: lodgingState.itemId }
+      : lodgingState.status === 'clearing'
+        ? { kind: 'clear', itemId: lodgingState.itemId }
+        : null;
   const dayHeadingRef = useRef<Text>(null);
   const emptyStateRef = useRef<View>(null);
   const rowRefs = useRef<Record<string, Text | null>>({});
@@ -713,12 +767,19 @@ function DayItineraryContent({
   return (
     <View style={styles.card}>
       <View style={styles.dayHeader}>
-        <Text ref={dayHeadingRef} accessibilityRole="header" style={styles.dayLabel}>{viewModel.dayLabel}</Text>
+        <Text ref={dayHeadingRef} accessibilityRole="header" style={styles.dayLabel}>
+          {viewModel.dayLabel}
+        </Text>
         <Text style={styles.dayDate}>{viewModel.formattedDate}</Text>
       </View>
 
       {viewModel.status === 'empty' ? (
-        <View ref={emptyStateRef} accessible accessibilityLabel={`${viewModel.title}. ${viewModel.helper}`} style={styles.emptyBox}>
+        <View
+          ref={emptyStateRef}
+          accessible
+          accessibilityLabel={`${viewModel.title}. ${viewModel.helper}`}
+          style={styles.emptyBox}
+        >
           <Text style={styles.emptyTitle}>{viewModel.title}</Text>
           <Text style={styles.message}>{viewModel.helper}</Text>
         </View>
@@ -726,89 +787,99 @@ function DayItineraryContent({
 
       {viewModel.status === 'success' ? (
         <View style={styles.placeList}>
-          {reorderState.status === 'editing' || reorderState.status === 'saving'
-            ? (
-                <ReorderPlaceList
-                  draft={reorderState.draft}
-                  isDisabled={reorderState.status === 'saving'}
-                  onMoveItem={onMoveReorderItem}
-                />
-              )
-            : viewModel.items.map((item) => {
-                const lodging = buildDayLodgingRowViewModel(item, lodgingSubmittingState);
-                const mapActions = buildDayItineraryMapRowActions(item);
-                return (
-                  <View key={item.id} style={styles.placeRow}>
-                    <View style={styles.orderBadge}>
-                      <Text style={styles.orderText}>{item.orderLabel}</Text>
+          {reorderState.status === 'editing' || reorderState.status === 'saving' ? (
+            <ReorderPlaceList
+              draft={reorderState.draft}
+              isDisabled={reorderState.status === 'saving'}
+              onMoveItem={onMoveReorderItem}
+            />
+          ) : (
+            viewModel.items.map((item) => {
+              const lodging = buildDayLodgingRowViewModel(item, lodgingSubmittingState);
+              const mapActions = buildDayItineraryMapRowActions(item);
+              return (
+                <View key={item.id} style={styles.placeRow}>
+                  <View style={styles.orderBadge}>
+                    <Text style={styles.orderText}>{item.orderLabel}</Text>
+                  </View>
+                  <View style={styles.placeContent}>
+                    <View style={styles.placeTitleRow}>
+                      <Text
+                        ref={(node) => {
+                          rowRefs.current[item.id] = node;
+                        }}
+                        accessibilityLabel={`${item.orderLabel}번째 장소 ${item.placeName}. ${item.placeTypeLabel}. ${item.address}`}
+                        style={styles.placeName}
+                      >
+                        {item.placeName}
+                      </Text>
+                      <Text style={styles.placeType}>{item.placeTypeLabel}</Text>
+                      {lodging.badgeLabel ? (
+                        <View style={styles.lodgingBadge}>
+                          <Text style={styles.lodgingBadgeText}>{lodging.badgeLabel}</Text>
+                        </View>
+                      ) : null}
                     </View>
-                    <View style={styles.placeContent}>
-                      <View style={styles.placeTitleRow}>
-                        <Text
-                          ref={(node) => {
-                            rowRefs.current[item.id] = node;
-                          }}
-                          accessibilityLabel={`${item.orderLabel}번째 장소 ${item.placeName}. ${item.placeTypeLabel}. ${item.address}`}
-                          style={styles.placeName}
-                        >
-                          {item.placeName}
-                        </Text>
-                        <Text style={styles.placeType}>{item.placeTypeLabel}</Text>
-                        {lodging.badgeLabel ? (
-                          <View style={styles.lodgingBadge}>
-                            <Text style={styles.lodgingBadgeText}>{lodging.badgeLabel}</Text>
-                          </View>
-                        ) : null}
-                      </View>
-                      <Text style={styles.address}>{item.address}</Text>
-                      <View style={styles.rowActionGroup}>
-                        <Pressable
-                          accessibilityLabel={`${item.placeName} 지도 열기`}
-                          accessibilityRole="button"
-                          onPress={() => onOpenMap(item)}
-                          style={styles.rowActionButton}
-                        >
-                          <Text style={styles.rowActionText}>{mapActions.map.label}</Text>
-                        </Pressable>
-                        <Pressable
-                          accessibilityHint={mapActions.copy.disabled ? mapActions.copy.disabledHelper : undefined}
-                          accessibilityLabel={`${item.placeName} 주소 복사`}
-                          accessibilityRole="button"
-                          accessibilityState={{ disabled: mapActions.copy.disabled }}
-                          disabled={mapActions.copy.disabled}
-                          onPress={() => onCopyAddress(item)}
-                          style={[styles.rowActionButton, mapActions.copy.disabled ? styles.rowActionButtonDisabled : null]}
-                        >
-                          <Text style={styles.rowActionText}>{mapActions.copy.label}</Text>
-                        </Pressable>
-                        <Pressable
-                          accessibilityRole="button"
-                          disabled={lodging.action.disabled}
-                          onPress={() => (lodging.action.kind === 'set' ? onSetLodging(item) : onClearLodging(item))}
-                          style={[styles.rowActionButton, lodging.action.disabled ? styles.rowActionButtonDisabled : null]}
-                        >
-                          {lodging.action.isSubmitting ? <ActivityIndicator color={theme.color.primary} /> : null}
-                          <Text style={styles.rowActionText}>{lodging.action.label}</Text>
-                        </Pressable>
-                        <Pressable accessibilityRole="button" onPress={() => onEditPlace(item)} style={styles.rowActionButton}>
-                          <Text style={styles.rowActionText}>수정</Text>
-                        </Pressable>
-                        <Pressable
-                          ref={(node) => {
-                            deleteTriggerRefs.current[item.id] = node;
-                          }}
-                          accessibilityLabel={`${item.placeName} 삭제`}
-                          accessibilityRole="button"
-                          onPress={() => onDeletePlace(item, findNodeHandle(deleteTriggerRefs.current[item.id]))}
-                          style={styles.rowDangerActionButton}
-                        >
-                          <Text style={styles.rowDangerActionText}>삭제</Text>
-                        </Pressable>
-                      </View>
+                    <Text style={styles.address}>{item.address}</Text>
+                    <View style={styles.rowActionGroup}>
+                      <Pressable
+                        accessibilityLabel={`${item.placeName} 지도 열기`}
+                        accessibilityRole="button"
+                        onPress={() => onOpenMap(item)}
+                        style={styles.rowActionButton}
+                      >
+                        <Text style={styles.rowActionText}>{mapActions.map.label}</Text>
+                      </Pressable>
+                      <Pressable
+                        accessibilityHint={mapActions.copy.disabled ? mapActions.copy.disabledHelper : undefined}
+                        accessibilityLabel={`${item.placeName} 주소 복사`}
+                        accessibilityRole="button"
+                        accessibilityState={{ disabled: mapActions.copy.disabled }}
+                        disabled={mapActions.copy.disabled}
+                        onPress={() => onCopyAddress(item)}
+                        style={[
+                          styles.rowActionButton,
+                          mapActions.copy.disabled ? styles.rowActionButtonDisabled : null,
+                        ]}
+                      >
+                        <Text style={styles.rowActionText}>{mapActions.copy.label}</Text>
+                      </Pressable>
+                      <Pressable
+                        accessibilityRole="button"
+                        disabled={lodging.action.disabled}
+                        onPress={() => (lodging.action.kind === 'set' ? onSetLodging(item) : onClearLodging(item))}
+                        style={[
+                          styles.rowActionButton,
+                          lodging.action.disabled ? styles.rowActionButtonDisabled : null,
+                        ]}
+                      >
+                        {lodging.action.isSubmitting ? <ActivityIndicator color={theme.color.primary} /> : null}
+                        <Text style={styles.rowActionText}>{lodging.action.label}</Text>
+                      </Pressable>
+                      <Pressable
+                        accessibilityRole="button"
+                        onPress={() => onEditPlace(item)}
+                        style={styles.rowActionButton}
+                      >
+                        <Text style={styles.rowActionText}>수정</Text>
+                      </Pressable>
+                      <Pressable
+                        ref={(node) => {
+                          deleteTriggerRefs.current[item.id] = node;
+                        }}
+                        accessibilityLabel={`${item.placeName} 삭제`}
+                        accessibilityRole="button"
+                        onPress={() => onDeletePlace(item, findNodeHandle(deleteTriggerRefs.current[item.id]))}
+                        style={styles.rowDangerActionButton}
+                      >
+                        <Text style={styles.rowDangerActionText}>삭제</Text>
+                      </Pressable>
                     </View>
                   </View>
-                );
-              })}
+                </View>
+              );
+            })
+          )}
         </View>
       ) : null}
 
@@ -949,7 +1020,11 @@ function ReorderPlaceList({
           return;
         }
 
-        const targetIndex = resolveTargetIndex(dragRef.current.startIndex, gestureState.dy, dragRef.current.snapshotHeights);
+        const targetIndex = resolveTargetIndex(
+          dragRef.current.startIndex,
+          gestureState.dy,
+          dragRef.current.snapshotHeights,
+        );
         if (targetIndex === dragRef.current.currentIndex) {
           return;
         }
@@ -964,7 +1039,11 @@ function ReorderPlaceList({
     const isActive = activeItemId === item.id;
 
     return (
-      <View key={item.id} onLayout={(event) => updateRowHeight(item.id, event)} style={[styles.placeRow, isActive ? styles.placeRowActive : null]}>
+      <View
+        key={item.id}
+        onLayout={(event) => updateRowHeight(item.id, event)}
+        style={[styles.placeRow, isActive ? styles.placeRowActive : null]}
+      >
         <View style={styles.orderBadge}>
           <Text style={styles.orderText}>{item.orderLabel}</Text>
         </View>
@@ -1064,7 +1143,12 @@ function EditPlacePanel({
       ) : null}
 
       <View style={styles.actionGroup}>
-        <Pressable accessibilityRole="button" disabled={submitView.disabled} onPress={onSubmit} style={[styles.button, submitView.disabled ? styles.buttonDisabled : null]}>
+        <Pressable
+          accessibilityRole="button"
+          disabled={submitView.disabled}
+          onPress={onSubmit}
+          style={[styles.button, submitView.disabled ? styles.buttonDisabled : null]}
+        >
           {isSaving ? <ActivityIndicator color={theme.color.onPrimary} /> : null}
           <Text style={styles.buttonText}>{submitView.label}</Text>
         </Pressable>
@@ -1118,7 +1202,9 @@ function DeletePlaceConfirmationModal({
     >
       <View style={styles.modalBackdrop}>
         <View accessibilityViewIsModal importantForAccessibility="yes" style={styles.modalCard}>
-          <Text ref={titleRef} accessibilityRole="header" style={styles.modalTitle}>{confirmation.title}</Text>
+          <Text ref={titleRef} accessibilityRole="header" style={styles.modalTitle}>
+            {confirmation.title}
+          </Text>
           <View style={styles.deleteTargetBox}>
             <Text style={styles.deleteTargetText}>{confirmation.itemLabel}</Text>
             <Text style={styles.deleteTargetContext}>{confirmation.contextLabel}</Text>
