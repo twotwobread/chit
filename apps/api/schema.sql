@@ -186,10 +186,12 @@ CREATE TABLE itinerary_items (
   rank text COLLATE "C" NOT NULL,
   version integer NOT NULL DEFAULT 1,
   arrived_at timestamptz,
+  skipped_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT itinerary_items_item_order_check CHECK (item_order >= 1),
   CONSTRAINT itinerary_items_version_check CHECK (version >= 1),
+  CONSTRAINT itinerary_items_arrived_skipped_exclusive CHECK (arrived_at IS NULL OR skipped_at IS NULL),
   CONSTRAINT itinerary_items_trip_place_fk FOREIGN KEY (trip_place_id, trip_id) REFERENCES trip_places(id, trip_id) ON DELETE CASCADE,
   CONSTRAINT itinerary_items_trip_date_order_unique UNIQUE (trip_id, scheduled_date, item_order),
   CONSTRAINT itinerary_items_trip_date_rank_unique UNIQUE (trip_id, scheduled_date, rank)

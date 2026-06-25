@@ -89,6 +89,7 @@ type ItineraryItem struct {
 	Rank          string
 	Version       int32
 	ArrivedAt     pgtype.Timestamptz
+	SkippedAt     pgtype.Timestamptz
 	CreatedAt     pgtype.Timestamptz
 	UpdatedAt     pgtype.Timestamptz
 }

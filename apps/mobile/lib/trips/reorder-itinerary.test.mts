@@ -356,6 +356,8 @@ describe('reorder itinerary helpers', () => {
           itemOrder: 1,
           version: 9,
           isLodging: false,
+          arrivedAt: null,
+          skippedAt: null,
           place: { id: 'place-3', name: '오사카성', placeType: 'sights', address: 'Osaka' },
         },
         {
@@ -363,6 +365,8 @@ describe('reorder itinerary helpers', () => {
           itemOrder: 2,
           version: 3,
           isLodging: false,
+          arrivedAt: null,
+          skippedAt: null,
           place: { id: 'place-1', name: '우메다 공중정원', placeType: 'sights', address: 'Umeda' },
         },
         {
@@ -370,6 +374,8 @@ describe('reorder itinerary helpers', () => {
           itemOrder: 3,
           version: 5,
           isLodging: false,
+          arrivedAt: null,
+          skippedAt: null,
           place: { id: 'place-2', name: '도톤보리', placeType: 'food', address: 'Dotonbori' },
         },
       ],

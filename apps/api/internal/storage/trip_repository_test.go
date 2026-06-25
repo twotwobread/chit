@@ -211,6 +211,162 @@ func TestMarkDayItineraryItemArrivedFirstPendingIdempotentAndDuplicatePlaceIndep
 	}
 }
 
+func TestMarkDayItineraryItemSkippedRestoreAndDuplicatePlaceIndependent(t *testing.T) {
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("DATABASE_URL is required for storage integration test")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	store, err := Open(ctx, databaseURL)
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer store.Close()
+
+	var userID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO users (display_name)
+		VALUES ('스킵 처리 테스트')
+		RETURNING id::text
+	`).Scan(&userID); err != nil {
+		t.Fatalf("insert user: %v", err)
+	}
+	defer func() { _, _ = store.pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1::uuid`, userID) }()
+
+	var tripID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO trips (name, start_date, end_date, default_currency, created_by)
+		VALUES ('스킵 처리 테스트 여행', '2026-07-10', '2026-07-13', 'JPY', $1::uuid)
+		RETURNING id::text
+	`, userID).Scan(&tripID); err != nil {
+		t.Fatalf("insert trip: %v", err)
+	}
+
+	var sharedPlaceID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO trip_places (trip_id, name, address, place_type)
+		VALUES ($1::uuid, '도톤보리', 'Dotonbori', 'food')
+		RETURNING id::text
+	`, tripID).Scan(&sharedPlaceID); err != nil {
+		t.Fatalf("insert shared trip place: %v", err)
+	}
+	var thirdPlaceID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO trip_places (trip_id, name, address, place_type)
+		VALUES ($1::uuid, '오사카성', 'Osakajo', 'sights')
+		RETURNING id::text
+	`, tripID).Scan(&thirdPlaceID); err != nil {
+		t.Fatalf("insert third trip place: %v", err)
+	}
+
+	var firstItemID string
+	var secondItemID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO itinerary_items (trip_id, scheduled_date, trip_place_id, item_order, rank, version)
+		VALUES ($1::uuid, '2026-07-11', $2::uuid, 1, '0000000000000001024', 1)
+		RETURNING id::text
+	`, tripID, sharedPlaceID).Scan(&firstItemID); err != nil {
+		t.Fatalf("insert first itinerary item: %v", err)
+	}
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO itinerary_items (trip_id, scheduled_date, trip_place_id, item_order, rank, version)
+		VALUES ($1::uuid, '2026-07-11', $2::uuid, 2, '0000000000000002048', 1)
+		RETURNING id::text
+	`, tripID, sharedPlaceID).Scan(&secondItemID); err != nil {
+		t.Fatalf("insert second itinerary item: %v", err)
+	}
+	if _, err := store.pool.Exec(ctx, `
+		INSERT INTO itinerary_items (trip_id, scheduled_date, trip_place_id, item_order, rank, version)
+		VALUES ($1::uuid, '2026-07-11', $2::uuid, 3, '0000000000000003072', 1)
+	`, tripID, thirdPlaceID); err != nil {
+		t.Fatalf("insert third itinerary item: %v", err)
+	}
+
+	_, err = store.MarkDayItineraryItemSkipped(ctx, trip.MarkDayItineraryItemSkippedRecord{TripID: tripID, ScheduledDate: "2026-07-11", ItemID: secondItemID})
+	if !errors.Is(err, trip.ErrConflict) {
+		t.Fatalf("expected out-of-order skip conflict, got %v", err)
+	}
+
+	skipped, err := store.MarkDayItineraryItemSkipped(ctx, trip.MarkDayItineraryItemSkippedRecord{TripID: tripID, ScheduledDate: "2026-07-11", ItemID: firstItemID})
+	if err != nil {
+		t.Fatalf("mark first item skipped: %v", err)
+	}
+	if skipped.Item.ID != firstItemID || skipped.Item.SkippedAt == nil || skipped.Item.ArrivedAt != nil {
+		t.Fatalf("expected first item to be skipped, got %#v", skipped.Item)
+	}
+	if len(skipped.Items) != 3 || skipped.Items[0].ID != firstItemID || skipped.Items[0].SkippedAt == nil || skipped.Items[1].ID != secondItemID || skipped.Items[1].SkippedAt != nil {
+		t.Fatalf("unexpected latest day snapshot after skip: %#v", skipped.Items)
+	}
+
+	var skippedSharedRows int
+	if err := store.pool.QueryRow(ctx, `
+		SELECT count(*)::int
+		FROM itinerary_items
+		WHERE trip_id = $1::uuid
+		  AND scheduled_date = '2026-07-11'
+		  AND trip_place_id = $2::uuid
+		  AND skipped_at IS NOT NULL
+	`, tripID, sharedPlaceID).Scan(&skippedSharedRows); err != nil {
+		t.Fatalf("count skipped shared place rows: %v", err)
+	}
+	if skippedSharedRows != 1 {
+		t.Fatalf("expected only one duplicate place itinerary row to be skipped, got %d", skippedSharedRows)
+	}
+
+	firstSkippedAt := *skipped.Item.SkippedAt
+	repeatSkip, err := store.MarkDayItineraryItemSkipped(ctx, trip.MarkDayItineraryItemSkippedRecord{TripID: tripID, ScheduledDate: "2026-07-11", ItemID: firstItemID})
+	if err != nil {
+		t.Fatalf("repeat mark first item skipped: %v", err)
+	}
+	if repeatSkip.Item.SkippedAt == nil || !repeatSkip.Item.SkippedAt.Equal(firstSkippedAt) {
+		t.Fatalf("expected repeat skip to preserve skipped_at, first=%v repeat=%v", firstSkippedAt, repeatSkip.Item.SkippedAt)
+	}
+
+	_, err = store.MarkDayItineraryItemArrived(ctx, trip.MarkDayItineraryItemArrivedRecord{TripID: tripID, ScheduledDate: "2026-07-11", ItemID: firstItemID})
+	if !errors.Is(err, trip.ErrConflict) {
+		t.Fatalf("expected skipped item arrival conflict, got %v", err)
+	}
+
+	restored, err := store.RestoreDayItineraryItem(ctx, trip.RestoreDayItineraryItemRecord{TripID: tripID, ScheduledDate: "2026-07-11", ItemID: firstItemID})
+	if err != nil {
+		t.Fatalf("restore first skipped item: %v", err)
+	}
+	if restored.Item.ID != firstItemID || restored.Item.SkippedAt != nil || restored.Item.ArrivedAt != nil {
+		t.Fatalf("expected first item to be restored to pending, got %#v", restored.Item)
+	}
+	if len(restored.Items) != 3 || restored.Items[0].ID != firstItemID || restored.Items[0].SkippedAt != nil || restored.Items[1].ID != secondItemID || restored.Items[1].SkippedAt != nil {
+		t.Fatalf("unexpected latest day snapshot after restore: %#v", restored.Items)
+	}
+
+	repeatRestore, err := store.RestoreDayItineraryItem(ctx, trip.RestoreDayItineraryItemRecord{TripID: tripID, ScheduledDate: "2026-07-11", ItemID: firstItemID})
+	if err != nil {
+		t.Fatalf("repeat restore pending item: %v", err)
+	}
+	if repeatRestore.Item.SkippedAt != nil || repeatRestore.Item.ArrivedAt != nil {
+		t.Fatalf("expected repeat restore to keep pending item, got %#v", repeatRestore.Item)
+	}
+
+	arrived, err := store.MarkDayItineraryItemArrived(ctx, trip.MarkDayItineraryItemArrivedRecord{TripID: tripID, ScheduledDate: "2026-07-11", ItemID: firstItemID})
+	if err != nil {
+		t.Fatalf("arrive restored item: %v", err)
+	}
+	if arrived.Item.ArrivedAt == nil || arrived.Item.SkippedAt != nil {
+		t.Fatalf("expected restored item to arrive without skipped state, got %#v", arrived.Item)
+	}
+
+	_, err = store.MarkDayItineraryItemSkipped(ctx, trip.MarkDayItineraryItemSkippedRecord{TripID: tripID, ScheduledDate: "2026-07-11", ItemID: firstItemID})
+	if !errors.Is(err, trip.ErrConflict) {
+		t.Fatalf("expected arrived item skip conflict, got %v", err)
+	}
+	_, err = store.RestoreDayItineraryItem(ctx, trip.RestoreDayItineraryItemRecord{TripID: tripID, ScheduledDate: "2026-07-11", ItemID: firstItemID})
+	if !errors.Is(err, trip.ErrConflict) {
+		t.Fatalf("expected arrived item restore conflict, got %v", err)
+	}
+}
+
 func TestDayLodgingPlacePersistenceAndItineraryMapping(t *testing.T) {
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {

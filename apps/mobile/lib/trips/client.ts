@@ -13,10 +13,12 @@ import {
   type ListTripParticipantsResponse,
   type ListTripsResponse,
   type MarkDayItineraryItemArrivedResponse,
+  type MarkDayItineraryItemSkippedResponse,
   type ReorderDayItineraryItemsRequest,
   type ReorderDayItineraryItemsResponse,
   type SetDayLodgingPlaceRequest,
   type SetDayLodgingPlaceResponse,
+  type RestoreDayItineraryItemResponse,
   type UpdateDayItineraryItemRequest,
   type UpdateDayItineraryItemResponse,
   type UpdateTripRequest,
@@ -108,6 +110,24 @@ export async function markDayItineraryItemArrived(
 ): Promise<MarkDayItineraryItemArrivedResponse> {
   await getMeWithRefresh();
   return TripsService.markDayItineraryItemArrived(tripId, date, itemId);
+}
+
+export async function markDayItineraryItemSkipped(
+  tripId: string,
+  date: string,
+  itemId: string,
+): Promise<MarkDayItineraryItemSkippedResponse> {
+  await getMeWithRefresh();
+  return TripsService.markDayItineraryItemSkipped(tripId, date, itemId);
+}
+
+export async function restoreDayItineraryItem(
+  tripId: string,
+  date: string,
+  itemId: string,
+): Promise<RestoreDayItineraryItemResponse> {
+  await getMeWithRefresh();
+  return TripsService.restoreDayItineraryItem(tripId, date, itemId);
 }
 
 export async function updateDayItineraryItem(

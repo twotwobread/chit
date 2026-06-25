@@ -122,6 +122,18 @@ type MarkDayItineraryItemArrivedRecord struct {
 	ItemID        string
 }
 
+type MarkDayItineraryItemSkippedRecord struct {
+	TripID        string
+	ScheduledDate string
+	ItemID        string
+}
+
+type RestoreDayItineraryItemRecord struct {
+	TripID        string
+	ScheduledDate string
+	ItemID        string
+}
+
 type SetDayLodgingPlaceRecord struct {
 	TripID        string
 	ScheduledDate string
@@ -253,6 +265,7 @@ type DayItineraryItem struct {
 	Version   int
 	IsLodging bool
 	ArrivedAt *time.Time
+	SkippedAt *time.Time
 	Place     TripPlaceSummary
 }
 
@@ -285,7 +298,29 @@ type MarkDayItineraryItemArrivedMutationResult struct {
 	Items []DayItineraryItem
 }
 
+type MarkDayItineraryItemSkippedMutationResult struct {
+	Item  DayItineraryItem
+	Items []DayItineraryItem
+}
+
+type RestoreDayItineraryItemMutationResult struct {
+	Item  DayItineraryItem
+	Items []DayItineraryItem
+}
+
 type MarkDayItineraryItemArrivedResult struct {
+	Day   TripDay
+	Item  DayItineraryItem
+	Items []DayItineraryItem
+}
+
+type MarkDayItineraryItemSkippedResult struct {
+	Day   TripDay
+	Item  DayItineraryItem
+	Items []DayItineraryItem
+}
+
+type RestoreDayItineraryItemResult struct {
 	Day   TripDay
 	Item  DayItineraryItem
 	Items []DayItineraryItem
@@ -365,6 +400,8 @@ type Repository interface {
 	GetItineraryItemByTripDateAndID(ctx context.Context, tripID string, date string, itemID string) (DayItineraryItem, bool, error)
 	ReorderDayItineraryItems(ctx context.Context, record ReorderDayItineraryItemsRecord) ([]DayItineraryItem, error)
 	MarkDayItineraryItemArrived(ctx context.Context, record MarkDayItineraryItemArrivedRecord) (MarkDayItineraryItemArrivedMutationResult, error)
+	MarkDayItineraryItemSkipped(ctx context.Context, record MarkDayItineraryItemSkippedRecord) (MarkDayItineraryItemSkippedMutationResult, error)
+	RestoreDayItineraryItem(ctx context.Context, record RestoreDayItineraryItemRecord) (RestoreDayItineraryItemMutationResult, error)
 	UpdateDayItineraryItemPlace(ctx context.Context, record UpdateDayItineraryItemRecord) (DayItineraryItem, error)
 	DeleteDayItineraryItem(ctx context.Context, tripID string, date string, itemID string) (bool, error)
 }

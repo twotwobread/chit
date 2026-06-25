@@ -233,6 +233,30 @@ func markDayItineraryItemArrivedResponseToOpenAPI(result trip.MarkDayItineraryIt
 	}
 }
 
+func markDayItineraryItemSkippedResponseToOpenAPI(result trip.MarkDayItineraryItemSkippedResult) openapi.MarkDayItineraryItemSkippedResponse {
+	items := make([]openapi.DayItineraryItem, 0, len(result.Items))
+	for _, item := range result.Items {
+		items = append(items, dayItineraryItemToOpenAPI(item))
+	}
+	return openapi.MarkDayItineraryItemSkippedResponse{
+		Day:   tripDayToOpenAPI(result.Day),
+		Item:  dayItineraryItemToOpenAPI(result.Item),
+		Items: items,
+	}
+}
+
+func restoreDayItineraryItemResponseToOpenAPI(result trip.RestoreDayItineraryItemResult) openapi.RestoreDayItineraryItemResponse {
+	items := make([]openapi.DayItineraryItem, 0, len(result.Items))
+	for _, item := range result.Items {
+		items = append(items, dayItineraryItemToOpenAPI(item))
+	}
+	return openapi.RestoreDayItineraryItemResponse{
+		Day:   tripDayToOpenAPI(result.Day),
+		Item:  dayItineraryItemToOpenAPI(result.Item),
+		Items: items,
+	}
+}
+
 func searchGooglePlacesResponseToOpenAPI(results []place.SearchResult) openapi.SearchGooglePlacesResponse {
 	items := make([]openapi.GooglePlaceSearchResult, 0, len(results))
 	for _, result := range results {
@@ -253,6 +277,7 @@ func dayItineraryItemToOpenAPI(item trip.DayItineraryItem) openapi.DayItineraryI
 		Version:   item.Version,
 		IsLodging: item.IsLodging,
 		ArrivedAt: optionalTimeToOpenAPI(item.ArrivedAt),
+		SkippedAt: optionalTimeToOpenAPI(item.SkippedAt),
 		Place:     tripPlaceSummaryToOpenAPI(item.Place),
 	}
 }

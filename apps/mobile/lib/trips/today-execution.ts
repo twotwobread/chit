@@ -33,6 +33,22 @@ export type TodayArriveAction = {
   itemId: string;
 };
 
+export type TodaySkipAction = {
+  kind: 'skip';
+  label: string;
+  tripId: string;
+  date: string;
+  itemId: string;
+};
+
+export type TodayRestoreAction = {
+  kind: 'restore';
+  label: string;
+  tripId: string;
+  date: string;
+  itemId: string;
+};
+
 export type TodayNavigateAction = {
   kind: 'navigate';
   label: string;
@@ -42,7 +58,13 @@ export type TodayNavigateAction = {
   };
 };
 
-export type TodayAction = TodayRouteAction | TodayRetryAction | TodayArriveAction | TodayNavigateAction;
+export type TodayAction =
+  | TodayRouteAction
+  | TodayRetryAction
+  | TodayArriveAction
+  | TodaySkipAction
+  | TodayRestoreAction
+  | TodayNavigateAction;
 
 export type TodayMultipleOngoingTripNotice = {
   message: string;
@@ -126,6 +148,21 @@ export type TodayRemainingSectionViewModel =
       items: TodayRemainingPlaceRowViewModel[];
     };
 
+export type TodaySkippedPlaceRowViewModel = {
+  itemId: string;
+  orderLabel: string;
+  placeName: string;
+  placeTypeLabel: string;
+  address: string;
+  restoreAction: TodayRestoreAction;
+};
+
+export type TodaySkippedPlacesSectionViewModel = {
+  title: string;
+  countLabel: string;
+  items: TodaySkippedPlaceRowViewModel[];
+};
+
 export type TodaySuccessViewModel = {
   status: 'success';
   tripName: string;
@@ -140,8 +177,22 @@ export type TodaySuccessViewModel = {
     navigationAction: TodayNavigateAction;
   };
   remainingSection: TodayRemainingSectionViewModel;
+  skippedSection: TodaySkippedPlacesSectionViewModel | null;
   arrivalAction: TodayArriveAction;
   quickExpenseAction: TodayRouteAction;
+  skipAction: TodaySkipAction;
+  primaryAction: TodayRouteAction;
+  multipleOngoingTripNotice: TodayMultipleOngoingTripNotice | null;
+};
+
+export type TodayRecoverNeededViewModel = {
+  status: 'recoverNeeded';
+  tripName: string;
+  dayLabel: string;
+  formattedDate: string;
+  title: string;
+  helper: string;
+  skippedSection: TodaySkippedPlacesSectionViewModel;
   primaryAction: TodayRouteAction;
   multipleOngoingTripNotice: TodayMultipleOngoingTripNotice | null;
 };
@@ -152,6 +203,7 @@ export type TodayExecutionViewModel =
   | TodayRetryableErrorViewModel
   | TodayEmptyItineraryViewModel
   | TodayCompletedViewModel
+  | TodayRecoverNeededViewModel
   | TodaySuccessViewModel;
 
 export function selectTodayTrip(trips: TripListItem[], today: string): TodayTripSelection | null {
@@ -190,7 +242,12 @@ export function buildTodayExecutionViewModel({
   itinerary: GetDayItineraryResponse;
   today: string;
   ongoingTripCount: number;
-}): TodayUnavailableViewModel | TodayEmptyItineraryViewModel | TodayCompletedViewModel | TodaySuccessViewModel {
+}):
+  | TodayUnavailableViewModel
+  | TodayEmptyItineraryViewModel
+  | TodayCompletedViewModel
+  | TodayRecoverNeededViewModel
+  | TodaySuccessViewModel {
   const currentDay = findTodayTripDay(tripDetail.days, today);
   if (!currentDay) {
     return buildTodayUnavailableViewModel(selectedTrip.id);
@@ -215,9 +272,20 @@ export function buildTodayExecutionViewModel({
     };
   }
 
-  const pendingItems = orderedItems.filter((item) => item.arrivedAt === null);
+  const pendingItems = orderedItems.filter(isPendingItem);
+  const skippedItems = orderedItems.filter(isSkippedItem);
   const nextItem = pendingItems[0];
   if (!nextItem) {
+    if (skippedItems.length > 0) {
+      return {
+        status: 'recoverNeeded',
+        ...common,
+        title: '진행할 장소가 없어요.',
+        helper: '스킵한 장소를 복구하면 다시 진행할 수 있어요.',
+        skippedSection: buildSkippedSection(skippedItems, selectedTrip.id, currentDay.date),
+      };
+    }
+
     return {
       status: 'completed',
       ...common,
@@ -240,8 +308,11 @@ export function buildTodayExecutionViewModel({
       navigationAction: navigateAction(nextItem.place.name, nextItem.place.address),
     },
     remainingSection: buildRemainingSection(pendingItems.slice(1)),
+    skippedSection:
+      skippedItems.length > 0 ? buildSkippedSection(skippedItems, selectedTrip.id, currentDay.date) : null,
     arrivalAction: arriveAction(selectedTrip.id, currentDay.date, nextItem.id),
     quickExpenseAction: routeAction('지출 등록', buildQuickExpenseRoute(selectedTrip.id, currentDay.date, nextItem.id)),
+    skipAction: skipAction(selectedTrip.id, currentDay.date, nextItem.id),
   };
 }
 
@@ -273,6 +344,14 @@ function orderedItineraryItems(items: DayItineraryItem[]): DayItineraryItem[] {
   return [...items].sort((left, right) => left.itemOrder - right.itemOrder);
 }
 
+function isPendingItem(item: DayItineraryItem): boolean {
+  return item.arrivedAt === null && item.skippedAt === null;
+}
+
+function isSkippedItem(item: DayItineraryItem): boolean {
+  return item.arrivedAt === null && item.skippedAt !== null;
+}
+
 function buildRemainingSection(items: DayItineraryItem[]): TodayRemainingSectionViewModel {
   if (items.length === 0) {
     return {
@@ -298,6 +377,25 @@ function buildRemainingSection(items: DayItineraryItem[]): TodayRemainingSection
   };
 }
 
+function buildSkippedSection(
+  items: DayItineraryItem[],
+  tripId: string,
+  date: string,
+): TodaySkippedPlacesSectionViewModel {
+  return {
+    title: '스킵한 장소',
+    countLabel: `${items.length}곳을 나중에 다시 볼 수 있어요.`,
+    items: items.map((item) => ({
+      itemId: item.id,
+      orderLabel: String(item.itemOrder),
+      placeName: item.place.name,
+      placeTypeLabel: getPlaceTypeLabel(item.place.placeType),
+      address: item.place.address,
+      restoreAction: restoreAction(tripId, date, item.id),
+    })),
+  };
+}
+
 function buildMultipleOngoingTripNotice(ongoingTripCount: number): TodayMultipleOngoingTripNotice | null {
   if (ongoingTripCount <= 1) {
     return null;
@@ -319,6 +417,14 @@ function retryAction(): TodayRetryAction {
 
 function arriveAction(tripId: string, date: string, itemId: string): TodayArriveAction {
   return { kind: 'arrive', label: '도착했어요', tripId, date, itemId };
+}
+
+function skipAction(tripId: string, date: string, itemId: string): TodaySkipAction {
+  return { kind: 'skip', label: '스킵하기', tripId, date, itemId };
+}
+
+function restoreAction(tripId: string, date: string, itemId: string): TodayRestoreAction {
+  return { kind: 'restore', label: '복구', tripId, date, itemId };
 }
 
 function navigateAction(placeName: string, address: string): TodayNavigateAction {

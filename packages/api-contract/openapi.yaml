@@ -980,6 +980,144 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /trips/{tripId}/days/{date}/itinerary/items/{itemId}/skip:
+    post:
+      operationId: markDayItineraryItemSkipped
+      summary: Mark a trip day itinerary item skipped
+      description: Marks the selected itinerary item instance skipped when it is the first pending item for the selected Day, and returns the latest Day itinerary snapshot.
+      tags:
+        - Trips
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: date
+          in: path
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Day itinerary item skipped, or already skipped idempotently.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarkDayItineraryItemSkippedResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip, virtual day, or itinerary item not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Skip conflict because the target item is arrived or is not the first pending item for the selected Day.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /trips/{tripId}/days/{date}/itinerary/items/{itemId}/restore:
+    post:
+      operationId: restoreDayItineraryItem
+      summary: Restore a skipped trip day itinerary item
+      description: Clears skipped state for the selected itinerary item instance and returns the latest Day itinerary snapshot.
+      tags:
+        - Trips
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: date
+          in: path
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Day itinerary item restored, or already pending idempotently.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RestoreDayItineraryItemResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip, virtual day, or itinerary item not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Restore conflict because the target item is already arrived.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /trips/{tripId}/days/{date}/itinerary/items/{itemId}:
     patch:
       operationId: updateDayItineraryItem
@@ -1764,6 +1902,7 @@ components:
         - version
         - isLodging
         - arrivedAt
+        - skippedAt
         - place
       properties:
         id:
@@ -1780,7 +1919,12 @@ components:
           type: string
           format: date-time
           nullable: true
-          description: Server-generated arrival timestamp for this itinerary item instance. Null means pending.
+          description: Server-generated arrival timestamp for this itinerary item instance. Null means pending when skippedAt is also null.
+        skippedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Server-generated skip timestamp for this itinerary item instance. Null means the item is not currently skipped.
         place:
           $ref: '#/components/schemas/TripPlaceSummary'
     GetDayItineraryResponse:
@@ -1919,6 +2063,38 @@ components:
         lodgingPlace:
           $ref: '#/components/schemas/TripPlaceSummary'
     MarkDayItineraryItemArrivedResponse:
+      type: object
+      required:
+        - day
+        - item
+        - items
+      properties:
+        day:
+          $ref: '#/components/schemas/TripDay'
+        item:
+          $ref: '#/components/schemas/DayItineraryItem'
+        items:
+          type: array
+          description: Latest server source-of-truth itinerary items for the selected day, ordered by itinerary order/rank.
+          items:
+            $ref: '#/components/schemas/DayItineraryItem'
+    MarkDayItineraryItemSkippedResponse:
+      type: object
+      required:
+        - day
+        - item
+        - items
+      properties:
+        day:
+          $ref: '#/components/schemas/TripDay'
+        item:
+          $ref: '#/components/schemas/DayItineraryItem'
+        items:
+          type: array
+          description: Latest server source-of-truth itinerary items for the selected day, ordered by itinerary order/rank.
+          items:
+            $ref: '#/components/schemas/DayItineraryItem'
+    RestoreDayItineraryItemResponse:
       type: object
       required:
         - day

@@ -15,8 +15,10 @@ import type { GetTripDetailResponse } from '../models/GetTripDetailResponse';
 import type { ListTripParticipantsResponse } from '../models/ListTripParticipantsResponse';
 import type { ListTripsResponse } from '../models/ListTripsResponse';
 import type { MarkDayItineraryItemArrivedResponse } from '../models/MarkDayItineraryItemArrivedResponse';
+import type { MarkDayItineraryItemSkippedResponse } from '../models/MarkDayItineraryItemSkippedResponse';
 import type { ReorderDayItineraryItemsRequest } from '../models/ReorderDayItineraryItemsRequest';
 import type { ReorderDayItineraryItemsResponse } from '../models/ReorderDayItineraryItemsResponse';
+import type { RestoreDayItineraryItemResponse } from '../models/RestoreDayItineraryItemResponse';
 import type { SetDayLodgingPlaceRequest } from '../models/SetDayLodgingPlaceRequest';
 import type { SetDayLodgingPlaceResponse } from '../models/SetDayLodgingPlaceResponse';
 import type { UpdateDayItineraryItemRequest } from '../models/UpdateDayItineraryItemRequest';
@@ -463,6 +465,70 @@ export class TripsService {
                 403: `Forbidden.`,
                 404: `Trip, virtual day, or itinerary item not found.`,
                 409: `Arrival conflict because the target pending item is not the first pending item for the selected Day.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
+     * Mark a trip day itinerary item skipped
+     * Marks the selected itinerary item instance skipped when it is the first pending item for the selected Day, and returns the latest Day itinerary snapshot.
+     * @param tripId
+     * @param date
+     * @param itemId
+     * @returns MarkDayItineraryItemSkippedResponse Day itinerary item skipped, or already skipped idempotently.
+     * @throws ApiError
+     */
+    public static markDayItineraryItemSkipped(
+        tripId: string,
+        date: string,
+        itemId: string,
+    ): CancelablePromise<MarkDayItineraryItemSkippedResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/trips/{tripId}/days/{date}/itinerary/items/{itemId}/skip',
+            path: {
+                'tripId': tripId,
+                'date': date,
+                'itemId': itemId,
+            },
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                403: `Forbidden.`,
+                404: `Trip, virtual day, or itinerary item not found.`,
+                409: `Skip conflict because the target item is arrived or is not the first pending item for the selected Day.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
+     * Restore a skipped trip day itinerary item
+     * Clears skipped state for the selected itinerary item instance and returns the latest Day itinerary snapshot.
+     * @param tripId
+     * @param date
+     * @param itemId
+     * @returns RestoreDayItineraryItemResponse Day itinerary item restored, or already pending idempotently.
+     * @throws ApiError
+     */
+    public static restoreDayItineraryItem(
+        tripId: string,
+        date: string,
+        itemId: string,
+    ): CancelablePromise<RestoreDayItineraryItemResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/trips/{tripId}/days/{date}/itinerary/items/{itemId}/restore',
+            path: {
+                'tripId': tripId,
+                'date': date,
+                'itemId': itemId,
+            },
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                403: `Forbidden.`,
+                404: `Trip, virtual day, or itinerary item not found.`,
+                409: `Restore conflict because the target item is already arrived.`,
                 500: `Unexpected server error.`,
             },
         });
