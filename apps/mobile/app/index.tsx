@@ -582,7 +582,6 @@ function TodayContent({
           state={navigationFallback}
         />
       ) : null}
-      <RemainingPlacesSection section={viewModel.remainingSection} />
       {viewModel.skippedSection ? (
         <SkippedPlacesSection
           onAction={onAction}
@@ -629,44 +628,6 @@ function TodayDayHeader({
   );
 }
 
-function RemainingPlacesSection({
-  section,
-}: {
-  section: Extract<TodayExecutionViewModel, { status: 'success' }>['remainingSection'];
-}) {
-  return (
-    <View style={styles.remainingSection}>
-      <View style={styles.remainingHeader}>
-        <Text style={styles.remainingTitle}>{section.title}</Text>
-        {section.status === 'list' ? <Text style={styles.remainingCount}>{section.countLabel}</Text> : null}
-      </View>
-
-      {section.status === 'empty' ? (
-        <View style={styles.remainingEmptyPanel}>
-          <Text style={styles.remainingEmptyTitle}>{section.emptyTitle}</Text>
-          <Text style={styles.remainingHelper}>{section.helper}</Text>
-        </View>
-      ) : null}
-
-      {section.status === 'list' ? (
-        <View style={styles.remainingList}>
-          {section.items.map((item) => (
-            <View key={item.itemId} style={styles.remainingRow}>
-              <View style={styles.placeMetaRow}>
-                <Text style={styles.orderBadge}>{item.orderLabel}</Text>
-                {item.timeLabel ? <Text style={styles.timeLabel}>{item.timeLabel}</Text> : null}
-                <Text style={styles.placeType}>{item.placeTypeLabel}</Text>
-              </View>
-              <Text style={styles.remainingPlaceName}>{item.placeName}</Text>
-              <Text style={styles.address}>{item.address}</Text>
-            </View>
-          ))}
-        </View>
-      ) : null}
-    </View>
-  );
-}
-
 function SkippedPlacesSection({
   onAction,
   restoringItemId,
@@ -677,21 +638,21 @@ function SkippedPlacesSection({
   section: NonNullable<Extract<TodayExecutionViewModel, { status: 'success' }>['skippedSection']>;
 }) {
   return (
-    <View style={styles.remainingSection}>
-      <View style={styles.remainingHeader}>
-        <Text style={styles.remainingTitle}>{section.title}</Text>
-        <Text style={styles.remainingCount}>{section.countLabel}</Text>
+    <View style={styles.skippedSection}>
+      <View style={styles.skippedHeader}>
+        <Text style={styles.skippedTitle}>{section.title}</Text>
+        <Text style={styles.skippedCount}>{section.countLabel}</Text>
       </View>
-      <View style={styles.remainingList}>
+      <View style={styles.skippedList}>
         {section.items.map((item) => {
           const isRestoring = restoringItemId === item.itemId;
           return (
-            <View key={item.itemId} style={styles.remainingRow}>
+            <View key={item.itemId} style={styles.skippedRow}>
               <View style={styles.placeMetaRow}>
                 <Text style={styles.orderBadge}>{item.orderLabel}</Text>
                 <Text style={styles.placeType}>{item.placeTypeLabel}</Text>
               </View>
-              <Text style={styles.remainingPlaceName}>{item.placeName}</Text>
+              <Text style={styles.skippedPlaceName}>{item.placeName}</Text>
               <Text style={styles.address}>{item.address}</Text>
               <ActionButton
                 action={item.restoreAction}
@@ -942,49 +903,30 @@ const styles = StyleSheet.create({
     fontFamily: theme.font.family.regular,
     fontSize: theme.font.size.body,
   },
-  remainingSection: {
+  skippedSection: {
     gap: theme.space[4],
   },
-  remainingHeader: {
+  skippedHeader: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  remainingTitle: {
+  skippedTitle: {
     color: theme.color.textStrong,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.subhead,
     fontWeight: theme.font.weight.bold,
   },
-  remainingCount: {
+  skippedCount: {
     color: theme.color.textMuted,
     fontFamily: theme.font.family.semibold,
     fontSize: theme.font.size.caption,
     fontWeight: theme.font.weight.semibold,
   },
-  remainingEmptyPanel: {
-    backgroundColor: theme.color.surfaceSunken,
-    borderColor: theme.color.borderSubtle,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    gap: theme.space[2],
-    padding: theme.space[5],
-  },
-  remainingEmptyTitle: {
-    color: theme.color.textBody,
-    fontFamily: theme.font.family.semibold,
-    fontSize: theme.font.size.body,
-    fontWeight: theme.font.weight.semibold,
-  },
-  remainingHelper: {
-    color: theme.color.textMuted,
-    fontFamily: theme.font.family.regular,
-    fontSize: theme.font.size.label,
-  },
-  remainingList: {
+  skippedList: {
     gap: theme.space[3],
   },
-  remainingRow: {
+  skippedRow: {
     backgroundColor: theme.color.surfaceSunken,
     borderColor: theme.color.borderSubtle,
     borderRadius: theme.radius.md,
@@ -992,17 +934,11 @@ const styles = StyleSheet.create({
     gap: theme.space[2],
     padding: theme.space[4],
   },
-  remainingPlaceName: {
+  skippedPlaceName: {
     color: theme.color.textStrong,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.subhead,
     fontWeight: theme.font.weight.bold,
-  },
-  timeLabel: {
-    color: theme.color.textMuted,
-    fontFamily: theme.font.family.semibold,
-    fontSize: theme.font.size.caption,
-    fontWeight: theme.font.weight.semibold,
   },
   emptyPanel: {
     backgroundColor: theme.color.surfaceSunken,
