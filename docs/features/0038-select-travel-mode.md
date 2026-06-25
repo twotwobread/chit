@@ -236,7 +236,7 @@ Travel-mode preference is stored only in mobile device-local app storage. It is 
 
 ### Automated Regression
 
-- `pnpm --filter @i-um/mobile test`: pass — 194 tests including travel-mode preference, Today selector state, and Google Maps mode mapping coverage.
+- `pnpm --filter @i-um/mobile test`: pass — 210 tests including travel-mode preference, Today selector state, and Google Maps mode mapping coverage.
 - `pnpm --filter @i-um/mobile typecheck`: pass.
 
 ### Manual Smoke
