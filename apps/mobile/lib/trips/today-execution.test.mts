@@ -155,7 +155,7 @@ test('builds an empty-itinerary Today state with current day context and day iti
   });
 });
 
-test('maps the first ordered itinerary item to the next place and subsequent items to the remaining list', () => {
+test('maps the first ordered itinerary item to the next place without exposing subsequent places on Today', () => {
   const viewModel = buildTodayExecutionViewModel({
     selectedTrip: trip({ id: 'trip-current' }),
     tripDetail: tripDetail(),
@@ -218,29 +218,6 @@ test('maps the first ordered itinerary item to the next place and subsequent ite
         },
       },
     },
-    remainingSection: {
-      status: 'list',
-      title: '남은 장소',
-      countLabel: '2곳 남았어요',
-      items: [
-        {
-          itemId: 'item-lodging',
-          orderLabel: '2',
-          placeName: '호텔 니코 오사카',
-          placeTypeLabel: '숙소',
-          address: '1 Chome-3-3 Nishi-Shinsaibashi, Chuo Ward, Osaka',
-          timeLabel: null,
-        },
-        {
-          itemId: 'item-third',
-          orderLabel: '3',
-          placeName: '오사카성',
-          placeTypeLabel: '관광지',
-          address: '1-1 Osakajo, Chuo Ward, Osaka',
-          timeLabel: null,
-        },
-      ],
-    },
     skippedSection: null,
     arrivalAction: {
       kind: 'arrive',
@@ -265,16 +242,12 @@ test('maps the first ordered itinerary item to the next place and subsequent ite
     multipleOngoingTripNotice: null,
   });
 
-  const firstRemaining =
-    viewModel.status === 'success' && viewModel.remainingSection.status === 'list'
-      ? viewModel.remainingSection.items[0]
-      : null;
-  assert.ok(firstRemaining);
-  assert.equal('route' in firstRemaining, false);
-  assert.equal('action' in firstRemaining, false);
+  assert.equal('remainingSection' in viewModel, false);
+  assert.equal(JSON.stringify(viewModel).includes('호텔 니코 오사카'), false);
+  assert.equal(JSON.stringify(viewModel).includes('오사카성'), false);
 });
 
-test('selects the first pending itinerary item and excludes arrived items from remaining places', () => {
+test('selects the first pending itinerary item without exposing later pending places', () => {
   const viewModel = buildTodayExecutionViewModel({
     selectedTrip: trip({ id: 'trip-current' }),
     tripDetail: tripDetail(),
@@ -352,21 +325,8 @@ test('selects the first pending itinerary item and excludes arrived items from r
       },
     ],
   });
-  assert.deepEqual(viewModel.remainingSection, {
-    status: 'list',
-    title: '남은 장소',
-    countLabel: '1곳 남았어요',
-    items: [
-      {
-        itemId: 'item-third',
-        orderLabel: '4',
-        placeName: '오사카성',
-        placeTypeLabel: '관광지',
-        address: 'Osakajo',
-        timeLabel: null,
-      },
-    ],
-  });
+  assert.equal('remainingSection' in viewModel, false);
+  assert.equal(JSON.stringify(viewModel).includes('오사카성'), false);
 });
 
 test('builds a completed Today state when every itinerary item is arrived', () => {
@@ -472,7 +432,7 @@ test('builds a recover-needed state when all non-arrived items are skipped', () 
   });
 });
 
-test('keeps the remaining section visible with an empty message when only the next place exists', () => {
+test('does not expose a remaining section when only the next place exists', () => {
   const viewModel = buildTodayExecutionViewModel({
     selectedTrip: trip({ id: 'trip-current' }),
     tripDetail: tripDetail(),
@@ -486,11 +446,11 @@ test('keeps the remaining section visible with an empty message when only the ne
     return;
   }
 
-  assert.deepEqual(viewModel.remainingSection, {
-    status: 'empty',
-    title: '남은 장소',
-    emptyTitle: '다음 장소 이후 남은 장소가 없어요.',
-    helper: '도착하면 오늘 일정이 끝나요.',
+  assert.equal('remainingSection' in viewModel, false);
+  assert.deepEqual(viewModel.primaryAction, {
+    kind: 'route',
+    label: '오늘 일정 보기',
+    route: '/trips/trip-current/days/2026-07-10',
   });
 });
 

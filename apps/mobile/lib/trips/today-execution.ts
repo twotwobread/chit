@@ -125,29 +125,6 @@ export type TodayCompletedViewModel = {
   multipleOngoingTripNotice: TodayMultipleOngoingTripNotice | null;
 };
 
-export type TodayRemainingPlaceRowViewModel = {
-  itemId: string;
-  orderLabel: string;
-  placeName: string;
-  placeTypeLabel: string;
-  address: string;
-  timeLabel: string | null;
-};
-
-export type TodayRemainingSectionViewModel =
-  | {
-      status: 'empty';
-      title: string;
-      emptyTitle: string;
-      helper: string;
-    }
-  | {
-      status: 'list';
-      title: string;
-      countLabel: string;
-      items: TodayRemainingPlaceRowViewModel[];
-    };
-
 export type TodaySkippedPlaceRowViewModel = {
   itemId: string;
   orderLabel: string;
@@ -176,7 +153,6 @@ export type TodaySuccessViewModel = {
     address: string;
     navigationAction: TodayNavigateAction;
   };
-  remainingSection: TodayRemainingSectionViewModel;
   skippedSection: TodaySkippedPlacesSectionViewModel | null;
   arrivalAction: TodayArriveAction;
   quickExpenseAction: TodayRouteAction;
@@ -307,7 +283,6 @@ export function buildTodayExecutionViewModel({
       address: nextItem.place.address,
       navigationAction: navigateAction(nextItem.place.name, nextItem.place.address),
     },
-    remainingSection: buildRemainingSection(pendingItems.slice(1)),
     skippedSection:
       skippedItems.length > 0 ? buildSkippedSection(skippedItems, selectedTrip.id, currentDay.date) : null,
     arrivalAction: arriveAction(selectedTrip.id, currentDay.date, nextItem.id),
@@ -350,31 +325,6 @@ function isPendingItem(item: DayItineraryItem): boolean {
 
 function isSkippedItem(item: DayItineraryItem): boolean {
   return item.arrivedAt === null && item.skippedAt !== null;
-}
-
-function buildRemainingSection(items: DayItineraryItem[]): TodayRemainingSectionViewModel {
-  if (items.length === 0) {
-    return {
-      status: 'empty',
-      title: '남은 장소',
-      emptyTitle: '다음 장소 이후 남은 장소가 없어요.',
-      helper: '도착하면 오늘 일정이 끝나요.',
-    };
-  }
-
-  return {
-    status: 'list',
-    title: '남은 장소',
-    countLabel: `${items.length}곳 남았어요`,
-    items: items.map((item) => ({
-      itemId: item.id,
-      orderLabel: String(item.itemOrder),
-      placeName: item.place.name,
-      placeTypeLabel: getPlaceTypeLabel(item.place.placeType),
-      address: item.place.address,
-      timeLabel: null,
-    })),
-  };
 }
 
 function buildSkippedSection(
