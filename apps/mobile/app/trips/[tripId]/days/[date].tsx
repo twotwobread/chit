@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   ActivityIndicator,
+  Alert,
+  AppState,
   findNodeHandle,
   Linking,
   Modal,
@@ -12,6 +14,7 @@ import {
   Text,
   TextInput,
   View,
+  type AppStateStatus,
   type LayoutChangeEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -81,6 +84,17 @@ import {
   dayLodgingMutationFailureState,
   type DayLodgingSubmittingState,
 } from '../../../../lib/trips/lodging-place';
+import {
+  DAY_ITINERARY_SHARED_UPDATE_POLL_INTERVAL_MS,
+  DAY_ITINERARY_SHARED_UPDATE_RELOAD_CONFIRMATION,
+  buildDayItinerarySharedUpdateBanner,
+  isDayItinerarySharedUpdateReloadDisabled,
+  markDayItinerarySharedUpdateApplied,
+  reduceDayItinerarySharedUpdateFromResponse,
+  shouldReconcileDayItinerarySharedUpdate,
+  type DayItinerarySharedUpdateLocalState,
+  type DayItinerarySharedUpdateState,
+} from '../../../../lib/trips/shared-itinerary-updates';
 
 type DayItineraryState =
   | { status: 'loading' }
@@ -165,17 +179,110 @@ export default function TripDayItineraryScreen() {
   const [mapActionFeedback, setMapActionFeedback] = useState<DayItineraryMapActionFeedback | null>(null);
   const [contentFocusRequest, setContentFocusRequest] = useState<DayItineraryContentFocusRequest | null>(null);
   const [isReorderDragging, setIsReorderDragging] = useState(false);
+  const [sharedUpdateState, setSharedUpdateState] = useState<DayItinerarySharedUpdateState>({
+    baselineSignature: null,
+    pendingSignature: null,
+  });
+  const [isAppActive, setIsAppActive] = useState(() => AppState.currentState === 'active');
   const scrollViewRef = useRef<ScrollView | null>(null);
   const scrollMetricsRef = useRef<DayItineraryScrollMetrics>({ offsetY: 0, viewportHeight: 0, contentHeight: 0 });
   const reorderDragPointerYRef = useRef<number | null>(null);
   const reorderAutoScrollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const editStateRef = useRef<EditState>({ status: 'idle' });
+  const deleteStateRef = useRef<DeleteState>({ status: 'idle' });
   const reorderStateRef = useRef<ReorderState>({ status: 'idle' });
+  const lodgingStateRef = useRef<LodgingState>({ status: 'idle' });
+  const sharedUpdateStateRef = useRef<DayItinerarySharedUpdateState>({
+    baselineSignature: null,
+    pendingSignature: null,
+  });
+  const appStateRef = useRef<AppStateStatus>(AppState.currentState);
+  const appActiveRef = useRef(AppState.currentState === 'active');
+  const screenFocusedRef = useRef(false);
+  const sharedUpdatePollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const sharedUpdatePollInFlightRef = useRef(false);
+  const itineraryRequestSequenceRef = useRef(0);
+  const latestHandledItineraryRequestRef = useRef(0);
   const deleteOriginFocusTargetRef = useRef<number | null>(null);
   const focusRequestIdRef = useRef(0);
+
+  const updateSharedUpdateState = useCallback((nextState: DayItinerarySharedUpdateState) => {
+    sharedUpdateStateRef.current = nextState;
+    setSharedUpdateState(nextState);
+  }, []);
+
+  const getSharedUpdateLocalState = useCallback(
+    (): DayItinerarySharedUpdateLocalState => ({
+      reorderStatus: reorderStateRef.current.status,
+      editStatus: editStateRef.current.status,
+      deleteStatus: deleteStateRef.current.status,
+      lodgingStatus: lodgingStateRef.current.status,
+    }),
+    [],
+  );
+
+  const nextItineraryRequestSequence = useCallback(() => {
+    itineraryRequestSequenceRef.current += 1;
+    return itineraryRequestSequenceRef.current;
+  }, []);
+
+  const applyItineraryResponse = useCallback(
+    (response: Awaited<ReturnType<typeof getTripDayItinerary>>, requestSequence?: number) => {
+      const sequence = requestSequence ?? nextItineraryRequestSequence();
+      if (sequence < latestHandledItineraryRequestRef.current) {
+        return false;
+      }
+
+      latestHandledItineraryRequestRef.current = sequence;
+      updateSharedUpdateState(markDayItinerarySharedUpdateApplied(response));
+      setState({ status: 'success', viewModel: buildDayItineraryViewModel(response) });
+      return true;
+    },
+    [nextItineraryRequestSequence, updateSharedUpdateState],
+  );
+
+  const handleItineraryFetchError = useCallback((error: unknown, options: { background: boolean }) => {
+    if (error instanceof MobileAuthError && (error.code === 'UNAUTHORIZED' || error.code === 'INVALID_REFRESH_TOKEN')) {
+      setState({ status: 'auth' });
+      return;
+    }
+    if (error instanceof ApiError) {
+      if (error.status === 401) {
+        setState({ status: 'auth' });
+        return;
+      }
+      const failure = dayItineraryFailureState(error.status);
+      if (failure.status === 'notFound') {
+        setState({ status: 'notFound', title: failure.title, helper: failure.helper });
+        return;
+      }
+      if (!options.background) {
+        setState({ status: 'error', title: failure.title, helper: failure.helper });
+      }
+      return;
+    }
+
+    if (!options.background) {
+      const failure = dayItineraryFailureState();
+      setState({ status: 'error', title: failure.title, helper: failure.helper });
+    }
+  }, []);
+
+  useEffect(() => {
+    editStateRef.current = editState;
+  }, [editState]);
+
+  useEffect(() => {
+    deleteStateRef.current = deleteState;
+  }, [deleteState]);
 
   useEffect(() => {
     reorderStateRef.current = reorderState;
   }, [reorderState]);
+
+  useEffect(() => {
+    lodgingStateRef.current = lodgingState;
+  }, [lodgingState]);
 
   const updateScrollOffset = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
     scrollMetricsRef.current.offsetY = event.nativeEvent.contentOffset.y;
@@ -253,53 +360,160 @@ export default function TripDayItineraryScreen() {
   const load = useCallback(async () => {
     if (!tripId || !date) {
       const notFound = dayItineraryFailureState(404);
+      updateSharedUpdateState({ baselineSignature: null, pendingSignature: null });
       setState({ status: 'notFound', title: notFound.title, helper: notFound.helper });
       return;
     }
 
+    const requestSequence = nextItineraryRequestSequence();
     setMapActionFeedback(null);
     setState({ status: 'loading' });
     try {
       const response = await getTripDayItinerary(tripId, date);
-      setState({ status: 'success', viewModel: buildDayItineraryViewModel(response) });
+      applyItineraryResponse(response, requestSequence);
     } catch (error) {
-      if (
-        error instanceof MobileAuthError &&
-        (error.code === 'UNAUTHORIZED' || error.code === 'INVALID_REFRESH_TOKEN')
-      ) {
-        setState({ status: 'auth' });
+      if (requestSequence < latestHandledItineraryRequestRef.current) {
         return;
       }
-      if (error instanceof ApiError) {
-        if (error.status === 401) {
-          setState({ status: 'auth' });
-          return;
-        }
-        const failure = dayItineraryFailureState(error.status);
-        if (failure.status === 'notFound') {
-          setState({ status: 'notFound', title: failure.title, helper: failure.helper });
-          return;
-        }
-        setState({ status: 'error', title: failure.title, helper: failure.helper });
-        return;
-      }
-      const failure = dayItineraryFailureState();
-      setState({ status: 'error', title: failure.title, helper: failure.helper });
+      latestHandledItineraryRequestRef.current = requestSequence;
+      handleItineraryFetchError(error, { background: false });
     }
-  }, [date, tripId]);
+  }, [
+    applyItineraryResponse,
+    date,
+    handleItineraryFetchError,
+    nextItineraryRequestSequence,
+    tripId,
+    updateSharedUpdateState,
+  ]);
+
+  const refetchSharedItinerary = useCallback(async () => {
+    if (!tripId || !date || sharedUpdatePollInFlightRef.current) {
+      return;
+    }
+
+    sharedUpdatePollInFlightRef.current = true;
+    const requestSequence = nextItineraryRequestSequence();
+    try {
+      const response = await getTripDayItinerary(tripId, date);
+      if (!screenFocusedRef.current || !appActiveRef.current || requestSequence < itineraryRequestSequenceRef.current) {
+        return;
+      }
+
+      const reduction = reduceDayItinerarySharedUpdateFromResponse(
+        sharedUpdateStateRef.current,
+        response,
+        getSharedUpdateLocalState(),
+      );
+      latestHandledItineraryRequestRef.current = requestSequence;
+
+      if (reduction.decision === 'autoApply') {
+        applyItineraryResponse(response, requestSequence);
+        return;
+      }
+
+      updateSharedUpdateState(reduction.state);
+    } catch (error) {
+      if (!screenFocusedRef.current || !appActiveRef.current || requestSequence < itineraryRequestSequenceRef.current) {
+        return;
+      }
+      handleItineraryFetchError(error, { background: true });
+    } finally {
+      sharedUpdatePollInFlightRef.current = false;
+    }
+  }, [
+    applyItineraryResponse,
+    date,
+    getSharedUpdateLocalState,
+    handleItineraryFetchError,
+    nextItineraryRequestSequence,
+    tripId,
+    updateSharedUpdateState,
+  ]);
+
+  const stopSharedUpdatePolling = useCallback(() => {
+    if (sharedUpdatePollIntervalRef.current) {
+      clearInterval(sharedUpdatePollIntervalRef.current);
+      sharedUpdatePollIntervalRef.current = null;
+    }
+  }, []);
+
+  const startSharedUpdatePolling = useCallback(() => {
+    if (!tripId || !date || !appActiveRef.current || sharedUpdatePollIntervalRef.current) {
+      return;
+    }
+
+    sharedUpdatePollIntervalRef.current = setInterval(() => {
+      void refetchSharedItinerary();
+    }, DAY_ITINERARY_SHARED_UPDATE_POLL_INTERVAL_MS);
+  }, [date, refetchSharedItinerary, tripId]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      const wasActive = appStateRef.current === 'active';
+      const nextIsActive = nextAppState === 'active';
+      appStateRef.current = nextAppState;
+      appActiveRef.current = nextIsActive;
+      setIsAppActive(nextIsActive);
+
+      if (!nextIsActive) {
+        stopSharedUpdatePolling();
+        return;
+      }
+
+      if (screenFocusedRef.current) {
+        startSharedUpdatePolling();
+        if (!wasActive) {
+          void refetchSharedItinerary();
+        }
+      }
+    });
+
+    return () => subscription.remove();
+  }, [refetchSharedItinerary, startSharedUpdatePolling, stopSharedUpdatePolling]);
+
+  useEffect(() => {
+    if (!tripId || !date || !screenFocusedRef.current || !isAppActive) {
+      return;
+    }
+
+    if (!shouldReconcileDayItinerarySharedUpdate(sharedUpdateState, getSharedUpdateLocalState())) {
+      return;
+    }
+
+    void refetchSharedItinerary();
+  }, [
+    date,
+    editState.status,
+    deleteState.status,
+    getSharedUpdateLocalState,
+    isAppActive,
+    lodgingState.status,
+    refetchSharedItinerary,
+    reorderState.status,
+    sharedUpdateState,
+    tripId,
+  ]);
 
   useFocusEffect(
     useCallback(() => {
+      screenFocusedRef.current = true;
       void load();
+      if (appActiveRef.current) {
+        startSharedUpdatePolling();
+      }
 
       return () => {
+        screenFocusedRef.current = false;
+        stopSharedUpdatePolling();
+        updateSharedUpdateState({ baselineSignature: null, pendingSignature: null });
         setReorderDragActive(false);
         if (reorderStateRef.current.status === 'editing') {
           setReorderFeedback(null);
           setReorderState({ status: 'idle' });
         }
       };
-    }, [load, setReorderDragActive]),
+    }, [load, setReorderDragActive, startSharedUpdatePolling, stopSharedUpdatePolling, updateSharedUpdateState]),
   );
 
   const discardReorder = useCallback(() => {
@@ -328,6 +542,48 @@ export default function TripDayItineraryScreen() {
     },
     [requestContentFocus],
   );
+
+  const discardDayScreenLocalState = useCallback(() => {
+    setReorderDragActive(false);
+    setEditState({ status: 'idle' });
+    setDeleteState({ status: 'idle' });
+    setReorderState({ status: 'idle' });
+    setLodgingState({ status: 'idle' });
+    setReorderFeedback(null);
+    setMapActionFeedback(null);
+    setContentFocusRequest(null);
+    deleteOriginFocusTargetRef.current = null;
+  }, [setReorderDragActive]);
+
+  const reloadLatestSharedUpdate = useCallback(async () => {
+    discardDayScreenLocalState();
+    await load();
+  }, [discardDayScreenLocalState, load]);
+
+  const requestSharedUpdateReload = useCallback(() => {
+    const localState = getSharedUpdateLocalState();
+    if (isDayItinerarySharedUpdateReloadDisabled(localState)) {
+      return;
+    }
+
+    Alert.alert(
+      DAY_ITINERARY_SHARED_UPDATE_RELOAD_CONFIRMATION.title,
+      DAY_ITINERARY_SHARED_UPDATE_RELOAD_CONFIRMATION.helper,
+      [
+        {
+          text: DAY_ITINERARY_SHARED_UPDATE_RELOAD_CONFIRMATION.cancelLabel,
+          style: 'cancel',
+        },
+        {
+          text: DAY_ITINERARY_SHARED_UPDATE_RELOAD_CONFIRMATION.confirmLabel,
+          style: 'destructive',
+          onPress: () => {
+            void reloadLatestSharedUpdate();
+          },
+        },
+      ],
+    );
+  }, [getSharedUpdateLocalState, reloadLatestSharedUpdate]);
 
   const backToTripDetail = () => {
     if (tripId) {
@@ -482,7 +738,7 @@ export default function TripDayItineraryScreen() {
       const success = buildDayItineraryReorderSuccessViewModel(response);
       setReorderFeedback(success.reorderFeedback);
       setReorderState(success.reorderState);
-      setState({ status: 'success', viewModel: success.itinerary });
+      applyItineraryResponse(response);
     } catch (error) {
       if (
         error instanceof MobileAuthError &&
@@ -670,6 +926,14 @@ export default function TripDayItineraryScreen() {
     }
   };
 
+  const sharedUpdateLocalState: DayItinerarySharedUpdateLocalState = {
+    reorderStatus: reorderState.status,
+    editStatus: editState.status,
+    deleteStatus: deleteState.status,
+    lodgingStatus: lodgingState.status,
+  };
+  const sharedUpdateBanner = buildDayItinerarySharedUpdateBanner(sharedUpdateState);
+  const sharedUpdateReloadDisabled = isDayItinerarySharedUpdateReloadDisabled(sharedUpdateLocalState);
   const isDeleteModalVisible = deleteState.status === 'confirming' || deleteState.status === 'deleting';
 
   return (
@@ -722,8 +986,11 @@ export default function TripDayItineraryScreen() {
               onSaveReorder={() => void submitReorder()}
               onSetLodging={(item) => void submitSetLodging(item)}
               mapActionFeedback={mapActionFeedback}
+              onReloadSharedUpdate={requestSharedUpdateReload}
               reorderFeedback={reorderFeedback}
               reorderState={reorderState}
+              sharedUpdateBanner={sharedUpdateBanner}
+              sharedUpdateReloadDisabled={sharedUpdateReloadDisabled}
               viewModel={state.viewModel}
             />
             {editState.status === 'editing' || editState.status === 'saving' ? (
@@ -796,8 +1063,11 @@ function DayItineraryContent({
   onSaveReorder,
   onSetLodging,
   mapActionFeedback,
+  onReloadSharedUpdate,
   reorderFeedback,
   reorderState,
+  sharedUpdateBanner,
+  sharedUpdateReloadDisabled,
   viewModel,
 }: {
   focusRequest: DayItineraryContentFocusRequest | null;
@@ -818,8 +1088,11 @@ function DayItineraryContent({
   onSaveReorder: () => void;
   onSetLodging: (item: DayItineraryRowViewModel) => void;
   mapActionFeedback: DayItineraryMapActionFeedback | null;
+  onReloadSharedUpdate: () => void;
   reorderFeedback: string | null;
   reorderState: ReorderState;
+  sharedUpdateBanner: ReturnType<typeof buildDayItinerarySharedUpdateBanner>;
+  sharedUpdateReloadDisabled: boolean;
   viewModel: DayItineraryViewModel;
 }) {
   const reorderAction = buildDayItineraryReorderAction(viewModel);
@@ -994,6 +1267,21 @@ function DayItineraryContent({
       ) : null}
 
       <View style={styles.actionGroup}>
+        {sharedUpdateBanner ? (
+          <View style={styles.sharedUpdateNotice}>
+            <Text style={styles.message}>{sharedUpdateBanner.message}</Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ disabled: sharedUpdateReloadDisabled }}
+              disabled={sharedUpdateReloadDisabled}
+              onPress={onReloadSharedUpdate}
+              style={[styles.secondaryButton, sharedUpdateReloadDisabled ? styles.secondaryButtonDisabled : null]}
+            >
+              <Text style={styles.secondaryButtonText}>{sharedUpdateBanner.actionLabel}</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
         {mapActionFeedback ? (
           <View style={mapActionFeedback.kind === 'error' ? styles.errorBox : styles.reorderNotice}>
             <Text style={styles.message}>{mapActionFeedback.message}</Text>
@@ -1677,6 +1965,14 @@ const styles = StyleSheet.create({
     borderColor: theme.color.borderSubtle,
     borderRadius: theme.radius.md,
     borderWidth: 1,
+    padding: theme.space[4],
+  },
+  sharedUpdateNotice: {
+    backgroundColor: theme.color.primarySoft,
+    borderColor: theme.color.primary,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    gap: theme.space[3],
     padding: theme.space[4],
   },
   actionGroup: {
