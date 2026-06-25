@@ -13,6 +13,8 @@ import {
   TextInput,
   View,
   type LayoutChangeEvent,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -45,6 +47,10 @@ import {
   submitDayItineraryReorder,
   type DayItineraryReorderDraftViewModel,
 } from '../../../../lib/trips/reorder-itinerary';
+import {
+  resolveDayItineraryDragAutoScrollOffset,
+  resolveDayItineraryDragTargetIndex,
+} from '../../../../lib/trips/reorder-itinerary-drag';
 import {
   buildDayItineraryDeleteConfirmation,
   buildDayItineraryDeleteSubmitState,
@@ -118,6 +124,12 @@ type DayItineraryContentFocusRequest = {
   target: DayItineraryContentFocusTarget;
 };
 
+type DayItineraryScrollMetrics = {
+  offsetY: number;
+  viewportHeight: number;
+  contentHeight: number;
+};
+
 type AccessibilityFocusable = Parameters<typeof findNodeHandle>[0];
 
 const accessibilityFocusDelayMs = 120;
@@ -152,6 +164,11 @@ export default function TripDayItineraryScreen() {
   const [reorderFeedback, setReorderFeedback] = useState<string | null>(null);
   const [mapActionFeedback, setMapActionFeedback] = useState<DayItineraryMapActionFeedback | null>(null);
   const [contentFocusRequest, setContentFocusRequest] = useState<DayItineraryContentFocusRequest | null>(null);
+  const [isReorderDragging, setIsReorderDragging] = useState(false);
+  const scrollViewRef = useRef<ScrollView | null>(null);
+  const scrollMetricsRef = useRef<DayItineraryScrollMetrics>({ offsetY: 0, viewportHeight: 0, contentHeight: 0 });
+  const reorderDragPointerYRef = useRef<number | null>(null);
+  const reorderAutoScrollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const reorderStateRef = useRef<ReorderState>({ status: 'idle' });
   const deleteOriginFocusTargetRef = useRef<number | null>(null);
   const focusRequestIdRef = useRef(0);
@@ -159,6 +176,79 @@ export default function TripDayItineraryScreen() {
   useEffect(() => {
     reorderStateRef.current = reorderState;
   }, [reorderState]);
+
+  const updateScrollOffset = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    scrollMetricsRef.current.offsetY = event.nativeEvent.contentOffset.y;
+  }, []);
+
+  const updateScrollLayout = useCallback((event: LayoutChangeEvent) => {
+    scrollMetricsRef.current.viewportHeight = event.nativeEvent.layout.height;
+  }, []);
+
+  const updateScrollContentSize = useCallback((_width: number, height: number) => {
+    scrollMetricsRef.current.contentHeight = height;
+  }, []);
+
+  const getReorderScrollOffsetY = useCallback(() => scrollMetricsRef.current.offsetY, []);
+
+  const applyReorderAutoScroll = useCallback((pointerY: number) => {
+    const metrics = scrollMetricsRef.current;
+    const nextOffsetY = resolveDayItineraryDragAutoScrollOffset({
+      pointerY,
+      viewportHeight: metrics.viewportHeight,
+      contentHeight: metrics.contentHeight,
+      currentOffsetY: metrics.offsetY,
+    });
+    if (nextOffsetY === null) {
+      return;
+    }
+
+    scrollMetricsRef.current.offsetY = nextOffsetY;
+    scrollViewRef.current?.scrollTo({ y: nextOffsetY, animated: false });
+  }, []);
+
+  const stopReorderAutoScroll = useCallback(() => {
+    if (reorderAutoScrollTimerRef.current) {
+      clearInterval(reorderAutoScrollTimerRef.current);
+      reorderAutoScrollTimerRef.current = null;
+    }
+    reorderDragPointerYRef.current = null;
+  }, []);
+
+  const startReorderAutoScroll = useCallback(() => {
+    if (reorderAutoScrollTimerRef.current) {
+      return;
+    }
+
+    reorderAutoScrollTimerRef.current = setInterval(() => {
+      const pointerY = reorderDragPointerYRef.current;
+      if (pointerY !== null) {
+        applyReorderAutoScroll(pointerY);
+      }
+    }, 16);
+  }, [applyReorderAutoScroll]);
+
+  const setReorderDragActive = useCallback(
+    (isActive: boolean) => {
+      setIsReorderDragging(isActive);
+      if (isActive) {
+        startReorderAutoScroll();
+        return;
+      }
+
+      stopReorderAutoScroll();
+    },
+    [startReorderAutoScroll, stopReorderAutoScroll],
+  );
+
+  const requestReorderAutoScroll = useCallback(
+    (pointerY: number) => {
+      reorderDragPointerYRef.current = pointerY;
+      applyReorderAutoScroll(pointerY);
+      startReorderAutoScroll();
+    },
+    [applyReorderAutoScroll, startReorderAutoScroll],
+  );
 
   const load = useCallback(async () => {
     if (!tripId || !date) {
@@ -203,18 +293,20 @@ export default function TripDayItineraryScreen() {
       void load();
 
       return () => {
+        setReorderDragActive(false);
         if (reorderStateRef.current.status === 'editing') {
           setReorderFeedback(null);
           setReorderState({ status: 'idle' });
         }
       };
-    }, [load]),
+    }, [load, setReorderDragActive]),
   );
 
   const discardReorder = useCallback(() => {
+    setReorderDragActive(false);
     setReorderFeedback(null);
     setReorderState({ status: 'idle' });
-  }, []);
+  }, [setReorderDragActive]);
 
   const requestContentFocus = useCallback((target: DayItineraryContentFocusTarget) => {
     focusRequestIdRef.current += 1;
@@ -583,9 +675,15 @@ export default function TripDayItineraryScreen() {
   return (
     <>
       <ScrollView
+        ref={scrollViewRef}
         accessibilityElementsHidden={isDeleteModalVisible}
         contentContainerStyle={styles.scrollContent}
         importantForAccessibility={isDeleteModalVisible ? 'no-hide-descendants' : 'auto'}
+        onContentSizeChange={updateScrollContentSize}
+        onLayout={updateScrollLayout}
+        onScroll={updateScrollOffset}
+        scrollEnabled={!isReorderDragging}
+        scrollEventThrottle={16}
         style={styles.scroll}
       >
         <View style={styles.header}>
@@ -603,6 +701,7 @@ export default function TripDayItineraryScreen() {
           <>
             <DayItineraryContent
               focusRequest={contentFocusRequest}
+              getReorderScrollOffsetY={getReorderScrollOffsetY}
               onFocusRequestHandled={clearContentFocusRequest}
               onAddPlace={() => {
                 if (tripId && date) {
@@ -618,6 +717,8 @@ export default function TripDayItineraryScreen() {
               onClearLodging={(item) => void submitClearLodging(item)}
               onMoveReorderItem={moveReorderItem}
               onOpenMap={(item) => void openPlaceMap(item)}
+              onReorderDragActiveChange={setReorderDragActive}
+              onReorderDragMove={requestReorderAutoScroll}
               onSaveReorder={() => void submitReorder()}
               onSetLodging={(item) => void submitSetLodging(item)}
               mapActionFeedback={mapActionFeedback}
@@ -678,6 +779,7 @@ export default function TripDayItineraryScreen() {
 
 function DayItineraryContent({
   focusRequest,
+  getReorderScrollOffsetY,
   lodgingState,
   onFocusRequestHandled,
   onAddPlace,
@@ -689,6 +791,8 @@ function DayItineraryContent({
   onExitReorderMode,
   onMoveReorderItem,
   onOpenMap,
+  onReorderDragActiveChange,
+  onReorderDragMove,
   onSaveReorder,
   onSetLodging,
   mapActionFeedback,
@@ -697,6 +801,7 @@ function DayItineraryContent({
   viewModel,
 }: {
   focusRequest: DayItineraryContentFocusRequest | null;
+  getReorderScrollOffsetY: () => number;
   lodgingState: LodgingState;
   onFocusRequestHandled: () => void;
   onAddPlace: () => void;
@@ -708,6 +813,8 @@ function DayItineraryContent({
   onExitReorderMode: () => void;
   onMoveReorderItem: (fromIndex: number, toIndex: number) => void;
   onOpenMap: (item: DayItineraryRowViewModel) => void;
+  onReorderDragActiveChange: (isActive: boolean) => void;
+  onReorderDragMove: (pointerY: number) => void;
   onSaveReorder: () => void;
   onSetLodging: (item: DayItineraryRowViewModel) => void;
   mapActionFeedback: DayItineraryMapActionFeedback | null;
@@ -790,7 +897,10 @@ function DayItineraryContent({
           {reorderState.status === 'editing' || reorderState.status === 'saving' ? (
             <ReorderPlaceList
               draft={reorderState.draft}
+              getScrollOffsetY={getReorderScrollOffsetY}
               isDisabled={reorderState.status === 'saving'}
+              onDragActiveChange={onReorderDragActiveChange}
+              onDragMove={onReorderDragMove}
               onMoveItem={onMoveReorderItem}
             />
           ) : (
@@ -951,11 +1061,17 @@ function DayItineraryContent({
 
 function ReorderPlaceList({
   draft,
+  getScrollOffsetY,
   isDisabled,
+  onDragActiveChange,
+  onDragMove,
   onMoveItem,
 }: {
   draft: DayItineraryReorderDraftViewModel;
+  getScrollOffsetY: () => number;
   isDisabled: boolean;
+  onDragActiveChange: (isActive: boolean) => void;
+  onDragMove: (pointerY: number) => void;
   onMoveItem: (fromIndex: number, toIndex: number) => void;
 }) {
   const rowHeightsRef = useRef<Record<string, number>>({});
@@ -963,6 +1079,7 @@ function ReorderPlaceList({
     itemId: string;
     currentIndex: number;
     startIndex: number;
+    startScrollOffsetY: number;
     snapshotHeights: number[];
   } | null>(null);
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
@@ -974,57 +1091,39 @@ function ReorderPlaceList({
   const finishDrag = () => {
     dragRef.current = null;
     setActiveItemId(null);
-  };
-
-  const resolveTargetIndex = (startIndex: number, dy: number, snapshotHeights: number[]) => {
-    let targetIndex = startIndex;
-
-    if (dy > 0) {
-      let consumedHeight = 0;
-      for (let index = startIndex + 1; index < snapshotHeights.length; index += 1) {
-        consumedHeight += snapshotHeights[index] ?? 0;
-        if (dy >= consumedHeight - (snapshotHeights[index] ?? 0) / 2) {
-          targetIndex = index;
-        }
-      }
-    }
-
-    if (dy < 0) {
-      let consumedHeight = 0;
-      for (let index = startIndex - 1; index >= 0; index -= 1) {
-        consumedHeight += snapshotHeights[index] ?? 0;
-        if (-dy >= consumedHeight - (snapshotHeights[index] ?? 0) / 2) {
-          targetIndex = index;
-        }
-      }
-    }
-
-    return targetIndex;
+    onDragActiveChange(false);
   };
 
   return draft.items.map((item, index) => {
     const responder = PanResponder.create({
       onStartShouldSetPanResponder: () => !isDisabled,
+      onStartShouldSetPanResponderCapture: () => !isDisabled,
       onMoveShouldSetPanResponder: () => !isDisabled,
+      onMoveShouldSetPanResponderCapture: () => !isDisabled,
       onPanResponderGrant: () => {
         dragRef.current = {
           itemId: item.id,
           currentIndex: index,
           startIndex: index,
+          startScrollOffsetY: getScrollOffsetY(),
           snapshotHeights: draft.items.map((draftItem) => rowHeightsRef.current[draftItem.id] ?? theme.layout.controlH),
         };
         setActiveItemId(item.id);
+        onDragActiveChange(true);
       },
       onPanResponderMove: (_, gestureState) => {
         if (!dragRef.current || dragRef.current.itemId !== item.id) {
           return;
         }
 
-        const targetIndex = resolveTargetIndex(
-          dragRef.current.startIndex,
-          gestureState.dy,
-          dragRef.current.snapshotHeights,
-        );
+        onDragMove(gestureState.moveY);
+        const dragOffsetY = gestureState.dy + getScrollOffsetY() - dragRef.current.startScrollOffsetY;
+        const targetIndex = resolveDayItineraryDragTargetIndex({
+          startIndex: dragRef.current.startIndex,
+          dragOffsetY,
+          rowHeights: dragRef.current.snapshotHeights,
+          fallbackRowHeight: theme.layout.controlH,
+        });
         if (targetIndex === dragRef.current.currentIndex) {
           return;
         }
@@ -1032,8 +1131,11 @@ function ReorderPlaceList({
         onMoveItem(dragRef.current.currentIndex, targetIndex);
         dragRef.current.currentIndex = targetIndex;
       },
+      onPanResponderReject: finishDrag,
       onPanResponderRelease: finishDrag,
       onPanResponderTerminate: finishDrag,
+      onPanResponderTerminationRequest: () => false,
+      onShouldBlockNativeResponder: () => true,
     });
 
     const isActive = activeItemId === item.id;
@@ -1055,8 +1157,8 @@ function ReorderPlaceList({
           <Text style={styles.address}>{item.address}</Text>
         </View>
         <View
-          accessibilityHint="길게 누른 뒤 끌어서 순서를 바꿔요."
-          accessibilityLabel={`${item.placeName} ${item.dragHandleLabel}`}
+          accessibilityHint="핸들을 잡고 위아래로 끌어서 순서를 바꿔요."
+          accessibilityLabel={`${item.placeName} 드래그 핸들`}
           accessibilityRole="button"
           style={[styles.dragHandle, isActive ? styles.dragHandleActive : null]}
           {...responder.panHandlers}
