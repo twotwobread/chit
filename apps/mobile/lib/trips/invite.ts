@@ -93,7 +93,7 @@ export function buildInviteLoginRequiredViewModel(): InviteAcceptViewModel {
   return {
     kind: 'loginRequired',
     title: '로그인이 필요합니다.',
-    message: '로그인 후 초대 링크를 다시 열어주세요.',
+    message: '로그인하면 이 초대 링크로 돌아와요.',
     primaryAction: 'login',
     primaryLabel: '로그인하기',
     secondaryAction: 'home',
@@ -105,7 +105,7 @@ export function buildInviteAuthRequiredViewModel(): InviteAcceptViewModel {
   return {
     kind: 'authRequired',
     title: '다시 로그인해주세요.',
-    message: '로그인 후 초대 링크를 다시 열어주세요.',
+    message: '로그인하면 이 초대 링크로 돌아와요.',
     primaryAction: 'login',
     primaryLabel: '로그인하기',
     secondaryAction: 'home',

@@ -17,13 +17,16 @@ import {
   type InviteAcceptAction,
   type InviteAcceptViewModel,
 } from '../../lib/trips/invite';
+import { setPendingInviteLoginHandoffForToken } from '../../lib/trips/invite-login-handoff';
 import { tripDetailPath } from '../../lib/trips/mypage';
 
 type InviteAcceptScreenState = { status: 'loading' } | { status: 'ready'; viewModel: InviteAcceptViewModel };
 
 export default function InviteAcceptScreen() {
-  const { token: tokenParam } = useLocalSearchParams<{ token?: string | string[] }>();
+  const params = useLocalSearchParams();
+  const tokenParam = params.token;
   const token = Array.isArray(tokenParam) ? tokenParam[0] : tokenParam;
+  const hasUnsafeHandoffParams = Object.keys(params).some((key) => key !== 'token');
   const [state, setState] = useState<InviteAcceptScreenState>({ status: 'loading' });
 
   const load = useCallback(async () => {
@@ -65,6 +68,12 @@ export default function InviteAcceptScreen() {
         return;
       }
       if (action === 'login') {
+        const normalizedToken = typeof token === 'string' ? token.trim() : '';
+        const handoff = hasUnsafeHandoffParams ? null : setPendingInviteLoginHandoffForToken(normalizedToken);
+        if (!handoff) {
+          setState({ status: 'ready', viewModel: buildInviteInvalidViewModel() });
+          return;
+        }
         router.replace('/login');
         return;
       }
@@ -74,7 +83,7 @@ export default function InviteAcceptScreen() {
       }
       router.replace('/');
     },
-    [load],
+    [hasUnsafeHandoffParams, load, token],
   );
 
   return (

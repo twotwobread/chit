@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 
@@ -7,6 +7,11 @@ import type { AuthProvider } from '@i-um/api-contract';
 import { loginWithOAuth, MobileAuthError } from '../lib/auth/client';
 import { getOAuthCredential, getVisibleOAuthProviderConfigs } from '../lib/auth/oauth';
 import { theme } from '../lib/design';
+import {
+  clearPendingInviteLoginHandoff,
+  consumeInviteLoginRedirectPath,
+  getLoginSubtitleForInviteHandoff,
+} from '../lib/trips/invite-login-handoff';
 
 type LoginState =
   | { status: 'idle' }
@@ -17,13 +22,25 @@ const providers = getVisibleOAuthProviderConfigs();
 
 export default function LoginScreen() {
   const [state, setState] = useState<LoginState>({ status: 'idle' });
+  const [subtitle] = useState(() => getLoginSubtitleForInviteHandoff());
+  const consumedHandoffRef = useRef(false);
+
+  useEffect(() => {
+    return () => {
+      if (!consumedHandoffRef.current) {
+        clearPendingInviteLoginHandoff();
+      }
+    };
+  }, []);
 
   const login = async (provider: AuthProvider) => {
     setState({ status: 'loading', provider });
     try {
       const credential = await getOAuthCredential(provider);
       await loginWithOAuth(provider, credential);
-      router.replace('/');
+      const redirectPath = consumeInviteLoginRedirectPath();
+      consumedHandoffRef.current = true;
+      router.replace(redirectPath);
     } catch (error) {
       setState(errorState(error));
     }
@@ -34,7 +51,7 @@ export default function LoginScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>이음</Text>
-      <Text style={styles.subtitle}>여행을 함께 이어가려면 로그인해주세요.</Text>
+      <Text style={styles.subtitle}>{subtitle}</Text>
 
       <View style={styles.card}>
         {providers.map((provider) => (

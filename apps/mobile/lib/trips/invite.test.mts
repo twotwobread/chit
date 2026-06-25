@@ -123,13 +123,14 @@ test('invite accept login and invalid helpers expose required CTA copy', () => {
   assert.deepEqual(buildInviteLoginRequiredViewModel(), {
     kind: 'loginRequired',
     title: '로그인이 필요합니다.',
-    message: '로그인 후 초대 링크를 다시 열어주세요.',
+    message: '로그인하면 이 초대 링크로 돌아와요.',
     primaryAction: 'login',
     primaryLabel: '로그인하기',
     secondaryAction: 'home',
     secondaryLabel: '홈으로',
   });
   assert.equal(buildInviteAuthRequiredViewModel().title, '다시 로그인해주세요.');
+  assert.equal(buildInviteAuthRequiredViewModel().message, '로그인하면 이 초대 링크로 돌아와요.');
   assert.equal(buildInviteInvalidViewModel().message, '링크가 잘못되었거나 더 이상 사용할 수 없어요.');
 });
 
