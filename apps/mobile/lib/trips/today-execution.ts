@@ -3,6 +3,7 @@ import type { DayItineraryItem, GetDayItineraryResponse, GetTripDetailResponse, 
 import { buildDayItineraryRoute, getPlaceTypeLabel } from './day-itinerary';
 import { formatTripDayDate } from './days';
 import { tripDetailPath } from './mypage';
+import { buildQuickExpenseRoute } from './quick-expense';
 import { groupTripsByStatus } from './status';
 
 export type TodayRouteAction = {
@@ -89,6 +90,7 @@ export type TodayCompletedViewModel = {
   title: string;
   helper: string;
   completedCountLabel: string;
+  quickExpenseAction: TodayRouteAction;
   primaryAction: TodayRouteAction;
   multipleOngoingTripNotice: TodayMultipleOngoingTripNotice | null;
 };
@@ -131,6 +133,7 @@ export type TodaySuccessViewModel = {
   };
   remainingSection: TodayRemainingSectionViewModel;
   arrivalAction: TodayArriveAction;
+  quickExpenseAction: TodayRouteAction;
   primaryAction: TodayRouteAction;
   multipleOngoingTripNotice: TodayMultipleOngoingTripNotice | null;
 };
@@ -213,6 +216,7 @@ export function buildTodayExecutionViewModel({
       title: '오늘 일정을 모두 완료했어요.',
       helper: '오늘 일정 화면에서 장소를 확인할 수 있어요.',
       completedCountLabel: `완료한 장소 ${orderedItems.length}곳`,
+      quickExpenseAction: routeAction('지출 등록', buildQuickExpenseRoute(selectedTrip.id, currentDay.date)),
     };
   }
 
@@ -229,6 +233,7 @@ export function buildTodayExecutionViewModel({
     },
     remainingSection: buildRemainingSection(pendingItems.slice(1)),
     arrivalAction: arriveAction(selectedTrip.id, currentDay.date, nextItem.id),
+    quickExpenseAction: routeAction('지출 등록', buildQuickExpenseRoute(selectedTrip.id, currentDay.date, nextItem.id)),
   };
 }
 

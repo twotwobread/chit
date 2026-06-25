@@ -458,6 +458,130 @@ func (s *Store) ListItineraryItemsByTripAndDate(ctx context.Context, tripID stri
 	return mapDayItineraryItems(rows), nil
 }
 
+func (s *Store) CreateQuickExpense(ctx context.Context, record trip.CreateQuickExpenseRecord) (trip.CreateQuickExpenseResult, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return trip.CreateQuickExpenseResult{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	qtx := s.queries.WithTx(tx)
+	tripRow, err := qtx.GetTripDefaultCurrencyForQuickExpense(ctx, mustUUID(record.TripID))
+	if err == pgx.ErrNoRows {
+		return trip.CreateQuickExpenseResult{}, trip.ErrNotFound
+	}
+	if err != nil {
+		return trip.CreateQuickExpenseResult{}, err
+	}
+
+	itemRow, err := qtx.GetQuickExpenseItineraryItem(ctx, db.GetQuickExpenseItineraryItemParams{
+		TripID:          mustUUID(record.TripID),
+		ScheduledDate:   dateTextValue(record.ScheduledDate),
+		ItineraryItemID: mustUUID(record.ItineraryItemID),
+	})
+	if err == pgx.ErrNoRows {
+		return trip.CreateQuickExpenseResult{}, trip.ErrNotFound
+	}
+	if err != nil {
+		return trip.CreateQuickExpenseResult{}, err
+	}
+
+	payerRow, err := qtx.GetQuickExpensePayerParticipant(ctx, db.GetQuickExpensePayerParticipantParams{
+		TripID:             mustUUID(record.TripID),
+		PayerParticipantID: mustUUID(record.PayerParticipantID),
+	})
+	if err == pgx.ErrNoRows {
+		return trip.CreateQuickExpenseResult{}, trip.ErrNotFound
+	}
+	if err != nil {
+		return trip.CreateQuickExpenseResult{}, err
+	}
+
+	participantRows, err := qtx.ListQuickExpenseSplitParticipants(ctx, mustUUID(record.TripID))
+	if err != nil {
+		return trip.CreateQuickExpenseResult{}, err
+	}
+	participants := make([]trip.ExpenseSplitParticipant, 0, len(participantRows))
+	for _, participantRow := range participantRows {
+		participants = append(participants, trip.ExpenseSplitParticipant{
+			ParticipantID: participantRow.ID,
+			DisplayName:   participantRow.DisplayName,
+			JoinedAt:      participantRow.JoinedAt.Time,
+		})
+	}
+
+	splitRecords, err := trip.AllocateEqualExpenseSplits(record.AmountMinor, participants)
+	if err != nil {
+		return trip.CreateQuickExpenseResult{}, err
+	}
+
+	expenseRow, err := qtx.InsertExpense(ctx, db.InsertExpenseParams{
+		TripID:             mustUUID(record.TripID),
+		ScheduledDate:      dateTextValue(record.ScheduledDate),
+		ItineraryItemID:    mustUUID(itemRow.ItineraryItemID),
+		TripPlaceID:        mustUUID(itemRow.TripPlaceID),
+		PlaceName:          itemRow.PlaceName,
+		PlaceAddress:       itemRow.PlaceAddress,
+		PlaceType:          itemRow.PlaceType,
+		AmountMinor:        record.AmountMinor,
+		Currency:           tripRow.DefaultCurrency,
+		PayerParticipantID: mustUUID(payerRow.ID),
+		PayerDisplayName:   trip.NormalizeParticipantDisplayName(payerRow.DisplayName),
+		CreatedBy:          mustUUID(record.CreatedBy),
+	})
+	if isForeignKeyViolation(err) {
+		return trip.CreateQuickExpenseResult{}, trip.ErrConflict
+	}
+	if err != nil {
+		return trip.CreateQuickExpenseResult{}, err
+	}
+
+	splits := make([]trip.ExpenseSplit, 0, len(splitRecords))
+	for _, splitRecord := range splitRecords {
+		splitRow, err := qtx.InsertExpenseSplit(ctx, db.InsertExpenseSplitParams{
+			ExpenseID:              mustUUID(expenseRow.ID),
+			ParticipantID:          mustUUID(splitRecord.ParticipantID),
+			ParticipantDisplayName: splitRecord.ParticipantDisplayName,
+			AmountMinor:            splitRecord.AmountMinor,
+			SplitOrder:             int32(splitRecord.SplitOrder),
+		})
+		if isForeignKeyViolation(err) {
+			return trip.CreateQuickExpenseResult{}, trip.ErrConflict
+		}
+		if err != nil {
+			return trip.CreateQuickExpenseResult{}, err
+		}
+		participantID := splitRow.ParticipantID
+		splits = append(splits, trip.ExpenseSplit{
+			ParticipantID: &participantID,
+			DisplayName:   splitRow.ParticipantDisplayName,
+			AmountMinor:   splitRow.AmountMinor,
+		})
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return trip.CreateQuickExpenseResult{}, err
+	}
+
+	itineraryItemID := expenseRow.ItineraryItemID
+	tripPlaceID := expenseRow.TripPlaceID
+	payerParticipantID := expenseRow.PayerParticipantID
+	return trip.CreateQuickExpenseResult{Expense: trip.Expense{
+		ID:                 expenseRow.ID,
+		TripID:             expenseRow.TripID,
+		ScheduledDate:      dateString(expenseRow.ScheduledDate),
+		ItineraryItemID:    &itineraryItemID,
+		TripPlaceID:        &tripPlaceID,
+		Place:              trip.ExpensePlaceSnapshot{Name: expenseRow.PlaceName, Address: expenseRow.PlaceAddress, PlaceType: expenseRow.PlaceType},
+		AmountMinor:        expenseRow.AmountMinor,
+		Currency:           expenseRow.Currency,
+		PayerParticipantID: &payerParticipantID,
+		PayerDisplayName:   expenseRow.PayerDisplayName,
+		Splits:             splits,
+		CreatedAt:          expenseRow.CreatedAt.Time,
+	}}, nil
+}
+
 func (s *Store) CreateManualDayItineraryItem(ctx context.Context, record trip.CreateManualDayItineraryItemRecord) (trip.DayItineraryItem, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -1173,4 +1297,9 @@ func isUniqueConstraintViolation(err error, constraintName string) bool {
 func isForeignKeyConstraintViolation(err error, constraintName string) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == "23503" && pgErr.ConstraintName == constraintName
+}
+
+func isForeignKeyViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23503"
 }

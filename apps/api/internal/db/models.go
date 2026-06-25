@@ -52,6 +52,34 @@ type DayLodgingPlace struct {
 	UpdatedAt   pgtype.Timestamptz
 }
 
+type Expense struct {
+	ID                 pgtype.UUID
+	TripID             pgtype.UUID
+	ScheduledDate      pgtype.Date
+	ItineraryItemID    pgtype.UUID
+	TripPlaceID        pgtype.UUID
+	PlaceName          string
+	PlaceAddress       string
+	PlaceType          string
+	AmountMinor        int64
+	Currency           string
+	PayerParticipantID pgtype.UUID
+	PayerDisplayName   string
+	CreatedBy          pgtype.UUID
+	CreatedAt          pgtype.Timestamptz
+	UpdatedAt          pgtype.Timestamptz
+}
+
+type ExpenseSplit struct {
+	ID                     pgtype.UUID
+	ExpenseID              pgtype.UUID
+	ParticipantID          pgtype.UUID
+	ParticipantDisplayName string
+	AmountMinor            int64
+	SplitOrder             int32
+	CreatedAt              pgtype.Timestamptz
+}
+
 type ItineraryItem struct {
 	ID            pgtype.UUID
 	TripID        pgtype.UUID

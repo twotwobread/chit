@@ -241,6 +241,11 @@ test('maps the first ordered itinerary item to the next place and subsequent ite
       date: '2026-07-10',
       itemId: 'item-next',
     },
+    quickExpenseAction: {
+      kind: 'route',
+      label: '지출 등록',
+      route: '/trips/trip-current/days/2026-07-10/expenses/quick?itemId=item-next',
+    },
     primaryAction: { kind: 'route', label: '오늘 일정 보기', route: '/trips/trip-current/days/2026-07-10' },
     multipleOngoingTripNotice: null,
   });
@@ -329,6 +334,11 @@ test('builds a completed Today state when every itinerary item is arrived', () =
     title: '오늘 일정을 모두 완료했어요.',
     helper: '오늘 일정 화면에서 장소를 확인할 수 있어요.',
     completedCountLabel: '완료한 장소 2곳',
+    quickExpenseAction: {
+      kind: 'route',
+      label: '지출 등록',
+      route: '/trips/trip-current/days/2026-07-10/expenses/quick',
+    },
     primaryAction: { kind: 'route', label: '오늘 일정 보기', route: '/trips/trip-current/days/2026-07-10' },
     multipleOngoingTripNotice: null,
   });
@@ -373,10 +383,15 @@ test('does not expose navigation action outside a next-place success state', () 
   });
 
   assert.equal('nextPlace' in empty, false);
+  assert.equal('quickExpenseAction' in empty, false);
   assert.equal('nextPlace' in completed, false);
+  assert.equal('quickExpenseAction' in completed, true);
   assert.equal('nextPlace' in buildTodayNoOngoingTripViewModel(), false);
+  assert.equal('quickExpenseAction' in buildTodayNoOngoingTripViewModel(), false);
   assert.equal('nextPlace' in buildTodayRetryableErrorViewModel(), false);
+  assert.equal('quickExpenseAction' in buildTodayRetryableErrorViewModel(), false);
   assert.equal('nextPlace' in buildTodayUnavailableViewModel(), false);
+  assert.equal('quickExpenseAction' in buildTodayUnavailableViewModel(), false);
 });
 
 test('builds retryable and unavailable failure states without crashing callers', () => {

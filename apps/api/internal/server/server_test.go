@@ -1965,6 +1965,126 @@ func TestCreateManualDayItineraryItemNotFoundAndForbidden(t *testing.T) {
 	}
 }
 
+func TestCreateQuickExpenseHandler(t *testing.T) {
+	backend := newFakeAuthBackend()
+	ownerToken := loginTestUser(t, backend)
+	tripID := createTestTrip(t, backend, ownerToken)
+	item := createTestDayItineraryItem(t, backend, ownerToken, tripID, "2026-07-11", `{"name":"도톤보리","address":"Dotonbori","placeType":"food"}`)
+	_ = loginTestUserWithSubject(t, backend, "apple-2", "지영")
+	member := tripdomain.Participant{
+		ID:          testUUID(2222),
+		TripID:      tripID,
+		UserID:      "user-2",
+		Role:        tripdomain.RoleMember,
+		DisplayName: "지영",
+		JoinedAt:    time.Date(2026, 6, 22, 15, 0, 0, 0, time.UTC),
+	}
+	backend.participants[tripID] = append(backend.participants[tripID], member)
+	payerID := backend.participants[tripID][0].ID
+
+	requestBody := []byte(fmt.Sprintf(`{"itineraryItemId":%q,"amountMinor":1001,"payerParticipantId":%q}`, item.ID, payerID))
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/days/2026-07-11/expenses/quick", bytes.NewReader(requestBody))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", "Bearer "+ownerToken)
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusCreated, recorder.Code, recorder.Body.String())
+	}
+
+	var body struct {
+		Expense struct {
+			TripID             string `json:"tripId"`
+			ScheduledDate      string `json:"scheduledDate"`
+			ItineraryItemID    string `json:"itineraryItemId"`
+			TripPlaceID        string `json:"tripPlaceId"`
+			AmountMinor        int64  `json:"amountMinor"`
+			Currency           string `json:"currency"`
+			PayerParticipantID string `json:"payerParticipantId"`
+			PayerDisplayName   string `json:"payerDisplayName"`
+			Place              struct {
+				Name      string `json:"name"`
+				Address   string `json:"address"`
+				PlaceType string `json:"placeType"`
+			} `json:"place"`
+			Splits []struct {
+				ParticipantID string `json:"participantId"`
+				DisplayName   string `json:"displayName"`
+				AmountMinor   int64  `json:"amountMinor"`
+			} `json:"splits"`
+		} `json:"expense"`
+	}
+	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Expense.TripID != tripID || body.Expense.ScheduledDate != "2026-07-11" || body.Expense.ItineraryItemID != item.ID || body.Expense.TripPlaceID != item.PlaceID {
+		t.Fatalf("unexpected linked expense ids: %#v", body.Expense)
+	}
+	if body.Expense.AmountMinor != 1001 || body.Expense.Currency != "JPY" || body.Expense.PayerParticipantID != payerID || body.Expense.PayerDisplayName != "민수" {
+		t.Fatalf("unexpected money/payer snapshot: %#v", body.Expense)
+	}
+	if body.Expense.Place.Name != "도톤보리" || body.Expense.Place.Address != "Dotonbori" || body.Expense.Place.PlaceType != "food" {
+		t.Fatalf("unexpected place snapshot: %#v", body.Expense.Place)
+	}
+	if len(body.Expense.Splits) != 2 || body.Expense.Splits[0].ParticipantID != payerID || body.Expense.Splits[0].AmountMinor != 501 || body.Expense.Splits[1].ParticipantID != member.ID || body.Expense.Splits[1].AmountMinor != 500 {
+		t.Fatalf("unexpected equal splits: %#v", body.Expense.Splits)
+	}
+}
+
+func TestCreateQuickExpenseRequiresAuth(t *testing.T) {
+	backend := newFakeAuthBackend()
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/trips/00000000-0000-0000-0000-000000000001/days/2026-07-10/expenses/quick", bytes.NewReader([]byte(`{"itineraryItemId":"00000000-0000-0000-0000-000000007001","amountMinor":1,"payerParticipantId":"00000000-0000-0000-0000-000000002001"}`)))
+	request.Header.Set("Content-Type", "application/json")
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusUnauthorized, recorder.Code, recorder.Body.String())
+	}
+}
+
+func TestCreateQuickExpenseValidationNotFoundAndForbidden(t *testing.T) {
+	backend := newFakeAuthBackend()
+	ownerToken := loginTestUser(t, backend)
+	tripID := createTestTrip(t, backend, ownerToken)
+	item := createTestDayItineraryItem(t, backend, ownerToken, tripID, "2026-07-11", `{"name":"도톤보리","address":"Dotonbori","placeType":"food"}`)
+	payerID := backend.participants[tripID][0].ID
+	nonParticipantToken := loginTestUserWithSubject(t, backend, "apple-2", "지영")
+
+	tests := []struct {
+		name       string
+		path       string
+		body       string
+		token      string
+		expectCode int
+	}{
+		{name: "invalid path date", path: "/trips/" + tripID + "/days/not-a-date/expenses/quick", body: fmt.Sprintf(`{"itineraryItemId":%q,"amountMinor":1,"payerParticipantId":%q}`, item.ID, payerID), token: ownerToken, expectCode: http.StatusBadRequest},
+		{name: "invalid amount", path: "/trips/" + tripID + "/days/2026-07-11/expenses/quick", body: fmt.Sprintf(`{"itineraryItemId":%q,"amountMinor":0,"payerParticipantId":%q}`, item.ID, payerID), token: ownerToken, expectCode: http.StatusBadRequest},
+		{name: "missing trip", path: "/trips/00000000-0000-0000-0000-000000000404/days/2026-07-11/expenses/quick", body: fmt.Sprintf(`{"itineraryItemId":%q,"amountMinor":1,"payerParticipantId":%q}`, item.ID, payerID), token: ownerToken, expectCode: http.StatusNotFound},
+		{name: "out of range", path: "/trips/" + tripID + "/days/2026-07-14/expenses/quick", body: fmt.Sprintf(`{"itineraryItemId":%q,"amountMinor":1,"payerParticipantId":%q}`, item.ID, payerID), token: ownerToken, expectCode: http.StatusNotFound},
+		{name: "forbidden", path: "/trips/" + tripID + "/days/2026-07-11/expenses/quick", body: fmt.Sprintf(`{"itineraryItemId":%q,"amountMinor":1,"payerParticipantId":%q}`, item.ID, payerID), token: nonParticipantToken, expectCode: http.StatusForbidden},
+		{name: "missing item", path: "/trips/" + tripID + "/days/2026-07-11/expenses/quick", body: fmt.Sprintf(`{"itineraryItemId":%q,"amountMinor":1,"payerParticipantId":%q}`, testUUID(7999), payerID), token: ownerToken, expectCode: http.StatusNotFound},
+		{name: "missing payer", path: "/trips/" + tripID + "/days/2026-07-11/expenses/quick", body: fmt.Sprintf(`{"itineraryItemId":%q,"amountMinor":1,"payerParticipantId":%q}`, item.ID, testUUID(2999)), token: ownerToken, expectCode: http.StatusNotFound},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			request := httptest.NewRequest(http.MethodPost, tt.path, bytes.NewReader([]byte(tt.body)))
+			request.Header.Set("Content-Type", "application/json")
+			request.Header.Set("Authorization", "Bearer "+tt.token)
+
+			NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+			if recorder.Code != tt.expectCode {
+				t.Fatalf("expected status %d, got %d with body %s", tt.expectCode, recorder.Code, recorder.Body.String())
+			}
+		})
+	}
+}
+
 func TestMarkDayItineraryItemArrivedHandler(t *testing.T) {
 	backend := newFakeAuthBackend()
 	accessToken := loginTestUser(t, backend)
@@ -3152,6 +3272,7 @@ type fakeAuthBackend struct {
 	nextInvite        int
 	nextPlace         int
 	nextItineraryItem int
+	nextExpense       int
 }
 
 func loginTestUser(t *testing.T, backend *fakeAuthBackend) string {
@@ -3663,6 +3784,77 @@ func (b *fakeAuthBackend) DeleteDayLodgingPlace(_ context.Context, tripID string
 func (b *fakeAuthBackend) ListItineraryItemsByTripAndDate(_ context.Context, tripID string, date string) ([]tripdomain.DayItineraryItem, error) {
 	b.markDayItineraryLodging(tripID, date)
 	return b.dayItineraryItems[tripID+":"+date], nil
+}
+
+func (b *fakeAuthBackend) CreateQuickExpense(_ context.Context, record tripdomain.CreateQuickExpenseRecord) (tripdomain.CreateQuickExpenseResult, error) {
+	foundTrip, ok := b.trips[record.TripID]
+	if !ok {
+		return tripdomain.CreateQuickExpenseResult{}, tripdomain.ErrNotFound
+	}
+
+	var foundItem tripdomain.DayItineraryItem
+	for _, item := range b.dayItineraryItems[record.TripID+":"+record.ScheduledDate] {
+		if item.ID == record.ItineraryItemID {
+			foundItem = item
+			break
+		}
+	}
+	if foundItem.ID == "" {
+		return tripdomain.CreateQuickExpenseResult{}, tripdomain.ErrNotFound
+	}
+
+	var payer tripdomain.Participant
+	for _, participant := range b.participants[record.TripID] {
+		if participant.ID == record.PayerParticipantID {
+			payer = participant
+			break
+		}
+	}
+	if payer.ID == "" {
+		return tripdomain.CreateQuickExpenseResult{}, tripdomain.ErrNotFound
+	}
+
+	splitParticipants := make([]tripdomain.ExpenseSplitParticipant, 0, len(b.participants[record.TripID]))
+	for _, participant := range b.participants[record.TripID] {
+		splitParticipants = append(splitParticipants, tripdomain.ExpenseSplitParticipant{
+			ParticipantID: participant.ID,
+			DisplayName:   participant.DisplayName,
+			JoinedAt:      participant.JoinedAt,
+		})
+	}
+	splitRecords, err := tripdomain.AllocateEqualExpenseSplits(record.AmountMinor, splitParticipants)
+	if err != nil {
+		return tripdomain.CreateQuickExpenseResult{}, err
+	}
+
+	splits := make([]tripdomain.ExpenseSplit, 0, len(splitRecords))
+	for _, splitRecord := range splitRecords {
+		participantID := splitRecord.ParticipantID
+		splits = append(splits, tripdomain.ExpenseSplit{
+			ParticipantID: &participantID,
+			DisplayName:   splitRecord.ParticipantDisplayName,
+			AmountMinor:   splitRecord.AmountMinor,
+		})
+	}
+
+	b.nextExpense++
+	itineraryItemID := foundItem.ID
+	tripPlaceID := foundItem.Place.ID
+	payerParticipantID := payer.ID
+	return tripdomain.CreateQuickExpenseResult{Expense: tripdomain.Expense{
+		ID:                 testUUID(9000 + b.nextExpense),
+		TripID:             record.TripID,
+		ScheduledDate:      record.ScheduledDate,
+		ItineraryItemID:    &itineraryItemID,
+		TripPlaceID:        &tripPlaceID,
+		Place:              tripdomain.ExpensePlaceSnapshot{Name: foundItem.Place.Name, Address: foundItem.Place.Address, PlaceType: foundItem.Place.PlaceType},
+		AmountMinor:        record.AmountMinor,
+		Currency:           foundTrip.DefaultCurrency,
+		PayerParticipantID: &payerParticipantID,
+		PayerDisplayName:   tripdomain.NormalizeParticipantDisplayName(payer.DisplayName),
+		Splits:             splits,
+		CreatedAt:          time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC),
+	}}, nil
 }
 
 func (b *fakeAuthBackend) CreateManualDayItineraryItem(_ context.Context, record tripdomain.CreateManualDayItineraryItemRecord) (tripdomain.DayItineraryItem, error) {

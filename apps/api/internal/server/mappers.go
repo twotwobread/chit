@@ -162,6 +162,43 @@ func createManualDayItineraryItemResponseToOpenAPI(result trip.CreateManualDayIt
 	}
 }
 
+func createQuickExpenseResponseToOpenAPI(result trip.CreateQuickExpenseResult) openapi.CreateQuickExpenseResponse {
+	return openapi.CreateQuickExpenseResponse{Expense: expenseToOpenAPI(result.Expense)}
+}
+
+func expenseToOpenAPI(expense trip.Expense) openapi.Expense {
+	splits := make([]openapi.ExpenseSplit, 0, len(expense.Splits))
+	for _, split := range expense.Splits {
+		splits = append(splits, openapi.ExpenseSplit{
+			ParticipantId: split.ParticipantID,
+			DisplayName:   split.DisplayName,
+			AmountMinor:   split.AmountMinor,
+		})
+	}
+	return openapi.Expense{
+		Id:                 expense.ID,
+		TripId:             expense.TripID,
+		ScheduledDate:      dateToOpenAPI(expense.ScheduledDate),
+		ItineraryItemId:    expense.ItineraryItemID,
+		TripPlaceId:        expense.TripPlaceID,
+		Place:              expensePlaceSnapshotToOpenAPI(expense.Place),
+		AmountMinor:        expense.AmountMinor,
+		Currency:           openapi.SupportedCurrency(expense.Currency),
+		PayerParticipantId: expense.PayerParticipantID,
+		PayerDisplayName:   expense.PayerDisplayName,
+		Splits:             splits,
+		CreatedAt:          expense.CreatedAt.UTC(),
+	}
+}
+
+func expensePlaceSnapshotToOpenAPI(place trip.ExpensePlaceSnapshot) openapi.ExpensePlaceSnapshot {
+	return openapi.ExpensePlaceSnapshot{
+		Name:      place.Name,
+		Address:   place.Address,
+		PlaceType: openapi.TripPlaceType(place.PlaceType),
+	}
+}
+
 func createGooglePlaceDayItineraryItemResponseToOpenAPI(result place.CreateGooglePlaceDayItineraryItemResult) openapi.CreateGooglePlaceDayItineraryItemResponse {
 	return openapi.CreateGooglePlaceDayItineraryItemResponse{
 		Day:  tripDayToOpenAPI(result.Day),

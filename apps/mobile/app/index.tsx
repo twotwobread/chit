@@ -401,7 +401,8 @@ function TodayContent({
           <Text style={styles.message}>{viewModel.helper}</Text>
           <Text style={styles.completedCount}>{viewModel.completedCountLabel}</Text>
         </View>
-        <ActionButton action={viewModel.primaryAction} onAction={onAction} />
+        <ActionButton action={viewModel.quickExpenseAction} onAction={onAction} />
+        <ActionButton action={viewModel.primaryAction} onAction={onAction} variant="secondary" />
         <MultipleOngoingNotice notice={viewModel.multipleOngoingTripNotice} onAction={onAction} />
       </View>
     );
@@ -420,6 +421,7 @@ function TodayContent({
         <Text style={styles.address}>{viewModel.nextPlace.address}</Text>
         <ActionButton action={viewModel.nextPlace.navigationAction} onAction={onAction} />
       </View>
+      <ActionButton action={viewModel.quickExpenseAction} onAction={onAction} />
       {navigationFallback ? (
         <TodayNavigationFallbackPanel
           itineraryAction={viewModel.primaryAction}

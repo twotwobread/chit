@@ -50,6 +50,12 @@ type SetDayLodgingPlaceInput struct {
 	TripPlaceID string
 }
 
+type CreateQuickExpenseInput struct {
+	ItineraryItemID    string
+	AmountMinor        int64
+	PayerParticipantID string
+}
+
 type UpdateDayItineraryItemInput struct {
 	Name      *string
 	Address   *string
@@ -120,6 +126,28 @@ type SetDayLodgingPlaceRecord struct {
 	TripID        string
 	ScheduledDate string
 	TripPlaceID   string
+}
+
+type CreateQuickExpenseRecord struct {
+	TripID             string
+	ScheduledDate      string
+	ItineraryItemID    string
+	AmountMinor        int64
+	PayerParticipantID string
+	CreatedBy          string
+}
+
+type ExpenseSplitParticipant struct {
+	ParticipantID string
+	DisplayName   string
+	JoinedAt      time.Time
+}
+
+type CreateExpenseSplitRecord struct {
+	ParticipantID          string
+	ParticipantDisplayName string
+	AmountMinor            int64
+	SplitOrder             int
 }
 
 type CreateTripInviteRecord struct {
@@ -263,6 +291,37 @@ type MarkDayItineraryItemArrivedResult struct {
 	Items []DayItineraryItem
 }
 
+type ExpensePlaceSnapshot struct {
+	Name      string
+	Address   string
+	PlaceType string
+}
+
+type ExpenseSplit struct {
+	ParticipantID *string
+	DisplayName   string
+	AmountMinor   int64
+}
+
+type Expense struct {
+	ID                 string
+	TripID             string
+	ScheduledDate      string
+	ItineraryItemID    *string
+	TripPlaceID        *string
+	Place              ExpensePlaceSnapshot
+	AmountMinor        int64
+	Currency           string
+	PayerParticipantID *string
+	PayerDisplayName   string
+	Splits             []ExpenseSplit
+	CreatedAt          time.Time
+}
+
+type CreateQuickExpenseResult struct {
+	Expense Expense
+}
+
 type DayLodgingPlace struct {
 	Date  string
 	Place TripPlaceSummary
@@ -301,6 +360,7 @@ type Repository interface {
 	SetDayLodgingPlace(ctx context.Context, record SetDayLodgingPlaceRecord) (TripPlaceSummary, error)
 	DeleteDayLodgingPlace(ctx context.Context, tripID string, date string) error
 	ListItineraryItemsByTripAndDate(ctx context.Context, tripID string, date string) ([]DayItineraryItem, error)
+	CreateQuickExpense(ctx context.Context, record CreateQuickExpenseRecord) (CreateQuickExpenseResult, error)
 	CreateManualDayItineraryItem(ctx context.Context, record CreateManualDayItineraryItemRecord) (DayItineraryItem, error)
 	GetItineraryItemByTripDateAndID(ctx context.Context, tripID string, date string, itemID string) (DayItineraryItem, bool, error)
 	ReorderDayItineraryItems(ctx context.Context, record ReorderDayItineraryItemsRecord) ([]DayItineraryItem, error)

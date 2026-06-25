@@ -5,6 +5,8 @@
 import type { AcceptTripInviteResponse } from '../models/AcceptTripInviteResponse';
 import type { CreateManualDayItineraryItemRequest } from '../models/CreateManualDayItineraryItemRequest';
 import type { CreateManualDayItineraryItemResponse } from '../models/CreateManualDayItineraryItemResponse';
+import type { CreateQuickExpenseRequest } from '../models/CreateQuickExpenseRequest';
+import type { CreateQuickExpenseResponse } from '../models/CreateQuickExpenseResponse';
 import type { CreateTripInviteResponse } from '../models/CreateTripInviteResponse';
 import type { CreateTripRequest } from '../models/CreateTripRequest';
 import type { CreateTripResponse } from '../models/CreateTripResponse';
@@ -330,6 +332,39 @@ export class TripsService {
                 401: `Unauthorized.`,
                 403: `Forbidden.`,
                 404: `Trip or virtual day not found.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
+     * Create a quick expense for a trip day place
+     * Creates an expense from a selected itinerary item, using the trip default currency and equal splits across current trip participants.
+     * @param tripId
+     * @param date
+     * @param requestBody
+     * @returns CreateQuickExpenseResponse Quick expense created.
+     * @throws ApiError
+     */
+    public static createQuickExpense(
+        tripId: string,
+        date: string,
+        requestBody: CreateQuickExpenseRequest,
+    ): CancelablePromise<CreateQuickExpenseResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/trips/{tripId}/days/{date}/expenses/quick',
+            path: {
+                'tripId': tripId,
+                'date': date,
+            },
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                403: `Forbidden.`,
+                404: `Trip, virtual day, itinerary item, or payer participant not found.`,
+                409: `Participant or itinerary state changed during creation.`,
                 500: `Unexpected server error.`,
             },
         });
