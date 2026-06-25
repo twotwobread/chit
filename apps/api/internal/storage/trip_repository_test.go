@@ -740,6 +740,9 @@ func TestCreateGooglePlaceDayItineraryItemReusesTripPlaceAndHandlesDuplicateConf
 	if first.ItemOrder != 1 || first.Place.Name != "도톤보리" || first.Place.PlaceType != "sights" {
 		t.Fatalf("unexpected first item: %#v", first)
 	}
+	if first.Place.RoutablePlace == nil || first.Place.RoutablePlace.GooglePlaceID != "google-place-1" || first.Place.RoutablePlace.Latitude != 34.6687 || first.Place.RoutablePlace.Longitude != 135.5013 {
+		t.Fatalf("expected routable place metadata, got %#v", first.Place.RoutablePlace)
+	}
 
 	_, err = store.CreateGooglePlaceDayItineraryItem(ctx, record)
 	if !errors.Is(err, place.ErrDuplicateDayPlaceConfirmationNeeded) {

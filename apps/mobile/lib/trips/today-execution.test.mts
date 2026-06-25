@@ -316,6 +316,7 @@ test('maps the first ordered itinerary item to the next place without exposing s
       placeName: '도톤보리',
       placeTypeLabel: '식당',
       address: '1 Chome Dotonbori, Chuo Ward, Osaka',
+      routablePlace: null,
       navigationAction: {
         kind: 'navigate',
         label: '길찾기',

@@ -347,7 +347,11 @@ RETURNING
   id::text,
   name,
   place_type,
-  address
+  address,
+  provider,
+  google_place_id,
+  latitude,
+  longitude
 `
 
 type CreateTripPlaceParams struct {
@@ -358,10 +362,14 @@ type CreateTripPlaceParams struct {
 }
 
 type CreateTripPlaceRow struct {
-	ID        string
-	Name      string
-	PlaceType string
-	Address   string
+	ID            string
+	Name          string
+	PlaceType     string
+	Address       string
+	Provider      string
+	GooglePlaceID pgtype.Text
+	Latitude      pgtype.Float8
+	Longitude     pgtype.Float8
 }
 
 func (q *Queries) CreateTripPlace(ctx context.Context, arg CreateTripPlaceParams) (CreateTripPlaceRow, error) {
@@ -377,6 +385,10 @@ func (q *Queries) CreateTripPlace(ctx context.Context, arg CreateTripPlaceParams
 		&i.Name,
 		&i.PlaceType,
 		&i.Address,
+		&i.Provider,
+		&i.GooglePlaceID,
+		&i.Latitude,
+		&i.Longitude,
 	)
 	return i, err
 }
@@ -535,7 +547,11 @@ SELECT
   tp.id::text AS id,
   tp.name,
   tp.place_type,
-  tp.address
+  tp.address,
+  tp.provider,
+  tp.google_place_id,
+  tp.latitude,
+  tp.longitude
 FROM day_lodging_places dlp
 JOIN trip_places tp
   ON tp.id = dlp.trip_place_id
@@ -550,10 +566,14 @@ type GetDayLodgingPlaceByTripAndDateParams struct {
 }
 
 type GetDayLodgingPlaceByTripAndDateRow struct {
-	ID        string
-	Name      string
-	PlaceType string
-	Address   string
+	ID            string
+	Name          string
+	PlaceType     string
+	Address       string
+	Provider      string
+	GooglePlaceID pgtype.Text
+	Latitude      pgtype.Float8
+	Longitude     pgtype.Float8
 }
 
 func (q *Queries) GetDayLodgingPlaceByTripAndDate(ctx context.Context, arg GetDayLodgingPlaceByTripAndDateParams) (GetDayLodgingPlaceByTripAndDateRow, error) {
@@ -564,6 +584,10 @@ func (q *Queries) GetDayLodgingPlaceByTripAndDate(ctx context.Context, arg GetDa
 		&i.Name,
 		&i.PlaceType,
 		&i.Address,
+		&i.Provider,
+		&i.GooglePlaceID,
+		&i.Latitude,
+		&i.Longitude,
 	)
 	return i, err
 }
@@ -573,7 +597,11 @@ SELECT
   id::text AS id,
   name,
   place_type,
-  address
+  address,
+  provider,
+  google_place_id,
+  latitude,
+  longitude
 FROM trip_places
 WHERE trip_id = $1::uuid
   AND provider = 'google'
@@ -586,10 +614,14 @@ type GetGoogleTripPlaceByGooglePlaceIDParams struct {
 }
 
 type GetGoogleTripPlaceByGooglePlaceIDRow struct {
-	ID        string
-	Name      string
-	PlaceType string
-	Address   string
+	ID            string
+	Name          string
+	PlaceType     string
+	Address       string
+	Provider      string
+	GooglePlaceID pgtype.Text
+	Latitude      pgtype.Float8
+	Longitude     pgtype.Float8
 }
 
 func (q *Queries) GetGoogleTripPlaceByGooglePlaceID(ctx context.Context, arg GetGoogleTripPlaceByGooglePlaceIDParams) (GetGoogleTripPlaceByGooglePlaceIDRow, error) {
@@ -600,6 +632,10 @@ func (q *Queries) GetGoogleTripPlaceByGooglePlaceID(ctx context.Context, arg Get
 		&i.Name,
 		&i.PlaceType,
 		&i.Address,
+		&i.Provider,
+		&i.GooglePlaceID,
+		&i.Latitude,
+		&i.Longitude,
 	)
 	return i, err
 }
@@ -615,7 +651,11 @@ SELECT
   tp.id::text AS trip_place_id,
   tp.name AS place_name,
   tp.place_type,
-  tp.address
+  tp.address,
+  tp.provider,
+  tp.google_place_id,
+  tp.latitude,
+  tp.longitude
 FROM itinerary_items ii
 JOIN trip_places tp
   ON tp.id = ii.trip_place_id
@@ -636,16 +676,20 @@ type GetItineraryItemByTripDateAndIDParams struct {
 }
 
 type GetItineraryItemByTripDateAndIDRow struct {
-	ID          string
-	ItemOrder   int32
-	Version     int32
-	ArrivedAt   pgtype.Timestamptz
-	SkippedAt   pgtype.Timestamptz
-	IsLodging   interface{}
-	TripPlaceID string
-	PlaceName   string
-	PlaceType   string
-	Address     string
+	ID            string
+	ItemOrder     int32
+	Version       int32
+	ArrivedAt     pgtype.Timestamptz
+	SkippedAt     pgtype.Timestamptz
+	IsLodging     interface{}
+	TripPlaceID   string
+	PlaceName     string
+	PlaceType     string
+	Address       string
+	Provider      string
+	GooglePlaceID pgtype.Text
+	Latitude      pgtype.Float8
+	Longitude     pgtype.Float8
 }
 
 func (q *Queries) GetItineraryItemByTripDateAndID(ctx context.Context, arg GetItineraryItemByTripDateAndIDParams) (GetItineraryItemByTripDateAndIDRow, error) {
@@ -662,6 +706,10 @@ func (q *Queries) GetItineraryItemByTripDateAndID(ctx context.Context, arg GetIt
 		&i.PlaceName,
 		&i.PlaceType,
 		&i.Address,
+		&i.Provider,
+		&i.GooglePlaceID,
+		&i.Latitude,
+		&i.Longitude,
 	)
 	return i, err
 }
@@ -784,7 +832,11 @@ SELECT
   id::text AS id,
   name,
   place_type,
-  address
+  address,
+  provider,
+  google_place_id,
+  latitude,
+  longitude
 FROM trip_places
 WHERE trip_id = $1::uuid
   AND id = $2::uuid
@@ -796,10 +848,14 @@ type GetTripPlaceSummaryByTripAndPlaceParams struct {
 }
 
 type GetTripPlaceSummaryByTripAndPlaceRow struct {
-	ID        string
-	Name      string
-	PlaceType string
-	Address   string
+	ID            string
+	Name          string
+	PlaceType     string
+	Address       string
+	Provider      string
+	GooglePlaceID pgtype.Text
+	Latitude      pgtype.Float8
+	Longitude     pgtype.Float8
 }
 
 func (q *Queries) GetTripPlaceSummaryByTripAndPlace(ctx context.Context, arg GetTripPlaceSummaryByTripAndPlaceParams) (GetTripPlaceSummaryByTripAndPlaceRow, error) {
@@ -810,6 +866,10 @@ func (q *Queries) GetTripPlaceSummaryByTripAndPlace(ctx context.Context, arg Get
 		&i.Name,
 		&i.PlaceType,
 		&i.Address,
+		&i.Provider,
+		&i.GooglePlaceID,
+		&i.Latitude,
+		&i.Longitude,
 	)
 	return i, err
 }
@@ -820,7 +880,11 @@ SELECT
   tp.id::text AS id,
   tp.name,
   tp.place_type,
-  tp.address
+  tp.address,
+  tp.provider,
+  tp.google_place_id,
+  tp.latitude,
+  tp.longitude
 FROM day_lodging_places dlp
 JOIN trip_places tp
   ON tp.id = dlp.trip_place_id
@@ -830,11 +894,15 @@ ORDER BY dlp.lodging_date ASC
 `
 
 type ListDayLodgingPlacesByTripRow struct {
-	LodgingDate pgtype.Date
-	ID          string
-	Name        string
-	PlaceType   string
-	Address     string
+	LodgingDate   pgtype.Date
+	ID            string
+	Name          string
+	PlaceType     string
+	Address       string
+	Provider      string
+	GooglePlaceID pgtype.Text
+	Latitude      pgtype.Float8
+	Longitude     pgtype.Float8
 }
 
 func (q *Queries) ListDayLodgingPlacesByTrip(ctx context.Context, dollar_1 pgtype.UUID) ([]ListDayLodgingPlacesByTripRow, error) {
@@ -852,6 +920,10 @@ func (q *Queries) ListDayLodgingPlacesByTrip(ctx context.Context, dollar_1 pgtyp
 			&i.Name,
 			&i.PlaceType,
 			&i.Address,
+			&i.Provider,
+			&i.GooglePlaceID,
+			&i.Latitude,
+			&i.Longitude,
 		); err != nil {
 			return nil, err
 		}
@@ -873,7 +945,11 @@ SELECT
   tp.id::text AS trip_place_id,
   tp.name AS place_name,
   tp.place_type,
-  tp.address
+  tp.address,
+  tp.provider,
+  tp.google_place_id,
+  tp.latitude,
+  tp.longitude
 FROM itinerary_items ii
 JOIN trip_places tp
   ON tp.id = ii.trip_place_id
@@ -893,15 +969,19 @@ type ListItineraryItemsByTripAndDateParams struct {
 }
 
 type ListItineraryItemsByTripAndDateRow struct {
-	ID          string
-	Version     int32
-	ArrivedAt   pgtype.Timestamptz
-	SkippedAt   pgtype.Timestamptz
-	IsLodging   interface{}
-	TripPlaceID string
-	PlaceName   string
-	PlaceType   string
-	Address     string
+	ID            string
+	Version       int32
+	ArrivedAt     pgtype.Timestamptz
+	SkippedAt     pgtype.Timestamptz
+	IsLodging     interface{}
+	TripPlaceID   string
+	PlaceName     string
+	PlaceType     string
+	Address       string
+	Provider      string
+	GooglePlaceID pgtype.Text
+	Latitude      pgtype.Float8
+	Longitude     pgtype.Float8
 }
 
 func (q *Queries) ListItineraryItemsByTripAndDate(ctx context.Context, arg ListItineraryItemsByTripAndDateParams) ([]ListItineraryItemsByTripAndDateRow, error) {
@@ -923,6 +1003,10 @@ func (q *Queries) ListItineraryItemsByTripAndDate(ctx context.Context, arg ListI
 			&i.PlaceName,
 			&i.PlaceType,
 			&i.Address,
+			&i.Provider,
+			&i.GooglePlaceID,
+			&i.Latitude,
+			&i.Longitude,
 		); err != nil {
 			return nil, err
 		}
@@ -1102,7 +1186,11 @@ SELECT
   tp.id::text AS id,
   tp.name,
   tp.place_type,
-  tp.address
+  tp.address,
+  tp.provider,
+  tp.google_place_id,
+  tp.latitude,
+  tp.longitude
 FROM upserted
 JOIN trip_places tp
   ON tp.id = upserted.trip_place_id
@@ -1116,10 +1204,14 @@ type SetDayLodgingPlaceParams struct {
 }
 
 type SetDayLodgingPlaceRow struct {
-	ID        string
-	Name      string
-	PlaceType string
-	Address   string
+	ID            string
+	Name          string
+	PlaceType     string
+	Address       string
+	Provider      string
+	GooglePlaceID pgtype.Text
+	Latitude      pgtype.Float8
+	Longitude     pgtype.Float8
 }
 
 func (q *Queries) SetDayLodgingPlace(ctx context.Context, arg SetDayLodgingPlaceParams) (SetDayLodgingPlaceRow, error) {
@@ -1130,6 +1222,10 @@ func (q *Queries) SetDayLodgingPlace(ctx context.Context, arg SetDayLodgingPlace
 		&i.Name,
 		&i.PlaceType,
 		&i.Address,
+		&i.Provider,
+		&i.GooglePlaceID,
+		&i.Latitude,
+		&i.Longitude,
 	)
 	return i, err
 }
@@ -1222,7 +1318,11 @@ WITH target AS (
     tp.id::text AS id,
     tp.name,
     tp.place_type,
-    tp.address
+    tp.address,
+    tp.provider,
+    tp.google_place_id,
+    tp.latitude,
+    tp.longitude
 )
 SELECT
   target.id::text AS id,
@@ -1234,7 +1334,11 @@ SELECT
   updated_place.id AS trip_place_id,
   updated_place.name AS place_name,
   updated_place.place_type,
-  updated_place.address
+  updated_place.address,
+  updated_place.provider,
+  updated_place.google_place_id,
+  updated_place.latitude,
+  updated_place.longitude
 FROM target
 JOIN updated_place ON true
 LEFT JOIN day_lodging_places dlp
@@ -1253,16 +1357,20 @@ type UpdateTripPlaceSnapshotByItineraryItemParams struct {
 }
 
 type UpdateTripPlaceSnapshotByItineraryItemRow struct {
-	ID          string
-	ItemOrder   int32
-	Version     int32
-	ArrivedAt   pgtype.Timestamptz
-	SkippedAt   pgtype.Timestamptz
-	IsLodging   interface{}
-	TripPlaceID string
-	PlaceName   string
-	PlaceType   string
-	Address     string
+	ID            string
+	ItemOrder     int32
+	Version       int32
+	ArrivedAt     pgtype.Timestamptz
+	SkippedAt     pgtype.Timestamptz
+	IsLodging     interface{}
+	TripPlaceID   string
+	PlaceName     string
+	PlaceType     string
+	Address       string
+	Provider      string
+	GooglePlaceID pgtype.Text
+	Latitude      pgtype.Float8
+	Longitude     pgtype.Float8
 }
 
 func (q *Queries) UpdateTripPlaceSnapshotByItineraryItem(ctx context.Context, arg UpdateTripPlaceSnapshotByItineraryItemParams) (UpdateTripPlaceSnapshotByItineraryItemRow, error) {
@@ -1286,6 +1394,10 @@ func (q *Queries) UpdateTripPlaceSnapshotByItineraryItem(ctx context.Context, ar
 		&i.PlaceName,
 		&i.PlaceType,
 		&i.Address,
+		&i.Provider,
+		&i.GooglePlaceID,
+		&i.Latitude,
+		&i.Longitude,
 	)
 	return i, err
 }
@@ -1320,7 +1432,11 @@ RETURNING
   id::text,
   name,
   place_type,
-  address
+  address,
+  provider,
+  google_place_id,
+  latitude,
+  longitude
 `
 
 type UpsertGoogleTripPlaceParams struct {
@@ -1336,10 +1452,14 @@ type UpsertGoogleTripPlaceParams struct {
 }
 
 type UpsertGoogleTripPlaceRow struct {
-	ID        string
-	Name      string
-	PlaceType string
-	Address   string
+	ID            string
+	Name          string
+	PlaceType     string
+	Address       string
+	Provider      string
+	GooglePlaceID pgtype.Text
+	Latitude      pgtype.Float8
+	Longitude     pgtype.Float8
 }
 
 func (q *Queries) UpsertGoogleTripPlace(ctx context.Context, arg UpsertGoogleTripPlaceParams) (UpsertGoogleTripPlaceRow, error) {
@@ -1360,6 +1480,10 @@ func (q *Queries) UpsertGoogleTripPlace(ctx context.Context, arg UpsertGoogleTri
 		&i.Name,
 		&i.PlaceType,
 		&i.Address,
+		&i.Provider,
+		&i.GooglePlaceID,
+		&i.Latitude,
+		&i.Longitude,
 	)
 	return i, err
 }

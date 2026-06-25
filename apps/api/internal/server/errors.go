@@ -7,6 +7,7 @@ import (
 	"github.com/twotwobread/i-um/apps/api/internal/auth"
 	"github.com/twotwobread/i-um/apps/api/internal/openapi"
 	"github.com/twotwobread/i-um/apps/api/internal/place"
+	"github.com/twotwobread/i-um/apps/api/internal/route"
 	"github.com/twotwobread/i-um/apps/api/internal/trip"
 )
 
@@ -245,6 +246,31 @@ func writeGooglePlaceDayItineraryError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusTooManyRequests, "PLACE_PROVIDER_RATE_LIMITED", "place provider rate limited", nil)
 	case errors.Is(err, place.ErrProviderUnavailable):
 		writeError(w, http.StatusBadGateway, "PLACE_PROVIDER_UNAVAILABLE", "place provider unavailable", nil)
+	default:
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error", nil)
+	}
+}
+
+func writeRoutePreviewError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, route.ErrValidation):
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid route preview request", nil)
+	case errors.Is(err, route.ErrUnauthorized):
+		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "unauthorized", nil)
+	case errors.Is(err, route.ErrForbidden):
+		writeError(w, http.StatusForbidden, "FORBIDDEN", "forbidden", nil)
+	case errors.Is(err, route.ErrNotFound):
+		writeError(w, http.StatusNotFound, "NOT_FOUND", "route preview context not found", nil)
+	case errors.Is(err, route.ErrProviderNoRoute):
+		writeError(w, http.StatusNotFound, "ROUTE_NOT_FOUND", "route not found", nil)
+	case errors.Is(err, route.ErrStaleItem):
+		writeError(w, http.StatusConflict, "ROUTE_PREVIEW_STALE_ITEM", "route preview target item is stale", nil)
+	case errors.Is(err, route.ErrUnsupportedPlace):
+		writeError(w, http.StatusConflict, "ROUTE_PREVIEW_UNSUPPORTED_PLACE", "route preview destination is unsupported", nil)
+	case errors.Is(err, route.ErrProviderLimited):
+		writeError(w, http.StatusTooManyRequests, "ROUTE_PROVIDER_RATE_LIMITED", "route provider rate limited", nil)
+	case errors.Is(err, route.ErrProviderDown):
+		writeError(w, http.StatusBadGateway, "ROUTE_PROVIDER_UNAVAILABLE", "route provider unavailable", nil)
 	default:
 		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error", nil)
 	}

@@ -7,6 +7,7 @@ import type { CreateManualDayItineraryItemRequest } from '../models/CreateManual
 import type { CreateManualDayItineraryItemResponse } from '../models/CreateManualDayItineraryItemResponse';
 import type { CreateQuickExpenseRequest } from '../models/CreateQuickExpenseRequest';
 import type { CreateQuickExpenseResponse } from '../models/CreateQuickExpenseResponse';
+import type { CreateRoutePreviewRequest } from '../models/CreateRoutePreviewRequest';
 import type { CreateTripInviteResponse } from '../models/CreateTripInviteResponse';
 import type { CreateTripRequest } from '../models/CreateTripRequest';
 import type { CreateTripResponse } from '../models/CreateTripResponse';
@@ -19,6 +20,7 @@ import type { MarkDayItineraryItemSkippedResponse } from '../models/MarkDayItine
 import type { ReorderDayItineraryItemsRequest } from '../models/ReorderDayItineraryItemsRequest';
 import type { ReorderDayItineraryItemsResponse } from '../models/ReorderDayItineraryItemsResponse';
 import type { RestoreDayItineraryItemResponse } from '../models/RestoreDayItineraryItemResponse';
+import type { RoutePreviewResponse } from '../models/RoutePreviewResponse';
 import type { SetDayLodgingPlaceRequest } from '../models/SetDayLodgingPlaceRequest';
 import type { SetDayLodgingPlaceResponse } from '../models/SetDayLodgingPlaceResponse';
 import type { UpdateDayItineraryItemRequest } from '../models/UpdateDayItineraryItemRequest';
@@ -372,8 +374,9 @@ export class TripsService {
         });
     }
     /**
+     * @deprecated
      * Add a manual place to a trip day itinerary
-     * Creates a manual trip place snapshot and appends a linked itinerary item to the selected virtual trip day.
+     * Deprecated. Manual Day itinerary item creation is disabled for normal app use; add Google-backed places instead.
      * @param tripId
      * @param date
      * @param requestBody
@@ -400,6 +403,7 @@ export class TripsService {
                 403: `Forbidden.`,
                 404: `Trip or virtual day not found.`,
                 409: `Concurrent append conflict.`,
+                410: `Manual place creation is disabled; use Google-backed place add flow.`,
                 500: `Unexpected server error.`,
             },
         });
@@ -530,6 +534,44 @@ export class TripsService {
                 404: `Trip, virtual day, or itinerary item not found.`,
                 409: `Restore conflict because the target item is already arrived.`,
                 500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
+     * Create an in-app route preview for a trip day itinerary item
+     * Returns a lightweight current-location-to-next-place route preview for the selected first pending itinerary item. Detailed navigation remains delegated to Google Maps.
+     * @param tripId
+     * @param date
+     * @param itemId
+     * @param requestBody
+     * @returns RoutePreviewResponse Route preview for the selected current next item.
+     * @throws ApiError
+     */
+    public static createRoutePreview(
+        tripId: string,
+        date: string,
+        itemId: string,
+        requestBody: CreateRoutePreviewRequest,
+    ): CancelablePromise<RoutePreviewResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/trips/{tripId}/days/{date}/itinerary/items/{itemId}/route-preview',
+            path: {
+                'tripId': tripId,
+                'date': date,
+                'itemId': itemId,
+            },
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                403: `Forbidden.`,
+                404: `Trip, virtual day, itinerary item, or provider route not found.`,
+                409: `Target item is stale or destination place is not routable.`,
+                429: `Route provider rate limited.`,
+                500: `Unexpected server error.`,
+                502: `Route provider unavailable or returned unusable route data.`,
             },
         });
     }

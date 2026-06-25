@@ -21,6 +21,12 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   const plugins: NonNullable<ExpoConfig['plugins']> = [
     'expo-router',
     'expo-secure-store',
+    [
+      'expo-location',
+      {
+        locationWhenInUsePermission: '현재 위치를 기준으로 다음 장소까지의 경로 미리보기를 보여드려요.',
+      },
+    ],
     ...kakaoPlugin,
     [
       'expo-font',
