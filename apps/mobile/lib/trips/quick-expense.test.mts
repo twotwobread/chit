@@ -125,6 +125,47 @@ test('builds item options only from today itinerary items and marks selected ite
   assert.equal(viewModel.payerOptions[0].displayName, '민수');
 });
 
+test('keeps repeated same-place occurrences selectable by itinerary item id', () => {
+  const viewModel = buildQuickExpenseViewModel({
+    currency: 'JPY',
+    itinerary: itinerary([
+      item({
+        id: 'item-lodging-morning',
+        itemOrder: 1,
+        place: {
+          id: 'place-lodging',
+          name: '호텔 니코 오사카',
+          placeType: 'lodging',
+          address: 'Nishi-Shinsaibashi',
+        },
+      }),
+      item({
+        id: 'item-lodging-night',
+        itemOrder: 4,
+        place: {
+          id: 'place-lodging',
+          name: '호텔 니코 오사카',
+          placeType: 'lodging',
+          address: 'Nishi-Shinsaibashi',
+        },
+      }),
+    ]),
+    participants: [participant({ participantId: 'participant-a' })],
+    selectedItemId: 'item-lodging-night',
+    shouldChooseItem: true,
+  });
+
+  assert.deepEqual(
+    viewModel.itemOptions.map((option) => ({ itemId: option.itemId, selected: option.selected })),
+    [
+      { itemId: 'item-lodging-morning', selected: false },
+      { itemId: 'item-lodging-night', selected: true },
+    ],
+  );
+  assert.equal(viewModel.selectedItem?.itemId, 'item-lodging-night');
+  assert.equal(viewModel.selectedItem?.placeName, '호텔 니코 오사카');
+});
+
 test('parses integer minor units for KRW and JPY and rejects decimals', () => {
   assert.deepEqual(parseAmountMinor('18,500', 'KRW'), { ok: true, amountMinor: 18500 });
   assert.deepEqual(parseAmountMinor('3200', 'JPY'), { ok: true, amountMinor: 3200 });
