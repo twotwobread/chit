@@ -17,13 +17,18 @@ type readinessChecker interface {
 }
 
 type apiServer struct {
-	readiness    readinessChecker
-	auth         *auth.Service
-	trips        *trip.Service
-	places       *place.Service
-	routes       *route.Service
-	appStoreURL  string
-	playStoreURL string
+	readiness                           readinessChecker
+	auth                                *auth.Service
+	trips                               *trip.Service
+	places                              *place.Service
+	routes                              *route.Service
+	inviteBaseURL                       string
+	inviteAppScheme                     string
+	inviteIOSAppIDs                     []string
+	inviteAndroidPackageName            string
+	inviteAndroidSHA256CertFingerprints []string
+	appStoreURL                         string
+	playStoreURL                        string
 }
 
 func NewRouter(readiness readinessChecker) http.Handler {
@@ -68,14 +73,21 @@ func NewRouterWithConfig(readiness readinessChecker, config Config) http.Handler
 
 	router := chi.NewRouter()
 	server := apiServer{
-		readiness:    readiness,
-		auth:         authService,
-		trips:        tripService,
-		places:       placeService,
-		routes:       routeService,
-		appStoreURL:  config.AppStoreURL,
-		playStoreURL: config.PlayStoreURL,
+		readiness:                           readiness,
+		auth:                                authService,
+		trips:                               tripService,
+		places:                              placeService,
+		routes:                              routeService,
+		inviteBaseURL:                       config.InviteBaseURL,
+		inviteAppScheme:                     config.InviteAppScheme,
+		inviteIOSAppIDs:                     config.InviteIOSAppIDs,
+		inviteAndroidPackageName:            config.InviteAndroidPackageName,
+		inviteAndroidSHA256CertFingerprints: config.InviteAndroidSHA256CertFingerprints,
+		appStoreURL:                         config.AppStoreURL,
+		playStoreURL:                        config.PlayStoreURL,
 	}
+	router.Get("/.well-known/apple-app-site-association", server.InviteAppleAppSiteAssociation)
+	router.Get("/.well-known/assetlinks.json", server.InviteAndroidAssetLinks)
 	router.Get("/invite/{token}", server.InviteFallback)
 	return openapi.HandlerWithOptions(server, openapi.ChiServerOptions{
 		BaseRouter:       router,
