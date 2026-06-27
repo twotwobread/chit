@@ -5,20 +5,23 @@
 - GitHub Issue: #50
 - Status: Implemented (pending manual smoke)
 - Created: 2026-06-25
-- Updated: 2026-06-25
+- Updated: 2026-06-27
 
 ## Source
 
 - Issue: #50 — [[Feature Slice] F-050 장소별 지출 연결](https://github.com/twotwobread/i-um/issues/50)
 - Covered by: #47 / `docs/features/0047-quick-expense-create.md`
-- Ouroboros/PM/Seed: Interview `interview_20260625_140833`, Seed `seed_2a8693507220` (MCP generated; file path not provided)
-- Ambiguity Score: `0.068`
+- Ouroboros/PM/Seed:
+  - Original clarification: Interview `interview_20260625_140833`, Seed `seed_2a8693507220` (MCP generated; file path not provided)
+  - 2026-06-27 confirmation: Interview `interview_20260627_083019`, Seed `seed_af50d9d7a025` (MCP generated; file path not provided)
+- Ambiguity Score: `0.057` for the 2026-06-27 confirmation (`0.068` for the original clarification)
 - Notes:
-  - User clarified that F-050's functional scope is already implemented by F-047 quick expense.
+  - User clarified and reconfirmed that F-050's functional scope is already implemented by F-047 quick expense.
   - F-050 must not introduce new product, API, DB, or mobile production behavior.
   - This document records the overlap, verification plan, and issue cleanup criteria for closing F-050 as covered by F-047 after verification.
   - Current implementation uses `itineraryItemId` / itinerary item occurrence as the primary context and derives `tripPlaceId` plus the place snapshot from that item.
-  - #95 time-based active schedule item selection is future scope; F-050 verifies the current order/progress-based behavior only.
+  - #95 time-based active schedule item selection and additional auto-linking inference are future scope; F-050 verifies the current order/progress-based behavior only.
+  - Closure status: keep #50 open as pending manual smoke or pending gap fix until the required evidence is recorded, unless an explicit accepted follow-up decision changes the gate.
 
 ## Goal
 
@@ -68,8 +71,8 @@ F-050은 신규 구현 slice가 아니라, 기존 quick expense가 지출을 `it
 - DB: No DB changes
   - Existing `expenses.itinerary_item_id`, `expenses.trip_place_id`, and `expenses.place_*` snapshot columns are owned by F-047.
 - Tests: Verification only
-  - Existing F-047 coverage was confirmed for route item selection, fallback chooser, request payload, handler response, and linked place snapshot.
-  - Added test-only regression hardening for repeated same-place itinerary occurrences in API handler and mobile helper tests.
+  - Existing F-047 coverage is the required baseline for route item selection, fallback chooser, request payload, handler response, and linked place snapshot.
+  - Repeated same-place itinerary occurrence coverage is required; the current repository includes API handler and mobile helper regressions, and new/modified tests should be added only if verification exposes an actual gap.
   - No F-050 production behavior is added.
 - Deploy/Smoke: Needed before closing #50
   - Close #50 only after automated checks and manual smoke for the linked-place flows are confirmed.
@@ -173,7 +176,7 @@ Existing indexes relevant to F-050:
 - [ ] AC-08: Existing mobile request builder blocks save without a selected item and sends `itineraryItemId` when valid.
 - [ ] AC-09: Verification includes the repeated-place/lodging-return scenario: the expense is linked to the exact itinerary item occurrence, while `tripPlaceId` remains derived for place-level grouping.
 - [ ] AC-10: #95 time-window active schedule item selection and place-level expense list/summary are explicitly out of scope or follow-up.
-- [ ] AC-11: #50 is not closed until AC-03 through AC-09 are confirmed by automated checks, manual smoke, or documented regression gaps/follow-ups.
+- [ ] AC-11: #50 is not closed until AC-03 through AC-09 are confirmed by automated checks and required manual smoke; if required evidence is missing or failing, keep the issue pending unless an explicit accepted follow-up decision changes the gate.
 - [ ] AC-12: After verification, #50 is commented/closed as covered by #47 with no new product/API/DB/mobile behavior.
 
 ## Regression Test Plan
@@ -202,24 +205,25 @@ Existing indexes relevant to F-050:
 
 ## TDD Implementation Plan
 
-F-050 has no new production implementation. The implementation phase is verification-centered and adds test-only regression hardening for the repeated-place occurrence that motivated the issue.
+F-050 has no new production implementation. The implementation phase is verification-centered: confirm the existing F-047 behavior and repeated-place regressions, and add or modify tests only if verification exposes an actual gap.
 
-1. Red: Add or confirm linked-place regression tests.
+1. Red: Confirm linked-place regression evidence, or add a failing targeted test only for a verified gap.
    - Confirm existing OpenAPI and generated types expose the required request/response fields.
    - Confirm existing API tests cover response `itineraryItemId`, derived `tripPlaceId`, and place snapshot.
    - Confirm existing mobile helper tests cover Today `itemId` routing and explicit chooser fallback.
-   - Add a failing API handler regression for two itinerary item occurrences sharing one `tripPlaceId`, then saving an expense for the second occurrence.
-   - Add a failing mobile helper regression that keeps repeated same-place occurrences selectable by distinct itinerary item ids.
+   - Confirm API handler regression coverage for two itinerary item occurrences sharing one `tripPlaceId`, then saving an expense for the second occurrence.
+   - Confirm mobile helper regression coverage that keeps repeated same-place occurrences selectable by distinct itinerary item ids.
    - Verify: `pnpm --filter @i-um/api test`, `pnpm --filter @i-um/mobile test`
-2. Green: Keep existing production behavior and satisfy the new regressions.
+2. Green: Keep existing production behavior and satisfy required regressions.
    - No OpenAPI, migration, generated code, server production code, or mobile production UI changes.
    - Existing implementation already stores the submitted `itineraryItemId` and derives `tripPlaceId`/place snapshot.
+   - If a required regression is missing or failing, fix the narrowest verified gap without adding new F-050 production scope unless the failure proves existing behavior is defective.
    - Verify: `pnpm verify:generated`, `pnpm --filter @i-um/mobile typecheck`
 3. Refactor: Documentation and issue cleanup only.
    - Keep F-047 as the source of truth for quick expense creation behavior.
    - Keep this F-050 spec as the source of truth for why the place-linking issue is covered.
    - Comment on #50 that “장소별 지출 연결” is covered by #47 and link to this spec plus verification evidence.
-   - Close #50 only after automated checks and manual smoke/gap decisions are recorded.
+   - Close #50 only after automated checks and required manual smoke pass, or after an explicit accepted follow-up decision changes the closure gate.
 4. Gate: Final verification before #50 closure.
    - `pnpm install --frozen-lockfile`
    - `pnpm verify:generated`
@@ -233,14 +237,16 @@ F-050 has no new production implementation. The implementation phase is verifica
 
 ### Automated Regression
 
-- `pnpm install --frozen-lockfile`: Pass (prepared worktree dependencies after first mobile test attempt found missing `node_modules`).
+2026-06-27 implementation verification:
+
+- `pnpm install --frozen-lockfile`: Pass.
 - `pnpm verify:generated`: Pass.
 - `pnpm --filter @i-um/api test`: Pass.
 - `pnpm --filter @i-um/api build`: Pass.
 - `pnpm --filter @i-um/mobile test`: Pass.
 - `pnpm --filter @i-um/mobile typecheck`: Pass.
-- `pnpm --filter @i-um/api format:check`: Pass.
-- `pnpm --filter @i-um/mobile format:check`: Pass.
+- `pnpm --filter @i-um/api format:check`: Not run (no API production or formatting changes in F-050).
+- `pnpm --filter @i-um/mobile format:check`: Not run (no mobile production or formatting changes in F-050).
 
 ### Manual Smoke
 
@@ -266,7 +272,7 @@ Before closing #50:
   - Attempt save with an item id that no longer belongs to the requested day, or remove the item before submit.
   - Expected: server rejects the request and mobile shows the existing reload/error copy.
 
-Current status: Not run for this implementation pass.
+Current status: Not run / still required before closing #50.
 
 ## Issue / Document Cleanup Plan
 
@@ -277,8 +283,8 @@ Current status: Not run for this implementation pass.
    - link #47 and `docs/features/0047-quick-expense-create.md`;
    - summarize verification evidence for `itineraryItemId`, `tripPlaceId`, place snapshot, Today auto item route, fallback chooser, and repeated-place occurrence;
    - state that no new F-050 production implementation was needed.
-4. Close #50 as `covered by #47` / duplicate after verification evidence is available.
-5. If verification fails because existing behavior is missing, do not close #50; record the failing behavior and create a concrete follow-up issue instead of expanding this covered-by spec.
+4. Close #50 as `covered by #47` / duplicate only after automated verification evidence and required manual smoke are available.
+5. If manual smoke is missing or verification fails because existing behavior is missing, do not close #50; record the pending/failing behavior and keep the issue open until the gap is fixed or an explicit accepted follow-up decision changes the closure gate.
 
 ## Release Notes
 
