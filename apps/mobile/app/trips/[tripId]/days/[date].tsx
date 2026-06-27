@@ -69,7 +69,7 @@ import {
   type DayItineraryEditFormValues,
 } from '../../../../lib/trips/day-itinerary-edit';
 import { manualPlaceTypeOptions } from '../../../../lib/trips/manual-place';
-import { buildGooglePlaceSearchRoute } from '../../../../lib/places/google-search';
+import { buildDayItineraryAddPlaceSearchRoute } from '../../../../lib/trips/day-itinerary-add-place-navigation';
 import {
   clearDayLodgingPlace,
   deleteDayItineraryItem,
@@ -1017,7 +1017,7 @@ export default function TripDayItineraryScreen() {
               onFocusRequestHandled={clearContentFocusRequest}
               onAddPlace={() => {
                 if (tripId && date) {
-                  router.push(buildGooglePlaceSearchRoute(tripId, date));
+                  router.push(buildDayItineraryAddPlaceSearchRoute(tripId, date));
                 }
               }}
               onCopyAddress={(item) => void copyPlaceAddress(item)}
