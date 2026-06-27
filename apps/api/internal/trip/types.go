@@ -365,6 +365,26 @@ type CreateQuickExpenseResult struct {
 	Expense Expense
 }
 
+type DayExpenseSplitListItem struct {
+	SplitOrder  int
+	DisplayName string
+	AmountMinor int64
+}
+
+type DayExpenseListItem struct {
+	ID               string
+	Place            ExpensePlaceSnapshot
+	AmountMinor      int64
+	Currency         string
+	PayerDisplayName string
+	Splits           []DayExpenseSplitListItem
+	CreatedAt        time.Time
+}
+
+type ListDayExpensesResult struct {
+	Expenses []DayExpenseListItem
+}
+
 type DayLodgingPlace struct {
 	Date  string
 	Place TripPlaceSummary
@@ -403,6 +423,7 @@ type Repository interface {
 	SetDayLodgingPlace(ctx context.Context, record SetDayLodgingPlaceRecord) (TripPlaceSummary, error)
 	DeleteDayLodgingPlace(ctx context.Context, tripID string, date string) error
 	ListItineraryItemsByTripAndDate(ctx context.Context, tripID string, date string) ([]DayItineraryItem, error)
+	ListDayExpensesByTripAndDate(ctx context.Context, tripID string, date string) ([]DayExpenseListItem, error)
 	CreateQuickExpense(ctx context.Context, record CreateQuickExpenseRecord) (CreateQuickExpenseResult, error)
 	CreateManualDayItineraryItem(ctx context.Context, record CreateManualDayItineraryItemRecord) (DayItineraryItem, error)
 	GetItineraryItemByTripDateAndID(ctx context.Context, tripID string, date string, itemID string) (DayItineraryItem, bool, error)

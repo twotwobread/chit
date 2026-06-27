@@ -701,6 +701,64 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /trips/{tripId}/days/{date}/expenses:
+    get:
+      operationId: listDayExpenses
+      summary: List expenses for a trip day
+      description: Returns read-only expense rows for the selected trip day, ordered newest-first.
+      tags:
+        - Trips
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: date
+          in: path
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Day expenses.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListDayExpensesResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip or virtual day not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /trips/{tripId}/days/{date}/expenses/quick:
     post:
       operationId: createQuickExpense
@@ -2156,6 +2214,66 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/DayItineraryItem'
+    ListDayExpensesResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - expenses
+      properties:
+        expenses:
+          type: array
+          items:
+            $ref: '#/components/schemas/DayExpenseListItem'
+    DayExpenseListItem:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - place
+        - amountMinor
+        - currency
+        - payerDisplayName
+        - splits
+        - createdAt
+      properties:
+        id:
+          type: string
+        place:
+          $ref: '#/components/schemas/ExpensePlaceSnapshot'
+        amountMinor:
+          type: integer
+          format: int64
+          minimum: 1
+        currency:
+          $ref: '#/components/schemas/SupportedCurrency'
+        payerDisplayName:
+          type: string
+          minLength: 1
+        splits:
+          type: array
+          items:
+            $ref: '#/components/schemas/DayExpenseSplitListItem'
+        createdAt:
+          type: string
+          format: date-time
+    DayExpenseSplitListItem:
+      type: object
+      additionalProperties: false
+      required:
+        - splitOrder
+        - displayName
+        - amountMinor
+      properties:
+        splitOrder:
+          type: integer
+          minimum: 1
+        displayName:
+          type: string
+          minLength: 1
+        amountMinor:
+          type: integer
+          format: int64
+          minimum: 0
     CreateQuickExpenseRequest:
       type: object
       additionalProperties: false

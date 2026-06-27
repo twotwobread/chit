@@ -27,6 +27,8 @@ export type { CreateRoutePreviewRequest } from './models/CreateRoutePreviewReque
 export type { CreateTripInviteResponse } from './models/CreateTripInviteResponse';
 export type { CreateTripRequest } from './models/CreateTripRequest';
 export type { CreateTripResponse } from './models/CreateTripResponse';
+export type { DayExpenseListItem } from './models/DayExpenseListItem';
+export type { DayExpenseSplitListItem } from './models/DayExpenseSplitListItem';
 export type { DayItineraryItem } from './models/DayItineraryItem';
 export type { DeviceInfo } from './models/DeviceInfo';
 export type { ErrorResponse } from './models/ErrorResponse';
@@ -40,6 +42,7 @@ export type { GetTripDetailResponse } from './models/GetTripDetailResponse';
 export type { GooglePlaceSearchResult } from './models/GooglePlaceSearchResult';
 export type { HealthResponse } from './models/HealthResponse';
 export type { LinkedIdentity } from './models/LinkedIdentity';
+export type { ListDayExpensesResponse } from './models/ListDayExpensesResponse';
 export type { ListTripParticipantsResponse } from './models/ListTripParticipantsResponse';
 export type { ListTripsResponse } from './models/ListTripsResponse';
 export type { MarkDayItineraryItemArrivedResponse } from './models/MarkDayItineraryItemArrivedResponse';

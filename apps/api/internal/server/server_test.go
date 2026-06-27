@@ -1847,6 +1847,172 @@ func TestCreateManualDayItineraryItemRequiresAuth(t *testing.T) {
 	}
 }
 
+func TestListDayExpensesHandler(t *testing.T) {
+	backend := newFakeAuthBackend()
+	ownerToken := loginTestUser(t, backend)
+	tripID := createTestTrip(t, backend, ownerToken)
+	item := createTestDayItineraryItem(t, backend, ownerToken, tripID, "2026-07-11", `{"name":"도톤보리","address":"Dotonbori","placeType":"food"}`)
+	_ = loginTestUserWithSubject(t, backend, "apple-2", "지영")
+	member := tripdomain.Participant{
+		ID:          testUUID(2222),
+		TripID:      tripID,
+		UserID:      "user-2",
+		Role:        tripdomain.RoleMember,
+		DisplayName: "지영",
+		JoinedAt:    time.Date(2026, 6, 22, 15, 0, 0, 0, time.UTC),
+	}
+	backend.participants[tripID] = append(backend.participants[tripID], member)
+	payerID := backend.participants[tripID][0].ID
+
+	createExpense := func(amountMinor int64) {
+		t.Helper()
+		requestBody := []byte(fmt.Sprintf(`{"itineraryItemId":%q,"amountMinor":%d,"payerParticipantId":%q}`, item.ID, amountMinor, payerID))
+		recorder := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/days/2026-07-11/expenses/quick", bytes.NewReader(requestBody))
+		request.Header.Set("Content-Type", "application/json")
+		request.Header.Set("Authorization", "Bearer "+ownerToken)
+
+		NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+		if recorder.Code != http.StatusCreated {
+			t.Fatalf("expected create expense status %d, got %d with body %s", http.StatusCreated, recorder.Code, recorder.Body.String())
+		}
+	}
+	createExpense(1001)
+	createExpense(2000)
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/trips/"+tripID+"/days/2026-07-11/expenses", nil)
+	request.Header.Set("Authorization", "Bearer "+ownerToken)
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusOK, recorder.Code, recorder.Body.String())
+	}
+
+	responseBody := recorder.Body.Bytes()
+	var body struct {
+		Expenses []struct {
+			ID               string `json:"id"`
+			AmountMinor      int64  `json:"amountMinor"`
+			Currency         string `json:"currency"`
+			PayerDisplayName string `json:"payerDisplayName"`
+			Place            struct {
+				Name      string `json:"name"`
+				Address   string `json:"address"`
+				PlaceType string `json:"placeType"`
+			} `json:"place"`
+			Splits []struct {
+				SplitOrder  int    `json:"splitOrder"`
+				DisplayName string `json:"displayName"`
+				AmountMinor int64  `json:"amountMinor"`
+			} `json:"splits"`
+			CreatedAt string `json:"createdAt"`
+		} `json:"expenses"`
+	}
+	if err := json.NewDecoder(bytes.NewReader(responseBody)).Decode(&body); err != nil {
+		t.Fatalf("decode list response: %v", err)
+	}
+	if len(body.Expenses) != 2 {
+		t.Fatalf("expected two expenses, got %#v", body.Expenses)
+	}
+	if body.Expenses[0].AmountMinor != 2000 || body.Expenses[1].AmountMinor != 1001 {
+		t.Fatalf("expected newest-first expenses, got %#v", body.Expenses)
+	}
+	if body.Expenses[0].Place.Name != "도톤보리" || body.Expenses[0].Currency != "JPY" || body.Expenses[0].PayerDisplayName != "민수" {
+		t.Fatalf("unexpected display snapshot: %#v", body.Expenses[0])
+	}
+	if len(body.Expenses[0].Splits) != 2 || body.Expenses[0].Splits[0].SplitOrder != 1 || body.Expenses[0].Splits[0].DisplayName != "민수" || body.Expenses[0].Splits[1].SplitOrder != 2 || body.Expenses[0].Splits[1].DisplayName != "지영" {
+		t.Fatalf("unexpected split rows: %#v", body.Expenses[0].Splits)
+	}
+
+	var rawBody struct {
+		Expenses []map[string]any `json:"expenses"`
+	}
+	if err := json.Unmarshal(responseBody, &rawBody); err != nil {
+		t.Fatalf("decode raw list response: %v", err)
+	}
+	for _, field := range []string{"itineraryItemId", "tripPlaceId", "payerParticipantId"} {
+		if _, ok := rawBody.Expenses[0][field]; ok {
+			t.Fatalf("expected list item not to expose nullable source field %q: %#v", field, rawBody.Expenses[0])
+		}
+	}
+}
+
+func TestListDayExpensesEmpty(t *testing.T) {
+	backend := newFakeAuthBackend()
+	ownerToken := loginTestUser(t, backend)
+	tripID := createTestTrip(t, backend, ownerToken)
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/trips/"+tripID+"/days/2026-07-11/expenses", nil)
+	request.Header.Set("Authorization", "Bearer "+ownerToken)
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusOK, recorder.Code, recorder.Body.String())
+	}
+	var body struct {
+		Expenses []struct{} `json:"expenses"`
+	}
+	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+		t.Fatalf("decode list response: %v", err)
+	}
+	if body.Expenses == nil || len(body.Expenses) != 0 {
+		t.Fatalf("expected empty non-nil expenses, got %#v", body.Expenses)
+	}
+}
+
+func TestListDayExpensesErrors(t *testing.T) {
+	backend := newFakeAuthBackend()
+	ownerToken := loginTestUser(t, backend)
+	tripID := createTestTrip(t, backend, ownerToken)
+	nonParticipantToken := loginTestUserWithSubject(t, backend, "apple-2", "지영")
+
+	tests := []struct {
+		name       string
+		path       string
+		token      string
+		expectCode int
+		expectErr  string
+	}{
+		{name: "requires auth", path: "/trips/" + tripID + "/days/2026-07-11/expenses", expectCode: http.StatusUnauthorized, expectErr: "UNAUTHORIZED"},
+		{name: "invalid trip id", path: "/trips/not-a-uuid/days/2026-07-11/expenses", token: ownerToken, expectCode: http.StatusBadRequest, expectErr: "VALIDATION_ERROR"},
+		{name: "invalid date", path: "/trips/" + tripID + "/days/not-a-date/expenses", token: ownerToken, expectCode: http.StatusBadRequest, expectErr: "VALIDATION_ERROR"},
+		{name: "missing trip", path: "/trips/00000000-0000-0000-0000-000000000404/days/2026-07-11/expenses", token: ownerToken, expectCode: http.StatusNotFound, expectErr: "NOT_FOUND"},
+		{name: "out of range", path: "/trips/" + tripID + "/days/2026-07-14/expenses", token: ownerToken, expectCode: http.StatusNotFound, expectErr: "NOT_FOUND"},
+		{name: "forbidden", path: "/trips/" + tripID + "/days/2026-07-11/expenses", token: nonParticipantToken, expectCode: http.StatusForbidden, expectErr: "FORBIDDEN"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			request := httptest.NewRequest(http.MethodGet, tt.path, nil)
+			if tt.token != "" {
+				request.Header.Set("Authorization", "Bearer "+tt.token)
+			}
+
+			NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+			if recorder.Code != tt.expectCode {
+				t.Fatalf("expected status %d, got %d with body %s", tt.expectCode, recorder.Code, recorder.Body.String())
+			}
+			var body struct {
+				Error struct {
+					Code string `json:"code"`
+				} `json:"error"`
+			}
+			if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+				t.Fatalf("decode error response: %v", err)
+			}
+			if body.Error.Code != tt.expectErr {
+				t.Fatalf("expected error %q, got %q", tt.expectErr, body.Error.Code)
+			}
+		})
+	}
+}
+
 func TestCreateQuickExpenseHandler(t *testing.T) {
 	backend := newFakeAuthBackend()
 	ownerToken := loginTestUser(t, backend)
@@ -3435,6 +3601,7 @@ type fakeAuthBackend struct {
 	googleTripPlaces  map[string]string
 	dayLodgingPlaces  map[string]tripdomain.TripPlaceSummary
 	dayItineraryItems map[string][]tripdomain.DayItineraryItem
+	dayExpenses       map[string][]tripdomain.DayExpenseListItem
 	tripInvites       map[string]tripdomain.TripInvite
 	reorderErr        error
 	arrivalErr        error
@@ -3616,6 +3783,7 @@ func newFakeAuthBackend() *fakeAuthBackend {
 		googleTripPlaces:  map[string]string{},
 		dayLodgingPlaces:  map[string]tripdomain.TripPlaceSummary{},
 		dayItineraryItems: map[string][]tripdomain.DayItineraryItem{},
+		dayExpenses:       map[string][]tripdomain.DayExpenseListItem{},
 		tripInvites:       map[string]tripdomain.TripInvite{},
 	}
 }
@@ -3959,6 +4127,17 @@ func (b *fakeAuthBackend) ListItineraryItemsByTripAndDate(_ context.Context, tri
 	return b.dayItineraryItems[tripID+":"+date], nil
 }
 
+func (b *fakeAuthBackend) ListDayExpensesByTripAndDate(_ context.Context, tripID string, date string) ([]tripdomain.DayExpenseListItem, error) {
+	expenses := append([]tripdomain.DayExpenseListItem(nil), b.dayExpenses[tripID+":"+date]...)
+	sort.SliceStable(expenses, func(left, right int) bool {
+		if expenses[left].CreatedAt.Equal(expenses[right].CreatedAt) {
+			return expenses[left].ID > expenses[right].ID
+		}
+		return expenses[left].CreatedAt.After(expenses[right].CreatedAt)
+	})
+	return expenses, nil
+}
+
 func (b *fakeAuthBackend) CreateQuickExpense(_ context.Context, record tripdomain.CreateQuickExpenseRecord) (tripdomain.CreateQuickExpenseResult, error) {
 	foundTrip, ok := b.trips[record.TripID]
 	if !ok {
@@ -4014,19 +4193,42 @@ func (b *fakeAuthBackend) CreateQuickExpense(_ context.Context, record tripdomai
 	itineraryItemID := foundItem.ID
 	tripPlaceID := foundItem.Place.ID
 	payerParticipantID := payer.ID
+	expenseID := testUUID(9000 + b.nextExpense)
+	createdAt := time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC).Add(time.Duration(b.nextExpense) * time.Minute)
+	placeSnapshot := tripdomain.ExpensePlaceSnapshot{Name: foundItem.Place.Name, Address: foundItem.Place.Address, PlaceType: foundItem.Place.PlaceType}
+	payerDisplayName := tripdomain.NormalizeParticipantDisplayName(payer.DisplayName)
+
+	daySplits := make([]tripdomain.DayExpenseSplitListItem, 0, len(splitRecords))
+	for _, splitRecord := range splitRecords {
+		daySplits = append(daySplits, tripdomain.DayExpenseSplitListItem{
+			SplitOrder:  splitRecord.SplitOrder,
+			DisplayName: splitRecord.ParticipantDisplayName,
+			AmountMinor: splitRecord.AmountMinor,
+		})
+	}
+	b.dayExpenses[record.TripID+":"+record.ScheduledDate] = append(b.dayExpenses[record.TripID+":"+record.ScheduledDate], tripdomain.DayExpenseListItem{
+		ID:               expenseID,
+		Place:            placeSnapshot,
+		AmountMinor:      record.AmountMinor,
+		Currency:         foundTrip.DefaultCurrency,
+		PayerDisplayName: payerDisplayName,
+		Splits:           daySplits,
+		CreatedAt:        createdAt,
+	})
+
 	return tripdomain.CreateQuickExpenseResult{Expense: tripdomain.Expense{
-		ID:                 testUUID(9000 + b.nextExpense),
+		ID:                 expenseID,
 		TripID:             record.TripID,
 		ScheduledDate:      record.ScheduledDate,
 		ItineraryItemID:    &itineraryItemID,
 		TripPlaceID:        &tripPlaceID,
-		Place:              tripdomain.ExpensePlaceSnapshot{Name: foundItem.Place.Name, Address: foundItem.Place.Address, PlaceType: foundItem.Place.PlaceType},
+		Place:              placeSnapshot,
 		AmountMinor:        record.AmountMinor,
 		Currency:           foundTrip.DefaultCurrency,
 		PayerParticipantID: &payerParticipantID,
-		PayerDisplayName:   tripdomain.NormalizeParticipantDisplayName(payer.DisplayName),
+		PayerDisplayName:   payerDisplayName,
 		Splits:             splits,
-		CreatedAt:          time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC),
+		CreatedAt:          createdAt,
 	}}, nil
 }
 

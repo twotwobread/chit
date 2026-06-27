@@ -13,6 +13,7 @@ import type { CreateTripRequest } from '../models/CreateTripRequest';
 import type { CreateTripResponse } from '../models/CreateTripResponse';
 import type { GetDayItineraryResponse } from '../models/GetDayItineraryResponse';
 import type { GetTripDetailResponse } from '../models/GetTripDetailResponse';
+import type { ListDayExpensesResponse } from '../models/ListDayExpensesResponse';
 import type { ListTripParticipantsResponse } from '../models/ListTripParticipantsResponse';
 import type { ListTripsResponse } from '../models/ListTripsResponse';
 import type { MarkDayItineraryItemArrivedResponse } from '../models/MarkDayItineraryItemArrivedResponse';
@@ -327,6 +328,34 @@ export class TripsService {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/trips/{tripId}/days/{date}/itinerary',
+            path: {
+                'tripId': tripId,
+                'date': date,
+            },
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                403: `Forbidden.`,
+                404: `Trip or virtual day not found.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
+     * List expenses for a trip day
+     * Returns read-only expense rows for the selected trip day, ordered newest-first.
+     * @param tripId
+     * @param date
+     * @returns ListDayExpensesResponse Day expenses.
+     * @throws ApiError
+     */
+    public static listDayExpenses(
+        tripId: string,
+        date: string,
+    ): CancelablePromise<ListDayExpensesResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/trips/{tripId}/days/{date}/expenses',
             path: {
                 'tripId': tripId,
                 'date': date,

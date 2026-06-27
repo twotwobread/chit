@@ -453,6 +453,58 @@ func (s *Store) ListItineraryItemsByTripAndDate(ctx context.Context, tripID stri
 	return mapDayItineraryItems(rows), nil
 }
 
+func (s *Store) ListDayExpensesByTripAndDate(ctx context.Context, tripID string, date string) ([]trip.DayExpenseListItem, error) {
+	expenseRows, err := s.queries.ListDayExpensesByTripAndDate(ctx, db.ListDayExpensesByTripAndDateParams{
+		TripID:        mustUUID(tripID),
+		ScheduledDate: dateTextValue(date),
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(expenseRows) == 0 {
+		return []trip.DayExpenseListItem{}, nil
+	}
+
+	expenseIDs := make([]pgtype.UUID, 0, len(expenseRows))
+	expenses := make([]trip.DayExpenseListItem, 0, len(expenseRows))
+	expenseIndexByID := make(map[string]int, len(expenseRows))
+	for _, expenseRow := range expenseRows {
+		expenseIDs = append(expenseIDs, mustUUID(expenseRow.ID))
+		expenseIndexByID[expenseRow.ID] = len(expenses)
+		expenses = append(expenses, trip.DayExpenseListItem{
+			ID: expenseRow.ID,
+			Place: trip.ExpensePlaceSnapshot{
+				Name:      expenseRow.PlaceName,
+				Address:   expenseRow.PlaceAddress,
+				PlaceType: expenseRow.PlaceType,
+			},
+			AmountMinor:      expenseRow.AmountMinor,
+			Currency:         expenseRow.Currency,
+			PayerDisplayName: expenseRow.PayerDisplayName,
+			Splits:           []trip.DayExpenseSplitListItem{},
+			CreatedAt:        expenseRow.CreatedAt.Time,
+		})
+	}
+
+	splitRows, err := s.queries.ListDayExpenseSplitsByExpenseIDs(ctx, expenseIDs)
+	if err != nil {
+		return nil, err
+	}
+	for _, splitRow := range splitRows {
+		expenseIndex, ok := expenseIndexByID[splitRow.ExpenseID]
+		if !ok {
+			continue
+		}
+		expenses[expenseIndex].Splits = append(expenses[expenseIndex].Splits, trip.DayExpenseSplitListItem{
+			SplitOrder:  int(splitRow.SplitOrder),
+			DisplayName: splitRow.ParticipantDisplayName,
+			AmountMinor: splitRow.AmountMinor,
+		})
+	}
+
+	return expenses, nil
+}
+
 func (s *Store) CreateQuickExpense(ctx context.Context, record trip.CreateQuickExpenseRecord) (trip.CreateQuickExpenseResult, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {

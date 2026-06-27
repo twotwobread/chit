@@ -66,6 +66,11 @@ type fakeRepository struct {
 	dayItineraryItems        []DayItineraryItem
 	listedItineraryTripID    string
 	listedItineraryDate      string
+	dayExpenses              []DayExpenseListItem
+	listedDayExpensesTripID  string
+	listedDayExpensesDate    string
+	listDayExpensesCalled    bool
+	listDayExpensesErr       error
 	quickExpenseRecord       CreateQuickExpenseRecord
 	quickExpenseCalled       bool
 	quickExpenseResult       CreateQuickExpenseResult
@@ -286,6 +291,19 @@ func (r *fakeRepository) ListItineraryItemsByTripAndDate(_ context.Context, trip
 	r.listedItineraryTripID = tripID
 	r.listedItineraryDate = date
 	return r.dayItineraryItems, nil
+}
+
+func (r *fakeRepository) ListDayExpensesByTripAndDate(_ context.Context, tripID string, date string) ([]DayExpenseListItem, error) {
+	r.listedDayExpensesTripID = tripID
+	r.listedDayExpensesDate = date
+	r.listDayExpensesCalled = true
+	if r.listDayExpensesErr != nil {
+		return nil, r.listDayExpensesErr
+	}
+	if r.dayExpenses != nil {
+		return r.dayExpenses, nil
+	}
+	return []DayExpenseListItem{}, nil
 }
 
 func (r *fakeRepository) CreateQuickExpense(_ context.Context, record CreateQuickExpenseRecord) (CreateQuickExpenseResult, error) {
@@ -1237,6 +1255,87 @@ func TestServiceGetDayItineraryOutOfRange(t *testing.T) {
 	}
 	if repo.listedItineraryTripID != "" {
 		t.Fatal("expected out-of-range date not to query itinerary items")
+	}
+}
+
+func TestServiceListDayExpenses(t *testing.T) {
+	createdAt := time.Date(2026, 7, 10, 12, 30, 0, 0, time.UTC)
+	repo := &fakeRepository{
+		trip:          Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"},
+		tripFound:     true,
+		isParticipant: true,
+		dayExpenses: []DayExpenseListItem{
+			{
+				ID:               testUUID(9002),
+				Place:            ExpensePlaceSnapshot{Name: "라멘", Address: "Dotonbori", PlaceType: "food"},
+				AmountMinor:      1200,
+				Currency:         "JPY",
+				PayerDisplayName: "민수",
+				Splits:           []DayExpenseSplitListItem{{SplitOrder: 1, DisplayName: "민수", AmountMinor: 600}, {SplitOrder: 2, DisplayName: "지아", AmountMinor: 600}},
+				CreatedAt:        createdAt,
+			},
+		},
+	}
+	service := newTestService(repo)
+
+	result, err := service.ListDayExpenses(context.Background(), "user-1", testTripID, "2026-07-10")
+	if err != nil {
+		t.Fatalf("ListDayExpenses returned error: %v", err)
+	}
+	if !repo.listDayExpensesCalled || repo.listedDayExpensesTripID != testTripID || repo.listedDayExpensesDate != "2026-07-10" {
+		t.Fatalf("expected list repository call, got trip=%q date=%q called=%v", repo.listedDayExpensesTripID, repo.listedDayExpensesDate, repo.listDayExpensesCalled)
+	}
+	if len(result.Expenses) != 1 || result.Expenses[0].ID != testUUID(9002) || result.Expenses[0].Place.Name != "라멘" || result.Expenses[0].PayerDisplayName != "민수" || len(result.Expenses[0].Splits) != 2 || !result.Expenses[0].CreatedAt.Equal(createdAt) {
+		t.Fatalf("unexpected day expense result: %#v", result)
+	}
+}
+
+func TestServiceListDayExpensesEmpty(t *testing.T) {
+	repo := &fakeRepository{
+		trip:          Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"},
+		tripFound:     true,
+		isParticipant: true,
+	}
+	service := newTestService(repo)
+
+	result, err := service.ListDayExpenses(context.Background(), "user-1", testTripID, "2026-07-11")
+	if err != nil {
+		t.Fatalf("ListDayExpenses returned error: %v", err)
+	}
+	if result.Expenses == nil || len(result.Expenses) != 0 {
+		t.Fatalf("expected empty non-nil expense list, got %#v", result.Expenses)
+	}
+}
+
+func TestServiceListDayExpensesValidationAuthAndRange(t *testing.T) {
+	validTrip := Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"}
+	tests := []struct {
+		name   string
+		repo   *fakeRepository
+		userID string
+		tripID string
+		date   string
+		want   error
+	}{
+		{name: "requires auth", repo: &fakeRepository{}, userID: " ", tripID: testTripID, date: "2026-07-10", want: ErrUnauthorized},
+		{name: "invalid trip id", repo: &fakeRepository{}, userID: "user-1", tripID: "not-a-uuid", date: "2026-07-10", want: ErrValidation},
+		{name: "invalid date", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, date: "2026/07/10", want: ErrValidation},
+		{name: "missing trip", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, date: "2026-07-10", want: ErrNotFound},
+		{name: "forbidden", repo: &fakeRepository{trip: validTrip, tripFound: true}, userID: "user-1", tripID: testTripID, date: "2026-07-10", want: ErrForbidden},
+		{name: "out of range", repo: &fakeRepository{trip: validTrip, tripFound: true, isParticipant: true}, userID: "user-1", tripID: testTripID, date: "2026-07-14", want: ErrNotFound},
+		{name: "repository error", repo: &fakeRepository{trip: validTrip, tripFound: true, isParticipant: true, listDayExpensesErr: ErrConflict}, userID: "user-1", tripID: testTripID, date: "2026-07-10", want: ErrConflict},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := newTestService(tt.repo).ListDayExpenses(context.Background(), tt.userID, tt.tripID, tt.date)
+			if !errors.Is(err, tt.want) {
+				t.Fatalf("expected %v, got %v", tt.want, err)
+			}
+			if tt.name != "repository error" && tt.repo.listDayExpensesCalled {
+				t.Fatal("expected repository list call not to happen")
+			}
+		})
 	}
 }
 

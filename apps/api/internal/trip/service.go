@@ -468,6 +468,54 @@ func (s *Service) GetDayItinerary(ctx context.Context, userID string, tripID str
 	}, nil
 }
 
+func (s *Service) ListDayExpenses(ctx context.Context, userID string, tripID string, date string) (ListDayExpensesResult, error) {
+	if strings.TrimSpace(userID) == "" {
+		return ListDayExpensesResult{}, ErrUnauthorized
+	}
+
+	tripID = strings.TrimSpace(tripID)
+	date = strings.TrimSpace(date)
+	if !isUUID(tripID) {
+		return ListDayExpensesResult{}, ErrValidation
+	}
+
+	selectedDate, err := parseDate(date)
+	if err != nil {
+		return ListDayExpensesResult{}, ErrValidation
+	}
+
+	foundTrip, ok, err := s.repo.GetTripByID(ctx, tripID)
+	if err != nil {
+		return ListDayExpensesResult{}, err
+	}
+	if !ok {
+		return ListDayExpensesResult{}, ErrNotFound
+	}
+
+	isParticipant, err := s.repo.IsTripParticipant(ctx, tripID, userID)
+	if err != nil {
+		return ListDayExpensesResult{}, err
+	}
+	if !isParticipant {
+		return ListDayExpensesResult{}, ErrForbidden
+	}
+
+	dayOrder, err := dayOrderInRange(foundTrip.StartDate, foundTrip.EndDate, selectedDate)
+	if err != nil {
+		return ListDayExpensesResult{}, ErrValidation
+	}
+	if dayOrder == 0 {
+		return ListDayExpensesResult{}, ErrNotFound
+	}
+
+	expenses, err := s.repo.ListDayExpensesByTripAndDate(ctx, tripID, selectedDate.Format(dateLayout))
+	if err != nil {
+		return ListDayExpensesResult{}, err
+	}
+
+	return ListDayExpensesResult{Expenses: expenses}, nil
+}
+
 func (s *Service) CreateQuickExpense(ctx context.Context, userID string, tripID string, date string, input CreateQuickExpenseInput) (CreateQuickExpenseResult, error) {
 	if strings.TrimSpace(userID) == "" {
 		return CreateQuickExpenseResult{}, ErrUnauthorized

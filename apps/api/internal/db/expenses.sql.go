@@ -268,6 +268,110 @@ func (q *Queries) InsertExpenseSplit(ctx context.Context, arg InsertExpenseSplit
 	return i, err
 }
 
+const listDayExpenseSplitsByExpenseIDs = `-- name: ListDayExpenseSplitsByExpenseIDs :many
+SELECT
+  expense_id::text,
+  split_order,
+  participant_display_name,
+  amount_minor
+FROM expense_splits
+WHERE expense_id = ANY($1::uuid[])
+ORDER BY expense_id ASC, split_order ASC
+`
+
+type ListDayExpenseSplitsByExpenseIDsRow struct {
+	ExpenseID              string
+	SplitOrder             int32
+	ParticipantDisplayName string
+	AmountMinor            int64
+}
+
+func (q *Queries) ListDayExpenseSplitsByExpenseIDs(ctx context.Context, expenseIds []pgtype.UUID) ([]ListDayExpenseSplitsByExpenseIDsRow, error) {
+	rows, err := q.db.Query(ctx, listDayExpenseSplitsByExpenseIDs, expenseIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListDayExpenseSplitsByExpenseIDsRow
+	for rows.Next() {
+		var i ListDayExpenseSplitsByExpenseIDsRow
+		if err := rows.Scan(
+			&i.ExpenseID,
+			&i.SplitOrder,
+			&i.ParticipantDisplayName,
+			&i.AmountMinor,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listDayExpensesByTripAndDate = `-- name: ListDayExpensesByTripAndDate :many
+SELECT
+  id::text,
+  place_name,
+  place_address,
+  place_type,
+  amount_minor,
+  currency,
+  payer_display_name,
+  created_at
+FROM expenses
+WHERE trip_id = $1::uuid
+  AND scheduled_date = $2
+ORDER BY created_at DESC, id DESC
+`
+
+type ListDayExpensesByTripAndDateParams struct {
+	TripID        pgtype.UUID
+	ScheduledDate pgtype.Date
+}
+
+type ListDayExpensesByTripAndDateRow struct {
+	ID               string
+	PlaceName        string
+	PlaceAddress     string
+	PlaceType        string
+	AmountMinor      int64
+	Currency         string
+	PayerDisplayName string
+	CreatedAt        pgtype.Timestamptz
+}
+
+func (q *Queries) ListDayExpensesByTripAndDate(ctx context.Context, arg ListDayExpensesByTripAndDateParams) ([]ListDayExpensesByTripAndDateRow, error) {
+	rows, err := q.db.Query(ctx, listDayExpensesByTripAndDate, arg.TripID, arg.ScheduledDate)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListDayExpensesByTripAndDateRow
+	for rows.Next() {
+		var i ListDayExpensesByTripAndDateRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.PlaceName,
+			&i.PlaceAddress,
+			&i.PlaceType,
+			&i.AmountMinor,
+			&i.Currency,
+			&i.PayerDisplayName,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listQuickExpenseSplitParticipants = `-- name: ListQuickExpenseSplitParticipants :many
 SELECT
   id::text,

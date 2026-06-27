@@ -167,6 +167,31 @@ func createQuickExpenseResponseToOpenAPI(result trip.CreateQuickExpenseResult) o
 	return openapi.CreateQuickExpenseResponse{Expense: expenseToOpenAPI(result.Expense)}
 }
 
+func listDayExpensesResponseToOpenAPI(result trip.ListDayExpensesResult) openapi.ListDayExpensesResponse {
+	expenses := make([]openapi.DayExpenseListItem, 0, len(result.Expenses))
+	for _, expense := range result.Expenses {
+		splits := make([]openapi.DayExpenseSplitListItem, 0, len(expense.Splits))
+		for _, split := range expense.Splits {
+			splits = append(splits, openapi.DayExpenseSplitListItem{
+				SplitOrder:  split.SplitOrder,
+				DisplayName: split.DisplayName,
+				AmountMinor: split.AmountMinor,
+			})
+		}
+		expenses = append(expenses, openapi.DayExpenseListItem{
+			Id:               expense.ID,
+			Place:            expensePlaceSnapshotToOpenAPI(expense.Place),
+			AmountMinor:      expense.AmountMinor,
+			Currency:         openapi.SupportedCurrency(expense.Currency),
+			PayerDisplayName: expense.PayerDisplayName,
+			Splits:           splits,
+			CreatedAt:        expense.CreatedAt.UTC(),
+		})
+	}
+
+	return openapi.ListDayExpensesResponse{Expenses: expenses}
+}
+
 func expenseToOpenAPI(expense trip.Expense) openapi.Expense {
 	splits := make([]openapi.ExpenseSplit, 0, len(expense.Splits))
 	for _, split := range expense.Splits {
