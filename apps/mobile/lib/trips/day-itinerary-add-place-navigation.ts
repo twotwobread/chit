@@ -1,0 +1,41 @@
+import type { Href } from 'expo-router';
+
+import { buildGooglePlaceSearchRoute } from '../places/google-search';
+
+import { buildDayItineraryRoute } from './day-itinerary';
+
+export type DayItineraryAddPlaceReturnParam = string | string[] | undefined;
+
+export type DayItineraryAddPlaceReturnNavigation =
+  | { kind: 'dismissToDay'; href: Href }
+  | { kind: 'replaceWithDay'; href: Href };
+
+const dayItineraryAddPlaceReturnParamName = 'returnTo';
+const dayItineraryAddPlaceReturnToDayValue = 'day-detail';
+
+export function buildDayItineraryAddPlaceSearchRoute(tripId: string, date: string): Href {
+  const searchRoute = buildGooglePlaceSearchRoute(tripId, date);
+  const returnParam = `${dayItineraryAddPlaceReturnParamName}=${dayItineraryAddPlaceReturnToDayValue}`;
+  return `${searchRoute}?${returnParam}` as Href;
+}
+
+export function isDayItineraryAddPlaceReturnToDay(returnTo: DayItineraryAddPlaceReturnParam): boolean {
+  const value = Array.isArray(returnTo) ? returnTo[0] : returnTo;
+  return value === dayItineraryAddPlaceReturnToDayValue;
+}
+
+export function resolveDayItineraryAddPlaceReturnNavigation({
+  tripId,
+  date,
+  returnTo,
+}: {
+  tripId: string;
+  date: string;
+  returnTo?: DayItineraryAddPlaceReturnParam;
+}): DayItineraryAddPlaceReturnNavigation {
+  const href = buildDayItineraryRoute(tripId, date);
+  if (isDayItineraryAddPlaceReturnToDay(returnTo)) {
+    return { kind: 'dismissToDay', href };
+  }
+  return { kind: 'replaceWithDay', href };
+}

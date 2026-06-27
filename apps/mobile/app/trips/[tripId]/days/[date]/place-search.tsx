@@ -6,7 +6,7 @@ import { ApiError } from '@i-um/api-contract';
 
 import { MobileAuthError } from '../../../../../lib/auth/client';
 import { theme } from '../../../../../lib/design';
-import { buildDayItineraryRoute } from '../../../../../lib/trips/day-itinerary';
+import { resolveDayItineraryAddPlaceReturnNavigation } from '../../../../../lib/trips/day-itinerary-add-place-navigation';
 import { createGooglePlaceDayItineraryItem, searchGooglePlaces } from '../../../../../lib/places/client';
 import {
   addingGooglePlaceState,
@@ -26,9 +26,14 @@ import {
 } from '../../../../../lib/places/google-search';
 
 export default function GooglePlaceSearchScreen() {
-  const { tripId: tripIdParam, date: dateParam } = useLocalSearchParams<{
+  const {
+    tripId: tripIdParam,
+    date: dateParam,
+    returnTo: returnToParam,
+  } = useLocalSearchParams<{
     tripId?: string | string[];
     date?: string | string[];
+    returnTo?: string | string[];
   }>();
   const tripId = Array.isArray(tripIdParam) ? tripIdParam[0] : tripIdParam;
   const date = Array.isArray(dateParam) ? dateParam[0] : dateParam;
@@ -39,12 +44,18 @@ export default function GooglePlaceSearchScreen() {
   const isAdding = addState.status === 'adding';
   const isBusy = isLoading || isAdding;
 
-  const backToDay = () => {
-    if (tripId && date) {
-      router.replace(buildDayItineraryRoute(tripId, date));
+  const returnToDay = () => {
+    if (!tripId || !date) {
+      router.replace('/');
       return;
     }
-    router.replace('/');
+
+    const navigation = resolveDayItineraryAddPlaceReturnNavigation({ tripId, date, returnTo: returnToParam });
+    if (navigation.kind === 'dismissToDay') {
+      router.dismissTo(navigation.href);
+      return;
+    }
+    router.replace(navigation.href);
   };
 
   const runSearch = async () => {
@@ -103,7 +114,7 @@ export default function GooglePlaceSearchScreen() {
     setAddState(addingGooglePlaceState(result.id));
     try {
       await createGooglePlaceDayItineraryItem(tripId, date, result.id, duplicateConfirmed);
-      router.replace(buildDayItineraryRoute(tripId, date));
+      returnToDay();
     } catch (error) {
       if (
         error instanceof MobileAuthError &&
@@ -142,7 +153,7 @@ export default function GooglePlaceSearchScreen() {
         <View style={styles.card}>
           <Text style={styles.errorTitle}>{title}</Text>
           <Text style={styles.message}>{helper}</Text>
-          <Pressable accessibilityRole="button" onPress={backToDay} style={styles.button}>
+          <Pressable accessibilityRole="button" onPress={returnToDay} style={styles.button}>
             <Text style={styles.buttonText}>Day 일정으로</Text>
           </Pressable>
         </View>
@@ -266,7 +277,7 @@ export default function GooglePlaceSearchScreen() {
         </View>
       ) : null}
 
-      <Pressable accessibilityRole="button" disabled={isBusy} onPress={backToDay} style={styles.backLink}>
+      <Pressable accessibilityRole="button" disabled={isBusy} onPress={returnToDay} style={styles.backLink}>
         <Text style={styles.backLinkText}>Day 일정으로</Text>
       </Pressable>
     </ScrollView>
