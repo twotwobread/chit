@@ -20,7 +20,7 @@ import {
   type NativeSyntheticEvent,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
-import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams, type Href } from 'expo-router';
 
 import { ApiError, type TripPlaceType } from '@i-um/api-contract';
 
@@ -74,6 +74,7 @@ import {
   clearDayLodgingPlace,
   deleteDayItineraryItem,
   getTripDayItinerary,
+  listDayExpenses,
   reorderDayItineraryItems,
   setDayLodgingPlace,
   updateDayItineraryItem,
@@ -84,6 +85,12 @@ import {
   dayLodgingMutationFailureState,
   type DayLodgingSubmittingState,
 } from '../../../../lib/trips/lodging-place';
+import {
+  buildDayExpensesViewModel,
+  dayExpensesFailureState,
+  type DayExpensesFailureViewModel,
+  type DayExpensesViewModel,
+} from '../../../../lib/trips/day-expenses';
 import {
   DAY_ITINERARY_SHARED_UPDATE_POLL_INTERVAL_MS,
   DAY_ITINERARY_SHARED_UPDATE_RELOAD_CONFIRMATION,
@@ -102,6 +109,11 @@ type DayItineraryState =
   | { status: 'auth' }
   | { status: 'notFound'; title: string; helper: string }
   | { status: 'error'; title: string; helper: string };
+
+type DayExpenseState =
+  | { status: 'loading' }
+  | { status: 'success'; viewModel: DayExpensesViewModel }
+  | { status: 'error'; error: DayExpensesFailureViewModel };
 
 type EditState =
   | { status: 'idle' }
@@ -171,6 +183,7 @@ export default function TripDayItineraryScreen() {
   const tripId = Array.isArray(tripIdParam) ? tripIdParam[0] : tripIdParam;
   const date = Array.isArray(dateParam) ? dateParam[0] : dateParam;
   const [state, setState] = useState<DayItineraryState>({ status: 'loading' });
+  const [expenseState, setExpenseState] = useState<DayExpenseState>({ status: 'loading' });
   const [editState, setEditState] = useState<EditState>({ status: 'idle' });
   const [deleteState, setDeleteState] = useState<DeleteState>({ status: 'idle' });
   const [reorderState, setReorderState] = useState<ReorderState>({ status: 'idle' });
@@ -268,6 +281,19 @@ export default function TripDayItineraryScreen() {
     }
   }, []);
 
+  const handleExpensesFetchError = useCallback((error: unknown) => {
+    if (error instanceof MobileAuthError && (error.code === 'UNAUTHORIZED' || error.code === 'INVALID_REFRESH_TOKEN')) {
+      setState({ status: 'auth' });
+      return;
+    }
+    if (error instanceof ApiError && error.status === 401) {
+      setState({ status: 'auth' });
+      return;
+    }
+
+    setExpenseState({ status: 'error', error: dayExpensesFailureState() });
+  }, []);
+
   useEffect(() => {
     editStateRef.current = editState;
   }, [editState]);
@@ -357,20 +383,41 @@ export default function TripDayItineraryScreen() {
     [applyReorderAutoScroll, startReorderAutoScroll],
   );
 
+  const loadExpenses = useCallback(async () => {
+    if (!tripId || !date) {
+      return;
+    }
+
+    setExpenseState({ status: 'loading' });
+    try {
+      const response = await listDayExpenses(tripId, date);
+      setExpenseState({
+        status: 'success',
+        viewModel: buildDayExpensesViewModel({ expenses: response.expenses, tripId, date }),
+      });
+    } catch (error) {
+      handleExpensesFetchError(error);
+    }
+  }, [date, handleExpensesFetchError, tripId]);
+
   const load = useCallback(async () => {
     if (!tripId || !date) {
       const notFound = dayItineraryFailureState(404);
       updateSharedUpdateState({ baselineSignature: null, pendingSignature: null });
       setState({ status: 'notFound', title: notFound.title, helper: notFound.helper });
+      setExpenseState({ status: 'loading' });
       return;
     }
 
     const requestSequence = nextItineraryRequestSequence();
     setMapActionFeedback(null);
     setState({ status: 'loading' });
+    setExpenseState({ status: 'loading' });
     try {
       const response = await getTripDayItinerary(tripId, date);
-      applyItineraryResponse(response, requestSequence);
+      if (applyItineraryResponse(response, requestSequence)) {
+        await loadExpenses();
+      }
     } catch (error) {
       if (requestSequence < latestHandledItineraryRequestRef.current) {
         return;
@@ -382,6 +429,7 @@ export default function TripDayItineraryScreen() {
     applyItineraryResponse,
     date,
     handleItineraryFetchError,
+    loadExpenses,
     nextItineraryRequestSequence,
     tripId,
     updateSharedUpdateState,
@@ -993,6 +1041,11 @@ export default function TripDayItineraryScreen() {
               sharedUpdateReloadDisabled={sharedUpdateReloadDisabled}
               viewModel={state.viewModel}
             />
+            <DayExpensesSection
+              onOpenCreate={(route) => router.push(route)}
+              onRetry={() => void loadExpenses()}
+              state={expenseState}
+            />
             {editState.status === 'editing' || editState.status === 'saving' ? (
               <EditPlacePanel
                 editState={editState}
@@ -1347,6 +1400,77 @@ function DayItineraryContent({
   );
 }
 
+function DayExpensesSection({
+  onOpenCreate,
+  onRetry,
+  state,
+}: {
+  onOpenCreate: (route: Href) => void;
+  onRetry: () => void;
+  state: DayExpenseState;
+}) {
+  const emptyViewModel = state.status === 'success' && state.viewModel.status === 'empty' ? state.viewModel : null;
+  const successViewModel = state.status === 'success' && state.viewModel.status === 'success' ? state.viewModel : null;
+
+  return (
+    <View style={[styles.card, styles.sectionCard]}>
+      <Text accessibilityRole="header" style={styles.sectionTitle}>
+        지출
+      </Text>
+
+      {state.status === 'loading' ? (
+        <View style={styles.expenseStatusBox}>
+          <ActivityIndicator color={theme.color.primary} />
+          <Text style={styles.message}>지출을 불러오는 중...</Text>
+        </View>
+      ) : null}
+
+      {state.status === 'error' ? (
+        <View style={styles.errorBox}>
+          <Text style={styles.expenseErrorTitle}>{state.error.title}</Text>
+          <Text style={styles.message}>{state.error.helper}</Text>
+          <Pressable accessibilityRole="button" onPress={onRetry} style={styles.secondaryButton}>
+            <Text style={styles.secondaryButtonText}>{state.error.actionLabel}</Text>
+          </Pressable>
+        </View>
+      ) : null}
+
+      {emptyViewModel ? (
+        <View style={styles.emptyBox}>
+          <Text style={styles.emptyTitle}>{emptyViewModel.emptyTitle}</Text>
+          <Text style={styles.message}>{emptyViewModel.helper}</Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => onOpenCreate(emptyViewModel.actionRoute)}
+            style={styles.button}
+          >
+            <Text style={styles.buttonText}>{emptyViewModel.actionLabel}</Text>
+          </Pressable>
+        </View>
+      ) : null}
+
+      {successViewModel ? (
+        <View style={styles.expenseList}>
+          {successViewModel.rows.map((row) => (
+            <View
+              key={row.id}
+              accessible
+              accessibilityLabel={`${row.placeName} ${row.amountLabel}. ${row.detailLine}`}
+              style={styles.expenseRow}
+            >
+              <View style={styles.expenseTopLine}>
+                <Text style={styles.expensePlaceName}>{row.placeName}</Text>
+                <Text style={styles.expenseAmount}>{row.amountLabel}</Text>
+              </View>
+              <Text style={styles.expenseDetail}>{row.detailLine}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 function ReorderPlaceList({
   draft,
   getScrollOffsetY,
@@ -1671,6 +1795,15 @@ const styles = StyleSheet.create({
     padding: theme.space[7],
     ...theme.shadow.sm,
   },
+  sectionCard: {
+    marginTop: theme.space[5],
+  },
+  sectionTitle: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.headline,
+    fontWeight: theme.font.weight.bold,
+  },
   modalBackdrop: {
     alignItems: 'center',
     backgroundColor: theme.color.bg,
@@ -1839,6 +1972,57 @@ const styles = StyleSheet.create({
     fontFamily: theme.font.family.semibold,
     fontSize: theme.font.size.caption,
     fontWeight: theme.font.weight.semibold,
+  },
+  expenseStatusBox: {
+    alignItems: 'center',
+    backgroundColor: theme.color.surfaceSunken,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    gap: theme.space[3],
+    padding: theme.space[5],
+  },
+  expenseList: {
+    gap: theme.space[3],
+  },
+  expenseRow: {
+    backgroundColor: theme.color.surfaceSunken,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    gap: theme.space[2],
+    padding: theme.space[4],
+  },
+  expenseTopLine: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: theme.space[3],
+    justifyContent: 'space-between',
+  },
+  expensePlaceName: {
+    color: theme.color.textStrong,
+    flex: 1,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.subhead,
+    fontWeight: theme.font.weight.bold,
+  },
+  expenseAmount: {
+    color: theme.color.primary,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.subhead,
+    fontWeight: theme.font.weight.bold,
+  },
+  expenseDetail: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.caption,
+  },
+  expenseErrorTitle: {
+    color: theme.color.danger,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.subhead,
+    fontWeight: theme.font.weight.bold,
+    textAlign: 'center',
   },
   dragHandle: {
     alignItems: 'center',

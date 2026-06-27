@@ -82,6 +82,31 @@ RETURNING
   payer_display_name,
   created_at;
 
+-- name: ListDayExpensesByTripAndDate :many
+SELECT
+  id::text,
+  place_name,
+  place_address,
+  place_type,
+  amount_minor,
+  currency,
+  payer_display_name,
+  created_at
+FROM expenses
+WHERE trip_id = sqlc.arg(trip_id)::uuid
+  AND scheduled_date = sqlc.arg(scheduled_date)
+ORDER BY created_at DESC, id DESC;
+
+-- name: ListDayExpenseSplitsByExpenseIDs :many
+SELECT
+  expense_id::text,
+  split_order,
+  participant_display_name,
+  amount_minor
+FROM expense_splits
+WHERE expense_id = ANY(sqlc.arg(expense_ids)::uuid[])
+ORDER BY expense_id ASC, split_order ASC;
+
 -- name: InsertExpenseSplit :one
 INSERT INTO expense_splits (
   expense_id,
