@@ -160,7 +160,7 @@ test('maps a selected ongoing trip without a matching day to an unavailable Toda
     title: '오늘 일정을 찾을 수 없어요.',
     helper: '여행 정보가 바뀌었을 수 있어요. 다시 시도하거나 여행 상세를 확인해주세요.',
     primaryAction: { kind: 'retry', label: '다시 시도' },
-    secondaryAction: { kind: 'route', label: '여행 상세로', route: '/trips/trip-current' },
+    secondaryAction: { kind: 'route', label: '여행 상세로', route: '/trips/trip-current/detail' },
   });
 });
 
@@ -647,7 +647,7 @@ test('builds retryable and unavailable failure states without crashing callers',
     title: '오늘 일정을 불러올 수 없어요.',
     helper: '잠시 후 다시 시도하거나 여행 상세를 확인해주세요.',
     primaryAction: { kind: 'retry', label: '다시 시도' },
-    secondaryAction: { kind: 'route', label: '여행 상세로', route: '/trips/trip-current' },
+    secondaryAction: { kind: 'route', label: '여행 상세로', route: '/trips/trip-current/detail' },
   });
 
   assert.deepEqual(buildTodayUnavailableViewModel('trip-current'), {
@@ -655,6 +655,6 @@ test('builds retryable and unavailable failure states without crashing callers',
     title: '오늘 일정을 찾을 수 없어요.',
     helper: '여행 정보가 바뀌었을 수 있어요. 다시 시도하거나 여행 상세를 확인해주세요.',
     primaryAction: { kind: 'retry', label: '다시 시도' },
-    secondaryAction: { kind: 'route', label: '여행 상세로', route: '/trips/trip-current' },
+    secondaryAction: { kind: 'route', label: '여행 상세로', route: '/trips/trip-current/detail' },
   });
 });

@@ -18,6 +18,7 @@ import {
   getTripDetail,
   listTripParticipants,
 } from '../../../../../../lib/trips/client';
+import { buildDayItineraryRoute } from '../../../../../../lib/trips/day-itinerary';
 import {
   buildCreateQuickExpenseRequest,
   buildDefaultSplitParticipantIds,
@@ -204,7 +205,13 @@ export default function QuickExpenseScreen() {
     }
   };
 
-  const backToToday = () => router.replace('/');
+  const backToDay = () => {
+    if (!tripId || !date) {
+      router.replace('/');
+      return;
+    }
+    router.replace(buildDayItineraryRoute(tripId, date));
+  };
 
   return (
     <ScrollView contentContainerStyle={styles.scrollContent} style={styles.scroll}>
@@ -221,7 +228,7 @@ export default function QuickExpenseScreen() {
       ) : null}
 
       {state.status === 'success' && savedSummary ? (
-        <QuickExpenseSavedSummaryCard onDone={backToToday} summary={savedSummary} />
+        <QuickExpenseSavedSummaryCard onDone={backToDay} summary={savedSummary} />
       ) : null}
 
       {state.status === 'success' && !savedSummary ? (
@@ -229,7 +236,7 @@ export default function QuickExpenseScreen() {
           amountInput={amountInput}
           errors={errors}
           formMessage={formMessage}
-          onBack={backToToday}
+          onBack={backToDay}
           onSelectItem={selectItem}
           onSelectPayer={selectPayer}
           onSubmit={() => void submit()}
@@ -262,7 +269,7 @@ export default function QuickExpenseScreen() {
       {state.status === 'invalid' ? (
         <Card>
           <Text style={styles.errorTitle}>잘못된 지출 등록 주소예요.</Text>
-          <PrimaryButton label="오늘로 돌아가기" onPress={backToToday} />
+          <PrimaryButton label="일정으로 돌아가기" onPress={backToDay} />
         </Card>
       ) : null}
 
@@ -273,7 +280,7 @@ export default function QuickExpenseScreen() {
           </Text>
           <Text style={styles.message}>{state.message}</Text>
           <PrimaryButton label="다시 시도" onPress={() => void load()} />
-          <SecondaryButton label="오늘로 돌아가기" onPress={backToToday} />
+          <SecondaryButton label="일정으로 돌아가기" onPress={backToDay} />
         </Card>
       ) : null}
     </ScrollView>

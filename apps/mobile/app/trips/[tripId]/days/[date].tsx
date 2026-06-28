@@ -72,6 +72,7 @@ import {
 } from '../../../../lib/trips/day-itinerary-edit';
 import { manualPlaceTypeOptions } from '../../../../lib/trips/manual-place';
 import { buildDayItineraryAddPlaceSearchRoute } from '../../../../lib/trips/day-itinerary-add-place-navigation';
+import { tripItineraryPath } from '../../../../lib/trips/routes';
 import {
   clearDayLodgingPlace,
   deleteScheduleItem,
@@ -635,9 +636,9 @@ export default function TripDayItineraryScreen() {
     );
   }, [getSharedUpdateLocalState, reloadLatestSharedUpdate]);
 
-  const backToTripDetail = () => {
+  const backToItinerary = () => {
     if (tripId) {
-      router.replace(`/trips/${tripId}`);
+      router.replace(tripItineraryPath(tripId));
       return;
     }
     router.replace('/');
@@ -1070,8 +1071,8 @@ export default function TripDayItineraryScreen() {
           <View style={styles.card}>
             <Text style={styles.errorTitle}>{state.title}</Text>
             <Text style={styles.message}>{state.helper}</Text>
-            <Pressable accessibilityRole="button" onPress={backToTripDetail} style={styles.button}>
-              <Text style={styles.buttonText}>여행 상세로</Text>
+            <Pressable accessibilityRole="button" onPress={backToItinerary} style={styles.button}>
+              <Text style={styles.buttonText}>일정으로</Text>
             </Pressable>
           </View>
         ) : null}

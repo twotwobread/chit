@@ -18,7 +18,7 @@ import {
   type InviteAcceptViewModel,
 } from '../../lib/trips/invite';
 import { setPendingInviteLoginHandoffForToken } from '../../lib/trips/invite-login-handoff';
-import { tripDetailPath } from '../../lib/trips/mypage';
+import { tripTodayPath } from '../../lib/trips/routes';
 
 type InviteAcceptScreenState = { status: 'loading' } | { status: 'ready'; viewModel: InviteAcceptViewModel };
 
@@ -78,7 +78,7 @@ export default function InviteAcceptScreen() {
         return;
       }
       if (action === 'viewTrip' && viewModel.tripId) {
-        router.replace(tripDetailPath(viewModel.tripId));
+        router.replace(tripTodayPath(viewModel.tripId));
         return;
       }
       router.replace('/');
