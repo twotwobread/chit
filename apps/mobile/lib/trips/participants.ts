@@ -1,5 +1,6 @@
 import type { TripParticipantListItem, TripParticipantRole } from '@i-um/api-contract';
 
+import type { Participant as CompanionSheetParticipant } from '../trip-ui/CompanionsSheet';
 import { tripRoleLabel } from './mypage';
 
 export type ParticipantRowViewModel = {
@@ -53,6 +54,18 @@ export function removeParticipantFromViewModel(
   return {
     rows: viewModel.rows.filter((participant) => participant.participantId !== participantId),
   };
+}
+
+export function buildCompanionSheetParticipants(
+  viewModel: ParticipantListViewModel,
+  currentUserId: string | null | undefined,
+): CompanionSheetParticipant[] {
+  return viewModel.rows.map((participant) => ({
+    id: participant.participantId,
+    name: participant.displayName,
+    role: participant.role,
+    isMe: Boolean(currentUserId && participant.participantId === currentUserId),
+  }));
 }
 
 export function participantRoleLabel(role: TripParticipantRole): string {
