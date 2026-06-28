@@ -232,11 +232,12 @@ CREATE TABLE expenses (
   schedule_item_id uuid,
   expense_date date NOT NULL,
   trip_place_id uuid REFERENCES trip_places(id) ON DELETE SET NULL,
-  place_name text NOT NULL,
-  place_address text NOT NULL,
-  place_type text NOT NULL,
+  place_name text,
+  place_address text,
+  place_type text,
   amount_minor bigint NOT NULL,
   currency text NOT NULL,
+  split_policy text NOT NULL DEFAULT 'equal',
   payer_participant_id uuid REFERENCES trip_participants(id) ON DELETE SET NULL,
   payer_display_name text NOT NULL,
   created_by uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
@@ -255,6 +256,7 @@ CREATE TABLE expenses (
   CONSTRAINT expenses_place_type_check CHECK (place_type IN ('sights', 'food', 'lodging', 'cafe', 'shopping', 'etc')),
   CONSTRAINT expenses_amount_minor_check CHECK (amount_minor > 0),
   CONSTRAINT expenses_currency_check CHECK (currency IN ('KRW', 'JPY', 'USD', 'EUR')),
+  CONSTRAINT expenses_split_policy_check CHECK (split_policy IN ('equal')),
   CONSTRAINT expenses_payer_display_name_length_check CHECK (char_length(payer_display_name) BETWEEN 1 AND 80)
 );
 

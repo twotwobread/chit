@@ -126,6 +126,7 @@ INSERT INTO expenses (
   place_type,
   amount_minor,
   currency,
+  split_policy,
   payer_participant_id,
   payer_display_name,
   created_by
@@ -141,24 +142,26 @@ INSERT INTO expenses (
   $9,
   $10,
   $11,
-  $12::uuid,
-  $13,
-  $14::uuid
+  $12,
+  $13::uuid,
+  $14,
+  $15::uuid
 )
 RETURNING
   id::text,
   trip_id::text,
   anchor_type,
-  trip_day_id::text,
-  schedule_item_id::text,
+  COALESCE(trip_day_id::text, '')::text AS trip_day_id,
+  COALESCE(schedule_item_id::text, '')::text AS schedule_item_id,
   expense_date,
-  trip_place_id::text,
-  place_name,
-  place_address,
-  place_type,
+  COALESCE(trip_place_id::text, '')::text AS trip_place_id,
+  COALESCE(place_name, '')::text AS place_name,
+  COALESCE(place_address, '')::text AS place_address,
+  COALESCE(place_type, '')::text AS place_type,
   amount_minor,
   currency,
-  payer_participant_id::text,
+  split_policy,
+  COALESCE(payer_participant_id::text, '')::text AS payer_participant_id,
   payer_display_name,
   created_at
 `
@@ -170,11 +173,12 @@ type InsertExpenseParams struct {
 	ScheduleItemID     pgtype.UUID
 	ExpenseDate        pgtype.Date
 	TripPlaceID        pgtype.UUID
-	PlaceName          string
-	PlaceAddress       string
-	PlaceType          string
+	PlaceName          pgtype.Text
+	PlaceAddress       pgtype.Text
+	PlaceType          pgtype.Text
 	AmountMinor        int64
 	Currency           string
+	SplitPolicy        string
 	PayerParticipantID pgtype.UUID
 	PayerDisplayName   string
 	CreatedBy          pgtype.UUID
@@ -193,6 +197,7 @@ type InsertExpenseRow struct {
 	PlaceType          string
 	AmountMinor        int64
 	Currency           string
+	SplitPolicy        string
 	PayerParticipantID string
 	PayerDisplayName   string
 	CreatedAt          pgtype.Timestamptz
@@ -211,6 +216,7 @@ func (q *Queries) InsertExpense(ctx context.Context, arg InsertExpenseParams) (I
 		arg.PlaceType,
 		arg.AmountMinor,
 		arg.Currency,
+		arg.SplitPolicy,
 		arg.PayerParticipantID,
 		arg.PayerDisplayName,
 		arg.CreatedBy,
@@ -229,6 +235,7 @@ func (q *Queries) InsertExpense(ctx context.Context, arg InsertExpenseParams) (I
 		&i.PlaceType,
 		&i.AmountMinor,
 		&i.Currency,
+		&i.SplitPolicy,
 		&i.PayerParticipantID,
 		&i.PayerDisplayName,
 		&i.CreatedAt,
@@ -253,7 +260,7 @@ INSERT INTO expense_splits (
 RETURNING
   id::text,
   expense_id::text,
-  participant_id::text,
+  COALESCE(participant_id::text, '')::text AS participant_id,
   participant_display_name,
   amount_minor,
   split_order
@@ -298,19 +305,31 @@ func (q *Queries) InsertExpenseSplit(ctx context.Context, arg InsertExpenseSplit
 
 const listDayExpenseSplitsByExpenseIDs = `-- name: ListDayExpenseSplitsByExpenseIDs :many
 SELECT
-  expense_id::text,
-  split_order,
-  participant_display_name,
-  amount_minor
-FROM expense_splits
-WHERE expense_id = ANY($1::uuid[])
-ORDER BY expense_id ASC, split_order ASC
+  es.expense_id::text AS expense_id,
+  es.split_order,
+  COALESCE(participant.id::text, es.participant_id::text, '')::text AS participant_id,
+  COALESCE(participant.display_name, es.participant_display_name, '여행자')::text AS participant_display_name,
+  CASE
+    WHEN participant.id IS NOT NULL THEN 'live'
+    ELSE 'fallback'
+  END::text AS participant_source,
+  es.amount_minor
+FROM expense_splits es
+JOIN expenses e
+  ON e.id = es.expense_id
+LEFT JOIN trip_participants participant
+  ON participant.id = es.participant_id
+ AND participant.trip_id = e.trip_id
+WHERE es.expense_id = ANY($1::uuid[])
+ORDER BY es.expense_id ASC, es.split_order ASC
 `
 
 type ListDayExpenseSplitsByExpenseIDsRow struct {
 	ExpenseID              string
 	SplitOrder             int32
+	ParticipantID          string
 	ParticipantDisplayName string
+	ParticipantSource      string
 	AmountMinor            int64
 }
 
@@ -326,7 +345,9 @@ func (q *Queries) ListDayExpenseSplitsByExpenseIDs(ctx context.Context, expenseI
 		if err := rows.Scan(
 			&i.ExpenseID,
 			&i.SplitOrder,
+			&i.ParticipantID,
 			&i.ParticipantDisplayName,
+			&i.ParticipantSource,
 			&i.AmountMinor,
 		); err != nil {
 			return nil, err
@@ -341,19 +362,48 @@ func (q *Queries) ListDayExpenseSplitsByExpenseIDs(ctx context.Context, expenseI
 
 const listDayExpensesByTripDay = `-- name: ListDayExpensesByTripDay :many
 SELECT
-  id::text,
-  place_name,
-  place_address,
-  place_type,
-  amount_minor,
-  currency,
-  payer_display_name,
-  created_at
-FROM expenses
-WHERE trip_id = $1::uuid
-  AND trip_day_id = $2::uuid
-  AND anchor_type IN ('trip_day', 'schedule_item')
-ORDER BY created_at DESC, id DESC
+  e.id::text AS id,
+  e.anchor_type,
+  COALESCE(e.trip_day_id::text, '')::text AS trip_day_id,
+  COALESCE(e.schedule_item_id::text, '')::text AS schedule_item_id,
+  e.expense_date,
+  COALESCE(live_place.name, e.place_name, '지출')::text AS display_title,
+  COALESCE(live_place.id::text, e.trip_place_id::text, '')::text AS trip_place_id,
+  COALESCE(live_place.name, e.place_name, '')::text AS place_name,
+  COALESCE(live_place.address, e.place_address, '')::text AS place_address,
+  COALESCE(live_place.place_type, e.place_type, '')::text AS place_type,
+  CASE
+    WHEN live_place.id IS NOT NULL THEN 'live'
+    WHEN e.place_name IS NOT NULL THEN 'fallback'
+    ELSE ''
+  END::text AS place_source,
+  e.amount_minor,
+  e.currency,
+  COALESCE(payer.id::text, e.payer_participant_id::text, '')::text AS payer_participant_id,
+  COALESCE(payer.display_name, e.payer_display_name, '여행자')::text AS payer_display_name,
+  CASE
+    WHEN payer.id IS NOT NULL THEN 'live'
+    ELSE 'fallback'
+  END::text AS payer_source,
+  e.split_policy,
+  e.created_at
+FROM expenses e
+LEFT JOIN schedule_items si
+  ON e.anchor_type = 'schedule_item'
+ AND si.id = e.schedule_item_id
+ AND si.trip_day_id = e.trip_day_id
+ AND si.trip_id = e.trip_id
+ AND si.deleted_at IS NULL
+LEFT JOIN trip_places live_place
+  ON live_place.id = si.trip_place_id
+ AND live_place.trip_id = e.trip_id
+LEFT JOIN trip_participants payer
+  ON payer.id = e.payer_participant_id
+ AND payer.trip_id = e.trip_id
+WHERE e.trip_id = $1::uuid
+  AND e.trip_day_id = $2::uuid
+  AND e.anchor_type IN ('trip_day', 'schedule_item')
+ORDER BY e.created_at DESC, e.id DESC
 `
 
 type ListDayExpensesByTripDayParams struct {
@@ -362,14 +412,24 @@ type ListDayExpensesByTripDayParams struct {
 }
 
 type ListDayExpensesByTripDayRow struct {
-	ID               string
-	PlaceName        string
-	PlaceAddress     string
-	PlaceType        string
-	AmountMinor      int64
-	Currency         string
-	PayerDisplayName string
-	CreatedAt        pgtype.Timestamptz
+	ID                 string
+	AnchorType         string
+	TripDayID          string
+	ScheduleItemID     string
+	ExpenseDate        pgtype.Date
+	DisplayTitle       string
+	TripPlaceID        string
+	PlaceName          string
+	PlaceAddress       string
+	PlaceType          string
+	PlaceSource        string
+	AmountMinor        int64
+	Currency           string
+	PayerParticipantID string
+	PayerDisplayName   string
+	PayerSource        string
+	SplitPolicy        string
+	CreatedAt          pgtype.Timestamptz
 }
 
 func (q *Queries) ListDayExpensesByTripDay(ctx context.Context, arg ListDayExpensesByTripDayParams) ([]ListDayExpensesByTripDayRow, error) {
@@ -383,12 +443,22 @@ func (q *Queries) ListDayExpensesByTripDay(ctx context.Context, arg ListDayExpen
 		var i ListDayExpensesByTripDayRow
 		if err := rows.Scan(
 			&i.ID,
+			&i.AnchorType,
+			&i.TripDayID,
+			&i.ScheduleItemID,
+			&i.ExpenseDate,
+			&i.DisplayTitle,
+			&i.TripPlaceID,
 			&i.PlaceName,
 			&i.PlaceAddress,
 			&i.PlaceType,
+			&i.PlaceSource,
 			&i.AmountMinor,
 			&i.Currency,
+			&i.PayerParticipantID,
 			&i.PayerDisplayName,
+			&i.PayerSource,
+			&i.SplitPolicy,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err

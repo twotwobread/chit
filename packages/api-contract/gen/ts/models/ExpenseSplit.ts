@@ -2,9 +2,9 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
+import type { ExpenseParticipantDisplay } from './ExpenseParticipantDisplay';
 export type ExpenseSplit = {
-    participantId: string | null;
-    displayName: string;
+    participant: ExpenseParticipantDisplay;
     amountMinor: number;
 };
 

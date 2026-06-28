@@ -113,6 +113,154 @@ func TestListScheduleItemsByTripDayFiltersSortsAndJoinsPlaces(t *testing.T) {
 	}
 }
 
+func TestExpenseDisplayUsesLiveRowsThenFallback(t *testing.T) {
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("DATABASE_URL is required for storage integration test")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	store, err := Open(ctx, databaseURL)
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer store.Close()
+
+	var ownerUserID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO users (display_name)
+		VALUES ('민수')
+		RETURNING id::text
+	`).Scan(&ownerUserID); err != nil {
+		t.Fatalf("insert owner user: %v", err)
+	}
+	var memberUserID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO users (display_name)
+		VALUES ('지영')
+		RETURNING id::text
+	`).Scan(&memberUserID); err != nil {
+		t.Fatalf("insert member user: %v", err)
+	}
+
+	var tripID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO trips (name, start_date, end_date, default_currency, created_by)
+		VALUES ('지출 표시 테스트 여행', '2026-07-10', '2026-07-13', 'JPY', $1::uuid)
+		RETURNING id::text
+	`, ownerUserID).Scan(&tripID); err != nil {
+		t.Fatalf("insert trip: %v", err)
+	}
+	defer func() {
+		_, _ = store.pool.Exec(context.Background(), `DELETE FROM trips WHERE id = $1::uuid`, tripID)
+		_, _ = store.pool.Exec(context.Background(), `DELETE FROM users WHERE id IN ($1::uuid, $2::uuid)`, ownerUserID, memberUserID)
+	}()
+
+	var ownerParticipantID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO trip_participants (trip_id, user_id, role, display_name, joined_at)
+		VALUES ($1::uuid, $2::uuid, 'owner', '민수', '2026-06-22T09:00:00Z')
+		RETURNING id::text
+	`, tripID, ownerUserID).Scan(&ownerParticipantID); err != nil {
+		t.Fatalf("insert owner participant: %v", err)
+	}
+	var memberParticipantID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO trip_participants (trip_id, user_id, role, display_name, joined_at)
+		VALUES ($1::uuid, $2::uuid, 'member', '지영', '2026-06-22T10:00:00Z')
+		RETURNING id::text
+	`, tripID, memberUserID).Scan(&memberParticipantID); err != nil {
+		t.Fatalf("insert member participant: %v", err)
+	}
+
+	var placeID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO trip_places (trip_id, name, address, place_type)
+		VALUES ($1::uuid, '도톤보리', 'Dotonbori', 'food')
+		RETURNING id::text
+	`, tripID).Scan(&placeID); err != nil {
+		t.Fatalf("insert trip place: %v", err)
+	}
+	tripDayID := tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-11")
+
+	var scheduleItemID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, item_order, rank, version)
+		VALUES ($1::uuid, $2::uuid, $3::uuid, 1, '0000000000000001024', 1)
+		RETURNING id::text
+	`, tripID, tripDayID, placeID).Scan(&scheduleItemID); err != nil {
+		t.Fatalf("insert schedule item: %v", err)
+	}
+
+	created, err := store.CreateQuickExpense(ctx, trip.CreateQuickExpenseRecord{
+		TripID:             tripID,
+		TripDayID:          tripDayID,
+		ScheduleItemID:     scheduleItemID,
+		AmountMinor:        1001,
+		PayerParticipantID: ownerParticipantID,
+		ParticipantIDs:     []string{ownerParticipantID, memberParticipantID},
+		CreatedBy:          ownerUserID,
+	})
+	if err != nil {
+		t.Fatalf("create quick expense: %v", err)
+	}
+	if created.Expense.SplitPolicy != trip.ExpenseSplitPolicyEqual || created.Expense.Place == nil || created.Expense.Place.Source != trip.ExpenseDisplaySourceLive || created.Expense.Payer.Source != trip.ExpenseDisplaySourceLive {
+		t.Fatalf("expected live canonical quick-create response, got %#v", created.Expense)
+	}
+
+	if _, err := store.pool.Exec(ctx, `UPDATE trip_places SET name = '라이브 라멘' WHERE id = $1::uuid`, placeID); err != nil {
+		t.Fatalf("update place live name: %v", err)
+	}
+	if _, err := store.pool.Exec(ctx, `
+		UPDATE trip_participants
+		SET display_name = CASE id
+		  WHEN $1::uuid THEN '라이브 민수'
+		  WHEN $2::uuid THEN '라이브 지영'
+		  ELSE display_name
+		END
+		WHERE id IN ($1::uuid, $2::uuid)
+	`, ownerParticipantID, memberParticipantID); err != nil {
+		t.Fatalf("update participant live names: %v", err)
+	}
+
+	liveExpenses, err := store.ListDayExpensesByTripDay(ctx, tripID, tripDayID)
+	if err != nil {
+		t.Fatalf("list live expenses: %v", err)
+	}
+	if len(liveExpenses) != 1 {
+		t.Fatalf("expected one live expense, got %#v", liveExpenses)
+	}
+	live := liveExpenses[0]
+	if live.DisplayTitle != "라이브 라멘" || live.Place == nil || live.Place.Name != "라이브 라멘" || live.Place.Source != trip.ExpenseDisplaySourceLive || live.Payer.DisplayName != "라이브 민수" || live.Payer.Source != trip.ExpenseDisplaySourceLive || len(live.Splits) != 2 || live.Splits[1].Participant.DisplayName != "라이브 지영" || live.Splits[1].Participant.Source != trip.ExpenseDisplaySourceLive {
+		t.Fatalf("expected live display values, got %#v", live)
+	}
+
+	deleted, err := store.DeleteScheduleItem(ctx, tripID, tripDayID, scheduleItemID)
+	if err != nil {
+		t.Fatalf("soft delete schedule item: %v", err)
+	}
+	if !deleted {
+		t.Fatal("expected schedule item delete to succeed")
+	}
+	if _, err := store.pool.Exec(ctx, `DELETE FROM trip_participants WHERE id IN ($1::uuid, $2::uuid)`, ownerParticipantID, memberParticipantID); err != nil {
+		t.Fatalf("delete participants: %v", err)
+	}
+
+	fallbackExpenses, err := store.ListDayExpensesByTripDay(ctx, tripID, tripDayID)
+	if err != nil {
+		t.Fatalf("list fallback expenses: %v", err)
+	}
+	if len(fallbackExpenses) != 1 {
+		t.Fatalf("expected one fallback expense, got %#v", fallbackExpenses)
+	}
+	fallback := fallbackExpenses[0]
+	if fallback.DisplayTitle != "라이브 라멘" || fallback.Place == nil || fallback.Place.Name != "라이브 라멘" || fallback.Place.Source != trip.ExpenseDisplaySourceFallback || fallback.Payer.DisplayName != "민수" || fallback.Payer.Source != trip.ExpenseDisplaySourceFallback || fallback.Payer.ParticipantID != nil || len(fallback.Splits) != 2 || fallback.Splits[1].Participant.DisplayName != "지영" || fallback.Splits[1].Participant.Source != trip.ExpenseDisplaySourceFallback || fallback.Splits[1].Participant.ParticipantID != nil {
+		t.Fatalf("expected fallback display values, got %#v", fallback)
+	}
+}
+
 func TestMarkScheduleItemArrivedFirstPendingIdempotentAndDuplicatePlaceIndependent(t *testing.T) {
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {

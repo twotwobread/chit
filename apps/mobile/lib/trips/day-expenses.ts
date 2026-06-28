@@ -59,9 +59,9 @@ export function buildDayExpensesViewModel({
     title: sectionTitle,
     rows: expenses.map((expense) => ({
       id: expense.id,
-      placeName: expense.place.name.trim(),
+      placeName: displayTitle(expense),
       amountLabel: formatMoney(expense.amountMinor, expense.currency),
-      detailLine: `결제 ${expense.payerDisplayName.trim()} · ${buildSplitSummary(expense.splits, expense.currency)}`,
+      detailLine: `결제 ${normalizeDisplayName(expense.payer.displayName)} · ${buildSplitSummary(expense.splits, expense.currency)}`,
     })),
   };
 }
@@ -93,5 +93,17 @@ export function buildSplitSummary(splits: DayExpenseSplitListItem[], currency: D
 }
 
 function splitLabel(split: DayExpenseSplitListItem, currency: DayExpenseListItem['currency']): string {
-  return `${split.displayName.trim()} ${formatMoney(split.amountMinor, currency)}`;
+  return `${normalizeDisplayName(split.participant.displayName)} ${formatMoney(split.amountMinor, currency)}`;
+}
+
+function displayTitle(expense: DayExpenseListItem): string {
+  const title = expense.displayTitle.trim();
+  if (title.length > 0) {
+    return title;
+  }
+  return expense.place?.name.trim() || '지출';
+}
+
+function normalizeDisplayName(value: string): string {
+  return value.trim() || '여행자';
 }

@@ -51,6 +51,17 @@ const (
 	ExpenseAnchorTypeTripDay      ExpenseAnchorType = "trip_day"
 )
 
+// Defines values for ExpenseDisplaySource.
+const (
+	Fallback ExpenseDisplaySource = "fallback"
+	Live     ExpenseDisplaySource = "live"
+)
+
+// Defines values for ExpenseSplitPolicy.
+const (
+	Equal ExpenseSplitPolicy = "equal"
+)
+
 // Defines values for HealthResponseStatus.
 const (
 	HealthResponseStatusOk HealthResponseStatus = "ok"
@@ -258,20 +269,30 @@ type CreateTripResponse struct {
 
 // DayExpenseListItem defines model for DayExpenseListItem.
 type DayExpenseListItem struct {
-	AmountMinor      int64                     `json:"amountMinor"`
-	CreatedAt        time.Time                 `json:"createdAt"`
-	Currency         SupportedCurrency         `json:"currency"`
-	Id               string                    `json:"id"`
-	PayerDisplayName string                    `json:"payerDisplayName"`
-	Place            ExpensePlaceSnapshot      `json:"place"`
-	Splits           []DayExpenseSplitListItem `json:"splits"`
+	AmountMinor int64             `json:"amountMinor"`
+	AnchorType  ExpenseAnchorType `json:"anchorType"`
+	CreatedAt   time.Time         `json:"createdAt"`
+	Currency    SupportedCurrency `json:"currency"`
+
+	// DisplayTitle User-facing title resolved by the server. For current schedule-item quick expenses this is the linked place/schedule display name or fallback place name.
+	DisplayTitle   string                    `json:"displayTitle"`
+	ExpenseDate    openapi_types.Date        `json:"expenseDate"`
+	Id             string                    `json:"id"`
+	Payer          ExpenseParticipantDisplay `json:"payer"`
+	Place          *ExpensePlaceDisplay      `json:"place"`
+	ScheduleItemId *string                   `json:"scheduleItemId"`
+
+	// SplitPolicy Persisted split policy for current quick expenses. Future custom split support may add enum values.
+	SplitPolicy ExpenseSplitPolicy        `json:"splitPolicy"`
+	Splits      []DayExpenseSplitListItem `json:"splits"`
+	TripDayId   *string                   `json:"tripDayId"`
 }
 
 // DayExpenseSplitListItem defines model for DayExpenseSplitListItem.
 type DayExpenseSplitListItem struct {
-	AmountMinor int64  `json:"amountMinor"`
-	DisplayName string `json:"displayName"`
-	SplitOrder  int    `json:"splitOrder"`
+	AmountMinor int64                     `json:"amountMinor"`
+	Participant ExpenseParticipantDisplay `json:"participant"`
+	SplitOrder  int                       `json:"splitOrder"`
 }
 
 // DeviceInfo defines model for DeviceInfo.
@@ -291,42 +312,62 @@ type ErrorResponse struct {
 
 // Expense defines model for Expense.
 type Expense struct {
-	AmountMinor        int64                `json:"amountMinor"`
-	AnchorType         ExpenseAnchorType    `json:"anchorType"`
-	CreatedAt          time.Time            `json:"createdAt"`
-	Currency           SupportedCurrency    `json:"currency"`
-	ExpenseDate        openapi_types.Date   `json:"expenseDate"`
-	Id                 string               `json:"id"`
-	PayerDisplayName   string               `json:"payerDisplayName"`
-	PayerParticipantId *string              `json:"payerParticipantId"`
-	Place              ExpensePlaceSnapshot `json:"place"`
+	AmountMinor int64             `json:"amountMinor"`
+	AnchorType  ExpenseAnchorType `json:"anchorType"`
+	CreatedAt   time.Time         `json:"createdAt"`
+	Currency    SupportedCurrency `json:"currency"`
+
+	// DisplayTitle User-facing title resolved by the server.
+	DisplayTitle string                    `json:"displayTitle"`
+	ExpenseDate  openapi_types.Date        `json:"expenseDate"`
+	Id           string                    `json:"id"`
+	Payer        ExpenseParticipantDisplay `json:"payer"`
+	Place        *ExpensePlaceDisplay      `json:"place"`
 
 	// ScheduleItemId Source schedule item. Present for schedule-item expenses; may become null if later detached to trip-level.
-	ScheduleItemId *string        `json:"scheduleItemId"`
-	Splits         []ExpenseSplit `json:"splits"`
-	TripDayId      *string        `json:"tripDayId"`
-	TripId         string         `json:"tripId"`
+	ScheduleItemId *string `json:"scheduleItemId"`
 
-	// TripPlaceId Source trip place. Present at creation; may become null later if the source place is deleted and history is retained.
-	TripPlaceId *string `json:"tripPlaceId"`
+	// SplitPolicy Persisted split policy for current quick expenses. Future custom split support may add enum values.
+	SplitPolicy ExpenseSplitPolicy `json:"splitPolicy"`
+	Splits      []ExpenseSplit     `json:"splits"`
+	TripDayId   *string            `json:"tripDayId"`
+	TripId      string             `json:"tripId"`
 }
 
-// ExpenseAnchorType defines model for Expense.AnchorType.
+// ExpenseAnchorType defines model for ExpenseAnchorType.
 type ExpenseAnchorType string
 
-// ExpensePlaceSnapshot defines model for ExpensePlaceSnapshot.
-type ExpensePlaceSnapshot struct {
-	Address   string        `json:"address"`
-	Name      string        `json:"name"`
-	PlaceType TripPlaceType `json:"placeType"`
+// ExpenseDisplaySource Display value source for diagnostics and tests. Do not render this as user-visible copy.
+type ExpenseDisplaySource string
+
+// ExpenseParticipantDisplay defines model for ExpenseParticipantDisplay.
+type ExpenseParticipantDisplay struct {
+	DisplayName   string  `json:"displayName"`
+	ParticipantId *string `json:"participantId"`
+
+	// Source Display value source for diagnostics and tests. Do not render this as user-visible copy.
+	Source ExpenseDisplaySource `json:"source"`
+}
+
+// ExpensePlaceDisplay defines model for ExpensePlaceDisplay.
+type ExpensePlaceDisplay struct {
+	Address   *string        `json:"address"`
+	Name      string         `json:"name"`
+	PlaceType *TripPlaceType `json:"placeType"`
+
+	// Source Display value source for diagnostics and tests. Do not render this as user-visible copy.
+	Source      ExpenseDisplaySource `json:"source"`
+	TripPlaceId *string              `json:"tripPlaceId"`
 }
 
 // ExpenseSplit defines model for ExpenseSplit.
 type ExpenseSplit struct {
-	AmountMinor   int64   `json:"amountMinor"`
-	DisplayName   string  `json:"displayName"`
-	ParticipantId *string `json:"participantId"`
+	AmountMinor int64                     `json:"amountMinor"`
+	Participant ExpenseParticipantDisplay `json:"participant"`
 }
+
+// ExpenseSplitPolicy Persisted split policy for current quick expenses. Future custom split support may add enum values.
+type ExpenseSplitPolicy string
 
 // GeoBounds defines model for GeoBounds.
 type GeoBounds struct {

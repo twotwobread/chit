@@ -174,18 +174,24 @@ func listDayExpensesResponseToOpenAPI(result trip.ListDayExpensesResult) openapi
 		for _, split := range expense.Splits {
 			splits = append(splits, openapi.DayExpenseSplitListItem{
 				SplitOrder:  split.SplitOrder,
-				DisplayName: split.DisplayName,
+				Participant: expenseParticipantDisplayToOpenAPI(split.Participant),
 				AmountMinor: split.AmountMinor,
 			})
 		}
 		expenses = append(expenses, openapi.DayExpenseListItem{
-			Id:               expense.ID,
-			Place:            expensePlaceSnapshotToOpenAPI(expense.Place),
-			AmountMinor:      expense.AmountMinor,
-			Currency:         openapi.SupportedCurrency(expense.Currency),
-			PayerDisplayName: expense.PayerDisplayName,
-			Splits:           splits,
-			CreatedAt:        expense.CreatedAt.UTC(),
+			Id:             expense.ID,
+			AnchorType:     openapi.ExpenseAnchorType(expense.AnchorType),
+			TripDayId:      expense.TripDayID,
+			ScheduleItemId: expense.ScheduleItemID,
+			ExpenseDate:    dateToOpenAPI(expense.ExpenseDate),
+			DisplayTitle:   expense.DisplayTitle,
+			Place:          expensePlaceDisplayToOpenAPI(expense.Place),
+			AmountMinor:    expense.AmountMinor,
+			Currency:       openapi.SupportedCurrency(expense.Currency),
+			Payer:          expenseParticipantDisplayToOpenAPI(expense.Payer),
+			SplitPolicy:    openapi.ExpenseSplitPolicy(expense.SplitPolicy),
+			Splits:         splits,
+			CreatedAt:      expense.CreatedAt.UTC(),
 		})
 	}
 
@@ -196,34 +202,51 @@ func expenseToOpenAPI(expense trip.Expense) openapi.Expense {
 	splits := make([]openapi.ExpenseSplit, 0, len(expense.Splits))
 	for _, split := range expense.Splits {
 		splits = append(splits, openapi.ExpenseSplit{
-			ParticipantId: split.ParticipantID,
-			DisplayName:   split.DisplayName,
-			AmountMinor:   split.AmountMinor,
+			Participant: expenseParticipantDisplayToOpenAPI(split.Participant),
+			AmountMinor: split.AmountMinor,
 		})
 	}
 	return openapi.Expense{
-		Id:                 expense.ID,
-		TripId:             expense.TripID,
-		AnchorType:         openapi.ExpenseAnchorType(expense.AnchorType),
-		TripDayId:          expense.TripDayID,
-		ScheduleItemId:     expense.ScheduleItemID,
-		ExpenseDate:        dateToOpenAPI(expense.ExpenseDate),
-		TripPlaceId:        expense.TripPlaceID,
-		Place:              expensePlaceSnapshotToOpenAPI(expense.Place),
-		AmountMinor:        expense.AmountMinor,
-		Currency:           openapi.SupportedCurrency(expense.Currency),
-		PayerParticipantId: expense.PayerParticipantID,
-		PayerDisplayName:   expense.PayerDisplayName,
-		Splits:             splits,
-		CreatedAt:          expense.CreatedAt.UTC(),
+		Id:             expense.ID,
+		TripId:         expense.TripID,
+		AnchorType:     openapi.ExpenseAnchorType(expense.AnchorType),
+		TripDayId:      expense.TripDayID,
+		ScheduleItemId: expense.ScheduleItemID,
+		ExpenseDate:    dateToOpenAPI(expense.ExpenseDate),
+		DisplayTitle:   expense.DisplayTitle,
+		Place:          expensePlaceDisplayToOpenAPI(expense.Place),
+		AmountMinor:    expense.AmountMinor,
+		Currency:       openapi.SupportedCurrency(expense.Currency),
+		Payer:          expenseParticipantDisplayToOpenAPI(expense.Payer),
+		SplitPolicy:    openapi.ExpenseSplitPolicy(expense.SplitPolicy),
+		Splits:         splits,
+		CreatedAt:      expense.CreatedAt.UTC(),
 	}
 }
 
-func expensePlaceSnapshotToOpenAPI(place trip.ExpensePlaceSnapshot) openapi.ExpensePlaceSnapshot {
-	return openapi.ExpensePlaceSnapshot{
-		Name:      place.Name,
-		Address:   place.Address,
-		PlaceType: openapi.TripPlaceType(place.PlaceType),
+func expensePlaceDisplayToOpenAPI(place *trip.ExpensePlaceDisplay) *openapi.ExpensePlaceDisplay {
+	if place == nil {
+		return nil
+	}
+	var placeType *openapi.TripPlaceType
+	if place.PlaceType != nil {
+		value := openapi.TripPlaceType(*place.PlaceType)
+		placeType = &value
+	}
+	return &openapi.ExpensePlaceDisplay{
+		TripPlaceId: place.TripPlaceID,
+		Name:        place.Name,
+		Address:     place.Address,
+		PlaceType:   placeType,
+		Source:      openapi.ExpenseDisplaySource(place.Source),
+	}
+}
+
+func expenseParticipantDisplayToOpenAPI(participant trip.ExpenseParticipantDisplay) openapi.ExpenseParticipantDisplay {
+	return openapi.ExpenseParticipantDisplay{
+		ParticipantId: participant.ParticipantID,
+		DisplayName:   participant.DisplayName,
+		Source:        openapi.ExpenseDisplaySource(participant.Source),
 	}
 }
 

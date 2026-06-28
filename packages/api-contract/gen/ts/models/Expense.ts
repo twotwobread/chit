@@ -2,13 +2,16 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-import type { ExpensePlaceSnapshot } from './ExpensePlaceSnapshot';
+import type { ExpenseAnchorType } from './ExpenseAnchorType';
+import type { ExpenseParticipantDisplay } from './ExpenseParticipantDisplay';
+import type { ExpensePlaceDisplay } from './ExpensePlaceDisplay';
 import type { ExpenseSplit } from './ExpenseSplit';
+import type { ExpenseSplitPolicy } from './ExpenseSplitPolicy';
 import type { SupportedCurrency } from './SupportedCurrency';
 export type Expense = {
     id: string;
     tripId: string;
-    anchorType: 'trip' | 'trip_day' | 'schedule_item';
+    anchorType: ExpenseAnchorType;
     tripDayId: string | null;
     /**
      * Source schedule item. Present for schedule-item expenses; may become null if later detached to trip-level.
@@ -16,14 +19,14 @@ export type Expense = {
     scheduleItemId: string | null;
     expenseDate: string;
     /**
-     * Source trip place. Present at creation; may become null later if the source place is deleted and history is retained.
+     * User-facing title resolved by the server.
      */
-    tripPlaceId: string | null;
-    place: ExpensePlaceSnapshot;
+    displayTitle: string;
+    place: ExpensePlaceDisplay | null;
     amountMinor: number;
     currency: SupportedCurrency;
-    payerParticipantId: string | null;
-    payerDisplayName: string;
+    payer: ExpenseParticipantDisplay;
+    splitPolicy: ExpenseSplitPolicy;
     splits: Array<ExpenseSplit>;
     createdAt: string;
 };

@@ -338,33 +338,46 @@ type RestoreScheduleItemResult struct {
 	Items []ScheduleItem
 }
 
-type ExpensePlaceSnapshot struct {
-	Name      string
-	Address   string
-	PlaceType string
+const (
+	ExpenseDisplaySourceLive     = "live"
+	ExpenseDisplaySourceFallback = "fallback"
+	ExpenseSplitPolicyEqual      = "equal"
+)
+
+type ExpensePlaceDisplay struct {
+	TripPlaceID *string
+	Name        string
+	Address     *string
+	PlaceType   *string
+	Source      string
+}
+
+type ExpenseParticipantDisplay struct {
+	ParticipantID *string
+	DisplayName   string
+	Source        string
 }
 
 type ExpenseSplit struct {
-	ParticipantID *string
-	DisplayName   string
-	AmountMinor   int64
+	Participant ExpenseParticipantDisplay
+	AmountMinor int64
 }
 
 type Expense struct {
-	ID                 string
-	TripID             string
-	AnchorType         string
-	TripDayID          *string
-	ScheduleItemID     *string
-	ExpenseDate        string
-	TripPlaceID        *string
-	Place              ExpensePlaceSnapshot
-	AmountMinor        int64
-	Currency           string
-	PayerParticipantID *string
-	PayerDisplayName   string
-	Splits             []ExpenseSplit
-	CreatedAt          time.Time
+	ID             string
+	TripID         string
+	AnchorType     string
+	TripDayID      *string
+	ScheduleItemID *string
+	ExpenseDate    string
+	DisplayTitle   string
+	Place          *ExpensePlaceDisplay
+	AmountMinor    int64
+	Currency       string
+	Payer          ExpenseParticipantDisplay
+	SplitPolicy    string
+	Splits         []ExpenseSplit
+	CreatedAt      time.Time
 }
 
 type CreateQuickExpenseResult struct {
@@ -373,18 +386,24 @@ type CreateQuickExpenseResult struct {
 
 type DayExpenseSplitListItem struct {
 	SplitOrder  int
-	DisplayName string
+	Participant ExpenseParticipantDisplay
 	AmountMinor int64
 }
 
 type DayExpenseListItem struct {
-	ID               string
-	Place            ExpensePlaceSnapshot
-	AmountMinor      int64
-	Currency         string
-	PayerDisplayName string
-	Splits           []DayExpenseSplitListItem
-	CreatedAt        time.Time
+	ID             string
+	AnchorType     string
+	TripDayID      *string
+	ScheduleItemID *string
+	ExpenseDate    string
+	DisplayTitle   string
+	Place          *ExpensePlaceDisplay
+	AmountMinor    int64
+	Currency       string
+	Payer          ExpenseParticipantDisplay
+	SplitPolicy    string
+	Splits         []DayExpenseSplitListItem
+	CreatedAt      time.Time
 }
 
 type ListDayExpensesResult struct {

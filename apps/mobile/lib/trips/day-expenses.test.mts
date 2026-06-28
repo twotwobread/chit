@@ -5,23 +5,33 @@ import type { DayExpenseListItem } from '@i-um/api-contract';
 
 import { buildDayExpensesViewModel, buildSplitSummary, dayExpensesFailureState } from './day-expenses.ts';
 
+function participant(displayName: string, participantId: string | null = 'participant-a') {
+  return { participantId, displayName, source: participantId ? 'live' : 'fallback' } as const;
+}
+
 function expense(overrides: Partial<DayExpenseListItem> = {}): DayExpenseListItem {
   return {
     id: 'expense-a',
-    place: { name: '도톤보리', address: 'Dotonbori', placeType: 'food' },
+    anchorType: 'schedule_item',
+    tripDayId: 'day-a',
+    scheduleItemId: 'item-a',
+    expenseDate: '2026-07-10',
+    displayTitle: '도톤보리',
+    place: { tripPlaceId: 'place-a', name: '도톤보리', address: 'Dotonbori', placeType: 'food', source: 'live' },
     amountMinor: 1200,
     currency: 'JPY',
-    payerDisplayName: '민수',
+    payer: participant('민수', 'payer-a'),
+    splitPolicy: 'equal',
     splits: [
-      { splitOrder: 1, displayName: '민수', amountMinor: 600 },
-      { splitOrder: 2, displayName: '지영', amountMinor: 600 },
+      { splitOrder: 1, participant: participant('민수', 'payer-a'), amountMinor: 600 },
+      { splitOrder: 2, participant: participant('지영', 'participant-b'), amountMinor: 600 },
     ],
     createdAt: '2026-07-10T12:00:00Z',
     ...overrides,
   };
 }
 
-test('builds compact read-only day expense rows from API display snapshots', () => {
+test('builds compact read-only day expense rows from canonical API display data', () => {
   const viewModel = buildDayExpensesViewModel({
     tripId: 'trip-a',
     date: '2026-07-10',
@@ -75,14 +85,14 @@ test('builds empty day expense state with quick expense route', () => {
 
 test('formats split summaries for one, two, and three or more participants', () => {
   assert.equal(
-    buildSplitSummary([{ splitOrder: 1, displayName: '민수', amountMinor: 1200 }], 'JPY'),
+    buildSplitSummary([{ splitOrder: 1, participant: participant('민수'), amountMinor: 1200 }], 'JPY'),
     '분담 민수 1,200엔',
   );
   assert.equal(
     buildSplitSummary(
       [
-        { splitOrder: 2, displayName: '지영', amountMinor: 500 },
-        { splitOrder: 1, displayName: '민수', amountMinor: 501 },
+        { splitOrder: 2, participant: participant('지영', 'participant-b'), amountMinor: 500 },
+        { splitOrder: 1, participant: participant('민수', 'participant-a'), amountMinor: 501 },
       ],
       'JPY',
     ),
@@ -91,9 +101,9 @@ test('formats split summaries for one, two, and three or more participants', () 
   assert.equal(
     buildSplitSummary(
       [
-        { splitOrder: 1, displayName: '민수', amountMinor: 400 },
-        { splitOrder: 2, displayName: '지영', amountMinor: 400 },
-        { splitOrder: 3, displayName: '유나', amountMinor: 400 },
+        { splitOrder: 1, participant: participant('민수', 'participant-a'), amountMinor: 400 },
+        { splitOrder: 2, participant: participant('지영', 'participant-b'), amountMinor: 400 },
+        { splitOrder: 3, participant: participant('유나', 'participant-c'), amountMinor: 400 },
       ],
       'JPY',
     ),
@@ -109,7 +119,7 @@ test('formats supported currencies in expense rows', () => {
       expense({
         currency: 'KRW',
         amountMinor: 18500,
-        splits: [{ splitOrder: 1, displayName: '민수', amountMinor: 18500 }],
+        splits: [{ splitOrder: 1, participant: participant('민수'), amountMinor: 18500 }],
       }),
     ],
   });
@@ -121,11 +131,11 @@ test('formats supported currencies in expense rows', () => {
   assert.equal(viewModel.rows[0].amountLabel, '18,500원');
   assert.equal(viewModel.rows[0].detailLine, '결제 민수 · 분담 민수 18,500원');
   assert.equal(
-    buildSplitSummary([{ splitOrder: 1, displayName: 'Alex', amountMinor: 1234 }], 'USD'),
+    buildSplitSummary([{ splitOrder: 1, participant: participant('Alex'), amountMinor: 1234 }], 'USD'),
     '분담 Alex $12.34',
   );
   assert.equal(
-    buildSplitSummary([{ splitOrder: 1, displayName: 'Alex', amountMinor: 1234 }], 'EUR'),
+    buildSplitSummary([{ splitOrder: 1, participant: participant('Alex'), amountMinor: 1234 }], 'EUR'),
     '분담 Alex €12.34',
   );
 });

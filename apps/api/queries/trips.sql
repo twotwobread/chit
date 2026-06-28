@@ -532,14 +532,48 @@ JOIN trip_days td
  AND td.trip_id = target.trip_id;
 
 -- name: SoftDeleteScheduleItemByTripDayAndID :one
-UPDATE schedule_items
-SET deleted_at = now(),
-    updated_at = now()
-WHERE trip_id = sqlc.arg(trip_id)::uuid
-  AND trip_day_id = sqlc.arg(trip_day_id)::uuid
-  AND id = sqlc.arg(schedule_item_id)::uuid
-  AND deleted_at IS NULL
-RETURNING trip_place_id::text;
+WITH target AS (
+  SELECT
+    si.id,
+    si.trip_id,
+    si.trip_day_id,
+    tp.id AS trip_place_id,
+    tp.name AS place_name,
+    tp.address AS place_address,
+    tp.place_type
+  FROM schedule_items si
+  JOIN trip_places tp
+    ON tp.id = si.trip_place_id
+   AND tp.trip_id = si.trip_id
+  WHERE si.trip_id = sqlc.arg(trip_id)::uuid
+    AND si.trip_day_id = sqlc.arg(trip_day_id)::uuid
+    AND si.id = sqlc.arg(schedule_item_id)::uuid
+    AND si.deleted_at IS NULL
+), refreshed_expenses AS (
+  UPDATE expenses e
+  SET trip_place_id = target.trip_place_id,
+      place_name = target.place_name,
+      place_address = target.place_address,
+      place_type = target.place_type,
+      updated_at = now()
+  FROM target
+  WHERE e.trip_id = target.trip_id
+    AND e.trip_day_id = target.trip_day_id
+    AND e.schedule_item_id = target.id
+    AND e.anchor_type = 'schedule_item'
+  RETURNING e.id
+), deleted_item AS (
+  UPDATE schedule_items si
+  SET deleted_at = now(),
+      updated_at = now()
+  FROM target
+  WHERE si.trip_id = target.trip_id
+    AND si.trip_day_id = target.trip_day_id
+    AND si.id = target.id
+  RETURNING target.trip_place_id::text AS trip_place_id
+)
+SELECT trip_place_id
+FROM deleted_item;
 
 -- name: CountScheduleItemsByTripPlaceID :one
 SELECT count(*)::int AS total_count
