@@ -11,11 +11,20 @@ export type AppBarProps = {
   caption?: string;
   leadingAction?: 'back' | 'home';
   members?: AppBarMember[];
+  onPressMembers?: () => void;
   onPressTitle?: () => void;
   onBack?: () => void;
 };
 
-export function AppBar({ caption, leadingAction = 'back', members = [], onBack, onPressTitle, tripName }: AppBarProps) {
+export function AppBar({
+  caption,
+  leadingAction = 'back',
+  members = [],
+  onBack,
+  onPressMembers,
+  onPressTitle,
+  tripName,
+}: AppBarProps) {
   const titleContent = (
     <>
       <View style={styles.titleRow}>
@@ -57,7 +66,19 @@ export function AppBar({ caption, leadingAction = 'back', members = [], onBack, 
       )}
 
       <View style={[styles.side, styles.sideEnd]}>
-        {members.length > 0 ? <AvatarGroup members={members} size={27} /> : null}
+        {members.length > 0 && onPressMembers ? (
+          <Pressable
+            accessibilityLabel="동행자 보기"
+            accessibilityRole="button"
+            hitSlop={8}
+            onPress={onPressMembers}
+            style={({ pressed }) => (pressed ? styles.pressed : null)}
+          >
+            <AvatarGroup members={members} size={27} />
+          </Pressable>
+        ) : members.length > 0 ? (
+          <AvatarGroup members={members} size={27} />
+        ) : null}
       </View>
     </View>
   );
