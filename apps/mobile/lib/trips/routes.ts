@@ -2,6 +2,8 @@ import type { Href } from 'expo-router';
 
 export type TripRootTab = 'today' | 'map' | 'itinerary' | 'settle';
 
+const TRIP_ROOT_TABS: readonly TripRootTab[] = ['today', 'map', 'itinerary', 'settle'];
+
 export type TripHiddenRouteKind =
   | 'detail'
   | 'edit'
@@ -49,6 +51,10 @@ export function tripEditPath(tripId: string): `/trips/${string}/edit` {
 
 export function tripParticipantsPath(tripId: string): `/trips/${string}/participants` {
   return `/trips/${tripId}/participants`;
+}
+
+export function isTripRootTab(value: string): value is TripRootTab {
+  return TRIP_ROOT_TABS.includes(value as TripRootTab);
 }
 
 export function tripTabPath(tripId: string, tab: TripRootTab): Href {

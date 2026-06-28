@@ -196,6 +196,8 @@ const styles = StyleSheet.create({
     marginTop: theme.space[1] + 1,
   },
   card: {
+    width: '100%',
+    maxWidth: theme.layout.cardMaxW,
     backgroundColor: theme.color.green[900],
     borderRadius: theme.radius['2xl'],
     gap: theme.space[3],
