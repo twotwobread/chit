@@ -1,5 +1,6 @@
 import type { TripListItem, TripParticipantRole } from '@i-um/api-contract';
 
+import { tripDetailPath } from './routes';
 import { groupTripsByStatus, localDateString, type TripStatusSection } from './status';
 
 export type MyTripCardViewModel = TripListItem & {
@@ -56,6 +57,4 @@ export function participantCountLabel(count: number): string {
   return `참여자 ${count}명`;
 }
 
-export function tripDetailPath(tripId: string): `/trips/${string}` {
-  return `/trips/${tripId}`;
-}
+export { tripDetailPath };

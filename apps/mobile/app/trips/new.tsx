@@ -9,6 +9,7 @@ import { Card, PrimaryButton, SecondaryButton, theme } from '../../lib/design';
 import { createTrip } from '../../lib/trips/client';
 import { dateFromString, isValidDate, monthStringFromDate, todayString } from '../../lib/trips/date';
 import { TripDateFieldButton, TripDatePicker, TripFormField } from '../../lib/trips/date-picker';
+import { tripDetailPath } from '../../lib/trips/routes';
 
 type FormState = {
   name: string;
@@ -113,7 +114,7 @@ export default function NewTripScreen() {
             </Text>
             <Text style={styles.summaryText}>기본 통화: {created.trip.defaultCurrency}</Text>
           </View>
-          <PrimaryButton label="여행 상세 보기" onPress={() => router.push(`/trips/${created.trip.id}`)} />
+          <PrimaryButton label="여행 상세 보기" onPress={() => router.push(tripDetailPath(created.trip.id))} />
           <SecondaryButton label="마이페이지에서 보기" onPress={() => router.push('/mypage')} />
           <SecondaryButton label="새 여행 만들기" onPress={reset} />
           <SecondaryButton label="홈으로" onPress={() => router.replace('/')} />

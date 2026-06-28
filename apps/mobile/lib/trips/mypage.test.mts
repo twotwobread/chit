@@ -122,9 +122,9 @@ test('shows an invited member trip with the existing member role label', () => {
   assert.equal(invitedTrip?.name, '초대받은 여행');
   assert.equal(invitedTrip?.roleLabel, '동행자');
   assert.equal(invitedTrip?.participantCountLabel, '참여자 2명');
-  assert.equal(tripDetailPath(invitedTrip?.id ?? ''), '/trips/trip-invited');
+  assert.equal(tripDetailPath(invitedTrip?.id ?? ''), '/trips/trip-invited/detail');
 });
 
-test('builds the existing trip detail route for current trip shortcut navigation', () => {
-  assert.equal(tripDetailPath('trip_123'), '/trips/trip_123');
+test('builds the canonical hidden trip detail route for trip management navigation', () => {
+  assert.equal(tripDetailPath('trip_123'), '/trips/trip_123/detail');
 });

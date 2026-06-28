@@ -19,6 +19,7 @@ import { theme } from '../lib/design';
 import { BottomMenu } from '../lib/navigation/BottomMenu';
 import { listMyTrips } from '../lib/trips/client';
 import { buildMyTripsSuccessViewModel, tripDetailPath } from '../lib/trips/mypage';
+import { tripTodayPath } from '../lib/trips/routes';
 
 type MyPageState =
   | { status: 'loading' }
@@ -294,7 +295,7 @@ function MyTripsSection({ state, onRetry }: { state: TripListState; onRetry: () 
             <Pressable
               accessibilityLabel={`${currentTrip.name} 여행 바로가기`}
               accessibilityRole="button"
-              onPress={() => router.push(tripDetailPath(currentTrip.id))}
+              onPress={() => router.push(tripTodayPath(currentTrip.id))}
               style={[styles.tripRow, styles.currentTripShortcut]}
             >
               <Text style={styles.currentTripLabel}>현재 진행 중인 여행</Text>

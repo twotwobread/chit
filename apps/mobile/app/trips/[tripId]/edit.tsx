@@ -9,6 +9,7 @@ import { getStoredSession } from '../../../lib/auth/session';
 import { Card, PrimaryButton, SecondaryButton, theme } from '../../../lib/design';
 import { getTripDetail, updateTrip } from '../../../lib/trips/client';
 import { dateFromString, monthStringFromDate, todayString } from '../../../lib/trips/date';
+import { tripDetailPath } from '../../../lib/trips/routes';
 import { TripDateFieldButton, TripDatePicker, TripFormField } from '../../../lib/trips/date-picker';
 import {
   buildUpdateTripRequest,
@@ -100,6 +101,14 @@ export default function EditTripScreen() {
     setActiveDateField(null);
   };
 
+  const returnToDetail = () => {
+    if (!tripId) {
+      router.replace('/');
+      return;
+    }
+    router.replace(tripDetailPath(tripId));
+  };
+
   const submit = async () => {
     if (!tripId || !form || !original) {
       return;
@@ -121,7 +130,7 @@ export default function EditTripScreen() {
     setSaveError(null);
     try {
       await updateTrip(tripId, request);
-      router.replace(`/trips/${tripId}`);
+      returnToDetail();
     } catch (error) {
       if (
         error instanceof MobileAuthError &&
@@ -273,7 +282,7 @@ export default function EditTripScreen() {
             onPress={() => void submit()}
           />
 
-          <SecondaryButton disabled={submitting} label="취소" onPress={() => router.replace(`/trips/${tripId}`)} />
+          <SecondaryButton disabled={submitting} label="취소" onPress={returnToDetail} />
         </Card>
       ) : null}
     </ScrollView>
