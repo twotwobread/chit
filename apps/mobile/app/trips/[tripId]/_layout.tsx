@@ -10,7 +10,8 @@ import { theme } from '../../../lib/design';
 import { AppBar } from '../../../lib/trip-ui/AppBar';
 import { TripSwitcherSheet } from '../../../lib/trip-ui/TripSwitcherSheet';
 import { getTripDetail, listMyTrips } from '../../../lib/trips/client';
-import { tripFallbackPathForPathname, tripTodayPath } from '../../../lib/trips/routes';
+import { markExplicitHomeIntent } from '../../../lib/trips/home-intent';
+import { isTripRootTabPath, tripFallbackPathForPathname, tripTodayPath } from '../../../lib/trips/routes';
 import { TripShellProvider, type TripShellState } from '../../../lib/trips/trip-shell-context';
 import { buildSwitchableTrips, buildTripAppBarMembers } from '../../../lib/trips/trip-tabs';
 
@@ -56,9 +57,17 @@ export default function TripLayout() {
   const detail = shellState.status === 'success' ? shellState.detail : null;
   const tripName = detail?.trip.name.trim() || '여행';
   const tripsForSheet = buildSwitchableTrips(switchableTrips, tripId ?? '');
+  const isRootTripTab = tripId ? isTripRootTabPath(pathname, tripId) : false;
 
   const handleBack = useCallback(() => {
     if (!tripId) {
+      markExplicitHomeIntent();
+      router.replace('/');
+      return;
+    }
+
+    if (isRootTripTab) {
+      markExplicitHomeIntent();
       router.replace('/');
       return;
     }
@@ -69,12 +78,13 @@ export default function TripLayout() {
     }
 
     router.replace(tripFallbackPathForPathname(pathname, tripId));
-  }, [pathname, tripId]);
+  }, [isRootTripTab, pathname, tripId]);
 
   return (
     <TripShellProvider value={shellState}>
       <View style={[styles.root, { paddingTop: insets.top }]}>
         <AppBar
+          leadingAction={isRootTripTab ? 'home' : 'back'}
           members={buildTripAppBarMembers(detail)}
           onBack={handleBack}
           onPressTitle={() => setSwitcherOpen(true)}

@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { theme } from '../design';
+import { markExplicitHomeIntent } from '../trips/home-intent';
 
 type BottomMenuTab = 'home' | 'my';
 
@@ -20,12 +21,13 @@ export function BottomMenu({ selected }: BottomMenuProps) {
         accessibilityState={{ selected: selected === 'home' }}
         onPress={() => {
           if (selected !== 'home') {
+            markExplicitHomeIntent();
             router.replace('/');
           }
         }}
         style={[styles.item, selected === 'home' ? styles.selectedItem : null]}
       >
-        <Text style={[styles.label, selected === 'home' ? styles.selectedLabel : null]}>오늘</Text>
+        <Text style={[styles.label, selected === 'home' ? styles.selectedLabel : null]}>홈</Text>
       </Pressable>
       <Pressable
         accessibilityRole="button"

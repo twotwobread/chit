@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  isTripRootTab,
   isTripRootTabPath,
   tripDetailPath,
   tripFallbackPath,
@@ -30,6 +31,15 @@ test('maps tab names to canonical tab roots', () => {
   assert.equal(tripTabPath('trip-a', 'map'), '/trips/trip-a/map');
   assert.equal(tripTabPath('trip-a', 'itinerary'), '/trips/trip-a/itinerary');
   assert.equal(tripTabPath('trip-a', 'settle'), '/trips/trip-a/settle');
+});
+
+test('recognizes concrete trip root tab route names for custom tab navigation', () => {
+  assert.equal(isTripRootTab('today'), true);
+  assert.equal(isTripRootTab('map'), true);
+  assert.equal(isTripRootTab('itinerary'), true);
+  assert.equal(isTripRootTab('settle'), true);
+  assert.equal(isTripRootTab('detail'), false);
+  assert.equal(isTripRootTab('(tabs)'), false);
 });
 
 test('encodes no-history fallback matrix for trip shell routes', () => {

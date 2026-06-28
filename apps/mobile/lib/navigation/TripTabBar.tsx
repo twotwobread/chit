@@ -1,8 +1,10 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Compass, ListOrdered, Map as MapIcon, Wallet } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { theme } from '../design';
+import { isTripRootTab, tripTabPath } from '../trips/routes';
 
 type TripTabRoute = {
   key: string;
@@ -42,6 +44,8 @@ const LABELS: Record<string, string> = {
 
 export function TripTabBar({ navigation, state }: TripTabBarProps) {
   const insets = useSafeAreaInsets();
+  const { tripId: tripIdParam } = useLocalSearchParams<{ tripId?: string | string[] }>();
+  const tripId = Array.isArray(tripIdParam) ? tripIdParam[0] : tripIdParam;
 
   return (
     <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, theme.space[3]) }]}>
@@ -58,6 +62,10 @@ export function TripTabBar({ navigation, state }: TripTabBarProps) {
             onPress={() => {
               const event = navigation.emit({ canPreventDefault: true, target: route.key, type: 'tabPress' });
               if (!focused && !event.defaultPrevented) {
+                if (tripId && isTripRootTab(route.name)) {
+                  router.replace(tripTabPath(tripId, route.name));
+                  return;
+                }
                 navigation.navigate(route.name);
               }
             }}

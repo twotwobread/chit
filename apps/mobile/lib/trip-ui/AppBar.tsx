@@ -1,5 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { ChevronDown, ChevronLeft } from 'lucide-react-native';
+import { ChevronDown, ChevronLeft, House } from 'lucide-react-native';
 import { router } from 'expo-router';
 
 import { AvatarGroup, theme } from '../design';
@@ -9,12 +9,13 @@ export type AppBarMember = { name: string; color?: string };
 export type AppBarProps = {
   tripName: string;
   caption?: string;
+  leadingAction?: 'back' | 'home';
   members?: AppBarMember[];
   onPressTitle?: () => void;
   onBack?: () => void;
 };
 
-export function AppBar({ caption, members = [], onBack, onPressTitle, tripName }: AppBarProps) {
+export function AppBar({ caption, leadingAction = 'back', members = [], onBack, onPressTitle, tripName }: AppBarProps) {
   const titleContent = (
     <>
       <View style={styles.titleRow}>
@@ -27,16 +28,19 @@ export function AppBar({ caption, members = [], onBack, onPressTitle, tripName }
     </>
   );
 
+  const LeadingIcon = leadingAction === 'home' ? House : ChevronLeft;
+  const leadingLabel = leadingAction === 'home' ? '홈으로' : '뒤로가기';
+
   return (
     <View style={styles.bar}>
       <Pressable
-        accessibilityLabel="홈으로"
+        accessibilityLabel={leadingLabel}
         accessibilityRole="button"
         hitSlop={8}
         onPress={onBack ?? (() => router.replace('/'))}
         style={({ pressed }) => [styles.side, pressed ? styles.pressed : null]}
       >
-        <ChevronLeft color={theme.color.textBody} size={26} strokeWidth={2.2} />
+        <LeadingIcon color={theme.color.textBody} size={leadingAction === 'home' ? 23 : 26} strokeWidth={2.2} />
       </Pressable>
 
       {onPressTitle ? (
