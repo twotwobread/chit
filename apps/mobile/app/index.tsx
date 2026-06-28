@@ -16,6 +16,7 @@ import { MobileAuthError } from '../lib/auth/client';
 import { clearStoredSession, readStoredSession } from '../lib/auth/session';
 import { theme } from '../lib/design';
 import { BottomMenu } from '../lib/navigation/BottomMenu';
+import { NextPlaceHeroCard, type NextPlace } from '../lib/trip-ui/NextPlaceHeroCard';
 import {
   createRoutePreview,
   getTripDayItinerary,
@@ -48,6 +49,7 @@ import {
 } from '../lib/trips/today-navigation-fallback';
 import {
   buildRoutePreviewRequest,
+  buildTodayRoutePreviewHeroChip,
   routePreviewEligibility,
   todayRoutePreviewCacheKey,
   todayRoutePreviewLoadingState,
@@ -63,6 +65,9 @@ import {
   defaultTravelMode,
   readStoredTravelMode,
   saveSelectedTravelMode,
+  travelModeDisplayLabel,
+  travelModeDisplayOptions,
+  travelModeFromDisplayLabel,
   type TravelMode,
 } from '../lib/trips/travel-mode';
 
@@ -738,17 +743,14 @@ function TodayContent({
         formattedDate={viewModel.formattedDate}
         tripName={viewModel.tripName}
       />
-      <View style={styles.nextPlaceCard}>
-        <Text style={styles.overline}>다음 장소</Text>
-        <Text style={styles.nextPlaceName}>{viewModel.nextPlace.placeName}</Text>
-        <View style={styles.placeMetaRow}>
-          <Text style={styles.orderBadge}>{viewModel.nextPlace.orderLabel}</Text>
-          <Text style={styles.placeType}>{viewModel.nextPlace.placeTypeLabel}</Text>
-        </View>
-        <Text style={styles.address}>{viewModel.nextPlace.address}</Text>
-        <TravelModeSelector selector={viewModel.nextPlace.travelModeSelector} onSelect={onTravelModeSelect} />
-        <ActionButton action={viewModel.nextPlace.navigationAction} onAction={onAction} />
-      </View>
+      <TodayNextPlaceHero
+        arrivingItemId={arrivingItemId}
+        onAction={onAction}
+        onTravelModeSelect={onTravelModeSelect}
+        routePreviewState={routePreviewState}
+        skippingItemId={skippingItemId}
+        viewModel={viewModel}
+      />
       <ActionButton action={viewModel.quickExpenseAction} onAction={onAction} />
       <NavigationFallbackSlot
         itineraryAction={viewModel.primaryAction}
@@ -771,23 +773,67 @@ function TodayContent({
         onRetry={onRoutePreviewRetry}
         state={routePreviewState}
       />
-      <ActionButton
-        action={viewModel.arrivalAction}
-        disabled={arrivingItemId === viewModel.arrivalAction.itemId}
-        label={arrivingItemId === viewModel.arrivalAction.itemId ? '도착 처리 중...' : undefined}
-        onAction={onAction}
-      />
-      <ActionButton
-        action={viewModel.skipAction}
-        disabled={skippingItemId === viewModel.skipAction.itemId}
-        label={skippingItemId === viewModel.skipAction.itemId ? '스킵 처리 중...' : undefined}
-        onAction={onAction}
-        variant="secondary"
-      />
       <ActionButton action={viewModel.primaryAction} onAction={onAction} variant="secondary" />
-      <LodgingNavigationActionBlock action={viewModel.lodgingNavigationAction} onAction={onAction} />
       <MultipleOngoingNotice notice={viewModel.multipleOngoingTripNotice} onAction={onAction} />
     </View>
+  );
+}
+
+function TodayNextPlaceHero({
+  arrivingItemId,
+  onAction,
+  onTravelModeSelect,
+  routePreviewState,
+  skippingItemId,
+  viewModel,
+}: {
+  arrivingItemId: string | null;
+  onAction: (action: TodayAction) => void;
+  onTravelModeSelect: (travelMode: TravelMode) => void;
+  routePreviewState: TodayRoutePreviewState;
+  skippingItemId: string | null;
+  viewModel: Extract<TodayExecutionViewModel, { status: 'success' }>;
+}) {
+  const selectedTravelMode = viewModel.nextPlace.navigationAction.travelMode;
+  const lodgingAction = viewModel.lodgingNavigationAction.action;
+  const place: NextPlace = {
+    order: viewModel.nextPlace.order,
+    type: viewModel.nextPlace.placeType,
+    name: viewModel.nextPlace.placeName,
+    address: viewModel.nextPlace.address,
+    legText: `${viewModel.nextPlace.orderLabel}번째 장소 · ${viewModel.nextPlace.placeTypeLabel}`,
+  };
+  const arriveDisabled = arrivingItemId === viewModel.arrivalAction.itemId;
+  const skipDisabled = skippingItemId === viewModel.skipAction.itemId;
+  const lodgingDisabled = viewModel.lodgingNavigationAction.disabled || !lodgingAction;
+
+  return (
+    <NextPlaceHeroCard
+      arriveDisabled={arriveDisabled}
+      arriveLabel={arriveDisabled ? '도착 처리 중...' : '도착'}
+      lodgingDisabled={lodgingDisabled}
+      lodgingHelper={viewModel.lodgingNavigationAction.helper ?? ''}
+      onArrive={() => onAction(viewModel.arrivalAction)}
+      onLodging={() => {
+        if (lodgingAction) {
+          onAction(lodgingAction);
+        }
+      }}
+      onNavigate={() => onAction(viewModel.nextPlace.navigationAction)}
+      onSkip={() => onAction(viewModel.skipAction)}
+      onTravelMode={(label) => {
+        const travelMode = travelModeFromDisplayLabel(label);
+        if (travelMode) {
+          onTravelModeSelect(travelMode);
+        }
+      }}
+      place={place}
+      routeChip={buildTodayRoutePreviewHeroChip(routePreviewState)}
+      skipDisabled={skipDisabled}
+      skipLabel={skipDisabled ? '스킵 처리 중...' : '건너뛰기'}
+      travelMode={travelModeDisplayLabel(selectedTravelMode)}
+      travelOptions={travelModeDisplayOptions}
+    />
   );
 }
 
@@ -806,36 +852,6 @@ function TodayDayHeader({
       <Text style={styles.dayText}>
         {dayLabel} · {formattedDate}
       </Text>
-    </View>
-  );
-}
-
-function TravelModeSelector({
-  onSelect,
-  selector,
-}: {
-  onSelect: (travelMode: TravelMode) => void;
-  selector: Extract<TodayExecutionViewModel, { status: 'success' }>['nextPlace']['travelModeSelector'];
-}) {
-  return (
-    <View accessibilityLabel={selector.accessibilityLabel} style={styles.travelModeSection}>
-      <Text style={styles.travelModeLabel}>{selector.label}</Text>
-      <View style={styles.travelModeOptions}>
-        {selector.options.map((option) => (
-          <Pressable
-            accessibilityLabel={option.accessibilityLabel}
-            accessibilityRole="button"
-            accessibilityState={option.accessibilityState}
-            key={option.mode}
-            onPress={() => onSelect(option.mode)}
-            style={[styles.travelModeOption, option.selected ? styles.travelModeOptionSelected : null]}
-          >
-            <Text style={option.selected ? styles.travelModeOptionTextSelected : styles.travelModeOptionText}>
-              {option.label}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
     </View>
   );
 }
@@ -1234,26 +1250,6 @@ const styles = StyleSheet.create({
     fontSize: theme.font.size.label,
     fontWeight: theme.font.weight.semibold,
   },
-  nextPlaceCard: {
-    backgroundColor: theme.color.surfaceSunken,
-    borderColor: theme.color.borderSubtle,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    gap: theme.space[3],
-    padding: theme.space[5],
-  },
-  overline: {
-    color: theme.color.primary,
-    fontFamily: theme.font.family.bold,
-    fontSize: theme.font.size.caption,
-    fontWeight: theme.font.weight.bold,
-  },
-  nextPlaceName: {
-    color: theme.color.textStrong,
-    fontFamily: theme.font.family.bold,
-    fontSize: theme.font.size.headline,
-    fontWeight: theme.font.weight.bold,
-  },
   placeMetaRow: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -1280,50 +1276,6 @@ const styles = StyleSheet.create({
     color: theme.color.textMuted,
     fontFamily: theme.font.family.regular,
     fontSize: theme.font.size.body,
-  },
-  travelModeSection: {
-    gap: theme.space[2],
-  },
-  travelModeLabel: {
-    color: theme.color.textBody,
-    fontFamily: theme.font.family.semibold,
-    fontSize: theme.font.size.label,
-    fontWeight: theme.font.weight.semibold,
-  },
-  travelModeOptions: {
-    backgroundColor: theme.color.surface,
-    borderColor: theme.color.borderSubtle,
-    borderRadius: theme.radius.pill,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: theme.space[1],
-    padding: theme.space[1],
-  },
-  travelModeOption: {
-    alignItems: 'center',
-    borderRadius: theme.radius.pill,
-    flex: 1,
-    justifyContent: 'center',
-    minHeight: theme.layout.controlHSm,
-    paddingHorizontal: theme.space[3],
-    paddingVertical: theme.space[2],
-  },
-  travelModeOptionSelected: {
-    backgroundColor: theme.color.primary,
-  },
-  travelModeOptionText: {
-    color: theme.color.textBody,
-    fontFamily: theme.font.family.semibold,
-    fontSize: theme.font.size.label,
-    fontWeight: theme.font.weight.semibold,
-    textAlign: 'center',
-  },
-  travelModeOptionTextSelected: {
-    color: theme.color.onPrimary,
-    fontFamily: theme.font.family.bold,
-    fontSize: theme.font.size.label,
-    fontWeight: theme.font.weight.bold,
-    textAlign: 'center',
   },
   skippedSection: {
     gap: theme.space[4],

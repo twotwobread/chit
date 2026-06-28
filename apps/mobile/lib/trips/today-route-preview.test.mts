@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 
 import {
   buildRoutePreviewRequest,
+  buildTodayRoutePreviewHeroChip,
   buildTodayRoutePreviewViewModel,
   decodeEncodedPolyline,
   routePreviewEligibility,
@@ -67,6 +68,55 @@ describe('today route preview helpers', () => {
       { latitude: 40.7, longitude: -120.95 },
       { latitude: 43.252, longitude: -126.453 },
     ]);
+  });
+
+  it('builds route preview hero chip summaries with safe fallback copy', () => {
+    assert.equal(
+      buildTodayRoutePreviewHeroChip({
+        status: 'success',
+        viewModel: {
+          itemId: 'item-1',
+          durationLabel: '약 22분',
+          distanceLabel: '5.4km',
+          modeLabel: '대중교통',
+          summaryText: '환승 1회',
+          map: null,
+          detailActionLabel: 'Google Maps에서 자세히',
+        },
+      }),
+      '대중교통 · 약 22분 · 5.4km',
+    );
+    assert.equal(
+      buildTodayRoutePreviewHeroChip({
+        status: 'success',
+        viewModel: {
+          itemId: 'item-1',
+          durationLabel: '약 22분',
+          distanceLabel: '',
+          modeLabel: '대중교통',
+          summaryText: '환승 1회',
+          map: null,
+          detailActionLabel: 'Google Maps에서 자세히',
+        },
+      }),
+      '대중교통 · 약 22분',
+    );
+    assert.equal(buildTodayRoutePreviewHeroChip({ status: 'idle' }), '경로 정보를 준비 중이에요');
+    assert.equal(
+      buildTodayRoutePreviewHeroChip({
+        status: 'success',
+        viewModel: {
+          itemId: 'item-1',
+          durationLabel: '',
+          distanceLabel: '',
+          modeLabel: '대중교통',
+          summaryText: '환승 1회',
+          map: null,
+          detailActionLabel: 'Google Maps에서 자세히',
+        },
+      }),
+      '경로 정보를 준비 중이에요',
+    );
   });
 
   it('builds stable session cache keys from coarse origin and fixed mode', () => {

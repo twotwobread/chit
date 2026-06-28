@@ -8,6 +8,7 @@ import type {
   TripDay,
   TripListItem,
   TripPlaceSummary,
+  TripPlaceType,
 } from '@i-um/api-contract';
 
 import { buildDayItineraryRoute, getPlaceTypeLabel, getScheduleItems } from './day-itinerary';
@@ -170,8 +171,10 @@ export type TodaySuccessViewModel = {
   formattedDate: string;
   nextPlace: {
     itemId: string;
+    order: number;
     orderLabel: string;
     placeName: string;
+    placeType: TripPlaceType;
     placeTypeLabel: string;
     address: string;
     routablePlace: RoutablePlace | null;
@@ -308,8 +311,10 @@ export function buildTodayExecutionViewModel({
     ...common,
     nextPlace: {
       itemId: nextItem.id,
+      order: nextItem.itemOrder,
       orderLabel: String(nextItem.itemOrder),
       placeName: nextItem.place.name,
+      placeType: nextItem.place.placeType,
       placeTypeLabel: getPlaceTypeLabel(nextItem.place.placeType),
       address: nextItem.place.address,
       routablePlace: nextItem.place.routablePlace ?? null,

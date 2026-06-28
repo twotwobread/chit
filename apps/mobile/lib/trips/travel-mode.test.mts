@@ -7,6 +7,9 @@ import {
   isTravelMode,
   readStoredTravelMode,
   saveSelectedTravelMode,
+  travelModeDisplayLabel,
+  travelModeDisplayOptions,
+  travelModeFromDisplayLabel,
   travelModeLabels,
   travelModes,
   type TravelModeStore,
@@ -64,6 +67,10 @@ describe('travel mode preference helpers', () => {
       walking: '도보',
       driving: '자동차',
     });
+    assert.deepEqual(travelModeDisplayOptions, ['대중교통', '도보', '자동차']);
+    assert.equal(travelModeDisplayLabel('driving'), '자동차');
+    assert.equal(travelModeFromDisplayLabel('도보'), 'walking');
+    assert.equal(travelModeFromDisplayLabel('자전거'), null);
     assert.equal(isTravelMode('transit'), true);
     assert.equal(isTravelMode('bike'), false);
   });
