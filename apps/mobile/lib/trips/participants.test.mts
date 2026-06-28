@@ -4,6 +4,7 @@ import test from 'node:test';
 import type { TripParticipantListItem } from '@i-um/api-contract';
 
 import {
+  buildCompanionSheetParticipants,
   buildParticipantListViewModel,
   participantListFailureStatus,
   participantRemovalFailureMessage,
@@ -71,6 +72,18 @@ test('removes a participant row from the participant list view model', () => {
 
   assert.deepEqual(removeParticipantFromViewModel(viewModel, 'participant-member').rows, [
     { participantId: 'participant-owner', displayName: '민수', role: 'owner', roleLabel: '주최자', canRemove: false },
+  ]);
+});
+
+test('builds companion sheet participants and marks the current user', () => {
+  const viewModel = buildParticipantListViewModel([
+    participant({ participantId: 'participant-owner', displayName: '민수', role: 'owner' }),
+    participant({ participantId: 'participant-member', displayName: '지영', role: 'member' }),
+  ]);
+
+  assert.deepEqual(buildCompanionSheetParticipants(viewModel, 'participant-member'), [
+    { id: 'participant-owner', name: '민수', role: 'owner', isMe: false },
+    { id: 'participant-member', name: '지영', role: 'member', isMe: true },
   ]);
 });
 

@@ -1,4 +1,4 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Copy, Info, Link2, Share2, UserMinus, UserPlus } from 'lucide-react-native';
 
 import { Avatar, Badge, theme } from '../design';
@@ -15,7 +15,12 @@ export type Participant = {
 export type InviteCardProps = {
   inviteUrl?: string | null;
   expiryLabel?: string;
+  statusLabel?: string;
+  feedbackMessage?: string | null;
+  createLabel?: string;
+  actionBusy?: boolean;
   onCopyInvite?: () => void;
+  onFallbackShare?: () => void;
   onKakaoShare?: () => void;
   onCreateInvite?: () => void;
 };
@@ -23,6 +28,7 @@ export type InviteCardProps = {
 export type ParticipantRowProps = {
   participant: Participant;
   canRemove?: boolean;
+  removing?: boolean;
   onRemove?: (participantId: string) => void;
   first?: boolean;
 };
@@ -32,15 +38,34 @@ export type CompanionsSheetProps = {
   participants: Participant[];
   inviteUrl?: string | null;
   expiryLabel?: string;
+  inviteStatusLabel?: string;
+  feedbackMessage?: string | null;
+  loading?: boolean;
+  errorMessage?: string | null;
+  removingParticipantId?: string | null;
+  actionBusy?: boolean;
   canManage?: boolean;
   onClose: () => void;
   onCopyInvite?: () => void;
+  onFallbackShare?: () => void;
   onKakaoShare?: () => void;
   onCreateInvite?: () => void;
+  onRetry?: () => void;
   onRemoveParticipant?: (participantId: string) => void;
 };
 
-export function InviteCard({ expiryLabel, inviteUrl, onCopyInvite, onCreateInvite, onKakaoShare }: InviteCardProps) {
+export function InviteCard({
+  actionBusy = false,
+  createLabel = '초대 링크 만들기',
+  expiryLabel,
+  feedbackMessage,
+  inviteUrl,
+  onCopyInvite,
+  onCreateInvite,
+  onFallbackShare,
+  onKakaoShare,
+  statusLabel,
+}: InviteCardProps) {
   const hasInvite = Boolean(inviteUrl);
 
   return (
@@ -64,18 +89,46 @@ export function InviteCard({ expiryLabel, inviteUrl, onCopyInvite, onCreateInvit
             {onKakaoShare ? (
               <Pressable
                 accessibilityRole="button"
+                disabled={actionBusy}
                 onPress={onKakaoShare}
-                style={({ pressed }) => [styles.inviteButton, styles.kakaoButton, pressed ? styles.pressed : null]}
+                style={({ pressed }) => [
+                  styles.inviteButton,
+                  styles.kakaoButton,
+                  actionBusy ? styles.disabled : null,
+                  pressed ? styles.pressed : null,
+                ]}
               >
                 <Share2 color={theme.providerColor.kakaoText} size={16} strokeWidth={2.2} />
                 <Text style={styles.kakaoText}>카카오 공유</Text>
               </Pressable>
             ) : null}
+            {onFallbackShare ? (
+              <Pressable
+                accessibilityRole="button"
+                disabled={actionBusy}
+                onPress={onFallbackShare}
+                style={({ pressed }) => [
+                  styles.inviteButton,
+                  styles.copyButton,
+                  actionBusy ? styles.disabled : null,
+                  pressed ? styles.pressed : null,
+                ]}
+              >
+                <Share2 color={theme.color.onPrimary} size={16} strokeWidth={2.2} />
+                <Text style={styles.copyText}>다른 앱 공유</Text>
+              </Pressable>
+            ) : null}
             {onCopyInvite ? (
               <Pressable
                 accessibilityRole="button"
+                disabled={actionBusy}
                 onPress={onCopyInvite}
-                style={({ pressed }) => [styles.inviteButton, styles.copyButton, pressed ? styles.pressed : null]}
+                style={({ pressed }) => [
+                  styles.inviteButton,
+                  styles.copyButton,
+                  actionBusy ? styles.disabled : null,
+                  pressed ? styles.pressed : null,
+                ]}
               >
                 <Copy color={theme.color.onPrimary} size={16} strokeWidth={2.2} />
                 <Text style={styles.copyText}>링크 복사</Text>
@@ -85,26 +138,36 @@ export function InviteCard({ expiryLabel, inviteUrl, onCopyInvite, onCreateInvit
         ) : onCreateInvite ? (
           <Pressable
             accessibilityRole="button"
+            disabled={actionBusy}
             onPress={onCreateInvite}
             style={({ pressed }) => [
               styles.inviteButton,
               styles.copyButton,
               styles.inviteCreateButton,
+              actionBusy ? styles.disabled : null,
               pressed ? styles.pressed : null,
             ]}
           >
             <UserPlus color={theme.color.onPrimary} size={16} strokeWidth={2.2} />
-            <Text style={styles.copyText}>초대 링크 만들기</Text>
+            <Text style={styles.copyText}>{createLabel}</Text>
           </Pressable>
         ) : null}
       </View>
 
+      {statusLabel ? <Text style={styles.inviteStatusText}>{statusLabel}</Text> : null}
+      {feedbackMessage ? <Text style={styles.feedbackText}>{feedbackMessage}</Text> : null}
       {expiryLabel ? <Text style={styles.expiryText}>{expiryLabel}</Text> : null}
     </View>
   );
 }
 
-export function ParticipantRow({ canRemove = false, first = false, onRemove, participant }: ParticipantRowProps) {
+export function ParticipantRow({
+  canRemove = false,
+  first = false,
+  onRemove,
+  participant,
+  removing = false,
+}: ParticipantRowProps) {
   const isOwner = participant.role === 'owner';
 
   return (
@@ -121,11 +184,20 @@ export function ParticipantRow({ canRemove = false, first = false, onRemove, par
         <Pressable
           accessibilityLabel={`${participant.name} 내보내기`}
           accessibilityRole="button"
+          disabled={removing}
           hitSlop={8}
           onPress={() => onRemove(participant.id)}
-          style={({ pressed }) => [styles.removeButton, pressed ? styles.pressed : null]}
+          style={({ pressed }) => [
+            styles.removeButton,
+            removing ? styles.disabled : null,
+            pressed ? styles.pressed : null,
+          ]}
         >
-          <UserMinus color={theme.color.textMuted} size={18} strokeWidth={2.2} />
+          {removing ? (
+            <ActivityIndicator color={theme.color.textMuted} size="small" />
+          ) : (
+            <UserMinus color={theme.color.textMuted} size={18} strokeWidth={2.2} />
+          )}
         </Pressable>
       ) : null}
     </View>
@@ -133,15 +205,23 @@ export function ParticipantRow({ canRemove = false, first = false, onRemove, par
 }
 
 export function CompanionsSheet({
+  actionBusy = false,
   canManage = false,
+  errorMessage,
   expiryLabel,
+  feedbackMessage,
+  inviteStatusLabel,
   inviteUrl,
+  loading = false,
   onClose,
   onCopyInvite,
   onCreateInvite,
+  onFallbackShare,
   onKakaoShare,
   onRemoveParticipant,
+  onRetry,
   participants,
+  removingParticipantId,
   visible,
 }: CompanionsSheetProps) {
   return (
@@ -154,32 +234,65 @@ export function CompanionsSheet({
       </View>
 
       <ScrollView contentContainerStyle={styles.sheetBody} showsVerticalScrollIndicator={false}>
-        <InviteCard
-          expiryLabel={expiryLabel}
-          inviteUrl={inviteUrl}
-          onCopyInvite={onCopyInvite}
-          onCreateInvite={onCreateInvite}
-          onKakaoShare={onKakaoShare}
-        />
+        {canManage ? (
+          <InviteCard
+            actionBusy={actionBusy}
+            createLabel={inviteStatusLabel ?? '초대 링크 만들기'}
+            expiryLabel={expiryLabel}
+            feedbackMessage={feedbackMessage}
+            inviteUrl={inviteUrl}
+            onCopyInvite={onCopyInvite}
+            onCreateInvite={onCreateInvite}
+            onFallbackShare={onFallbackShare}
+            onKakaoShare={onKakaoShare}
+            statusLabel={inviteUrl ? inviteStatusLabel : undefined}
+          />
+        ) : feedbackMessage ? (
+          <Text style={styles.feedbackText}>{feedbackMessage}</Text>
+        ) : null}
 
-        <Text style={styles.listLabel}>참여자 {participants.length}명</Text>
-        {participants.length === 0 ? (
+        {loading ? (
           <View style={styles.emptyParticipants}>
-            <Text style={styles.emptyTitle}>아직 동행자가 없어요</Text>
-            <Text style={styles.emptyHelper}>초대 링크를 공유해 함께 여행할 사람을 초대해보세요.</Text>
+            <ActivityIndicator color={theme.color.primary} />
+            <Text style={styles.emptyHelper}>동행자를 불러오는 중...</Text>
+          </View>
+        ) : errorMessage ? (
+          <View style={styles.emptyParticipants}>
+            <Text style={styles.emptyTitle}>동행자를 불러올 수 없어요</Text>
+            <Text style={styles.emptyHelper}>{errorMessage}</Text>
+            {onRetry ? (
+              <Pressable
+                accessibilityRole="button"
+                onPress={onRetry}
+                style={({ pressed }) => [styles.inviteButton, styles.copyButton, pressed ? styles.pressed : null]}
+              >
+                <Text style={styles.copyText}>다시 시도</Text>
+              </Pressable>
+            ) : null}
           </View>
         ) : (
-          <View style={styles.participantList}>
-            {participants.map((participant, index) => (
-              <ParticipantRow
-                canRemove={canManage && participant.role === 'member'}
-                first={index === 0}
-                key={participant.id}
-                onRemove={onRemoveParticipant}
-                participant={participant}
-              />
-            ))}
-          </View>
+          <>
+            <Text style={styles.listLabel}>참여자 {participants.length}명</Text>
+            {participants.length === 0 ? (
+              <View style={styles.emptyParticipants}>
+                <Text style={styles.emptyTitle}>아직 동행자가 없어요</Text>
+                <Text style={styles.emptyHelper}>초대 링크를 공유해 함께 여행할 사람을 초대해보세요.</Text>
+              </View>
+            ) : (
+              <View style={styles.participantList}>
+                {participants.map((participant, index) => (
+                  <ParticipantRow
+                    canRemove={canManage && participant.role === 'member'}
+                    first={index === 0}
+                    key={participant.id}
+                    onRemove={onRemoveParticipant}
+                    participant={participant}
+                    removing={removingParticipantId === participant.id}
+                  />
+                ))}
+              </View>
+            )}
+          </>
         )}
 
         <View style={styles.noteRow}>
@@ -202,6 +315,9 @@ const styles = StyleSheet.create({
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.label,
     fontWeight: theme.font.weight.bold,
+  },
+  disabled: {
+    opacity: 0.55,
   },
   emptyHelper: {
     color: theme.color.textMuted,
@@ -258,10 +374,22 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
   },
+  feedbackText: {
+    color: theme.color.green[100],
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.caption,
+    lineHeight: theme.font.size.caption * theme.font.leading.normal,
+  },
   inviteHead: {
     alignItems: 'center',
     flexDirection: 'row',
     gap: theme.space[2],
+  },
+  inviteStatusText: {
+    color: theme.color.green[100],
+    fontFamily: theme.font.family.semibold,
+    fontSize: theme.font.size.caption,
+    fontWeight: theme.font.weight.semibold,
   },
   inviteTitle: {
     color: theme.color.onPrimary,
