@@ -207,6 +207,9 @@ type CreateQuickExpenseRequest struct {
 	// ItineraryItemId Required itinerary item for the selected Day. Must belong to tripId/date.
 	ItineraryItemId string `json:"itineraryItemId"`
 
+	// ParticipantIds Current accepted trip participants selected as equal split targets.
+	ParticipantIds []string `json:"participantIds"`
+
 	// PayerParticipantId Active trip participant who paid the expense.
 	PayerParticipantId string `json:"payerParticipantId"`
 }

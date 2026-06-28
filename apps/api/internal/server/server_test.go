@@ -1866,7 +1866,7 @@ func TestListDayExpensesHandler(t *testing.T) {
 
 	createExpense := func(amountMinor int64) {
 		t.Helper()
-		requestBody := []byte(fmt.Sprintf(`{"itineraryItemId":%q,"amountMinor":%d,"payerParticipantId":%q}`, item.ID, amountMinor, payerID))
+		requestBody := []byte(fmt.Sprintf(`{"itineraryItemId":%q,"amountMinor":%d,"payerParticipantId":%q,"participantIds":[%q,%q]}`, item.ID, amountMinor, payerID, payerID, member.ID))
 		recorder := httptest.NewRecorder()
 		request := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/days/2026-07-11/expenses/quick", bytes.NewReader(requestBody))
 		request.Header.Set("Content-Type", "application/json")
@@ -2030,7 +2030,7 @@ func TestCreateQuickExpenseHandler(t *testing.T) {
 	backend.participants[tripID] = append(backend.participants[tripID], member)
 	payerID := backend.participants[tripID][0].ID
 
-	requestBody := []byte(fmt.Sprintf(`{"itineraryItemId":%q,"amountMinor":1001,"payerParticipantId":%q}`, item.ID, payerID))
+	requestBody := []byte(fmt.Sprintf(`{"itineraryItemId":%q,"amountMinor":1001,"payerParticipantId":%q,"participantIds":[%q]}`, item.ID, payerID, member.ID))
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/days/2026-07-11/expenses/quick", bytes.NewReader(requestBody))
 	request.Header.Set("Content-Type", "application/json")
@@ -2076,8 +2076,8 @@ func TestCreateQuickExpenseHandler(t *testing.T) {
 	if body.Expense.Place.Name != "도톤보리" || body.Expense.Place.Address != "Dotonbori" || body.Expense.Place.PlaceType != "food" {
 		t.Fatalf("unexpected place snapshot: %#v", body.Expense.Place)
 	}
-	if len(body.Expense.Splits) != 2 || body.Expense.Splits[0].ParticipantID != payerID || body.Expense.Splits[0].AmountMinor != 501 || body.Expense.Splits[1].ParticipantID != member.ID || body.Expense.Splits[1].AmountMinor != 500 {
-		t.Fatalf("unexpected equal splits: %#v", body.Expense.Splits)
+	if len(body.Expense.Splits) != 1 || body.Expense.Splits[0].ParticipantID != member.ID || body.Expense.Splits[0].AmountMinor != 1001 {
+		t.Fatalf("unexpected payer-excluded one-person split: %#v", body.Expense.Splits)
 	}
 }
 
@@ -2129,7 +2129,7 @@ func TestCreateQuickExpenseLinksRepeatedPlaceByItineraryItemOccurrence(t *testin
 	}
 
 	payerID := backend.participants[tripID][0].ID
-	requestBody := []byte(fmt.Sprintf(`{"itineraryItemId":%q,"amountMinor":4500,"payerParticipantId":%q}`, second.ID, payerID))
+	requestBody := []byte(fmt.Sprintf(`{"itineraryItemId":%q,"amountMinor":4500,"payerParticipantId":%q,"participantIds":[%q]}`, second.ID, payerID, payerID))
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/days/2026-07-11/expenses/quick", bytes.NewReader(requestBody))
 	request.Header.Set("Content-Type", "application/json")
@@ -2186,6 +2186,22 @@ func TestCreateQuickExpenseValidationNotFoundAndForbidden(t *testing.T) {
 	item := createTestDayItineraryItem(t, backend, ownerToken, tripID, "2026-07-11", `{"name":"도톤보리","address":"Dotonbori","placeType":"food"}`)
 	payerID := backend.participants[tripID][0].ID
 	nonParticipantToken := loginTestUserWithSubject(t, backend, "apple-2", "지영")
+	bodyFor := func(itineraryItemID string, amountMinor int64, payerParticipantID string, participantIDs []string) string {
+		t.Helper()
+		payload := map[string]interface{}{
+			"itineraryItemId":    itineraryItemID,
+			"amountMinor":        amountMinor,
+			"payerParticipantId": payerParticipantID,
+		}
+		if participantIDs != nil {
+			payload["participantIds"] = participantIDs
+		}
+		data, err := json.Marshal(payload)
+		if err != nil {
+			t.Fatalf("marshal quick expense request: %v", err)
+		}
+		return string(data)
+	}
 
 	tests := []struct {
 		name       string
@@ -2194,13 +2210,18 @@ func TestCreateQuickExpenseValidationNotFoundAndForbidden(t *testing.T) {
 		token      string
 		expectCode int
 	}{
-		{name: "invalid path date", path: "/trips/" + tripID + "/days/not-a-date/expenses/quick", body: fmt.Sprintf(`{"itineraryItemId":%q,"amountMinor":1,"payerParticipantId":%q}`, item.ID, payerID), token: ownerToken, expectCode: http.StatusBadRequest},
-		{name: "invalid amount", path: "/trips/" + tripID + "/days/2026-07-11/expenses/quick", body: fmt.Sprintf(`{"itineraryItemId":%q,"amountMinor":0,"payerParticipantId":%q}`, item.ID, payerID), token: ownerToken, expectCode: http.StatusBadRequest},
-		{name: "missing trip", path: "/trips/00000000-0000-0000-0000-000000000404/days/2026-07-11/expenses/quick", body: fmt.Sprintf(`{"itineraryItemId":%q,"amountMinor":1,"payerParticipantId":%q}`, item.ID, payerID), token: ownerToken, expectCode: http.StatusNotFound},
-		{name: "out of range", path: "/trips/" + tripID + "/days/2026-07-14/expenses/quick", body: fmt.Sprintf(`{"itineraryItemId":%q,"amountMinor":1,"payerParticipantId":%q}`, item.ID, payerID), token: ownerToken, expectCode: http.StatusNotFound},
-		{name: "forbidden", path: "/trips/" + tripID + "/days/2026-07-11/expenses/quick", body: fmt.Sprintf(`{"itineraryItemId":%q,"amountMinor":1,"payerParticipantId":%q}`, item.ID, payerID), token: nonParticipantToken, expectCode: http.StatusForbidden},
-		{name: "missing item", path: "/trips/" + tripID + "/days/2026-07-11/expenses/quick", body: fmt.Sprintf(`{"itineraryItemId":%q,"amountMinor":1,"payerParticipantId":%q}`, testUUID(7999), payerID), token: ownerToken, expectCode: http.StatusNotFound},
-		{name: "missing payer", path: "/trips/" + tripID + "/days/2026-07-11/expenses/quick", body: fmt.Sprintf(`{"itineraryItemId":%q,"amountMinor":1,"payerParticipantId":%q}`, item.ID, testUUID(2999)), token: ownerToken, expectCode: http.StatusNotFound},
+		{name: "invalid path date", path: "/trips/" + tripID + "/days/not-a-date/expenses/quick", body: bodyFor(item.ID, 1, payerID, []string{payerID}), token: ownerToken, expectCode: http.StatusBadRequest},
+		{name: "invalid amount", path: "/trips/" + tripID + "/days/2026-07-11/expenses/quick", body: bodyFor(item.ID, 0, payerID, []string{payerID}), token: ownerToken, expectCode: http.StatusBadRequest},
+		{name: "missing split participants", path: "/trips/" + tripID + "/days/2026-07-11/expenses/quick", body: bodyFor(item.ID, 1, payerID, nil), token: ownerToken, expectCode: http.StatusBadRequest},
+		{name: "empty split participants", path: "/trips/" + tripID + "/days/2026-07-11/expenses/quick", body: bodyFor(item.ID, 1, payerID, []string{}), token: ownerToken, expectCode: http.StatusBadRequest},
+		{name: "malformed split participant", path: "/trips/" + tripID + "/days/2026-07-11/expenses/quick", body: bodyFor(item.ID, 1, payerID, []string{"not-a-uuid"}), token: ownerToken, expectCode: http.StatusBadRequest},
+		{name: "duplicate split participant", path: "/trips/" + tripID + "/days/2026-07-11/expenses/quick", body: bodyFor(item.ID, 1, payerID, []string{payerID, payerID}), token: ownerToken, expectCode: http.StatusBadRequest},
+		{name: "non trip split participant", path: "/trips/" + tripID + "/days/2026-07-11/expenses/quick", body: bodyFor(item.ID, 1, payerID, []string{testUUID(2998)}), token: ownerToken, expectCode: http.StatusBadRequest},
+		{name: "missing trip", path: "/trips/00000000-0000-0000-0000-000000000404/days/2026-07-11/expenses/quick", body: bodyFor(item.ID, 1, payerID, []string{payerID}), token: ownerToken, expectCode: http.StatusNotFound},
+		{name: "out of range", path: "/trips/" + tripID + "/days/2026-07-14/expenses/quick", body: bodyFor(item.ID, 1, payerID, []string{payerID}), token: ownerToken, expectCode: http.StatusNotFound},
+		{name: "forbidden", path: "/trips/" + tripID + "/days/2026-07-11/expenses/quick", body: bodyFor(item.ID, 1, payerID, []string{payerID}), token: nonParticipantToken, expectCode: http.StatusForbidden},
+		{name: "missing item", path: "/trips/" + tripID + "/days/2026-07-11/expenses/quick", body: bodyFor(testUUID(7999), 1, payerID, []string{payerID}), token: ownerToken, expectCode: http.StatusNotFound},
+		{name: "missing payer", path: "/trips/" + tripID + "/days/2026-07-11/expenses/quick", body: bodyFor(item.ID, 1, testUUID(2999), []string{payerID}), token: ownerToken, expectCode: http.StatusNotFound},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -4166,14 +4187,19 @@ func (b *fakeAuthBackend) CreateQuickExpense(_ context.Context, record tripdomai
 		return tripdomain.CreateQuickExpenseResult{}, tripdomain.ErrNotFound
 	}
 
-	splitParticipants := make([]tripdomain.ExpenseSplitParticipant, 0, len(b.participants[record.TripID]))
+	allParticipants := make([]tripdomain.ExpenseSplitParticipant, 0, len(b.participants[record.TripID]))
 	for _, participant := range b.participants[record.TripID] {
-		splitParticipants = append(splitParticipants, tripdomain.ExpenseSplitParticipant{
+		allParticipants = append(allParticipants, tripdomain.ExpenseSplitParticipant{
 			ParticipantID: participant.ID,
 			DisplayName:   participant.DisplayName,
 			JoinedAt:      participant.JoinedAt,
 		})
 	}
+	splitParticipants, err := tripdomain.SelectExpenseSplitParticipants(allParticipants, record.ParticipantIDs)
+	if err != nil {
+		return tripdomain.CreateQuickExpenseResult{}, err
+	}
+
 	splitRecords, err := tripdomain.AllocateEqualExpenseSplits(record.AmountMinor, splitParticipants)
 	if err != nil {
 		return tripdomain.CreateQuickExpenseResult{}, err

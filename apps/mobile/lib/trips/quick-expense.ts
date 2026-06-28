@@ -16,6 +16,7 @@ export type QuickExpenseFormErrors = {
   amount?: string;
   item?: string;
   payer?: string;
+  participants?: string;
 };
 
 export type QuickExpenseItemOption = {
@@ -28,6 +29,12 @@ export type QuickExpenseItemOption = {
 };
 
 export type QuickExpensePayerOption = {
+  participantId: string;
+  displayName: string;
+  selected: boolean;
+};
+
+export type QuickExpenseSplitParticipantOption = {
   participantId: string;
   displayName: string;
   selected: boolean;
@@ -53,8 +60,10 @@ export type QuickExpenseViewModel = {
   selectedItem: QuickExpenseItemOption | null;
   itemOptions: QuickExpenseItemOption[];
   payerOptions: QuickExpensePayerOption[];
+  splitParticipantOptions: QuickExpenseSplitParticipantOption[];
   splitPreviewRows: QuickExpenseSplitRow[];
   splitPreviewMessage: string | null;
+  splitParticipantError: string | null;
   showItemSelector: boolean;
   helper: string | null;
   emptyMessage: string | null;
@@ -75,12 +84,23 @@ export function hasQuickExpenseEntry(items: DayItineraryItem[]): boolean {
   return items.length > 0;
 }
 
+export function buildDefaultSplitParticipantIds(participants: TripParticipantListItem[]): string[] {
+  return participants.map((participant) => participant.participantId);
+}
+
+export function toggleQuickExpenseSplitParticipant(selectedParticipantIds: string[], participantId: string): string[] {
+  return selectedParticipantIds.includes(participantId)
+    ? selectedParticipantIds.filter((selectedParticipantId) => selectedParticipantId !== participantId)
+    : [...selectedParticipantIds, participantId];
+}
+
 export function buildQuickExpenseViewModel({
   amountInput,
   currency,
   itinerary,
   participants,
   selectedItemId,
+  selectedSplitParticipantIds,
   shouldChooseItem,
 }: {
   amountInput?: string;
@@ -88,15 +108,24 @@ export function buildQuickExpenseViewModel({
   itinerary: GetDayItineraryResponse;
   participants: TripParticipantListItem[];
   selectedItemId: string | null;
+  selectedSplitParticipantIds?: string[];
   shouldChooseItem: boolean;
 }): QuickExpenseViewModel {
   const itemOptions = orderedItems(itinerary.items).map((item) => toItemOption(item, selectedItemId));
   const selectedItem = itemOptions.find((item) => item.selected) ?? null;
   const showItemSelector = shouldChooseItem || selectedItem === null;
+  const selectedParticipantSet = new Set(selectedSplitParticipantIds ?? buildDefaultSplitParticipantIds(participants));
+  const selectedParticipants = participants.filter((participant) =>
+    selectedParticipantSet.has(participant.participantId),
+  );
   const parsedAmount =
     amountInput === undefined || amountInput.trim() === '' ? null : parseAmountMinor(amountInput, currency);
   const splitPreviewRows = parsedAmount?.ok
-    ? buildDefaultEqualSplitPreview({ amountMinor: parsedAmount.amountMinor, currency, participants })
+    ? buildDefaultEqualSplitPreview({
+        amountMinor: parsedAmount.amountMinor,
+        currency,
+        participants: selectedParticipants,
+      })
     : [];
   return {
     dayLabel: `Day ${itinerary.day.dayOrder}`,
@@ -110,9 +139,16 @@ export function buildQuickExpenseViewModel({
       displayName: normalizeParticipantDisplayName(participant.displayName),
       selected: false,
     })),
+    splitParticipantOptions: participants.map((participant) => ({
+      participantId: participant.participantId,
+      displayName: normalizeParticipantDisplayName(participant.displayName),
+      selected: selectedParticipantSet.has(participant.participantId),
+    })),
     splitPreviewRows,
     splitPreviewMessage:
       parsedAmount?.ok && participants.length === 0 ? '참여자 정보를 불러오지 못해 분할을 계산할 수 없어요.' : null,
+    splitParticipantError:
+      participants.length > 0 && selectedParticipants.length === 0 ? '분할할 사람을 1명 이상 선택해주세요.' : null,
     showItemSelector,
     helper:
       showItemSelector && itemOptions.length > 0
@@ -218,11 +254,13 @@ export function buildCreateQuickExpenseRequest({
   amountInput,
   currency,
   itineraryItemId,
+  participantIds,
   payerParticipantId,
 }: {
   amountInput: string;
   currency: SupportedCurrency;
   itineraryItemId: string | null;
+  participantIds: string[];
   payerParticipantId: string | null;
 }): { ok: true; request: CreateQuickExpenseRequest } | { ok: false; errors: QuickExpenseFormErrors } {
   const errors: QuickExpenseFormErrors = {};
@@ -236,8 +274,17 @@ export function buildCreateQuickExpenseRequest({
   if (!payerParticipantId) {
     errors.payer = '결제자를 선택해주세요.';
   }
+  if (participantIds.length === 0) {
+    errors.participants = '분할할 사람을 1명 이상 선택해주세요.';
+  }
 
-  if (Object.keys(errors).length > 0 || !parsedAmount.ok || !itineraryItemId || !payerParticipantId) {
+  if (
+    Object.keys(errors).length > 0 ||
+    !parsedAmount.ok ||
+    !itineraryItemId ||
+    !payerParticipantId ||
+    participantIds.length === 0
+  ) {
     return { ok: false, errors };
   }
 
@@ -247,13 +294,14 @@ export function buildCreateQuickExpenseRequest({
       itineraryItemId,
       amountMinor: parsedAmount.amountMinor,
       payerParticipantId,
+      participantIds,
     },
   };
 }
 
 export function quickExpenseFailureMessage(status?: number): string {
   if (status === 400) {
-    return '금액, 장소, 결제자를 다시 확인해주세요.';
+    return '금액, 장소, 참여자를 다시 확인해주세요.';
   }
   if (status === 403 || status === 404) {
     return '여행이나 장소, 참여자를 더 이상 사용할 수 없어요. 다시 불러와주세요.';

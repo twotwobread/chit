@@ -13,12 +13,14 @@ import equalSplitCases from '../../../../packages/api-contract/fixtures/equal-sp
 import {
   buildCreateQuickExpenseRequest,
   buildDefaultEqualSplitPreview,
+  buildDefaultSplitParticipantIds,
   buildQuickExpenseRoute,
   buildQuickExpenseViewModel,
   buildSavedEqualSplitSummary,
   formatMoney,
   inferCurrentQuickExpenseItem,
   parseAmountMinor,
+  toggleQuickExpenseSplitParticipant,
 } from './quick-expense.ts';
 
 function item(overrides: Partial<DayItineraryItem>): DayItineraryItem {
@@ -250,7 +252,56 @@ test('builds split preview in the quick expense view model for valid amount and 
       ['00000000-0000-0000-0000-000000002003', '현우', '333엔'],
     ],
   );
+  assert.deepEqual(
+    viewModel.splitParticipantOptions.map((option) => [option.participantId, option.displayName, option.selected]),
+    [
+      ['00000000-0000-0000-0000-000000002003', '현우', true],
+      ['00000000-0000-0000-0000-000000002001', '민수', true],
+      ['00000000-0000-0000-0000-000000002002', '여행자', true],
+    ],
+  );
   assert.equal(viewModel.splitPreviewMessage, null);
+  assert.equal(viewModel.splitParticipantError, null);
+});
+
+test('builds split participant selection state and previews only selected participants', () => {
+  const participants = [
+    participant({ participantId: 'participant-payer', displayName: '민수', joinedAt: '2026-07-10T09:00:00Z' }),
+    participant({ participantId: 'participant-friend', displayName: '지영', joinedAt: '2026-07-10T10:00:00Z' }),
+  ];
+
+  assert.deepEqual(buildDefaultSplitParticipantIds(participants), ['participant-payer', 'participant-friend']);
+  assert.deepEqual(
+    toggleQuickExpenseSplitParticipant(['participant-payer', 'participant-friend'], 'participant-payer'),
+    ['participant-friend'],
+  );
+  assert.deepEqual(toggleQuickExpenseSplitParticipant(['participant-friend'], 'participant-payer'), [
+    'participant-friend',
+    'participant-payer',
+  ]);
+
+  const viewModel = buildQuickExpenseViewModel({
+    amountInput: '1000',
+    currency: 'JPY',
+    itinerary: itinerary([item({ id: 'item-a' })]),
+    participants,
+    selectedItemId: 'item-a',
+    selectedSplitParticipantIds: ['participant-friend'],
+    shouldChooseItem: false,
+  });
+
+  assert.deepEqual(
+    viewModel.splitParticipantOptions.map((option) => [option.participantId, option.selected]),
+    [
+      ['participant-payer', false],
+      ['participant-friend', true],
+    ],
+  );
+  assert.deepEqual(
+    viewModel.splitPreviewRows.map((row) => [row.participantId, row.amountLabel]),
+    [['participant-friend', '1,000엔']],
+  );
+  assert.equal(viewModel.splitParticipantError, null);
 });
 
 test('hides split preview for invalid amount and reports missing participants for valid amount', () => {
@@ -275,6 +326,18 @@ test('hides split preview for invalid amount and reports missing participants fo
   });
   assert.deepEqual(noParticipants.splitPreviewRows, []);
   assert.equal(noParticipants.splitPreviewMessage, '참여자 정보를 불러오지 못해 분할을 계산할 수 없어요.');
+
+  const zeroSelected = buildQuickExpenseViewModel({
+    amountInput: '1000',
+    currency: 'JPY',
+    itinerary: itinerary([item({ id: 'item-a' })]),
+    participants: [participant({ participantId: 'participant-a' })],
+    selectedItemId: 'item-a',
+    selectedSplitParticipantIds: [],
+    shouldChooseItem: false,
+  });
+  assert.deepEqual(zeroSelected.splitPreviewRows, []);
+  assert.equal(zeroSelected.splitParticipantError, '분할할 사람을 1명 이상 선택해주세요.');
 });
 
 test('builds saved split summary from server response splits', () => {
@@ -298,11 +361,17 @@ test('builds create quick expense request and validation errors', () => {
       amountInput: '18,500',
       currency: 'KRW',
       itineraryItemId: 'item-a',
+      participantIds: ['participant-b'],
       payerParticipantId: 'participant-a',
     }),
     {
       ok: true,
-      request: { itineraryItemId: 'item-a', amountMinor: 18500, payerParticipantId: 'participant-a' },
+      request: {
+        itineraryItemId: 'item-a',
+        amountMinor: 18500,
+        payerParticipantId: 'participant-a',
+        participantIds: ['participant-b'],
+      },
     },
   );
 
@@ -311,6 +380,7 @@ test('builds create quick expense request and validation errors', () => {
       amountInput: '0',
       currency: 'KRW',
       itineraryItemId: null,
+      participantIds: [],
       payerParticipantId: null,
     }),
     {
@@ -319,6 +389,7 @@ test('builds create quick expense request and validation errors', () => {
         amount: '금액을 1 이상 입력해주세요.',
         item: '지출을 연결할 장소를 선택해주세요.',
         payer: '결제자를 선택해주세요.',
+        participants: '분할할 사람을 1명 이상 선택해주세요.',
       },
     },
   );

@@ -15,5 +15,9 @@ export type CreateQuickExpenseRequest = {
      * Active trip participant who paid the expense.
      */
     payerParticipantId: string;
+    /**
+     * Current accepted trip participants selected as equal split targets.
+     */
+    participantIds: Array<string>;
 };
 

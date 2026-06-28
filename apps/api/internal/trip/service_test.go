@@ -1341,6 +1341,7 @@ func TestServiceListDayExpensesValidationAuthAndRange(t *testing.T) {
 
 func TestServiceCreateQuickExpense(t *testing.T) {
 	payerID := testUUID(2001)
+	splitParticipantID := testUUID(2002)
 	itemID := testUUID(7001)
 	repo := &fakeRepository{
 		trip:          Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13", DefaultCurrency: "JPY"},
@@ -1353,6 +1354,7 @@ func TestServiceCreateQuickExpense(t *testing.T) {
 		ItineraryItemID:    itemID,
 		AmountMinor:        1001,
 		PayerParticipantID: payerID,
+		ParticipantIDs:     []string{strings.ToUpper(splitParticipantID)},
 	})
 	if err != nil {
 		t.Fatalf("CreateQuickExpense returned error: %v", err)
@@ -1364,6 +1366,9 @@ func TestServiceCreateQuickExpense(t *testing.T) {
 	if repo.quickExpenseRecord.TripID != testTripID || repo.quickExpenseRecord.ScheduledDate != "2026-07-11" || repo.quickExpenseRecord.ItineraryItemID != itemID || repo.quickExpenseRecord.PayerParticipantID != payerID || repo.quickExpenseRecord.AmountMinor != 1001 || repo.quickExpenseRecord.CreatedBy != "user-1" {
 		t.Fatalf("unexpected quick expense record: %#v", repo.quickExpenseRecord)
 	}
+	if len(repo.quickExpenseRecord.ParticipantIDs) != 1 || repo.quickExpenseRecord.ParticipantIDs[0] != splitParticipantID {
+		t.Fatalf("expected payer-excluded one-person split target, got %#v", repo.quickExpenseRecord.ParticipantIDs)
+	}
 	if result.Expense.ID == "" || result.Expense.AmountMinor != 1001 || result.Expense.Currency != "JPY" || result.Expense.ItineraryItemID == nil || *result.Expense.ItineraryItemID != itemID {
 		t.Fatalf("unexpected quick expense result: %#v", result.Expense)
 	}
@@ -1371,8 +1376,12 @@ func TestServiceCreateQuickExpense(t *testing.T) {
 
 func TestServiceCreateQuickExpenseValidationAuthAndRange(t *testing.T) {
 	payerID := testUUID(2001)
+	splitParticipantID := testUUID(2002)
 	itemID := testUUID(7001)
 	validTrip := Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13", DefaultCurrency: "JPY"}
+	validInput := func() CreateQuickExpenseInput {
+		return CreateQuickExpenseInput{ItineraryItemID: itemID, AmountMinor: 1, PayerParticipantID: payerID, ParticipantIDs: []string{payerID, splitParticipantID}}
+	}
 	tests := []struct {
 		name   string
 		repo   *fakeRepository
@@ -1382,16 +1391,19 @@ func TestServiceCreateQuickExpenseValidationAuthAndRange(t *testing.T) {
 		input  CreateQuickExpenseInput
 		want   error
 	}{
-		{name: "requires auth", repo: &fakeRepository{}, userID: " ", tripID: testTripID, date: "2026-07-10", input: CreateQuickExpenseInput{ItineraryItemID: itemID, AmountMinor: 1, PayerParticipantID: payerID}, want: ErrUnauthorized},
-		{name: "invalid trip id", repo: &fakeRepository{}, userID: "user-1", tripID: "not-a-uuid", date: "2026-07-10", input: CreateQuickExpenseInput{ItineraryItemID: itemID, AmountMinor: 1, PayerParticipantID: payerID}, want: ErrValidation},
-		{name: "invalid date", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, date: "2026/07/10", input: CreateQuickExpenseInput{ItineraryItemID: itemID, AmountMinor: 1, PayerParticipantID: payerID}, want: ErrValidation},
-		{name: "invalid item id", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, date: "2026-07-10", input: CreateQuickExpenseInput{ItineraryItemID: "bad", AmountMinor: 1, PayerParticipantID: payerID}, want: ErrValidation},
-		{name: "invalid payer id", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, date: "2026-07-10", input: CreateQuickExpenseInput{ItineraryItemID: itemID, AmountMinor: 1, PayerParticipantID: "bad"}, want: ErrValidation},
-		{name: "invalid amount", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, date: "2026-07-10", input: CreateQuickExpenseInput{ItineraryItemID: itemID, AmountMinor: 0, PayerParticipantID: payerID}, want: ErrValidation},
-		{name: "missing trip", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, date: "2026-07-10", input: CreateQuickExpenseInput{ItineraryItemID: itemID, AmountMinor: 1, PayerParticipantID: payerID}, want: ErrNotFound},
-		{name: "forbidden", repo: &fakeRepository{trip: validTrip, tripFound: true}, userID: "user-1", tripID: testTripID, date: "2026-07-10", input: CreateQuickExpenseInput{ItineraryItemID: itemID, AmountMinor: 1, PayerParticipantID: payerID}, want: ErrForbidden},
-		{name: "out of range", repo: &fakeRepository{trip: validTrip, tripFound: true, isParticipant: true}, userID: "user-1", tripID: testTripID, date: "2026-07-14", input: CreateQuickExpenseInput{ItineraryItemID: itemID, AmountMinor: 1, PayerParticipantID: payerID}, want: ErrNotFound},
-		{name: "repository not found", repo: &fakeRepository{trip: validTrip, tripFound: true, isParticipant: true, quickExpenseErr: ErrNotFound}, userID: "user-1", tripID: testTripID, date: "2026-07-10", input: CreateQuickExpenseInput{ItineraryItemID: itemID, AmountMinor: 1, PayerParticipantID: payerID}, want: ErrNotFound},
+		{name: "requires auth", repo: &fakeRepository{}, userID: " ", tripID: testTripID, date: "2026-07-10", input: validInput(), want: ErrUnauthorized},
+		{name: "invalid trip id", repo: &fakeRepository{}, userID: "user-1", tripID: "not-a-uuid", date: "2026-07-10", input: validInput(), want: ErrValidation},
+		{name: "invalid date", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, date: "2026/07/10", input: validInput(), want: ErrValidation},
+		{name: "invalid item id", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, date: "2026-07-10", input: CreateQuickExpenseInput{ItineraryItemID: "bad", AmountMinor: 1, PayerParticipantID: payerID, ParticipantIDs: []string{payerID}}, want: ErrValidation},
+		{name: "invalid payer id", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, date: "2026-07-10", input: CreateQuickExpenseInput{ItineraryItemID: itemID, AmountMinor: 1, PayerParticipantID: "bad", ParticipantIDs: []string{payerID}}, want: ErrValidation},
+		{name: "invalid amount", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, date: "2026-07-10", input: CreateQuickExpenseInput{ItineraryItemID: itemID, AmountMinor: 0, PayerParticipantID: payerID, ParticipantIDs: []string{payerID}}, want: ErrValidation},
+		{name: "missing split participants", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, date: "2026-07-10", input: CreateQuickExpenseInput{ItineraryItemID: itemID, AmountMinor: 1, PayerParticipantID: payerID}, want: ErrValidation},
+		{name: "invalid split participant id", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, date: "2026-07-10", input: CreateQuickExpenseInput{ItineraryItemID: itemID, AmountMinor: 1, PayerParticipantID: payerID, ParticipantIDs: []string{"bad"}}, want: ErrValidation},
+		{name: "duplicate split participant ids", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, date: "2026-07-10", input: CreateQuickExpenseInput{ItineraryItemID: itemID, AmountMinor: 1, PayerParticipantID: payerID, ParticipantIDs: []string{splitParticipantID, splitParticipantID}}, want: ErrValidation},
+		{name: "missing trip", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, date: "2026-07-10", input: validInput(), want: ErrNotFound},
+		{name: "forbidden", repo: &fakeRepository{trip: validTrip, tripFound: true}, userID: "user-1", tripID: testTripID, date: "2026-07-10", input: validInput(), want: ErrForbidden},
+		{name: "out of range", repo: &fakeRepository{trip: validTrip, tripFound: true, isParticipant: true}, userID: "user-1", tripID: testTripID, date: "2026-07-14", input: validInput(), want: ErrNotFound},
+		{name: "repository not found", repo: &fakeRepository{trip: validTrip, tripFound: true, isParticipant: true, quickExpenseErr: ErrNotFound}, userID: "user-1", tripID: testTripID, date: "2026-07-10", input: validInput(), want: ErrNotFound},
 	}
 
 	for _, tt := range tests {
@@ -1402,6 +1414,39 @@ func TestServiceCreateQuickExpenseValidationAuthAndRange(t *testing.T) {
 			}
 			if (errors.Is(tt.want, ErrValidation) || errors.Is(tt.want, ErrUnauthorized) || tt.name == "missing trip" || tt.name == "forbidden" || tt.name == "out of range") && tt.repo.quickExpenseCalled {
 				t.Fatal("expected quick expense repository call not to happen")
+			}
+		})
+	}
+}
+
+func TestSelectExpenseSplitParticipants(t *testing.T) {
+	participants := []ExpenseSplitParticipant{
+		{ParticipantID: testUUID(2001), DisplayName: "민수", JoinedAt: time.Date(2026, 7, 10, 9, 0, 0, 0, time.UTC)},
+		{ParticipantID: testUUID(2002), DisplayName: "지영", JoinedAt: time.Date(2026, 7, 10, 10, 0, 0, 0, time.UTC)},
+		{ParticipantID: testUUID(2003), DisplayName: "현우", JoinedAt: time.Date(2026, 7, 10, 11, 0, 0, 0, time.UTC)},
+	}
+
+	selected, err := SelectExpenseSplitParticipants(participants, []string{testUUID(2003), testUUID(2001)})
+	if err != nil {
+		t.Fatalf("SelectExpenseSplitParticipants returned error: %v", err)
+	}
+	if len(selected) != 2 || selected[0].ParticipantID != testUUID(2001) || selected[1].ParticipantID != testUUID(2003) {
+		t.Fatalf("expected selected current participants in source order, got %#v", selected)
+	}
+
+	tests := []struct {
+		name           string
+		participantIDs []string
+	}{
+		{name: "empty", participantIDs: nil},
+		{name: "duplicate", participantIDs: []string{testUUID(2001), testUUID(2001)}},
+		{name: "unknown", participantIDs: []string{testUUID(2999)}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := SelectExpenseSplitParticipants(participants, tt.participantIDs)
+			if !errors.Is(err, ErrValidation) {
+				t.Fatalf("expected ErrValidation, got %v", err)
 			}
 		})
 	}

@@ -54,6 +54,7 @@ type CreateQuickExpenseInput struct {
 	ItineraryItemID    string
 	AmountMinor        int64
 	PayerParticipantID string
+	ParticipantIDs     []string
 }
 
 type UpdateDayItineraryItemInput struct {
@@ -146,6 +147,7 @@ type CreateQuickExpenseRecord struct {
 	ItineraryItemID    string
 	AmountMinor        int64
 	PayerParticipantID string
+	ParticipantIDs     []string
 	CreatedBy          string
 }
 
