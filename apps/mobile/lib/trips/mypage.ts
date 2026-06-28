@@ -4,8 +4,11 @@ import { tripDetailPath } from './routes';
 import { groupTripsByStatus, localDateString, type TripStatusSection } from './status';
 
 export type MyTripCardViewModel = TripListItem & {
+  dateRangeLabel: string;
+  currencyLabel: string;
   roleLabel: string;
   participantCountLabel: string;
+  metaLabels: string[];
 };
 
 export type MyTripsStatusSectionViewModel = Omit<TripStatusSection, 'trips'> & {
@@ -33,11 +36,25 @@ export function buildMyTripsSuccessViewModel(
 }
 
 export function toTripCardViewModel(trip: TripListItem): MyTripCardViewModel {
+  const roleLabel = tripRoleLabel(trip.myRole);
+  const participantLabel = participantCountLabel(trip.participantCount);
+
   return {
     ...trip,
-    roleLabel: tripRoleLabel(trip.myRole),
-    participantCountLabel: participantCountLabel(trip.participantCount),
+    dateRangeLabel: formatTripDateRange(trip.startDate, trip.endDate),
+    currencyLabel: `기본 통화 ${trip.defaultCurrency}`,
+    roleLabel,
+    participantCountLabel: participantLabel,
+    metaLabels: [roleLabel, participantLabel],
   };
+}
+
+export function formatTripDateRange(startDate: string, endDate: string): string {
+  return `${formatTripDate(startDate)} ~ ${formatTripDate(endDate)}`;
+}
+
+export function formatTripDate(value: string): string {
+  return value.split('-').join('.');
 }
 
 export function tripRoleLabel(role: TripParticipantRole): string {

@@ -9,6 +9,8 @@ export type AccountProvider = 'apple' | 'kakao';
 export type ProfileCardProps = {
   name: string;
   provider?: AccountProvider;
+  providerLabel?: string;
+  helperLabel?: string | null;
   avatarColor?: string;
   onEdit?: () => void;
 };
@@ -28,6 +30,7 @@ export type SettingRowProps = {
   value?: string;
   affordance?: string;
   danger?: boolean;
+  disabled?: boolean;
   onPress?: () => void;
   first?: boolean;
 };
@@ -37,7 +40,14 @@ const PROVIDER_META: Record<AccountProvider, { bg: string; fg: string; label: st
   kakao: { bg: theme.providerColor.kakaoBg, fg: theme.providerColor.kakaoText, label: '카카오로 로그인됨' },
 };
 
-export function ProfileCard({ avatarColor = theme.color.primary, name, onEdit, provider = 'kakao' }: ProfileCardProps) {
+export function ProfileCard({
+  avatarColor = theme.color.primary,
+  helperLabel,
+  name,
+  onEdit,
+  provider = 'kakao',
+  providerLabel,
+}: ProfileCardProps) {
   const providerMeta = PROVIDER_META[provider];
 
   return (
@@ -47,8 +57,9 @@ export function ProfileCard({ avatarColor = theme.color.primary, name, onEdit, p
         <Text numberOfLines={1} style={styles.name}>
           {name}
         </Text>
+        {helperLabel ? <Text style={styles.profileHelper}>{helperLabel}</Text> : null}
         <View style={[styles.providerBadge, { backgroundColor: providerMeta.bg }]}>
-          <Text style={[styles.providerText, { color: providerMeta.fg }]}>{providerMeta.label}</Text>
+          <Text style={[styles.providerText, { color: providerMeta.fg }]}>{providerLabel ?? providerMeta.label}</Text>
         </View>
       </View>
       {onEdit ? (
@@ -94,6 +105,7 @@ export function SettingsList({ children, title }: SettingsListProps) {
 export function SettingRow({
   affordance,
   danger = false,
+  disabled = false,
   first = false,
   icon,
   label,
@@ -105,7 +117,9 @@ export function SettingRow({
       {icon ? <View style={[styles.rowIcon, danger ? styles.rowIconDanger : null]}>{icon}</View> : null}
       <Text style={[styles.rowLabel, danger ? styles.rowLabelDanger : null]}>{label}</Text>
       {value ? <Text style={styles.rowValue}>{value}</Text> : null}
-      {affordance ? <Text style={styles.rowAffordance}>{affordance}</Text> : null}
+      {affordance ? (
+        <Text style={[styles.rowAffordance, disabled ? styles.rowValueDisabled : null]}>{affordance}</Text>
+      ) : null}
       {onPress && !affordance ? <ChevronRight color={theme.color.textFaint} size={18} strokeWidth={2} /> : null}
     </>
   );
@@ -114,15 +128,24 @@ export function SettingRow({
     return (
       <Pressable
         accessibilityRole="button"
+        accessibilityState={{ disabled }}
+        disabled={disabled}
         onPress={onPress}
-        style={({ pressed }) => [styles.row, first ? null : styles.rowDivider, pressed ? styles.pressed : null]}
+        style={({ pressed }) => [
+          styles.row,
+          first ? null : styles.rowDivider,
+          pressed ? styles.pressed : null,
+          disabled ? styles.rowDisabled : null,
+        ]}
       >
         {content}
       </Pressable>
     );
   }
 
-  return <View style={[styles.row, first ? null : styles.rowDivider]}>{content}</View>;
+  return (
+    <View style={[styles.row, first ? null : styles.rowDivider, disabled ? styles.rowDisabled : null]}>{content}</View>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -177,6 +200,11 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: theme.space[2],
   },
+  profileHelper: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.caption,
+  },
   providerBadge: {
     alignSelf: 'flex-start',
     borderRadius: theme.radius.pill,
@@ -201,6 +229,9 @@ const styles = StyleSheet.create({
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.caption,
     fontWeight: theme.font.weight.bold,
+  },
+  rowDisabled: {
+    opacity: 0.5,
   },
   rowDivider: {
     borderTopColor: theme.color.borderSubtle,
@@ -231,6 +262,9 @@ const styles = StyleSheet.create({
     color: theme.color.textMuted,
     fontFamily: theme.font.family.regular,
     fontSize: theme.font.size.caption,
+  },
+  rowValueDisabled: {
+    color: theme.color.textFaint,
   },
   statLabel: {
     color: theme.color.textMuted,

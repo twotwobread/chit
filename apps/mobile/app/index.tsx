@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 
 import { ApiError } from '@i-um/api-contract';
@@ -7,6 +7,7 @@ import { ApiError } from '@i-um/api-contract';
 import { MobileAuthError } from '../lib/auth/client';
 import { clearStoredSession, readStoredSession } from '../lib/auth/session';
 import { Card, PrimaryButton, SecondaryButton, theme } from '../lib/design';
+import { ActiveTripCard, PastTripRow, UpcomingTripRow } from '../lib/home-ui/TripCards';
 import { BottomMenu } from '../lib/navigation/BottomMenu';
 import { listMyTrips } from '../lib/trips/client';
 import {
@@ -169,24 +170,15 @@ function HomeContent({ viewModel }: { viewModel: HomeViewModel }) {
 
 function CurrentTripCard({ trip }: { trip: HomeCurrentTripViewModel }) {
   return (
-    <Pressable
-      accessibilityLabel={`${trip.name} 여행 이어가기`}
-      accessibilityRole="button"
+    <ActiveTripCard
+      ctaLabel={trip.resumeLabel}
+      currencyLabel={trip.currencyLabel}
+      dateLabel={trip.dateRangeLabel}
+      dayLabel="진행 중인 여행"
+      metaLabels={trip.metaLabels}
+      name={trip.name}
       onPress={() => router.push(trip.resumePath)}
-      style={({ pressed }) => [styles.tripRow, styles.currentTripCard, pressed ? styles.pressed : null]}
-    >
-      <Text style={styles.currentTripLabel}>진행 중인 여행</Text>
-      <Text style={styles.tripName}>{trip.name}</Text>
-      <Text style={styles.tripDate}>{formatDateRange(trip.startDate, trip.endDate)}</Text>
-      <Text style={styles.tripCurrency}>기본 통화 {trip.defaultCurrency}</Text>
-      <View style={styles.tripMetaRow}>
-        <Text style={styles.metaLabel}>{trip.roleLabel}</Text>
-        <Text style={styles.metaLabel}>{trip.participantCountLabel}</Text>
-      </View>
-      <View style={styles.currentTripCta}>
-        <Text style={styles.currentTripCtaText}>{trip.resumeLabel}</Text>
-      </View>
-    </Pressable>
+    />
   );
 }
 
@@ -201,8 +193,8 @@ function TripSections({ sections }: { sections: HomeTripStatusSectionViewModel[]
         <View key={section.title} style={styles.tripSection}>
           <Text style={styles.tripSectionTitle}>{section.title}</Text>
           <View style={styles.tripList}>
-            {section.trips.map((trip) => (
-              <TripRow key={trip.id} trip={trip} />
+            {section.trips.map((trip, index) => (
+              <TripRow key={trip.id} first={index === 0} section={section} trip={trip} />
             ))}
           </View>
         </View>
@@ -211,22 +203,40 @@ function TripSections({ sections }: { sections: HomeTripStatusSectionViewModel[]
   );
 }
 
-function TripRow({ trip }: { trip: HomeTripCardViewModel }) {
+function TripRow({
+  first,
+  section,
+  trip,
+}: {
+  first: boolean;
+  section: HomeTripStatusSectionViewModel;
+  trip: HomeTripCardViewModel;
+}) {
+  const onPress = () => router.push(trip.detailPath);
+
+  if (section.status === 'past') {
+    return (
+      <PastTripRow
+        currencyLabel={trip.currencyLabel}
+        dateLabel={trip.dateRangeLabel}
+        first={first}
+        metaLabels={trip.metaLabels}
+        name={trip.name}
+        onPress={onPress}
+      />
+    );
+  }
+
   return (
-    <Pressable
-      accessibilityLabel={`${trip.name} 여행 정보 보기`}
-      accessibilityRole="button"
-      onPress={() => router.push(trip.detailPath)}
-      style={({ pressed }) => [styles.tripRow, pressed ? styles.pressed : null]}
-    >
-      <Text style={styles.tripName}>{trip.name}</Text>
-      <Text style={styles.tripDate}>{formatDateRange(trip.startDate, trip.endDate)}</Text>
-      <Text style={styles.tripCurrency}>기본 통화 {trip.defaultCurrency}</Text>
-      <View style={styles.tripMetaRow}>
-        <Text style={styles.metaLabel}>{trip.roleLabel}</Text>
-        <Text style={styles.metaLabel}>{trip.participantCountLabel}</Text>
-      </View>
-    </Pressable>
+    <UpcomingTripRow
+      currencyLabel={trip.currencyLabel}
+      dateLabel={trip.dateRangeLabel}
+      metaLabels={trip.metaLabels}
+      name={trip.name}
+      onPress={onPress}
+      statusLabel={section.status === 'ongoing' ? '진행 중' : undefined}
+      statusTone={section.status === 'ongoing' ? 'success' : 'amber'}
+    />
   );
 }
 
@@ -242,54 +252,12 @@ async function handleAuthError(error: unknown): Promise<boolean> {
   return false;
 }
 
-function formatDateRange(startDate: string, endDate: string): string {
-  return `${formatDate(startDate)} ~ ${formatDate(endDate)}`;
-}
-
-function formatDate(value: string): string {
-  return value.split('-').join('.');
-}
-
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: theme.color.bg,
-  },
-  scroll: {
-    flex: 1,
-  },
   content: {
-    flexGrow: 1,
     alignItems: 'center',
+    flexGrow: 1,
     gap: theme.space[4],
     padding: theme.space[7],
-  },
-  header: {
-    width: '100%',
-    maxWidth: theme.layout.cardMaxW,
-    gap: theme.space[3],
-  },
-  title: {
-    color: theme.color.textStrong,
-    fontFamily: theme.font.family.bold,
-    fontSize: theme.font.size.titleLg,
-    fontWeight: theme.font.weight.bold,
-  },
-  subtitle: {
-    color: theme.color.textMuted,
-    fontFamily: theme.font.family.regular,
-  },
-  homeBody: {
-    width: '100%',
-    maxWidth: theme.layout.cardMaxW,
-    gap: theme.space[4],
-  },
-  stateTitle: {
-    color: theme.color.textStrong,
-    fontFamily: theme.font.family.bold,
-    fontSize: theme.font.size.subhead,
-    fontWeight: theme.font.weight.bold,
-    textAlign: 'center',
   },
   errorTitle: {
     color: theme.color.danger,
@@ -298,13 +266,51 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.bold,
     textAlign: 'center',
   },
+  header: {
+    gap: theme.space[3],
+    maxWidth: theme.layout.cardMaxW,
+    width: '100%',
+  },
+  homeBody: {
+    gap: theme.space[4],
+    maxWidth: theme.layout.cardMaxW,
+    width: '100%',
+  },
   message: {
     color: theme.color.textBody,
     fontFamily: theme.font.family.regular,
     textAlign: 'center',
   },
-  tripSections: {
-    gap: theme.space[5],
+  screen: {
+    backgroundColor: theme.color.bg,
+    flex: 1,
+  },
+  scroll: {
+    flex: 1,
+  },
+  stateTitle: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.subhead,
+    fontWeight: theme.font.weight.bold,
+    textAlign: 'center',
+  },
+  subtitle: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.regular,
+  },
+  title: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.titleLg,
+    fontWeight: theme.font.weight.bold,
+  },
+  tripList: {
+    backgroundColor: theme.color.surface,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.xl,
+    borderWidth: 1,
+    overflow: 'hidden',
   },
   tripSection: {
     gap: theme.space[3],
@@ -315,72 +321,7 @@ const styles = StyleSheet.create({
     fontSize: theme.font.size.label,
     fontWeight: theme.font.weight.bold,
   },
-  tripList: {
-    gap: theme.space[3],
-  },
-  tripRow: {
-    backgroundColor: theme.color.surface,
-    borderColor: theme.color.borderSubtle,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    gap: theme.space[2],
-    padding: theme.space[4],
-    ...theme.shadow.xs,
-  },
-  currentTripCard: {
-    backgroundColor: theme.color.surfaceSoft,
-    borderColor: theme.color.borderDefault,
-  },
-  currentTripLabel: {
-    color: theme.color.primary,
-    fontFamily: theme.font.family.bold,
-    fontSize: theme.font.size.label,
-    fontWeight: theme.font.weight.bold,
-  },
-  tripName: {
-    color: theme.color.textStrong,
-    fontFamily: theme.font.family.bold,
-    fontSize: theme.font.size.subhead,
-    fontWeight: theme.font.weight.bold,
-  },
-  tripDate: {
-    color: theme.color.textMuted,
-    fontFamily: theme.font.family.regular,
-    fontSize: theme.font.size.label,
-  },
-  tripCurrency: {
-    color: theme.color.textBody,
-    fontFamily: theme.font.family.regular,
-    fontSize: theme.font.size.label,
-  },
-  tripMetaRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: theme.space[3],
-  },
-  metaLabel: {
-    color: theme.color.textMuted,
-    fontFamily: theme.font.family.bold,
-    fontSize: theme.font.size.label,
-    fontWeight: theme.font.weight.bold,
-  },
-  currentTripCta: {
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    borderColor: theme.color.primary,
-    borderRadius: theme.radius.pill,
-    borderWidth: 1,
-    marginTop: theme.space[2],
-    paddingHorizontal: theme.space[4],
-    paddingVertical: theme.space[2],
-  },
-  currentTripCtaText: {
-    color: theme.color.primary,
-    fontFamily: theme.font.family.bold,
-    fontSize: theme.font.size.label,
-    fontWeight: theme.font.weight.bold,
-  },
-  pressed: {
-    opacity: 0.72,
+  tripSections: {
+    gap: theme.space[5],
   },
 });

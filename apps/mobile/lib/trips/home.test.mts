@@ -123,6 +123,8 @@ test('Home pins the selected current trip and deduplicates it from grouped secti
   assert.equal(viewModel.currentTrip?.resumePath, '/trips/current/today');
   assert.equal(viewModel.currentTrip?.detailPath, '/trips/current/detail');
   assert.equal(viewModel.currentTrip?.participantCountLabel, '참여자 2명');
+  assert.equal(viewModel.currentTrip?.dateRangeLabel, '2026.06.20 ~ 2026.06.22');
+  assert.equal(viewModel.currentTrip?.currencyLabel, '기본 통화 KRW');
   assert.deepEqual(
     viewModel.sections.map((section) => [section.status, section.trips.map((item) => [item.id, item.detailPath])]),
     [
