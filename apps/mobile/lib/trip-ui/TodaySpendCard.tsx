@@ -1,0 +1,109 @@
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Plus } from 'lucide-react-native';
+
+import { AmountText, Badge, theme } from '../design';
+
+export type TodaySpendCardProps = {
+  totalAmount: number;
+  currency?: 'KRW' | 'JPY' | string;
+  paidByMeAmount?: number;
+  needsReviewCount?: number;
+  onPressAdd: () => void;
+  addLabel?: string;
+};
+
+export function TodaySpendCard({
+  addLabel = '지출 등록',
+  currency = 'JPY',
+  needsReviewCount = 0,
+  onPressAdd,
+  paidByMeAmount,
+  totalAmount,
+}: TodaySpendCardProps) {
+  return (
+    <View style={styles.card}>
+      <View style={styles.head}>
+        <Text style={styles.overline}>오늘 지출</Text>
+        {needsReviewCount > 0 ? <Badge label={`확인 필요 ${needsReviewCount}`} tone="amber" /> : null}
+      </View>
+
+      <View style={styles.amountRow}>
+        <AmountText currency={currency} size="xl" value={totalAmount} />
+        {paidByMeAmount == null ? null : (
+          <View style={styles.paidByMeRow}>
+            <Text style={styles.paidByMeLabel}>내가 낸 금액</Text>
+            <AmountText currency={currency} size="sm" value={paidByMeAmount} style={styles.paidByMeAmount} />
+          </View>
+        )}
+      </View>
+
+      <Pressable
+        accessibilityRole="button"
+        onPress={onPressAdd}
+        style={({ pressed }) => [styles.cta, pressed ? styles.pressed : null]}
+      >
+        <Plus color={theme.color.amber[700]} size={18} strokeWidth={2.4} />
+        <Text style={styles.ctaText}>{addLabel}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  amountRow: {
+    alignItems: 'flex-start',
+    gap: theme.space[2],
+  },
+  card: {
+    backgroundColor: theme.color.accentSoft,
+    borderColor: theme.color.amber[100],
+    borderRadius: theme.radius.xl,
+    borderWidth: 1,
+    gap: theme.space[4],
+    padding: theme.space[5],
+    width: '100%',
+  },
+  cta: {
+    alignItems: 'center',
+    backgroundColor: theme.color.amber[100],
+    borderRadius: theme.radius.lg,
+    flexDirection: 'row',
+    gap: theme.space[2],
+    height: theme.layout.controlH,
+    justifyContent: 'center',
+  },
+  ctaText: {
+    color: theme.color.amber[700],
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.body,
+    fontWeight: theme.font.weight.bold,
+  },
+  head: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  overline: {
+    color: theme.color.amber[700],
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.micro,
+    fontWeight: theme.font.weight.bold,
+    letterSpacing: 1,
+  },
+  paidByMeAmount: {
+    color: theme.color.amber[700],
+  },
+  paidByMeLabel: {
+    color: theme.color.amber[700],
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.caption,
+  },
+  paidByMeRow: {
+    alignItems: 'baseline',
+    flexDirection: 'row',
+    gap: theme.space[2],
+  },
+  pressed: {
+    opacity: 0.72,
+  },
+});
