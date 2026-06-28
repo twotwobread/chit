@@ -71,9 +71,34 @@ export type QuickExpenseViewModel = {
 
 const zeroDecimalCurrencies = new Set<SupportedCurrency>(['KRW', 'JPY']);
 
+export type QuickExpenseRouteTarget = {
+  tripId: string;
+  date: string;
+  itemId: string | null;
+};
+
 export function buildQuickExpenseRoute(tripId: string, tripDayId: string, itemId?: string | null): Href {
   const base = `/trips/${tripId}/days/${tripDayId}/expenses/quick`;
   return (itemId ? `${base}?itemId=${encodeURIComponent(itemId)}` : base) as Href;
+}
+
+export function parseQuickExpenseRoute(route: Href): QuickExpenseRouteTarget | null {
+  if (typeof route !== 'string') {
+    return null;
+  }
+
+  const [path, query = ''] = route.split('?');
+  const match = /^\/trips\/([^/]+)\/days\/([^/]+)\/expenses\/quick$/.exec(path);
+  if (!match) {
+    return null;
+  }
+
+  const itemId = new URLSearchParams(query).get('itemId')?.trim() || null;
+  return {
+    tripId: decodeURIComponent(match[1]),
+    date: decodeURIComponent(match[2]),
+    itemId,
+  };
 }
 
 export function inferCurrentQuickExpenseItem(items: ScheduleItem[]): ScheduleItem | null {

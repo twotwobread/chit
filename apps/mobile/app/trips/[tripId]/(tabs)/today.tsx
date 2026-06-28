@@ -1,23 +1,44 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Linking, Platform, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as Location from 'expo-location';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 
-import { ApiError, type GetTripDetailResponse, type TripListItem } from '@i-um/api-contract';
+import {
+  ApiError,
+  type GetDayScheduleItemsResponse,
+  type GetTripDetailResponse,
+  type SupportedCurrency,
+  type TripListItem,
+  type TripParticipantListItem,
+} from '@i-um/api-contract';
 
 import { MobileAuthError } from '../../../../lib/auth/client';
+import { clearStoredSession } from '../../../../lib/auth/session';
 import { Card, ListRow, PrimaryButton, SecondaryButton, theme } from '../../../../lib/design';
+import { BottomSheet } from '../../../../lib/trip-ui/BottomSheet';
 import { NextPlaceHeroCard } from '../../../../lib/trip-ui/NextPlaceHeroCard';
+import { QuickExpenseForm } from '../../../../lib/trip-ui/QuickExpenseForm';
 import { TripScreen, TripScreenHeader, TripStateCard } from '../../../../lib/trip-ui/TripScreenScaffold';
 import {
+  createQuickExpense,
   createRoutePreview,
   getTripDayItinerary,
   getTripDetail,
+  listTripParticipants,
   markScheduleItemArrived,
   markScheduleItemSkipped,
   restoreScheduleItem,
 } from '../../../../lib/trips/client';
 import { openTodayNavigationDestination } from '../../../../lib/trips/today-navigation';
+import {
+  buildCreateQuickExpenseRequest,
+  buildDefaultSplitParticipantIds,
+  buildQuickExpenseViewModel,
+  buildSavedEqualSplitSummary,
+  parseQuickExpenseRoute,
+  quickExpenseFailureMessage,
+  type QuickExpenseRouteTarget,
+} from '../../../../lib/trips/quick-expense';
 import {
   buildRoutePreviewRequest,
   buildTodayRoutePreviewHeroChip,
@@ -55,12 +76,30 @@ type TripTodayState =
   | { status: 'notFound' }
   | { status: 'error' };
 
+type QuickExpenseOverlayState =
+  | { status: 'idle' }
+  | { status: 'loading'; target: QuickExpenseRouteTarget }
+  | {
+      status: 'ready' | 'saving';
+      target: QuickExpenseRouteTarget;
+      tripName: string;
+      currency: SupportedCurrency;
+      itinerary: GetDayScheduleItemsResponse;
+      participants: TripParticipantListItem[];
+      selectedItemId: string | null;
+      payerParticipantId: string | null;
+      selectedSplitParticipantIds: string[];
+      errorMessage: string | null;
+    }
+  | { status: 'error'; target: QuickExpenseRouteTarget; message: string };
+
 export default function TripTodayTabScreen() {
   const { tripId: tripIdParam } = useLocalSearchParams<{ tripId?: string | string[] }>();
   const tripId = Array.isArray(tripIdParam) ? tripIdParam[0] : tripIdParam;
   const [state, setState] = useState<TripTodayState>({ status: 'loading' });
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [pendingItemId, setPendingItemId] = useState<string | null>(null);
+  const [quickExpenseState, setQuickExpenseState] = useState<QuickExpenseOverlayState>({ status: 'idle' });
   const [routeChip, setRouteChip] = useState(todayRoutePreviewHeroChipFallbackCopy);
 
   const load = useCallback(async () => {
@@ -158,6 +197,122 @@ export default function TripTodayTabScreen() {
     };
   }, [state, tripId]);
 
+  const openQuickExpenseOverlay = useCallback(async (target: QuickExpenseRouteTarget) => {
+    setActionMessage(null);
+    setQuickExpenseState({ status: 'loading', target });
+    try {
+      const [tripDetail, itinerary, participantsResponse] = await Promise.all([
+        getTripDetail(target.tripId),
+        getTripDayItinerary(target.tripId, target.date),
+        listTripParticipants(target.tripId),
+      ]);
+      const validItemId =
+        target.itemId && itinerary.scheduleItems.some((item) => item.id === target.itemId) ? target.itemId : null;
+      const participants = participantsResponse.participants;
+      setQuickExpenseState({
+        status: 'ready',
+        target,
+        tripName: tripDetail.trip.name.trim() || '여행',
+        currency: tripDetail.trip.defaultCurrency,
+        itinerary,
+        participants,
+        selectedItemId: validItemId,
+        payerParticipantId: participants.length === 1 ? participants[0].participantId : null,
+        selectedSplitParticipantIds: buildDefaultSplitParticipantIds(participants),
+        errorMessage: null,
+      });
+    } catch (error) {
+      if (error instanceof MobileAuthError || (error instanceof ApiError && error.status === 401)) {
+        await clearStoredSession();
+        setQuickExpenseState({ status: 'idle' });
+        setState({ status: 'auth' });
+        return;
+      }
+      setQuickExpenseState({
+        status: 'error',
+        target,
+        message: quickExpenseFailureMessage(error instanceof ApiError ? error.status : undefined),
+      });
+    }
+  }, []);
+
+  const closeQuickExpenseOverlay = useCallback(() => {
+    setQuickExpenseState({ status: 'idle' });
+  }, []);
+
+  const submitQuickExpenseOverlay = useCallback(
+    async ({
+      amount,
+      itemId,
+      payerParticipantId,
+      splitParticipantIds,
+    }: {
+      amount: number;
+      itemId: string;
+      payerParticipantId: string;
+      splitParticipantIds: string[];
+    }) => {
+      if (quickExpenseState.status !== 'ready' || quickExpenseState.target.tripId !== tripId) {
+        return;
+      }
+
+      const validation = buildCreateQuickExpenseRequest({
+        amountInput: String(amount),
+        currency: quickExpenseState.currency,
+        scheduleItemId: itemId,
+        participantIds: splitParticipantIds,
+        payerParticipantId,
+      });
+      if (!validation.ok) {
+        setQuickExpenseState((current) =>
+          current.status === 'ready'
+            ? { ...current, errorMessage: Object.values(validation.errors).find(Boolean) ?? null }
+            : current,
+        );
+        return;
+      }
+
+      setQuickExpenseState({ ...quickExpenseState, status: 'saving', errorMessage: null });
+      try {
+        const response = await createQuickExpense(
+          quickExpenseState.target.tripId,
+          quickExpenseState.target.date,
+          validation.request,
+        );
+        const summary = buildSavedEqualSplitSummary({
+          amountMinor: response.expense.amountMinor,
+          currency: response.expense.currency,
+          splits: response.expense.splits,
+        });
+        setQuickExpenseState({ status: 'idle' });
+        await load();
+        setActionMessage(`지출을 저장했어요. ${summary.amountLabel}`);
+      } catch (error) {
+        if (error instanceof MobileAuthError || (error instanceof ApiError && error.status === 401)) {
+          await clearStoredSession();
+          setQuickExpenseState({ status: 'idle' });
+          setState({ status: 'auth' });
+          return;
+        }
+        if (error instanceof ApiError && error.status === 409) {
+          setQuickExpenseState({
+            ...quickExpenseState,
+            status: 'ready',
+            errorMessage: quickExpenseFailureMessage(error.status),
+          });
+          void openQuickExpenseOverlay(quickExpenseState.target);
+          return;
+        }
+        setQuickExpenseState({
+          ...quickExpenseState,
+          status: 'ready',
+          errorMessage: quickExpenseFailureMessage(error instanceof ApiError ? error.status : undefined),
+        });
+      }
+    },
+    [load, openQuickExpenseOverlay, quickExpenseState, tripId],
+  );
+
   const runAction = useCallback(
     async (action: TodayAction) => {
       if (!tripId) {
@@ -166,6 +321,11 @@ export default function TripTodayTabScreen() {
 
       setActionMessage(null);
       if (action.kind === 'route') {
+        const quickExpenseTarget = parseQuickExpenseRoute(action.route);
+        if (quickExpenseTarget) {
+          await openQuickExpenseOverlay(quickExpenseTarget);
+          return;
+        }
         router.push(action.route);
         return;
       }
@@ -211,7 +371,7 @@ export default function TripTodayTabScreen() {
         setPendingItemId(null);
       }
     },
-    [load, tripId],
+    [load, openQuickExpenseOverlay, tripId],
   );
 
   const handleTravelMode = useCallback((label: string) => {
@@ -265,6 +425,13 @@ export default function TripTodayTabScreen() {
           viewModel={state.viewModel}
         />
       ) : null}
+
+      <QuickExpenseOverlaySheet
+        onClose={closeQuickExpenseOverlay}
+        onRetry={(target) => void openQuickExpenseOverlay(target)}
+        onSubmit={(payload) => void submitQuickExpenseOverlay(payload)}
+        state={quickExpenseState}
+      />
     </TripScreen>
   );
 }
@@ -380,6 +547,87 @@ function TodayReadyContent({
   );
 }
 
+function QuickExpenseOverlaySheet({
+  onClose,
+  onRetry,
+  onSubmit,
+  state,
+}: {
+  state: QuickExpenseOverlayState;
+  onClose: () => void;
+  onRetry: (target: QuickExpenseRouteTarget) => void;
+  onSubmit: (payload: {
+    amount: number;
+    itemId: string;
+    payerParticipantId: string;
+    splitParticipantIds: string[];
+  }) => void;
+}) {
+  const isReady = state.status === 'ready' || state.status === 'saving';
+  const viewModel = isReady
+    ? buildQuickExpenseViewModel({
+        amountInput: '',
+        currency: state.currency,
+        itinerary: state.itinerary,
+        participants: state.participants,
+        selectedItemId: state.selectedItemId,
+        selectedSplitParticipantIds: state.selectedSplitParticipantIds,
+        shouldChooseItem: state.selectedItemId === null,
+      })
+    : null;
+
+  return (
+    <BottomSheet onClose={onClose} visible={state.status !== 'idle'}>
+      <ScrollView contentContainerStyle={styles.quickExpenseSheetBody} showsVerticalScrollIndicator={false}>
+        <View style={styles.quickExpenseSheetHeader}>
+          <Text style={styles.cardTitle}>지출 등록</Text>
+          <Text style={styles.cardHelper}>오늘 화면을 떠나지 않고 금액과 결제자를 입력해요.</Text>
+        </View>
+
+        {state.status === 'loading' ? (
+          <View style={styles.quickExpenseStatusBox}>
+            <ActivityIndicator color={theme.color.primary} />
+            <Text style={styles.message}>지출 등록 정보를 불러오는 중...</Text>
+          </View>
+        ) : null}
+
+        {state.status === 'error' ? (
+          <View style={styles.quickExpenseStatusBox}>
+            <Text style={styles.errorTitle}>지출 등록을 열 수 없어요.</Text>
+            <Text style={styles.message}>{state.message}</Text>
+            <PrimaryButton label="다시 시도" onPress={() => onRetry(state.target)} />
+            <SecondaryButton label="닫기" onPress={onClose} />
+          </View>
+        ) : null}
+
+        {isReady && viewModel ? (
+          <QuickExpenseForm
+            currency={state.currency}
+            errorMessage={state.errorMessage}
+            initialDraft={{
+              itemId: state.selectedItemId,
+              payerParticipantId: state.payerParticipantId,
+              splitParticipantIds: state.selectedSplitParticipantIds,
+            }}
+            itemOptions={viewModel.itemOptions.map((item) => ({
+              id: item.itemId,
+              label: `${item.orderLabel}. ${item.placeName}`,
+              helper: `${item.placeTypeLabel} · ${item.address}`,
+            }))}
+            onCancel={onClose}
+            onSave={onSubmit}
+            participantOptions={viewModel.payerOptions.map((participant) => ({
+              id: participant.participantId,
+              name: participant.displayName,
+            }))}
+            submitting={state.status === 'saving'}
+          />
+        ) : null}
+      </ScrollView>
+    </BottomSheet>
+  );
+}
+
 function SkippedPlacesSection({
   onRestore,
   pendingItemId,
@@ -473,6 +721,13 @@ const styles = StyleSheet.create({
     fontSize: theme.font.size.subhead,
     fontWeight: theme.font.weight.bold,
   },
+  errorTitle: {
+    color: theme.color.danger,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.body,
+    fontWeight: theme.font.weight.bold,
+    textAlign: 'center',
+  },
   eyebrow: {
     color: theme.color.primary,
     fontFamily: theme.font.family.bold,
@@ -484,6 +739,18 @@ const styles = StyleSheet.create({
     fontFamily: theme.font.family.regular,
     fontSize: theme.font.size.body,
     textAlign: 'center',
+  },
+  quickExpenseSheetBody: {
+    paddingBottom: theme.space[3],
+  },
+  quickExpenseSheetHeader: {
+    gap: theme.space[1],
+    marginBottom: theme.space[4],
+  },
+  quickExpenseStatusBox: {
+    alignItems: 'center',
+    gap: theme.space[3],
+    paddingVertical: theme.space[4],
   },
   rowButton: {
     minHeight: 36,
