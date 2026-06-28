@@ -11,12 +11,14 @@ export type DayItineraryMapActionFeedback = {
 export type DayItineraryMapRowActions = {
   map: {
     label: '지도';
+    accessibilityLabel: string;
     url: string;
     successFeedback: null;
     failureFeedback: string;
   };
   copy: {
     label: '주소 복사';
+    accessibilityLabel: string;
     address?: string;
     disabled: boolean;
     disabledHelper?: string;
@@ -45,12 +47,14 @@ export function buildDayItineraryMapRowActions(input: DayItineraryMapActionInput
   return {
     map: {
       label: '지도',
+      accessibilityLabel: `${input.placeName} 지도 열기`,
       url: buildGoogleMapsSearchUrl(input.placeName, address),
       successFeedback: null,
       failureFeedback: mapFailureMessage,
     },
     copy: {
       label: '주소 복사',
+      accessibilityLabel: `${input.placeName} 주소 복사`,
       address: address || undefined,
       disabled: !address,
       disabledHelper: address ? undefined : missingAddressHelper,

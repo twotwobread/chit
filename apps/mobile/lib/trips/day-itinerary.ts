@@ -91,6 +91,10 @@ export function getScheduleItems(response: GetDayScheduleItemsResponse): Schedul
   return response.scheduleItems ?? ((response as unknown as { items?: ScheduleItem[] }).items || []);
 }
 
+export function buildDayItineraryPlaceAccessibilityLabel(item: DayItineraryRowViewModel): string {
+  return `${item.orderLabel}번째 장소 ${item.placeName}. ${item.placeTypeLabel}. ${item.address}`;
+}
+
 export function dayItineraryFailureState(status?: number): DayItineraryFailureViewModel {
   if (status === 403 || status === 404) {
     return {

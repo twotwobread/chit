@@ -9,6 +9,7 @@ export type DayExpenseRowViewModel = {
   placeName: string;
   amountLabel: string;
   detailLine: string;
+  accessibilityLabel: string;
 };
 
 export type DayExpensesViewModel =
@@ -57,12 +58,19 @@ export function buildDayExpensesViewModel({
   return {
     status: 'success',
     title: sectionTitle,
-    rows: expenses.map((expense) => ({
-      id: expense.id,
-      placeName: displayTitle(expense),
-      amountLabel: formatMoney(expense.amountMinor, expense.currency),
-      detailLine: `결제 ${normalizeDisplayName(expense.payer.displayName)} · ${buildSplitSummary(expense.splits, expense.currency)}`,
-    })),
+    rows: expenses.map((expense) => {
+      const placeName = displayTitle(expense);
+      const amountLabel = formatMoney(expense.amountMinor, expense.currency);
+      const detailLine = `결제 ${normalizeDisplayName(expense.payer.displayName)} · ${buildSplitSummary(expense.splits, expense.currency)}`;
+
+      return {
+        id: expense.id,
+        placeName,
+        amountLabel,
+        detailLine,
+        accessibilityLabel: `${placeName} ${amountLabel}. ${detailLine}`,
+      };
+    }),
   };
 }
 

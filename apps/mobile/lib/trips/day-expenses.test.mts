@@ -49,6 +49,7 @@ test('builds compact read-only day expense rows from canonical API display data'
       placeName: '도톤보리',
       amountLabel: '1,200엔',
       detailLine: '결제 민수 · 분담 민수 600엔 · 지영 600엔',
+      accessibilityLabel: '도톤보리 1,200엔. 결제 민수 · 분담 민수 600엔 · 지영 600엔',
     },
   ]);
 });
