@@ -1,3 +1,10 @@
+export type DayItineraryDragOffsetInput = {
+  pointerY: number;
+  startPointerY: number;
+  currentScrollOffsetY: number;
+  startScrollOffsetY: number;
+};
+
 export type DayItineraryDragTargetInput = {
   startIndex: number;
   dragOffsetY: number;
@@ -19,6 +26,15 @@ const DEFAULT_MAX_STEP = 18;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
+}
+
+export function resolveDayItineraryDragOffsetY({
+  pointerY,
+  startPointerY,
+  currentScrollOffsetY,
+  startScrollOffsetY,
+}: DayItineraryDragOffsetInput): number {
+  return pointerY - startPointerY + currentScrollOffsetY - startScrollOffsetY;
 }
 
 function resolveRowHeight(

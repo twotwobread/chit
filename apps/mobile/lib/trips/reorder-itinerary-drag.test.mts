@@ -1,9 +1,69 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { resolveDayItineraryDragAutoScrollOffset, resolveDayItineraryDragTargetIndex } from './reorder-itinerary-drag';
+import {
+  resolveDayItineraryDragAutoScrollOffset,
+  resolveDayItineraryDragOffsetY,
+  resolveDayItineraryDragTargetIndex,
+} from './reorder-itinerary-drag';
 
 describe('reorder itinerary drag helpers', () => {
+  it('computes drag offset from absolute pointer movement and scroll delta', () => {
+    assert.equal(
+      resolveDayItineraryDragOffsetY({
+        pointerY: 342,
+        startPointerY: 430,
+        currentScrollOffsetY: 161,
+        startScrollOffsetY: 161,
+      }),
+      -88,
+    );
+    assert.equal(
+      resolveDayItineraryDragOffsetY({
+        pointerY: 342,
+        startPointerY: 430,
+        currentScrollOffsetY: 181,
+        startScrollOffsetY: 161,
+      }),
+      -68,
+    );
+  });
+
+  it('keeps the same target after a reorder render even when responder dy would reset', () => {
+    const rowHeights = [137, 137, 97];
+    const firstDragOffsetY = resolveDayItineraryDragOffsetY({
+      pointerY: 353,
+      startPointerY: 430,
+      currentScrollOffsetY: 161,
+      startScrollOffsetY: 161,
+    });
+    const nextDragOffsetY = resolveDayItineraryDragOffsetY({
+      pointerY: 342,
+      startPointerY: 430,
+      currentScrollOffsetY: 161,
+      startScrollOffsetY: 161,
+    });
+
+    assert.equal(
+      resolveDayItineraryDragTargetIndex({
+        startIndex: 2,
+        dragOffsetY: firstDragOffsetY,
+        rowHeights,
+        fallbackRowHeight: 56,
+      }),
+      1,
+    );
+    assert.equal(
+      resolveDayItineraryDragTargetIndex({
+        startIndex: 2,
+        dragOffsetY: nextDragOffsetY,
+        rowHeights,
+        fallbackRowHeight: 56,
+      }),
+      1,
+    );
+  });
+
   it('moves the target index down when the drag crosses row midpoints', () => {
     const rowHeights = [80, 100, 120];
 
