@@ -25,6 +25,7 @@
     "expo-location": "~19.0.8",
     "expo-router": "6.0.24",
     "expo-secure-store": "~15.0.8",
+    "lucide-react-native": "^1.21.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-native": "0.81.5",
@@ -32,7 +33,8 @@
     "react-native-kakao-share-link": "1.0.12",
     "react-native-maps": "1.20.1",
     "react-native-safe-area-context": "5.6.2",
-    "react-native-screens": "~4.16.0"
+    "react-native-screens": "~4.16.0",
+    "react-native-svg": "15.12.1"
   },
   "devDependencies": {
     "@types/react": "~19.1.17",
