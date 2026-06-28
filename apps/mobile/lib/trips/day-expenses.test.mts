@@ -47,8 +47,13 @@ test('builds compact read-only day expense rows from canonical API display data'
     {
       id: 'expense-a',
       placeName: '도톤보리',
+      amountMinor: 1200,
+      currency: 'JPY',
       amountLabel: '1,200엔',
+      payerLabel: '결제 민수',
+      splitLabel: '분담 민수 600엔 · 지영 600엔',
       detailLine: '결제 민수 · 분담 민수 600엔 · 지영 600엔',
+      category: 'food',
       accessibilityLabel: '도톤보리 1,200엔. 결제 민수 · 분담 민수 600엔 · 지영 600엔',
     },
   ]);
@@ -129,7 +134,11 @@ test('formats supported currencies in expense rows', () => {
   if (viewModel.status !== 'success') {
     return;
   }
+  assert.equal(viewModel.rows[0].amountMinor, 18500);
+  assert.equal(viewModel.rows[0].currency, 'KRW');
   assert.equal(viewModel.rows[0].amountLabel, '18,500원');
+  assert.equal(viewModel.rows[0].payerLabel, '결제 민수');
+  assert.equal(viewModel.rows[0].splitLabel, '분담 민수 18,500원');
   assert.equal(viewModel.rows[0].detailLine, '결제 민수 · 분담 민수 18,500원');
   assert.equal(
     buildSplitSummary([{ splitOrder: 1, participant: participant('Alex'), amountMinor: 1234 }], 'USD'),

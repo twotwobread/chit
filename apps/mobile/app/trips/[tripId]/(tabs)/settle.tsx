@@ -5,7 +5,8 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { ApiError } from '@i-um/api-contract';
 
 import { MobileAuthError } from '../../../../lib/auth/client';
-import { ListRow, theme } from '../../../../lib/design';
+import { theme } from '../../../../lib/design';
+import { ExpenseRow } from '../../../../lib/trip-ui/ExpenseRow';
 import { TripListCard, TripScreen, TripScreenHeader, TripStateCard } from '../../../../lib/trip-ui/TripScreenScaffold';
 import { getTripDetail, listDayExpenses } from '../../../../lib/trips/client';
 import {
@@ -122,12 +123,15 @@ function SettleContent({
         <Text style={styles.summaryHelper}>오늘 등록된 지출 {viewModel.rows.length}건</Text>
       </View>
       {viewModel.rows.map((row, index) => (
-        <ListRow
+        <ExpenseRow
+          amount={row.amountMinor}
+          category={row.category}
+          currency={row.currency}
           first={index === 0}
           key={row.id}
-          subtitle={row.detailLine}
+          payerLabel={row.payerLabel}
+          splitLabel={row.splitLabel}
           title={row.placeName}
-          trailing={<Text style={styles.amount}>{row.amountLabel}</Text>}
         />
       ))}
     </TripListCard>
@@ -167,12 +171,6 @@ function settleFailureState(error: unknown): TripSettleState {
 }
 
 const styles = StyleSheet.create({
-  amount: {
-    color: theme.color.textStrong,
-    fontFamily: theme.font.family.bold,
-    fontSize: theme.font.size.body,
-    fontWeight: theme.font.weight.bold,
-  },
   summary: {
     gap: theme.space[1],
     paddingHorizontal: theme.space[1],
