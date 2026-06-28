@@ -17,6 +17,7 @@ import { clearStoredSession } from '../../../../lib/auth/session';
 import { Card, ListRow, PrimaryButton, SecondaryButton, theme } from '../../../../lib/design';
 import { BottomSheet } from '../../../../lib/trip-ui/BottomSheet';
 import { NextPlaceHeroCard } from '../../../../lib/trip-ui/NextPlaceHeroCard';
+import { TodaySpendCard } from '../../../../lib/trip-ui/TodaySpendCard';
 import { QuickExpenseForm } from '../../../../lib/trip-ui/QuickExpenseForm';
 import { TripScreen, TripScreenHeader, TripStateCard } from '../../../../lib/trip-ui/TripScreenScaffold';
 import {
@@ -24,12 +25,14 @@ import {
   createRoutePreview,
   getTripDayItinerary,
   getTripDetail,
+  listDayExpenses,
   listTripParticipants,
   markScheduleItemArrived,
   markScheduleItemSkipped,
   restoreScheduleItem,
 } from '../../../../lib/trips/client';
 import { openTodayNavigationDestination } from '../../../../lib/trips/today-navigation';
+import { buildTodaySpendSummaryViewModel, type TodaySpendSummaryViewModel } from '../../../../lib/trips/today-spend';
 import {
   buildCreateQuickExpenseRequest,
   buildDefaultSplitParticipantIds,
@@ -70,7 +73,7 @@ import { localDateString } from '../../../../lib/trips/status';
 
 type TripTodayState =
   | { status: 'loading' }
-  | { status: 'ready'; viewModel: TodayExecutionViewModel }
+  | { status: 'ready'; viewModel: TodayExecutionViewModel; spendSummary: TodaySpendSummaryViewModel }
   | { status: 'unavailable'; viewModel: TripTabUnavailableViewModel }
   | { status: 'auth' }
   | { status: 'notFound' }
@@ -121,7 +124,10 @@ export default function TripTodayTabScreen() {
         return;
       }
 
-      const itinerary = await getTripDayItinerary(tripId, currentDay.id);
+      const [itinerary, expensesResponse] = await Promise.all([
+        getTripDayItinerary(tripId, currentDay.id),
+        listDayExpenses(tripId, currentDay.id),
+      ]);
       const viewModel = buildTodayExecutionViewModel({
         itinerary,
         ongoingTripCount: 1,
@@ -136,7 +142,16 @@ export default function TripTodayTabScreen() {
         return;
       }
 
-      setState({ status: 'ready', viewModel });
+      setState({
+        status: 'ready',
+        viewModel,
+        spendSummary: buildTodaySpendSummaryViewModel({
+          actionRoute:
+            'quickExpenseAction' in viewModel ? viewModel.quickExpenseAction.route : viewModel.primaryAction.route,
+          defaultCurrency: detail.trip.defaultCurrency,
+          expenses: expensesResponse.expenses,
+        }),
+      });
     } catch (error) {
       setState(todayFailureState(error));
     }
@@ -422,6 +437,7 @@ export default function TripTodayTabScreen() {
           onTravelMode={handleTravelMode}
           pendingItemId={pendingItemId}
           routeChip={routeChip}
+          spendSummary={state.spendSummary}
           viewModel={state.viewModel}
         />
       ) : null}
@@ -442,9 +458,11 @@ function TodayReadyContent({
   onTravelMode,
   pendingItemId,
   routeChip,
+  spendSummary,
   viewModel,
 }: {
   viewModel: TodayExecutionViewModel;
+  spendSummary: TodaySpendSummaryViewModel;
   actionMessage: string | null;
   pendingItemId: string | null;
   routeChip: string;
@@ -494,12 +512,6 @@ function TodayReadyContent({
           <Text style={styles.cardTitle}>{viewModel.title}</Text>
           <Text style={styles.cardHelper}>{viewModel.helper}</Text>
           <PrimaryButton label={viewModel.primaryAction.label} onPress={() => onAction(viewModel.primaryAction)} />
-          {viewModel.status === 'completed' ? (
-            <SecondaryButton
-              label={viewModel.quickExpenseAction.label}
-              onPress={() => onAction(viewModel.quickExpenseAction)}
-            />
-          ) : null}
         </Card>
       ) : null}
 
@@ -526,16 +538,18 @@ function TodayReadyContent({
         />
       ) : null}
 
-      {viewModel.status === 'success' ? (
-        <Card>
-          <Text style={styles.cardTitle}>오늘 일정 바로가기</Text>
-          <Text style={styles.cardHelper}>전체 순서와 장소 편집은 Day 상세에서 할 수 있어요.</Text>
-          <PrimaryButton label={viewModel.primaryAction.label} onPress={() => onAction(viewModel.primaryAction)} />
-          <SecondaryButton
-            label={viewModel.quickExpenseAction.label}
-            onPress={() => onAction(viewModel.quickExpenseAction)}
-          />
-        </Card>
+      {viewModel.status === 'success' || viewModel.status === 'completed' ? (
+        <TodaySpendCard
+          addLabel={spendSummary.actionLabel}
+          additionalAmountLabels={spendSummary.additionalTotals.map((total) => total.amountLabel)}
+          currency={spendSummary.primaryTotal.currency}
+          needsReviewCount={spendSummary.needsReviewCount}
+          onPressAdd={() =>
+            onAction({ kind: 'route', label: spendSummary.actionLabel, route: spendSummary.actionRoute })
+          }
+          totalAmount={spendSummary.primaryTotal.amountMinor}
+          totalAmountLabel={spendSummary.primaryTotal.amountLabel}
+        />
       ) : null}
 
       {actionMessage ? (
