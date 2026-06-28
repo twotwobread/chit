@@ -57,8 +57,12 @@ export function QuickExpenseForm({
   participantOptions,
   submitting = false,
 }: QuickExpenseFormProps) {
-  const defaultItemId = initialDraft?.itemId ?? itemOptions[0]?.id ?? null;
-  const defaultPayerId = initialDraft?.payerParticipantId ?? participantOptions[0]?.id ?? null;
+  const defaultItemId = Object.prototype.hasOwnProperty.call(initialDraft ?? {}, 'itemId')
+    ? (initialDraft?.itemId ?? null)
+    : (itemOptions[0]?.id ?? null);
+  const defaultPayerId = Object.prototype.hasOwnProperty.call(initialDraft ?? {}, 'payerParticipantId')
+    ? (initialDraft?.payerParticipantId ?? null)
+    : (participantOptions[0]?.id ?? null);
   const defaultSplitIds = initialDraft?.splitParticipantIds ?? participantOptions.map((participant) => participant.id);
   const [draft, setDraft] = useState<QuickExpenseDraft>({
     amountInput: initialDraft?.amountInput ?? '',
@@ -127,7 +131,7 @@ export function QuickExpenseForm({
       <View style={styles.amountField}>
         <Text style={styles.currencyLabel}>{currencyLabel(currency)}</Text>
         <TextInput
-          keyboardType="number-pad"
+          keyboardType="decimal-pad"
           onChangeText={(amountInput) => updateDraft({ amountInput })}
           placeholder="0"
           placeholderTextColor={theme.color.textFaint}
@@ -248,12 +252,12 @@ function ParticipantChip({
 }
 
 function parseAmountInput(value: string): number | null {
-  const normalized = value.replace(/[^0-9]/g, '');
-  if (!normalized) {
+  const normalized = value.trim().replaceAll(',', '');
+  if (!/^\d+(\.\d{1,2})?$/.test(normalized)) {
     return null;
   }
 
-  const amount = Number.parseInt(normalized, 10);
+  const amount = Number(normalized);
   return Number.isFinite(amount) ? amount : null;
 }
 

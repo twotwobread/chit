@@ -20,6 +20,7 @@ import {
   formatMoney,
   inferCurrentQuickExpenseItem,
   parseAmountMinor,
+  parseQuickExpenseRoute,
   toggleQuickExpenseSplitParticipant,
 } from './quick-expense.ts';
 
@@ -401,4 +402,18 @@ test('builds route with optional inferred item id', () => {
     buildQuickExpenseRoute('trip-a', '2026-07-10', 'item-a'),
     '/trips/trip-a/days/2026-07-10/expenses/quick?itemId=item-a',
   );
+});
+
+test('parses quick expense routes for overlay interception', () => {
+  assert.deepEqual(parseQuickExpenseRoute('/trips/trip-a/days/2026-07-10/expenses/quick'), {
+    tripId: 'trip-a',
+    date: '2026-07-10',
+    itemId: null,
+  });
+  assert.deepEqual(parseQuickExpenseRoute('/trips/trip-a/days/2026-07-10/expenses/quick?itemId=item%20a'), {
+    tripId: 'trip-a',
+    date: '2026-07-10',
+    itemId: 'item a',
+  });
+  assert.equal(parseQuickExpenseRoute('/trips/trip-a/days/2026-07-10'), null);
 });
