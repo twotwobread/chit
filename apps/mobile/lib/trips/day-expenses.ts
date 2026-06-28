@@ -1,14 +1,21 @@
 import type { Href } from 'expo-router';
 
-import type { DayExpenseListItem, DayExpenseSplitListItem } from '@i-um/api-contract';
+import type { DayExpenseListItem, DayExpenseSplitListItem, TripPlaceType } from '@i-um/api-contract';
+
+import type { ExpenseCategory } from '../trip-ui/ExpenseRow';
 
 import { buildQuickExpenseRoute, formatMoney } from './quick-expense';
 
 export type DayExpenseRowViewModel = {
   id: string;
   placeName: string;
+  amountMinor: number;
+  currency: DayExpenseListItem['currency'];
   amountLabel: string;
+  payerLabel: string;
+  splitLabel: string;
   detailLine: string;
+  category: ExpenseCategory;
   accessibilityLabel: string;
 };
 
@@ -61,13 +68,20 @@ export function buildDayExpensesViewModel({
     rows: expenses.map((expense) => {
       const placeName = displayTitle(expense);
       const amountLabel = formatMoney(expense.amountMinor, expense.currency);
-      const detailLine = `결제 ${normalizeDisplayName(expense.payer.displayName)} · ${buildSplitSummary(expense.splits, expense.currency)}`;
+      const payerLabel = `결제 ${normalizeDisplayName(expense.payer.displayName)}`;
+      const splitLabel = buildSplitSummary(expense.splits, expense.currency);
+      const detailLine = `${payerLabel} · ${splitLabel}`;
 
       return {
         id: expense.id,
         placeName,
+        amountMinor: expense.amountMinor,
+        currency: expense.currency,
         amountLabel,
+        payerLabel,
+        splitLabel,
         detailLine,
+        category: expenseCategory(expense.place?.placeType),
         accessibilityLabel: `${placeName} ${amountLabel}. ${detailLine}`,
       };
     }),
@@ -110,6 +124,25 @@ function displayTitle(expense: DayExpenseListItem): string {
     return title;
   }
   return expense.place?.name.trim() || '지출';
+}
+
+function expenseCategory(placeType?: TripPlaceType | null): ExpenseCategory {
+  switch (placeType) {
+    case 'cafe':
+    case 'food':
+    case 'shopping':
+    case 'sights':
+      return placeType;
+    case 'etc':
+    case 'lodging':
+    case null:
+    case undefined:
+      return 'etc';
+    default: {
+      const exhaustive: never = placeType;
+      throw new Error(`Unsupported trip place type: ${exhaustive}`);
+    }
+  }
 }
 
 function normalizeDisplayName(value: string): string {
