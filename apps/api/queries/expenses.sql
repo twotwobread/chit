@@ -5,21 +5,27 @@ SELECT
 FROM trips
 WHERE id = sqlc.arg(trip_id)::uuid;
 
--- name: GetQuickExpenseItineraryItem :one
+-- name: GetQuickExpenseScheduleItem :one
 SELECT
-  ii.id::text AS itinerary_item_id,
-  ii.scheduled_date,
+  si.id::text AS schedule_item_id,
+  si.trip_day_id::text AS trip_day_id,
+  td.date AS trip_day_date,
   tp.id::text AS trip_place_id,
   tp.name AS place_name,
   tp.place_type,
   tp.address AS place_address
-FROM itinerary_items ii
+FROM schedule_items si
+JOIN trip_days td
+  ON td.id = si.trip_day_id
+ AND td.trip_id = si.trip_id
+ AND td.deleted_at IS NULL
 JOIN trip_places tp
-  ON tp.id = ii.trip_place_id
- AND tp.trip_id = ii.trip_id
-WHERE ii.trip_id = sqlc.arg(trip_id)::uuid
-  AND ii.scheduled_date = sqlc.arg(scheduled_date)
-  AND ii.id = sqlc.arg(itinerary_item_id)::uuid;
+  ON tp.id = si.trip_place_id
+ AND tp.trip_id = si.trip_id
+WHERE si.trip_id = sqlc.arg(trip_id)::uuid
+  AND si.trip_day_id = sqlc.arg(trip_day_id)::uuid
+  AND si.id = sqlc.arg(schedule_item_id)::uuid
+  AND si.deleted_at IS NULL;
 
 -- name: GetQuickExpensePayerParticipant :one
 SELECT
@@ -42,8 +48,10 @@ ORDER BY joined_at ASC, id ASC;
 -- name: InsertExpense :one
 INSERT INTO expenses (
   trip_id,
-  scheduled_date,
-  itinerary_item_id,
+  anchor_type,
+  trip_day_id,
+  schedule_item_id,
+  expense_date,
   trip_place_id,
   place_name,
   place_address,
@@ -55,9 +63,11 @@ INSERT INTO expenses (
   created_by
 ) VALUES (
   sqlc.arg(trip_id)::uuid,
-  sqlc.arg(scheduled_date),
-  sqlc.arg(itinerary_item_id)::uuid,
-  sqlc.arg(trip_place_id)::uuid,
+  sqlc.arg(anchor_type),
+  sqlc.narg(trip_day_id)::uuid,
+  sqlc.narg(schedule_item_id)::uuid,
+  sqlc.arg(expense_date),
+  sqlc.narg(trip_place_id)::uuid,
   sqlc.arg(place_name),
   sqlc.arg(place_address),
   sqlc.arg(place_type),
@@ -70,8 +80,10 @@ INSERT INTO expenses (
 RETURNING
   id::text,
   trip_id::text,
-  scheduled_date,
-  itinerary_item_id::text,
+  anchor_type,
+  trip_day_id::text,
+  schedule_item_id::text,
+  expense_date,
   trip_place_id::text,
   place_name,
   place_address,
@@ -82,7 +94,7 @@ RETURNING
   payer_display_name,
   created_at;
 
--- name: ListDayExpensesByTripAndDate :many
+-- name: ListDayExpensesByTripDay :many
 SELECT
   id::text,
   place_name,
@@ -94,7 +106,8 @@ SELECT
   created_at
 FROM expenses
 WHERE trip_id = sqlc.arg(trip_id)::uuid
-  AND scheduled_date = sqlc.arg(scheduled_date)
+  AND trip_day_id = sqlc.arg(trip_day_id)::uuid
+  AND anchor_type IN ('trip_day', 'schedule_item')
 ORDER BY created_at DESC, id DESC;
 
 -- name: ListDayExpenseSplitsByExpenseIDs :many
@@ -122,6 +135,8 @@ INSERT INTO expense_splits (
   sqlc.arg(split_order)
 )
 RETURNING
+  id::text,
+  expense_id::text,
   participant_id::text,
   participant_display_name,
   amount_minor,

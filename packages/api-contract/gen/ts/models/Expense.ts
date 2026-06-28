@@ -8,11 +8,13 @@ import type { SupportedCurrency } from './SupportedCurrency';
 export type Expense = {
     id: string;
     tripId: string;
-    scheduledDate: string;
+    anchorType: 'trip' | 'trip_day' | 'schedule_item';
+    tripDayId: string | null;
     /**
-     * Source itinerary item. Present at creation; may become null later if the source item is deleted and history is retained.
+     * Source schedule item. Present for schedule-item expenses; may become null if later detached to trip-level.
      */
-    itineraryItemId: string | null;
+    scheduleItemId: string | null;
+    expenseDate: string;
     /**
      * Source trip place. Present at creation; may become null later if the source place is deleted and history is retained.
      */

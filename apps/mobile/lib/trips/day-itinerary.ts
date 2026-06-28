@@ -1,6 +1,6 @@
 import type { Href } from 'expo-router';
 
-import type { GetDayItineraryResponse, TripPlaceType } from '@i-um/api-contract';
+import type { GetDayScheduleItemsResponse, ScheduleItem, TripPlaceType } from '@i-um/api-contract';
 
 import { theme } from '../design/theme';
 import { formatTripDayDate } from './days';
@@ -44,19 +44,20 @@ export type DayItineraryFailureViewModel =
       helper: string;
     };
 
-export function buildDayItineraryRoute(tripId: string, date: string): Href {
-  return `/trips/${tripId}/days/${date}` as Href;
+export function buildDayItineraryRoute(tripId: string, tripDayId: string): Href {
+  return `/trips/${tripId}/days/${tripDayId}` as Href;
 }
 
 export function getPlaceTypeLabel(placeType: TripPlaceType): string {
   return theme.placeType[placeType].label;
 }
 
-export function buildDayItineraryViewModel(response: GetDayItineraryResponse): DayItineraryViewModel {
+export function buildDayItineraryViewModel(response: GetDayScheduleItemsResponse): DayItineraryViewModel {
   const dayLabel = `Day ${response.day.dayOrder}`;
   const formattedDate = formatTripDayDate(response.day.date);
+  const scheduleItems = getScheduleItems(response);
 
-  if (response.items.length === 0) {
+  if (scheduleItems.length === 0) {
     return {
       status: 'empty',
       dayLabel,
@@ -70,7 +71,7 @@ export function buildDayItineraryViewModel(response: GetDayItineraryResponse): D
     status: 'success',
     dayLabel,
     formattedDate,
-    items: [...response.items]
+    items: [...scheduleItems]
       .sort((left, right) => left.itemOrder - right.itemOrder)
       .map((item) => ({
         id: item.id,
@@ -84,6 +85,10 @@ export function buildDayItineraryViewModel(response: GetDayItineraryResponse): D
         address: item.place.address,
       })),
   };
+}
+
+export function getScheduleItems(response: GetDayScheduleItemsResponse): ScheduleItem[] {
+  return response.scheduleItems ?? ((response as unknown as { items?: ScheduleItem[] }).items || []);
 }
 
 export function dayItineraryFailureState(status?: number): DayItineraryFailureViewModel {

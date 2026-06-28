@@ -45,18 +45,18 @@ func writeTripDetailError(w http.ResponseWriter, err error) {
 	}
 }
 
-func writeTripDayItineraryError(w http.ResponseWriter, err error) {
+func writeTripDayScheduleError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, trip.ErrValidation):
-		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid day itinerary request", nil)
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid day schedule request", nil)
 	case errors.Is(err, trip.ErrUnauthorized):
 		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "unauthorized", nil)
 	case errors.Is(err, trip.ErrForbidden):
 		writeError(w, http.StatusForbidden, "FORBIDDEN", "forbidden", nil)
 	case errors.Is(err, trip.ErrNotFound):
-		writeError(w, http.StatusNotFound, "NOT_FOUND", "day itinerary not found", nil)
+		writeError(w, http.StatusNotFound, "NOT_FOUND", "day schedule not found", nil)
 	case errors.Is(err, trip.ErrConflict):
-		writeError(w, http.StatusConflict, "CONFLICT", "day itinerary append conflict", nil)
+		writeError(w, http.StatusConflict, "CONFLICT", "day schedule append conflict", nil)
 	default:
 		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error", nil)
 	}
@@ -109,69 +109,69 @@ func writeDayLodgingPlaceError(w http.ResponseWriter, err error) {
 	}
 }
 
-func writeDayItineraryArrivalError(w http.ResponseWriter, err error) {
+func writeDayScheduleArrivalError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, trip.ErrValidation):
-		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid day itinerary arrival request", nil)
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid day schedule arrival request", nil)
 	case errors.Is(err, trip.ErrUnauthorized):
 		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "unauthorized", nil)
 	case errors.Is(err, trip.ErrForbidden):
 		writeError(w, http.StatusForbidden, "FORBIDDEN", "forbidden", nil)
 	case errors.Is(err, trip.ErrNotFound):
-		writeError(w, http.StatusNotFound, "NOT_FOUND", "day itinerary item not found", nil)
+		writeError(w, http.StatusNotFound, "NOT_FOUND", "day schedule item not found", nil)
 	case errors.Is(err, trip.ErrConflict):
-		writeError(w, http.StatusConflict, "CONFLICT", "day itinerary arrival conflict", nil)
+		writeError(w, http.StatusConflict, "CONFLICT", "day schedule arrival conflict", nil)
 	default:
 		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error", nil)
 	}
 }
 
-func writeDayItinerarySkipError(w http.ResponseWriter, err error) {
+func writeDayScheduleSkipError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, trip.ErrValidation):
-		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid day itinerary skip request", nil)
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid day schedule skip request", nil)
 	case errors.Is(err, trip.ErrUnauthorized):
 		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "unauthorized", nil)
 	case errors.Is(err, trip.ErrForbidden):
 		writeError(w, http.StatusForbidden, "FORBIDDEN", "forbidden", nil)
 	case errors.Is(err, trip.ErrNotFound):
-		writeError(w, http.StatusNotFound, "NOT_FOUND", "day itinerary item not found", nil)
+		writeError(w, http.StatusNotFound, "NOT_FOUND", "day schedule item not found", nil)
 	case errors.Is(err, trip.ErrConflict):
-		writeError(w, http.StatusConflict, "CONFLICT", "day itinerary skip conflict", nil)
+		writeError(w, http.StatusConflict, "CONFLICT", "day schedule skip conflict", nil)
 	default:
 		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error", nil)
 	}
 }
 
-func writeDayItineraryRestoreError(w http.ResponseWriter, err error) {
+func writeDayScheduleRestoreError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, trip.ErrValidation):
-		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid day itinerary restore request", nil)
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid day schedule restore request", nil)
 	case errors.Is(err, trip.ErrUnauthorized):
 		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "unauthorized", nil)
 	case errors.Is(err, trip.ErrForbidden):
 		writeError(w, http.StatusForbidden, "FORBIDDEN", "forbidden", nil)
 	case errors.Is(err, trip.ErrNotFound):
-		writeError(w, http.StatusNotFound, "NOT_FOUND", "day itinerary item not found", nil)
+		writeError(w, http.StatusNotFound, "NOT_FOUND", "day schedule item not found", nil)
 	case errors.Is(err, trip.ErrConflict):
-		writeError(w, http.StatusConflict, "CONFLICT", "day itinerary restore conflict", nil)
+		writeError(w, http.StatusConflict, "CONFLICT", "day schedule restore conflict", nil)
 	default:
 		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error", nil)
 	}
 }
 
-func writeDayItineraryReorderError(w http.ResponseWriter, err error) {
+func writeDayScheduleReorderError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, trip.ErrValidation):
-		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid day itinerary reorder request", nil)
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid day schedule reorder request", nil)
 	case errors.Is(err, trip.ErrUnauthorized):
 		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "unauthorized", nil)
 	case errors.Is(err, trip.ErrForbidden):
 		writeError(w, http.StatusForbidden, "FORBIDDEN", "forbidden", nil)
 	case errors.Is(err, trip.ErrNotFound):
-		writeError(w, http.StatusNotFound, "NOT_FOUND", "day itinerary not found", nil)
+		writeError(w, http.StatusNotFound, "NOT_FOUND", "day schedule not found", nil)
 	case errors.Is(err, trip.ErrConflict):
-		writeError(w, http.StatusConflict, "CONFLICT", "itinerary reorder conflict", nil)
+		writeError(w, http.StatusConflict, "CONFLICT", "schedule reorder conflict", nil)
 	default:
 		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error", nil)
 	}
@@ -243,20 +243,20 @@ func writePlaceSearchError(w http.ResponseWriter, err error) {
 	}
 }
 
-func writeGooglePlaceDayItineraryError(w http.ResponseWriter, err error) {
+func writeGooglePlaceDayScheduleError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, place.ErrValidation):
-		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid google place itinerary request", nil)
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid google place schedule request", nil)
 	case errors.Is(err, place.ErrUnauthorized):
 		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "unauthorized", nil)
 	case errors.Is(err, place.ErrForbidden):
 		writeError(w, http.StatusForbidden, "FORBIDDEN", "forbidden", nil)
 	case errors.Is(err, place.ErrNotFound):
-		writeError(w, http.StatusNotFound, "NOT_FOUND", "google place itinerary context not found", nil)
+		writeError(w, http.StatusNotFound, "NOT_FOUND", "google place schedule context not found", nil)
 	case errors.Is(err, place.ErrDuplicateDayPlaceConfirmationNeeded):
 		writeError(w, http.StatusConflict, "DUPLICATE_DAY_PLACE_CONFIRMATION_REQUIRED", "duplicate day place confirmation required", nil)
 	case errors.Is(err, place.ErrConflict):
-		writeError(w, http.StatusConflict, "CONFLICT", "day itinerary append conflict", nil)
+		writeError(w, http.StatusConflict, "CONFLICT", "day schedule append conflict", nil)
 	case errors.Is(err, place.ErrProviderRateLimited):
 		writeError(w, http.StatusTooManyRequests, "PLACE_PROVIDER_RATE_LIMITED", "place provider rate limited", nil)
 	case errors.Is(err, place.ErrProviderUnavailable):

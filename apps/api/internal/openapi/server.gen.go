@@ -44,6 +44,13 @@ const (
 	RefreshSuccess AuthRefreshResponseResult = "refresh_success"
 )
 
+// Defines values for ExpenseAnchorType.
+const (
+	ExpenseAnchorTypeScheduleItem ExpenseAnchorType = "schedule_item"
+	ExpenseAnchorTypeTrip         ExpenseAnchorType = "trip"
+	ExpenseAnchorTypeTripDay      ExpenseAnchorType = "trip_day"
+)
+
 // Defines values for HealthResponseStatus.
 const (
 	HealthResponseStatusOk HealthResponseStatus = "ok"
@@ -173,30 +180,30 @@ type AuthUser struct {
 	Id          string  `json:"id"`
 }
 
-// CreateGooglePlaceDayItineraryItemRequest defines model for CreateGooglePlaceDayItineraryItemRequest.
-type CreateGooglePlaceDayItineraryItemRequest struct {
+// CreateGooglePlaceScheduleItemRequest defines model for CreateGooglePlaceScheduleItemRequest.
+type CreateGooglePlaceScheduleItemRequest struct {
 	// DuplicateConfirmed Set true only after the user confirms adding the same Google place to the same Day again.
 	DuplicateConfirmed bool   `json:"duplicateConfirmed"`
 	GooglePlaceId      string `json:"googlePlaceId"`
 }
 
-// CreateGooglePlaceDayItineraryItemResponse defines model for CreateGooglePlaceDayItineraryItemResponse.
-type CreateGooglePlaceDayItineraryItemResponse struct {
-	Day  TripDay          `json:"day"`
-	Item DayItineraryItem `json:"item"`
+// CreateGooglePlaceScheduleItemResponse defines model for CreateGooglePlaceScheduleItemResponse.
+type CreateGooglePlaceScheduleItemResponse struct {
+	Day          TripDay      `json:"day"`
+	ScheduleItem ScheduleItem `json:"scheduleItem"`
 }
 
-// CreateManualDayItineraryItemRequest defines model for CreateManualDayItineraryItemRequest.
-type CreateManualDayItineraryItemRequest struct {
+// CreateManualScheduleItemRequest defines model for CreateManualScheduleItemRequest.
+type CreateManualScheduleItemRequest struct {
 	Address   string        `json:"address"`
 	Name      string        `json:"name"`
 	PlaceType TripPlaceType `json:"placeType"`
 }
 
-// CreateManualDayItineraryItemResponse defines model for CreateManualDayItineraryItemResponse.
-type CreateManualDayItineraryItemResponse struct {
-	Day  TripDay          `json:"day"`
-	Item DayItineraryItem `json:"item"`
+// CreateManualScheduleItemResponse defines model for CreateManualScheduleItemResponse.
+type CreateManualScheduleItemResponse struct {
+	Day          TripDay      `json:"day"`
+	ScheduleItem ScheduleItem `json:"scheduleItem"`
 }
 
 // CreateQuickExpenseRequest defines model for CreateQuickExpenseRequest.
@@ -204,14 +211,14 @@ type CreateQuickExpenseRequest struct {
 	// AmountMinor Positive amount in currency minor units.
 	AmountMinor int64 `json:"amountMinor"`
 
-	// ItineraryItemId Required itinerary item for the selected Day. Must belong to tripId/date.
-	ItineraryItemId string `json:"itineraryItemId"`
-
 	// ParticipantIds Current accepted trip participants selected as equal split targets.
 	ParticipantIds []string `json:"participantIds"`
 
 	// PayerParticipantId Active trip participant who paid the expense.
 	PayerParticipantId string `json:"payerParticipantId"`
+
+	// ScheduleItemId Required schedule item for the selected Day. Must belong to tripId/tripDayId.
+	ScheduleItemId string `json:"scheduleItemId"`
 }
 
 // CreateQuickExpenseResponse defines model for CreateQuickExpenseResponse.
@@ -267,20 +274,6 @@ type DayExpenseSplitListItem struct {
 	SplitOrder  int    `json:"splitOrder"`
 }
 
-// DayItineraryItem defines model for DayItineraryItem.
-type DayItineraryItem struct {
-	// ArrivedAt Server-generated arrival timestamp for this itinerary item instance. Null means pending when skippedAt is also null.
-	ArrivedAt *time.Time       `json:"arrivedAt"`
-	Id        string           `json:"id"`
-	IsLodging bool             `json:"isLodging"`
-	ItemOrder int              `json:"itemOrder"`
-	Place     TripPlaceSummary `json:"place"`
-
-	// SkippedAt Server-generated skip timestamp for this itinerary item instance. Null means the item is not currently skipped.
-	SkippedAt *time.Time `json:"skippedAt"`
-	Version   int        `json:"version"`
-}
-
 // DeviceInfo defines model for DeviceInfo.
 type DeviceInfo struct {
 	DeviceName *string `json:"deviceName"`
@@ -298,23 +291,28 @@ type ErrorResponse struct {
 
 // Expense defines model for Expense.
 type Expense struct {
-	AmountMinor int64             `json:"amountMinor"`
-	CreatedAt   time.Time         `json:"createdAt"`
-	Currency    SupportedCurrency `json:"currency"`
-	Id          string            `json:"id"`
-
-	// ItineraryItemId Source itinerary item. Present at creation; may become null later if the source item is deleted and history is retained.
-	ItineraryItemId    *string              `json:"itineraryItemId"`
+	AmountMinor        int64                `json:"amountMinor"`
+	AnchorType         ExpenseAnchorType    `json:"anchorType"`
+	CreatedAt          time.Time            `json:"createdAt"`
+	Currency           SupportedCurrency    `json:"currency"`
+	ExpenseDate        openapi_types.Date   `json:"expenseDate"`
+	Id                 string               `json:"id"`
 	PayerDisplayName   string               `json:"payerDisplayName"`
 	PayerParticipantId *string              `json:"payerParticipantId"`
 	Place              ExpensePlaceSnapshot `json:"place"`
-	ScheduledDate      openapi_types.Date   `json:"scheduledDate"`
-	Splits             []ExpenseSplit       `json:"splits"`
-	TripId             string               `json:"tripId"`
+
+	// ScheduleItemId Source schedule item. Present for schedule-item expenses; may become null if later detached to trip-level.
+	ScheduleItemId *string        `json:"scheduleItemId"`
+	Splits         []ExpenseSplit `json:"splits"`
+	TripDayId      *string        `json:"tripDayId"`
+	TripId         string         `json:"tripId"`
 
 	// TripPlaceId Source trip place. Present at creation; may become null later if the source place is deleted and history is retained.
 	TripPlaceId *string `json:"tripPlaceId"`
 }
+
+// ExpenseAnchorType defines model for Expense.AnchorType.
+type ExpenseAnchorType string
 
 // ExpensePlaceSnapshot defines model for ExpensePlaceSnapshot.
 type ExpensePlaceSnapshot struct {
@@ -342,10 +340,10 @@ type GeoPoint struct {
 	Longitude float64 `json:"longitude"`
 }
 
-// GetDayItineraryResponse defines model for GetDayItineraryResponse.
-type GetDayItineraryResponse struct {
-	Day   TripDay            `json:"day"`
-	Items []DayItineraryItem `json:"items"`
+// GetDayScheduleItemsResponse defines model for GetDayScheduleItemsResponse.
+type GetDayScheduleItemsResponse struct {
+	Day           TripDay        `json:"day"`
+	ScheduleItems []ScheduleItem `json:"scheduleItems"`
 }
 
 // GetTripDetailResponse defines model for GetTripDetailResponse.
@@ -393,22 +391,22 @@ type ListTripsResponse struct {
 	Trips []TripListItem `json:"trips"`
 }
 
-// MarkDayItineraryItemArrivedResponse defines model for MarkDayItineraryItemArrivedResponse.
-type MarkDayItineraryItemArrivedResponse struct {
-	Day  TripDay          `json:"day"`
-	Item DayItineraryItem `json:"item"`
+// MarkScheduleItemArrivedResponse defines model for MarkScheduleItemArrivedResponse.
+type MarkScheduleItemArrivedResponse struct {
+	Day          TripDay      `json:"day"`
+	ScheduleItem ScheduleItem `json:"scheduleItem"`
 
-	// Items Latest server source-of-truth itinerary items for the selected day, ordered by itinerary order/rank.
-	Items []DayItineraryItem `json:"items"`
+	// ScheduleItems Latest server source-of-truth schedule items for the selected day, ordered by schedule order/rank.
+	ScheduleItems []ScheduleItem `json:"scheduleItems"`
 }
 
-// MarkDayItineraryItemSkippedResponse defines model for MarkDayItineraryItemSkippedResponse.
-type MarkDayItineraryItemSkippedResponse struct {
-	Day  TripDay          `json:"day"`
-	Item DayItineraryItem `json:"item"`
+// MarkScheduleItemSkippedResponse defines model for MarkScheduleItemSkippedResponse.
+type MarkScheduleItemSkippedResponse struct {
+	Day          TripDay      `json:"day"`
+	ScheduleItem ScheduleItem `json:"scheduleItem"`
 
-	// Items Latest server source-of-truth itinerary items for the selected day, ordered by itinerary order/rank.
-	Items []DayItineraryItem `json:"items"`
+	// ScheduleItems Latest server source-of-truth schedule items for the selected day, ordered by schedule order/rank.
+	ScheduleItems []ScheduleItem `json:"scheduleItems"`
 }
 
 // MetadataReadinessCheck defines model for MetadataReadinessCheck.
@@ -479,42 +477,42 @@ type RefreshTokenRequest struct {
 	RefreshToken string `json:"refreshToken"`
 }
 
-// ReorderDayItineraryItemsRequest defines model for ReorderDayItineraryItemsRequest.
-type ReorderDayItineraryItemsRequest struct {
-	// Moves Ordered same-Day move operations. Applying them sequentially must produce the client's final local order.
-	Moves []ReorderDayItineraryMove `json:"moves"`
-}
+// ReorderDayScheduleMove Ordered move operation. The server applies moves sequentially inside one transaction. `beforeScheduleItemId` and `afterScheduleItemId` cannot both be null, and all present ids must be distinct.
+type ReorderDayScheduleMove struct {
+	// AfterScheduleItemId The schedule item that must be immediately after the moved item after this move, or null when moving to the last position.
+	AfterScheduleItemId *string `json:"afterScheduleItemId"`
 
-// ReorderDayItineraryItemsResponse defines model for ReorderDayItineraryItemsResponse.
-type ReorderDayItineraryItemsResponse struct {
-	Day TripDay `json:"day"`
-
-	// Items Latest server source-of-truth itinerary items ordered by rank.
-	Items []DayItineraryItem `json:"items"`
-}
-
-// ReorderDayItineraryMove Ordered move operation. The server applies moves sequentially inside one transaction. `beforeItemId` and `afterItemId` cannot both be null, and all present ids must be distinct.
-type ReorderDayItineraryMove struct {
-	// AfterItemId The itinerary item that must be immediately after the moved item after this move, or null when moving to the last position.
-	AfterItemId *string `json:"afterItemId"`
-
-	// BeforeItemId The itinerary item that must be immediately before the moved item after this move, or null when moving to the first position.
-	BeforeItemId *string `json:"beforeItemId"`
+	// BeforeScheduleItemId The schedule item that must be immediately before the moved item after this move, or null when moving to the first position.
+	BeforeScheduleItemId *string `json:"beforeScheduleItemId"`
 
 	// ClientVersion The moved item's optimistic locking version observed by the client.
 	ClientVersion int `json:"clientVersion"`
 
-	// ItemId The itinerary item being moved.
-	ItemId string `json:"itemId"`
+	// ScheduleItemId The schedule item being moved.
+	ScheduleItemId string `json:"scheduleItemId"`
 }
 
-// RestoreDayItineraryItemResponse defines model for RestoreDayItineraryItemResponse.
-type RestoreDayItineraryItemResponse struct {
-	Day  TripDay          `json:"day"`
-	Item DayItineraryItem `json:"item"`
+// ReorderScheduleItemsRequest defines model for ReorderScheduleItemsRequest.
+type ReorderScheduleItemsRequest struct {
+	// Moves Ordered same-Day move operations. Applying them sequentially must produce the client's final local order.
+	Moves []ReorderDayScheduleMove `json:"moves"`
+}
 
-	// Items Latest server source-of-truth itinerary items for the selected day, ordered by itinerary order/rank.
-	Items []DayItineraryItem `json:"items"`
+// ReorderScheduleItemsResponse defines model for ReorderScheduleItemsResponse.
+type ReorderScheduleItemsResponse struct {
+	Day TripDay `json:"day"`
+
+	// ScheduleItems Latest server source-of-truth schedule items ordered by rank.
+	ScheduleItems []ScheduleItem `json:"scheduleItems"`
+}
+
+// RestoreScheduleItemResponse defines model for RestoreScheduleItemResponse.
+type RestoreScheduleItemResponse struct {
+	Day          TripDay      `json:"day"`
+	ScheduleItem ScheduleItem `json:"scheduleItem"`
+
+	// ScheduleItems Latest server source-of-truth schedule items for the selected day, ordered by schedule order/rank.
+	ScheduleItems []ScheduleItem `json:"scheduleItems"`
 }
 
 // RoutablePlace defines model for RoutablePlace.
@@ -538,11 +536,11 @@ type RoutePreviewMap struct {
 
 // RoutePreviewResponse defines model for RoutePreviewResponse.
 type RoutePreviewResponse struct {
-	GeneratedAt time.Time                `json:"generatedAt"`
-	ItemId      string                   `json:"itemId"`
-	Map         *RoutePreviewMap         `json:"map"`
-	Mode        RoutePreviewResponseMode `json:"mode"`
-	Summary     RoutePreviewSummary      `json:"summary"`
+	GeneratedAt    time.Time                `json:"generatedAt"`
+	Map            *RoutePreviewMap         `json:"map"`
+	Mode           RoutePreviewResponseMode `json:"mode"`
+	ScheduleItemId string                   `json:"scheduleItemId"`
+	Summary        RoutePreviewSummary      `json:"summary"`
 }
 
 // RoutePreviewResponseMode defines model for RoutePreviewResponse.Mode.
@@ -554,6 +552,20 @@ type RoutePreviewSummary struct {
 	DurationSeconds int    `json:"durationSeconds"`
 	SummaryText     string `json:"summaryText"`
 	TransferCount   *int   `json:"transferCount"`
+}
+
+// ScheduleItem defines model for ScheduleItem.
+type ScheduleItem struct {
+	// ArrivedAt Server-generated arrival timestamp for this schedule item instance. Null means pending when skippedAt is also null.
+	ArrivedAt *time.Time       `json:"arrivedAt"`
+	Id        string           `json:"id"`
+	IsLodging bool             `json:"isLodging"`
+	ItemOrder int              `json:"itemOrder"`
+	Place     TripPlaceSummary `json:"place"`
+
+	// SkippedAt Server-generated skip timestamp for this schedule item instance. Null means the item is not currently skipped.
+	SkippedAt *time.Time `json:"skippedAt"`
+	Version   int        `json:"version"`
 }
 
 // SearchGooglePlacesResponse defines model for SearchGooglePlacesResponse.
@@ -591,6 +603,7 @@ type Trip struct {
 type TripDay struct {
 	Date         openapi_types.Date `json:"date"`
 	DayOrder     int                `json:"dayOrder"`
+	Id           string             `json:"id"`
 	LodgingPlace *TripPlaceSummary  `json:"lodgingPlace"`
 }
 
@@ -663,27 +676,29 @@ type TripPlaceSummary struct {
 // TripPlaceType defines model for TripPlaceType.
 type TripPlaceType string
 
-// UpdateDayItineraryItemRequest defines model for UpdateDayItineraryItemRequest.
-type UpdateDayItineraryItemRequest struct {
-	Address   *string        `json:"address,omitempty"`
-	Name      *string        `json:"name,omitempty"`
-	PlaceType *TripPlaceType `json:"placeType,omitempty"`
-}
-
-// UpdateDayItineraryItemResponse defines model for UpdateDayItineraryItemResponse.
-type UpdateDayItineraryItemResponse struct {
-	Item DayItineraryItem `json:"item"`
-}
-
 // UpdateMeRequest defines model for UpdateMeRequest.
 type UpdateMeRequest struct {
 	// DisplayName Server trims leading/trailing whitespace, counts Unicode code points after trim, then validates and persists the value.
 	DisplayName string `json:"displayName"`
 }
 
+// UpdateScheduleItemRequest defines model for UpdateScheduleItemRequest.
+type UpdateScheduleItemRequest struct {
+	Address   *string        `json:"address,omitempty"`
+	Name      *string        `json:"name,omitempty"`
+	PlaceType *TripPlaceType `json:"placeType,omitempty"`
+}
+
+// UpdateScheduleItemResponse defines model for UpdateScheduleItemResponse.
+type UpdateScheduleItemResponse struct {
+	ScheduleItem ScheduleItem `json:"scheduleItem"`
+}
+
 // UpdateTripRequest defines model for UpdateTripRequest.
 type UpdateTripRequest struct {
-	DefaultCurrency *SupportedCurrency `json:"defaultCurrency,omitempty"`
+	// ConfirmOutOfRangeDayArchive Set true after showing the shrink impact summary when a date range change archives out-of-range days.
+	ConfirmOutOfRangeDayArchive *bool              `json:"confirmOutOfRangeDayArchive,omitempty"`
+	DefaultCurrency             *SupportedCurrency `json:"defaultCurrency,omitempty"`
 
 	// EndDate End date in YYYY-MM-DD format. Must not be before the merged startDate.
 	EndDate *openapi_types.Date `json:"endDate,omitempty"`
@@ -725,23 +740,23 @@ type UpdateTripJSONRequestBody = UpdateTripRequest
 // CreateQuickExpenseJSONRequestBody defines body for CreateQuickExpense for application/json ContentType.
 type CreateQuickExpenseJSONRequestBody = CreateQuickExpenseRequest
 
-// CreateManualDayItineraryItemJSONRequestBody defines body for CreateManualDayItineraryItem for application/json ContentType.
-type CreateManualDayItineraryItemJSONRequestBody = CreateManualDayItineraryItemRequest
-
-// ReorderDayItineraryItemsJSONRequestBody defines body for ReorderDayItineraryItems for application/json ContentType.
-type ReorderDayItineraryItemsJSONRequestBody = ReorderDayItineraryItemsRequest
-
-// UpdateDayItineraryItemJSONRequestBody defines body for UpdateDayItineraryItem for application/json ContentType.
-type UpdateDayItineraryItemJSONRequestBody = UpdateDayItineraryItemRequest
-
-// CreateRoutePreviewJSONRequestBody defines body for CreateRoutePreview for application/json ContentType.
-type CreateRoutePreviewJSONRequestBody = CreateRoutePreviewRequest
-
 // SetDayLodgingPlaceJSONRequestBody defines body for SetDayLodgingPlace for application/json ContentType.
 type SetDayLodgingPlaceJSONRequestBody = SetDayLodgingPlaceRequest
 
-// CreateGooglePlaceDayItineraryItemJSONRequestBody defines body for CreateGooglePlaceDayItineraryItem for application/json ContentType.
-type CreateGooglePlaceDayItineraryItemJSONRequestBody = CreateGooglePlaceDayItineraryItemRequest
+// CreateGooglePlaceScheduleItemJSONRequestBody defines body for CreateGooglePlaceScheduleItem for application/json ContentType.
+type CreateGooglePlaceScheduleItemJSONRequestBody = CreateGooglePlaceScheduleItemRequest
+
+// CreateManualScheduleItemJSONRequestBody defines body for CreateManualScheduleItem for application/json ContentType.
+type CreateManualScheduleItemJSONRequestBody = CreateManualScheduleItemRequest
+
+// ReorderScheduleItemsJSONRequestBody defines body for ReorderScheduleItems for application/json ContentType.
+type ReorderScheduleItemsJSONRequestBody = ReorderScheduleItemsRequest
+
+// UpdateScheduleItemJSONRequestBody defines body for UpdateScheduleItem for application/json ContentType.
+type UpdateScheduleItemJSONRequestBody = UpdateScheduleItemRequest
+
+// CreateRoutePreviewJSONRequestBody defines body for CreateRoutePreview for application/json ContentType.
+type CreateRoutePreviewJSONRequestBody = CreateRoutePreviewRequest
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -794,50 +809,50 @@ type ServerInterface interface {
 	// (PATCH /trips/{tripId})
 	UpdateTrip(w http.ResponseWriter, r *http.Request, tripId string)
 	// List expenses for a trip day
-	// (GET /trips/{tripId}/days/{date}/expenses)
-	ListDayExpenses(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date)
+	// (GET /trips/{tripId}/days/{tripDayId}/expenses)
+	ListDayExpenses(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string)
 	// Create a quick expense for a trip day place
-	// (POST /trips/{tripId}/days/{date}/expenses/quick)
-	CreateQuickExpense(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date)
-	// Get a trip day itinerary
-	// (GET /trips/{tripId}/days/{date}/itinerary)
-	GetDayItinerary(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date)
-	// Add a manual place to a trip day itinerary
-	// (POST /trips/{tripId}/days/{date}/itinerary-items)
-	CreateManualDayItineraryItem(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date)
-	// Reorder a trip day itinerary
-	// (PATCH /trips/{tripId}/days/{date}/itinerary-items/order)
-	ReorderDayItineraryItems(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date)
-	// Delete a trip day itinerary item
-	// (DELETE /trips/{tripId}/days/{date}/itinerary/items/{itemId})
-	DeleteDayItineraryItem(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, itemId string)
-	// Update a trip day itinerary item place snapshot
-	// (PATCH /trips/{tripId}/days/{date}/itinerary/items/{itemId})
-	UpdateDayItineraryItem(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, itemId string)
-	// Mark a trip day itinerary item arrived
-	// (POST /trips/{tripId}/days/{date}/itinerary/items/{itemId}/arrive)
-	MarkDayItineraryItemArrived(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, itemId string)
-	// Restore a skipped trip day itinerary item
-	// (POST /trips/{tripId}/days/{date}/itinerary/items/{itemId}/restore)
-	RestoreDayItineraryItem(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, itemId string)
-	// Create an in-app route preview for a trip day itinerary item
-	// (POST /trips/{tripId}/days/{date}/itinerary/items/{itemId}/route-preview)
-	CreateRoutePreview(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, itemId string)
-	// Mark a trip day itinerary item skipped
-	// (POST /trips/{tripId}/days/{date}/itinerary/items/{itemId}/skip)
-	MarkDayItineraryItemSkipped(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, itemId string)
+	// (POST /trips/{tripId}/days/{tripDayId}/expenses/quick)
+	CreateQuickExpense(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string)
 	// Clear a trip day lodging place
-	// (DELETE /trips/{tripId}/days/{date}/lodging-place)
-	ClearDayLodgingPlace(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date)
+	// (DELETE /trips/{tripId}/days/{tripDayId}/lodging-place)
+	ClearDayLodgingPlace(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string)
 	// Set a trip day lodging place
-	// (PUT /trips/{tripId}/days/{date}/lodging-place)
-	SetDayLodgingPlace(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date)
-	// Add a Google Place result to a trip day itinerary
-	// (POST /trips/{tripId}/days/{date}/places/google/itinerary-items)
-	CreateGooglePlaceDayItineraryItem(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date)
+	// (PUT /trips/{tripId}/days/{tripDayId}/lodging-place)
+	SetDayLodgingPlace(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string)
+	// Add a Google Place result to a trip day schedule
+	// (POST /trips/{tripId}/days/{tripDayId}/places/google/schedule-items)
+	CreateGooglePlaceScheduleItem(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string)
 	// Search Google Places for a trip day
-	// (GET /trips/{tripId}/days/{date}/places/google/search)
-	SearchGooglePlaces(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, params SearchGooglePlacesParams)
+	// (GET /trips/{tripId}/days/{tripDayId}/places/google/search)
+	SearchGooglePlaces(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, params SearchGooglePlacesParams)
+	// Get a trip day schedule
+	// (GET /trips/{tripId}/days/{tripDayId}/schedule-items)
+	GetDayScheduleItems(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string)
+	// Add a manual place to a trip day schedule
+	// (POST /trips/{tripId}/days/{tripDayId}/schedule-items/manual)
+	CreateManualScheduleItem(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string)
+	// Reorder a trip day schedule
+	// (PATCH /trips/{tripId}/days/{tripDayId}/schedule-items/order)
+	ReorderScheduleItems(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string)
+	// Delete a trip day schedule item
+	// (DELETE /trips/{tripId}/days/{tripDayId}/schedule-items/{scheduleItemId})
+	DeleteScheduleItem(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, scheduleItemId string)
+	// Update a trip day schedule item place snapshot
+	// (PATCH /trips/{tripId}/days/{tripDayId}/schedule-items/{scheduleItemId})
+	UpdateScheduleItem(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, scheduleItemId string)
+	// Mark a trip day schedule item arrived
+	// (POST /trips/{tripId}/days/{tripDayId}/schedule-items/{scheduleItemId}/arrive)
+	MarkScheduleItemArrived(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, scheduleItemId string)
+	// Restore a skipped trip day schedule item
+	// (POST /trips/{tripId}/days/{tripDayId}/schedule-items/{scheduleItemId}/restore)
+	RestoreScheduleItem(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, scheduleItemId string)
+	// Create an in-app route preview for a trip day schedule item
+	// (POST /trips/{tripId}/days/{tripDayId}/schedule-items/{scheduleItemId}/route-preview)
+	CreateRoutePreview(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, scheduleItemId string)
+	// Mark a trip day schedule item skipped
+	// (POST /trips/{tripId}/days/{tripDayId}/schedule-items/{scheduleItemId}/skip)
+	MarkScheduleItemSkipped(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, scheduleItemId string)
 	// Create or retrieve the current trip invite link
 	// (POST /trips/{tripId}/invites)
 	CreateTripInvite(w http.ResponseWriter, r *http.Request, tripId string)
@@ -950,92 +965,92 @@ func (_ Unimplemented) UpdateTrip(w http.ResponseWriter, r *http.Request, tripId
 }
 
 // List expenses for a trip day
-// (GET /trips/{tripId}/days/{date}/expenses)
-func (_ Unimplemented) ListDayExpenses(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date) {
+// (GET /trips/{tripId}/days/{tripDayId}/expenses)
+func (_ Unimplemented) ListDayExpenses(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
 // Create a quick expense for a trip day place
-// (POST /trips/{tripId}/days/{date}/expenses/quick)
-func (_ Unimplemented) CreateQuickExpense(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// Get a trip day itinerary
-// (GET /trips/{tripId}/days/{date}/itinerary)
-func (_ Unimplemented) GetDayItinerary(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// Add a manual place to a trip day itinerary
-// (POST /trips/{tripId}/days/{date}/itinerary-items)
-func (_ Unimplemented) CreateManualDayItineraryItem(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// Reorder a trip day itinerary
-// (PATCH /trips/{tripId}/days/{date}/itinerary-items/order)
-func (_ Unimplemented) ReorderDayItineraryItems(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// Delete a trip day itinerary item
-// (DELETE /trips/{tripId}/days/{date}/itinerary/items/{itemId})
-func (_ Unimplemented) DeleteDayItineraryItem(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, itemId string) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// Update a trip day itinerary item place snapshot
-// (PATCH /trips/{tripId}/days/{date}/itinerary/items/{itemId})
-func (_ Unimplemented) UpdateDayItineraryItem(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, itemId string) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// Mark a trip day itinerary item arrived
-// (POST /trips/{tripId}/days/{date}/itinerary/items/{itemId}/arrive)
-func (_ Unimplemented) MarkDayItineraryItemArrived(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, itemId string) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// Restore a skipped trip day itinerary item
-// (POST /trips/{tripId}/days/{date}/itinerary/items/{itemId}/restore)
-func (_ Unimplemented) RestoreDayItineraryItem(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, itemId string) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// Create an in-app route preview for a trip day itinerary item
-// (POST /trips/{tripId}/days/{date}/itinerary/items/{itemId}/route-preview)
-func (_ Unimplemented) CreateRoutePreview(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, itemId string) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// Mark a trip day itinerary item skipped
-// (POST /trips/{tripId}/days/{date}/itinerary/items/{itemId}/skip)
-func (_ Unimplemented) MarkDayItineraryItemSkipped(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, itemId string) {
+// (POST /trips/{tripId}/days/{tripDayId}/expenses/quick)
+func (_ Unimplemented) CreateQuickExpense(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
 // Clear a trip day lodging place
-// (DELETE /trips/{tripId}/days/{date}/lodging-place)
-func (_ Unimplemented) ClearDayLodgingPlace(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date) {
+// (DELETE /trips/{tripId}/days/{tripDayId}/lodging-place)
+func (_ Unimplemented) ClearDayLodgingPlace(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
 // Set a trip day lodging place
-// (PUT /trips/{tripId}/days/{date}/lodging-place)
-func (_ Unimplemented) SetDayLodgingPlace(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date) {
+// (PUT /trips/{tripId}/days/{tripDayId}/lodging-place)
+func (_ Unimplemented) SetDayLodgingPlace(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Add a Google Place result to a trip day itinerary
-// (POST /trips/{tripId}/days/{date}/places/google/itinerary-items)
-func (_ Unimplemented) CreateGooglePlaceDayItineraryItem(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date) {
+// Add a Google Place result to a trip day schedule
+// (POST /trips/{tripId}/days/{tripDayId}/places/google/schedule-items)
+func (_ Unimplemented) CreateGooglePlaceScheduleItem(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
 // Search Google Places for a trip day
-// (GET /trips/{tripId}/days/{date}/places/google/search)
-func (_ Unimplemented) SearchGooglePlaces(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, params SearchGooglePlacesParams) {
+// (GET /trips/{tripId}/days/{tripDayId}/places/google/search)
+func (_ Unimplemented) SearchGooglePlaces(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, params SearchGooglePlacesParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Get a trip day schedule
+// (GET /trips/{tripId}/days/{tripDayId}/schedule-items)
+func (_ Unimplemented) GetDayScheduleItems(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Add a manual place to a trip day schedule
+// (POST /trips/{tripId}/days/{tripDayId}/schedule-items/manual)
+func (_ Unimplemented) CreateManualScheduleItem(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Reorder a trip day schedule
+// (PATCH /trips/{tripId}/days/{tripDayId}/schedule-items/order)
+func (_ Unimplemented) ReorderScheduleItems(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Delete a trip day schedule item
+// (DELETE /trips/{tripId}/days/{tripDayId}/schedule-items/{scheduleItemId})
+func (_ Unimplemented) DeleteScheduleItem(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, scheduleItemId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Update a trip day schedule item place snapshot
+// (PATCH /trips/{tripId}/days/{tripDayId}/schedule-items/{scheduleItemId})
+func (_ Unimplemented) UpdateScheduleItem(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, scheduleItemId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Mark a trip day schedule item arrived
+// (POST /trips/{tripId}/days/{tripDayId}/schedule-items/{scheduleItemId}/arrive)
+func (_ Unimplemented) MarkScheduleItemArrived(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, scheduleItemId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Restore a skipped trip day schedule item
+// (POST /trips/{tripId}/days/{tripDayId}/schedule-items/{scheduleItemId}/restore)
+func (_ Unimplemented) RestoreScheduleItem(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, scheduleItemId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Create an in-app route preview for a trip day schedule item
+// (POST /trips/{tripId}/days/{tripDayId}/schedule-items/{scheduleItemId}/route-preview)
+func (_ Unimplemented) CreateRoutePreview(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, scheduleItemId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Mark a trip day schedule item skipped
+// (POST /trips/{tripId}/days/{tripDayId}/schedule-items/{scheduleItemId}/skip)
+func (_ Unimplemented) MarkScheduleItemSkipped(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, scheduleItemId string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1420,12 +1435,12 @@ func (siw *ServerInterfaceWrapper) ListDayExpenses(w http.ResponseWriter, r *htt
 		return
 	}
 
-	// ------------- Path parameter "date" -------------
-	var date openapi_types.Date
+	// ------------- Path parameter "tripDayId" -------------
+	var tripDayId string
 
-	err = runtime.BindStyledParameterWithOptions("simple", "date", chi.URLParam(r, "date"), &date, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "tripDayId", chi.URLParam(r, "tripDayId"), &tripDayId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "date", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripDayId", Err: err})
 		return
 	}
 
@@ -1436,7 +1451,7 @@ func (siw *ServerInterfaceWrapper) ListDayExpenses(w http.ResponseWriter, r *htt
 	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListDayExpenses(w, r, tripId, date)
+		siw.Handler.ListDayExpenses(w, r, tripId, tripDayId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1460,12 +1475,12 @@ func (siw *ServerInterfaceWrapper) CreateQuickExpense(w http.ResponseWriter, r *
 		return
 	}
 
-	// ------------- Path parameter "date" -------------
-	var date openapi_types.Date
+	// ------------- Path parameter "tripDayId" -------------
+	var tripDayId string
 
-	err = runtime.BindStyledParameterWithOptions("simple", "date", chi.URLParam(r, "date"), &date, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "tripDayId", chi.URLParam(r, "tripDayId"), &tripDayId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "date", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripDayId", Err: err})
 		return
 	}
 
@@ -1476,421 +1491,7 @@ func (siw *ServerInterfaceWrapper) CreateQuickExpense(w http.ResponseWriter, r *
 	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateQuickExpense(w, r, tripId, date)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// GetDayItinerary operation middleware
-func (siw *ServerInterfaceWrapper) GetDayItinerary(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// ------------- Path parameter "tripId" -------------
-	var tripId string
-
-	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
-		return
-	}
-
-	// ------------- Path parameter "date" -------------
-	var date openapi_types.Date
-
-	err = runtime.BindStyledParameterWithOptions("simple", "date", chi.URLParam(r, "date"), &date, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "date", Err: err})
-		return
-	}
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetDayItinerary(w, r, tripId, date)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// CreateManualDayItineraryItem operation middleware
-func (siw *ServerInterfaceWrapper) CreateManualDayItineraryItem(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// ------------- Path parameter "tripId" -------------
-	var tripId string
-
-	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
-		return
-	}
-
-	// ------------- Path parameter "date" -------------
-	var date openapi_types.Date
-
-	err = runtime.BindStyledParameterWithOptions("simple", "date", chi.URLParam(r, "date"), &date, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "date", Err: err})
-		return
-	}
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateManualDayItineraryItem(w, r, tripId, date)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// ReorderDayItineraryItems operation middleware
-func (siw *ServerInterfaceWrapper) ReorderDayItineraryItems(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// ------------- Path parameter "tripId" -------------
-	var tripId string
-
-	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
-		return
-	}
-
-	// ------------- Path parameter "date" -------------
-	var date openapi_types.Date
-
-	err = runtime.BindStyledParameterWithOptions("simple", "date", chi.URLParam(r, "date"), &date, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "date", Err: err})
-		return
-	}
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ReorderDayItineraryItems(w, r, tripId, date)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// DeleteDayItineraryItem operation middleware
-func (siw *ServerInterfaceWrapper) DeleteDayItineraryItem(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// ------------- Path parameter "tripId" -------------
-	var tripId string
-
-	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
-		return
-	}
-
-	// ------------- Path parameter "date" -------------
-	var date openapi_types.Date
-
-	err = runtime.BindStyledParameterWithOptions("simple", "date", chi.URLParam(r, "date"), &date, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "date", Err: err})
-		return
-	}
-
-	// ------------- Path parameter "itemId" -------------
-	var itemId string
-
-	err = runtime.BindStyledParameterWithOptions("simple", "itemId", chi.URLParam(r, "itemId"), &itemId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "itemId", Err: err})
-		return
-	}
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.DeleteDayItineraryItem(w, r, tripId, date, itemId)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// UpdateDayItineraryItem operation middleware
-func (siw *ServerInterfaceWrapper) UpdateDayItineraryItem(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// ------------- Path parameter "tripId" -------------
-	var tripId string
-
-	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
-		return
-	}
-
-	// ------------- Path parameter "date" -------------
-	var date openapi_types.Date
-
-	err = runtime.BindStyledParameterWithOptions("simple", "date", chi.URLParam(r, "date"), &date, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "date", Err: err})
-		return
-	}
-
-	// ------------- Path parameter "itemId" -------------
-	var itemId string
-
-	err = runtime.BindStyledParameterWithOptions("simple", "itemId", chi.URLParam(r, "itemId"), &itemId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "itemId", Err: err})
-		return
-	}
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.UpdateDayItineraryItem(w, r, tripId, date, itemId)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// MarkDayItineraryItemArrived operation middleware
-func (siw *ServerInterfaceWrapper) MarkDayItineraryItemArrived(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// ------------- Path parameter "tripId" -------------
-	var tripId string
-
-	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
-		return
-	}
-
-	// ------------- Path parameter "date" -------------
-	var date openapi_types.Date
-
-	err = runtime.BindStyledParameterWithOptions("simple", "date", chi.URLParam(r, "date"), &date, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "date", Err: err})
-		return
-	}
-
-	// ------------- Path parameter "itemId" -------------
-	var itemId string
-
-	err = runtime.BindStyledParameterWithOptions("simple", "itemId", chi.URLParam(r, "itemId"), &itemId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "itemId", Err: err})
-		return
-	}
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.MarkDayItineraryItemArrived(w, r, tripId, date, itemId)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// RestoreDayItineraryItem operation middleware
-func (siw *ServerInterfaceWrapper) RestoreDayItineraryItem(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// ------------- Path parameter "tripId" -------------
-	var tripId string
-
-	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
-		return
-	}
-
-	// ------------- Path parameter "date" -------------
-	var date openapi_types.Date
-
-	err = runtime.BindStyledParameterWithOptions("simple", "date", chi.URLParam(r, "date"), &date, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "date", Err: err})
-		return
-	}
-
-	// ------------- Path parameter "itemId" -------------
-	var itemId string
-
-	err = runtime.BindStyledParameterWithOptions("simple", "itemId", chi.URLParam(r, "itemId"), &itemId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "itemId", Err: err})
-		return
-	}
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.RestoreDayItineraryItem(w, r, tripId, date, itemId)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// CreateRoutePreview operation middleware
-func (siw *ServerInterfaceWrapper) CreateRoutePreview(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// ------------- Path parameter "tripId" -------------
-	var tripId string
-
-	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
-		return
-	}
-
-	// ------------- Path parameter "date" -------------
-	var date openapi_types.Date
-
-	err = runtime.BindStyledParameterWithOptions("simple", "date", chi.URLParam(r, "date"), &date, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "date", Err: err})
-		return
-	}
-
-	// ------------- Path parameter "itemId" -------------
-	var itemId string
-
-	err = runtime.BindStyledParameterWithOptions("simple", "itemId", chi.URLParam(r, "itemId"), &itemId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "itemId", Err: err})
-		return
-	}
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateRoutePreview(w, r, tripId, date, itemId)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// MarkDayItineraryItemSkipped operation middleware
-func (siw *ServerInterfaceWrapper) MarkDayItineraryItemSkipped(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// ------------- Path parameter "tripId" -------------
-	var tripId string
-
-	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
-		return
-	}
-
-	// ------------- Path parameter "date" -------------
-	var date openapi_types.Date
-
-	err = runtime.BindStyledParameterWithOptions("simple", "date", chi.URLParam(r, "date"), &date, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "date", Err: err})
-		return
-	}
-
-	// ------------- Path parameter "itemId" -------------
-	var itemId string
-
-	err = runtime.BindStyledParameterWithOptions("simple", "itemId", chi.URLParam(r, "itemId"), &itemId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "itemId", Err: err})
-		return
-	}
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.MarkDayItineraryItemSkipped(w, r, tripId, date, itemId)
+		siw.Handler.CreateQuickExpense(w, r, tripId, tripDayId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1914,12 +1515,12 @@ func (siw *ServerInterfaceWrapper) ClearDayLodgingPlace(w http.ResponseWriter, r
 		return
 	}
 
-	// ------------- Path parameter "date" -------------
-	var date openapi_types.Date
+	// ------------- Path parameter "tripDayId" -------------
+	var tripDayId string
 
-	err = runtime.BindStyledParameterWithOptions("simple", "date", chi.URLParam(r, "date"), &date, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "tripDayId", chi.URLParam(r, "tripDayId"), &tripDayId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "date", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripDayId", Err: err})
 		return
 	}
 
@@ -1930,7 +1531,7 @@ func (siw *ServerInterfaceWrapper) ClearDayLodgingPlace(w http.ResponseWriter, r
 	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ClearDayLodgingPlace(w, r, tripId, date)
+		siw.Handler.ClearDayLodgingPlace(w, r, tripId, tripDayId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1954,12 +1555,12 @@ func (siw *ServerInterfaceWrapper) SetDayLodgingPlace(w http.ResponseWriter, r *
 		return
 	}
 
-	// ------------- Path parameter "date" -------------
-	var date openapi_types.Date
+	// ------------- Path parameter "tripDayId" -------------
+	var tripDayId string
 
-	err = runtime.BindStyledParameterWithOptions("simple", "date", chi.URLParam(r, "date"), &date, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "tripDayId", chi.URLParam(r, "tripDayId"), &tripDayId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "date", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripDayId", Err: err})
 		return
 	}
 
@@ -1970,7 +1571,7 @@ func (siw *ServerInterfaceWrapper) SetDayLodgingPlace(w http.ResponseWriter, r *
 	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.SetDayLodgingPlace(w, r, tripId, date)
+		siw.Handler.SetDayLodgingPlace(w, r, tripId, tripDayId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1980,8 +1581,8 @@ func (siw *ServerInterfaceWrapper) SetDayLodgingPlace(w http.ResponseWriter, r *
 	handler.ServeHTTP(w, r)
 }
 
-// CreateGooglePlaceDayItineraryItem operation middleware
-func (siw *ServerInterfaceWrapper) CreateGooglePlaceDayItineraryItem(w http.ResponseWriter, r *http.Request) {
+// CreateGooglePlaceScheduleItem operation middleware
+func (siw *ServerInterfaceWrapper) CreateGooglePlaceScheduleItem(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
@@ -1994,12 +1595,12 @@ func (siw *ServerInterfaceWrapper) CreateGooglePlaceDayItineraryItem(w http.Resp
 		return
 	}
 
-	// ------------- Path parameter "date" -------------
-	var date openapi_types.Date
+	// ------------- Path parameter "tripDayId" -------------
+	var tripDayId string
 
-	err = runtime.BindStyledParameterWithOptions("simple", "date", chi.URLParam(r, "date"), &date, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "tripDayId", chi.URLParam(r, "tripDayId"), &tripDayId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "date", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripDayId", Err: err})
 		return
 	}
 
@@ -2010,7 +1611,7 @@ func (siw *ServerInterfaceWrapper) CreateGooglePlaceDayItineraryItem(w http.Resp
 	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateGooglePlaceDayItineraryItem(w, r, tripId, date)
+		siw.Handler.CreateGooglePlaceScheduleItem(w, r, tripId, tripDayId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2034,12 +1635,12 @@ func (siw *ServerInterfaceWrapper) SearchGooglePlaces(w http.ResponseWriter, r *
 		return
 	}
 
-	// ------------- Path parameter "date" -------------
-	var date openapi_types.Date
+	// ------------- Path parameter "tripDayId" -------------
+	var tripDayId string
 
-	err = runtime.BindStyledParameterWithOptions("simple", "date", chi.URLParam(r, "date"), &date, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "tripDayId", chi.URLParam(r, "tripDayId"), &tripDayId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "date", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripDayId", Err: err})
 		return
 	}
 
@@ -2076,7 +1677,421 @@ func (siw *ServerInterfaceWrapper) SearchGooglePlaces(w http.ResponseWriter, r *
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.SearchGooglePlaces(w, r, tripId, date, params)
+		siw.Handler.SearchGooglePlaces(w, r, tripId, tripDayId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetDayScheduleItems operation middleware
+func (siw *ServerInterfaceWrapper) GetDayScheduleItems(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "tripDayId" -------------
+	var tripDayId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripDayId", chi.URLParam(r, "tripDayId"), &tripDayId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripDayId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetDayScheduleItems(w, r, tripId, tripDayId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateManualScheduleItem operation middleware
+func (siw *ServerInterfaceWrapper) CreateManualScheduleItem(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "tripDayId" -------------
+	var tripDayId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripDayId", chi.URLParam(r, "tripDayId"), &tripDayId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripDayId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateManualScheduleItem(w, r, tripId, tripDayId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ReorderScheduleItems operation middleware
+func (siw *ServerInterfaceWrapper) ReorderScheduleItems(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "tripDayId" -------------
+	var tripDayId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripDayId", chi.URLParam(r, "tripDayId"), &tripDayId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripDayId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReorderScheduleItems(w, r, tripId, tripDayId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteScheduleItem operation middleware
+func (siw *ServerInterfaceWrapper) DeleteScheduleItem(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "tripDayId" -------------
+	var tripDayId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripDayId", chi.URLParam(r, "tripDayId"), &tripDayId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripDayId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "scheduleItemId" -------------
+	var scheduleItemId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "scheduleItemId", chi.URLParam(r, "scheduleItemId"), &scheduleItemId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "scheduleItemId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteScheduleItem(w, r, tripId, tripDayId, scheduleItemId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateScheduleItem operation middleware
+func (siw *ServerInterfaceWrapper) UpdateScheduleItem(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "tripDayId" -------------
+	var tripDayId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripDayId", chi.URLParam(r, "tripDayId"), &tripDayId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripDayId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "scheduleItemId" -------------
+	var scheduleItemId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "scheduleItemId", chi.URLParam(r, "scheduleItemId"), &scheduleItemId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "scheduleItemId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateScheduleItem(w, r, tripId, tripDayId, scheduleItemId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// MarkScheduleItemArrived operation middleware
+func (siw *ServerInterfaceWrapper) MarkScheduleItemArrived(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "tripDayId" -------------
+	var tripDayId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripDayId", chi.URLParam(r, "tripDayId"), &tripDayId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripDayId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "scheduleItemId" -------------
+	var scheduleItemId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "scheduleItemId", chi.URLParam(r, "scheduleItemId"), &scheduleItemId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "scheduleItemId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.MarkScheduleItemArrived(w, r, tripId, tripDayId, scheduleItemId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RestoreScheduleItem operation middleware
+func (siw *ServerInterfaceWrapper) RestoreScheduleItem(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "tripDayId" -------------
+	var tripDayId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripDayId", chi.URLParam(r, "tripDayId"), &tripDayId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripDayId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "scheduleItemId" -------------
+	var scheduleItemId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "scheduleItemId", chi.URLParam(r, "scheduleItemId"), &scheduleItemId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "scheduleItemId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RestoreScheduleItem(w, r, tripId, tripDayId, scheduleItemId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateRoutePreview operation middleware
+func (siw *ServerInterfaceWrapper) CreateRoutePreview(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "tripDayId" -------------
+	var tripDayId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripDayId", chi.URLParam(r, "tripDayId"), &tripDayId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripDayId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "scheduleItemId" -------------
+	var scheduleItemId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "scheduleItemId", chi.URLParam(r, "scheduleItemId"), &scheduleItemId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "scheduleItemId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateRoutePreview(w, r, tripId, tripDayId, scheduleItemId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// MarkScheduleItemSkipped operation middleware
+func (siw *ServerInterfaceWrapper) MarkScheduleItemSkipped(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "tripDayId" -------------
+	var tripDayId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripDayId", chi.URLParam(r, "tripDayId"), &tripDayId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripDayId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "scheduleItemId" -------------
+	var scheduleItemId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "scheduleItemId", chi.URLParam(r, "scheduleItemId"), &scheduleItemId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "scheduleItemId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.MarkScheduleItemSkipped(w, r, tripId, tripDayId, scheduleItemId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2350,49 +2365,49 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Patch(options.BaseURL+"/trips/{tripId}", wrapper.UpdateTrip)
 	})
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/trips/{tripId}/days/{date}/expenses", wrapper.ListDayExpenses)
+		r.Get(options.BaseURL+"/trips/{tripId}/days/{tripDayId}/expenses", wrapper.ListDayExpenses)
 	})
 	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/trips/{tripId}/days/{date}/expenses/quick", wrapper.CreateQuickExpense)
+		r.Post(options.BaseURL+"/trips/{tripId}/days/{tripDayId}/expenses/quick", wrapper.CreateQuickExpense)
 	})
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/trips/{tripId}/days/{date}/itinerary", wrapper.GetDayItinerary)
+		r.Delete(options.BaseURL+"/trips/{tripId}/days/{tripDayId}/lodging-place", wrapper.ClearDayLodgingPlace)
 	})
 	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/trips/{tripId}/days/{date}/itinerary-items", wrapper.CreateManualDayItineraryItem)
+		r.Put(options.BaseURL+"/trips/{tripId}/days/{tripDayId}/lodging-place", wrapper.SetDayLodgingPlace)
 	})
 	r.Group(func(r chi.Router) {
-		r.Patch(options.BaseURL+"/trips/{tripId}/days/{date}/itinerary-items/order", wrapper.ReorderDayItineraryItems)
+		r.Post(options.BaseURL+"/trips/{tripId}/days/{tripDayId}/places/google/schedule-items", wrapper.CreateGooglePlaceScheduleItem)
 	})
 	r.Group(func(r chi.Router) {
-		r.Delete(options.BaseURL+"/trips/{tripId}/days/{date}/itinerary/items/{itemId}", wrapper.DeleteDayItineraryItem)
+		r.Get(options.BaseURL+"/trips/{tripId}/days/{tripDayId}/places/google/search", wrapper.SearchGooglePlaces)
 	})
 	r.Group(func(r chi.Router) {
-		r.Patch(options.BaseURL+"/trips/{tripId}/days/{date}/itinerary/items/{itemId}", wrapper.UpdateDayItineraryItem)
+		r.Get(options.BaseURL+"/trips/{tripId}/days/{tripDayId}/schedule-items", wrapper.GetDayScheduleItems)
 	})
 	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/trips/{tripId}/days/{date}/itinerary/items/{itemId}/arrive", wrapper.MarkDayItineraryItemArrived)
+		r.Post(options.BaseURL+"/trips/{tripId}/days/{tripDayId}/schedule-items/manual", wrapper.CreateManualScheduleItem)
 	})
 	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/trips/{tripId}/days/{date}/itinerary/items/{itemId}/restore", wrapper.RestoreDayItineraryItem)
+		r.Patch(options.BaseURL+"/trips/{tripId}/days/{tripDayId}/schedule-items/order", wrapper.ReorderScheduleItems)
 	})
 	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/trips/{tripId}/days/{date}/itinerary/items/{itemId}/route-preview", wrapper.CreateRoutePreview)
+		r.Delete(options.BaseURL+"/trips/{tripId}/days/{tripDayId}/schedule-items/{scheduleItemId}", wrapper.DeleteScheduleItem)
 	})
 	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/trips/{tripId}/days/{date}/itinerary/items/{itemId}/skip", wrapper.MarkDayItineraryItemSkipped)
+		r.Patch(options.BaseURL+"/trips/{tripId}/days/{tripDayId}/schedule-items/{scheduleItemId}", wrapper.UpdateScheduleItem)
 	})
 	r.Group(func(r chi.Router) {
-		r.Delete(options.BaseURL+"/trips/{tripId}/days/{date}/lodging-place", wrapper.ClearDayLodgingPlace)
+		r.Post(options.BaseURL+"/trips/{tripId}/days/{tripDayId}/schedule-items/{scheduleItemId}/arrive", wrapper.MarkScheduleItemArrived)
 	})
 	r.Group(func(r chi.Router) {
-		r.Put(options.BaseURL+"/trips/{tripId}/days/{date}/lodging-place", wrapper.SetDayLodgingPlace)
+		r.Post(options.BaseURL+"/trips/{tripId}/days/{tripDayId}/schedule-items/{scheduleItemId}/restore", wrapper.RestoreScheduleItem)
 	})
 	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/trips/{tripId}/days/{date}/places/google/itinerary-items", wrapper.CreateGooglePlaceDayItineraryItem)
+		r.Post(options.BaseURL+"/trips/{tripId}/days/{tripDayId}/schedule-items/{scheduleItemId}/route-preview", wrapper.CreateRoutePreview)
 	})
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/trips/{tripId}/days/{date}/places/google/search", wrapper.SearchGooglePlaces)
+		r.Post(options.BaseURL+"/trips/{tripId}/days/{tripDayId}/schedule-items/{scheduleItemId}/skip", wrapper.MarkScheduleItemSkipped)
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/trips/{tripId}/invites", wrapper.CreateTripInvite)

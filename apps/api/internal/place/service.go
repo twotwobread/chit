@@ -28,7 +28,7 @@ func NewService(repo Repository, provider Provider) *Service {
 	return &Service{repo: repo, provider: provider}
 }
 
-func (s *Service) SearchGoogle(ctx context.Context, userID string, tripID string, date string, input SearchInput) ([]SearchResult, error) {
+func (s *Service) SearchGoogle(ctx context.Context, userID string, tripID string, tripDayID string, input SearchInput) ([]SearchResult, error) {
 	if strings.TrimSpace(userID) == "" {
 		return nil, ErrUnauthorized
 	}
@@ -37,14 +37,14 @@ func (s *Service) SearchGoogle(ctx context.Context, userID string, tripID string
 	}
 
 	tripID = strings.TrimSpace(tripID)
-	date = strings.TrimSpace(date)
+	tripDayID = strings.TrimSpace(tripDayID)
 	if _, err := uuid.Parse(tripID); err != nil {
 		return nil, ErrValidation
 	}
-
-	selectedDate, err := time.Parse(dateLayout, date)
-	if err != nil {
-		return nil, ErrValidation
+	if _, err := uuid.Parse(tripDayID); err != nil {
+		if _, parseErr := time.Parse(dateLayout, tripDayID); parseErr != nil {
+			return nil, ErrValidation
+		}
 	}
 
 	query := strings.TrimSpace(input.Query)
@@ -61,7 +61,7 @@ func (s *Service) SearchGoogle(ctx context.Context, userID string, tripID string
 		return nil, ErrValidation
 	}
 
-	if _, _, err := s.validateTripDayParticipant(ctx, userID, tripID, selectedDate); err != nil {
+	if _, err := s.validateTripDayParticipant(ctx, userID, tripID, tripDayID); err != nil {
 		return nil, err
 	}
 
@@ -72,64 +72,63 @@ func (s *Service) SearchGoogle(ctx context.Context, userID string, tripID string
 	return s.provider.Search(ctx, ProviderSearchInput{Query: query, Limit: limit})
 }
 
-func (s *Service) CreateGooglePlaceDayItineraryItem(ctx context.Context, userID string, tripID string, date string, input CreateGooglePlaceDayItineraryItemInput) (CreateGooglePlaceDayItineraryItemResult, error) {
+func (s *Service) CreateGooglePlaceScheduleItem(ctx context.Context, userID string, tripID string, tripDayID string, input CreateGooglePlaceScheduleItemInput) (CreateGooglePlaceScheduleItemResult, error) {
 	if strings.TrimSpace(userID) == "" {
-		return CreateGooglePlaceDayItineraryItemResult{}, ErrUnauthorized
+		return CreateGooglePlaceScheduleItemResult{}, ErrUnauthorized
 	}
 	if s == nil || s.repo == nil {
-		return CreateGooglePlaceDayItineraryItemResult{}, ErrProviderUnavailable
+		return CreateGooglePlaceScheduleItemResult{}, ErrProviderUnavailable
 	}
 
 	tripID = strings.TrimSpace(tripID)
-	date = strings.TrimSpace(date)
+	tripDayID = strings.TrimSpace(tripDayID)
 	if _, err := uuid.Parse(tripID); err != nil {
-		return CreateGooglePlaceDayItineraryItemResult{}, ErrValidation
+		return CreateGooglePlaceScheduleItemResult{}, ErrValidation
 	}
-
-	selectedDate, err := time.Parse(dateLayout, date)
-	if err != nil {
-		return CreateGooglePlaceDayItineraryItemResult{}, ErrValidation
+	if _, err := uuid.Parse(tripDayID); err != nil {
+		if _, parseErr := time.Parse(dateLayout, tripDayID); parseErr != nil {
+			return CreateGooglePlaceScheduleItemResult{}, ErrValidation
+		}
 	}
 
 	googlePlaceID := strings.TrimSpace(input.GooglePlaceID)
 	if len([]rune(googlePlaceID)) < 1 || len([]rune(googlePlaceID)) > maxGooglePlaceIDLen {
-		return CreateGooglePlaceDayItineraryItemResult{}, ErrValidation
+		return CreateGooglePlaceScheduleItemResult{}, ErrValidation
 	}
 
-	_, dayOrder, err := s.validateTripDayParticipant(ctx, userID, tripID, selectedDate)
+	day, err := s.validateTripDayParticipant(ctx, userID, tripID, tripDayID)
 	if err != nil {
-		return CreateGooglePlaceDayItineraryItemResult{}, err
+		return CreateGooglePlaceScheduleItemResult{}, err
 	}
 
-	dateText := selectedDate.Format(dateLayout)
-	var item trip.DayItineraryItem
+	var item trip.ScheduleItem
 	if existingPlace, ok, err := s.repo.GetGoogleTripPlaceByGooglePlaceID(ctx, tripID, googlePlaceID); err != nil {
-		return CreateGooglePlaceDayItineraryItemResult{}, err
+		return CreateGooglePlaceScheduleItemResult{}, err
 	} else if ok {
-		item, err = s.repo.AppendGooglePlaceDayItineraryItem(ctx, AppendGooglePlaceDayItineraryItemRecord{
+		item, err = s.repo.AppendGooglePlaceScheduleItem(ctx, AppendGooglePlaceScheduleItemRecord{
 			TripID:             tripID,
-			ScheduledDate:      dateText,
+			TripDayID:          tripDayID,
 			TripPlaceID:        existingPlace.ID,
 			DuplicateConfirmed: input.DuplicateConfirmed,
 		})
 		if err != nil {
-			return CreateGooglePlaceDayItineraryItemResult{}, err
+			return CreateGooglePlaceScheduleItemResult{}, err
 		}
 	} else {
 		if s.provider == nil {
-			return CreateGooglePlaceDayItineraryItemResult{}, ErrProviderUnavailable
+			return CreateGooglePlaceScheduleItemResult{}, ErrProviderUnavailable
 		}
 		details, err := s.provider.Details(ctx, ProviderDetailsInput{GooglePlaceID: googlePlaceID})
 		if err != nil {
-			return CreateGooglePlaceDayItineraryItemResult{}, err
+			return CreateGooglePlaceScheduleItemResult{}, err
 		}
 		snapshot, err := buildGooglePlaceSnapshot(googlePlaceID, details)
 		if err != nil {
-			return CreateGooglePlaceDayItineraryItemResult{}, err
+			return CreateGooglePlaceScheduleItemResult{}, err
 		}
-		item, err = s.repo.CreateGooglePlaceDayItineraryItem(ctx, CreateGooglePlaceDayItineraryItemRecord{
+		item, err = s.repo.CreateGooglePlaceScheduleItem(ctx, CreateGooglePlaceScheduleItemRecord{
 			TripID:             tripID,
-			ScheduledDate:      dateText,
+			TripDayID:          tripDayID,
 			GooglePlaceID:      snapshot.GooglePlaceID,
 			Name:               snapshot.DisplayName,
 			Address:            snapshot.FormattedAddress,
@@ -141,51 +140,52 @@ func (s *Service) CreateGooglePlaceDayItineraryItem(ctx context.Context, userID 
 			DuplicateConfirmed: input.DuplicateConfirmed,
 		})
 		if err != nil {
-			return CreateGooglePlaceDayItineraryItemResult{}, err
+			return CreateGooglePlaceScheduleItemResult{}, err
 		}
 	}
 
-	lodgingPlace, hasLodgingPlace, err := s.repo.GetDayLodgingPlaceByTripAndDate(ctx, tripID, dateText)
-	if err != nil {
-		return CreateGooglePlaceDayItineraryItemResult{}, err
-	}
-
-	return CreateGooglePlaceDayItineraryItemResult{
-		Day: trip.TripDay{
-			Date:         dateText,
-			DayOrder:     dayOrder,
-			LodgingPlace: optionalTripPlaceSummary(lodgingPlace, hasLodgingPlace),
-		},
-		Item: item,
-	}, nil
+	return CreateGooglePlaceScheduleItemResult{Day: day, Item: item}, nil
 }
 
-func (s *Service) validateTripDayParticipant(ctx context.Context, userID string, tripID string, selectedDate time.Time) (trip.Trip, int, error) {
+func (s *Service) validateTripDayParticipant(ctx context.Context, userID string, tripID string, tripDayID string) (trip.TripDay, error) {
 	foundTrip, ok, err := s.repo.GetTripByID(ctx, tripID)
 	if err != nil {
-		return trip.Trip{}, 0, err
+		return trip.TripDay{}, err
 	}
 	if !ok {
-		return trip.Trip{}, 0, ErrNotFound
+		return trip.TripDay{}, ErrNotFound
 	}
 
 	isParticipant, err := s.repo.IsTripParticipant(ctx, tripID, userID)
 	if err != nil {
-		return trip.Trip{}, 0, err
+		return trip.TripDay{}, err
 	}
 	if !isParticipant {
-		return trip.Trip{}, 0, ErrForbidden
+		return trip.TripDay{}, ErrForbidden
 	}
 
-	dayOrder, err := dayOrderInRange(foundTrip.StartDate, foundTrip.EndDate, selectedDate)
+	if _, err := uuid.Parse(tripDayID); err != nil {
+		selectedDate, parseErr := time.Parse(dateLayout, tripDayID)
+		if parseErr != nil {
+			return trip.TripDay{}, ErrValidation
+		}
+		dayOrder, err := dayOrderInRange(foundTrip.StartDate, foundTrip.EndDate, selectedDate)
+		if err != nil {
+			return trip.TripDay{}, ErrValidation
+		}
+		if dayOrder == 0 {
+			return trip.TripDay{}, ErrNotFound
+		}
+		return trip.TripDay{ID: tripDayID, Date: selectedDate.Format(dateLayout), DayOrder: dayOrder}, nil
+	}
+	day, ok, err := s.repo.GetActiveTripDayByTripAndID(ctx, tripID, tripDayID)
 	if err != nil {
-		return trip.Trip{}, 0, ErrValidation
+		return trip.TripDay{}, err
 	}
-	if dayOrder == 0 {
-		return trip.Trip{}, 0, ErrNotFound
+	if !ok {
+		return trip.TripDay{}, ErrNotFound
 	}
-
-	return foundTrip, dayOrder, nil
+	return day, nil
 }
 
 func buildGooglePlaceSnapshot(expectedGooglePlaceID string, details GooglePlaceDetails) (GooglePlaceDetails, error) {

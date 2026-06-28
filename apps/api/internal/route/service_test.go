@@ -18,7 +18,7 @@ type fakeRepository struct {
 	trip           trip.Trip
 	tripFound      bool
 	participant    bool
-	items          []trip.DayItineraryItem
+	items          []trip.ScheduleItem
 	listItemsErr   error
 	participantErr error
 }
@@ -31,7 +31,14 @@ func (r *fakeRepository) IsTripParticipant(context.Context, string, string) (boo
 	return r.participant, r.participantErr
 }
 
-func (r *fakeRepository) ListItineraryItemsByTripAndDate(context.Context, string, string) ([]trip.DayItineraryItem, error) {
+func (r *fakeRepository) GetActiveTripDayByTripAndID(context.Context, string, string) (trip.TripDay, bool, error) {
+	if !r.tripFound {
+		return trip.TripDay{}, false, nil
+	}
+	return trip.TripDay{ID: "00000000-0000-0000-0000-000000000701", Date: "2026-07-10", DayOrder: 1}, true, nil
+}
+
+func (r *fakeRepository) ListScheduleItemsByTripDay(context.Context, string, string) ([]trip.ScheduleItem, error) {
 	return r.items, r.listItemsErr
 }
 
@@ -62,7 +69,7 @@ func TestServiceCreatePreviewSuccess(t *testing.T) {
 		trip:        trip.Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-12"},
 		tripFound:   true,
 		participant: true,
-		items: []trip.DayItineraryItem{{
+		items: []trip.ScheduleItem{{
 			ID: testItemID,
 			Place: trip.TripPlaceSummary{RoutablePlace: &trip.RoutablePlace{
 				Provider:      "google",
@@ -97,7 +104,7 @@ func TestServiceCreatePreviewUnsupportedManualPlace(t *testing.T) {
 		trip:        trip.Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-12"},
 		tripFound:   true,
 		participant: true,
-		items:       []trip.DayItineraryItem{{ID: testItemID, Place: trip.TripPlaceSummary{Name: "수동 장소"}}},
+		items:       []trip.ScheduleItem{{ID: testItemID, Place: trip.TripPlaceSummary{Name: "수동 장소"}}},
 	}, &fakeProvider{})
 
 	_, err := service.CreatePreview(context.Background(), "user-1", testTripID, "2026-07-10", testItemID, PreviewInput{Origin: GeoPoint{Latitude: 37.5, Longitude: 127.0}})
@@ -112,7 +119,7 @@ func TestServiceCreatePreviewRejectsStaleItem(t *testing.T) {
 		trip:        trip.Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-12"},
 		tripFound:   true,
 		participant: true,
-		items: []trip.DayItineraryItem{
+		items: []trip.ScheduleItem{
 			{ID: testItemID, ArrivedAt: &arrivedAt, Place: trip.TripPlaceSummary{RoutablePlace: &trip.RoutablePlace{Provider: "google", GooglePlaceID: "google-1", Latitude: 37.5, Longitude: 127.0}}},
 			{ID: "00000000-0000-0000-0000-000000000102", Place: trip.TripPlaceSummary{RoutablePlace: &trip.RoutablePlace{Provider: "google", GooglePlaceID: "google-2", Latitude: 37.6, Longitude: 127.1}}},
 		},
@@ -129,7 +136,7 @@ func TestServiceCreatePreviewMapsProviderErrors(t *testing.T) {
 		trip:        trip.Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-12"},
 		tripFound:   true,
 		participant: true,
-		items: []trip.DayItineraryItem{{ID: testItemID, Place: trip.TripPlaceSummary{RoutablePlace: &trip.RoutablePlace{
+		items: []trip.ScheduleItem{{ID: testItemID, Place: trip.TripPlaceSummary{RoutablePlace: &trip.RoutablePlace{
 			Provider: "google", GooglePlaceID: "google-1", Latitude: 37.5, Longitude: 127.0,
 		}}}},
 	}, &fakeProvider{err: ErrProviderNoRoute})

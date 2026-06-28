@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import type {
-  DayItineraryItem,
-  GetDayItineraryResponse,
+  ScheduleItem,
+  GetDayScheduleItemsResponse,
   GetTripDetailResponse,
   TripDay,
   TripListItem,
@@ -58,6 +58,7 @@ function tripDetail(overrides: Partial<GetTripDetailResponse> = {}): GetTripDeta
 
 function day(overrides: Partial<TripDay>): TripDay {
   return {
+    id: '2026-07-10',
     date: '2026-07-10',
     dayOrder: 1,
     lodgingPlace: null,
@@ -94,7 +95,7 @@ const enabledHotelNavigationAction = {
   },
 };
 
-function itinerary(overrides: Partial<GetDayItineraryResponse> = {}): GetDayItineraryResponse {
+function itinerary(overrides: Partial<GetDayScheduleItemsResponse> = {}): GetDayScheduleItemsResponse {
   return {
     day: day({ date: '2026-07-10', dayOrder: 1 }),
     items: [],
@@ -102,7 +103,7 @@ function itinerary(overrides: Partial<GetDayItineraryResponse> = {}): GetDayItin
   };
 }
 
-function item(overrides: Partial<DayItineraryItem>): DayItineraryItem {
+function item(overrides: Partial<ScheduleItem>): ScheduleItem {
   return {
     id: 'item-a',
     itemOrder: 1,
@@ -278,7 +279,7 @@ test('maps the first ordered itinerary item to the next place without exposing s
             address: '1 Chome-3-3 Nishi-Shinsaibashi, Chuo Ward, Osaka',
           },
           isLodging: true,
-        } as DayItineraryItem),
+        } as ScheduleItem),
         item({
           id: 'item-next',
           itemOrder: 1,

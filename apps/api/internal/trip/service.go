@@ -345,16 +345,10 @@ func (s *Service) GetDetail(ctx context.Context, userID string, tripID string) (
 		previewNames[index] = participantDisplayName(name)
 	}
 
-	days, err := tripDaysForRange(foundTrip.StartDate, foundTrip.EndDate)
+	days, err := s.repo.ListActiveTripDaysByTrip(ctx, tripID)
 	if err != nil {
 		return GetDetailResult{}, err
 	}
-
-	lodgingPlaces, err := s.repo.ListDayLodgingPlacesByTrip(ctx, tripID)
-	if err != nil {
-		return GetDetailResult{}, err
-	}
-	applyDayLodgingPlaces(days, lodgingPlaces)
 
 	overflowCount := totalCount - len(previewNames)
 	if overflowCount < 0 {
@@ -408,107 +402,26 @@ func (s *Service) ListParticipants(ctx context.Context, userID string, tripID st
 	return participants, nil
 }
 
-func (s *Service) GetDayItinerary(ctx context.Context, userID string, tripID string, date string) (GetDayItineraryResult, error) {
-	if strings.TrimSpace(userID) == "" {
-		return GetDayItineraryResult{}, ErrUnauthorized
-	}
-
-	tripID = strings.TrimSpace(tripID)
-	date = strings.TrimSpace(date)
-	if !isUUID(tripID) {
-		return GetDayItineraryResult{}, ErrValidation
-	}
-
-	selectedDate, err := parseDate(date)
+func (s *Service) GetDayScheduleItems(ctx context.Context, userID string, tripID string, tripDayID string) (GetDayScheduleItemsResult, error) {
+	day, err := s.activeTripDay(ctx, userID, tripID, tripDayID)
 	if err != nil {
-		return GetDayItineraryResult{}, ErrValidation
+		return GetDayScheduleItemsResult{}, err
 	}
 
-	foundTrip, ok, err := s.repo.GetTripByID(ctx, tripID)
+	items, err := s.repo.ListScheduleItemsByTripDay(ctx, strings.TrimSpace(tripID), strings.TrimSpace(tripDayID))
 	if err != nil {
-		return GetDayItineraryResult{}, err
-	}
-	if !ok {
-		return GetDayItineraryResult{}, ErrNotFound
+		return GetDayScheduleItemsResult{}, err
 	}
 
-	isParticipant, err := s.repo.IsTripParticipant(ctx, tripID, userID)
-	if err != nil {
-		return GetDayItineraryResult{}, err
-	}
-	if !isParticipant {
-		return GetDayItineraryResult{}, ErrForbidden
-	}
-
-	dayOrder, err := dayOrderInRange(foundTrip.StartDate, foundTrip.EndDate, selectedDate)
-	if err != nil {
-		return GetDayItineraryResult{}, ErrValidation
-	}
-	if dayOrder == 0 {
-		return GetDayItineraryResult{}, ErrNotFound
-	}
-
-	lodgingPlace, hasLodgingPlace, err := s.repo.GetDayLodgingPlaceByTripAndDate(ctx, tripID, selectedDate.Format(dateLayout))
-	if err != nil {
-		return GetDayItineraryResult{}, err
-	}
-
-	items, err := s.repo.ListItineraryItemsByTripAndDate(ctx, tripID, selectedDate.Format(dateLayout))
-	if err != nil {
-		return GetDayItineraryResult{}, err
-	}
-
-	return GetDayItineraryResult{
-		Day: TripDay{
-			Date:         selectedDate.Format(dateLayout),
-			DayOrder:     dayOrder,
-			LodgingPlace: optionalTripPlaceSummary(lodgingPlace, hasLodgingPlace),
-		},
-		Items: items,
-	}, nil
+	return GetDayScheduleItemsResult{Day: day, Items: items}, nil
 }
 
-func (s *Service) ListDayExpenses(ctx context.Context, userID string, tripID string, date string) (ListDayExpensesResult, error) {
-	if strings.TrimSpace(userID) == "" {
-		return ListDayExpensesResult{}, ErrUnauthorized
-	}
-
-	tripID = strings.TrimSpace(tripID)
-	date = strings.TrimSpace(date)
-	if !isUUID(tripID) {
-		return ListDayExpensesResult{}, ErrValidation
-	}
-
-	selectedDate, err := parseDate(date)
-	if err != nil {
-		return ListDayExpensesResult{}, ErrValidation
-	}
-
-	foundTrip, ok, err := s.repo.GetTripByID(ctx, tripID)
-	if err != nil {
+func (s *Service) ListDayExpenses(ctx context.Context, userID string, tripID string, tripDayID string) (ListDayExpensesResult, error) {
+	if _, err := s.activeTripDay(ctx, userID, tripID, tripDayID); err != nil {
 		return ListDayExpensesResult{}, err
 	}
-	if !ok {
-		return ListDayExpensesResult{}, ErrNotFound
-	}
 
-	isParticipant, err := s.repo.IsTripParticipant(ctx, tripID, userID)
-	if err != nil {
-		return ListDayExpensesResult{}, err
-	}
-	if !isParticipant {
-		return ListDayExpensesResult{}, ErrForbidden
-	}
-
-	dayOrder, err := dayOrderInRange(foundTrip.StartDate, foundTrip.EndDate, selectedDate)
-	if err != nil {
-		return ListDayExpensesResult{}, ErrValidation
-	}
-	if dayOrder == 0 {
-		return ListDayExpensesResult{}, ErrNotFound
-	}
-
-	expenses, err := s.repo.ListDayExpensesByTripAndDate(ctx, tripID, selectedDate.Format(dateLayout))
+	expenses, err := s.repo.ListDayExpensesByTripDay(ctx, strings.TrimSpace(tripID), strings.TrimSpace(tripDayID))
 	if err != nil {
 		return ListDayExpensesResult{}, err
 	}
@@ -516,56 +429,24 @@ func (s *Service) ListDayExpenses(ctx context.Context, userID string, tripID str
 	return ListDayExpensesResult{Expenses: expenses}, nil
 }
 
-func (s *Service) CreateQuickExpense(ctx context.Context, userID string, tripID string, date string, input CreateQuickExpenseInput) (CreateQuickExpenseResult, error) {
-	if strings.TrimSpace(userID) == "" {
-		return CreateQuickExpenseResult{}, ErrUnauthorized
-	}
-
-	tripID = strings.TrimSpace(tripID)
-	date = strings.TrimSpace(date)
-	itineraryItemID := strings.TrimSpace(input.ItineraryItemID)
+func (s *Service) CreateQuickExpense(ctx context.Context, userID string, tripID string, tripDayID string, input CreateQuickExpenseInput) (CreateQuickExpenseResult, error) {
+	scheduleItemID := strings.TrimSpace(input.ScheduleItemID)
 	payerParticipantID := strings.TrimSpace(input.PayerParticipantID)
 	participantIDs, err := normalizeQuickExpenseParticipantIDs(input.ParticipantIDs)
 	if err != nil {
 		return CreateQuickExpenseResult{}, err
 	}
-	if !isUUID(tripID) || !isUUID(itineraryItemID) || !isUUID(payerParticipantID) || input.AmountMinor < 1 {
+	if !isUUID(scheduleItemID) || !isUUID(payerParticipantID) || input.AmountMinor < 1 {
 		return CreateQuickExpenseResult{}, ErrValidation
 	}
-
-	selectedDate, err := parseDate(date)
-	if err != nil {
-		return CreateQuickExpenseResult{}, ErrValidation
-	}
-
-	foundTrip, ok, err := s.repo.GetTripByID(ctx, tripID)
-	if err != nil {
+	if _, err := s.activeTripDay(ctx, userID, tripID, tripDayID); err != nil {
 		return CreateQuickExpenseResult{}, err
-	}
-	if !ok {
-		return CreateQuickExpenseResult{}, ErrNotFound
-	}
-
-	isParticipant, err := s.repo.IsTripParticipant(ctx, tripID, userID)
-	if err != nil {
-		return CreateQuickExpenseResult{}, err
-	}
-	if !isParticipant {
-		return CreateQuickExpenseResult{}, ErrForbidden
-	}
-
-	dayOrder, err := dayOrderInRange(foundTrip.StartDate, foundTrip.EndDate, selectedDate)
-	if err != nil {
-		return CreateQuickExpenseResult{}, ErrValidation
-	}
-	if dayOrder == 0 {
-		return CreateQuickExpenseResult{}, ErrNotFound
 	}
 
 	return s.repo.CreateQuickExpense(ctx, CreateQuickExpenseRecord{
-		TripID:             tripID,
-		ScheduledDate:      selectedDate.Format(dateLayout),
-		ItineraryItemID:    itineraryItemID,
+		TripID:             strings.TrimSpace(tripID),
+		TripDayID:          strings.TrimSpace(tripDayID),
+		ScheduleItemID:     scheduleItemID,
 		AmountMinor:        input.AmountMinor,
 		PayerParticipantID: payerParticipantID,
 		ParticipantIDs:     participantIDs,
@@ -594,491 +475,271 @@ func normalizeQuickExpenseParticipantIDs(participantIDs []string) ([]string, err
 	return normalized, nil
 }
 
-func (s *Service) SetDayLodgingPlace(ctx context.Context, userID string, tripID string, date string, input SetDayLodgingPlaceInput) (SetDayLodgingPlaceResult, error) {
-	if strings.TrimSpace(userID) == "" {
-		return SetDayLodgingPlaceResult{}, ErrUnauthorized
-	}
-
-	tripID = strings.TrimSpace(tripID)
-	date = strings.TrimSpace(date)
+func (s *Service) SetDayLodgingPlace(ctx context.Context, userID string, tripID string, tripDayID string, input SetDayLodgingPlaceInput) (SetDayLodgingPlaceResult, error) {
 	tripPlaceID := strings.TrimSpace(input.TripPlaceID)
-	if !isUUID(tripID) || !isUUID(tripPlaceID) {
+	if !isUUID(tripPlaceID) {
 		return SetDayLodgingPlaceResult{}, ErrValidation
 	}
-
-	selectedDate, err := parseDate(date)
-	if err != nil {
-		return SetDayLodgingPlaceResult{}, ErrValidation
-	}
-
-	dayOrder, err := s.dayOrder(ctx, userID, tripID, selectedDate)
+	day, err := s.activeTripDay(ctx, userID, tripID, tripDayID)
 	if err != nil {
 		return SetDayLodgingPlaceResult{}, err
 	}
-
-	if _, ok, err := s.repo.GetTripPlaceSummaryByTripAndPlace(ctx, tripID, tripPlaceID); err != nil {
+	if _, ok, err := s.repo.GetTripPlaceSummaryByTripAndPlace(ctx, strings.TrimSpace(tripID), tripPlaceID); err != nil {
 		return SetDayLodgingPlaceResult{}, err
 	} else if !ok {
 		return SetDayLodgingPlaceResult{}, ErrNotFound
 	}
 
-	lodgingPlace, err := s.repo.SetDayLodgingPlace(ctx, SetDayLodgingPlaceRecord{
-		TripID:        tripID,
-		ScheduledDate: selectedDate.Format(dateLayout),
-		TripPlaceID:   tripPlaceID,
-	})
+	lodgingPlace, err := s.repo.SetDayLodgingPlace(ctx, SetDayLodgingPlaceRecord{TripID: strings.TrimSpace(tripID), TripDayID: strings.TrimSpace(tripDayID), TripPlaceID: tripPlaceID})
 	if err != nil {
 		return SetDayLodgingPlaceResult{}, err
 	}
-
-	return SetDayLodgingPlaceResult{
-		Day: TripDay{
-			Date:         selectedDate.Format(dateLayout),
-			DayOrder:     dayOrder,
-			LodgingPlace: &lodgingPlace,
-		},
-		LodgingPlace: lodgingPlace,
-	}, nil
+	day.LodgingPlace = &lodgingPlace
+	return SetDayLodgingPlaceResult{Day: day, LodgingPlace: lodgingPlace}, nil
 }
 
-func (s *Service) ClearDayLodgingPlace(ctx context.Context, userID string, tripID string, date string) error {
-	if strings.TrimSpace(userID) == "" {
-		return ErrUnauthorized
-	}
-
-	tripID = strings.TrimSpace(tripID)
-	date = strings.TrimSpace(date)
-	if !isUUID(tripID) {
-		return ErrValidation
-	}
-
-	selectedDate, err := parseDate(date)
-	if err != nil {
-		return ErrValidation
-	}
-
-	if err := s.validateTripDayParticipant(ctx, userID, tripID, selectedDate); err != nil {
+func (s *Service) ClearDayLodgingPlace(ctx context.Context, userID string, tripID string, tripDayID string) error {
+	if _, err := s.activeTripDay(ctx, userID, tripID, tripDayID); err != nil {
 		return err
 	}
-
-	return s.repo.DeleteDayLodgingPlace(ctx, tripID, selectedDate.Format(dateLayout))
+	return s.repo.DeleteDayLodgingPlace(ctx, strings.TrimSpace(tripID), strings.TrimSpace(tripDayID))
 }
 
-func (s *Service) CreateManualDayItineraryItem(ctx context.Context, userID string, tripID string, date string, input CreateManualDayItineraryItemInput) (CreateManualDayItineraryItemResult, error) {
-	if strings.TrimSpace(userID) == "" {
-		return CreateManualDayItineraryItemResult{}, ErrUnauthorized
-	}
-
-	tripID = strings.TrimSpace(tripID)
-	date = strings.TrimSpace(date)
-	if !isUUID(tripID) {
-		return CreateManualDayItineraryItemResult{}, ErrValidation
-	}
-
-	selectedDate, err := parseDate(date)
+func (s *Service) CreateManualScheduleItem(ctx context.Context, userID string, tripID string, tripDayID string, input CreateManualScheduleItemInput) (CreateManualScheduleItemResult, error) {
+	day, err := s.activeTripDay(ctx, userID, tripID, tripDayID)
 	if err != nil {
-		return CreateManualDayItineraryItemResult{}, ErrValidation
+		return CreateManualScheduleItemResult{}, err
 	}
 
 	name := strings.TrimSpace(input.Name)
 	if len([]rune(name)) < 1 || len([]rune(name)) > 120 {
-		return CreateManualDayItineraryItemResult{}, ErrValidation
+		return CreateManualScheduleItemResult{}, ErrValidation
 	}
-
 	address := strings.TrimSpace(input.Address)
 	if len([]rune(address)) < 1 || len([]rune(address)) > 240 {
-		return CreateManualDayItineraryItemResult{}, ErrValidation
+		return CreateManualScheduleItemResult{}, ErrValidation
 	}
-
 	placeType := strings.TrimSpace(input.PlaceType)
 	if !isSupportedPlaceType(placeType) {
-		return CreateManualDayItineraryItemResult{}, ErrValidation
+		return CreateManualScheduleItemResult{}, ErrValidation
 	}
 
-	foundTrip, ok, err := s.repo.GetTripByID(ctx, tripID)
+	item, err := s.repo.CreateManualScheduleItem(ctx, CreateManualScheduleItemRecord{TripID: strings.TrimSpace(tripID), TripDayID: strings.TrimSpace(tripDayID), Name: name, Address: address, PlaceType: placeType})
 	if err != nil {
-		return CreateManualDayItineraryItemResult{}, err
+		return CreateManualScheduleItemResult{}, err
+	}
+	return CreateManualScheduleItemResult{Day: day, Item: item}, nil
+}
+
+func (s *Service) UpdateScheduleItem(ctx context.Context, userID string, tripID string, tripDayID string, itemID string, input UpdateScheduleItemInput) (UpdateScheduleItemResult, error) {
+	if _, err := s.activeTripDay(ctx, userID, tripID, tripDayID); err != nil {
+		return UpdateScheduleItemResult{}, err
+	}
+	itemID = strings.TrimSpace(itemID)
+	if !isUUID(itemID) || isEmptyScheduleItemUpdate(input) {
+		return UpdateScheduleItemResult{}, ErrValidation
+	}
+	if err := validateUpdateScheduleItemInput(input); err != nil {
+		return UpdateScheduleItemResult{}, err
+	}
+
+	foundItem, ok, err := s.repo.GetScheduleItemByTripDayAndID(ctx, strings.TrimSpace(tripID), strings.TrimSpace(tripDayID), itemID)
+	if err != nil {
+		return UpdateScheduleItemResult{}, err
 	}
 	if !ok {
-		return CreateManualDayItineraryItemResult{}, ErrNotFound
+		return UpdateScheduleItemResult{}, ErrNotFound
 	}
 
-	isParticipant, err := s.repo.IsTripParticipant(ctx, tripID, userID)
+	merged, err := mergeUpdateScheduleItemInput(strings.TrimSpace(tripID), strings.TrimSpace(tripDayID), itemID, foundItem, input)
 	if err != nil {
-		return CreateManualDayItineraryItemResult{}, err
+		return UpdateScheduleItemResult{}, err
 	}
-	if !isParticipant {
-		return CreateManualDayItineraryItemResult{}, ErrForbidden
-	}
-
-	dayOrder, err := dayOrderInRange(foundTrip.StartDate, foundTrip.EndDate, selectedDate)
+	updatedItem, err := s.repo.UpdateScheduleItemPlace(ctx, merged)
 	if err != nil {
-		return CreateManualDayItineraryItemResult{}, ErrValidation
+		return UpdateScheduleItemResult{}, err
 	}
-	if dayOrder == 0 {
-		return CreateManualDayItineraryItemResult{}, ErrNotFound
-	}
-
-	item, err := s.repo.CreateManualDayItineraryItem(ctx, CreateManualDayItineraryItemRecord{
-		TripID:        tripID,
-		ScheduledDate: selectedDate.Format(dateLayout),
-		Name:          name,
-		Address:       address,
-		PlaceType:     placeType,
-	})
-	if err != nil {
-		return CreateManualDayItineraryItemResult{}, err
-	}
-
-	lodgingPlace, hasLodgingPlace, err := s.repo.GetDayLodgingPlaceByTripAndDate(ctx, tripID, selectedDate.Format(dateLayout))
-	if err != nil {
-		return CreateManualDayItineraryItemResult{}, err
-	}
-
-	return CreateManualDayItineraryItemResult{
-		Day: TripDay{
-			Date:         selectedDate.Format(dateLayout),
-			DayOrder:     dayOrder,
-			LodgingPlace: optionalTripPlaceSummary(lodgingPlace, hasLodgingPlace),
-		},
-		Item: item,
-	}, nil
+	return UpdateScheduleItemResult{Item: updatedItem}, nil
 }
 
-func (s *Service) UpdateDayItineraryItem(ctx context.Context, userID string, tripID string, date string, itemID string, input UpdateDayItineraryItemInput) (UpdateDayItineraryItemResult, error) {
-	if strings.TrimSpace(userID) == "" {
-		return UpdateDayItineraryItemResult{}, ErrUnauthorized
-	}
-
-	tripID = strings.TrimSpace(tripID)
-	date = strings.TrimSpace(date)
+func (s *Service) MarkScheduleItemArrived(ctx context.Context, userID string, tripID string, tripDayID string, itemID string) (MarkScheduleItemArrivedResult, error) {
 	itemID = strings.TrimSpace(itemID)
-	if !isUUID(tripID) || !isUUID(itemID) || isEmptyDayItineraryItemUpdate(input) {
-		return UpdateDayItineraryItemResult{}, ErrValidation
+	if !isUUID(itemID) {
+		return MarkScheduleItemArrivedResult{}, ErrValidation
 	}
-
-	selectedDate, err := parseDate(date)
+	day, err := s.activeTripDay(ctx, userID, tripID, tripDayID)
 	if err != nil {
-		return UpdateDayItineraryItemResult{}, ErrValidation
+		return MarkScheduleItemArrivedResult{}, err
 	}
-
-	if err := validateUpdateDayItineraryItemInput(input); err != nil {
-		return UpdateDayItineraryItemResult{}, err
-	}
-
-	if err := s.validateTripDayParticipant(ctx, userID, tripID, selectedDate); err != nil {
-		return UpdateDayItineraryItemResult{}, err
-	}
-
-	foundItem, ok, err := s.repo.GetItineraryItemByTripDateAndID(ctx, tripID, selectedDate.Format(dateLayout), itemID)
+	mutation, err := s.repo.MarkScheduleItemArrived(ctx, MarkScheduleItemArrivedRecord{TripID: strings.TrimSpace(tripID), TripDayID: strings.TrimSpace(tripDayID), ItemID: itemID})
 	if err != nil {
-		return UpdateDayItineraryItemResult{}, err
+		return MarkScheduleItemArrivedResult{}, err
 	}
-	if !ok {
-		return UpdateDayItineraryItemResult{}, ErrNotFound
-	}
-
-	merged, err := mergeUpdateDayItineraryItemInput(tripID, selectedDate.Format(dateLayout), itemID, foundItem, input)
-	if err != nil {
-		return UpdateDayItineraryItemResult{}, err
-	}
-
-	updatedItem, err := s.repo.UpdateDayItineraryItemPlace(ctx, merged)
-	if err != nil {
-		return UpdateDayItineraryItemResult{}, err
-	}
-
-	return UpdateDayItineraryItemResult{Item: updatedItem}, nil
+	return MarkScheduleItemArrivedResult{Day: day, Item: mutation.Item, Items: mutation.Items}, nil
 }
 
-func (s *Service) MarkDayItineraryItemArrived(ctx context.Context, userID string, tripID string, date string, itemID string) (MarkDayItineraryItemArrivedResult, error) {
-	if strings.TrimSpace(userID) == "" {
-		return MarkDayItineraryItemArrivedResult{}, ErrUnauthorized
-	}
-
-	tripID = strings.TrimSpace(tripID)
-	date = strings.TrimSpace(date)
+func (s *Service) MarkScheduleItemSkipped(ctx context.Context, userID string, tripID string, tripDayID string, itemID string) (MarkScheduleItemSkippedResult, error) {
 	itemID = strings.TrimSpace(itemID)
-	if !isUUID(tripID) || !isUUID(itemID) {
-		return MarkDayItineraryItemArrivedResult{}, ErrValidation
+	if !isUUID(itemID) {
+		return MarkScheduleItemSkippedResult{}, ErrValidation
 	}
-
-	selectedDate, err := parseDate(date)
+	day, err := s.activeTripDay(ctx, userID, tripID, tripDayID)
 	if err != nil {
-		return MarkDayItineraryItemArrivedResult{}, ErrValidation
+		return MarkScheduleItemSkippedResult{}, err
 	}
-
-	dayOrder, err := s.dayOrder(ctx, userID, tripID, selectedDate)
+	mutation, err := s.repo.MarkScheduleItemSkipped(ctx, MarkScheduleItemSkippedRecord{TripID: strings.TrimSpace(tripID), TripDayID: strings.TrimSpace(tripDayID), ItemID: itemID})
 	if err != nil {
-		return MarkDayItineraryItemArrivedResult{}, err
+		return MarkScheduleItemSkippedResult{}, err
 	}
-
-	mutation, err := s.repo.MarkDayItineraryItemArrived(ctx, MarkDayItineraryItemArrivedRecord{
-		TripID:        tripID,
-		ScheduledDate: selectedDate.Format(dateLayout),
-		ItemID:        itemID,
-	})
-	if err != nil {
-		return MarkDayItineraryItemArrivedResult{}, err
-	}
-
-	lodgingPlace, hasLodgingPlace, err := s.repo.GetDayLodgingPlaceByTripAndDate(ctx, tripID, selectedDate.Format(dateLayout))
-	if err != nil {
-		return MarkDayItineraryItemArrivedResult{}, err
-	}
-
-	return MarkDayItineraryItemArrivedResult{
-		Day: TripDay{
-			Date:         selectedDate.Format(dateLayout),
-			DayOrder:     dayOrder,
-			LodgingPlace: optionalTripPlaceSummary(lodgingPlace, hasLodgingPlace),
-		},
-		Item:  mutation.Item,
-		Items: mutation.Items,
-	}, nil
+	return MarkScheduleItemSkippedResult{Day: day, Item: mutation.Item, Items: mutation.Items}, nil
 }
 
-func (s *Service) MarkDayItineraryItemSkipped(ctx context.Context, userID string, tripID string, date string, itemID string) (MarkDayItineraryItemSkippedResult, error) {
-	if strings.TrimSpace(userID) == "" {
-		return MarkDayItineraryItemSkippedResult{}, ErrUnauthorized
-	}
-
-	tripID = strings.TrimSpace(tripID)
-	date = strings.TrimSpace(date)
+func (s *Service) RestoreScheduleItem(ctx context.Context, userID string, tripID string, tripDayID string, itemID string) (RestoreScheduleItemResult, error) {
 	itemID = strings.TrimSpace(itemID)
-	if !isUUID(tripID) || !isUUID(itemID) {
-		return MarkDayItineraryItemSkippedResult{}, ErrValidation
+	if !isUUID(itemID) {
+		return RestoreScheduleItemResult{}, ErrValidation
 	}
-
-	selectedDate, err := parseDate(date)
+	day, err := s.activeTripDay(ctx, userID, tripID, tripDayID)
 	if err != nil {
-		return MarkDayItineraryItemSkippedResult{}, ErrValidation
+		return RestoreScheduleItemResult{}, err
 	}
-
-	dayOrder, err := s.dayOrder(ctx, userID, tripID, selectedDate)
+	mutation, err := s.repo.RestoreScheduleItem(ctx, RestoreScheduleItemRecord{TripID: strings.TrimSpace(tripID), TripDayID: strings.TrimSpace(tripDayID), ItemID: itemID})
 	if err != nil {
-		return MarkDayItineraryItemSkippedResult{}, err
+		return RestoreScheduleItemResult{}, err
 	}
-
-	mutation, err := s.repo.MarkDayItineraryItemSkipped(ctx, MarkDayItineraryItemSkippedRecord{
-		TripID:        tripID,
-		ScheduledDate: selectedDate.Format(dateLayout),
-		ItemID:        itemID,
-	})
-	if err != nil {
-		return MarkDayItineraryItemSkippedResult{}, err
-	}
-
-	lodgingPlace, hasLodgingPlace, err := s.repo.GetDayLodgingPlaceByTripAndDate(ctx, tripID, selectedDate.Format(dateLayout))
-	if err != nil {
-		return MarkDayItineraryItemSkippedResult{}, err
-	}
-
-	return MarkDayItineraryItemSkippedResult{
-		Day: TripDay{
-			Date:         selectedDate.Format(dateLayout),
-			DayOrder:     dayOrder,
-			LodgingPlace: optionalTripPlaceSummary(lodgingPlace, hasLodgingPlace),
-		},
-		Item:  mutation.Item,
-		Items: mutation.Items,
-	}, nil
+	return RestoreScheduleItemResult{Day: day, Item: mutation.Item, Items: mutation.Items}, nil
 }
 
-func (s *Service) RestoreDayItineraryItem(ctx context.Context, userID string, tripID string, date string, itemID string) (RestoreDayItineraryItemResult, error) {
-	if strings.TrimSpace(userID) == "" {
-		return RestoreDayItineraryItemResult{}, ErrUnauthorized
-	}
-
-	tripID = strings.TrimSpace(tripID)
-	date = strings.TrimSpace(date)
+func (s *Service) DeleteScheduleItem(ctx context.Context, userID string, tripID string, tripDayID string, itemID string) error {
 	itemID = strings.TrimSpace(itemID)
-	if !isUUID(tripID) || !isUUID(itemID) {
-		return RestoreDayItineraryItemResult{}, ErrValidation
-	}
-
-	selectedDate, err := parseDate(date)
-	if err != nil {
-		return RestoreDayItineraryItemResult{}, ErrValidation
-	}
-
-	dayOrder, err := s.dayOrder(ctx, userID, tripID, selectedDate)
-	if err != nil {
-		return RestoreDayItineraryItemResult{}, err
-	}
-
-	mutation, err := s.repo.RestoreDayItineraryItem(ctx, RestoreDayItineraryItemRecord{
-		TripID:        tripID,
-		ScheduledDate: selectedDate.Format(dateLayout),
-		ItemID:        itemID,
-	})
-	if err != nil {
-		return RestoreDayItineraryItemResult{}, err
-	}
-
-	lodgingPlace, hasLodgingPlace, err := s.repo.GetDayLodgingPlaceByTripAndDate(ctx, tripID, selectedDate.Format(dateLayout))
-	if err != nil {
-		return RestoreDayItineraryItemResult{}, err
-	}
-
-	return RestoreDayItineraryItemResult{
-		Day: TripDay{
-			Date:         selectedDate.Format(dateLayout),
-			DayOrder:     dayOrder,
-			LodgingPlace: optionalTripPlaceSummary(lodgingPlace, hasLodgingPlace),
-		},
-		Item:  mutation.Item,
-		Items: mutation.Items,
-	}, nil
-}
-
-func (s *Service) DeleteDayItineraryItem(ctx context.Context, userID string, tripID string, date string, itemID string) error {
-	if strings.TrimSpace(userID) == "" {
-		return ErrUnauthorized
-	}
-
-	tripID = strings.TrimSpace(tripID)
-	date = strings.TrimSpace(date)
-	itemID = strings.TrimSpace(itemID)
-	if !isUUID(tripID) || !isUUID(itemID) {
+	if !isUUID(itemID) {
 		return ErrValidation
 	}
-
-	selectedDate, err := parseDate(date)
-	if err != nil {
-		return ErrValidation
-	}
-
-	if err := s.validateTripDayParticipant(ctx, userID, tripID, selectedDate); err != nil {
+	if _, err := s.activeTripDay(ctx, userID, tripID, tripDayID); err != nil {
 		return err
 	}
-
-	deleted, err := s.repo.DeleteDayItineraryItem(ctx, tripID, selectedDate.Format(dateLayout), itemID)
+	deleted, err := s.repo.DeleteScheduleItem(ctx, strings.TrimSpace(tripID), strings.TrimSpace(tripDayID), itemID)
 	if err != nil {
 		return err
 	}
 	if !deleted {
 		return ErrNotFound
 	}
-
 	return nil
 }
 
-func (s *Service) ReorderDayItineraryItems(ctx context.Context, userID string, tripID string, date string, moves []ReorderDayItineraryMoveInput) (ReorderDayItineraryItemsResult, error) {
-	if strings.TrimSpace(userID) == "" {
-		return ReorderDayItineraryItemsResult{}, ErrUnauthorized
-	}
-
-	tripID = strings.TrimSpace(tripID)
-	date = strings.TrimSpace(date)
-	if !isUUID(tripID) || len(moves) == 0 {
-		return ReorderDayItineraryItemsResult{}, ErrValidation
-	}
-
-	selectedDate, err := parseDate(date)
+func (s *Service) ReorderScheduleItems(ctx context.Context, userID string, tripID string, tripDayID string, moves []ReorderDayScheduleMoveInput) (ReorderScheduleItemsResult, error) {
+	day, err := s.activeTripDay(ctx, userID, tripID, tripDayID)
 	if err != nil {
-		return ReorderDayItineraryItemsResult{}, ErrValidation
+		return ReorderScheduleItemsResult{}, err
 	}
-
-	if err := s.validateTripDayParticipant(ctx, userID, tripID, selectedDate); err != nil {
-		return ReorderDayItineraryItemsResult{}, err
+	if len(moves) == 0 {
+		return ReorderScheduleItemsResult{}, ErrValidation
 	}
-
-	recordMoves := make([]ReorderDayItineraryMoveRecord, 0, len(moves))
+	recordMoves := make([]ReorderDayScheduleMoveRecord, 0, len(moves))
 	for _, move := range moves {
-		recordMove, err := s.validateReorderDayItineraryMove(ctx, tripID, selectedDate.Format(dateLayout), move)
+		recordMove, err := s.validateReorderDayScheduleMove(ctx, strings.TrimSpace(tripID), strings.TrimSpace(tripDayID), move)
 		if err != nil {
-			return ReorderDayItineraryItemsResult{}, err
+			return ReorderScheduleItemsResult{}, err
 		}
 		recordMoves = append(recordMoves, recordMove)
 	}
-
-	items, err := s.repo.ReorderDayItineraryItems(ctx, ReorderDayItineraryItemsRecord{
-		TripID:        tripID,
-		ScheduledDate: selectedDate.Format(dateLayout),
-		Moves:         recordMoves,
-	})
+	items, err := s.repo.ReorderScheduleItems(ctx, ReorderScheduleItemsRecord{TripID: strings.TrimSpace(tripID), TripDayID: strings.TrimSpace(tripDayID), Moves: recordMoves})
 	if err != nil {
-		return ReorderDayItineraryItemsResult{}, err
+		return ReorderScheduleItemsResult{}, err
 	}
-
-	dayOrder, err := s.dayOrder(ctx, userID, tripID, selectedDate)
-	if err != nil {
-		return ReorderDayItineraryItemsResult{}, err
-	}
-
-	lodgingPlace, hasLodgingPlace, err := s.repo.GetDayLodgingPlaceByTripAndDate(ctx, tripID, selectedDate.Format(dateLayout))
-	if err != nil {
-		return ReorderDayItineraryItemsResult{}, err
-	}
-
-	return ReorderDayItineraryItemsResult{
-		Day: TripDay{
-			Date:         selectedDate.Format(dateLayout),
-			DayOrder:     dayOrder,
-			LodgingPlace: optionalTripPlaceSummary(lodgingPlace, hasLodgingPlace),
-		},
-		Items: items,
-	}, nil
+	return ReorderScheduleItemsResult{Day: day, Items: items}, nil
 }
 
-func (s *Service) validateTripDayParticipant(ctx context.Context, userID string, tripID string, selectedDate time.Time) error {
-	_, err := s.dayOrder(ctx, userID, tripID, selectedDate)
-	return err
-}
+func (s *Service) activeTripDay(ctx context.Context, userID string, tripID string, tripDayID string) (TripDay, error) {
+	if strings.TrimSpace(userID) == "" {
+		return TripDay{}, ErrUnauthorized
+	}
+	tripID = strings.TrimSpace(tripID)
+	tripDayID = strings.TrimSpace(tripDayID)
+	if !isUUID(tripID) {
+		return TripDay{}, ErrValidation
+	}
+	if !isUUID(tripDayID) {
+		if _, err := parseDate(tripDayID); err != nil {
+			return TripDay{}, ErrValidation
+		}
+	}
 
-func (s *Service) dayOrder(ctx context.Context, userID string, tripID string, selectedDate time.Time) (int, error) {
 	foundTrip, ok, err := s.repo.GetTripByID(ctx, tripID)
 	if err != nil {
-		return 0, err
+		return TripDay{}, err
 	}
 	if !ok {
-		return 0, ErrNotFound
+		return TripDay{}, ErrNotFound
 	}
-
 	isParticipant, err := s.repo.IsTripParticipant(ctx, tripID, userID)
 	if err != nil {
-		return 0, err
+		return TripDay{}, err
 	}
 	if !isParticipant {
-		return 0, ErrForbidden
+		return TripDay{}, ErrForbidden
 	}
-
-	dayOrder, err := dayOrderInRange(foundTrip.StartDate, foundTrip.EndDate, selectedDate)
+	if !isUUID(tripDayID) {
+		selectedDate, err := parseDate(tripDayID)
+		if err != nil {
+			return TripDay{}, ErrValidation
+		}
+		dayOrder, err := dayOrderInRange(foundTrip.StartDate, foundTrip.EndDate, selectedDate)
+		if err != nil {
+			return TripDay{}, ErrValidation
+		}
+		if dayOrder == 0 {
+			return TripDay{}, ErrNotFound
+		}
+		if day, ok, err := s.repo.GetActiveTripDayByTripAndID(ctx, tripID, tripDayID); err != nil {
+			return TripDay{}, err
+		} else if ok {
+			if day.Date == "" {
+				day.Date = selectedDate.Format(dateLayout)
+			}
+			if day.DayOrder == 0 {
+				day.DayOrder = dayOrder
+			}
+			return day, nil
+		}
+		return TripDay{ID: tripDayID, Date: selectedDate.Format(dateLayout), DayOrder: dayOrder}, nil
+	}
+	day, ok, err := s.repo.GetActiveTripDayByTripAndID(ctx, tripID, tripDayID)
 	if err != nil {
-		return 0, ErrValidation
+		return TripDay{}, err
 	}
-	if dayOrder == 0 {
-		return 0, ErrNotFound
+	if !ok {
+		return TripDay{}, ErrNotFound
 	}
-	return dayOrder, nil
+	return day, nil
 }
 
-func (s *Service) validateReorderDayItineraryMove(ctx context.Context, tripID string, date string, move ReorderDayItineraryMoveInput) (ReorderDayItineraryMoveRecord, error) {
+func (s *Service) validateReorderDayScheduleMove(ctx context.Context, tripID string, tripDayID string, move ReorderDayScheduleMoveInput) (ReorderDayScheduleMoveRecord, error) {
 	itemID := strings.TrimSpace(move.ItemID)
 	beforeItemID := trimOptionalString(move.BeforeItemID)
 	afterItemID := trimOptionalString(move.AfterItemID)
 	if !isUUID(itemID) || move.ClientVersion < 1 || (beforeItemID == nil && afterItemID == nil) {
-		return ReorderDayItineraryMoveRecord{}, ErrValidation
+		return ReorderDayScheduleMoveRecord{}, ErrValidation
 	}
 	if !isDistinctMoveIDs(itemID, beforeItemID, afterItemID) {
-		return ReorderDayItineraryMoveRecord{}, ErrValidation
+		return ReorderDayScheduleMoveRecord{}, ErrValidation
 	}
 	if !optionalUUID(beforeItemID) || !optionalUUID(afterItemID) {
-		return ReorderDayItineraryMoveRecord{}, ErrValidation
+		return ReorderDayScheduleMoveRecord{}, ErrValidation
 	}
 
 	for _, referencedID := range referencedMoveItemIDs(itemID, beforeItemID, afterItemID) {
-		_, ok, err := s.repo.GetItineraryItemByTripDateAndID(ctx, tripID, date, referencedID)
+		_, ok, err := s.repo.GetScheduleItemByTripDayAndID(ctx, tripID, tripDayID, referencedID)
 		if err != nil {
-			return ReorderDayItineraryMoveRecord{}, err
+			return ReorderDayScheduleMoveRecord{}, err
 		}
 		if !ok {
-			return ReorderDayItineraryMoveRecord{}, ErrValidation
+			return ReorderDayScheduleMoveRecord{}, ErrValidation
 		}
 	}
 
-	return ReorderDayItineraryMoveRecord{
+	return ReorderDayScheduleMoveRecord{
 		ItemID:        itemID,
 		BeforeItemID:  beforeItemID,
 		AfterItemID:   afterItemID,
@@ -1134,14 +795,14 @@ func mergeUpdateInput(foundTrip Trip, input UpdateInput) (UpdateRecord, error) {
 }
 
 func isEmptyUpdate(input UpdateInput) bool {
-	return input.Name == nil && input.StartDate == nil && input.EndDate == nil && input.DefaultCurrency == nil
+	return input.Name == nil && input.StartDate == nil && input.EndDate == nil && input.DefaultCurrency == nil && input.ConfirmOutOfRangeDayArchive == nil
 }
 
-func isEmptyDayItineraryItemUpdate(input UpdateDayItineraryItemInput) bool {
+func isEmptyScheduleItemUpdate(input UpdateScheduleItemInput) bool {
 	return input.Name == nil && input.Address == nil && input.PlaceType == nil
 }
 
-func validateUpdateDayItineraryItemInput(input UpdateDayItineraryItemInput) error {
+func validateUpdateScheduleItemInput(input UpdateScheduleItemInput) error {
 	if input.Name != nil {
 		name := strings.TrimSpace(*input.Name)
 		if len([]rune(name)) < 1 || len([]rune(name)) > 120 {
@@ -1163,13 +824,13 @@ func validateUpdateDayItineraryItemInput(input UpdateDayItineraryItemInput) erro
 	return nil
 }
 
-func mergeUpdateDayItineraryItemInput(tripID string, date string, itemID string, foundItem DayItineraryItem, input UpdateDayItineraryItemInput) (UpdateDayItineraryItemRecord, error) {
+func mergeUpdateScheduleItemInput(tripID string, tripDayID string, itemID string, foundItem ScheduleItem, input UpdateScheduleItemInput) (UpdateScheduleItemRecord, error) {
 	name := foundItem.Place.Name
 	if input.Name != nil {
 		name = strings.TrimSpace(*input.Name)
 	}
 	if len([]rune(name)) < 1 || len([]rune(name)) > 120 {
-		return UpdateDayItineraryItemRecord{}, ErrValidation
+		return UpdateScheduleItemRecord{}, ErrValidation
 	}
 
 	address := foundItem.Place.Address
@@ -1177,7 +838,7 @@ func mergeUpdateDayItineraryItemInput(tripID string, date string, itemID string,
 		address = strings.TrimSpace(*input.Address)
 	}
 	if len([]rune(address)) < 1 || len([]rune(address)) > 300 {
-		return UpdateDayItineraryItemRecord{}, ErrValidation
+		return UpdateScheduleItemRecord{}, ErrValidation
 	}
 
 	placeType := foundItem.Place.PlaceType
@@ -1185,16 +846,16 @@ func mergeUpdateDayItineraryItemInput(tripID string, date string, itemID string,
 		placeType = strings.TrimSpace(*input.PlaceType)
 	}
 	if !isSupportedPlaceType(placeType) {
-		return UpdateDayItineraryItemRecord{}, ErrValidation
+		return UpdateScheduleItemRecord{}, ErrValidation
 	}
 
-	return UpdateDayItineraryItemRecord{
-		TripID:        tripID,
-		ScheduledDate: date,
-		ItemID:        itemID,
-		Name:          name,
-		Address:       address,
-		PlaceType:     placeType,
+	return UpdateScheduleItemRecord{
+		TripID:    tripID,
+		TripDayID: tripDayID,
+		ItemID:    itemID,
+		Name:      name,
+		Address:   address,
+		PlaceType: placeType,
 	}, nil
 }
 

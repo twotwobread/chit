@@ -1,4 +1,4 @@
-import type { CreateManualDayItineraryItemRequest, TripPlaceType } from '@i-um/api-contract';
+import type { CreateManualScheduleItemRequest, TripPlaceType } from '@i-um/api-contract';
 
 import { getPlaceTypeLabel } from './day-itinerary';
 
@@ -15,7 +15,7 @@ export type ManualPlaceFormErrors = {
 };
 
 export type ManualPlaceValidationResult =
-  | { ok: true; request: CreateManualDayItineraryItemRequest }
+  | { ok: true; request: CreateManualScheduleItemRequest }
   | { ok: false; errors: ManualPlaceFormErrors };
 
 export type ManualPlaceFailureViewModel =

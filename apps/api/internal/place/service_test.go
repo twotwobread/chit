@@ -110,7 +110,7 @@ func TestServiceSearchGoogleProviderErrors(t *testing.T) {
 	}
 }
 
-func TestServiceCreateGooglePlaceDayItineraryItemCreatesSnapshotAndItem(t *testing.T) {
+func TestServiceCreateGooglePlaceScheduleItemCreatesSnapshotAndItem(t *testing.T) {
 	repo := &fakeRepository{trip: trip.Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"}, tripFound: true, isParticipant: true}
 	provider := &fakeProvider{details: GooglePlaceDetails{
 		GooglePlaceID:    "google-1",
@@ -123,9 +123,9 @@ func TestServiceCreateGooglePlaceDayItineraryItemCreatesSnapshotAndItem(t *testi
 	}}
 	service := NewService(repo, provider)
 
-	result, err := service.CreateGooglePlaceDayItineraryItem(context.Background(), "user-1", testTripID, "2026-07-11", CreateGooglePlaceDayItineraryItemInput{GooglePlaceID: " google-1 "})
+	result, err := service.CreateGooglePlaceScheduleItem(context.Background(), "user-1", testTripID, "2026-07-11", CreateGooglePlaceScheduleItemInput{GooglePlaceID: " google-1 "})
 	if err != nil {
-		t.Fatalf("CreateGooglePlaceDayItineraryItem returned error: %v", err)
+		t.Fatalf("CreateGooglePlaceScheduleItem returned error: %v", err)
 	}
 
 	if !provider.detailsCalled || provider.detailsInput.GooglePlaceID != "google-1" {
@@ -142,7 +142,7 @@ func TestServiceCreateGooglePlaceDayItineraryItemCreatesSnapshotAndItem(t *testi
 	}
 }
 
-func TestServiceCreateGooglePlaceDayItineraryItemReusesExistingTripPlaceWithoutProviderRefresh(t *testing.T) {
+func TestServiceCreateGooglePlaceScheduleItemReusesExistingTripPlaceWithoutProviderRefresh(t *testing.T) {
 	repo := &fakeRepository{
 		trip:                trip.Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"},
 		tripFound:           true,
@@ -153,9 +153,9 @@ func TestServiceCreateGooglePlaceDayItineraryItemReusesExistingTripPlaceWithoutP
 	provider := &fakeProvider{}
 	service := NewService(repo, provider)
 
-	result, err := service.CreateGooglePlaceDayItineraryItem(context.Background(), "user-1", testTripID, "2026-07-11", CreateGooglePlaceDayItineraryItemInput{GooglePlaceID: "google-1"})
+	result, err := service.CreateGooglePlaceScheduleItem(context.Background(), "user-1", testTripID, "2026-07-11", CreateGooglePlaceScheduleItemInput{GooglePlaceID: "google-1"})
 	if err != nil {
-		t.Fatalf("CreateGooglePlaceDayItineraryItem returned error: %v", err)
+		t.Fatalf("CreateGooglePlaceScheduleItem returned error: %v", err)
 	}
 
 	if provider.detailsCalled {
@@ -169,7 +169,7 @@ func TestServiceCreateGooglePlaceDayItineraryItemReusesExistingTripPlaceWithoutP
 	}
 }
 
-func TestServiceCreateGooglePlaceDayItineraryItemDuplicateConfirmation(t *testing.T) {
+func TestServiceCreateGooglePlaceScheduleItemDuplicateConfirmation(t *testing.T) {
 	repo := &fakeRepository{
 		trip:                trip.Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"},
 		tripFound:           true,
@@ -180,13 +180,13 @@ func TestServiceCreateGooglePlaceDayItineraryItemDuplicateConfirmation(t *testin
 	}
 	service := NewService(repo, &fakeProvider{})
 
-	_, err := service.CreateGooglePlaceDayItineraryItem(context.Background(), "user-1", testTripID, "2026-07-11", CreateGooglePlaceDayItineraryItemInput{GooglePlaceID: "google-1"})
+	_, err := service.CreateGooglePlaceScheduleItem(context.Background(), "user-1", testTripID, "2026-07-11", CreateGooglePlaceScheduleItemInput{GooglePlaceID: "google-1"})
 	if !errors.Is(err, ErrDuplicateDayPlaceConfirmationNeeded) {
 		t.Fatalf("expected duplicate confirmation error, got %v", err)
 	}
 
 	repo.appendErr = nil
-	_, err = service.CreateGooglePlaceDayItineraryItem(context.Background(), "user-1", testTripID, "2026-07-11", CreateGooglePlaceDayItineraryItemInput{GooglePlaceID: "google-1", DuplicateConfirmed: true})
+	_, err = service.CreateGooglePlaceScheduleItem(context.Background(), "user-1", testTripID, "2026-07-11", CreateGooglePlaceScheduleItemInput{GooglePlaceID: "google-1", DuplicateConfirmed: true})
 	if err != nil {
 		t.Fatalf("expected confirmed duplicate to append, got %v", err)
 	}
@@ -195,18 +195,18 @@ func TestServiceCreateGooglePlaceDayItineraryItemDuplicateConfirmation(t *testin
 	}
 }
 
-func TestServiceCreateGooglePlaceDayItineraryItemValidationAndProviderData(t *testing.T) {
+func TestServiceCreateGooglePlaceScheduleItemValidationAndProviderData(t *testing.T) {
 	validRepo := &fakeRepository{trip: trip.Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"}, tripFound: true, isParticipant: true}
 	service := NewService(validRepo, &fakeProvider{})
 
-	_, err := service.CreateGooglePlaceDayItineraryItem(context.Background(), "user-1", testTripID, "2026-07-10", CreateGooglePlaceDayItineraryItemInput{})
+	_, err := service.CreateGooglePlaceScheduleItem(context.Background(), "user-1", testTripID, "2026-07-10", CreateGooglePlaceScheduleItemInput{})
 	if !errors.Is(err, ErrValidation) {
 		t.Fatalf("expected invalid google place id validation error, got %v", err)
 	}
 
 	provider := &fakeProvider{details: GooglePlaceDetails{GooglePlaceID: "google-1", DisplayName: "도톤보리", FormattedAddress: "Osaka", Latitude: 0, Longitude: 181, PrimaryType: "cafe", Types: []string{"cafe"}}}
 	service = NewService(validRepo, provider)
-	_, err = service.CreateGooglePlaceDayItineraryItem(context.Background(), "user-1", testTripID, "2026-07-10", CreateGooglePlaceDayItineraryItemInput{GooglePlaceID: "google-1"})
+	_, err = service.CreateGooglePlaceScheduleItem(context.Background(), "user-1", testTripID, "2026-07-10", CreateGooglePlaceScheduleItemInput{GooglePlaceID: "google-1"})
 	if !errors.Is(err, ErrProviderUnavailable) {
 		t.Fatalf("expected invalid provider data to be unavailable, got %v", err)
 	}
@@ -232,8 +232,8 @@ type fakeRepository struct {
 	checkedUserID        string
 	existingGooglePlace  trip.TripPlaceSummary
 	existingGoogleFound  bool
-	createdGoogleRecord  CreateGooglePlaceDayItineraryItemRecord
-	appendedGoogleRecord AppendGooglePlaceDayItineraryItemRecord
+	createdGoogleRecord  CreateGooglePlaceScheduleItemRecord
+	appendedGoogleRecord AppendGooglePlaceScheduleItemRecord
 	appendErr            error
 }
 
@@ -247,32 +247,35 @@ func (r *fakeRepository) IsTripParticipant(_ context.Context, tripID string, use
 	return r.isParticipant, nil
 }
 
+func (r *fakeRepository) GetActiveTripDayByTripAndID(_ context.Context, tripID string, tripDayID string) (trip.TripDay, bool, error) {
+	if !r.tripFound || tripDayID == "2026-07-14" {
+		return trip.TripDay{}, false, nil
+	}
+	return trip.TripDay{ID: tripDayID, Date: "2026-07-10", DayOrder: 1}, true, nil
+}
+
 func (r *fakeRepository) GetGoogleTripPlaceByGooglePlaceID(context.Context, string, string) (trip.TripPlaceSummary, bool, error) {
 	return r.existingGooglePlace, r.existingGoogleFound, nil
 }
 
-func (r *fakeRepository) GetDayLodgingPlaceByTripAndDate(context.Context, string, string) (trip.TripPlaceSummary, bool, error) {
-	return trip.TripPlaceSummary{}, false, nil
-}
-
-func (r *fakeRepository) AppendGooglePlaceDayItineraryItem(_ context.Context, record AppendGooglePlaceDayItineraryItemRecord) (trip.DayItineraryItem, error) {
+func (r *fakeRepository) AppendGooglePlaceScheduleItem(_ context.Context, record AppendGooglePlaceScheduleItemRecord) (trip.ScheduleItem, error) {
 	r.appendedGoogleRecord = record
 	if r.appendErr != nil {
-		return trip.DayItineraryItem{}, r.appendErr
+		return trip.ScheduleItem{}, r.appendErr
 	}
 	placeSummary := r.existingGooglePlace
 	if placeSummary.ID == "" {
 		placeSummary = trip.TripPlaceSummary{ID: record.TripPlaceID, Name: "도톤보리", PlaceType: "sights", Address: "Osaka"}
 	}
-	return trip.DayItineraryItem{ID: "item-1", ItemOrder: 1, Version: 1, Place: placeSummary}, nil
+	return trip.ScheduleItem{ID: "item-1", ItemOrder: 1, Version: 1, Place: placeSummary}, nil
 }
 
-func (r *fakeRepository) CreateGooglePlaceDayItineraryItem(_ context.Context, record CreateGooglePlaceDayItineraryItemRecord) (trip.DayItineraryItem, error) {
+func (r *fakeRepository) CreateGooglePlaceScheduleItem(_ context.Context, record CreateGooglePlaceScheduleItemRecord) (trip.ScheduleItem, error) {
 	r.createdGoogleRecord = record
 	if r.appendErr != nil {
-		return trip.DayItineraryItem{}, r.appendErr
+		return trip.ScheduleItem{}, r.appendErr
 	}
-	return trip.DayItineraryItem{
+	return trip.ScheduleItem{
 		ID:        "item-1",
 		ItemOrder: 1,
 		Version:   1,

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import type { GetDayItineraryResponse } from '@i-um/api-contract';
+import type { GetDayScheduleItemsResponse } from '@i-um/api-contract';
 
 import type { DayItineraryViewModel } from './day-itinerary';
 import {
@@ -11,7 +11,7 @@ import {
   buildDayItineraryReorderDraft,
   buildDayItineraryReorderSuccessViewModel,
   buildDayItineraryReorderSubmitState,
-  buildReorderDayItineraryItemsRequest,
+  buildReorderScheduleItemsRequest,
   dayItineraryReorderFailureState,
   hasDayItineraryReorderChanges,
   moveDayItineraryReorderItem,
@@ -183,12 +183,12 @@ describe('reorder itinerary helpers', () => {
       disabled: true,
       label: '저장 중...',
     });
-    assert.deepEqual(buildReorderDayItineraryItemsRequest(reorderedDraft), {
+    assert.deepEqual(buildReorderScheduleItemsRequest(reorderedDraft), {
       moves: [
         {
-          itemId: 'item-3',
-          beforeItemId: null,
-          afterItemId: 'item-1',
+          scheduleItemId: 'item-3',
+          beforeScheduleItemId: null,
+          afterScheduleItemId: 'item-1',
           clientVersion: 8,
         },
       ],
@@ -244,9 +244,9 @@ describe('reorder itinerary helpers', () => {
       assert.deepEqual(request, {
         moves: [
           {
-            itemId: 'item-3',
-            beforeItemId: null,
-            afterItemId: 'item-1',
+            scheduleItemId: 'item-3',
+            beforeScheduleItemId: null,
+            afterScheduleItemId: 'item-1',
             clientVersion: 8,
           },
         ],
@@ -304,7 +304,7 @@ describe('reorder itinerary helpers', () => {
 
     assert.equal(hasDayItineraryReorderChanges(restoredDraft), false);
     assert.deepEqual(buildDayItineraryReorderSubmitState(false, restoredDraft), { disabled: true, label: '저장' });
-    assert.equal(buildReorderDayItineraryItemsRequest(restoredDraft), null);
+    assert.equal(buildReorderScheduleItemsRequest(restoredDraft), null);
   });
 
   it('skips persistence when save is attempted without any reorder changes', async () => {
@@ -348,7 +348,7 @@ describe('reorder itinerary helpers', () => {
   });
 
   it('exits edit mode and shows the latest itinerary order after a successful save', () => {
-    const response: GetDayItineraryResponse = {
+    const response: GetDayScheduleItemsResponse = {
       day: { date: '2026-07-10', dayOrder: 1, lodgingPlace: null },
       items: [
         {

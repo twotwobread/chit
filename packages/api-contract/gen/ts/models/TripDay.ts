@@ -4,6 +4,7 @@
 /* eslint-disable */
 import type { TripPlaceSummary } from './TripPlaceSummary';
 export type TripDay = {
+    id: string;
     date: string;
     dayOrder: number;
     lodgingPlace: TripPlaceSummary | null;

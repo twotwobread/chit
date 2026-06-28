@@ -33,10 +33,10 @@ func (e DuplicateDayPlaceConfirmationError) Unwrap() error {
 type Repository interface {
 	GetTripByID(ctx context.Context, tripID string) (trip.Trip, bool, error)
 	IsTripParticipant(ctx context.Context, tripID string, userID string) (bool, error)
+	GetActiveTripDayByTripAndID(ctx context.Context, tripID string, tripDayID string) (trip.TripDay, bool, error)
 	GetGoogleTripPlaceByGooglePlaceID(ctx context.Context, tripID string, googlePlaceID string) (trip.TripPlaceSummary, bool, error)
-	GetDayLodgingPlaceByTripAndDate(ctx context.Context, tripID string, date string) (trip.TripPlaceSummary, bool, error)
-	AppendGooglePlaceDayItineraryItem(ctx context.Context, record AppendGooglePlaceDayItineraryItemRecord) (trip.DayItineraryItem, error)
-	CreateGooglePlaceDayItineraryItem(ctx context.Context, record CreateGooglePlaceDayItineraryItemRecord) (trip.DayItineraryItem, error)
+	AppendGooglePlaceScheduleItem(ctx context.Context, record AppendGooglePlaceScheduleItemRecord) (trip.ScheduleItem, error)
+	CreateGooglePlaceScheduleItem(ctx context.Context, record CreateGooglePlaceScheduleItemRecord) (trip.ScheduleItem, error)
 }
 
 type Provider interface {
@@ -58,7 +58,7 @@ type SearchInput struct {
 	Limit int
 }
 
-type CreateGooglePlaceDayItineraryItemInput struct {
+type CreateGooglePlaceScheduleItemInput struct {
 	GooglePlaceID      string
 	DuplicateConfirmed bool
 }
@@ -80,16 +80,16 @@ type GooglePlaceDetails struct {
 	Types            []string
 }
 
-type AppendGooglePlaceDayItineraryItemRecord struct {
+type AppendGooglePlaceScheduleItemRecord struct {
 	TripID             string
-	ScheduledDate      string
+	TripDayID          string
 	TripPlaceID        string
 	DuplicateConfirmed bool
 }
 
-type CreateGooglePlaceDayItineraryItemRecord struct {
+type CreateGooglePlaceScheduleItemRecord struct {
 	TripID             string
-	ScheduledDate      string
+	TripDayID          string
 	GooglePlaceID      string
 	Name               string
 	Address            string
@@ -101,7 +101,7 @@ type CreateGooglePlaceDayItineraryItemRecord struct {
 	DuplicateConfirmed bool
 }
 
-type CreateGooglePlaceDayItineraryItemResult struct {
+type CreateGooglePlaceScheduleItemResult struct {
 	Day  trip.TripDay
-	Item trip.DayItineraryItem
+	Item trip.ScheduleItem
 }

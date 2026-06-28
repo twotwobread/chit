@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import type {
-  DayItineraryItem,
+  ScheduleItem,
   ExpenseSplit,
-  GetDayItineraryResponse,
+  GetDayScheduleItemsResponse,
   TripParticipantListItem,
 } from '@i-um/api-contract';
 
@@ -23,7 +23,7 @@ import {
   toggleQuickExpenseSplitParticipant,
 } from './quick-expense.ts';
 
-function item(overrides: Partial<DayItineraryItem>): DayItineraryItem {
+function item(overrides: Partial<ScheduleItem>): ScheduleItem {
   return {
     id: 'item-a',
     itemOrder: 1,
@@ -40,7 +40,7 @@ function item(overrides: Partial<DayItineraryItem>): DayItineraryItem {
   };
 }
 
-function itinerary(items: DayItineraryItem[]): GetDayItineraryResponse {
+function itinerary(items: ScheduleItem[]): GetDayScheduleItemsResponse {
   return {
     day: { date: '2026-07-10', dayOrder: 1, lodgingPlace: null },
     items,
@@ -360,14 +360,14 @@ test('builds create quick expense request and validation errors', () => {
     buildCreateQuickExpenseRequest({
       amountInput: '18,500',
       currency: 'KRW',
-      itineraryItemId: 'item-a',
+      scheduleItemId: 'item-a',
       participantIds: ['participant-b'],
       payerParticipantId: 'participant-a',
     }),
     {
       ok: true,
       request: {
-        itineraryItemId: 'item-a',
+        scheduleItemId: 'item-a',
         amountMinor: 18500,
         payerParticipantId: 'participant-a',
         participantIds: ['participant-b'],
@@ -379,7 +379,7 @@ test('builds create quick expense request and validation errors', () => {
     buildCreateQuickExpenseRequest({
       amountInput: '0',
       currency: 'KRW',
-      itineraryItemId: null,
+      scheduleItemId: null,
       participantIds: [],
       payerParticipantId: null,
     }),

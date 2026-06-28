@@ -1,8 +1,8 @@
 import type { Href } from 'expo-router';
 
 import type {
-  DayItineraryItem,
-  GetDayItineraryResponse,
+  ScheduleItem,
+  GetDayScheduleItemsResponse,
   GetTripDetailResponse,
   RoutablePlace,
   TripDay,
@@ -10,7 +10,7 @@ import type {
   TripPlaceSummary,
 } from '@i-um/api-contract';
 
-import { buildDayItineraryRoute, getPlaceTypeLabel } from './day-itinerary';
+import { buildDayItineraryRoute, getPlaceTypeLabel, getScheduleItems } from './day-itinerary';
 import { formatTripDayDate } from './days';
 import { tripDetailPath } from './mypage';
 import { buildQuickExpenseRoute } from './quick-expense';
@@ -243,7 +243,7 @@ export function buildTodayExecutionViewModel({
 }: {
   selectedTrip: TripListItem;
   tripDetail: GetTripDetailResponse;
-  itinerary: GetDayItineraryResponse;
+  itinerary: GetDayScheduleItemsResponse;
   today: string;
   ongoingTripCount: number;
   travelMode?: TravelMode;
@@ -258,8 +258,8 @@ export function buildTodayExecutionViewModel({
     return buildTodayUnavailableViewModel(selectedTrip.id);
   }
 
-  const dayRoute = buildDayItineraryRoute(selectedTrip.id, currentDay.date);
-  const orderedItems = orderedItineraryItems(itinerary.items);
+  const dayRoute = buildDayItineraryRoute(selectedTrip.id, currentDay.id);
+  const orderedItems = orderedItineraryItems(getScheduleItems(itinerary));
   const lodgingSourceDay = itinerary.day.date === currentDay.date ? itinerary.day : currentDay;
   const common = {
     tripName: tripDetail.trip.name,
@@ -289,7 +289,7 @@ export function buildTodayExecutionViewModel({
         ...common,
         title: '진행할 장소가 없어요.',
         helper: '스킵한 장소를 복구하면 다시 진행할 수 있어요.',
-        skippedSection: buildSkippedSection(skippedItems, selectedTrip.id, currentDay.date),
+        skippedSection: buildSkippedSection(skippedItems, selectedTrip.id, currentDay.id),
       };
     }
 
@@ -299,7 +299,7 @@ export function buildTodayExecutionViewModel({
       title: '오늘 일정을 모두 완료했어요.',
       helper: '오늘 일정 화면에서 장소를 확인할 수 있어요.',
       completedCountLabel: `완료한 장소 ${orderedItems.length}곳`,
-      quickExpenseAction: routeAction('지출 등록', buildQuickExpenseRoute(selectedTrip.id, currentDay.date)),
+      quickExpenseAction: routeAction('지출 등록', buildQuickExpenseRoute(selectedTrip.id, currentDay.id)),
     };
   }
 
@@ -316,11 +316,10 @@ export function buildTodayExecutionViewModel({
       navigationAction: navigateAction('길찾기', nextItem.place.name, nextItem.place.address, travelMode),
       travelModeSelector: buildTravelModeSelectorViewModel(travelMode),
     },
-    skippedSection:
-      skippedItems.length > 0 ? buildSkippedSection(skippedItems, selectedTrip.id, currentDay.date) : null,
-    arrivalAction: arriveAction(selectedTrip.id, currentDay.date, nextItem.id),
-    quickExpenseAction: routeAction('지출 등록', buildQuickExpenseRoute(selectedTrip.id, currentDay.date, nextItem.id)),
-    skipAction: skipAction(selectedTrip.id, currentDay.date, nextItem.id),
+    skippedSection: skippedItems.length > 0 ? buildSkippedSection(skippedItems, selectedTrip.id, currentDay.id) : null,
+    arrivalAction: arriveAction(selectedTrip.id, currentDay.id, nextItem.id),
+    quickExpenseAction: routeAction('지출 등록', buildQuickExpenseRoute(selectedTrip.id, currentDay.id, nextItem.id)),
+    skipAction: skipAction(selectedTrip.id, currentDay.id, nextItem.id),
   };
 }
 
@@ -370,23 +369,19 @@ export function findTodayTripDay(days: TripDay[], today: string): TripDay | null
   return days.find((day) => day.date === today) ?? null;
 }
 
-function orderedItineraryItems(items: DayItineraryItem[]): DayItineraryItem[] {
+function orderedItineraryItems(items: ScheduleItem[]): ScheduleItem[] {
   return [...items].sort((left, right) => left.itemOrder - right.itemOrder);
 }
 
-function isPendingItem(item: DayItineraryItem): boolean {
+function isPendingItem(item: ScheduleItem): boolean {
   return item.arrivedAt === null && item.skippedAt === null;
 }
 
-function isSkippedItem(item: DayItineraryItem): boolean {
+function isSkippedItem(item: ScheduleItem): boolean {
   return item.arrivedAt === null && item.skippedAt !== null;
 }
 
-function buildSkippedSection(
-  items: DayItineraryItem[],
-  tripId: string,
-  date: string,
-): TodaySkippedPlacesSectionViewModel {
+function buildSkippedSection(items: ScheduleItem[], tripId: string, date: string): TodaySkippedPlacesSectionViewModel {
   return {
     title: '스킵한 장소',
     countLabel: `${items.length}곳을 나중에 다시 볼 수 있어요.`,

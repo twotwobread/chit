@@ -138,14 +138,14 @@ func updateTripResponseToOpenAPI(result trip.UpdateResult) openapi.UpdateTripRes
 	return openapi.UpdateTripResponse{Trip: tripToOpenAPI(result.Trip)}
 }
 
-func getDayItineraryResponseToOpenAPI(result trip.GetDayItineraryResult) openapi.GetDayItineraryResponse {
-	items := make([]openapi.DayItineraryItem, 0, len(result.Items))
+func getDayScheduleResponseToOpenAPI(result trip.GetDayScheduleItemsResult) openapi.GetDayScheduleItemsResponse {
+	items := make([]openapi.ScheduleItem, 0, len(result.Items))
 	for _, item := range result.Items {
-		items = append(items, dayItineraryItemToOpenAPI(item))
+		items = append(items, dayScheduleItemToOpenAPI(item))
 	}
-	return openapi.GetDayItineraryResponse{
-		Day:   tripDayToOpenAPI(result.Day),
-		Items: items,
+	return openapi.GetDayScheduleItemsResponse{
+		Day:           tripDayToOpenAPI(result.Day),
+		ScheduleItems: items,
 	}
 }
 
@@ -156,10 +156,10 @@ func setDayLodgingPlaceResponseToOpenAPI(result trip.SetDayLodgingPlaceResult) o
 	}
 }
 
-func createManualDayItineraryItemResponseToOpenAPI(result trip.CreateManualDayItineraryItemResult) openapi.CreateManualDayItineraryItemResponse {
-	return openapi.CreateManualDayItineraryItemResponse{
-		Day:  tripDayToOpenAPI(result.Day),
-		Item: dayItineraryItemToOpenAPI(result.Item),
+func createManualScheduleItemResponseToOpenAPI(result trip.CreateManualScheduleItemResult) openapi.CreateManualScheduleItemResponse {
+	return openapi.CreateManualScheduleItemResponse{
+		Day:          tripDayToOpenAPI(result.Day),
+		ScheduleItem: dayScheduleItemToOpenAPI(result.Item),
 	}
 }
 
@@ -204,8 +204,10 @@ func expenseToOpenAPI(expense trip.Expense) openapi.Expense {
 	return openapi.Expense{
 		Id:                 expense.ID,
 		TripId:             expense.TripID,
-		ScheduledDate:      dateToOpenAPI(expense.ScheduledDate),
-		ItineraryItemId:    expense.ItineraryItemID,
+		AnchorType:         openapi.ExpenseAnchorType(expense.AnchorType),
+		TripDayId:          expense.TripDayID,
+		ScheduleItemId:     expense.ScheduleItemID,
+		ExpenseDate:        dateToOpenAPI(expense.ExpenseDate),
 		TripPlaceId:        expense.TripPlaceID,
 		Place:              expensePlaceSnapshotToOpenAPI(expense.Place),
 		AmountMinor:        expense.AmountMinor,
@@ -225,71 +227,71 @@ func expensePlaceSnapshotToOpenAPI(place trip.ExpensePlaceSnapshot) openapi.Expe
 	}
 }
 
-func createGooglePlaceDayItineraryItemResponseToOpenAPI(result place.CreateGooglePlaceDayItineraryItemResult) openapi.CreateGooglePlaceDayItineraryItemResponse {
-	return openapi.CreateGooglePlaceDayItineraryItemResponse{
-		Day:  tripDayToOpenAPI(result.Day),
-		Item: dayItineraryItemToOpenAPI(result.Item),
+func createGooglePlaceScheduleItemResponseToOpenAPI(result place.CreateGooglePlaceScheduleItemResult) openapi.CreateGooglePlaceScheduleItemResponse {
+	return openapi.CreateGooglePlaceScheduleItemResponse{
+		Day:          tripDayToOpenAPI(result.Day),
+		ScheduleItem: dayScheduleItemToOpenAPI(result.Item),
 	}
 }
 
-func updateDayItineraryItemResponseToOpenAPI(result trip.UpdateDayItineraryItemResult) openapi.UpdateDayItineraryItemResponse {
-	return openapi.UpdateDayItineraryItemResponse{Item: dayItineraryItemToOpenAPI(result.Item)}
+func updateScheduleItemResponseToOpenAPI(result trip.UpdateScheduleItemResult) openapi.UpdateScheduleItemResponse {
+	return openapi.UpdateScheduleItemResponse{ScheduleItem: dayScheduleItemToOpenAPI(result.Item)}
 }
 
-func reorderDayItineraryItemsResponseToOpenAPI(result trip.ReorderDayItineraryItemsResult) openapi.ReorderDayItineraryItemsResponse {
-	items := make([]openapi.DayItineraryItem, 0, len(result.Items))
+func reorderScheduleItemsResponseToOpenAPI(result trip.ReorderScheduleItemsResult) openapi.ReorderScheduleItemsResponse {
+	items := make([]openapi.ScheduleItem, 0, len(result.Items))
 	for _, item := range result.Items {
-		items = append(items, dayItineraryItemToOpenAPI(item))
+		items = append(items, dayScheduleItemToOpenAPI(item))
 	}
-	return openapi.ReorderDayItineraryItemsResponse{
-		Day:   tripDayToOpenAPI(result.Day),
-		Items: items,
-	}
-}
-
-func markDayItineraryItemArrivedResponseToOpenAPI(result trip.MarkDayItineraryItemArrivedResult) openapi.MarkDayItineraryItemArrivedResponse {
-	items := make([]openapi.DayItineraryItem, 0, len(result.Items))
-	for _, item := range result.Items {
-		items = append(items, dayItineraryItemToOpenAPI(item))
-	}
-	return openapi.MarkDayItineraryItemArrivedResponse{
-		Day:   tripDayToOpenAPI(result.Day),
-		Item:  dayItineraryItemToOpenAPI(result.Item),
-		Items: items,
+	return openapi.ReorderScheduleItemsResponse{
+		Day:           tripDayToOpenAPI(result.Day),
+		ScheduleItems: items,
 	}
 }
 
-func markDayItineraryItemSkippedResponseToOpenAPI(result trip.MarkDayItineraryItemSkippedResult) openapi.MarkDayItineraryItemSkippedResponse {
-	items := make([]openapi.DayItineraryItem, 0, len(result.Items))
+func markScheduleItemArrivedResponseToOpenAPI(result trip.MarkScheduleItemArrivedResult) openapi.MarkScheduleItemArrivedResponse {
+	items := make([]openapi.ScheduleItem, 0, len(result.Items))
 	for _, item := range result.Items {
-		items = append(items, dayItineraryItemToOpenAPI(item))
+		items = append(items, dayScheduleItemToOpenAPI(item))
 	}
-	return openapi.MarkDayItineraryItemSkippedResponse{
-		Day:   tripDayToOpenAPI(result.Day),
-		Item:  dayItineraryItemToOpenAPI(result.Item),
-		Items: items,
+	return openapi.MarkScheduleItemArrivedResponse{
+		Day:           tripDayToOpenAPI(result.Day),
+		ScheduleItem:  dayScheduleItemToOpenAPI(result.Item),
+		ScheduleItems: items,
 	}
 }
 
-func restoreDayItineraryItemResponseToOpenAPI(result trip.RestoreDayItineraryItemResult) openapi.RestoreDayItineraryItemResponse {
-	items := make([]openapi.DayItineraryItem, 0, len(result.Items))
+func markScheduleItemSkippedResponseToOpenAPI(result trip.MarkScheduleItemSkippedResult) openapi.MarkScheduleItemSkippedResponse {
+	items := make([]openapi.ScheduleItem, 0, len(result.Items))
 	for _, item := range result.Items {
-		items = append(items, dayItineraryItemToOpenAPI(item))
+		items = append(items, dayScheduleItemToOpenAPI(item))
 	}
-	return openapi.RestoreDayItineraryItemResponse{
-		Day:   tripDayToOpenAPI(result.Day),
-		Item:  dayItineraryItemToOpenAPI(result.Item),
-		Items: items,
+	return openapi.MarkScheduleItemSkippedResponse{
+		Day:           tripDayToOpenAPI(result.Day),
+		ScheduleItem:  dayScheduleItemToOpenAPI(result.Item),
+		ScheduleItems: items,
+	}
+}
+
+func restoreScheduleItemResponseToOpenAPI(result trip.RestoreScheduleItemResult) openapi.RestoreScheduleItemResponse {
+	items := make([]openapi.ScheduleItem, 0, len(result.Items))
+	for _, item := range result.Items {
+		items = append(items, dayScheduleItemToOpenAPI(item))
+	}
+	return openapi.RestoreScheduleItemResponse{
+		Day:           tripDayToOpenAPI(result.Day),
+		ScheduleItem:  dayScheduleItemToOpenAPI(result.Item),
+		ScheduleItems: items,
 	}
 }
 
 func routePreviewResponseToOpenAPI(result route.PreviewResult) openapi.RoutePreviewResponse {
 	return openapi.RoutePreviewResponse{
-		ItemId:      result.ItemID,
-		Mode:        openapi.Transit,
-		Summary:     routePreviewSummaryToOpenAPI(result.Summary),
-		Map:         routePreviewMapToOpenAPI(result.Map),
-		GeneratedAt: result.GeneratedAt.UTC(),
+		ScheduleItemId: result.ItemID,
+		Mode:           openapi.Transit,
+		Summary:        routePreviewSummaryToOpenAPI(result.Summary),
+		Map:            routePreviewMapToOpenAPI(result.Map),
+		GeneratedAt:    result.GeneratedAt.UTC(),
 	}
 }
 
@@ -334,8 +336,8 @@ func searchGooglePlacesResponseToOpenAPI(results []place.SearchResult) openapi.S
 	return openapi.SearchGooglePlacesResponse{Results: items}
 }
 
-func dayItineraryItemToOpenAPI(item trip.DayItineraryItem) openapi.DayItineraryItem {
-	return openapi.DayItineraryItem{
+func dayScheduleItemToOpenAPI(item trip.ScheduleItem) openapi.ScheduleItem {
+	return openapi.ScheduleItem{
 		Id:        item.ID,
 		ItemOrder: item.ItemOrder,
 		Version:   item.Version,
@@ -386,6 +388,7 @@ func optionalTripPlaceSummaryToOpenAPI(place *trip.TripPlaceSummary) *openapi.Tr
 
 func tripDayToOpenAPI(day trip.TripDay) openapi.TripDay {
 	return openapi.TripDay{
+		Id:           day.ID,
 		Date:         dateToOpenAPI(day.Date),
 		DayOrder:     day.DayOrder,
 		LodgingPlace: optionalTripPlaceSummaryToOpenAPI(day.LodgingPlace),

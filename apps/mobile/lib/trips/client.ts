@@ -1,29 +1,29 @@
 import {
   TripsService,
   type AcceptTripInviteResponse,
-  type CreateManualDayItineraryItemRequest,
-  type CreateManualDayItineraryItemResponse,
+  type CreateManualScheduleItemRequest,
+  type CreateManualScheduleItemResponse,
   type CreateQuickExpenseRequest,
   type CreateQuickExpenseResponse,
   type CreateRoutePreviewRequest,
   type CreateTripInviteResponse,
   type CreateTripRequest,
   type CreateTripResponse,
-  type GetDayItineraryResponse,
+  type GetDayScheduleItemsResponse,
   type GetTripDetailResponse,
   type ListDayExpensesResponse,
   type ListTripParticipantsResponse,
   type ListTripsResponse,
-  type MarkDayItineraryItemArrivedResponse,
-  type MarkDayItineraryItemSkippedResponse,
-  type ReorderDayItineraryItemsRequest,
-  type ReorderDayItineraryItemsResponse,
+  type MarkScheduleItemArrivedResponse,
+  type MarkScheduleItemSkippedResponse,
+  type ReorderScheduleItemsRequest,
+  type ReorderScheduleItemsResponse,
   type RoutePreviewResponse,
   type SetDayLodgingPlaceRequest,
   type SetDayLodgingPlaceResponse,
-  type RestoreDayItineraryItemResponse,
-  type UpdateDayItineraryItemRequest,
-  type UpdateDayItineraryItemResponse,
+  type RestoreScheduleItemResponse,
+  type UpdateScheduleItemRequest,
+  type UpdateScheduleItemResponse,
   type UpdateTripRequest,
   type UpdateTripResponse,
 } from '@i-um/api-contract';
@@ -60,23 +60,23 @@ export async function acceptTripInvite(token: string): Promise<AcceptTripInviteR
   return TripsService.acceptTripInvite(token);
 }
 
-export async function getTripDayItinerary(tripId: string, date: string): Promise<GetDayItineraryResponse> {
+export async function getTripDayItinerary(tripId: string, tripDayId: string): Promise<GetDayScheduleItemsResponse> {
   await getMeWithRefresh();
-  return TripsService.getDayItinerary(tripId, date);
+  return TripsService.getDayScheduleItems(tripId, tripDayId);
 }
 
-export async function listDayExpenses(tripId: string, date: string): Promise<ListDayExpensesResponse> {
+export async function listDayExpenses(tripId: string, tripDayId: string): Promise<ListDayExpensesResponse> {
   await getMeWithRefresh();
-  return TripsService.listDayExpenses(tripId, date);
+  return TripsService.listDayExpenses(tripId, tripDayId);
 }
 
-export async function createManualDayItineraryItem(
+export async function createManualScheduleItem(
   tripId: string,
   date: string,
-  request: CreateManualDayItineraryItemRequest,
-): Promise<CreateManualDayItineraryItemResponse> {
+  request: CreateManualScheduleItemRequest,
+): Promise<CreateManualScheduleItemResponse> {
   await getMeWithRefresh();
-  return TripsService.createManualDayItineraryItem(tripId, date, request);
+  return TripsService.createManualScheduleItem(tripId, date, request);
 }
 
 export async function createQuickExpense(
@@ -102,40 +102,40 @@ export async function clearDayLodgingPlace(tripId: string, date: string): Promis
   return TripsService.clearDayLodgingPlace(tripId, date);
 }
 
-export async function reorderDayItineraryItems(
+export async function reorderScheduleItems(
   tripId: string,
   date: string,
-  request: ReorderDayItineraryItemsRequest,
-): Promise<ReorderDayItineraryItemsResponse> {
+  request: ReorderScheduleItemsRequest,
+): Promise<ReorderScheduleItemsResponse> {
   await getMeWithRefresh();
-  return TripsService.reorderDayItineraryItems(tripId, date, request);
+  return TripsService.reorderScheduleItems(tripId, date, request);
 }
 
-export async function markDayItineraryItemArrived(
+export async function markScheduleItemArrived(
   tripId: string,
   date: string,
   itemId: string,
-): Promise<MarkDayItineraryItemArrivedResponse> {
+): Promise<MarkScheduleItemArrivedResponse> {
   await getMeWithRefresh();
-  return TripsService.markDayItineraryItemArrived(tripId, date, itemId);
+  return TripsService.markScheduleItemArrived(tripId, date, itemId);
 }
 
-export async function markDayItineraryItemSkipped(
+export async function markScheduleItemSkipped(
   tripId: string,
   date: string,
   itemId: string,
-): Promise<MarkDayItineraryItemSkippedResponse> {
+): Promise<MarkScheduleItemSkippedResponse> {
   await getMeWithRefresh();
-  return TripsService.markDayItineraryItemSkipped(tripId, date, itemId);
+  return TripsService.markScheduleItemSkipped(tripId, date, itemId);
 }
 
-export async function restoreDayItineraryItem(
+export async function restoreScheduleItem(
   tripId: string,
   date: string,
   itemId: string,
-): Promise<RestoreDayItineraryItemResponse> {
+): Promise<RestoreScheduleItemResponse> {
   await getMeWithRefresh();
-  return TripsService.restoreDayItineraryItem(tripId, date, itemId);
+  return TripsService.restoreScheduleItem(tripId, date, itemId);
 }
 
 export async function createRoutePreview(
@@ -148,19 +148,19 @@ export async function createRoutePreview(
   return TripsService.createRoutePreview(tripId, date, itemId, request);
 }
 
-export async function updateDayItineraryItem(
+export async function updateScheduleItem(
   tripId: string,
   date: string,
   itemId: string,
-  request: UpdateDayItineraryItemRequest,
-): Promise<UpdateDayItineraryItemResponse> {
+  request: UpdateScheduleItemRequest,
+): Promise<UpdateScheduleItemResponse> {
   await getMeWithRefresh();
-  return TripsService.updateDayItineraryItem(tripId, date, itemId, request);
+  return TripsService.updateScheduleItem(tripId, date, itemId, request);
 }
 
-export async function deleteDayItineraryItem(tripId: string, date: string, itemId: string): Promise<void> {
+export async function deleteScheduleItem(tripId: string, date: string, itemId: string): Promise<void> {
   await getMeWithRefresh();
-  return TripsService.deleteDayItineraryItem(tripId, date, itemId);
+  return TripsService.deleteScheduleItem(tripId, date, itemId);
 }
 
 export async function updateTrip(tripId: string, request: UpdateTripRequest): Promise<UpdateTripResponse> {

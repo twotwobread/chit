@@ -12,7 +12,7 @@ import (
 	"github.com/twotwobread/i-um/apps/api/internal/trip"
 )
 
-func TestListItineraryItemsByTripAndDateFiltersSortsAndJoinsPlaces(t *testing.T) {
+func TestListScheduleItemsByTripDayFiltersSortsAndJoinsPlaces(t *testing.T) {
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
 		t.Skip("DATABASE_URL is required for storage integration test")
@@ -72,18 +72,35 @@ func TestListItineraryItemsByTripAndDateFiltersSortsAndJoinsPlaces(t *testing.T)
 	}
 
 	if _, err := store.pool.Exec(ctx, `
-		INSERT INTO itinerary_items (trip_id, scheduled_date, trip_place_id, item_order, rank, version)
+		WITH ensured_trip_days AS (
+		  INSERT INTO trip_days (trip_id, date, day_order, deleted_at, updated_at)
+		  SELECT
+		    t.id,
+		    day::date,
+		    row_number() OVER (ORDER BY day::date)::integer,
+		    NULL,
+		    now()
+		  FROM trips t
+		  CROSS JOIN LATERAL generate_series(t.start_date, t.end_date, interval '1 day') AS day
+		  WHERE t.id = $1::uuid
+		  ON CONFLICT (trip_id, date) DO UPDATE
+		  SET day_order = EXCLUDED.day_order,
+		      deleted_at = NULL,
+		      updated_at = now()
+		  RETURNING id, date
+		)
+		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, item_order, rank, version)
 		VALUES
-		  ($1::uuid, '2026-07-11', $3::uuid, 2, '0000000000000002048', 2),
-		  ($1::uuid, '2026-07-11', $2::uuid, 1, '0000000000000001024', 5),
-		  ($1::uuid, '2026-07-12', $4::uuid, 1, '0000000000000001024', 1)
+		  ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $3::uuid, 2, '0000000000000002048', 2),
+		  ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, 1, '0000000000000001024', 5),
+		  ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-12'), $4::uuid, 1, '0000000000000001024', 1)
 	`, tripID, firstPlaceID, secondPlaceID, otherDatePlaceID); err != nil {
-		t.Fatalf("insert itinerary items: %v", err)
+		t.Fatalf("insert schedule items: %v", err)
 	}
 
-	items, err := store.ListItineraryItemsByTripAndDate(ctx, tripID, "2026-07-11")
+	items, err := store.ListScheduleItemsByTripDay(ctx, tripID, tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-11"))
 	if err != nil {
-		t.Fatalf("list itinerary items: %v", err)
+		t.Fatalf("list schedule items: %v", err)
 	}
 	if len(items) != 2 {
 		t.Fatalf("expected two filtered items, got %#v", items)
@@ -96,7 +113,7 @@ func TestListItineraryItemsByTripAndDateFiltersSortsAndJoinsPlaces(t *testing.T)
 	}
 }
 
-func TestMarkDayItineraryItemArrivedFirstPendingIdempotentAndDuplicatePlaceIndependent(t *testing.T) {
+func TestMarkScheduleItemArrivedFirstPendingIdempotentAndDuplicatePlaceIndependent(t *testing.T) {
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
 		t.Skip("DATABASE_URL is required for storage integration test")
@@ -150,32 +167,83 @@ func TestMarkDayItineraryItemArrivedFirstPendingIdempotentAndDuplicatePlaceIndep
 	var firstItemID string
 	var secondItemID string
 	if err := store.pool.QueryRow(ctx, `
-		INSERT INTO itinerary_items (trip_id, scheduled_date, trip_place_id, item_order, rank, version)
-		VALUES ($1::uuid, '2026-07-11', $2::uuid, 1, '0000000000000001024', 1)
+		WITH ensured_trip_days AS (
+		  INSERT INTO trip_days (trip_id, date, day_order, deleted_at, updated_at)
+		  SELECT
+		    t.id,
+		    day::date,
+		    row_number() OVER (ORDER BY day::date)::integer,
+		    NULL,
+		    now()
+		  FROM trips t
+		  CROSS JOIN LATERAL generate_series(t.start_date, t.end_date, interval '1 day') AS day
+		  WHERE t.id = $1::uuid
+		  ON CONFLICT (trip_id, date) DO UPDATE
+		  SET day_order = EXCLUDED.day_order,
+		      deleted_at = NULL,
+		      updated_at = now()
+		  RETURNING id, date
+		)
+		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, item_order, rank, version)
+		VALUES ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, 1, '0000000000000001024', 1)
 		RETURNING id::text
 	`, tripID, sharedPlaceID).Scan(&firstItemID); err != nil {
-		t.Fatalf("insert first itinerary item: %v", err)
+		t.Fatalf("insert first schedule item: %v", err)
 	}
 	if err := store.pool.QueryRow(ctx, `
-		INSERT INTO itinerary_items (trip_id, scheduled_date, trip_place_id, item_order, rank, version)
-		VALUES ($1::uuid, '2026-07-11', $2::uuid, 2, '0000000000000002048', 1)
+		WITH ensured_trip_days AS (
+		  INSERT INTO trip_days (trip_id, date, day_order, deleted_at, updated_at)
+		  SELECT
+		    t.id,
+		    day::date,
+		    row_number() OVER (ORDER BY day::date)::integer,
+		    NULL,
+		    now()
+		  FROM trips t
+		  CROSS JOIN LATERAL generate_series(t.start_date, t.end_date, interval '1 day') AS day
+		  WHERE t.id = $1::uuid
+		  ON CONFLICT (trip_id, date) DO UPDATE
+		  SET day_order = EXCLUDED.day_order,
+		      deleted_at = NULL,
+		      updated_at = now()
+		  RETURNING id, date
+		)
+		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, item_order, rank, version)
+		VALUES ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, 2, '0000000000000002048', 1)
 		RETURNING id::text
 	`, tripID, sharedPlaceID).Scan(&secondItemID); err != nil {
-		t.Fatalf("insert second itinerary item: %v", err)
+		t.Fatalf("insert second schedule item: %v", err)
 	}
 	if _, err := store.pool.Exec(ctx, `
-		INSERT INTO itinerary_items (trip_id, scheduled_date, trip_place_id, item_order, rank, version)
-		VALUES ($1::uuid, '2026-07-11', $2::uuid, 3, '0000000000000003072', 1)
+		WITH ensured_trip_days AS (
+		  INSERT INTO trip_days (trip_id, date, day_order, deleted_at, updated_at)
+		  SELECT
+		    t.id,
+		    day::date,
+		    row_number() OVER (ORDER BY day::date)::integer,
+		    NULL,
+		    now()
+		  FROM trips t
+		  CROSS JOIN LATERAL generate_series(t.start_date, t.end_date, interval '1 day') AS day
+		  WHERE t.id = $1::uuid
+		  ON CONFLICT (trip_id, date) DO UPDATE
+		  SET day_order = EXCLUDED.day_order,
+		      deleted_at = NULL,
+		      updated_at = now()
+		  RETURNING id, date
+		)
+		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, item_order, rank, version)
+		VALUES ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, 3, '0000000000000003072', 1)
 	`, tripID, thirdPlaceID); err != nil {
-		t.Fatalf("insert third itinerary item: %v", err)
+		t.Fatalf("insert third schedule item: %v", err)
 	}
 
-	_, err = store.MarkDayItineraryItemArrived(ctx, trip.MarkDayItineraryItemArrivedRecord{TripID: tripID, ScheduledDate: "2026-07-11", ItemID: secondItemID})
+	_, err = store.MarkScheduleItemArrived(ctx, trip.MarkScheduleItemArrivedRecord{TripID: tripID, TripDayID: tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-11"), ItemID: secondItemID})
 	if !errors.Is(err, trip.ErrConflict) {
 		t.Fatalf("expected out-of-order conflict, got %v", err)
 	}
 
-	result, err := store.MarkDayItineraryItemArrived(ctx, trip.MarkDayItineraryItemArrivedRecord{TripID: tripID, ScheduledDate: "2026-07-11", ItemID: firstItemID})
+	result, err := store.MarkScheduleItemArrived(ctx, trip.MarkScheduleItemArrivedRecord{TripID: tripID, TripDayID: tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-11"), ItemID: firstItemID})
 	if err != nil {
 		t.Fatalf("mark first item arrived: %v", err)
 	}
@@ -189,20 +257,20 @@ func TestMarkDayItineraryItemArrivedFirstPendingIdempotentAndDuplicatePlaceIndep
 	var arrivedSharedRows int
 	if err := store.pool.QueryRow(ctx, `
 		SELECT count(*)::int
-		FROM itinerary_items
+		FROM schedule_items
 		WHERE trip_id = $1::uuid
-		  AND scheduled_date = '2026-07-11'
+		  AND trip_day_id = (SELECT id FROM trip_days WHERE trip_id = $1::uuid AND date = '2026-07-11')
 		  AND trip_place_id = $2::uuid
 		  AND arrived_at IS NOT NULL
 	`, tripID, sharedPlaceID).Scan(&arrivedSharedRows); err != nil {
 		t.Fatalf("count arrived shared place rows: %v", err)
 	}
 	if arrivedSharedRows != 1 {
-		t.Fatalf("expected only one duplicate place itinerary row to be arrived, got %d", arrivedSharedRows)
+		t.Fatalf("expected only one duplicate place schedule row to be arrived, got %d", arrivedSharedRows)
 	}
 
 	firstArrivedAt := *result.Item.ArrivedAt
-	repeat, err := store.MarkDayItineraryItemArrived(ctx, trip.MarkDayItineraryItemArrivedRecord{TripID: tripID, ScheduledDate: "2026-07-11", ItemID: firstItemID})
+	repeat, err := store.MarkScheduleItemArrived(ctx, trip.MarkScheduleItemArrivedRecord{TripID: tripID, TripDayID: tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-11"), ItemID: firstItemID})
 	if err != nil {
 		t.Fatalf("repeat mark first item arrived: %v", err)
 	}
@@ -211,7 +279,7 @@ func TestMarkDayItineraryItemArrivedFirstPendingIdempotentAndDuplicatePlaceIndep
 	}
 }
 
-func TestMarkDayItineraryItemSkippedRestoreAndDuplicatePlaceIndependent(t *testing.T) {
+func TestMarkScheduleItemSkippedRestoreAndDuplicatePlaceIndependent(t *testing.T) {
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
 		t.Skip("DATABASE_URL is required for storage integration test")
@@ -265,32 +333,83 @@ func TestMarkDayItineraryItemSkippedRestoreAndDuplicatePlaceIndependent(t *testi
 	var firstItemID string
 	var secondItemID string
 	if err := store.pool.QueryRow(ctx, `
-		INSERT INTO itinerary_items (trip_id, scheduled_date, trip_place_id, item_order, rank, version)
-		VALUES ($1::uuid, '2026-07-11', $2::uuid, 1, '0000000000000001024', 1)
+		WITH ensured_trip_days AS (
+		  INSERT INTO trip_days (trip_id, date, day_order, deleted_at, updated_at)
+		  SELECT
+		    t.id,
+		    day::date,
+		    row_number() OVER (ORDER BY day::date)::integer,
+		    NULL,
+		    now()
+		  FROM trips t
+		  CROSS JOIN LATERAL generate_series(t.start_date, t.end_date, interval '1 day') AS day
+		  WHERE t.id = $1::uuid
+		  ON CONFLICT (trip_id, date) DO UPDATE
+		  SET day_order = EXCLUDED.day_order,
+		      deleted_at = NULL,
+		      updated_at = now()
+		  RETURNING id, date
+		)
+		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, item_order, rank, version)
+		VALUES ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, 1, '0000000000000001024', 1)
 		RETURNING id::text
 	`, tripID, sharedPlaceID).Scan(&firstItemID); err != nil {
-		t.Fatalf("insert first itinerary item: %v", err)
+		t.Fatalf("insert first schedule item: %v", err)
 	}
 	if err := store.pool.QueryRow(ctx, `
-		INSERT INTO itinerary_items (trip_id, scheduled_date, trip_place_id, item_order, rank, version)
-		VALUES ($1::uuid, '2026-07-11', $2::uuid, 2, '0000000000000002048', 1)
+		WITH ensured_trip_days AS (
+		  INSERT INTO trip_days (trip_id, date, day_order, deleted_at, updated_at)
+		  SELECT
+		    t.id,
+		    day::date,
+		    row_number() OVER (ORDER BY day::date)::integer,
+		    NULL,
+		    now()
+		  FROM trips t
+		  CROSS JOIN LATERAL generate_series(t.start_date, t.end_date, interval '1 day') AS day
+		  WHERE t.id = $1::uuid
+		  ON CONFLICT (trip_id, date) DO UPDATE
+		  SET day_order = EXCLUDED.day_order,
+		      deleted_at = NULL,
+		      updated_at = now()
+		  RETURNING id, date
+		)
+		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, item_order, rank, version)
+		VALUES ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, 2, '0000000000000002048', 1)
 		RETURNING id::text
 	`, tripID, sharedPlaceID).Scan(&secondItemID); err != nil {
-		t.Fatalf("insert second itinerary item: %v", err)
+		t.Fatalf("insert second schedule item: %v", err)
 	}
 	if _, err := store.pool.Exec(ctx, `
-		INSERT INTO itinerary_items (trip_id, scheduled_date, trip_place_id, item_order, rank, version)
-		VALUES ($1::uuid, '2026-07-11', $2::uuid, 3, '0000000000000003072', 1)
+		WITH ensured_trip_days AS (
+		  INSERT INTO trip_days (trip_id, date, day_order, deleted_at, updated_at)
+		  SELECT
+		    t.id,
+		    day::date,
+		    row_number() OVER (ORDER BY day::date)::integer,
+		    NULL,
+		    now()
+		  FROM trips t
+		  CROSS JOIN LATERAL generate_series(t.start_date, t.end_date, interval '1 day') AS day
+		  WHERE t.id = $1::uuid
+		  ON CONFLICT (trip_id, date) DO UPDATE
+		  SET day_order = EXCLUDED.day_order,
+		      deleted_at = NULL,
+		      updated_at = now()
+		  RETURNING id, date
+		)
+		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, item_order, rank, version)
+		VALUES ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, 3, '0000000000000003072', 1)
 	`, tripID, thirdPlaceID); err != nil {
-		t.Fatalf("insert third itinerary item: %v", err)
+		t.Fatalf("insert third schedule item: %v", err)
 	}
 
-	_, err = store.MarkDayItineraryItemSkipped(ctx, trip.MarkDayItineraryItemSkippedRecord{TripID: tripID, ScheduledDate: "2026-07-11", ItemID: secondItemID})
+	_, err = store.MarkScheduleItemSkipped(ctx, trip.MarkScheduleItemSkippedRecord{TripID: tripID, TripDayID: tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-11"), ItemID: secondItemID})
 	if !errors.Is(err, trip.ErrConflict) {
 		t.Fatalf("expected out-of-order skip conflict, got %v", err)
 	}
 
-	skipped, err := store.MarkDayItineraryItemSkipped(ctx, trip.MarkDayItineraryItemSkippedRecord{TripID: tripID, ScheduledDate: "2026-07-11", ItemID: firstItemID})
+	skipped, err := store.MarkScheduleItemSkipped(ctx, trip.MarkScheduleItemSkippedRecord{TripID: tripID, TripDayID: tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-11"), ItemID: firstItemID})
 	if err != nil {
 		t.Fatalf("mark first item skipped: %v", err)
 	}
@@ -304,20 +423,20 @@ func TestMarkDayItineraryItemSkippedRestoreAndDuplicatePlaceIndependent(t *testi
 	var skippedSharedRows int
 	if err := store.pool.QueryRow(ctx, `
 		SELECT count(*)::int
-		FROM itinerary_items
+		FROM schedule_items
 		WHERE trip_id = $1::uuid
-		  AND scheduled_date = '2026-07-11'
+		  AND trip_day_id = (SELECT id FROM trip_days WHERE trip_id = $1::uuid AND date = '2026-07-11')
 		  AND trip_place_id = $2::uuid
 		  AND skipped_at IS NOT NULL
 	`, tripID, sharedPlaceID).Scan(&skippedSharedRows); err != nil {
 		t.Fatalf("count skipped shared place rows: %v", err)
 	}
 	if skippedSharedRows != 1 {
-		t.Fatalf("expected only one duplicate place itinerary row to be skipped, got %d", skippedSharedRows)
+		t.Fatalf("expected only one duplicate place schedule row to be skipped, got %d", skippedSharedRows)
 	}
 
 	firstSkippedAt := *skipped.Item.SkippedAt
-	repeatSkip, err := store.MarkDayItineraryItemSkipped(ctx, trip.MarkDayItineraryItemSkippedRecord{TripID: tripID, ScheduledDate: "2026-07-11", ItemID: firstItemID})
+	repeatSkip, err := store.MarkScheduleItemSkipped(ctx, trip.MarkScheduleItemSkippedRecord{TripID: tripID, TripDayID: tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-11"), ItemID: firstItemID})
 	if err != nil {
 		t.Fatalf("repeat mark first item skipped: %v", err)
 	}
@@ -325,12 +444,12 @@ func TestMarkDayItineraryItemSkippedRestoreAndDuplicatePlaceIndependent(t *testi
 		t.Fatalf("expected repeat skip to preserve skipped_at, first=%v repeat=%v", firstSkippedAt, repeatSkip.Item.SkippedAt)
 	}
 
-	_, err = store.MarkDayItineraryItemArrived(ctx, trip.MarkDayItineraryItemArrivedRecord{TripID: tripID, ScheduledDate: "2026-07-11", ItemID: firstItemID})
+	_, err = store.MarkScheduleItemArrived(ctx, trip.MarkScheduleItemArrivedRecord{TripID: tripID, TripDayID: tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-11"), ItemID: firstItemID})
 	if !errors.Is(err, trip.ErrConflict) {
 		t.Fatalf("expected skipped item arrival conflict, got %v", err)
 	}
 
-	restored, err := store.RestoreDayItineraryItem(ctx, trip.RestoreDayItineraryItemRecord{TripID: tripID, ScheduledDate: "2026-07-11", ItemID: firstItemID})
+	restored, err := store.RestoreScheduleItem(ctx, trip.RestoreScheduleItemRecord{TripID: tripID, TripDayID: tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-11"), ItemID: firstItemID})
 	if err != nil {
 		t.Fatalf("restore first skipped item: %v", err)
 	}
@@ -341,7 +460,7 @@ func TestMarkDayItineraryItemSkippedRestoreAndDuplicatePlaceIndependent(t *testi
 		t.Fatalf("unexpected latest day snapshot after restore: %#v", restored.Items)
 	}
 
-	repeatRestore, err := store.RestoreDayItineraryItem(ctx, trip.RestoreDayItineraryItemRecord{TripID: tripID, ScheduledDate: "2026-07-11", ItemID: firstItemID})
+	repeatRestore, err := store.RestoreScheduleItem(ctx, trip.RestoreScheduleItemRecord{TripID: tripID, TripDayID: tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-11"), ItemID: firstItemID})
 	if err != nil {
 		t.Fatalf("repeat restore pending item: %v", err)
 	}
@@ -349,7 +468,7 @@ func TestMarkDayItineraryItemSkippedRestoreAndDuplicatePlaceIndependent(t *testi
 		t.Fatalf("expected repeat restore to keep pending item, got %#v", repeatRestore.Item)
 	}
 
-	arrived, err := store.MarkDayItineraryItemArrived(ctx, trip.MarkDayItineraryItemArrivedRecord{TripID: tripID, ScheduledDate: "2026-07-11", ItemID: firstItemID})
+	arrived, err := store.MarkScheduleItemArrived(ctx, trip.MarkScheduleItemArrivedRecord{TripID: tripID, TripDayID: tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-11"), ItemID: firstItemID})
 	if err != nil {
 		t.Fatalf("arrive restored item: %v", err)
 	}
@@ -357,17 +476,17 @@ func TestMarkDayItineraryItemSkippedRestoreAndDuplicatePlaceIndependent(t *testi
 		t.Fatalf("expected restored item to arrive without skipped state, got %#v", arrived.Item)
 	}
 
-	_, err = store.MarkDayItineraryItemSkipped(ctx, trip.MarkDayItineraryItemSkippedRecord{TripID: tripID, ScheduledDate: "2026-07-11", ItemID: firstItemID})
+	_, err = store.MarkScheduleItemSkipped(ctx, trip.MarkScheduleItemSkippedRecord{TripID: tripID, TripDayID: tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-11"), ItemID: firstItemID})
 	if !errors.Is(err, trip.ErrConflict) {
 		t.Fatalf("expected arrived item skip conflict, got %v", err)
 	}
-	_, err = store.RestoreDayItineraryItem(ctx, trip.RestoreDayItineraryItemRecord{TripID: tripID, ScheduledDate: "2026-07-11", ItemID: firstItemID})
+	_, err = store.RestoreScheduleItem(ctx, trip.RestoreScheduleItemRecord{TripID: tripID, TripDayID: tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-11"), ItemID: firstItemID})
 	if !errors.Is(err, trip.ErrConflict) {
 		t.Fatalf("expected arrived item restore conflict, got %v", err)
 	}
 }
 
-func TestDayLodgingPlacePersistenceAndItineraryMapping(t *testing.T) {
+func TestDayLodgingPlacePersistenceAndScheduleMapping(t *testing.T) {
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
 		t.Skip("DATABASE_URL is required for storage integration test")
@@ -419,16 +538,33 @@ func TestDayLodgingPlacePersistenceAndItineraryMapping(t *testing.T) {
 	}
 
 	if _, err := store.pool.Exec(ctx, `
-		INSERT INTO itinerary_items (trip_id, scheduled_date, trip_place_id, item_order, rank, version)
+		WITH ensured_trip_days AS (
+		  INSERT INTO trip_days (trip_id, date, day_order, deleted_at, updated_at)
+		  SELECT
+		    t.id,
+		    day::date,
+		    row_number() OVER (ORDER BY day::date)::integer,
+		    NULL,
+		    now()
+		  FROM trips t
+		  CROSS JOIN LATERAL generate_series(t.start_date, t.end_date, interval '1 day') AS day
+		  WHERE t.id = $1::uuid
+		  ON CONFLICT (trip_id, date) DO UPDATE
+		  SET day_order = EXCLUDED.day_order,
+		      deleted_at = NULL,
+		      updated_at = now()
+		  RETURNING id, date
+		)
+		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, item_order, rank, version)
 		VALUES
-		  ($1::uuid, '2026-07-11', $2::uuid, 1, '0000000000000001024', 1),
-		  ($1::uuid, '2026-07-11', $2::uuid, 2, '0000000000000002048', 1),
-		  ($1::uuid, '2026-07-11', $3::uuid, 3, '0000000000000003072', 1)
+		  ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, 1, '0000000000000001024', 1),
+		  ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, 2, '0000000000000002048', 1),
+		  ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $3::uuid, 3, '0000000000000003072', 1)
 	`, tripID, lodgingPlaceID, foodPlaceID); err != nil {
-		t.Fatalf("insert itinerary items: %v", err)
+		t.Fatalf("insert schedule items: %v", err)
 	}
 
-	selected, err := store.SetDayLodgingPlace(ctx, trip.SetDayLodgingPlaceRecord{TripID: tripID, ScheduledDate: "2026-07-11", TripPlaceID: lodgingPlaceID})
+	selected, err := store.SetDayLodgingPlace(ctx, trip.SetDayLodgingPlaceRecord{TripID: tripID, TripDayID: tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-11"), TripPlaceID: lodgingPlaceID})
 	if err != nil {
 		t.Fatalf("set day lodging place: %v", err)
 	}
@@ -444,15 +580,15 @@ func TestDayLodgingPlacePersistenceAndItineraryMapping(t *testing.T) {
 		t.Fatalf("unexpected lodging place list: %#v", lodgingPlaces)
 	}
 
-	items, err := store.ListItineraryItemsByTripAndDate(ctx, tripID, "2026-07-11")
+	items, err := store.ListScheduleItemsByTripDay(ctx, tripID, tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-11"))
 	if err != nil {
-		t.Fatalf("list lodging-mapped itinerary items: %v", err)
+		t.Fatalf("list lodging-mapped schedule items: %v", err)
 	}
 	if len(items) != 3 || !items[0].IsLodging || !items[1].IsLodging || items[2].IsLodging {
 		t.Fatalf("expected all matching lodging rows to be marked, got %#v", items)
 	}
 
-	replaced, err := store.SetDayLodgingPlace(ctx, trip.SetDayLodgingPlaceRecord{TripID: tripID, ScheduledDate: "2026-07-11", TripPlaceID: foodPlaceID})
+	replaced, err := store.SetDayLodgingPlace(ctx, trip.SetDayLodgingPlaceRecord{TripID: tripID, TripDayID: tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-11"), TripPlaceID: foodPlaceID})
 	if err != nil {
 		t.Fatalf("replace day lodging place: %v", err)
 	}
@@ -460,15 +596,15 @@ func TestDayLodgingPlacePersistenceAndItineraryMapping(t *testing.T) {
 		t.Fatalf("expected replacement lodging place %q, got %#v", foodPlaceID, replaced)
 	}
 
-	items, err = store.ListItineraryItemsByTripAndDate(ctx, tripID, "2026-07-11")
+	items, err = store.ListScheduleItemsByTripDay(ctx, tripID, tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-11"))
 	if err != nil {
-		t.Fatalf("list replaced lodging-mapped itinerary items: %v", err)
+		t.Fatalf("list replaced lodging-mapped schedule items: %v", err)
 	}
 	if len(items) != 3 || items[0].IsLodging || items[1].IsLodging || !items[2].IsLodging {
 		t.Fatalf("expected replacement lodging mapping, got %#v", items)
 	}
 
-	if err := store.DeleteDayLodgingPlace(ctx, tripID, "2026-07-11"); err != nil {
+	if err := store.DeleteDayLodgingPlace(ctx, tripID, tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-11")); err != nil {
 		t.Fatalf("clear day lodging place: %v", err)
 	}
 	_, found, err := store.GetDayLodgingPlaceByTripAndDate(ctx, tripID, "2026-07-11")
@@ -544,12 +680,12 @@ func TestDayLodgingPlaceEnforcesSameTripAndCascadesOnPlaceDelete(t *testing.T) {
 		t.Fatalf("insert second trip place: %v", err)
 	}
 
-	_, err = store.SetDayLodgingPlace(ctx, trip.SetDayLodgingPlaceRecord{TripID: firstTripID, ScheduledDate: "2026-07-11", TripPlaceID: secondPlaceID})
+	_, err = store.SetDayLodgingPlace(ctx, trip.SetDayLodgingPlaceRecord{TripID: firstTripID, TripDayID: tripRepositoryTestDayID(t, ctx, store, firstTripID, "2026-07-11"), TripPlaceID: secondPlaceID})
 	if !errors.Is(err, trip.ErrNotFound) {
 		t.Fatalf("expected cross-trip place to map to ErrNotFound, got %v", err)
 	}
 
-	if _, err := store.SetDayLodgingPlace(ctx, trip.SetDayLodgingPlaceRecord{TripID: firstTripID, ScheduledDate: "2026-07-11", TripPlaceID: firstPlaceID}); err != nil {
+	if _, err := store.SetDayLodgingPlace(ctx, trip.SetDayLodgingPlaceRecord{TripID: firstTripID, TripDayID: tripRepositoryTestDayID(t, ctx, store, firstTripID, "2026-07-11"), TripPlaceID: firstPlaceID}); err != nil {
 		t.Fatalf("set first trip lodging: %v", err)
 	}
 	if _, err := store.pool.Exec(ctx, `DELETE FROM trip_places WHERE id = $1::uuid`, firstPlaceID); err != nil {
@@ -564,7 +700,7 @@ func TestDayLodgingPlaceEnforcesSameTripAndCascadesOnPlaceDelete(t *testing.T) {
 	}
 }
 
-func TestCreateManualDayItineraryItemCreatesPlaceAndAppendsItem(t *testing.T) {
+func TestCreateManualScheduleItemCreatesPlaceAndAppendsItem(t *testing.T) {
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
 		t.Skip("DATABASE_URL is required for storage integration test")
@@ -598,12 +734,12 @@ func TestCreateManualDayItineraryItemCreatesPlaceAndAppendsItem(t *testing.T) {
 		t.Fatalf("insert trip: %v", err)
 	}
 
-	first, err := store.CreateManualDayItineraryItem(ctx, trip.CreateManualDayItineraryItemRecord{
-		TripID:        tripID,
-		ScheduledDate: "2026-07-11",
-		Name:          "우메다 공중정원",
-		Address:       "Umeda",
-		PlaceType:     "sights",
+	first, err := store.CreateManualScheduleItem(ctx, trip.CreateManualScheduleItemRecord{
+		TripID:    tripID,
+		TripDayID: tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-11"),
+		Name:      "우메다 공중정원",
+		Address:   "Umeda",
+		PlaceType: "sights",
 	})
 	if err != nil {
 		t.Fatalf("create first manual item: %v", err)
@@ -612,12 +748,12 @@ func TestCreateManualDayItineraryItemCreatesPlaceAndAppendsItem(t *testing.T) {
 		t.Fatalf("unexpected first item: %#v", first)
 	}
 
-	second, err := store.CreateManualDayItineraryItem(ctx, trip.CreateManualDayItineraryItemRecord{
-		TripID:        tripID,
-		ScheduledDate: "2026-07-11",
-		Name:          "우메다 공중정원",
-		Address:       "Umeda",
-		PlaceType:     "sights",
+	second, err := store.CreateManualScheduleItem(ctx, trip.CreateManualScheduleItemRecord{
+		TripID:    tripID,
+		TripDayID: tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-11"),
+		Name:      "우메다 공중정원",
+		Address:   "Umeda",
+		PlaceType: "sights",
 	})
 	if err != nil {
 		t.Fatalf("create duplicate manual item: %v", err)
@@ -626,9 +762,9 @@ func TestCreateManualDayItineraryItemCreatesPlaceAndAppendsItem(t *testing.T) {
 		t.Fatalf("expected duplicate item to append at order 2 with version 1, got %#v", second)
 	}
 
-	items, err := store.ListItineraryItemsByTripAndDate(ctx, tripID, "2026-07-11")
+	items, err := store.ListScheduleItemsByTripDay(ctx, tripID, tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-11"))
 	if err != nil {
-		t.Fatalf("list created itinerary items: %v", err)
+		t.Fatalf("list created schedule items: %v", err)
 	}
 	if len(items) != 2 || items[0].ItemOrder != 1 || items[1].ItemOrder != 2 {
 		t.Fatalf("expected two appended items, got %#v", items)
@@ -638,7 +774,7 @@ func TestCreateManualDayItineraryItemCreatesPlaceAndAppendsItem(t *testing.T) {
 	var firstVersion int
 	if err := store.pool.QueryRow(ctx, `
 		SELECT rank, version
-		FROM itinerary_items
+		FROM schedule_items
 		WHERE id = $1::uuid
 	`, first.ID).Scan(&firstRank, &firstVersion); err != nil {
 		t.Fatalf("load first item rank/version: %v", err)
@@ -651,7 +787,7 @@ func TestCreateManualDayItineraryItemCreatesPlaceAndAppendsItem(t *testing.T) {
 	var secondVersion int
 	if err := store.pool.QueryRow(ctx, `
 		SELECT rank, version
-		FROM itinerary_items
+		FROM schedule_items
 		WHERE id = $1::uuid
 	`, second.ID).Scan(&secondRank, &secondVersion); err != nil {
 		t.Fatalf("load second item rank/version: %v", err)
@@ -672,7 +808,7 @@ func TestCreateManualDayItineraryItemCreatesPlaceAndAppendsItem(t *testing.T) {
 	}
 }
 
-func TestCreateGooglePlaceDayItineraryItemReusesTripPlaceAndHandlesDuplicateConfirmation(t *testing.T) {
+func TestCreateGooglePlaceScheduleItemReusesTripPlaceAndHandlesDuplicateConfirmation(t *testing.T) {
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
 		t.Skip("DATABASE_URL is required for storage integration test")
@@ -721,9 +857,9 @@ func TestCreateGooglePlaceDayItineraryItemReusesTripPlaceAndHandlesDuplicateConf
 		t.Fatalf("insert trip: %v", err)
 	}
 
-	record := place.CreateGooglePlaceDayItineraryItemRecord{
+	record := place.CreateGooglePlaceScheduleItemRecord{
 		TripID:            tripID,
-		ScheduledDate:     "2026-07-11",
+		TripDayID:         tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-11"),
 		GooglePlaceID:     "google-place-1",
 		Name:              "도톤보리",
 		Address:           "Osaka",
@@ -733,7 +869,7 @@ func TestCreateGooglePlaceDayItineraryItemReusesTripPlaceAndHandlesDuplicateConf
 		GooglePrimaryType: "tourist_attraction",
 		GoogleTypes:       []string{"tourist_attraction", "point_of_interest"},
 	}
-	first, err := store.CreateGooglePlaceDayItineraryItem(ctx, record)
+	first, err := store.CreateGooglePlaceScheduleItem(ctx, record)
 	if err != nil {
 		t.Fatalf("create first google item: %v", err)
 	}
@@ -744,13 +880,13 @@ func TestCreateGooglePlaceDayItineraryItemReusesTripPlaceAndHandlesDuplicateConf
 		t.Fatalf("expected routable place metadata, got %#v", first.Place.RoutablePlace)
 	}
 
-	_, err = store.CreateGooglePlaceDayItineraryItem(ctx, record)
+	_, err = store.CreateGooglePlaceScheduleItem(ctx, record)
 	if !errors.Is(err, place.ErrDuplicateDayPlaceConfirmationNeeded) {
 		t.Fatalf("expected duplicate confirmation error, got %v", err)
 	}
 
 	record.DuplicateConfirmed = true
-	second, err := store.CreateGooglePlaceDayItineraryItem(ctx, record)
+	second, err := store.CreateGooglePlaceScheduleItem(ctx, record)
 	if err != nil {
 		t.Fatalf("create confirmed duplicate google item: %v", err)
 	}
@@ -776,7 +912,7 @@ func TestCreateGooglePlaceDayItineraryItemReusesTripPlaceAndHandlesDuplicateConf
 	}
 }
 
-func TestReorderDayItineraryItemsAppliesMovesSequentiallyAndReturnsLatestOrder(t *testing.T) {
+func TestReorderScheduleItemsAppliesMovesSequentiallyAndReturnsLatestOrder(t *testing.T) {
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
 		t.Skip("DATABASE_URL is required for storage integration test")
@@ -825,25 +961,42 @@ func TestReorderDayItineraryItemsAppliesMovesSequentiallyAndReturnsLatestOrder(t
 		var itemID string
 		rank := 1024 * (index + 1)
 		if err := store.pool.QueryRow(ctx, `
-			INSERT INTO itinerary_items (trip_id, scheduled_date, trip_place_id, item_order, rank, version)
-			VALUES ($1::uuid, '2026-07-11', $2::uuid, $3, lpad($4::int::text, 19, '0'), 1)
+			WITH ensured_trip_days AS (
+		  INSERT INTO trip_days (trip_id, date, day_order, deleted_at, updated_at)
+		  SELECT
+		    t.id,
+		    day::date,
+		    row_number() OVER (ORDER BY day::date)::integer,
+		    NULL,
+		    now()
+		  FROM trips t
+		  CROSS JOIN LATERAL generate_series(t.start_date, t.end_date, interval '1 day') AS day
+		  WHERE t.id = $1::uuid
+		  ON CONFLICT (trip_id, date) DO UPDATE
+		  SET day_order = EXCLUDED.day_order,
+		      deleted_at = NULL,
+		      updated_at = now()
+		  RETURNING id, date
+		)
+		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, item_order, rank, version)
+			VALUES ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, $3, lpad($4::int::text, 19, '0'), 1)
 			RETURNING id::text
 		`, tripID, placeID, index+1, rank).Scan(&itemID); err != nil {
-			t.Fatalf("insert itinerary item %d: %v", index, err)
+			t.Fatalf("insert schedule item %d: %v", index, err)
 		}
 		itemIDs = append(itemIDs, itemID)
 	}
 
-	reordered, err := store.ReorderDayItineraryItems(ctx, trip.ReorderDayItineraryItemsRecord{
-		TripID:        tripID,
-		ScheduledDate: "2026-07-11",
-		Moves: []trip.ReorderDayItineraryMoveRecord{
+	reordered, err := store.ReorderScheduleItems(ctx, trip.ReorderScheduleItemsRecord{
+		TripID:    tripID,
+		TripDayID: tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-11"),
+		Moves: []trip.ReorderDayScheduleMoveRecord{
 			{ItemID: itemIDs[3], BeforeItemID: stringPtr(itemIDs[0]), AfterItemID: stringPtr(itemIDs[1]), ClientVersion: 1},
 			{ItemID: itemIDs[1], BeforeItemID: stringPtr(itemIDs[2]), ClientVersion: 1},
 		},
 	})
 	if err != nil {
-		t.Fatalf("reorder day itinerary items: %v", err)
+		t.Fatalf("reorder day schedule items: %v", err)
 	}
 
 	if len(reordered) != 4 {
@@ -868,9 +1021,9 @@ func TestReorderDayItineraryItemsAppliesMovesSequentiallyAndReturnsLatestOrder(t
 
 	rows, err := store.pool.Query(ctx, `
 		SELECT id::text, version
-		FROM itinerary_items
+		FROM schedule_items
 		WHERE trip_id = $1::uuid
-		  AND scheduled_date = '2026-07-11'
+		  AND trip_day_id = (SELECT id FROM trip_days WHERE trip_id = $1::uuid AND date = '2026-07-11')
 		ORDER BY rank ASC, id ASC
 	`, tripID)
 	if err != nil {
@@ -903,7 +1056,7 @@ func TestReorderDayItineraryItemsAppliesMovesSequentiallyAndReturnsLatestOrder(t
 	}
 }
 
-func TestReorderDayItineraryItemsRejectsStaleMovedItemVersionWithoutChangingData(t *testing.T) {
+func TestReorderScheduleItemsRejectsStaleMovedItemVersionWithoutChangingData(t *testing.T) {
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
 		t.Skip("DATABASE_URL is required for storage integration test")
@@ -959,21 +1112,38 @@ func TestReorderDayItineraryItemsRejectsStaleMovedItemVersionWithoutChangingData
 
 		var itemID string
 		if err := store.pool.QueryRow(ctx, `
-			INSERT INTO itinerary_items (trip_id, scheduled_date, trip_place_id, item_order, rank, version)
-			VALUES ($1::uuid, '2026-07-11', $2::uuid, $3, $4, $5)
+			WITH ensured_trip_days AS (
+		  INSERT INTO trip_days (trip_id, date, day_order, deleted_at, updated_at)
+		  SELECT
+		    t.id,
+		    day::date,
+		    row_number() OVER (ORDER BY day::date)::integer,
+		    NULL,
+		    now()
+		  FROM trips t
+		  CROSS JOIN LATERAL generate_series(t.start_date, t.end_date, interval '1 day') AS day
+		  WHERE t.id = $1::uuid
+		  ON CONFLICT (trip_id, date) DO UPDATE
+		  SET day_order = EXCLUDED.day_order,
+		      deleted_at = NULL,
+		      updated_at = now()
+		  RETURNING id, date
+		)
+		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, item_order, rank, version)
+			VALUES ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, $3, $4, $5)
 			RETURNING id::text
 		`, tripID, placeID, index+1, ranks[index], versions[index]).Scan(&itemID); err != nil {
-			t.Fatalf("insert itinerary item %d: %v", index, err)
+			t.Fatalf("insert schedule item %d: %v", index, err)
 		}
 		itemIDs = append(itemIDs, itemID)
 		initialRanks[itemID] = ranks[index]
 		initialVersions[itemID] = versions[index]
 	}
 
-	_, err = store.ReorderDayItineraryItems(ctx, trip.ReorderDayItineraryItemsRecord{
-		TripID:        tripID,
-		ScheduledDate: "2026-07-11",
-		Moves: []trip.ReorderDayItineraryMoveRecord{{
+	_, err = store.ReorderScheduleItems(ctx, trip.ReorderScheduleItemsRecord{
+		TripID:    tripID,
+		TripDayID: tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-11"),
+		Moves: []trip.ReorderDayScheduleMoveRecord{{
 			ItemID:        itemIDs[0],
 			AfterItemID:   stringPtr(itemIDs[1]),
 			ClientVersion: 1,
@@ -985,9 +1155,9 @@ func TestReorderDayItineraryItemsRejectsStaleMovedItemVersionWithoutChangingData
 
 	rows, err := store.pool.Query(ctx, `
 		SELECT id::text, rank, version
-		FROM itinerary_items
+		FROM schedule_items
 		WHERE trip_id = $1::uuid
-		  AND scheduled_date = '2026-07-11'
+		  AND trip_day_id = (SELECT id FROM trip_days WHERE trip_id = $1::uuid AND date = '2026-07-11')
 		ORDER BY rank ASC, id ASC
 	`, tripID)
 	if err != nil {
@@ -1026,7 +1196,7 @@ func TestReorderDayItineraryItemsRejectsStaleMovedItemVersionWithoutChangingData
 	}
 }
 
-func TestReorderDayItineraryItemsRollsBackEarlierMovesWhenLaterMoveFails(t *testing.T) {
+func TestReorderScheduleItemsRollsBackEarlierMovesWhenLaterMoveFails(t *testing.T) {
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
 		t.Skip("DATABASE_URL is required for storage integration test")
@@ -1082,20 +1252,37 @@ func TestReorderDayItineraryItemsRollsBackEarlierMovesWhenLaterMoveFails(t *test
 		var itemID string
 		rank := ranks[index]
 		if err := store.pool.QueryRow(ctx, `
-			INSERT INTO itinerary_items (trip_id, scheduled_date, trip_place_id, item_order, rank, version)
-			VALUES ($1::uuid, '2026-07-11', $2::uuid, $3, $4, 1)
+			WITH ensured_trip_days AS (
+		  INSERT INTO trip_days (trip_id, date, day_order, deleted_at, updated_at)
+		  SELECT
+		    t.id,
+		    day::date,
+		    row_number() OVER (ORDER BY day::date)::integer,
+		    NULL,
+		    now()
+		  FROM trips t
+		  CROSS JOIN LATERAL generate_series(t.start_date, t.end_date, interval '1 day') AS day
+		  WHERE t.id = $1::uuid
+		  ON CONFLICT (trip_id, date) DO UPDATE
+		  SET day_order = EXCLUDED.day_order,
+		      deleted_at = NULL,
+		      updated_at = now()
+		  RETURNING id, date
+		)
+		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, item_order, rank, version)
+			VALUES ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, $3, $4, 1)
 			RETURNING id::text
 		`, tripID, placeID, index+1, rank).Scan(&itemID); err != nil {
-			t.Fatalf("insert itinerary item %d: %v", index, err)
+			t.Fatalf("insert schedule item %d: %v", index, err)
 		}
 		itemIDs = append(itemIDs, itemID)
 		initialRanks[itemID] = rank
 	}
 
-	_, err = store.ReorderDayItineraryItems(ctx, trip.ReorderDayItineraryItemsRecord{
-		TripID:        tripID,
-		ScheduledDate: "2026-07-11",
-		Moves: []trip.ReorderDayItineraryMoveRecord{
+	_, err = store.ReorderScheduleItems(ctx, trip.ReorderScheduleItemsRecord{
+		TripID:    tripID,
+		TripDayID: tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-11"),
+		Moves: []trip.ReorderDayScheduleMoveRecord{
 			{ItemID: itemIDs[3], BeforeItemID: stringPtr(itemIDs[0]), AfterItemID: stringPtr(itemIDs[1]), ClientVersion: 1},
 			{ItemID: itemIDs[3], BeforeItemID: stringPtr(itemIDs[2]), ClientVersion: 1},
 		},
@@ -1106,9 +1293,9 @@ func TestReorderDayItineraryItemsRollsBackEarlierMovesWhenLaterMoveFails(t *test
 
 	rows, err := store.pool.Query(ctx, `
 		SELECT id::text, rank, version
-		FROM itinerary_items
+		FROM schedule_items
 		WHERE trip_id = $1::uuid
-		  AND scheduled_date = '2026-07-11'
+		  AND trip_day_id = (SELECT id FROM trip_days WHERE trip_id = $1::uuid AND date = '2026-07-11')
 		ORDER BY rank ASC, id ASC
 	`, tripID)
 	if err != nil {
@@ -1147,7 +1334,7 @@ func TestReorderDayItineraryItemsRollsBackEarlierMovesWhenLaterMoveFails(t *test
 	}
 }
 
-func TestReorderDayItineraryItemsRetriesOnceAfterRankUniqueCollision(t *testing.T) {
+func TestReorderScheduleItemsRetriesOnceAfterRankUniqueCollision(t *testing.T) {
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
 		t.Skip("DATABASE_URL is required for storage integration test")
@@ -1162,13 +1349,13 @@ func TestReorderDayItineraryItemsRetriesOnceAfterRankUniqueCollision(t *testing.
 	}
 	defer store.Close()
 
-	tripID, itemIDs, _ := createReorderDayItineraryFixture(t, ctx, store, "순서 변경 충돌 재시도 테스트")
+	tripID, itemIDs, _ := createReorderDayScheduleFixture(t, ctx, store, "순서 변경 충돌 재시도 테스트")
 	installForcedReorderRankCollision(t, ctx, store, itemIDs[3], 1)
 
-	reordered, err := store.ReorderDayItineraryItems(ctx, trip.ReorderDayItineraryItemsRecord{
-		TripID:        tripID,
-		ScheduledDate: "2026-07-11",
-		Moves: []trip.ReorderDayItineraryMoveRecord{
+	reordered, err := store.ReorderScheduleItems(ctx, trip.ReorderScheduleItemsRecord{
+		TripID:    tripID,
+		TripDayID: tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-11"),
+		Moves: []trip.ReorderDayScheduleMoveRecord{
 			{ItemID: itemIDs[3], BeforeItemID: stringPtr(itemIDs[0]), AfterItemID: stringPtr(itemIDs[1]), ClientVersion: 1},
 		},
 	})
@@ -1188,9 +1375,9 @@ func TestReorderDayItineraryItemsRetriesOnceAfterRankUniqueCollision(t *testing.
 
 	rows, err := store.pool.Query(ctx, `
 		SELECT id::text, version
-		FROM itinerary_items
+		FROM schedule_items
 		WHERE trip_id = $1::uuid
-		  AND scheduled_date = '2026-07-11'
+		  AND trip_day_id = (SELECT id FROM trip_days WHERE trip_id = $1::uuid AND date = '2026-07-11')
 		ORDER BY rank ASC, id ASC
 	`, tripID)
 	if err != nil {
@@ -1223,7 +1410,7 @@ func TestReorderDayItineraryItemsRetriesOnceAfterRankUniqueCollision(t *testing.
 	}
 }
 
-func TestReorderDayItineraryItemsReturnsConflictWhenRankUniqueRetryStillCollides(t *testing.T) {
+func TestReorderScheduleItemsReturnsConflictWhenRankUniqueRetryStillCollides(t *testing.T) {
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
 		t.Skip("DATABASE_URL is required for storage integration test")
@@ -1238,13 +1425,13 @@ func TestReorderDayItineraryItemsReturnsConflictWhenRankUniqueRetryStillCollides
 	}
 	defer store.Close()
 
-	tripID, itemIDs, initialRanks := createReorderDayItineraryFixture(t, ctx, store, "순서 변경 충돌 실패 테스트")
+	tripID, itemIDs, initialRanks := createReorderDayScheduleFixture(t, ctx, store, "순서 변경 충돌 실패 테스트")
 	installForcedReorderRankCollision(t, ctx, store, itemIDs[3], 2)
 
-	_, err = store.ReorderDayItineraryItems(ctx, trip.ReorderDayItineraryItemsRecord{
-		TripID:        tripID,
-		ScheduledDate: "2026-07-11",
-		Moves: []trip.ReorderDayItineraryMoveRecord{
+	_, err = store.ReorderScheduleItems(ctx, trip.ReorderScheduleItemsRecord{
+		TripID:    tripID,
+		TripDayID: tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-11"),
+		Moves: []trip.ReorderDayScheduleMoveRecord{
 			{ItemID: itemIDs[3], BeforeItemID: stringPtr(itemIDs[0]), AfterItemID: stringPtr(itemIDs[1]), ClientVersion: 1},
 		},
 	})
@@ -1254,9 +1441,9 @@ func TestReorderDayItineraryItemsReturnsConflictWhenRankUniqueRetryStillCollides
 
 	rows, err := store.pool.Query(ctx, `
 		SELECT id::text, rank, version
-		FROM itinerary_items
+		FROM schedule_items
 		WHERE trip_id = $1::uuid
-		  AND scheduled_date = '2026-07-11'
+		  AND trip_day_id = (SELECT id FROM trip_days WHERE trip_id = $1::uuid AND date = '2026-07-11')
 		ORDER BY rank ASC, id ASC
 	`, tripID)
 	if err != nil {
@@ -1295,7 +1482,7 @@ func TestReorderDayItineraryItemsReturnsConflictWhenRankUniqueRetryStillCollides
 	}
 }
 
-func TestUpdateDayItineraryItemPlaceUpdatesSharedPlaceSnapshot(t *testing.T) {
+func TestUpdateScheduleItemPlaceUpdatesSharedPlaceSnapshot(t *testing.T) {
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
 		t.Skip("DATABASE_URL is required for storage integration test")
@@ -1340,35 +1527,69 @@ func TestUpdateDayItineraryItemPlaceUpdatesSharedPlaceSnapshot(t *testing.T) {
 
 	var firstItemID string
 	if err := store.pool.QueryRow(ctx, `
-		INSERT INTO itinerary_items (trip_id, scheduled_date, trip_place_id, item_order, rank)
-		VALUES ($1::uuid, '2026-07-11', $2::uuid, 1, '0000000000000001024')
+		WITH ensured_trip_days AS (
+		  INSERT INTO trip_days (trip_id, date, day_order, deleted_at, updated_at)
+		  SELECT
+		    t.id,
+		    day::date,
+		    row_number() OVER (ORDER BY day::date)::integer,
+		    NULL,
+		    now()
+		  FROM trips t
+		  CROSS JOIN LATERAL generate_series(t.start_date, t.end_date, interval '1 day') AS day
+		  WHERE t.id = $1::uuid
+		  ON CONFLICT (trip_id, date) DO UPDATE
+		  SET day_order = EXCLUDED.day_order,
+		      deleted_at = NULL,
+		      updated_at = now()
+		  RETURNING id, date
+		)
+		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, item_order, rank)
+		VALUES ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, 1, '0000000000000001024')
 		RETURNING id::text
 	`, tripID, placeID).Scan(&firstItemID); err != nil {
-		t.Fatalf("insert first itinerary item: %v", err)
+		t.Fatalf("insert first schedule item: %v", err)
 	}
 	if _, err := store.pool.Exec(ctx, `
-		INSERT INTO itinerary_items (trip_id, scheduled_date, trip_place_id, item_order, rank)
-		VALUES ($1::uuid, '2026-07-12', $2::uuid, 1, '0000000000000001024')
+		WITH ensured_trip_days AS (
+		  INSERT INTO trip_days (trip_id, date, day_order, deleted_at, updated_at)
+		  SELECT
+		    t.id,
+		    day::date,
+		    row_number() OVER (ORDER BY day::date)::integer,
+		    NULL,
+		    now()
+		  FROM trips t
+		  CROSS JOIN LATERAL generate_series(t.start_date, t.end_date, interval '1 day') AS day
+		  WHERE t.id = $1::uuid
+		  ON CONFLICT (trip_id, date) DO UPDATE
+		  SET day_order = EXCLUDED.day_order,
+		      deleted_at = NULL,
+		      updated_at = now()
+		  RETURNING id, date
+		)
+		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, item_order, rank)
+		VALUES ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-12'), $2::uuid, 1, '0000000000000001024')
 	`, tripID, placeID); err != nil {
-		t.Fatalf("insert second itinerary item: %v", err)
+		t.Fatalf("insert second schedule item: %v", err)
 	}
 
-	updated, err := store.UpdateDayItineraryItemPlace(ctx, trip.UpdateDayItineraryItemRecord{
-		TripID:        tripID,
-		ScheduledDate: "2026-07-11",
-		ItemID:        firstItemID,
-		Name:          "우메다 스카이빌딩",
-		Address:       "Umeda Sky Building",
-		PlaceType:     "food",
+	updated, err := store.UpdateScheduleItemPlace(ctx, trip.UpdateScheduleItemRecord{
+		TripID:    tripID,
+		TripDayID: tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-11"),
+		ItemID:    firstItemID,
+		Name:      "우메다 스카이빌딩",
+		Address:   "Umeda Sky Building",
+		PlaceType: "food",
 	})
 	if err != nil {
-		t.Fatalf("update day itinerary item place: %v", err)
+		t.Fatalf("update day schedule item place: %v", err)
 	}
 	if updated.ID != firstItemID || updated.ItemOrder != 1 || updated.Version != 1 || updated.Place.ID != placeID || updated.Place.Name != "우메다 스카이빌딩" || updated.Place.Address != "Umeda Sky Building" || updated.Place.PlaceType != "food" {
 		t.Fatalf("unexpected updated item: %#v", updated)
 	}
 
-	otherDayItems, err := store.ListItineraryItemsByTripAndDate(ctx, tripID, "2026-07-12")
+	otherDayItems, err := store.ListScheduleItemsByTripDay(ctx, tripID, tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-12"))
 	if err != nil {
 		t.Fatalf("list other day items: %v", err)
 	}
@@ -1377,7 +1598,7 @@ func TestUpdateDayItineraryItemPlaceUpdatesSharedPlaceSnapshot(t *testing.T) {
 	}
 }
 
-func TestDeleteDayItineraryItemRemovesSelectedItemAndCleansOrphanPlace(t *testing.T) {
+func TestDeleteScheduleItemRemovesSelectedItemAndCleansOrphanPlace(t *testing.T) {
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
 		t.Skip("DATABASE_URL is required for storage integration test")
@@ -1421,22 +1642,56 @@ func TestDeleteDayItineraryItemRemovesSelectedItemAndCleansOrphanPlace(t *testin
 	}
 	var firstSharedItemID string
 	if err := store.pool.QueryRow(ctx, `
-		INSERT INTO itinerary_items (trip_id, scheduled_date, trip_place_id, item_order, rank)
-		VALUES ($1::uuid, '2026-07-11', $2::uuid, 1, '0000000000000001024')
+		WITH ensured_trip_days AS (
+		  INSERT INTO trip_days (trip_id, date, day_order, deleted_at, updated_at)
+		  SELECT
+		    t.id,
+		    day::date,
+		    row_number() OVER (ORDER BY day::date)::integer,
+		    NULL,
+		    now()
+		  FROM trips t
+		  CROSS JOIN LATERAL generate_series(t.start_date, t.end_date, interval '1 day') AS day
+		  WHERE t.id = $1::uuid
+		  ON CONFLICT (trip_id, date) DO UPDATE
+		  SET day_order = EXCLUDED.day_order,
+		      deleted_at = NULL,
+		      updated_at = now()
+		  RETURNING id, date
+		)
+		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, item_order, rank)
+		VALUES ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, 1, '0000000000000001024')
 		RETURNING id::text
 	`, tripID, sharedPlaceID).Scan(&firstSharedItemID); err != nil {
 		t.Fatalf("insert first shared item: %v", err)
 	}
 	if _, err := store.pool.Exec(ctx, `
-		INSERT INTO itinerary_items (trip_id, scheduled_date, trip_place_id, item_order, rank)
-		VALUES ($1::uuid, '2026-07-12', $2::uuid, 1, '0000000000000001024')
+		WITH ensured_trip_days AS (
+		  INSERT INTO trip_days (trip_id, date, day_order, deleted_at, updated_at)
+		  SELECT
+		    t.id,
+		    day::date,
+		    row_number() OVER (ORDER BY day::date)::integer,
+		    NULL,
+		    now()
+		  FROM trips t
+		  CROSS JOIN LATERAL generate_series(t.start_date, t.end_date, interval '1 day') AS day
+		  WHERE t.id = $1::uuid
+		  ON CONFLICT (trip_id, date) DO UPDATE
+		  SET day_order = EXCLUDED.day_order,
+		      deleted_at = NULL,
+		      updated_at = now()
+		  RETURNING id, date
+		)
+		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, item_order, rank)
+		VALUES ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-12'), $2::uuid, 1, '0000000000000001024')
 	`, tripID, sharedPlaceID); err != nil {
 		t.Fatalf("insert second shared item: %v", err)
 	}
 
-	deleted, err := store.DeleteDayItineraryItem(ctx, tripID, "2026-07-11", firstSharedItemID)
+	deleted, err := store.DeleteScheduleItem(ctx, tripID, tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-11"), firstSharedItemID)
 	if err != nil {
-		t.Fatalf("delete shared itinerary item: %v", err)
+		t.Fatalf("delete shared schedule item: %v", err)
 	}
 	if !deleted {
 		t.Fatal("expected delete to report true")
@@ -1459,18 +1714,35 @@ func TestDeleteDayItineraryItemRemovesSelectedItemAndCleansOrphanPlace(t *testin
 	}
 	var lodgingOnlyItemID string
 	if err := store.pool.QueryRow(ctx, `
-		INSERT INTO itinerary_items (trip_id, scheduled_date, trip_place_id, item_order, rank)
-		VALUES ($1::uuid, '2026-07-11', $2::uuid, 2, '0000000000000002048')
+		WITH ensured_trip_days AS (
+		  INSERT INTO trip_days (trip_id, date, day_order, deleted_at, updated_at)
+		  SELECT
+		    t.id,
+		    day::date,
+		    row_number() OVER (ORDER BY day::date)::integer,
+		    NULL,
+		    now()
+		  FROM trips t
+		  CROSS JOIN LATERAL generate_series(t.start_date, t.end_date, interval '1 day') AS day
+		  WHERE t.id = $1::uuid
+		  ON CONFLICT (trip_id, date) DO UPDATE
+		  SET day_order = EXCLUDED.day_order,
+		      deleted_at = NULL,
+		      updated_at = now()
+		  RETURNING id, date
+		)
+		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, item_order, rank)
+		VALUES ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, 2, '0000000000000002048')
 		RETURNING id::text
 	`, tripID, lodgingOnlyPlaceID).Scan(&lodgingOnlyItemID); err != nil {
 		t.Fatalf("insert lodging-only item: %v", err)
 	}
-	if _, err := store.SetDayLodgingPlace(ctx, trip.SetDayLodgingPlaceRecord{TripID: tripID, ScheduledDate: "2026-07-11", TripPlaceID: lodgingOnlyPlaceID}); err != nil {
+	if _, err := store.SetDayLodgingPlace(ctx, trip.SetDayLodgingPlaceRecord{TripID: tripID, TripDayID: tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-11"), TripPlaceID: lodgingOnlyPlaceID}); err != nil {
 		t.Fatalf("set lodging-only place as day lodging: %v", err)
 	}
-	deleted, err = store.DeleteDayItineraryItem(ctx, tripID, "2026-07-11", lodgingOnlyItemID)
+	deleted, err = store.DeleteScheduleItem(ctx, tripID, tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-11"), lodgingOnlyItemID)
 	if err != nil {
-		t.Fatalf("delete lodging-only itinerary item: %v", err)
+		t.Fatalf("delete lodging-only schedule item: %v", err)
 	}
 	if !deleted {
 		t.Fatal("expected lodging-only item delete to report true")
@@ -1484,7 +1756,7 @@ func TestDeleteDayItineraryItemRemovesSelectedItemAndCleansOrphanPlace(t *testin
 	}
 	lodgingPlace, found, err := store.GetDayLodgingPlaceByTripAndDate(ctx, tripID, "2026-07-11")
 	if err != nil {
-		t.Fatalf("get lodging after itinerary item delete: %v", err)
+		t.Fatalf("get lodging after schedule item delete: %v", err)
 	}
 	if !found || lodgingPlace.ID != lodgingOnlyPlaceID {
 		t.Fatalf("expected day lodging to remain after item delete, found=%v place=%#v", found, lodgingPlace)
@@ -1500,16 +1772,33 @@ func TestDeleteDayItineraryItemRemovesSelectedItemAndCleansOrphanPlace(t *testin
 	}
 	var orphanItemID string
 	if err := store.pool.QueryRow(ctx, `
-		INSERT INTO itinerary_items (trip_id, scheduled_date, trip_place_id, item_order, rank)
-		VALUES ($1::uuid, '2026-07-11', $2::uuid, 3, '0000000000000003072')
+		WITH ensured_trip_days AS (
+		  INSERT INTO trip_days (trip_id, date, day_order, deleted_at, updated_at)
+		  SELECT
+		    t.id,
+		    day::date,
+		    row_number() OVER (ORDER BY day::date)::integer,
+		    NULL,
+		    now()
+		  FROM trips t
+		  CROSS JOIN LATERAL generate_series(t.start_date, t.end_date, interval '1 day') AS day
+		  WHERE t.id = $1::uuid
+		  ON CONFLICT (trip_id, date) DO UPDATE
+		  SET day_order = EXCLUDED.day_order,
+		      deleted_at = NULL,
+		      updated_at = now()
+		  RETURNING id, date
+		)
+		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, item_order, rank)
+		VALUES ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, 3, '0000000000000003072')
 		RETURNING id::text
 	`, tripID, orphanPlaceID).Scan(&orphanItemID); err != nil {
 		t.Fatalf("insert orphan item: %v", err)
 	}
 
-	deleted, err = store.DeleteDayItineraryItem(ctx, tripID, "2026-07-11", orphanItemID)
+	deleted, err = store.DeleteScheduleItem(ctx, tripID, tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-11"), orphanItemID)
 	if err != nil {
-		t.Fatalf("delete orphan itinerary item: %v", err)
+		t.Fatalf("delete orphan schedule item: %v", err)
 	}
 	if !deleted {
 		t.Fatal("expected orphan delete to report true")
@@ -1518,8 +1807,15 @@ func TestDeleteDayItineraryItemRemovesSelectedItemAndCleansOrphanPlace(t *testin
 	if err := store.pool.QueryRow(ctx, `SELECT count(*)::int FROM trip_places WHERE id = $1::uuid`, orphanPlaceID).Scan(&orphanPlaceCount); err != nil {
 		t.Fatalf("count orphan place: %v", err)
 	}
-	if orphanPlaceCount != 0 {
-		t.Fatalf("expected orphan place to be cleaned up, got count %d", orphanPlaceCount)
+	if orphanPlaceCount != 1 {
+		t.Fatalf("expected soft-deleted item history to keep orphan place, got count %d", orphanPlaceCount)
+	}
+	var orphanDeletedAt *time.Time
+	if err := store.pool.QueryRow(ctx, `SELECT deleted_at FROM schedule_items WHERE id = $1::uuid`, orphanItemID).Scan(&orphanDeletedAt); err != nil {
+		t.Fatalf("load soft-deleted orphan item: %v", err)
+	}
+	if orphanDeletedAt == nil {
+		t.Fatal("expected orphan schedule item to be soft-deleted")
 	}
 }
 
@@ -2061,11 +2357,46 @@ func assertTripRepositoryParticipantCount(t *testing.T, ctx context.Context, sto
 	}
 }
 
+func tripRepositoryTestDayID(t *testing.T, ctx context.Context, store *Store, tripID string, date string) string {
+	t.Helper()
+
+	if _, err := store.pool.Exec(ctx, `
+		INSERT INTO trip_days (trip_id, date, day_order, deleted_at, updated_at)
+		SELECT
+		  t.id,
+		  day::date,
+		  row_number() OVER (ORDER BY day::date)::integer,
+		  NULL,
+		  now()
+		FROM trips t
+		CROSS JOIN LATERAL generate_series(t.start_date, t.end_date, interval '1 day') AS day
+		WHERE t.id = $1::uuid
+		ON CONFLICT (trip_id, date) DO UPDATE
+		SET day_order = EXCLUDED.day_order,
+		    deleted_at = NULL,
+		    updated_at = now()
+	`, tripID); err != nil {
+		t.Fatalf("sync trip days for trip %s: %v", tripID, err)
+	}
+
+	var tripDayID string
+	if err := store.pool.QueryRow(ctx, `
+		SELECT id::text
+		FROM trip_days
+		WHERE trip_id = $1::uuid
+		  AND date = $2::date
+		  AND deleted_at IS NULL
+	`, tripID, date).Scan(&tripDayID); err != nil {
+		t.Fatalf("select trip day %s for trip %s: %v", date, tripID, err)
+	}
+	return tripDayID
+}
+
 func stringPtr(value string) *string {
 	return &value
 }
 
-func createReorderDayItineraryFixture(t *testing.T, ctx context.Context, store *Store, label string) (string, []string, map[string]string) {
+func createReorderDayScheduleFixture(t *testing.T, ctx context.Context, store *Store, label string) (string, []string, map[string]string) {
 	t.Helper()
 
 	var userID string
@@ -2108,11 +2439,28 @@ func createReorderDayItineraryFixture(t *testing.T, ctx context.Context, store *
 
 		var itemID string
 		if err := store.pool.QueryRow(ctx, `
-			INSERT INTO itinerary_items (trip_id, scheduled_date, trip_place_id, item_order, rank, version)
-			VALUES ($1::uuid, '2026-07-11', $2::uuid, $3, $4, 1)
+			WITH ensured_trip_days AS (
+		  INSERT INTO trip_days (trip_id, date, day_order, deleted_at, updated_at)
+		  SELECT
+		    t.id,
+		    day::date,
+		    row_number() OVER (ORDER BY day::date)::integer,
+		    NULL,
+		    now()
+		  FROM trips t
+		  CROSS JOIN LATERAL generate_series(t.start_date, t.end_date, interval '1 day') AS day
+		  WHERE t.id = $1::uuid
+		  ON CONFLICT (trip_id, date) DO UPDATE
+		  SET day_order = EXCLUDED.day_order,
+		      deleted_at = NULL,
+		      updated_at = now()
+		  RETURNING id, date
+		)
+		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, item_order, rank, version)
+			VALUES ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, $3, $4, 1)
 			RETURNING id::text
 		`, tripID, placeID, index+1, ranks[index]).Scan(&itemID); err != nil {
-			t.Fatalf("insert itinerary item %d: %v", index, err)
+			t.Fatalf("insert schedule item %d: %v", index, err)
 		}
 		itemIDs = append(itemIDs, itemID)
 		initialRanks[itemID] = ranks[index]
@@ -2125,7 +2473,7 @@ func installForcedReorderRankCollision(t *testing.T, ctx context.Context, store 
 	t.Helper()
 
 	cleanup := `
-		DROP TRIGGER IF EXISTS reorder_rank_collision_trigger ON itinerary_items;
+		DROP TRIGGER IF EXISTS reorder_rank_collision_trigger ON schedule_items;
 		DROP FUNCTION IF EXISTS reorder_rank_collision();
 		DROP SEQUENCE IF EXISTS reorder_rank_collision_seq;
 	`
@@ -2145,14 +2493,14 @@ func installForcedReorderRankCollision(t *testing.T, ctx context.Context, store 
 				AND NEW.rank IS DISTINCT FROM OLD.rank
 				AND nextval('reorder_rank_collision_seq') <= %d THEN
 				RAISE EXCEPTION 'forced rank collision'
-					USING ERRCODE = '23505', CONSTRAINT = 'itinerary_items_trip_date_rank_unique';
+					USING ERRCODE = '23505', CONSTRAINT = 'schedule_items_active_day_rank_unique';
 			END IF;
 			RETURN NEW;
 		END;
 		$$;
 
 		CREATE TRIGGER reorder_rank_collision_trigger
-		BEFORE UPDATE ON itinerary_items
+		BEFORE UPDATE ON schedule_items
 		FOR EACH ROW
 		EXECUTE FUNCTION reorder_rank_collision();
 	`, itemID, collisionCount)

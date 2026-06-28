@@ -2,14 +2,14 @@ import type { Href } from 'expo-router';
 
 import type {
   CreateQuickExpenseRequest,
-  DayItineraryItem,
+  ScheduleItem,
   ExpenseSplit,
-  GetDayItineraryResponse,
+  GetDayScheduleItemsResponse,
   SupportedCurrency,
   TripParticipantListItem,
 } from '@i-um/api-contract';
 
-import { getPlaceTypeLabel } from './day-itinerary';
+import { getPlaceTypeLabel, getScheduleItems } from './day-itinerary';
 import { formatTripDayDate } from './days';
 
 export type QuickExpenseFormErrors = {
@@ -71,16 +71,16 @@ export type QuickExpenseViewModel = {
 
 const zeroDecimalCurrencies = new Set<SupportedCurrency>(['KRW', 'JPY']);
 
-export function buildQuickExpenseRoute(tripId: string, date: string, itemId?: string | null): Href {
-  const base = `/trips/${tripId}/days/${date}/expenses/quick`;
+export function buildQuickExpenseRoute(tripId: string, tripDayId: string, itemId?: string | null): Href {
+  const base = `/trips/${tripId}/days/${tripDayId}/expenses/quick`;
   return (itemId ? `${base}?itemId=${encodeURIComponent(itemId)}` : base) as Href;
 }
 
-export function inferCurrentQuickExpenseItem(items: DayItineraryItem[]): DayItineraryItem | null {
+export function inferCurrentQuickExpenseItem(items: ScheduleItem[]): ScheduleItem | null {
   return orderedItems(items).find((item) => item.arrivedAt === null) ?? null;
 }
 
-export function hasQuickExpenseEntry(items: DayItineraryItem[]): boolean {
+export function hasQuickExpenseEntry(items: ScheduleItem[]): boolean {
   return items.length > 0;
 }
 
@@ -105,13 +105,13 @@ export function buildQuickExpenseViewModel({
 }: {
   amountInput?: string;
   currency: SupportedCurrency;
-  itinerary: GetDayItineraryResponse;
+  itinerary: GetDayScheduleItemsResponse;
   participants: TripParticipantListItem[];
   selectedItemId: string | null;
   selectedSplitParticipantIds?: string[];
   shouldChooseItem: boolean;
 }): QuickExpenseViewModel {
-  const itemOptions = orderedItems(itinerary.items).map((item) => toItemOption(item, selectedItemId));
+  const itemOptions = orderedItems(getScheduleItems(itinerary)).map((item) => toItemOption(item, selectedItemId));
   const selectedItem = itemOptions.find((item) => item.selected) ?? null;
   const showItemSelector = shouldChooseItem || selectedItem === null;
   const selectedParticipantSet = new Set(selectedSplitParticipantIds ?? buildDefaultSplitParticipantIds(participants));
@@ -253,13 +253,13 @@ export function buildSavedEqualSplitSummary({
 export function buildCreateQuickExpenseRequest({
   amountInput,
   currency,
-  itineraryItemId,
+  scheduleItemId,
   participantIds,
   payerParticipantId,
 }: {
   amountInput: string;
   currency: SupportedCurrency;
-  itineraryItemId: string | null;
+  scheduleItemId: string | null;
   participantIds: string[];
   payerParticipantId: string | null;
 }): { ok: true; request: CreateQuickExpenseRequest } | { ok: false; errors: QuickExpenseFormErrors } {
@@ -268,7 +268,7 @@ export function buildCreateQuickExpenseRequest({
   if (!parsedAmount.ok) {
     errors.amount = parsedAmount.message;
   }
-  if (!itineraryItemId) {
+  if (!scheduleItemId) {
     errors.item = '지출을 연결할 장소를 선택해주세요.';
   }
   if (!payerParticipantId) {
@@ -281,7 +281,7 @@ export function buildCreateQuickExpenseRequest({
   if (
     Object.keys(errors).length > 0 ||
     !parsedAmount.ok ||
-    !itineraryItemId ||
+    !scheduleItemId ||
     !payerParticipantId ||
     participantIds.length === 0
   ) {
@@ -291,7 +291,7 @@ export function buildCreateQuickExpenseRequest({
   return {
     ok: true,
     request: {
-      itineraryItemId,
+      scheduleItemId,
       amountMinor: parsedAmount.amountMinor,
       payerParticipantId,
       participantIds,
@@ -312,7 +312,7 @@ export function quickExpenseFailureMessage(status?: number): string {
   return '지출을 저장할 수 없어요. 잠시 후 다시 시도해주세요.';
 }
 
-function toItemOption(item: DayItineraryItem, selectedItemId: string | null): QuickExpenseItemOption {
+function toItemOption(item: ScheduleItem, selectedItemId: string | null): QuickExpenseItemOption {
   return {
     itemId: item.id,
     orderLabel: String(item.itemOrder),
@@ -323,7 +323,7 @@ function toItemOption(item: DayItineraryItem, selectedItemId: string | null): Qu
   };
 }
 
-function orderedItems(items: DayItineraryItem[]): DayItineraryItem[] {
+function orderedItems(items: ScheduleItem[]): ScheduleItem[] {
   return [...items].sort((left, right) => left.itemOrder - right.itemOrder);
 }
 

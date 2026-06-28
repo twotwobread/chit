@@ -3,9 +3,9 @@
 /* tslint:disable */
 /* eslint-disable */
 import type { TripPlaceType } from './TripPlaceType';
-export type UpdateDayItineraryItemRequest = {
-    name?: string;
-    address?: string;
-    placeType?: TripPlaceType;
+export type CreateManualScheduleItemRequest = {
+    name: string;
+    address: string;
+    placeType: TripPlaceType;
 };
 

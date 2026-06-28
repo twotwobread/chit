@@ -1,36 +1,36 @@
 import {
   PlacesService,
-  type CreateGooglePlaceDayItineraryItemResponse,
+  type CreateGooglePlaceScheduleItemResponse,
   type SearchGooglePlacesResponse,
 } from '@i-um/api-contract';
 
 import { getMeWithRefresh } from '../auth/client';
 import {
-  buildCreateGooglePlaceDayItineraryItemRequest,
+  buildCreateGooglePlaceScheduleItemRequest,
   googlePlaceSearchDefaultLimit,
   normalizeGooglePlaceSearchQuery,
 } from './google-search';
 
 export async function searchGooglePlaces(
   tripId: string,
-  date: string,
+  tripDayId: string,
   query: string,
   limit = googlePlaceSearchDefaultLimit,
 ): Promise<SearchGooglePlacesResponse> {
   await getMeWithRefresh();
-  return PlacesService.searchGooglePlaces(tripId, date, normalizeGooglePlaceSearchQuery(query), limit);
+  return PlacesService.searchGooglePlaces(tripId, tripDayId, normalizeGooglePlaceSearchQuery(query), limit);
 }
 
-export async function createGooglePlaceDayItineraryItem(
+export async function createGooglePlaceScheduleItem(
   tripId: string,
-  date: string,
+  tripDayId: string,
   googlePlaceId: string,
   duplicateConfirmed: boolean,
-): Promise<CreateGooglePlaceDayItineraryItemResponse> {
+): Promise<CreateGooglePlaceScheduleItemResponse> {
   await getMeWithRefresh();
-  return PlacesService.createGooglePlaceDayItineraryItem(
+  return PlacesService.createGooglePlaceScheduleItem(
     tripId,
-    date,
-    buildCreateGooglePlaceDayItineraryItemRequest(googlePlaceId, duplicateConfirmed),
+    tripDayId,
+    buildCreateGooglePlaceScheduleItemRequest(googlePlaceId, duplicateConfirmed),
   );
 }

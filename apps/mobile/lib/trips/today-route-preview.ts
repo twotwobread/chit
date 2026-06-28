@@ -73,7 +73,7 @@ export function buildRoutePreviewRequest(origin: TodayRoutePreviewOrigin): { ori
 
 export function buildTodayRoutePreviewViewModel(response: RoutePreviewResponse): TodayRoutePreviewViewModel {
   return {
-    itemId: response.itemId,
+    itemId: response.scheduleItemId,
     durationLabel: formatDuration(response.summary.durationSeconds),
     distanceLabel: formatDistance(response.summary.distanceMeters),
     modeLabel: '대중교통',

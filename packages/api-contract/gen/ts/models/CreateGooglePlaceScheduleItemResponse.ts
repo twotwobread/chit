@@ -2,10 +2,10 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-import type { DayItineraryItem } from './DayItineraryItem';
+import type { ScheduleItem } from './ScheduleItem';
 import type { TripDay } from './TripDay';
-export type CreateManualDayItineraryItemResponse = {
+export type CreateGooglePlaceScheduleItemResponse = {
     day: TripDay;
-    item: DayItineraryItem;
+    scheduleItem: ScheduleItem;
 };
 

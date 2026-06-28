@@ -2,8 +2,8 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-import type { DayItineraryItem } from './DayItineraryItem';
-export type UpdateDayItineraryItemResponse = {
-    item: DayItineraryItem;
+import type { ScheduleItem } from './ScheduleItem';
+export type UpdateScheduleItemResponse = {
+    scheduleItem: ScheduleItem;
 };
 

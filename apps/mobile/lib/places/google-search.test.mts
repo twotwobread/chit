@@ -3,7 +3,7 @@ import { describe, it } from 'node:test';
 
 import {
   addingGooglePlaceState,
-  buildCreateGooglePlaceDayItineraryItemRequest,
+  buildCreateGooglePlaceScheduleItemRequest,
   buildGooglePlaceSearchInputState,
   buildGooglePlaceSearchRoute,
   canSearchGooglePlaces,
@@ -73,7 +73,7 @@ describe('google place search helpers', () => {
   it('builds add request and add states', () => {
     const result = { id: 'google-1', placeName: '도톤보리', address: 'Osaka', typeHint: '관광지' };
 
-    assert.deepEqual(buildCreateGooglePlaceDayItineraryItemRequest(' google-1 ', false), {
+    assert.deepEqual(buildCreateGooglePlaceScheduleItemRequest(' google-1 ', false), {
       googlePlaceId: 'google-1',
       duplicateConfirmed: false,
     });

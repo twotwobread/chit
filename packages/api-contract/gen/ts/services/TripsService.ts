@@ -3,29 +3,29 @@
 /* tslint:disable */
 /* eslint-disable */
 import type { AcceptTripInviteResponse } from '../models/AcceptTripInviteResponse';
-import type { CreateManualDayItineraryItemRequest } from '../models/CreateManualDayItineraryItemRequest';
-import type { CreateManualDayItineraryItemResponse } from '../models/CreateManualDayItineraryItemResponse';
+import type { CreateManualScheduleItemRequest } from '../models/CreateManualScheduleItemRequest';
+import type { CreateManualScheduleItemResponse } from '../models/CreateManualScheduleItemResponse';
 import type { CreateQuickExpenseRequest } from '../models/CreateQuickExpenseRequest';
 import type { CreateQuickExpenseResponse } from '../models/CreateQuickExpenseResponse';
 import type { CreateRoutePreviewRequest } from '../models/CreateRoutePreviewRequest';
 import type { CreateTripInviteResponse } from '../models/CreateTripInviteResponse';
 import type { CreateTripRequest } from '../models/CreateTripRequest';
 import type { CreateTripResponse } from '../models/CreateTripResponse';
-import type { GetDayItineraryResponse } from '../models/GetDayItineraryResponse';
+import type { GetDayScheduleItemsResponse } from '../models/GetDayScheduleItemsResponse';
 import type { GetTripDetailResponse } from '../models/GetTripDetailResponse';
 import type { ListDayExpensesResponse } from '../models/ListDayExpensesResponse';
 import type { ListTripParticipantsResponse } from '../models/ListTripParticipantsResponse';
 import type { ListTripsResponse } from '../models/ListTripsResponse';
-import type { MarkDayItineraryItemArrivedResponse } from '../models/MarkDayItineraryItemArrivedResponse';
-import type { MarkDayItineraryItemSkippedResponse } from '../models/MarkDayItineraryItemSkippedResponse';
-import type { ReorderDayItineraryItemsRequest } from '../models/ReorderDayItineraryItemsRequest';
-import type { ReorderDayItineraryItemsResponse } from '../models/ReorderDayItineraryItemsResponse';
-import type { RestoreDayItineraryItemResponse } from '../models/RestoreDayItineraryItemResponse';
+import type { MarkScheduleItemArrivedResponse } from '../models/MarkScheduleItemArrivedResponse';
+import type { MarkScheduleItemSkippedResponse } from '../models/MarkScheduleItemSkippedResponse';
+import type { ReorderScheduleItemsRequest } from '../models/ReorderScheduleItemsRequest';
+import type { ReorderScheduleItemsResponse } from '../models/ReorderScheduleItemsResponse';
+import type { RestoreScheduleItemResponse } from '../models/RestoreScheduleItemResponse';
 import type { RoutePreviewResponse } from '../models/RoutePreviewResponse';
 import type { SetDayLodgingPlaceRequest } from '../models/SetDayLodgingPlaceRequest';
 import type { SetDayLodgingPlaceResponse } from '../models/SetDayLodgingPlaceResponse';
-import type { UpdateDayItineraryItemRequest } from '../models/UpdateDayItineraryItemRequest';
-import type { UpdateDayItineraryItemResponse } from '../models/UpdateDayItineraryItemResponse';
+import type { UpdateScheduleItemRequest } from '../models/UpdateScheduleItemRequest';
+import type { UpdateScheduleItemResponse } from '../models/UpdateScheduleItemResponse';
 import type { UpdateTripRequest } from '../models/UpdateTripRequest';
 import type { UpdateTripResponse } from '../models/UpdateTripResponse';
 import type { CancelablePromise } from '../core/CancelablePromise';
@@ -257,22 +257,22 @@ export class TripsService {
      * Set a trip day lodging place
      * Stores or replaces the selected Day lodging target for an authenticated trip participant.
      * @param tripId
-     * @param date
+     * @param tripDayId
      * @param requestBody
      * @returns SetDayLodgingPlaceResponse Day lodging place saved.
      * @throws ApiError
      */
     public static setDayLodgingPlace(
         tripId: string,
-        date: string,
+        tripDayId: string,
         requestBody: SetDayLodgingPlaceRequest,
     ): CancelablePromise<SetDayLodgingPlaceResponse> {
         return __request(OpenAPI, {
             method: 'PUT',
-            url: '/trips/{tripId}/days/{date}/lodging-place',
+            url: '/trips/{tripId}/days/{tripDayId}/lodging-place',
             path: {
                 'tripId': tripId,
-                'date': date,
+                'tripDayId': tripDayId,
             },
             body: requestBody,
             mediaType: 'application/json',
@@ -280,7 +280,7 @@ export class TripsService {
                 400: `Validation error.`,
                 401: `Unauthorized.`,
                 403: `Forbidden.`,
-                404: `Trip, virtual day, or trip place not found.`,
+                404: `Trip, trip day, or trip place not found.`,
                 500: `Unexpected server error.`,
             },
         });
@@ -289,54 +289,54 @@ export class TripsService {
      * Clear a trip day lodging place
      * Removes the selected Day lodging target for an authenticated trip participant. Clearing an empty Day lodging selection is a 204 no-op.
      * @param tripId
-     * @param date
+     * @param tripDayId
      * @returns void
      * @throws ApiError
      */
     public static clearDayLodgingPlace(
         tripId: string,
-        date: string,
+        tripDayId: string,
     ): CancelablePromise<void> {
         return __request(OpenAPI, {
             method: 'DELETE',
-            url: '/trips/{tripId}/days/{date}/lodging-place',
+            url: '/trips/{tripId}/days/{tripDayId}/lodging-place',
             path: {
                 'tripId': tripId,
-                'date': date,
+                'tripDayId': tripDayId,
             },
             errors: {
                 400: `Validation error.`,
                 401: `Unauthorized.`,
                 403: `Forbidden.`,
-                404: `Trip or virtual day not found.`,
+                404: `Trip or trip day not found.`,
                 500: `Unexpected server error.`,
             },
         });
     }
     /**
-     * Get a trip day itinerary
-     * Returns the ordered read-only itinerary items for a selected virtual trip day.
+     * Get a trip day schedule
+     * Returns the ordered read-only schedule items for a selected virtual trip day.
      * @param tripId
-     * @param date
-     * @returns GetDayItineraryResponse Day itinerary.
+     * @param tripDayId
+     * @returns GetDayScheduleItemsResponse Day schedule.
      * @throws ApiError
      */
-    public static getDayItinerary(
+    public static getDayScheduleItems(
         tripId: string,
-        date: string,
-    ): CancelablePromise<GetDayItineraryResponse> {
+        tripDayId: string,
+    ): CancelablePromise<GetDayScheduleItemsResponse> {
         return __request(OpenAPI, {
             method: 'GET',
-            url: '/trips/{tripId}/days/{date}/itinerary',
+            url: '/trips/{tripId}/days/{tripDayId}/schedule-items',
             path: {
                 'tripId': tripId,
-                'date': date,
+                'tripDayId': tripDayId,
             },
             errors: {
                 400: `Validation error.`,
                 401: `Unauthorized.`,
                 403: `Forbidden.`,
-                404: `Trip or virtual day not found.`,
+                404: `Trip or trip day not found.`,
                 500: `Unexpected server error.`,
             },
         });
@@ -345,50 +345,50 @@ export class TripsService {
      * List expenses for a trip day
      * Returns read-only expense rows for the selected trip day, ordered newest-first.
      * @param tripId
-     * @param date
+     * @param tripDayId
      * @returns ListDayExpensesResponse Day expenses.
      * @throws ApiError
      */
     public static listDayExpenses(
         tripId: string,
-        date: string,
+        tripDayId: string,
     ): CancelablePromise<ListDayExpensesResponse> {
         return __request(OpenAPI, {
             method: 'GET',
-            url: '/trips/{tripId}/days/{date}/expenses',
+            url: '/trips/{tripId}/days/{tripDayId}/expenses',
             path: {
                 'tripId': tripId,
-                'date': date,
+                'tripDayId': tripDayId,
             },
             errors: {
                 400: `Validation error.`,
                 401: `Unauthorized.`,
                 403: `Forbidden.`,
-                404: `Trip or virtual day not found.`,
+                404: `Trip or trip day not found.`,
                 500: `Unexpected server error.`,
             },
         });
     }
     /**
      * Create a quick expense for a trip day place
-     * Creates an expense from a selected itinerary item, using the trip default currency and equal splits across the submitted selected current trip participants.
+     * Creates an expense from a selected schedule item, using the trip default currency and equal splits across the submitted selected current trip participants.
      * @param tripId
-     * @param date
+     * @param tripDayId
      * @param requestBody
      * @returns CreateQuickExpenseResponse Quick expense created.
      * @throws ApiError
      */
     public static createQuickExpense(
         tripId: string,
-        date: string,
+        tripDayId: string,
         requestBody: CreateQuickExpenseRequest,
     ): CancelablePromise<CreateQuickExpenseResponse> {
         return __request(OpenAPI, {
             method: 'POST',
-            url: '/trips/{tripId}/days/{date}/expenses/quick',
+            url: '/trips/{tripId}/days/{tripDayId}/expenses/quick',
             path: {
                 'tripId': tripId,
-                'date': date,
+                'tripDayId': tripDayId,
             },
             body: requestBody,
             mediaType: 'application/json',
@@ -396,33 +396,33 @@ export class TripsService {
                 400: `Validation error.`,
                 401: `Unauthorized.`,
                 403: `Forbidden.`,
-                404: `Trip, virtual day, itinerary item, or payer participant not found.`,
-                409: `Participant or itinerary state changed during creation.`,
+                404: `Trip, trip day, schedule item, or payer participant not found.`,
+                409: `Participant or schedule state changed during creation.`,
                 500: `Unexpected server error.`,
             },
         });
     }
     /**
      * @deprecated
-     * Add a manual place to a trip day itinerary
-     * Deprecated. Manual Day itinerary item creation is disabled for normal app use; add Google-backed places instead.
+     * Add a manual place to a trip day schedule
+     * Deprecated. Manual Day schedule item creation is disabled for normal app use; add Google-backed places instead.
      * @param tripId
-     * @param date
+     * @param tripDayId
      * @param requestBody
-     * @returns CreateManualDayItineraryItemResponse Manual place added to the selected Day itinerary.
+     * @returns CreateManualScheduleItemResponse Manual place added to the selected Day schedule.
      * @throws ApiError
      */
-    public static createManualDayItineraryItem(
+    public static createManualScheduleItem(
         tripId: string,
-        date: string,
-        requestBody: CreateManualDayItineraryItemRequest,
-    ): CancelablePromise<CreateManualDayItineraryItemResponse> {
+        tripDayId: string,
+        requestBody: CreateManualScheduleItemRequest,
+    ): CancelablePromise<CreateManualScheduleItemResponse> {
         return __request(OpenAPI, {
             method: 'POST',
-            url: '/trips/{tripId}/days/{date}/itinerary-items',
+            url: '/trips/{tripId}/days/{tripDayId}/schedule-items/manual',
             path: {
                 'tripId': tripId,
-                'date': date,
+                'tripDayId': tripDayId,
             },
             body: requestBody,
             mediaType: 'application/json',
@@ -430,7 +430,7 @@ export class TripsService {
                 400: `Validation error.`,
                 401: `Unauthorized.`,
                 403: `Forbidden.`,
-                404: `Trip or virtual day not found.`,
+                404: `Trip or trip day not found.`,
                 409: `Concurrent append conflict.`,
                 410: `Manual place creation is disabled; use Google-backed place add flow.`,
                 500: `Unexpected server error.`,
@@ -438,25 +438,25 @@ export class TripsService {
         });
     }
     /**
-     * Reorder a trip day itinerary
-     * Applies an ordered batch of same-Day itinerary item moves inside one transaction and returns the latest Day itinerary.
+     * Reorder a trip day schedule
+     * Applies an ordered batch of same-Day schedule item moves inside one transaction and returns the latest Day schedule.
      * @param tripId
-     * @param date
+     * @param tripDayId
      * @param requestBody
-     * @returns ReorderDayItineraryItemsResponse Day itinerary reordered.
+     * @returns ReorderScheduleItemsResponse Day schedule reordered.
      * @throws ApiError
      */
-    public static reorderDayItineraryItems(
+    public static reorderScheduleItems(
         tripId: string,
-        date: string,
-        requestBody: ReorderDayItineraryItemsRequest,
-    ): CancelablePromise<ReorderDayItineraryItemsResponse> {
+        tripDayId: string,
+        requestBody: ReorderScheduleItemsRequest,
+    ): CancelablePromise<ReorderScheduleItemsResponse> {
         return __request(OpenAPI, {
             method: 'PATCH',
-            url: '/trips/{tripId}/days/{date}/itinerary-items/order',
+            url: '/trips/{tripId}/days/{tripDayId}/schedule-items/order',
             path: {
                 'tripId': tripId,
-                'date': date,
+                'tripDayId': tripDayId,
             },
             body: requestBody,
             mediaType: 'application/json',
@@ -464,131 +464,131 @@ export class TripsService {
                 400: `Validation error.`,
                 401: `Unauthorized.`,
                 403: `Forbidden.`,
-                404: `Trip or virtual day not found.`,
+                404: `Trip or trip day not found.`,
                 409: `Reorder conflict.`,
                 500: `Unexpected server error.`,
             },
         });
     }
     /**
-     * Mark a trip day itinerary item arrived
-     * Marks the selected itinerary item instance arrived when it is the first pending item for the selected Day, and returns the latest Day itinerary snapshot.
+     * Mark a trip day schedule item arrived
+     * Marks the selected schedule item instance arrived when it is the first pending item for the selected Day, and returns the latest Day schedule snapshot.
      * @param tripId
-     * @param date
-     * @param itemId
-     * @returns MarkDayItineraryItemArrivedResponse Day itinerary item arrived, or already arrived idempotently.
+     * @param tripDayId
+     * @param scheduleItemId
+     * @returns MarkScheduleItemArrivedResponse Day schedule item arrived, or already arrived idempotently.
      * @throws ApiError
      */
-    public static markDayItineraryItemArrived(
+    public static markScheduleItemArrived(
         tripId: string,
-        date: string,
-        itemId: string,
-    ): CancelablePromise<MarkDayItineraryItemArrivedResponse> {
+        tripDayId: string,
+        scheduleItemId: string,
+    ): CancelablePromise<MarkScheduleItemArrivedResponse> {
         return __request(OpenAPI, {
             method: 'POST',
-            url: '/trips/{tripId}/days/{date}/itinerary/items/{itemId}/arrive',
+            url: '/trips/{tripId}/days/{tripDayId}/schedule-items/{scheduleItemId}/arrive',
             path: {
                 'tripId': tripId,
-                'date': date,
-                'itemId': itemId,
+                'tripDayId': tripDayId,
+                'scheduleItemId': scheduleItemId,
             },
             errors: {
                 400: `Validation error.`,
                 401: `Unauthorized.`,
                 403: `Forbidden.`,
-                404: `Trip, virtual day, or itinerary item not found.`,
+                404: `Trip, trip day, or schedule item not found.`,
                 409: `Arrival conflict because the target pending item is not the first pending item for the selected Day.`,
                 500: `Unexpected server error.`,
             },
         });
     }
     /**
-     * Mark a trip day itinerary item skipped
-     * Marks the selected itinerary item instance skipped when it is the first pending item for the selected Day, and returns the latest Day itinerary snapshot.
+     * Mark a trip day schedule item skipped
+     * Marks the selected schedule item instance skipped when it is the first pending item for the selected Day, and returns the latest Day schedule snapshot.
      * @param tripId
-     * @param date
-     * @param itemId
-     * @returns MarkDayItineraryItemSkippedResponse Day itinerary item skipped, or already skipped idempotently.
+     * @param tripDayId
+     * @param scheduleItemId
+     * @returns MarkScheduleItemSkippedResponse Day schedule item skipped, or already skipped idempotently.
      * @throws ApiError
      */
-    public static markDayItineraryItemSkipped(
+    public static markScheduleItemSkipped(
         tripId: string,
-        date: string,
-        itemId: string,
-    ): CancelablePromise<MarkDayItineraryItemSkippedResponse> {
+        tripDayId: string,
+        scheduleItemId: string,
+    ): CancelablePromise<MarkScheduleItemSkippedResponse> {
         return __request(OpenAPI, {
             method: 'POST',
-            url: '/trips/{tripId}/days/{date}/itinerary/items/{itemId}/skip',
+            url: '/trips/{tripId}/days/{tripDayId}/schedule-items/{scheduleItemId}/skip',
             path: {
                 'tripId': tripId,
-                'date': date,
-                'itemId': itemId,
+                'tripDayId': tripDayId,
+                'scheduleItemId': scheduleItemId,
             },
             errors: {
                 400: `Validation error.`,
                 401: `Unauthorized.`,
                 403: `Forbidden.`,
-                404: `Trip, virtual day, or itinerary item not found.`,
+                404: `Trip, trip day, or schedule item not found.`,
                 409: `Skip conflict because the target item is arrived or is not the first pending item for the selected Day.`,
                 500: `Unexpected server error.`,
             },
         });
     }
     /**
-     * Restore a skipped trip day itinerary item
-     * Clears skipped state for the selected itinerary item instance and returns the latest Day itinerary snapshot.
+     * Restore a skipped trip day schedule item
+     * Clears skipped state for the selected schedule item instance and returns the latest Day schedule snapshot.
      * @param tripId
-     * @param date
-     * @param itemId
-     * @returns RestoreDayItineraryItemResponse Day itinerary item restored, or already pending idempotently.
+     * @param tripDayId
+     * @param scheduleItemId
+     * @returns RestoreScheduleItemResponse Day schedule item restored, or already pending idempotently.
      * @throws ApiError
      */
-    public static restoreDayItineraryItem(
+    public static restoreScheduleItem(
         tripId: string,
-        date: string,
-        itemId: string,
-    ): CancelablePromise<RestoreDayItineraryItemResponse> {
+        tripDayId: string,
+        scheduleItemId: string,
+    ): CancelablePromise<RestoreScheduleItemResponse> {
         return __request(OpenAPI, {
             method: 'POST',
-            url: '/trips/{tripId}/days/{date}/itinerary/items/{itemId}/restore',
+            url: '/trips/{tripId}/days/{tripDayId}/schedule-items/{scheduleItemId}/restore',
             path: {
                 'tripId': tripId,
-                'date': date,
-                'itemId': itemId,
+                'tripDayId': tripDayId,
+                'scheduleItemId': scheduleItemId,
             },
             errors: {
                 400: `Validation error.`,
                 401: `Unauthorized.`,
                 403: `Forbidden.`,
-                404: `Trip, virtual day, or itinerary item not found.`,
+                404: `Trip, trip day, or schedule item not found.`,
                 409: `Restore conflict because the target item is already arrived.`,
                 500: `Unexpected server error.`,
             },
         });
     }
     /**
-     * Create an in-app route preview for a trip day itinerary item
-     * Returns a lightweight current-location-to-next-place route preview for the selected first pending itinerary item. Detailed navigation remains delegated to Google Maps.
+     * Create an in-app route preview for a trip day schedule item
+     * Returns a lightweight current-location-to-next-place route preview for the selected first pending schedule item. Detailed navigation remains delegated to Google Maps.
      * @param tripId
-     * @param date
-     * @param itemId
+     * @param tripDayId
+     * @param scheduleItemId
      * @param requestBody
      * @returns RoutePreviewResponse Route preview for the selected current next item.
      * @throws ApiError
      */
     public static createRoutePreview(
         tripId: string,
-        date: string,
-        itemId: string,
+        tripDayId: string,
+        scheduleItemId: string,
         requestBody: CreateRoutePreviewRequest,
     ): CancelablePromise<RoutePreviewResponse> {
         return __request(OpenAPI, {
             method: 'POST',
-            url: '/trips/{tripId}/days/{date}/itinerary/items/{itemId}/route-preview',
+            url: '/trips/{tripId}/days/{tripDayId}/schedule-items/{scheduleItemId}/route-preview',
             path: {
                 'tripId': tripId,
-                'date': date,
-                'itemId': itemId,
+                'tripDayId': tripDayId,
+                'scheduleItemId': scheduleItemId,
             },
             body: requestBody,
             mediaType: 'application/json',
@@ -596,7 +596,7 @@ export class TripsService {
                 400: `Validation error.`,
                 401: `Unauthorized.`,
                 403: `Forbidden.`,
-                404: `Trip, virtual day, itinerary item, or provider route not found.`,
+                404: `Trip, trip day, schedule item, or provider route not found.`,
                 409: `Target item is stale or destination place is not routable.`,
                 429: `Route provider rate limited.`,
                 500: `Unexpected server error.`,
@@ -605,28 +605,28 @@ export class TripsService {
         });
     }
     /**
-     * Update a trip day itinerary item place snapshot
-     * Updates name, address, and/or place type for the trip place snapshot linked from the selected Day itinerary item.
+     * Update a trip day schedule item place snapshot
+     * Updates name, address, and/or place type for the trip place snapshot linked from the selected Day schedule item.
      * @param tripId
-     * @param date
-     * @param itemId
+     * @param tripDayId
+     * @param scheduleItemId
      * @param requestBody
-     * @returns UpdateDayItineraryItemResponse Day itinerary item updated.
+     * @returns UpdateScheduleItemResponse Day schedule item updated.
      * @throws ApiError
      */
-    public static updateDayItineraryItem(
+    public static updateScheduleItem(
         tripId: string,
-        date: string,
-        itemId: string,
-        requestBody: UpdateDayItineraryItemRequest,
-    ): CancelablePromise<UpdateDayItineraryItemResponse> {
+        tripDayId: string,
+        scheduleItemId: string,
+        requestBody: UpdateScheduleItemRequest,
+    ): CancelablePromise<UpdateScheduleItemResponse> {
         return __request(OpenAPI, {
             method: 'PATCH',
-            url: '/trips/{tripId}/days/{date}/itinerary/items/{itemId}',
+            url: '/trips/{tripId}/days/{tripDayId}/schedule-items/{scheduleItemId}',
             path: {
                 'tripId': tripId,
-                'date': date,
-                'itemId': itemId,
+                'tripDayId': tripDayId,
+                'scheduleItemId': scheduleItemId,
             },
             body: requestBody,
             mediaType: 'application/json',
@@ -634,38 +634,38 @@ export class TripsService {
                 400: `Validation error.`,
                 401: `Unauthorized.`,
                 403: `Forbidden.`,
-                404: `Trip, virtual day, or itinerary item not found.`,
+                404: `Trip, trip day, or schedule item not found.`,
                 500: `Unexpected server error.`,
             },
         });
     }
     /**
-     * Delete a trip day itinerary item
-     * Removes the selected itinerary item from the virtual Day and orphan-cleans the linked trip place when unreferenced.
+     * Delete a trip day schedule item
+     * Soft-deletes the selected schedule item from the Day while retaining linked place history.
      * @param tripId
-     * @param date
-     * @param itemId
+     * @param tripDayId
+     * @param scheduleItemId
      * @returns void
      * @throws ApiError
      */
-    public static deleteDayItineraryItem(
+    public static deleteScheduleItem(
         tripId: string,
-        date: string,
-        itemId: string,
+        tripDayId: string,
+        scheduleItemId: string,
     ): CancelablePromise<void> {
         return __request(OpenAPI, {
             method: 'DELETE',
-            url: '/trips/{tripId}/days/{date}/itinerary/items/{itemId}',
+            url: '/trips/{tripId}/days/{tripDayId}/schedule-items/{scheduleItemId}',
             path: {
                 'tripId': tripId,
-                'date': date,
-                'itemId': itemId,
+                'tripDayId': tripDayId,
+                'scheduleItemId': scheduleItemId,
             },
             errors: {
                 400: `Validation error.`,
                 401: `Unauthorized.`,
                 403: `Forbidden.`,
-                404: `Trip, virtual day, or itinerary item not found.`,
+                404: `Trip, trip day, or schedule item not found.`,
                 500: `Unexpected server error.`,
             },
         });
