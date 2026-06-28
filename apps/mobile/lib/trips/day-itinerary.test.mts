@@ -4,6 +4,7 @@ import { describe, it } from 'node:test';
 import type { GetDayScheduleItemsResponse } from '@i-um/api-contract';
 
 import {
+  buildDayItineraryPlaceAccessibilityLabel,
   buildDayItineraryRoute,
   buildDayItineraryViewModel,
   dayItineraryFailureState,
@@ -91,6 +92,23 @@ describe('day itinerary helpers', () => {
       title: '아직 등록된 장소가 없어요.',
       helper: '장소 추가를 눌러 방문할 장소를 검색해보세요.',
     });
+  });
+
+  it('builds the existing place row accessibility label from row presentation data', () => {
+    assert.equal(
+      buildDayItineraryPlaceAccessibilityLabel({
+        id: 'item-1',
+        version: 7,
+        orderLabel: '1',
+        isLodging: true,
+        placeId: 'place-1',
+        placeName: '우메다 공중정원',
+        placeType: 'sights',
+        placeTypeLabel: '관광지',
+        address: 'Umeda',
+      }),
+      '1번째 장소 우메다 공중정원. 관광지. Umeda',
+    );
   });
 
   it('maps place type enum values to Korean labels', () => {

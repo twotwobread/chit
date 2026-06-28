@@ -25,8 +25,9 @@ import { router, useFocusEffect, useLocalSearchParams, type Href } from 'expo-ro
 import { ApiError, type TripPlaceType } from '@i-um/api-contract';
 
 import { MobileAuthError } from '../../../../lib/auth/client';
-import { theme } from '../../../../lib/design';
+import { Badge, ListRow, PlacePin, PlaceTag, theme } from '../../../../lib/design';
 import {
+  buildDayItineraryPlaceAccessibilityLabel,
   buildDayItineraryViewModel,
   dayItineraryFailureState,
   type DayItineraryRowViewModel,
@@ -1234,31 +1235,25 @@ function DayItineraryContent({
               const mapActions = buildDayItineraryMapRowActions(item);
               return (
                 <View key={item.id} style={styles.placeRow}>
-                  <View style={styles.orderBadge}>
-                    <Text style={styles.orderText}>{item.orderLabel}</Text>
-                  </View>
+                  <PlacePin order={item.orderLabel} type={item.placeType} />
                   <View style={styles.placeContent}>
                     <View style={styles.placeTitleRow}>
                       <Text
                         ref={(node) => {
                           rowRefs.current[item.id] = node;
                         }}
-                        accessibilityLabel={`${item.orderLabel}번째 장소 ${item.placeName}. ${item.placeTypeLabel}. ${item.address}`}
+                        accessibilityLabel={buildDayItineraryPlaceAccessibilityLabel(item)}
                         style={styles.placeName}
                       >
                         {item.placeName}
                       </Text>
-                      <Text style={styles.placeType}>{item.placeTypeLabel}</Text>
-                      {lodging.badgeLabel ? (
-                        <View style={styles.lodgingBadge}>
-                          <Text style={styles.lodgingBadgeText}>{lodging.badgeLabel}</Text>
-                        </View>
-                      ) : null}
+                      <PlaceTag type={item.placeType} />
+                      {lodging.badgeLabel ? <Badge label={lodging.badgeLabel} tone="primary" /> : null}
                     </View>
                     <Text style={styles.address}>{item.address}</Text>
                     <View style={styles.rowActionGroup}>
                       <Pressable
-                        accessibilityLabel={`${item.placeName} 지도 열기`}
+                        accessibilityLabel={mapActions.map.accessibilityLabel}
                         accessibilityRole="button"
                         onPress={() => onOpenMap(item)}
                         style={styles.rowActionButton}
@@ -1267,7 +1262,7 @@ function DayItineraryContent({
                       </Pressable>
                       <Pressable
                         accessibilityHint={mapActions.copy.disabled ? mapActions.copy.disabledHelper : undefined}
-                        accessibilityLabel={`${item.placeName} 주소 복사`}
+                        accessibilityLabel={mapActions.copy.accessibilityLabel}
                         accessibilityRole="button"
                         accessibilityState={{ disabled: mapActions.copy.disabled }}
                         disabled={mapActions.copy.disabled}
@@ -1451,17 +1446,13 @@ function DayExpensesSection({
       {successViewModel ? (
         <View style={styles.expenseList}>
           {successViewModel.rows.map((row) => (
-            <View
-              key={row.id}
-              accessible
-              accessibilityLabel={`${row.placeName} ${row.amountLabel}. ${row.detailLine}`}
-              style={styles.expenseRow}
-            >
-              <View style={styles.expenseTopLine}>
-                <Text style={styles.expensePlaceName}>{row.placeName}</Text>
-                <Text style={styles.expenseAmount}>{row.amountLabel}</Text>
-              </View>
-              <Text style={styles.expenseDetail}>{row.detailLine}</Text>
+            <View key={row.id} accessible accessibilityLabel={row.accessibilityLabel} style={styles.expenseRow}>
+              <ListRow
+                first
+                subtitle={row.detailLine}
+                title={<Text style={styles.expensePlaceName}>{row.placeName}</Text>}
+                trailing={<Text style={styles.expenseAmount}>{row.amountLabel}</Text>}
+              />
             </View>
           ))}
         </View>
@@ -1564,13 +1555,11 @@ function ReorderPlaceList({
         onLayout={(event) => updateRowHeight(item.id, event)}
         style={[styles.placeRow, isActive ? styles.placeRowActive : null]}
       >
-        <View style={styles.orderBadge}>
-          <Text style={styles.orderText}>{item.orderLabel}</Text>
-        </View>
+        <PlacePin order={item.orderLabel} type={item.placeType} />
         <View style={styles.placeContent}>
           <View style={styles.placeTitleRow}>
             <Text style={styles.placeName}>{item.placeName}</Text>
-            <Text style={styles.placeType}>{item.placeTypeLabel}</Text>
+            <PlaceTag type={item.placeType} />
           </View>
           <Text style={styles.address}>{item.address}</Text>
         </View>
@@ -1888,19 +1877,6 @@ const styles = StyleSheet.create({
     borderColor: theme.color.primary,
     backgroundColor: theme.color.primarySoft,
   },
-  orderBadge: {
-    alignItems: 'center',
-    backgroundColor: theme.color.primarySoft,
-    borderRadius: theme.radius.pill,
-    height: theme.layout.controlHSm,
-    justifyContent: 'center',
-    width: theme.layout.controlHSm,
-  },
-  orderText: {
-    color: theme.color.primary,
-    fontFamily: theme.font.family.bold,
-    fontWeight: theme.font.weight.bold,
-  },
   placeContent: {
     flex: 1,
     gap: theme.space[2],
@@ -1916,12 +1892,6 @@ const styles = StyleSheet.create({
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.subhead,
     fontWeight: theme.font.weight.bold,
-  },
-  placeType: {
-    color: theme.color.primary,
-    fontFamily: theme.font.family.semibold,
-    fontSize: theme.font.size.caption,
-    fontWeight: theme.font.weight.semibold,
   },
   address: {
     color: theme.color.textMuted,
@@ -1959,20 +1929,6 @@ const styles = StyleSheet.create({
     fontSize: theme.font.size.caption,
     fontWeight: theme.font.weight.semibold,
   },
-  lodgingBadge: {
-    backgroundColor: theme.color.primarySoft,
-    borderColor: theme.color.primary,
-    borderRadius: theme.radius.pill,
-    borderWidth: 1,
-    paddingHorizontal: theme.space[3],
-    paddingVertical: theme.space[1],
-  },
-  lodgingBadgeText: {
-    color: theme.color.primary,
-    fontFamily: theme.font.family.semibold,
-    fontSize: theme.font.size.micro,
-    fontWeight: theme.font.weight.semibold,
-  },
   rowDangerActionText: {
     color: theme.color.danger,
     fontFamily: theme.font.family.semibold,
@@ -1996,14 +1952,7 @@ const styles = StyleSheet.create({
     borderColor: theme.color.borderSubtle,
     borderRadius: theme.radius.md,
     borderWidth: 1,
-    gap: theme.space[2],
-    padding: theme.space[4],
-  },
-  expenseTopLine: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: theme.space[3],
-    justifyContent: 'space-between',
+    overflow: 'hidden',
   },
   expensePlaceName: {
     color: theme.color.textStrong,
@@ -2017,11 +1966,6 @@ const styles = StyleSheet.create({
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.subhead,
     fontWeight: theme.font.weight.bold,
-  },
-  expenseDetail: {
-    color: theme.color.textMuted,
-    fontFamily: theme.font.family.regular,
-    fontSize: theme.font.size.caption,
   },
   expenseErrorTitle: {
     color: theme.color.danger,

@@ -31,12 +31,14 @@ describe('day itinerary map action helpers', () => {
     assert.deepEqual(buildDayItineraryMapRowActions({ placeName: '도톤보리', address: ' Dotonbori ' }), {
       map: {
         label: '지도',
+        accessibilityLabel: '도톤보리 지도 열기',
         url: 'https://www.google.com/maps/search/?api=1&query=%EB%8F%84%ED%86%A4%EB%B3%B4%EB%A6%AC%20Dotonbori',
         successFeedback: null,
         failureFeedback: '지도를 열 수 없어요. 잠시 후 다시 시도해주세요.',
       },
       copy: {
         label: '주소 복사',
+        accessibilityLabel: '도톤보리 주소 복사',
         address: 'Dotonbori',
         disabled: false,
         disabledHelper: undefined,
@@ -48,12 +50,14 @@ describe('day itinerary map action helpers', () => {
     assert.deepEqual(buildDayItineraryMapRowActions({ placeName: '도톤보리', address: '   ' }), {
       map: {
         label: '지도',
+        accessibilityLabel: '도톤보리 지도 열기',
         url: 'https://www.google.com/maps/search/?api=1&query=%EB%8F%84%ED%86%A4%EB%B3%B4%EB%A6%AC',
         successFeedback: null,
         failureFeedback: '지도를 열 수 없어요. 잠시 후 다시 시도해주세요.',
       },
       copy: {
         label: '주소 복사',
+        accessibilityLabel: '도톤보리 주소 복사',
         address: undefined,
         disabled: true,
         disabledHelper: '주소 정보가 없어요.',
