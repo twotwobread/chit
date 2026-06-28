@@ -20,10 +20,12 @@ import {
 } from '../../../../../../lib/trips/client';
 import {
   buildCreateQuickExpenseRequest,
+  buildDefaultSplitParticipantIds,
   buildQuickExpenseViewModel,
   buildSavedEqualSplitSummary,
   quickExpenseFailureMessage,
   type QuickExpenseFormErrors,
+  toggleQuickExpenseSplitParticipant,
   type QuickExpenseSavedSplitSummary,
   type QuickExpenseViewModel,
 } from '../../../../../../lib/trips/quick-expense';
@@ -57,6 +59,7 @@ export default function QuickExpenseScreen() {
   const [amountInput, setAmountInput] = useState('');
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [payerParticipantId, setPayerParticipantId] = useState<string | null>(null);
+  const [selectedSplitParticipantIds, setSelectedSplitParticipantIds] = useState<string[]>([]);
   const [errors, setErrors] = useState<QuickExpenseFormErrors>({});
   const [saving, setSaving] = useState(false);
   const [formMessage, setFormMessage] = useState<string | null>(null);
@@ -95,17 +98,17 @@ export default function QuickExpenseScreen() {
       ]);
       const validRouteItem =
         routeItemId && itinerary.items.some((item) => item.id === routeItemId) ? routeItemId : null;
+      const participants = participantsResponse.participants;
       setSelectedItemId(validRouteItem);
-      setPayerParticipantId(
-        participantsResponse.participants.length === 1 ? participantsResponse.participants[0].participantId : null,
-      );
+      setPayerParticipantId(participants.length === 1 ? participants[0].participantId : null);
+      setSelectedSplitParticipantIds(buildDefaultSplitParticipantIds(participants));
       setAmountInput('');
       setState({
         status: 'success',
         tripName: tripDetail.trip.name,
         currency: tripDetail.trip.defaultCurrency,
         itinerary,
-        participants: participantsResponse.participants,
+        participants,
         shouldChooseItem: validRouteItem === null,
       });
     } catch (error) {
@@ -147,6 +150,12 @@ export default function QuickExpenseScreen() {
     setFormMessage(null);
   };
 
+  const toggleSplitParticipant = (participantId: string) => {
+    setSelectedSplitParticipantIds((current) => toggleQuickExpenseSplitParticipant(current, participantId));
+    setErrors((current) => ({ ...current, participants: undefined }));
+    setFormMessage(null);
+  };
+
   const submit = async () => {
     if (state.status !== 'success' || !tripId || !date || saving) {
       return;
@@ -156,6 +165,7 @@ export default function QuickExpenseScreen() {
       amountInput,
       currency: state.currency,
       itineraryItemId: selectedItemId,
+      participantIds: selectedSplitParticipantIds,
       payerParticipantId,
     });
     if (!validation.ok) {
@@ -223,10 +233,12 @@ export default function QuickExpenseScreen() {
           onSelectItem={selectItem}
           onSelectPayer={selectPayer}
           onSubmit={() => void submit()}
+          onToggleSplitParticipant={toggleSplitParticipant}
           onUpdateAmount={updateAmountInput}
           payerParticipantId={payerParticipantId}
           saving={saving}
           selectedItemId={selectedItemId}
+          selectedSplitParticipantIds={selectedSplitParticipantIds}
           tripName={state.tripName}
           viewModel={buildQuickExpenseViewModel({
             amountInput,
@@ -234,6 +246,7 @@ export default function QuickExpenseScreen() {
             itinerary: state.itinerary,
             participants: state.participants,
             selectedItemId,
+            selectedSplitParticipantIds,
             shouldChooseItem: state.shouldChooseItem,
           })}
         />
@@ -275,10 +288,12 @@ function QuickExpenseForm({
   onSelectItem,
   onSelectPayer,
   onSubmit,
+  onToggleSplitParticipant,
   onUpdateAmount,
   payerParticipantId,
   saving,
   selectedItemId,
+  selectedSplitParticipantIds,
   tripName,
   viewModel,
 }: {
@@ -289,10 +304,12 @@ function QuickExpenseForm({
   onSelectItem: (itemId: string) => void;
   onSelectPayer: (participantId: string) => void;
   onSubmit: () => void;
+  onToggleSplitParticipant: (participantId: string) => void;
   onUpdateAmount: (value: string) => void;
   payerParticipantId: string | null;
   saving: boolean;
   selectedItemId: string | null;
+  selectedSplitParticipantIds: string[];
   tripName: string;
   viewModel: QuickExpenseViewModel;
 }) {
@@ -300,6 +317,7 @@ function QuickExpenseForm({
     amountInput,
     currency: viewModel.currency,
     itineraryItemId: selectedItemId,
+    participantIds: selectedSplitParticipantIds,
     payerParticipantId,
   });
   const canSubmit = validation.ok && !saving && !viewModel.emptyMessage;
@@ -397,9 +415,35 @@ function QuickExpenseForm({
         {errors.payer ? <Text style={styles.errorMessage}>{errors.payer}</Text> : null}
       </View>
 
+      <View style={styles.fieldGroup}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.label}>분할 대상</Text>
+          <Text style={styles.splitHelper}>체크한 사람에게만 아래 금액으로 나눠져요. 결제자도 제외할 수 있어요.</Text>
+        </View>
+        <View style={styles.optionList}>
+          {viewModel.splitParticipantOptions.map((option) => (
+            <Pressable
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: option.selected }}
+              disabled={saving || Boolean(viewModel.emptyMessage)}
+              key={option.participantId}
+              onPress={() => onToggleSplitParticipant(option.participantId)}
+              style={[styles.payerChip, option.selected ? styles.optionCardSelected : null]}
+            >
+              <Text style={option.selected ? styles.payerChipTextSelected : styles.payerChipText}>
+                {option.displayName}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+        {errors.participants || viewModel.splitParticipantError ? (
+          <Text style={styles.errorMessage}>{errors.participants ?? viewModel.splitParticipantError}</Text>
+        ) : null}
+      </View>
+
       {viewModel.splitPreviewRows.length > 0 ? (
         <SplitRowsSection
-          helper="저장하면 모든 참여자에게 아래 금액으로 나눠져요."
+          helper="저장하면 선택한 참여자에게 아래 금액으로 나눠져요."
           rows={viewModel.splitPreviewRows}
           title="기본 1/N 분할"
         />

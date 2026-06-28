@@ -525,6 +525,10 @@ func (s *Service) CreateQuickExpense(ctx context.Context, userID string, tripID 
 	date = strings.TrimSpace(date)
 	itineraryItemID := strings.TrimSpace(input.ItineraryItemID)
 	payerParticipantID := strings.TrimSpace(input.PayerParticipantID)
+	participantIDs, err := normalizeQuickExpenseParticipantIDs(input.ParticipantIDs)
+	if err != nil {
+		return CreateQuickExpenseResult{}, err
+	}
 	if !isUUID(tripID) || !isUUID(itineraryItemID) || !isUUID(payerParticipantID) || input.AmountMinor < 1 {
 		return CreateQuickExpenseResult{}, ErrValidation
 	}
@@ -564,8 +568,30 @@ func (s *Service) CreateQuickExpense(ctx context.Context, userID string, tripID 
 		ItineraryItemID:    itineraryItemID,
 		AmountMinor:        input.AmountMinor,
 		PayerParticipantID: payerParticipantID,
+		ParticipantIDs:     participantIDs,
 		CreatedBy:          userID,
 	})
+}
+
+func normalizeQuickExpenseParticipantIDs(participantIDs []string) ([]string, error) {
+	if len(participantIDs) == 0 {
+		return nil, ErrValidation
+	}
+
+	seen := make(map[string]struct{}, len(participantIDs))
+	normalized := make([]string, 0, len(participantIDs))
+	for _, rawID := range participantIDs {
+		participantID := strings.ToLower(strings.TrimSpace(rawID))
+		if !isUUID(participantID) {
+			return nil, ErrValidation
+		}
+		if _, ok := seen[participantID]; ok {
+			return nil, ErrValidation
+		}
+		seen[participantID] = struct{}{}
+		normalized = append(normalized, participantID)
+	}
+	return normalized, nil
 }
 
 func (s *Service) SetDayLodgingPlace(ctx context.Context, userID string, tripID string, date string, input SetDayLodgingPlaceInput) (SetDayLodgingPlaceResult, error) {
@@ -1338,6 +1364,36 @@ func NormalizeParticipantDisplayName(value string) string {
 		return "여행자"
 	}
 	return name
+}
+
+func SelectExpenseSplitParticipants(participants []ExpenseSplitParticipant, participantIDs []string) ([]ExpenseSplitParticipant, error) {
+	if len(participantIDs) == 0 {
+		return nil, ErrValidation
+	}
+
+	selectedParticipantIDs := make(map[string]struct{}, len(participantIDs))
+	for _, participantID := range participantIDs {
+		if participantID == "" {
+			return nil, ErrValidation
+		}
+		if _, ok := selectedParticipantIDs[participantID]; ok {
+			return nil, ErrValidation
+		}
+		selectedParticipantIDs[participantID] = struct{}{}
+	}
+
+	selectedParticipants := make([]ExpenseSplitParticipant, 0, len(selectedParticipantIDs))
+	for _, participant := range participants {
+		if _, ok := selectedParticipantIDs[participant.ParticipantID]; !ok {
+			continue
+		}
+		selectedParticipants = append(selectedParticipants, participant)
+		delete(selectedParticipantIDs, participant.ParticipantID)
+	}
+	if len(selectedParticipantIDs) > 0 || len(selectedParticipants) == 0 {
+		return nil, ErrValidation
+	}
+	return selectedParticipants, nil
 }
 
 func AllocateEqualExpenseSplits(amountMinor int64, participants []ExpenseSplitParticipant) ([]CreateExpenseSplitRecord, error) {

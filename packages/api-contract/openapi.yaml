@@ -763,7 +763,7 @@ paths:
     post:
       operationId: createQuickExpense
       summary: Create a quick expense for a trip day place
-      description: Creates an expense from a selected itinerary item, using the trip default currency and equal splits across current trip participants.
+      description: Creates an expense from a selected itinerary item, using the trip default currency and equal splits across the submitted selected current trip participants.
       tags:
         - Trips
       security:
@@ -2281,6 +2281,7 @@ components:
         - itineraryItemId
         - amountMinor
         - payerParticipantId
+        - participantIds
       properties:
         itineraryItemId:
           type: string
@@ -2293,6 +2294,13 @@ components:
         payerParticipantId:
           type: string
           description: Active trip participant who paid the expense.
+        participantIds:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+          description: Current accepted trip participants selected as equal split targets.
     CreateQuickExpenseResponse:
       type: object
       required:

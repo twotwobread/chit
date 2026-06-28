@@ -548,13 +548,17 @@ func (s *Store) CreateQuickExpense(ctx context.Context, record trip.CreateQuickE
 	if err != nil {
 		return trip.CreateQuickExpenseResult{}, err
 	}
-	participants := make([]trip.ExpenseSplitParticipant, 0, len(participantRows))
+	allParticipants := make([]trip.ExpenseSplitParticipant, 0, len(participantRows))
 	for _, participantRow := range participantRows {
-		participants = append(participants, trip.ExpenseSplitParticipant{
+		allParticipants = append(allParticipants, trip.ExpenseSplitParticipant{
 			ParticipantID: participantRow.ID,
 			DisplayName:   participantRow.DisplayName,
 			JoinedAt:      participantRow.JoinedAt.Time,
 		})
+	}
+	participants, err := trip.SelectExpenseSplitParticipants(allParticipants, record.ParticipantIDs)
+	if err != nil {
+		return trip.CreateQuickExpenseResult{}, err
 	}
 
 	splitRecords, err := trip.AllocateEqualExpenseSplits(record.AmountMinor, participants)

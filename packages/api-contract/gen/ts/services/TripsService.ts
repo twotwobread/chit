@@ -371,7 +371,7 @@ export class TripsService {
     }
     /**
      * Create a quick expense for a trip day place
-     * Creates an expense from a selected itinerary item, using the trip default currency and equal splits across current trip participants.
+     * Creates an expense from a selected itinerary item, using the trip default currency and equal splits across the submitted selected current trip participants.
      * @param tripId
      * @param date
      * @param requestBody

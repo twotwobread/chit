@@ -268,6 +268,7 @@ func (s apiServer) CreateQuickExpense(w http.ResponseWriter, r *http.Request, tr
 		ItineraryItemID:    body.ItineraryItemId,
 		AmountMinor:        body.AmountMinor,
 		PayerParticipantID: body.PayerParticipantId,
+		ParticipantIDs:     body.ParticipantIds,
 	})
 	if err != nil {
 		writeQuickExpenseError(w, err)
