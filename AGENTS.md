@@ -58,8 +58,9 @@ i-um/
 
 ## Task rules
 
-- Feature spec/plan drafting: use `/skill:i-um-feature-spec-plan`; create/select the feature worktree first so spec and implementation stay one PR by default; do not draft or substantially revise `docs/features/*` without Ouroboros clarification unless the user explicitly waives it.
-- Feature implementation: use `/skill:i-um-feature-start` or read `.pi/rules/feature-implement.md`.
+- Request routing: explicit spec/plan requests use `/skill:i-um-feature-spec-plan`; implementation/fix/debug requests without an approved spec use `/skill:i-um-feature-start` or read `.pi/rules/task-triage.md` before choosing no-spec fast path vs spec escalation.
+- Feature spec/plan drafting: create/select the feature worktree first so spec and implementation stay one PR by default; do not draft or substantially revise `docs/features/*` without Ouroboros clarification unless the user explicitly waives it.
+- Feature/issue implementation after triage or from an approved spec: use `/skill:i-um-feature-start` or read `.pi/rules/feature-implement.md`.
 - PR creation/merge from an existing worktree: use `/skill:i-um-pr-lifecycle` or read `.pi/rules/pr-lifecycle.md`.
 - API/DB changes: read `.pi/rules/api-db.md`.
 - Mobile UI changes: read `.pi/rules/mobile-ui.md`.

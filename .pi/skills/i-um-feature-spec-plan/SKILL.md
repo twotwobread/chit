@@ -5,9 +5,11 @@ description: Create or substantially revise i-um feature specs and implementatio
 
 # i-um Feature Spec / Plan
 
-Use when the task is to create or substantially revise a feature spec and implementation plan, especially `docs/features/<id>.md` or a GitHub Issue labeled `needs-spec`. Treat the spec/plan as the first phase of the same feature branch/PR that will later contain implementation.
+Use when the task is to create or substantially revise a feature spec and implementation plan, especially `docs/features/<id>.md`, a GitHub Issue labeled `needs-spec`, or an explicit user request such as “write/draft/update the spec” or “make a plan”. Treat the spec/plan as the first phase of the same feature branch/PR that will later contain implementation.
 
-Do not use this for implementation from an already approved spec; use `i-um-feature-start` in the same feature worktree/branch instead.
+Explicit spec/plan requests win over the issue’s apparent bug/feature classification. If the target appears small enough for a no-spec fast path, mention that option and ask before switching away from the requested spec flow.
+
+Do not use this for implementation from an already approved spec or for ordinary fix/debug requests before triage; use `i-um-feature-start` in the same feature worktree/branch instead. If `i-um-feature-start` escalates to spec flow and the user approves, continue here.
 
 ## Required input
 

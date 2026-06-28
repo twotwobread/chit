@@ -1,6 +1,6 @@
 # Worktree Rule
 
-Use when creating or selecting a worktree for feature/doc PR work. Feature spec/plan drafting counts as feature work.
+Use when creating or selecting a worktree for feature/doc/issue PR work. Feature spec/plan drafting counts as feature work; triaged bugfix/small implementation PRs use the same worktree policy.
 
 ## Rules
 
@@ -16,7 +16,7 @@ Use when creating or selecting a worktree for feature/doc PR work. Feature spec/
 
 ## Standard commands
 
-Feature work, including spec/plan first:
+Feature or issue work, including spec/plan first:
 
 ```bash
 .pi/bin/worktree-create F042 short-name
