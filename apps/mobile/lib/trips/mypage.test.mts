@@ -5,6 +5,7 @@ import type { TripListItem } from '@i-um/api-contract';
 
 import {
   buildMyTripsSuccessViewModel,
+  formatTripDateRange,
   participantCountLabel,
   toTripCardViewModel,
   tripDetailPath,
@@ -76,10 +77,16 @@ test('uses deterministic primary current trip when multiple trips are ongoing', 
   );
 });
 
-test('formats trip role and participant count labels', () => {
+test('formats trip labels for reusable card composition', () => {
   assert.equal(tripRoleLabel('owner'), '주최자');
   assert.equal(tripRoleLabel('member'), '동행자');
   assert.equal(participantCountLabel(3), '참여자 3명');
+  assert.equal(formatTripDateRange('2026-06-20', '2026-06-22'), '2026.06.20 ~ 2026.06.22');
+
+  const viewModel = toTripCardViewModel(trip({ defaultCurrency: 'JPY', participantCount: 2 }));
+  assert.equal(viewModel.dateRangeLabel, '2026.06.20 ~ 2026.06.22');
+  assert.equal(viewModel.currencyLabel, '기본 통화 JPY');
+  assert.deepEqual(viewModel.metaLabels, ['주최자', '참여자 2명']);
 });
 
 test('adds role and participant count labels to cards in every status section', () => {
@@ -94,9 +101,13 @@ test('adds role and participant count labels to cards in every status section', 
 
   assert.deepEqual(
     viewModel.sections.map((section) =>
-      section.trips.map((item) => [item.id, item.roleLabel, item.participantCountLabel]),
+      section.trips.map((item) => [item.id, item.roleLabel, item.participantCountLabel, item.dateRangeLabel]),
     ),
-    [[['ongoing', '주최자', '참여자 2명']], [['upcoming', '동행자', '참여자 3명']], [['past', '동행자', '참여자 4명']]],
+    [
+      [['ongoing', '주최자', '참여자 2명', '2026.06.20 ~ 2026.06.22']],
+      [['upcoming', '동행자', '참여자 3명', '2026.06.23 ~ 2026.06.25']],
+      [['past', '동행자', '참여자 4명', '2026.06.18 ~ 2026.06.21']],
+    ],
   );
   assert.equal(viewModel.currentTrip?.roleLabel, '주최자');
   assert.equal(viewModel.currentTrip?.participantCountLabel, '참여자 2명');

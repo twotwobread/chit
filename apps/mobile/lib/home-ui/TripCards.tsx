@@ -6,27 +6,37 @@ import { AvatarGroup, Badge, theme } from '../design';
 export type ActiveTripCardProps = {
   name: string;
   dayLabel: string;
+  dateLabel?: string;
+  currencyLabel?: string;
+  helperLabel?: string;
   nextPlaceLabel?: string;
   nextTimeLabel?: string;
-  completedCount: number;
-  totalCount: number;
+  completedCount?: number;
+  totalCount?: number;
+  progressLabel?: string;
+  metaLabels?: string[];
   members?: { name: string; color?: string }[];
+  ctaLabel?: string;
   onPress: () => void;
 };
 
 export type UpcomingTripRowProps = {
   name: string;
   dateLabel: string;
+  currencyLabel?: string;
   companionsLabel?: string;
   ddayLabel?: string;
   statusLabel?: string;
   statusTone?: 'amber' | 'neutral' | 'success';
+  metaLabels?: string[];
   onPress: () => void;
 };
 
 export type PastTripRowProps = {
   name: string;
   dateLabel: string;
+  currencyLabel?: string;
+  metaLabels?: string[];
   settledLabel?: string;
   onPress: () => void;
   first?: boolean;
@@ -34,15 +44,23 @@ export type PastTripRowProps = {
 
 export function ActiveTripCard({
   completedCount,
+  ctaLabel = '오늘 일정 들어가기',
+  currencyLabel,
+  dateLabel,
   dayLabel,
+  helperLabel,
   members = [],
+  metaLabels = [],
   name,
   nextPlaceLabel,
   nextTimeLabel,
   onPress,
+  progressLabel,
   totalCount,
 }: ActiveTripCardProps) {
-  const progress = totalCount > 0 ? Math.min(100, Math.max(0, Math.round((completedCount / totalCount) * 100))) : 0;
+  const showProgress = completedCount != null && totalCount != null;
+  const progress =
+    showProgress && totalCount > 0 ? Math.min(100, Math.max(0, Math.round((completedCount / totalCount) * 100))) : 0;
 
   return (
     <Pressable
@@ -60,6 +78,17 @@ export function ActiveTripCard({
       <Text numberOfLines={1} style={styles.heroName}>
         {name}
       </Text>
+      {dateLabel ? <Text style={styles.heroDate}>{dateLabel}</Text> : null}
+      {currencyLabel ? <Text style={styles.heroMeta}>{currencyLabel}</Text> : null}
+      {metaLabels.length > 0 ? (
+        <View style={styles.heroMetaRow}>
+          {metaLabels.map((label) => (
+            <Text key={label} style={styles.heroMetaPill}>
+              {label}
+            </Text>
+          ))}
+        </View>
+      ) : null}
       {nextPlaceLabel ? (
         <View style={styles.heroNextRow}>
           <MapPin color={theme.color.green[300]} size={16} strokeWidth={2} />
@@ -68,21 +97,21 @@ export function ActiveTripCard({
             {nextTimeLabel ? ` · ${nextTimeLabel}` : ''}
           </Text>
         </View>
-      ) : (
-        <Text style={styles.heroNext}>오늘 남은 장소를 확인해보세요.</Text>
-      )}
+      ) : helperLabel ? (
+        <Text style={styles.heroNext}>{helperLabel}</Text>
+      ) : null}
 
-      <View style={styles.progressRow}>
-        <View style={styles.track}>
-          <View style={[styles.fill, { width: `${progress}%` }]} />
+      {showProgress ? (
+        <View style={styles.progressRow}>
+          <View style={styles.track}>
+            <View style={[styles.fill, { width: `${progress}%` }]} />
+          </View>
+          <Text style={styles.progressText}>{progressLabel ?? `${totalCount}곳 중 ${completedCount}곳`}</Text>
         </View>
-        <Text style={styles.progressText}>
-          {totalCount}곳 중 {completedCount}곳
-        </Text>
-      </View>
+      ) : null}
 
       <View style={styles.heroCta}>
-        <Text style={styles.heroCtaText}>오늘 일정 들어가기</Text>
+        <Text style={styles.heroCtaText}>{ctaLabel}</Text>
         <ChevronRight color={theme.color.green[800]} size={18} strokeWidth={2.4} />
       </View>
     </Pressable>
@@ -91,8 +120,10 @@ export function ActiveTripCard({
 
 export function UpcomingTripRow({
   companionsLabel,
+  currencyLabel,
   dateLabel,
   ddayLabel,
+  metaLabels = [],
   name,
   onPress,
   statusLabel,
@@ -115,8 +146,17 @@ export function UpcomingTripRow({
           {name}
         </Text>
         <Text numberOfLines={1} style={styles.upcomingMeta}>
-          {[dateLabel, companionsLabel].filter(Boolean).join(' · ')}
+          {[dateLabel, currencyLabel, companionsLabel].filter(Boolean).join(' · ')}
         </Text>
+        {metaLabels.length > 0 ? (
+          <View style={styles.rowMetaWrap}>
+            {metaLabels.map((label) => (
+              <Text key={label} style={styles.rowMetaLabel}>
+                {label}
+              </Text>
+            ))}
+          </View>
+        ) : null}
         {statusLabel ? <Badge label={statusLabel} tone={statusTone === 'success' ? 'success' : statusTone} /> : null}
       </View>
       <ChevronRight color={theme.color.textFaint} size={20} strokeWidth={2} />
@@ -124,7 +164,15 @@ export function UpcomingTripRow({
   );
 }
 
-export function PastTripRow({ first = false, name, dateLabel, onPress, settledLabel = '정산 완료' }: PastTripRowProps) {
+export function PastTripRow({
+  currencyLabel,
+  dateLabel,
+  first = false,
+  metaLabels = [],
+  name,
+  onPress,
+  settledLabel = '정산 완료',
+}: PastTripRowProps) {
   return (
     <Pressable
       accessibilityRole="button"
@@ -138,7 +186,16 @@ export function PastTripRow({ first = false, name, dateLabel, onPress, settledLa
         <Text numberOfLines={1} style={styles.pastName}>
           {name}
         </Text>
-        <Text style={styles.pastMeta}>{dateLabel}</Text>
+        <Text style={styles.pastMeta}>{[dateLabel, currencyLabel].filter(Boolean).join(' · ')}</Text>
+        {metaLabels.length > 0 ? (
+          <View style={styles.rowMetaWrap}>
+            {metaLabels.map((label) => (
+              <Text key={label} style={styles.rowMetaLabel}>
+                {label}
+              </Text>
+            ))}
+          </View>
+        ) : null}
       </View>
       <View style={styles.settledTag}>
         <Check color={theme.color.green[700]} size={13} strokeWidth={2.6} />
@@ -199,6 +256,12 @@ const styles = StyleSheet.create({
     fontSize: theme.font.size.subhead,
     fontWeight: theme.font.weight.bold,
   },
+  heroDate: {
+    color: theme.color.green[100],
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.label,
+    marginTop: theme.space[2],
+  },
   heroDayBadge: {
     backgroundColor: theme.color.green[800],
     borderRadius: theme.radius.pill,
@@ -215,6 +278,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
+  },
+  heroMeta: {
+    color: theme.color.green[100],
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.label,
+    marginTop: theme.space[1],
+  },
+  heroMetaPill: {
+    color: theme.color.onPrimary,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.caption,
+    fontWeight: theme.font.weight.bold,
+  },
+  heroMetaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.space[3],
+    marginTop: theme.space[3],
   },
   heroName: {
     color: theme.color.onPrimary,
@@ -250,6 +331,7 @@ const styles = StyleSheet.create({
   },
   pastBody: {
     flex: 1,
+    gap: theme.space[1],
   },
   pastDivider: {
     borderTopColor: theme.color.borderSubtle,
@@ -267,7 +349,6 @@ const styles = StyleSheet.create({
     color: theme.color.textMuted,
     fontFamily: theme.font.family.regular,
     fontSize: theme.font.size.caption,
-    marginTop: theme.space[1],
   },
   pastName: {
     color: theme.color.textStrong,
@@ -289,6 +370,17 @@ const styles = StyleSheet.create({
     fontFamily: theme.font.family.semibold,
     fontSize: theme.font.size.caption,
     fontWeight: theme.font.weight.semibold,
+  },
+  rowMetaLabel: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.caption,
+    fontWeight: theme.font.weight.bold,
+  },
+  rowMetaWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.space[3],
   },
   settledTag: {
     alignItems: 'center',
