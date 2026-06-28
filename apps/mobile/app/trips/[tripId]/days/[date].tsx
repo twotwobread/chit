@@ -52,6 +52,7 @@ import {
 } from '../../../../lib/trips/reorder-itinerary';
 import {
   resolveDayItineraryDragAutoScrollOffset,
+  resolveDayItineraryDragOffsetY,
   resolveDayItineraryDragTargetIndex,
 } from '../../../../lib/trips/reorder-itinerary-drag';
 import {
@@ -1491,6 +1492,7 @@ function ReorderPlaceList({
     itemId: string;
     currentIndex: number;
     startIndex: number;
+    startPointerY: number;
     startScrollOffsetY: number;
     snapshotHeights: number[];
   } | null>(null);
@@ -1512,11 +1514,12 @@ function ReorderPlaceList({
       onStartShouldSetPanResponderCapture: () => !isDisabled,
       onMoveShouldSetPanResponder: () => !isDisabled,
       onMoveShouldSetPanResponderCapture: () => !isDisabled,
-      onPanResponderGrant: () => {
+      onPanResponderGrant: (_, gestureState) => {
         dragRef.current = {
           itemId: item.id,
           currentIndex: index,
           startIndex: index,
+          startPointerY: gestureState.y0,
           startScrollOffsetY: getScrollOffsetY(),
           snapshotHeights: draft.items.map((draftItem) => rowHeightsRef.current[draftItem.id] ?? theme.layout.controlH),
         };
@@ -1529,7 +1532,12 @@ function ReorderPlaceList({
         }
 
         onDragMove(gestureState.moveY);
-        const dragOffsetY = gestureState.dy + getScrollOffsetY() - dragRef.current.startScrollOffsetY;
+        const dragOffsetY = resolveDayItineraryDragOffsetY({
+          pointerY: gestureState.moveY,
+          startPointerY: dragRef.current.startPointerY,
+          currentScrollOffsetY: getScrollOffsetY(),
+          startScrollOffsetY: dragRef.current.startScrollOffsetY,
+        });
         const targetIndex = resolveDayItineraryDragTargetIndex({
           startIndex: dragRef.current.startIndex,
           dragOffsetY,
