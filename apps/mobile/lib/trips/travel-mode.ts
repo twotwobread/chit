@@ -10,6 +10,8 @@ export const travelModeLabels: Record<TravelMode, string> = {
   driving: '자동차',
 };
 
+export const travelModeDisplayOptions = travelModes.map((mode) => travelModeLabels[mode]);
+
 export const travelModeStorageKey = 'i-um.trips.travel-mode.v1';
 
 export type TravelModeStore = {
@@ -57,6 +59,14 @@ const secureTravelModeStore: TravelModeStore = {
 
 export function isTravelMode(value: unknown): value is TravelMode {
   return typeof value === 'string' && travelModes.includes(value as TravelMode);
+}
+
+export function travelModeDisplayLabel(mode: TravelMode): string {
+  return travelModeLabels[mode];
+}
+
+export function travelModeFromDisplayLabel(label: string): TravelMode | null {
+  return travelModes.find((mode) => travelModeLabels[mode] === label) ?? null;
 }
 
 export function buildTravelModeSelectorViewModel(selectedMode: TravelMode): TravelModeSelectorViewModel {

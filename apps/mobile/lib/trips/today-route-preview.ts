@@ -38,6 +38,8 @@ export type TodayRoutePreviewMapViewModel = {
   };
 };
 
+export const todayRoutePreviewHeroChipFallbackCopy = '경로 정보를 준비 중이에요';
+
 export const todayRoutePreviewLoadingState = (): TodayRoutePreviewState => ({
   status: 'loading',
   message: '경로 미리보기를 준비하고 있어요.',
@@ -85,6 +87,21 @@ export function buildTodayRoutePreviewViewModel(response: RoutePreviewResponse):
 
 export function todayRoutePreviewSuccessState(response: RoutePreviewResponse): TodayRoutePreviewState {
   return { status: 'success', viewModel: buildTodayRoutePreviewViewModel(response) };
+}
+
+export function buildTodayRoutePreviewHeroChip(state: TodayRoutePreviewState): string {
+  if (state.status !== 'success') {
+    return todayRoutePreviewHeroChipFallbackCopy;
+  }
+
+  const modeLabel = state.viewModel.modeLabel.trim();
+  const durationLabel = state.viewModel.durationLabel.trim();
+  const distanceLabel = state.viewModel.distanceLabel.trim();
+  if (!modeLabel || !durationLabel) {
+    return todayRoutePreviewHeroChipFallbackCopy;
+  }
+
+  return distanceLabel ? `${modeLabel} · ${durationLabel} · ${distanceLabel}` : `${modeLabel} · ${durationLabel}`;
 }
 
 export function todayRoutePreviewCacheKey({

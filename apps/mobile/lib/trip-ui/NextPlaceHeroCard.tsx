@@ -20,14 +20,26 @@ export type NextPlaceHeroCardProps = {
   routeChip?: string;
   onNavigate: () => void;
   onArrive: () => void;
+  arriveDisabled?: boolean;
+  arriveLabel?: string;
   onSkip: () => void;
+  skipDisabled?: boolean;
+  skipLabel?: string;
   onLodging: () => void;
+  lodgingDisabled?: boolean;
+  lodgingHelper?: string;
+  lodgingLabel?: string;
 };
 
 const DEFAULT_TRAVEL_OPTIONS = ['대중교통', '도보', '자동차'];
 const ROUTE_FALLBACK_COPY = '경로 정보를 준비 중이에요';
 
 export function NextPlaceHeroCard({
+  arriveDisabled = false,
+  arriveLabel = '도착',
+  lodgingDisabled = false,
+  lodgingHelper,
+  lodgingLabel = '숙소로',
   onArrive,
   onLodging,
   onNavigate,
@@ -35,6 +47,8 @@ export function NextPlaceHeroCard({
   onTravelMode,
   place,
   routeChip,
+  skipDisabled = false,
+  skipLabel = '건너뛰기',
   travelMode,
   travelOptions = DEFAULT_TRAVEL_OPTIONS,
 }: NextPlaceHeroCardProps) {
@@ -95,30 +109,50 @@ export function NextPlaceHeroCard({
         </Pressable>
         <Pressable
           accessibilityRole="button"
+          accessibilityState={{ disabled: arriveDisabled }}
+          disabled={arriveDisabled}
           onPress={onArrive}
-          style={({ pressed }) => [styles.action, styles.actionGreen, pressed ? styles.pressed : null]}
+          style={({ pressed }) => [
+            styles.action,
+            styles.actionGreen,
+            arriveDisabled ? styles.disabled : null,
+            pressed ? styles.pressed : null,
+          ]}
         >
           <Check color={theme.color.onPrimary} size={18} strokeWidth={2.6} />
-          <Text style={[styles.actionText, styles.actionTextLight]}>도착</Text>
+          <Text style={[styles.actionText, styles.actionTextLight]}>{arriveLabel}</Text>
         </Pressable>
       </View>
 
       <View style={styles.subRow}>
         <Pressable
           accessibilityRole="button"
+          accessibilityState={{ disabled: skipDisabled }}
+          disabled={skipDisabled}
           onPress={onSkip}
-          style={({ pressed }) => [styles.subAction, pressed ? styles.pressedDark : null]}
+          style={({ pressed }) => [
+            styles.subAction,
+            skipDisabled ? styles.disabled : null,
+            pressed ? styles.pressedDark : null,
+          ]}
         >
-          <Text style={styles.subActionText}>건너뛰기</Text>
+          <Text style={styles.subActionText}>{skipLabel}</Text>
         </Pressable>
         <Pressable
           accessibilityRole="button"
+          accessibilityState={{ disabled: lodgingDisabled }}
+          disabled={lodgingDisabled}
           onPress={onLodging}
-          style={({ pressed }) => [styles.subAction, pressed ? styles.pressedDark : null]}
+          style={({ pressed }) => [
+            styles.subAction,
+            lodgingDisabled ? styles.disabled : null,
+            pressed ? styles.pressedDark : null,
+          ]}
         >
-          <Text style={styles.subActionText}>숙소로</Text>
+          <Text style={styles.subActionText}>{lodgingLabel}</Text>
         </Pressable>
       </View>
+      {lodgingHelper ? <Text style={styles.lodgingHelper}>{lodgingHelper}</Text> : null}
     </View>
   );
 }
@@ -174,6 +208,9 @@ const styles = StyleSheet.create({
     gap: theme.space[4],
     marginTop: theme.space[2],
   },
+  disabled: {
+    opacity: 0.55,
+  },
   headBody: {
     flex: 1,
   },
@@ -181,6 +218,12 @@ const styles = StyleSheet.create({
     color: theme.color.green[100],
     fontFamily: theme.font.family.regular,
     fontSize: theme.font.size.caption,
+  },
+  lodgingHelper: {
+    color: theme.color.green[100],
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.caption,
+    textAlign: 'center',
   },
   metaRow: {
     alignItems: 'center',

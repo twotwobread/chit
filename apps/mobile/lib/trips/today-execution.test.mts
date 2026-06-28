@@ -313,8 +313,10 @@ test('maps the first ordered itinerary item to the next place without exposing s
     formattedDate: '2026.07.10',
     nextPlace: {
       itemId: 'item-next',
+      order: 1,
       orderLabel: '1',
       placeName: '도톤보리',
+      placeType: 'food',
       placeTypeLabel: '식당',
       address: '1 Chome Dotonbori, Chuo Ward, Osaka',
       routablePlace: null,
@@ -422,6 +424,8 @@ test('selects the first pending itinerary item without exposing later pending pl
   }
 
   assert.equal(viewModel.nextPlace.itemId, 'item-next');
+  assert.equal(viewModel.nextPlace.order, 3);
+  assert.equal(viewModel.nextPlace.placeType, 'food');
   assert.deepEqual(viewModel.nextPlace.navigationAction, {
     kind: 'navigate',
     label: '길찾기',
