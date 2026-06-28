@@ -1,13 +1,13 @@
 ---
 name: i-um-feature-start
-description: Start implementation for an approved i-um feature spec. Use for implementation only, not feature spec/plan drafting or PR-only lifecycle tasks.
+description: Start implementation/fix/debug work for an i-um issue or approved feature spec after light triage. Use for implementation only, not explicit spec/plan drafting or PR-only lifecycle tasks.
 ---
 
-# i-um Feature Start
+# i-um Feature / Issue Start
 
-Use when the user asks to implement/start coding from an approved specific GitHub Issue or feature spec. If the spec/plan was drafted in a feature worktree, continue implementation in that same worktree/branch.
+Use when the user asks to implement, start coding, fix, debug, or resolve a specific GitHub Issue, approved feature spec, or clear small request. If the spec/plan was drafted in a feature worktree, continue implementation in that same worktree/branch.
 
-Do not use this for feature spec/plan drafting; use `i-um-feature-spec-plan` instead.
+Do not use this for explicit feature spec/plan drafting; use `i-um-feature-spec-plan` instead.
 Do not use this for “create/merge PR from an existing worktree”; use `i-um-pr-lifecycle` instead.
 
 ## Required input
@@ -16,15 +16,17 @@ Need at least one:
 
 - GitHub Issue number, e.g. `#42`
 - Feature spec path, e.g. `docs/features/0042-*.md`
+- Clear user-described bug, fix, or small implementation request
 
 If missing, ask before implementation.
 
 ## Minimal reads
 
-1. Target feature spec.
-2. `.pi/rules/feature-implement.md`.
-3. `.pi/rules/worktree.md` if creating/selecting a worktree.
-4. Conditional rules only when needed:
+1. `.pi/rules/task-triage.md` unless the request explicitly targets an approved spec and no routing decision is needed.
+2. Target feature spec when present or linked.
+3. `.pi/rules/feature-implement.md`.
+4. `.pi/rules/worktree.md` if creating/selecting a worktree.
+5. Conditional rules only when needed:
    - API/DB/domain schema: `.pi/rules/api-db.md`
    - Mobile UI: `.pi/rules/mobile-ui.md`
    - Testing/verification: `.pi/rules/testing.md`
@@ -41,34 +43,42 @@ Do not read delivery/DoD/testing umbrella docs. Read `docs/decisions/` only when
    - `git rev-parse --show-toplevel`
    - Do not overwrite unrelated user changes.
 
-2. Spec/plan drafting guard
-   - If the current request is to create or substantially revise a feature spec/implementation plan, stop this implementation flow and use `i-um-feature-spec-plan`.
-   - Do not draft from issue text alone unless the user explicitly waived Ouroboros in the spec/plan workflow.
+2. Request routing guard
+   - If the current request explicitly asks to create or substantially revise a feature spec/implementation plan, stop this implementation flow and use `i-um-feature-spec-plan`.
+   - Do not trust the words “bug”, “feature”, or “simple” as the final classification; use `.pi/rules/task-triage.md` when no approved spec already defines the work.
+   - Do not run Ouroboros or start spec drafting unless the user asked for it or approves a spec escalation.
 
 3. Resolve issue/spec
    - If an issue number is provided, inspect with `gh issue view <number> --comments` when useful.
    - Prefer the spec linked from the issue.
-   - Otherwise resolve `docs/features/NNNN-*.md`.
-   - If no spec exists, stop and ask whether to create one with `i-um-feature-spec-plan` first.
+   - Otherwise resolve `docs/features/NNNN-*.md` when the request clearly points to one.
+   - If no spec exists, do not automatically stop; apply task triage to choose no-spec fast path, technical investigation, or spec escalation.
 
-4. Readiness gate
-   - Stop if scope/API/DB/UI/acceptance criteria are ambiguous.
-   - Stop if open questions block implementation.
-   - Stop if the request conflicts with the spec.
+4. Triage decision
+   - Approved spec: implement the spec only.
+   - No-spec fast path: state the expected behavior and focused verification target, then make the minimal fix.
+   - Technical investigation path: share a short investigation plan or hypothesis, then keep debugging narrowly.
+   - Spec escalation: pause, summarize why no-spec is risky, recommend `i-um-feature-spec-plan`, and ask before switching.
 
-5. Worktree
-   - Prefer the existing feature worktree/branch that contains or is meant to contain the target spec.
+5. Readiness gate
+   - Stop if scope/API/DB/UI/acceptance criteria are ambiguous in a way that blocks safe implementation.
+   - Stop if open questions require product/domain decisions.
+   - Stop if the request conflicts with an existing spec, contract, or decision.
+   - Re-triage if implementation reveals any spec escalation trigger.
+
+6. Worktree
+   - Prefer the existing feature/issue worktree/branch that contains or is meant to contain the target spec or fix.
    - Do not create a second implementation branch/worktree when the spec was drafted on an unmerged feature branch.
-   - If no matching feature worktree exists, use `.pi/bin/worktree-create` from the repository root while the root remains on `develop`.
-   - Continue all implementation inside the selected `.worktrees/*` path so spec/plan and implementation stay in one PR by default.
+   - If no matching worktree exists and the change is PR-sized, use `.pi/bin/worktree-create` from the repository root while the root remains on `develop`.
+   - Continue all implementation inside the selected `.worktrees/*` path.
 
-6. Implement
-   - Follow the target spec only.
+7. Implement
+   - Follow the target spec when one exists; otherwise stay within the triaged scope.
    - API changes start from OpenAPI.
    - DB changes use migrations.
    - Mobile uses generated API client/types when available.
    - Add tests for changed behavior or record a gap.
 
-7. Complete
+8. Complete
    - Read `.pi/rules/completion-report.md` before the final report.
-   - Report changed behavior, verification commands/results, manual smoke/deploy status, and gaps.
+   - Report changed behavior, triage route, verification commands/results, manual smoke/deploy status, and gaps.
