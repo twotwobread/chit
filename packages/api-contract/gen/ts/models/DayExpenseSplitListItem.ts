@@ -2,9 +2,10 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
+import type { ExpenseParticipantDisplay } from './ExpenseParticipantDisplay';
 export type DayExpenseSplitListItem = {
     splitOrder: number;
-    displayName: string;
+    participant: ExpenseParticipantDisplay;
     amountMinor: number;
 };
 

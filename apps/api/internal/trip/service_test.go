@@ -345,20 +345,23 @@ func (r *fakeRepository) CreateQuickExpense(_ context.Context, record CreateQuic
 	tripDayID := record.TripDayID
 	placeID := testUUID(8001)
 	payerID := record.PayerParticipantID
+	placeAddress := "Dotonbori"
+	placeType := "food"
 	return CreateQuickExpenseResult{Expense: Expense{
-		ID:                 testUUID(9001),
-		TripID:             record.TripID,
-		AnchorType:         "schedule_item",
-		TripDayID:          &tripDayID,
-		ScheduleItemID:     &itemID,
-		TripPlaceID:        &placeID,
-		Place:              ExpensePlaceSnapshot{Name: "도톤보리", Address: "Dotonbori", PlaceType: "food"},
-		AmountMinor:        record.AmountMinor,
-		Currency:           r.trip.DefaultCurrency,
-		PayerParticipantID: &payerID,
-		PayerDisplayName:   "민수",
-		Splits:             []ExpenseSplit{{ParticipantID: &payerID, DisplayName: "민수", AmountMinor: record.AmountMinor}},
-		CreatedAt:          time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC),
+		ID:             testUUID(9001),
+		TripID:         record.TripID,
+		AnchorType:     "schedule_item",
+		TripDayID:      &tripDayID,
+		ScheduleItemID: &itemID,
+		ExpenseDate:    "2026-07-10",
+		DisplayTitle:   "도톤보리",
+		Place:          &ExpensePlaceDisplay{TripPlaceID: &placeID, Name: "도톤보리", Address: &placeAddress, PlaceType: &placeType, Source: ExpenseDisplaySourceLive},
+		AmountMinor:    record.AmountMinor,
+		Currency:       r.trip.DefaultCurrency,
+		Payer:          ExpenseParticipantDisplay{ParticipantID: &payerID, DisplayName: "민수", Source: ExpenseDisplaySourceLive},
+		SplitPolicy:    ExpenseSplitPolicyEqual,
+		Splits:         []ExpenseSplit{{Participant: ExpenseParticipantDisplay{ParticipantID: &payerID, DisplayName: "민수", Source: ExpenseDisplaySourceLive}, AmountMinor: record.AmountMinor}},
+		CreatedAt:      time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC),
 	}}, nil
 }
 
@@ -1294,13 +1297,18 @@ func TestServiceListDayExpenses(t *testing.T) {
 		isParticipant: true,
 		dayExpenses: []DayExpenseListItem{
 			{
-				ID:               testUUID(9002),
-				Place:            ExpensePlaceSnapshot{Name: "라멘", Address: "Dotonbori", PlaceType: "food"},
-				AmountMinor:      1200,
-				Currency:         "JPY",
-				PayerDisplayName: "민수",
-				Splits:           []DayExpenseSplitListItem{{SplitOrder: 1, DisplayName: "민수", AmountMinor: 600}, {SplitOrder: 2, DisplayName: "지아", AmountMinor: 600}},
-				CreatedAt:        createdAt,
+				ID:           testUUID(9002),
+				DisplayTitle: "라멘",
+				Place:        &ExpensePlaceDisplay{Name: "라멘", Source: ExpenseDisplaySourceLive},
+				AmountMinor:  1200,
+				Currency:     "JPY",
+				Payer:        ExpenseParticipantDisplay{DisplayName: "민수", Source: ExpenseDisplaySourceLive},
+				SplitPolicy:  ExpenseSplitPolicyEqual,
+				Splits: []DayExpenseSplitListItem{
+					{SplitOrder: 1, Participant: ExpenseParticipantDisplay{DisplayName: "민수", Source: ExpenseDisplaySourceLive}, AmountMinor: 600},
+					{SplitOrder: 2, Participant: ExpenseParticipantDisplay{DisplayName: "지아", Source: ExpenseDisplaySourceLive}, AmountMinor: 600},
+				},
+				CreatedAt: createdAt,
 			},
 		},
 	}
@@ -1313,7 +1321,7 @@ func TestServiceListDayExpenses(t *testing.T) {
 	if !repo.listDayExpensesCalled || repo.listedDayExpensesTripID != testTripID || repo.listedDayExpensesDate != "2026-07-10" {
 		t.Fatalf("expected list repository call, got trip=%q date=%q called=%v", repo.listedDayExpensesTripID, repo.listedDayExpensesDate, repo.listDayExpensesCalled)
 	}
-	if len(result.Expenses) != 1 || result.Expenses[0].ID != testUUID(9002) || result.Expenses[0].Place.Name != "라멘" || result.Expenses[0].PayerDisplayName != "민수" || len(result.Expenses[0].Splits) != 2 || !result.Expenses[0].CreatedAt.Equal(createdAt) {
+	if len(result.Expenses) != 1 || result.Expenses[0].ID != testUUID(9002) || result.Expenses[0].Place == nil || result.Expenses[0].Place.Name != "라멘" || result.Expenses[0].Payer.DisplayName != "민수" || len(result.Expenses[0].Splits) != 2 || !result.Expenses[0].CreatedAt.Equal(createdAt) {
 		t.Fatalf("unexpected day expense result: %#v", result)
 	}
 }

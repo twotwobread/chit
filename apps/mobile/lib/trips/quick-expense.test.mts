@@ -342,8 +342,8 @@ test('hides split preview for invalid amount and reports missing participants fo
 
 test('builds saved split summary from server response splits', () => {
   const splits: ExpenseSplit[] = [
-    { participantId: 'participant-a', displayName: ' 민수 ', amountMinor: 334 },
-    { participantId: null, displayName: '', amountMinor: 333 },
+    { participant: { participantId: 'participant-a', displayName: ' 민수 ', source: 'live' }, amountMinor: 334 },
+    { participant: { participantId: null, displayName: '', source: 'fallback' }, amountMinor: 333 },
   ];
 
   assert.deepEqual(buildSavedEqualSplitSummary({ amountMinor: 667, currency: 'JPY', splits }), {

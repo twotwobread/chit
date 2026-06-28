@@ -1893,19 +1893,33 @@ func TestListDayExpensesHandler(t *testing.T) {
 	responseBody := recorder.Body.Bytes()
 	var body struct {
 		Expenses []struct {
-			ID               string `json:"id"`
-			AmountMinor      int64  `json:"amountMinor"`
-			Currency         string `json:"currency"`
-			PayerDisplayName string `json:"payerDisplayName"`
-			Place            struct {
-				Name      string `json:"name"`
-				Address   string `json:"address"`
-				PlaceType string `json:"placeType"`
+			ID             string `json:"id"`
+			AnchorType     string `json:"anchorType"`
+			DisplayTitle   string `json:"displayTitle"`
+			ScheduleItemID string `json:"scheduleItemId"`
+			AmountMinor    int64  `json:"amountMinor"`
+			Currency       string `json:"currency"`
+			SplitPolicy    string `json:"splitPolicy"`
+			Payer          struct {
+				ParticipantID string `json:"participantId"`
+				DisplayName   string `json:"displayName"`
+				Source        string `json:"source"`
+			} `json:"payer"`
+			Place struct {
+				TripPlaceID string `json:"tripPlaceId"`
+				Name        string `json:"name"`
+				Address     string `json:"address"`
+				PlaceType   string `json:"placeType"`
+				Source      string `json:"source"`
 			} `json:"place"`
 			Splits []struct {
-				SplitOrder  int    `json:"splitOrder"`
-				DisplayName string `json:"displayName"`
-				AmountMinor int64  `json:"amountMinor"`
+				SplitOrder  int `json:"splitOrder"`
+				Participant struct {
+					ParticipantID string `json:"participantId"`
+					DisplayName   string `json:"displayName"`
+					Source        string `json:"source"`
+				} `json:"participant"`
+				AmountMinor int64 `json:"amountMinor"`
 			} `json:"splits"`
 			CreatedAt string `json:"createdAt"`
 		} `json:"expenses"`
@@ -1919,10 +1933,10 @@ func TestListDayExpensesHandler(t *testing.T) {
 	if body.Expenses[0].AmountMinor != 2000 || body.Expenses[1].AmountMinor != 1001 {
 		t.Fatalf("expected newest-first expenses, got %#v", body.Expenses)
 	}
-	if body.Expenses[0].Place.Name != "도톤보리" || body.Expenses[0].Currency != "JPY" || body.Expenses[0].PayerDisplayName != "민수" {
-		t.Fatalf("unexpected display snapshot: %#v", body.Expenses[0])
+	if body.Expenses[0].Place.Name != "도톤보리" || body.Expenses[0].Place.Source != "live" || body.Expenses[0].DisplayTitle != "도톤보리" || body.Expenses[0].Currency != "JPY" || body.Expenses[0].Payer.DisplayName != "민수" || body.Expenses[0].Payer.Source != "live" || body.Expenses[0].SplitPolicy != "equal" {
+		t.Fatalf("unexpected canonical display: %#v", body.Expenses[0])
 	}
-	if len(body.Expenses[0].Splits) != 2 || body.Expenses[0].Splits[0].SplitOrder != 1 || body.Expenses[0].Splits[0].DisplayName != "민수" || body.Expenses[0].Splits[1].SplitOrder != 2 || body.Expenses[0].Splits[1].DisplayName != "지영" {
+	if len(body.Expenses[0].Splits) != 2 || body.Expenses[0].Splits[0].SplitOrder != 1 || body.Expenses[0].Splits[0].Participant.DisplayName != "민수" || body.Expenses[0].Splits[1].SplitOrder != 2 || body.Expenses[0].Splits[1].Participant.DisplayName != "지영" {
 		t.Fatalf("unexpected split rows: %#v", body.Expenses[0].Splits)
 	}
 
@@ -1932,7 +1946,7 @@ func TestListDayExpensesHandler(t *testing.T) {
 	if err := json.Unmarshal(responseBody, &rawBody); err != nil {
 		t.Fatalf("decode raw list response: %v", err)
 	}
-	for _, field := range []string{"scheduleItemId", "tripPlaceId", "payerParticipantId"} {
+	for _, field := range []string{"tripPlaceId", "payerParticipantId", "payerDisplayName"} {
 		if _, ok := rawBody.Expenses[0][field]; ok {
 			t.Fatalf("expected list item not to expose nullable source field %q: %#v", field, rawBody.Expenses[0])
 		}
@@ -2044,39 +2058,48 @@ func TestCreateQuickExpenseHandler(t *testing.T) {
 
 	var body struct {
 		Expense struct {
-			TripID             string `json:"tripId"`
-			TripDayID          string `json:"tripDayId"`
-			ScheduleItemID     string `json:"scheduleItemId"`
-			TripPlaceID        string `json:"tripPlaceId"`
-			AmountMinor        int64  `json:"amountMinor"`
-			Currency           string `json:"currency"`
-			PayerParticipantID string `json:"payerParticipantId"`
-			PayerDisplayName   string `json:"payerDisplayName"`
-			Place              struct {
-				Name      string `json:"name"`
-				Address   string `json:"address"`
-				PlaceType string `json:"placeType"`
-			} `json:"place"`
-			Splits []struct {
+			TripID         string `json:"tripId"`
+			TripDayID      string `json:"tripDayId"`
+			ScheduleItemID string `json:"scheduleItemId"`
+			DisplayTitle   string `json:"displayTitle"`
+			AmountMinor    int64  `json:"amountMinor"`
+			Currency       string `json:"currency"`
+			SplitPolicy    string `json:"splitPolicy"`
+			Payer          struct {
 				ParticipantID string `json:"participantId"`
 				DisplayName   string `json:"displayName"`
-				AmountMinor   int64  `json:"amountMinor"`
+				Source        string `json:"source"`
+			} `json:"payer"`
+			Place struct {
+				TripPlaceID string `json:"tripPlaceId"`
+				Name        string `json:"name"`
+				Address     string `json:"address"`
+				PlaceType   string `json:"placeType"`
+				Source      string `json:"source"`
+			} `json:"place"`
+			Splits []struct {
+				Participant struct {
+					ParticipantID string `json:"participantId"`
+					DisplayName   string `json:"displayName"`
+					Source        string `json:"source"`
+				} `json:"participant"`
+				AmountMinor int64 `json:"amountMinor"`
 			} `json:"splits"`
 		} `json:"expense"`
 	}
 	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if body.Expense.TripID != tripID || body.Expense.TripDayID != "2026-07-11" || body.Expense.ScheduleItemID != item.ID || body.Expense.TripPlaceID != item.PlaceID {
+	if body.Expense.TripID != tripID || body.Expense.TripDayID != "2026-07-11" || body.Expense.ScheduleItemID != item.ID || body.Expense.Place.TripPlaceID != item.PlaceID {
 		t.Fatalf("unexpected linked expense ids: %#v", body.Expense)
 	}
-	if body.Expense.AmountMinor != 1001 || body.Expense.Currency != "JPY" || body.Expense.PayerParticipantID != payerID || body.Expense.PayerDisplayName != "민수" {
-		t.Fatalf("unexpected money/payer snapshot: %#v", body.Expense)
+	if body.Expense.AmountMinor != 1001 || body.Expense.Currency != "JPY" || body.Expense.SplitPolicy != "equal" || body.Expense.Payer.ParticipantID != payerID || body.Expense.Payer.DisplayName != "민수" || body.Expense.Payer.Source != "live" {
+		t.Fatalf("unexpected money/payer display: %#v", body.Expense)
 	}
-	if body.Expense.Place.Name != "도톤보리" || body.Expense.Place.Address != "Dotonbori" || body.Expense.Place.PlaceType != "food" {
-		t.Fatalf("unexpected place snapshot: %#v", body.Expense.Place)
+	if body.Expense.DisplayTitle != "도톤보리" || body.Expense.Place.Name != "도톤보리" || body.Expense.Place.Address != "Dotonbori" || body.Expense.Place.PlaceType != "food" || body.Expense.Place.Source != "live" {
+		t.Fatalf("unexpected place display: %#v", body.Expense.Place)
 	}
-	if len(body.Expense.Splits) != 1 || body.Expense.Splits[0].ParticipantID != member.ID || body.Expense.Splits[0].AmountMinor != 1001 {
+	if len(body.Expense.Splits) != 1 || body.Expense.Splits[0].Participant.ParticipantID != member.ID || body.Expense.Splits[0].Participant.DisplayName != "지영" || body.Expense.Splits[0].AmountMinor != 1001 {
 		t.Fatalf("unexpected payer-excluded one-person split: %#v", body.Expense.Splits)
 	}
 }
@@ -2144,11 +2167,12 @@ func TestCreateQuickExpenseLinksRepeatedPlaceByScheduleItemOccurrence(t *testing
 	var body struct {
 		Expense struct {
 			ScheduleItemID string `json:"scheduleItemId"`
-			TripPlaceID    string `json:"tripPlaceId"`
 			Place          struct {
-				Name      string `json:"name"`
-				Address   string `json:"address"`
-				PlaceType string `json:"placeType"`
+				TripPlaceID string `json:"tripPlaceId"`
+				Name        string `json:"name"`
+				Address     string `json:"address"`
+				PlaceType   string `json:"placeType"`
+				Source      string `json:"source"`
 			} `json:"place"`
 		} `json:"expense"`
 	}
@@ -2158,11 +2182,11 @@ func TestCreateQuickExpenseLinksRepeatedPlaceByScheduleItemOccurrence(t *testing
 	if body.Expense.ScheduleItemID != second.ID || body.Expense.ScheduleItemID == first.ID {
 		t.Fatalf("expected expense to link to second occurrence %q, got %#v", second.ID, body.Expense)
 	}
-	if body.Expense.TripPlaceID != second.PlaceID {
+	if body.Expense.Place.TripPlaceID != second.PlaceID {
 		t.Fatalf("expected derived shared trip place %q, got %#v", second.PlaceID, body.Expense)
 	}
-	if body.Expense.Place.Name != "호텔 니코 오사카" || body.Expense.Place.Address != "Nishi-Shinsaibashi" || body.Expense.Place.PlaceType != "lodging" {
-		t.Fatalf("unexpected place snapshot: %#v", body.Expense.Place)
+	if body.Expense.Place.Name != "호텔 니코 오사카" || body.Expense.Place.Address != "Nishi-Shinsaibashi" || body.Expense.Place.PlaceType != "lodging" || body.Expense.Place.Source != "live" {
+		t.Fatalf("unexpected place display: %#v", body.Expense.Place)
 	}
 }
 
@@ -4238,9 +4262,8 @@ func (b *fakeAuthBackend) CreateQuickExpense(_ context.Context, record tripdomai
 	for _, splitRecord := range splitRecords {
 		participantID := splitRecord.ParticipantID
 		splits = append(splits, tripdomain.ExpenseSplit{
-			ParticipantID: &participantID,
-			DisplayName:   splitRecord.ParticipantDisplayName,
-			AmountMinor:   splitRecord.AmountMinor,
+			Participant: tripdomain.ExpenseParticipantDisplay{ParticipantID: &participantID, DisplayName: splitRecord.ParticipantDisplayName, Source: tripdomain.ExpenseDisplaySourceLive},
+			AmountMinor: splitRecord.AmountMinor,
 		})
 	}
 
@@ -4250,43 +4273,52 @@ func (b *fakeAuthBackend) CreateQuickExpense(_ context.Context, record tripdomai
 	payerParticipantID := payer.ID
 	expenseID := testUUID(9000 + b.nextExpense)
 	createdAt := time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC).Add(time.Duration(b.nextExpense) * time.Minute)
-	placeSnapshot := tripdomain.ExpensePlaceSnapshot{Name: foundItem.Place.Name, Address: foundItem.Place.Address, PlaceType: foundItem.Place.PlaceType}
-	payerDisplayName := tripdomain.NormalizeParticipantDisplayName(payer.DisplayName)
+	placeAddress := foundItem.Place.Address
+	placeType := foundItem.Place.PlaceType
+	placeDisplay := &tripdomain.ExpensePlaceDisplay{TripPlaceID: &tripPlaceID, Name: foundItem.Place.Name, Address: &placeAddress, PlaceType: &placeType, Source: tripdomain.ExpenseDisplaySourceLive}
+	payerDisplay := tripdomain.ExpenseParticipantDisplay{ParticipantID: &payerParticipantID, DisplayName: tripdomain.NormalizeParticipantDisplayName(payer.DisplayName), Source: tripdomain.ExpenseDisplaySourceLive}
 
 	daySplits := make([]tripdomain.DayExpenseSplitListItem, 0, len(splitRecords))
 	for _, splitRecord := range splitRecords {
+		participantID := splitRecord.ParticipantID
 		daySplits = append(daySplits, tripdomain.DayExpenseSplitListItem{
 			SplitOrder:  splitRecord.SplitOrder,
-			DisplayName: splitRecord.ParticipantDisplayName,
+			Participant: tripdomain.ExpenseParticipantDisplay{ParticipantID: &participantID, DisplayName: splitRecord.ParticipantDisplayName, Source: tripdomain.ExpenseDisplaySourceLive},
 			AmountMinor: splitRecord.AmountMinor,
 		})
 	}
+	tripDayID := record.TripDayID
 	b.dayExpenses[record.TripID+":"+record.TripDayID] = append(b.dayExpenses[record.TripID+":"+record.TripDayID], tripdomain.DayExpenseListItem{
-		ID:               expenseID,
-		Place:            placeSnapshot,
-		AmountMinor:      record.AmountMinor,
-		Currency:         foundTrip.DefaultCurrency,
-		PayerDisplayName: payerDisplayName,
-		Splits:           daySplits,
-		CreatedAt:        createdAt,
+		ID:             expenseID,
+		AnchorType:     "schedule_item",
+		TripDayID:      &tripDayID,
+		ScheduleItemID: &scheduleItemID,
+		ExpenseDate:    "2026-07-10",
+		DisplayTitle:   foundItem.Place.Name,
+		Place:          placeDisplay,
+		AmountMinor:    record.AmountMinor,
+		Currency:       foundTrip.DefaultCurrency,
+		Payer:          payerDisplay,
+		SplitPolicy:    tripdomain.ExpenseSplitPolicyEqual,
+		Splits:         daySplits,
+		CreatedAt:      createdAt,
 	})
 
-	tripDayID := record.TripDayID
 	return tripdomain.CreateQuickExpenseResult{Expense: tripdomain.Expense{
-		ID:                 expenseID,
-		TripID:             record.TripID,
-		AnchorType:         "schedule_item",
-		TripDayID:          &tripDayID,
-		ScheduleItemID:     &scheduleItemID,
-		ExpenseDate:        "2026-07-10",
-		TripPlaceID:        &tripPlaceID,
-		Place:              placeSnapshot,
-		AmountMinor:        record.AmountMinor,
-		Currency:           foundTrip.DefaultCurrency,
-		PayerParticipantID: &payerParticipantID,
-		PayerDisplayName:   payerDisplayName,
-		Splits:             splits,
-		CreatedAt:          createdAt,
+		ID:             expenseID,
+		TripID:         record.TripID,
+		AnchorType:     "schedule_item",
+		TripDayID:      &tripDayID,
+		ScheduleItemID: &scheduleItemID,
+		ExpenseDate:    "2026-07-10",
+		DisplayTitle:   foundItem.Place.Name,
+		Place:          placeDisplay,
+		AmountMinor:    record.AmountMinor,
+		Currency:       foundTrip.DefaultCurrency,
+		Payer:          payerDisplay,
+		SplitPolicy:    tripdomain.ExpenseSplitPolicyEqual,
+		Splits:         splits,
+		CreatedAt:      createdAt,
 	}}, nil
 }
 

@@ -242,8 +242,8 @@ export function buildSavedEqualSplitSummary({
   return {
     amountLabel: formatMoney(amountMinor, currency),
     splitRows: splits.map((split) => ({
-      participantId: split.participantId,
-      displayName: normalizeParticipantDisplayName(split.displayName),
+      participantId: split.participant.participantId,
+      displayName: normalizeParticipantDisplayName(split.participant.displayName),
       amountMinor: split.amountMinor,
       amountLabel: formatMoney(split.amountMinor, currency),
     })),

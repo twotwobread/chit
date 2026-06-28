@@ -2217,26 +2217,50 @@ components:
       additionalProperties: false
       required:
         - id
+        - anchorType
+        - tripDayId
+        - scheduleItemId
+        - expenseDate
+        - displayTitle
         - place
         - amountMinor
         - currency
-        - payerDisplayName
+        - payer
+        - splitPolicy
         - splits
         - createdAt
       properties:
         id:
           type: string
+        anchorType:
+          $ref: '#/components/schemas/ExpenseAnchorType'
+        tripDayId:
+          type: string
+          nullable: true
+        scheduleItemId:
+          type: string
+          nullable: true
+        expenseDate:
+          type: string
+          format: date
+        displayTitle:
+          type: string
+          minLength: 1
+          description: User-facing title resolved by the server. For current schedule-item quick expenses this is the linked place/schedule display name or fallback place name.
         place:
-          $ref: '#/components/schemas/ExpensePlaceSnapshot'
+          allOf:
+            - $ref: '#/components/schemas/ExpensePlaceDisplay'
+          nullable: true
         amountMinor:
           type: integer
           format: int64
           minimum: 1
         currency:
           $ref: '#/components/schemas/SupportedCurrency'
-        payerDisplayName:
-          type: string
-          minLength: 1
+        payer:
+          $ref: '#/components/schemas/ExpenseParticipantDisplay'
+        splitPolicy:
+          $ref: '#/components/schemas/ExpenseSplitPolicy'
         splits:
           type: array
           items:
@@ -2249,15 +2273,14 @@ components:
       additionalProperties: false
       required:
         - splitOrder
-        - displayName
+        - participant
         - amountMinor
       properties:
         splitOrder:
           type: integer
           minimum: 1
-        displayName:
-          type: string
-          minLength: 1
+        participant:
+          $ref: '#/components/schemas/ExpenseParticipantDisplay'
         amountMinor:
           type: integer
           format: int64
@@ -2291,6 +2314,7 @@ components:
           description: Current accepted trip participants selected as equal split targets.
     CreateQuickExpenseResponse:
       type: object
+      additionalProperties: false
       required:
         - expense
       properties:
@@ -2298,6 +2322,7 @@ components:
           $ref: '#/components/schemas/Expense'
     Expense:
       type: object
+      additionalProperties: false
       required:
         - id
         - tripId
@@ -2305,12 +2330,12 @@ components:
         - tripDayId
         - scheduleItemId
         - expenseDate
-        - tripPlaceId
+        - displayTitle
         - place
         - amountMinor
         - currency
-        - payerParticipantId
-        - payerDisplayName
+        - payer
+        - splitPolicy
         - splits
         - createdAt
       properties:
@@ -2319,11 +2344,7 @@ components:
         tripId:
           type: string
         anchorType:
-          type: string
-          enum:
-            - trip
-            - trip_day
-            - schedule_item
+          $ref: '#/components/schemas/ExpenseAnchorType'
         tripDayId:
           type: string
           nullable: true
@@ -2334,22 +2355,24 @@ components:
         expenseDate:
           type: string
           format: date
-        tripPlaceId:
+        displayTitle:
           type: string
-          nullable: true
-          description: Source trip place. Present at creation; may become null later if the source place is deleted and history is retained.
+          minLength: 1
+          description: User-facing title resolved by the server.
         place:
-          $ref: '#/components/schemas/ExpensePlaceSnapshot'
+          allOf:
+            - $ref: '#/components/schemas/ExpensePlaceDisplay'
+          nullable: true
         amountMinor:
           type: integer
           format: int64
+          minimum: 1
         currency:
           $ref: '#/components/schemas/SupportedCurrency'
-        payerParticipantId:
-          type: string
-          nullable: true
-        payerDisplayName:
-          type: string
+        payer:
+          $ref: '#/components/schemas/ExpenseParticipantDisplay'
+        splitPolicy:
+          $ref: '#/components/schemas/ExpenseSplitPolicy'
         splits:
           type: array
           items:
@@ -2357,31 +2380,73 @@ components:
         createdAt:
           type: string
           format: date-time
-    ExpensePlaceSnapshot:
+    ExpenseAnchorType:
+      type: string
+      enum:
+        - trip
+        - trip_day
+        - schedule_item
+    ExpenseDisplaySource:
+      type: string
+      enum:
+        - live
+        - fallback
+      description: Display value source for diagnostics and tests. Do not render this as user-visible copy.
+    ExpenseSplitPolicy:
+      type: string
+      enum:
+        - equal
+      description: Persisted split policy for current quick expenses. Future custom split support may add enum values.
+    ExpensePlaceDisplay:
       type: object
+      additionalProperties: false
       required:
+        - tripPlaceId
         - name
         - address
         - placeType
+        - source
       properties:
+        tripPlaceId:
+          type: string
+          nullable: true
         name:
           type: string
+          minLength: 1
         address:
           type: string
+          nullable: true
         placeType:
-          $ref: '#/components/schemas/TripPlaceType'
-    ExpenseSplit:
+          allOf:
+            - $ref: '#/components/schemas/TripPlaceType'
+          nullable: true
+        source:
+          $ref: '#/components/schemas/ExpenseDisplaySource'
+    ExpenseParticipantDisplay:
       type: object
+      additionalProperties: false
       required:
         - participantId
         - displayName
-        - amountMinor
+        - source
       properties:
         participantId:
           type: string
           nullable: true
         displayName:
           type: string
+          minLength: 1
+        source:
+          $ref: '#/components/schemas/ExpenseDisplaySource'
+    ExpenseSplit:
+      type: object
+      additionalProperties: false
+      required:
+        - participant
+        - amountMinor
+      properties:
+        participant:
+          $ref: '#/components/schemas/ExpenseParticipantDisplay'
         amountMinor:
           type: integer
           format: int64

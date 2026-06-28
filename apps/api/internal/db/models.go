@@ -52,11 +52,12 @@ type Expense struct {
 	ScheduleItemID     pgtype.UUID
 	ExpenseDate        pgtype.Date
 	TripPlaceID        pgtype.UUID
-	PlaceName          string
-	PlaceAddress       string
-	PlaceType          string
+	PlaceName          pgtype.Text
+	PlaceAddress       pgtype.Text
+	PlaceType          pgtype.Text
 	AmountMinor        int64
 	Currency           string
+	SplitPolicy        string
 	PayerParticipantID pgtype.UUID
 	PayerDisplayName   string
 	CreatedBy          pgtype.UUID

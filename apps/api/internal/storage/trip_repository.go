@@ -623,17 +623,19 @@ func (s *Store) ListDayExpensesByTripDay(ctx context.Context, tripID string, tri
 		expenseIDs = append(expenseIDs, mustUUID(expenseRow.ID))
 		expenseIndexByID[expenseRow.ID] = len(expenses)
 		expenses = append(expenses, trip.DayExpenseListItem{
-			ID: expenseRow.ID,
-			Place: trip.ExpensePlaceSnapshot{
-				Name:      expenseRow.PlaceName,
-				Address:   expenseRow.PlaceAddress,
-				PlaceType: expenseRow.PlaceType,
-			},
-			AmountMinor:      expenseRow.AmountMinor,
-			Currency:         expenseRow.Currency,
-			PayerDisplayName: expenseRow.PayerDisplayName,
-			Splits:           []trip.DayExpenseSplitListItem{},
-			CreatedAt:        expenseRow.CreatedAt.Time,
+			ID:             expenseRow.ID,
+			AnchorType:     expenseRow.AnchorType,
+			TripDayID:      optionalString(expenseRow.TripDayID),
+			ScheduleItemID: optionalString(expenseRow.ScheduleItemID),
+			ExpenseDate:    dateString(expenseRow.ExpenseDate),
+			DisplayTitle:   expenseRow.DisplayTitle,
+			Place:          expensePlaceDisplay(expenseRow.TripPlaceID, expenseRow.PlaceName, expenseRow.PlaceAddress, expenseRow.PlaceType, expenseRow.PlaceSource),
+			AmountMinor:    expenseRow.AmountMinor,
+			Currency:       expenseRow.Currency,
+			Payer:          expenseParticipantDisplay(expenseRow.PayerParticipantID, expenseRow.PayerDisplayName, expenseRow.PayerSource),
+			SplitPolicy:    expenseRow.SplitPolicy,
+			Splits:         []trip.DayExpenseSplitListItem{},
+			CreatedAt:      expenseRow.CreatedAt.Time,
 		})
 	}
 
@@ -648,7 +650,7 @@ func (s *Store) ListDayExpensesByTripDay(ctx context.Context, tripID string, tri
 		}
 		expenses[expenseIndex].Splits = append(expenses[expenseIndex].Splits, trip.DayExpenseSplitListItem{
 			SplitOrder:  int(splitRow.SplitOrder),
-			DisplayName: splitRow.ParticipantDisplayName,
+			Participant: expenseParticipantDisplay(splitRow.ParticipantID, splitRow.ParticipantDisplayName, splitRow.ParticipantSource),
 			AmountMinor: splitRow.AmountMinor,
 		})
 	}
@@ -723,11 +725,12 @@ func (s *Store) CreateQuickExpense(ctx context.Context, record trip.CreateQuickE
 		ScheduleItemID:     mustUUID(itemRow.ScheduleItemID),
 		ExpenseDate:        itemRow.TripDayDate,
 		TripPlaceID:        mustUUID(itemRow.TripPlaceID),
-		PlaceName:          itemRow.PlaceName,
-		PlaceAddress:       itemRow.PlaceAddress,
-		PlaceType:          itemRow.PlaceType,
+		PlaceName:          textValue(itemRow.PlaceName),
+		PlaceAddress:       textValue(itemRow.PlaceAddress),
+		PlaceType:          textValue(itemRow.PlaceType),
 		AmountMinor:        record.AmountMinor,
 		Currency:           tripRow.DefaultCurrency,
+		SplitPolicy:        trip.ExpenseSplitPolicyEqual,
 		PayerParticipantID: mustUUID(payerRow.ID),
 		PayerDisplayName:   trip.NormalizeParticipantDisplayName(payerRow.DisplayName),
 		CreatedBy:          mustUUID(record.CreatedBy),
@@ -756,9 +759,8 @@ func (s *Store) CreateQuickExpense(ctx context.Context, record trip.CreateQuickE
 		}
 		participantID := splitRow.ParticipantID
 		splits = append(splits, trip.ExpenseSplit{
-			ParticipantID: &participantID,
-			DisplayName:   splitRow.ParticipantDisplayName,
-			AmountMinor:   splitRow.AmountMinor,
+			Participant: expenseParticipantDisplay(participantID, splitRow.ParticipantDisplayName, trip.ExpenseDisplaySourceLive),
+			AmountMinor: splitRow.AmountMinor,
 		})
 	}
 
@@ -766,25 +768,21 @@ func (s *Store) CreateQuickExpense(ctx context.Context, record trip.CreateQuickE
 		return trip.CreateQuickExpenseResult{}, err
 	}
 
-	scheduleItemID := expenseRow.ScheduleItemID
-	tripDayID := expenseRow.TripDayID
-	tripPlaceID := expenseRow.TripPlaceID
-	payerParticipantID := expenseRow.PayerParticipantID
 	return trip.CreateQuickExpenseResult{Expense: trip.Expense{
-		ID:                 expenseRow.ID,
-		TripID:             expenseRow.TripID,
-		AnchorType:         expenseRow.AnchorType,
-		TripDayID:          &tripDayID,
-		ScheduleItemID:     &scheduleItemID,
-		ExpenseDate:        dateString(expenseRow.ExpenseDate),
-		TripPlaceID:        &tripPlaceID,
-		Place:              trip.ExpensePlaceSnapshot{Name: expenseRow.PlaceName, Address: expenseRow.PlaceAddress, PlaceType: expenseRow.PlaceType},
-		AmountMinor:        expenseRow.AmountMinor,
-		Currency:           expenseRow.Currency,
-		PayerParticipantID: &payerParticipantID,
-		PayerDisplayName:   expenseRow.PayerDisplayName,
-		Splits:             splits,
-		CreatedAt:          expenseRow.CreatedAt.Time,
+		ID:             expenseRow.ID,
+		TripID:         expenseRow.TripID,
+		AnchorType:     expenseRow.AnchorType,
+		TripDayID:      optionalString(expenseRow.TripDayID),
+		ScheduleItemID: optionalString(expenseRow.ScheduleItemID),
+		ExpenseDate:    dateString(expenseRow.ExpenseDate),
+		DisplayTitle:   expenseRow.PlaceName,
+		Place:          expensePlaceDisplay(expenseRow.TripPlaceID, expenseRow.PlaceName, expenseRow.PlaceAddress, expenseRow.PlaceType, trip.ExpenseDisplaySourceLive),
+		AmountMinor:    expenseRow.AmountMinor,
+		Currency:       expenseRow.Currency,
+		Payer:          expenseParticipantDisplay(expenseRow.PayerParticipantID, expenseRow.PayerDisplayName, trip.ExpenseDisplaySourceLive),
+		SplitPolicy:    expenseRow.SplitPolicy,
+		Splits:         splits,
+		CreatedAt:      expenseRow.CreatedAt.Time,
 	}}, nil
 }
 
@@ -1561,6 +1559,40 @@ func timePtrFromTimestamptz(value pgtype.Timestamptz) *time.Time {
 	}
 	timestamp := value.Time.UTC()
 	return &timestamp
+}
+
+func optionalString(value string) *string {
+	if value == "" {
+		return nil
+	}
+	return &value
+}
+
+func expensePlaceDisplay(tripPlaceID string, name string, address string, placeType string, source string) *trip.ExpensePlaceDisplay {
+	if source == "" || name == "" {
+		return nil
+	}
+	return &trip.ExpensePlaceDisplay{
+		TripPlaceID: optionalString(tripPlaceID),
+		Name:        name,
+		Address:     optionalString(address),
+		PlaceType:   optionalString(placeType),
+		Source:      source,
+	}
+}
+
+func expenseParticipantDisplay(participantID string, displayName string, source string) trip.ExpenseParticipantDisplay {
+	if displayName == "" {
+		displayName = "여행자"
+	}
+	if source == "" {
+		source = trip.ExpenseDisplaySourceFallback
+	}
+	return trip.ExpenseParticipantDisplay{
+		ParticipantID: optionalString(participantID),
+		DisplayName:   displayName,
+		Source:        source,
+	}
 }
 
 func float8Value(value float64) pgtype.Float8 {
