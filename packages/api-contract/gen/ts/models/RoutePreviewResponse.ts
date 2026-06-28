@@ -5,7 +5,7 @@
 import type { RoutePreviewMap } from './RoutePreviewMap';
 import type { RoutePreviewSummary } from './RoutePreviewSummary';
 export type RoutePreviewResponse = {
-    itemId: string;
+    scheduleItemId: string;
     mode: 'transit';
     summary: RoutePreviewSummary;
     map: RoutePreviewMap | null;

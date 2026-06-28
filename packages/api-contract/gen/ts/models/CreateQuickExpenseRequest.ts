@@ -4,9 +4,9 @@
 /* eslint-disable */
 export type CreateQuickExpenseRequest = {
     /**
-     * Required itinerary item for the selected Day. Must belong to tripId/date.
+     * Required schedule item for the selected Day. Must belong to tripId/tripDayId.
      */
-    itineraryItemId: string;
+    scheduleItemId: string;
     /**
      * Positive amount in currency minor units.
      */

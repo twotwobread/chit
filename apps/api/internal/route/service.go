@@ -43,7 +43,7 @@ func NewService(repo Repository, provider Provider, options ...Option) *Service 
 	return service
 }
 
-func (s *Service) CreatePreview(ctx context.Context, userID string, tripID string, date string, itemID string, input PreviewInput) (PreviewResult, error) {
+func (s *Service) CreatePreview(ctx context.Context, userID string, tripID string, tripDayID string, itemID string, input PreviewInput) (PreviewResult, error) {
 	if strings.TrimSpace(userID) == "" {
 		return PreviewResult{}, ErrUnauthorized
 	}
@@ -52,27 +52,28 @@ func (s *Service) CreatePreview(ctx context.Context, userID string, tripID strin
 	}
 
 	tripID = strings.TrimSpace(tripID)
-	date = strings.TrimSpace(date)
+	tripDayID = strings.TrimSpace(tripDayID)
 	itemID = strings.TrimSpace(itemID)
 	if !isUUID(tripID) || !isUUID(itemID) || !validGeoPoint(input.Origin) {
 		return PreviewResult{}, ErrValidation
 	}
-
-	selectedDate, err := time.Parse(dateLayout, date)
-	if err != nil {
-		return PreviewResult{}, ErrValidation
+	if !isUUID(tripDayID) {
+		if _, err := time.Parse(dateLayout, tripDayID); err != nil {
+			return PreviewResult{}, ErrValidation
+		}
 	}
-	if err := s.validateTripDayParticipant(ctx, userID, tripID, selectedDate); err != nil {
+
+	if err := s.validateTripDayParticipant(ctx, userID, tripID, tripDayID); err != nil {
 		return PreviewResult{}, err
 	}
 
-	items, err := s.repo.ListItineraryItemsByTripAndDate(ctx, tripID, selectedDate.Format(dateLayout))
+	items, err := s.repo.ListScheduleItemsByTripDay(ctx, tripID, tripDayID)
 	if err != nil {
 		return PreviewResult{}, err
 	}
 
 	found := false
-	var firstPending *trip.DayItineraryItem
+	var firstPending *trip.ScheduleItem
 	for index := range items {
 		item := items[index]
 		if item.ID == itemID {
@@ -134,7 +135,7 @@ func (s *Service) CreatePreview(ctx context.Context, userID string, tripID strin
 	return result, nil
 }
 
-func (s *Service) validateTripDayParticipant(ctx context.Context, userID string, tripID string, selectedDate time.Time) error {
+func (s *Service) validateTripDayParticipant(ctx context.Context, userID string, tripID string, tripDayID string) error {
 	tripRecord, found, err := s.repo.GetTripByID(ctx, tripID)
 	if err != nil {
 		return err
@@ -149,16 +150,27 @@ func (s *Service) validateTripDayParticipant(ctx context.Context, userID string,
 	if !participant {
 		return ErrForbidden
 	}
-
-	startDate, err := time.Parse(dateLayout, tripRecord.StartDate)
-	if err != nil {
-		return err
+	if !isUUID(tripDayID) {
+		selectedDate, err := time.Parse(dateLayout, tripDayID)
+		if err != nil {
+			return ErrValidation
+		}
+		startDate, err := time.Parse(dateLayout, tripRecord.StartDate)
+		if err != nil {
+			return err
+		}
+		endDate, err := time.Parse(dateLayout, tripRecord.EndDate)
+		if err != nil {
+			return err
+		}
+		if selectedDate.Before(startDate) || selectedDate.After(endDate) {
+			return ErrNotFound
+		}
+		return nil
 	}
-	endDate, err := time.Parse(dateLayout, tripRecord.EndDate)
-	if err != nil {
+	if _, found, err := s.repo.GetActiveTripDayByTripAndID(ctx, tripID, tripDayID); err != nil {
 		return err
-	}
-	if selectedDate.Before(startDate) || selectedDate.After(endDate) {
+	} else if !found {
 		return ErrNotFound
 	}
 	return nil

@@ -44,7 +44,7 @@ import {
   buildDayItineraryReorderDraft,
   buildDayItineraryReorderSuccessViewModel,
   buildDayItineraryReorderSubmitState,
-  buildReorderDayItineraryItemsRequest,
+  buildReorderScheduleItemsRequest,
   dayItineraryReorderFailureState,
   moveDayItineraryReorderItem,
   submitDayItineraryReorder,
@@ -73,12 +73,12 @@ import { manualPlaceTypeOptions } from '../../../../lib/trips/manual-place';
 import { buildDayItineraryAddPlaceSearchRoute } from '../../../../lib/trips/day-itinerary-add-place-navigation';
 import {
   clearDayLodgingPlace,
-  deleteDayItineraryItem,
+  deleteScheduleItem,
   getTripDayItinerary,
   listDayExpenses,
-  reorderDayItineraryItems,
+  reorderScheduleItems,
   setDayLodgingPlace,
-  updateDayItineraryItem,
+  updateScheduleItem,
 } from '../../../../lib/trips/client';
 import {
   buildDayLodgingRowViewModel,
@@ -713,7 +713,7 @@ export default function TripDayItineraryScreen() {
     const submittingState: EditState = { ...editState, status: 'saving', errors: {}, error: undefined };
     setEditState(submittingState);
     try {
-      await updateDayItineraryItem(tripId, date, editState.item.id, validation.request);
+      await updateScheduleItem(tripId, date, editState.item.id, validation.request);
       setEditState({ status: 'idle' });
       await load();
     } catch (error) {
@@ -770,16 +770,14 @@ export default function TripDayItineraryScreen() {
     }
 
     const draft = reorderState.draft;
-    if (!buildReorderDayItineraryItemsRequest(draft)) {
+    if (!buildReorderScheduleItemsRequest(draft)) {
       return;
     }
 
     const submittingState: ReorderState = { ...reorderState, status: 'saving', error: undefined };
     setReorderState(submittingState);
     try {
-      const response = await submitDayItineraryReorder(draft, (request) =>
-        reorderDayItineraryItems(tripId, date, request),
-      );
+      const response = await submitDayItineraryReorder(draft, (request) => reorderScheduleItems(tripId, date, request));
       if (!response) {
         setReorderState({ status: 'editing', draft });
         return;
@@ -940,7 +938,7 @@ export default function TripDayItineraryScreen() {
     const deletingState: DeleteState = { ...deleteState, status: 'deleting', error: undefined };
     setDeleteState(deletingState);
     try {
-      await deleteDayItineraryItem(tripId, date, deleteState.item.id);
+      await deleteScheduleItem(tripId, date, deleteState.item.id);
       await load();
       setDeleteState({ status: 'idle' });
       deleteOriginFocusTargetRef.current = null;

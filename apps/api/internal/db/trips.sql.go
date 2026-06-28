@@ -11,60 +11,63 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const countDayLodgingPlacesByTripPlaceID = `-- name: CountDayLodgingPlacesByTripPlaceID :one
-SELECT count(*)::int AS total_count
-FROM day_lodging_places
+const countScheduleItemsByTripDayAndPlace = `-- name: CountScheduleItemsByTripDayAndPlace :one
+SELECT count(*)::int
+FROM schedule_items
 WHERE trip_id = $1::uuid
-  AND trip_place_id = $2::uuid
+  AND trip_day_id = $2::uuid
+  AND trip_place_id = $3::uuid
+  AND deleted_at IS NULL
 `
 
-type CountDayLodgingPlacesByTripPlaceIDParams struct {
+type CountScheduleItemsByTripDayAndPlaceParams struct {
 	TripID      pgtype.UUID
+	TripDayID   pgtype.UUID
 	TripPlaceID pgtype.UUID
 }
 
-func (q *Queries) CountDayLodgingPlacesByTripPlaceID(ctx context.Context, arg CountDayLodgingPlacesByTripPlaceIDParams) (int32, error) {
-	row := q.db.QueryRow(ctx, countDayLodgingPlacesByTripPlaceID, arg.TripID, arg.TripPlaceID)
-	var total_count int32
-	err := row.Scan(&total_count)
-	return total_count, err
-}
-
-const countItineraryItemsByTripDateAndPlace = `-- name: CountItineraryItemsByTripDateAndPlace :one
-SELECT count(*)::int
-FROM itinerary_items
-WHERE trip_id = $1::uuid
-  AND scheduled_date = $2
-  AND trip_place_id = $3::uuid
-`
-
-type CountItineraryItemsByTripDateAndPlaceParams struct {
-	TripID        pgtype.UUID
-	ScheduledDate pgtype.Date
-	TripPlaceID   pgtype.UUID
-}
-
-func (q *Queries) CountItineraryItemsByTripDateAndPlace(ctx context.Context, arg CountItineraryItemsByTripDateAndPlaceParams) (int32, error) {
-	row := q.db.QueryRow(ctx, countItineraryItemsByTripDateAndPlace, arg.TripID, arg.ScheduledDate, arg.TripPlaceID)
+func (q *Queries) CountScheduleItemsByTripDayAndPlace(ctx context.Context, arg CountScheduleItemsByTripDayAndPlaceParams) (int32, error) {
+	row := q.db.QueryRow(ctx, countScheduleItemsByTripDayAndPlace, arg.TripID, arg.TripDayID, arg.TripPlaceID)
 	var column_1 int32
 	err := row.Scan(&column_1)
 	return column_1, err
 }
 
-const countItineraryItemsByTripPlaceID = `-- name: CountItineraryItemsByTripPlaceID :one
+const countScheduleItemsByTripPlaceID = `-- name: CountScheduleItemsByTripPlaceID :one
 SELECT count(*)::int AS total_count
-FROM itinerary_items
+FROM schedule_items
 WHERE trip_id = $1::uuid
   AND trip_place_id = $2::uuid
+  AND deleted_at IS NULL
 `
 
-type CountItineraryItemsByTripPlaceIDParams struct {
+type CountScheduleItemsByTripPlaceIDParams struct {
 	TripID      pgtype.UUID
 	TripPlaceID pgtype.UUID
 }
 
-func (q *Queries) CountItineraryItemsByTripPlaceID(ctx context.Context, arg CountItineraryItemsByTripPlaceIDParams) (int32, error) {
-	row := q.db.QueryRow(ctx, countItineraryItemsByTripPlaceID, arg.TripID, arg.TripPlaceID)
+func (q *Queries) CountScheduleItemsByTripPlaceID(ctx context.Context, arg CountScheduleItemsByTripPlaceIDParams) (int32, error) {
+	row := q.db.QueryRow(ctx, countScheduleItemsByTripPlaceID, arg.TripID, arg.TripPlaceID)
+	var total_count int32
+	err := row.Scan(&total_count)
+	return total_count, err
+}
+
+const countTripDaysByLodgingPlaceID = `-- name: CountTripDaysByLodgingPlaceID :one
+SELECT count(*)::int AS total_count
+FROM trip_days
+WHERE trip_id = $1::uuid
+  AND lodging_trip_place_id = $2::uuid
+  AND deleted_at IS NULL
+`
+
+type CountTripDaysByLodgingPlaceIDParams struct {
+	TripID      pgtype.UUID
+	TripPlaceID pgtype.UUID
+}
+
+func (q *Queries) CountTripDaysByLodgingPlaceID(ctx context.Context, arg CountTripDaysByLodgingPlaceIDParams) (int32, error) {
+	row := q.db.QueryRow(ctx, countTripDaysByLodgingPlaceID, arg.TripID, arg.TripPlaceID)
 	var total_count int32
 	err := row.Scan(&total_count)
 	return total_count, err
@@ -83,29 +86,29 @@ func (q *Queries) CountTripParticipantsByTripID(ctx context.Context, dollar_1 pg
 	return total_count, err
 }
 
-const createItineraryItemAtEnd = `-- name: CreateItineraryItemAtEnd :one
-INSERT INTO itinerary_items (
+const createScheduleItemAtEnd = `-- name: CreateScheduleItemAtEnd :one
+INSERT INTO schedule_items (
   trip_id,
-  scheduled_date,
+  trip_day_id,
   trip_place_id,
   item_order,
   rank
 ) VALUES (
   $1::uuid,
-  $2,
+  $2::uuid,
   $3::uuid,
   (
     SELECT COALESCE(MAX(item_order), 0) + 1
-    FROM itinerary_items
-    WHERE trip_id = $1::uuid
-      AND scheduled_date = $2
+    FROM schedule_items
+    WHERE trip_day_id = $2::uuid
+      AND deleted_at IS NULL
   ),
   lpad(
     (
       SELECT COALESCE(MAX(rank::bigint), 0) + 1024
-      FROM itinerary_items
-      WHERE trip_id = $1::uuid
-        AND scheduled_date = $2
+      FROM schedule_items
+      WHERE trip_day_id = $2::uuid
+        AND deleted_at IS NULL
     )::text,
     19,
     '0'
@@ -119,13 +122,13 @@ RETURNING
   skipped_at
 `
 
-type CreateItineraryItemAtEndParams struct {
-	TripID        pgtype.UUID
-	ScheduledDate pgtype.Date
-	TripPlaceID   pgtype.UUID
+type CreateScheduleItemAtEndParams struct {
+	TripID      pgtype.UUID
+	TripDayID   pgtype.UUID
+	TripPlaceID pgtype.UUID
 }
 
-type CreateItineraryItemAtEndRow struct {
+type CreateScheduleItemAtEndRow struct {
 	ID        string
 	ItemOrder int32
 	Version   int32
@@ -133,9 +136,9 @@ type CreateItineraryItemAtEndRow struct {
 	SkippedAt pgtype.Timestamptz
 }
 
-func (q *Queries) CreateItineraryItemAtEnd(ctx context.Context, arg CreateItineraryItemAtEndParams) (CreateItineraryItemAtEndRow, error) {
-	row := q.db.QueryRow(ctx, createItineraryItemAtEnd, arg.TripID, arg.ScheduledDate, arg.TripPlaceID)
-	var i CreateItineraryItemAtEndRow
+func (q *Queries) CreateScheduleItemAtEnd(ctx context.Context, arg CreateScheduleItemAtEndParams) (CreateScheduleItemAtEndRow, error) {
+	row := q.db.QueryRow(ctx, createScheduleItemAtEnd, arg.TripID, arg.TripDayID, arg.TripPlaceID)
+	var i CreateScheduleItemAtEndRow
 	err := row.Scan(
 		&i.ID,
 		&i.ItemOrder,
@@ -410,40 +413,22 @@ func (q *Queries) DeactivateTripInvite(ctx context.Context, arg DeactivateTripIn
 }
 
 const deleteDayLodgingPlace = `-- name: DeleteDayLodgingPlace :exec
-DELETE FROM day_lodging_places
+UPDATE trip_days
+SET lodging_trip_place_id = NULL,
+    updated_at = now()
 WHERE trip_id = $1::uuid
-  AND lodging_date = $2
+  AND id = $2::uuid
+  AND deleted_at IS NULL
 `
 
 type DeleteDayLodgingPlaceParams struct {
-	TripID      pgtype.UUID
-	LodgingDate pgtype.Date
+	TripID    pgtype.UUID
+	TripDayID pgtype.UUID
 }
 
 func (q *Queries) DeleteDayLodgingPlace(ctx context.Context, arg DeleteDayLodgingPlaceParams) error {
-	_, err := q.db.Exec(ctx, deleteDayLodgingPlace, arg.TripID, arg.LodgingDate)
+	_, err := q.db.Exec(ctx, deleteDayLodgingPlace, arg.TripID, arg.TripDayID)
 	return err
-}
-
-const deleteItineraryItemByTripDateAndID = `-- name: DeleteItineraryItemByTripDateAndID :one
-DELETE FROM itinerary_items
-WHERE trip_id = $1::uuid
-  AND scheduled_date = $2
-  AND id = $3::uuid
-RETURNING trip_place_id::text
-`
-
-type DeleteItineraryItemByTripDateAndIDParams struct {
-	TripID        pgtype.UUID
-	ScheduledDate pgtype.Date
-	ItemID        pgtype.UUID
-}
-
-func (q *Queries) DeleteItineraryItemByTripDateAndID(ctx context.Context, arg DeleteItineraryItemByTripDateAndIDParams) (string, error) {
-	row := q.db.QueryRow(ctx, deleteItineraryItemByTripDateAndID, arg.TripID, arg.ScheduledDate, arg.ItemID)
-	var trip_place_id string
-	err := row.Scan(&trip_place_id)
-	return trip_place_id, err
 }
 
 const deleteTripByID = `-- name: DeleteTripByID :one
@@ -502,6 +487,66 @@ func (q *Queries) DeleteTripPlaceByID(ctx context.Context, arg DeleteTripPlaceBy
 	return err
 }
 
+const getActiveTripDayByTripAndID = `-- name: GetActiveTripDayByTripAndID :one
+SELECT
+  td.id::text AS id,
+  td.date,
+  td.day_order,
+  COALESCE(tp.id::text, ''::text)::text AS lodging_trip_place_id,
+  tp.name AS lodging_place_name,
+  tp.place_type AS lodging_place_type,
+  tp.address AS lodging_place_address,
+  tp.provider AS lodging_place_provider,
+  tp.google_place_id AS lodging_google_place_id,
+  tp.latitude AS lodging_latitude,
+  tp.longitude AS lodging_longitude
+FROM trip_days td
+LEFT JOIN trip_places tp
+  ON tp.id = td.lodging_trip_place_id
+ AND tp.trip_id = td.trip_id
+WHERE td.trip_id = $1::uuid
+  AND td.id = $2::uuid
+  AND td.deleted_at IS NULL
+`
+
+type GetActiveTripDayByTripAndIDParams struct {
+	TripID    pgtype.UUID
+	TripDayID pgtype.UUID
+}
+
+type GetActiveTripDayByTripAndIDRow struct {
+	ID                   string
+	Date                 pgtype.Date
+	DayOrder             int32
+	LodgingTripPlaceID   string
+	LodgingPlaceName     pgtype.Text
+	LodgingPlaceType     pgtype.Text
+	LodgingPlaceAddress  pgtype.Text
+	LodgingPlaceProvider pgtype.Text
+	LodgingGooglePlaceID pgtype.Text
+	LodgingLatitude      pgtype.Float8
+	LodgingLongitude     pgtype.Float8
+}
+
+func (q *Queries) GetActiveTripDayByTripAndID(ctx context.Context, arg GetActiveTripDayByTripAndIDParams) (GetActiveTripDayByTripAndIDRow, error) {
+	row := q.db.QueryRow(ctx, getActiveTripDayByTripAndID, arg.TripID, arg.TripDayID)
+	var i GetActiveTripDayByTripAndIDRow
+	err := row.Scan(
+		&i.ID,
+		&i.Date,
+		&i.DayOrder,
+		&i.LodgingTripPlaceID,
+		&i.LodgingPlaceName,
+		&i.LodgingPlaceType,
+		&i.LodgingPlaceAddress,
+		&i.LodgingPlaceProvider,
+		&i.LodgingGooglePlaceID,
+		&i.LodgingLatitude,
+		&i.LodgingLongitude,
+	)
+	return i, err
+}
+
 const getCurrentTripInviteForUpdate = `-- name: GetCurrentTripInviteForUpdate :one
 SELECT
   id::text,
@@ -538,56 +583,6 @@ func (q *Queries) GetCurrentTripInviteForUpdate(ctx context.Context, tripID pgty
 		&i.DeactivatedAt,
 		&i.CreatedAt,
 		&i.CreatedBy,
-	)
-	return i, err
-}
-
-const getDayLodgingPlaceByTripAndDate = `-- name: GetDayLodgingPlaceByTripAndDate :one
-SELECT
-  tp.id::text AS id,
-  tp.name,
-  tp.place_type,
-  tp.address,
-  tp.provider,
-  tp.google_place_id,
-  tp.latitude,
-  tp.longitude
-FROM day_lodging_places dlp
-JOIN trip_places tp
-  ON tp.id = dlp.trip_place_id
- AND tp.trip_id = dlp.trip_id
-WHERE dlp.trip_id = $1::uuid
-  AND dlp.lodging_date = $2
-`
-
-type GetDayLodgingPlaceByTripAndDateParams struct {
-	TripID      pgtype.UUID
-	LodgingDate pgtype.Date
-}
-
-type GetDayLodgingPlaceByTripAndDateRow struct {
-	ID            string
-	Name          string
-	PlaceType     string
-	Address       string
-	Provider      string
-	GooglePlaceID pgtype.Text
-	Latitude      pgtype.Float8
-	Longitude     pgtype.Float8
-}
-
-func (q *Queries) GetDayLodgingPlaceByTripAndDate(ctx context.Context, arg GetDayLodgingPlaceByTripAndDateParams) (GetDayLodgingPlaceByTripAndDateRow, error) {
-	row := q.db.QueryRow(ctx, getDayLodgingPlaceByTripAndDate, arg.TripID, arg.LodgingDate)
-	var i GetDayLodgingPlaceByTripAndDateRow
-	err := row.Scan(
-		&i.ID,
-		&i.Name,
-		&i.PlaceType,
-		&i.Address,
-		&i.Provider,
-		&i.GooglePlaceID,
-		&i.Latitude,
-		&i.Longitude,
 	)
 	return i, err
 }
@@ -640,14 +635,14 @@ func (q *Queries) GetGoogleTripPlaceByGooglePlaceID(ctx context.Context, arg Get
 	return i, err
 }
 
-const getItineraryItemByTripDateAndID = `-- name: GetItineraryItemByTripDateAndID :one
+const getScheduleItemByTripDayAndID = `-- name: GetScheduleItemByTripDayAndID :one
 SELECT
-  ii.id::text AS id,
-  ii.item_order,
-  ii.version,
-  ii.arrived_at,
-  ii.skipped_at,
-  (dlp.trip_place_id IS NOT NULL) AS is_lodging,
+  si.id::text AS id,
+  si.item_order,
+  si.version,
+  si.arrived_at,
+  si.skipped_at,
+  COALESCE(td.lodging_trip_place_id = si.trip_place_id, false) AS is_lodging,
   tp.id::text AS trip_place_id,
   tp.name AS place_name,
   tp.place_type,
@@ -656,26 +651,27 @@ SELECT
   tp.google_place_id,
   tp.latitude,
   tp.longitude
-FROM itinerary_items ii
+FROM schedule_items si
+JOIN trip_days td
+  ON td.id = si.trip_day_id
+ AND td.trip_id = si.trip_id
+ AND td.deleted_at IS NULL
 JOIN trip_places tp
-  ON tp.id = ii.trip_place_id
- AND tp.trip_id = ii.trip_id
-LEFT JOIN day_lodging_places dlp
-  ON dlp.trip_id = ii.trip_id
- AND dlp.lodging_date = ii.scheduled_date
- AND dlp.trip_place_id = ii.trip_place_id
-WHERE ii.trip_id = $1::uuid
-  AND ii.scheduled_date = $2
-  AND ii.id = $3::uuid
+  ON tp.id = si.trip_place_id
+ AND tp.trip_id = si.trip_id
+WHERE si.trip_id = $1::uuid
+  AND si.trip_day_id = $2::uuid
+  AND si.id = $3::uuid
+  AND si.deleted_at IS NULL
 `
 
-type GetItineraryItemByTripDateAndIDParams struct {
-	TripID        pgtype.UUID
-	ScheduledDate pgtype.Date
-	ItemID        pgtype.UUID
+type GetScheduleItemByTripDayAndIDParams struct {
+	TripID         pgtype.UUID
+	TripDayID      pgtype.UUID
+	ScheduleItemID pgtype.UUID
 }
 
-type GetItineraryItemByTripDateAndIDRow struct {
+type GetScheduleItemByTripDayAndIDRow struct {
 	ID            string
 	ItemOrder     int32
 	Version       int32
@@ -692,9 +688,9 @@ type GetItineraryItemByTripDateAndIDRow struct {
 	Longitude     pgtype.Float8
 }
 
-func (q *Queries) GetItineraryItemByTripDateAndID(ctx context.Context, arg GetItineraryItemByTripDateAndIDParams) (GetItineraryItemByTripDateAndIDRow, error) {
-	row := q.db.QueryRow(ctx, getItineraryItemByTripDateAndID, arg.TripID, arg.ScheduledDate, arg.ItemID)
-	var i GetItineraryItemByTripDateAndIDRow
+func (q *Queries) GetScheduleItemByTripDayAndID(ctx context.Context, arg GetScheduleItemByTripDayAndIDParams) (GetScheduleItemByTripDayAndIDRow, error) {
+	row := q.db.QueryRow(ctx, getScheduleItemByTripDayAndID, arg.TripID, arg.TripDayID, arg.ScheduleItemID)
+	var i GetScheduleItemByTripDayAndIDRow
 	err := row.Scan(
 		&i.ID,
 		&i.ItemOrder,
@@ -874,56 +870,63 @@ func (q *Queries) GetTripPlaceSummaryByTripAndPlace(ctx context.Context, arg Get
 	return i, err
 }
 
-const listDayLodgingPlacesByTrip = `-- name: ListDayLodgingPlacesByTrip :many
+const listActiveTripDaysByTrip = `-- name: ListActiveTripDaysByTrip :many
 SELECT
-  dlp.lodging_date,
-  tp.id::text AS id,
-  tp.name,
-  tp.place_type,
-  tp.address,
-  tp.provider,
-  tp.google_place_id,
-  tp.latitude,
-  tp.longitude
-FROM day_lodging_places dlp
-JOIN trip_places tp
-  ON tp.id = dlp.trip_place_id
- AND tp.trip_id = dlp.trip_id
-WHERE dlp.trip_id = $1::uuid
-ORDER BY dlp.lodging_date ASC
+  td.id::text AS id,
+  td.date,
+  td.day_order,
+  COALESCE(tp.id::text, ''::text)::text AS lodging_trip_place_id,
+  tp.name AS lodging_place_name,
+  tp.place_type AS lodging_place_type,
+  tp.address AS lodging_place_address,
+  tp.provider AS lodging_place_provider,
+  tp.google_place_id AS lodging_google_place_id,
+  tp.latitude AS lodging_latitude,
+  tp.longitude AS lodging_longitude
+FROM trip_days td
+LEFT JOIN trip_places tp
+  ON tp.id = td.lodging_trip_place_id
+ AND tp.trip_id = td.trip_id
+WHERE td.trip_id = $1::uuid
+  AND td.deleted_at IS NULL
+ORDER BY td.day_order ASC, td.date ASC
 `
 
-type ListDayLodgingPlacesByTripRow struct {
-	LodgingDate   pgtype.Date
-	ID            string
-	Name          string
-	PlaceType     string
-	Address       string
-	Provider      string
-	GooglePlaceID pgtype.Text
-	Latitude      pgtype.Float8
-	Longitude     pgtype.Float8
+type ListActiveTripDaysByTripRow struct {
+	ID                   string
+	Date                 pgtype.Date
+	DayOrder             int32
+	LodgingTripPlaceID   string
+	LodgingPlaceName     pgtype.Text
+	LodgingPlaceType     pgtype.Text
+	LodgingPlaceAddress  pgtype.Text
+	LodgingPlaceProvider pgtype.Text
+	LodgingGooglePlaceID pgtype.Text
+	LodgingLatitude      pgtype.Float8
+	LodgingLongitude     pgtype.Float8
 }
 
-func (q *Queries) ListDayLodgingPlacesByTrip(ctx context.Context, dollar_1 pgtype.UUID) ([]ListDayLodgingPlacesByTripRow, error) {
-	rows, err := q.db.Query(ctx, listDayLodgingPlacesByTrip, dollar_1)
+func (q *Queries) ListActiveTripDaysByTrip(ctx context.Context, dollar_1 pgtype.UUID) ([]ListActiveTripDaysByTripRow, error) {
+	rows, err := q.db.Query(ctx, listActiveTripDaysByTrip, dollar_1)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ListDayLodgingPlacesByTripRow
+	var items []ListActiveTripDaysByTripRow
 	for rows.Next() {
-		var i ListDayLodgingPlacesByTripRow
+		var i ListActiveTripDaysByTripRow
 		if err := rows.Scan(
-			&i.LodgingDate,
 			&i.ID,
-			&i.Name,
-			&i.PlaceType,
-			&i.Address,
-			&i.Provider,
-			&i.GooglePlaceID,
-			&i.Latitude,
-			&i.Longitude,
+			&i.Date,
+			&i.DayOrder,
+			&i.LodgingTripPlaceID,
+			&i.LodgingPlaceName,
+			&i.LodgingPlaceType,
+			&i.LodgingPlaceAddress,
+			&i.LodgingPlaceProvider,
+			&i.LodgingGooglePlaceID,
+			&i.LodgingLatitude,
+			&i.LodgingLongitude,
 		); err != nil {
 			return nil, err
 		}
@@ -935,13 +938,14 @@ func (q *Queries) ListDayLodgingPlacesByTrip(ctx context.Context, dollar_1 pgtyp
 	return items, nil
 }
 
-const listItineraryItemsByTripAndDate = `-- name: ListItineraryItemsByTripAndDate :many
+const listScheduleItemsByTripDay = `-- name: ListScheduleItemsByTripDay :many
 SELECT
-  ii.id::text AS id,
-  ii.version,
-  ii.arrived_at,
-  ii.skipped_at,
-  (dlp.trip_place_id IS NOT NULL) AS is_lodging,
+  si.id::text AS id,
+  si.item_order,
+  si.version,
+  si.arrived_at,
+  si.skipped_at,
+  COALESCE(td.lodging_trip_place_id = si.trip_place_id, false) AS is_lodging,
   tp.id::text AS trip_place_id,
   tp.name AS place_name,
   tp.place_type,
@@ -950,26 +954,28 @@ SELECT
   tp.google_place_id,
   tp.latitude,
   tp.longitude
-FROM itinerary_items ii
+FROM schedule_items si
+JOIN trip_days td
+  ON td.id = si.trip_day_id
+ AND td.trip_id = si.trip_id
+ AND td.deleted_at IS NULL
 JOIN trip_places tp
-  ON tp.id = ii.trip_place_id
- AND tp.trip_id = ii.trip_id
-LEFT JOIN day_lodging_places dlp
-  ON dlp.trip_id = ii.trip_id
- AND dlp.lodging_date = ii.scheduled_date
- AND dlp.trip_place_id = ii.trip_place_id
-WHERE ii.trip_id = $1::uuid
-  AND ii.scheduled_date = $2
-ORDER BY ii.rank ASC, ii.id ASC
+  ON tp.id = si.trip_place_id
+ AND tp.trip_id = si.trip_id
+WHERE si.trip_id = $1::uuid
+  AND si.trip_day_id = $2::uuid
+  AND si.deleted_at IS NULL
+ORDER BY si.rank ASC, si.id ASC
 `
 
-type ListItineraryItemsByTripAndDateParams struct {
-	Column1       pgtype.UUID
-	ScheduledDate pgtype.Date
+type ListScheduleItemsByTripDayParams struct {
+	TripID    pgtype.UUID
+	TripDayID pgtype.UUID
 }
 
-type ListItineraryItemsByTripAndDateRow struct {
+type ListScheduleItemsByTripDayRow struct {
 	ID            string
+	ItemOrder     int32
 	Version       int32
 	ArrivedAt     pgtype.Timestamptz
 	SkippedAt     pgtype.Timestamptz
@@ -984,17 +990,18 @@ type ListItineraryItemsByTripAndDateRow struct {
 	Longitude     pgtype.Float8
 }
 
-func (q *Queries) ListItineraryItemsByTripAndDate(ctx context.Context, arg ListItineraryItemsByTripAndDateParams) ([]ListItineraryItemsByTripAndDateRow, error) {
-	rows, err := q.db.Query(ctx, listItineraryItemsByTripAndDate, arg.Column1, arg.ScheduledDate)
+func (q *Queries) ListScheduleItemsByTripDay(ctx context.Context, arg ListScheduleItemsByTripDayParams) ([]ListScheduleItemsByTripDayRow, error) {
+	rows, err := q.db.Query(ctx, listScheduleItemsByTripDay, arg.TripID, arg.TripDayID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ListItineraryItemsByTripAndDateRow
+	var items []ListScheduleItemsByTripDayRow
 	for rows.Next() {
-		var i ListItineraryItemsByTripAndDateRow
+		var i ListScheduleItemsByTripDayRow
 		if err := rows.Scan(
 			&i.ID,
+			&i.ItemOrder,
 			&i.Version,
 			&i.ArrivedAt,
 			&i.SkippedAt,
@@ -1173,14 +1180,14 @@ func (q *Queries) LockTripForInvite(ctx context.Context, tripID pgtype.UUID) (st
 }
 
 const setDayLodgingPlace = `-- name: SetDayLodgingPlace :one
-WITH upserted AS (
-  INSERT INTO day_lodging_places (trip_id, lodging_date, trip_place_id)
-  VALUES ($1::uuid, $2, $3::uuid)
-  ON CONFLICT (trip_id, lodging_date) DO UPDATE
-  SET
-    trip_place_id = EXCLUDED.trip_place_id,
-    updated_at = now()
-  RETURNING trip_id, trip_place_id
+WITH updated AS (
+  UPDATE trip_days
+  SET lodging_trip_place_id = $1::uuid,
+      updated_at = now()
+  WHERE trip_id = $2::uuid
+    AND id = $3::uuid
+    AND deleted_at IS NULL
+  RETURNING trip_id, lodging_trip_place_id
 )
 SELECT
   tp.id::text AS id,
@@ -1191,16 +1198,16 @@ SELECT
   tp.google_place_id,
   tp.latitude,
   tp.longitude
-FROM upserted
+FROM updated
 JOIN trip_places tp
-  ON tp.id = upserted.trip_place_id
- AND tp.trip_id = upserted.trip_id
+  ON tp.id = updated.lodging_trip_place_id
+ AND tp.trip_id = updated.trip_id
 `
 
 type SetDayLodgingPlaceParams struct {
-	TripID      pgtype.UUID
-	LodgingDate pgtype.Date
 	TripPlaceID pgtype.UUID
+	TripID      pgtype.UUID
+	TripDayID   pgtype.UUID
 }
 
 type SetDayLodgingPlaceRow struct {
@@ -1215,7 +1222,7 @@ type SetDayLodgingPlaceRow struct {
 }
 
 func (q *Queries) SetDayLodgingPlace(ctx context.Context, arg SetDayLodgingPlaceParams) (SetDayLodgingPlaceRow, error) {
-	row := q.db.QueryRow(ctx, setDayLodgingPlace, arg.TripID, arg.LodgingDate, arg.TripPlaceID)
+	row := q.db.QueryRow(ctx, setDayLodgingPlace, arg.TripPlaceID, arg.TripID, arg.TripDayID)
 	var i SetDayLodgingPlaceRow
 	err := row.Scan(
 		&i.ID,
@@ -1228,6 +1235,30 @@ func (q *Queries) SetDayLodgingPlace(ctx context.Context, arg SetDayLodgingPlace
 		&i.Longitude,
 	)
 	return i, err
+}
+
+const softDeleteScheduleItemByTripDayAndID = `-- name: SoftDeleteScheduleItemByTripDayAndID :one
+UPDATE schedule_items
+SET deleted_at = now(),
+    updated_at = now()
+WHERE trip_id = $1::uuid
+  AND trip_day_id = $2::uuid
+  AND id = $3::uuid
+  AND deleted_at IS NULL
+RETURNING trip_place_id::text
+`
+
+type SoftDeleteScheduleItemByTripDayAndIDParams struct {
+	TripID         pgtype.UUID
+	TripDayID      pgtype.UUID
+	ScheduleItemID pgtype.UUID
+}
+
+func (q *Queries) SoftDeleteScheduleItemByTripDayAndID(ctx context.Context, arg SoftDeleteScheduleItemByTripDayAndIDParams) (string, error) {
+	row := q.db.QueryRow(ctx, softDeleteScheduleItemByTripDayAndID, arg.TripID, arg.TripDayID, arg.ScheduleItemID)
+	var trip_place_id string
+	err := row.Scan(&trip_place_id)
+	return trip_place_id, err
 }
 
 const updateTripBasicInfo = `-- name: UpdateTripBasicInfo :one
@@ -1291,19 +1322,26 @@ func (q *Queries) UpdateTripBasicInfo(ctx context.Context, arg UpdateTripBasicIn
 	return i, err
 }
 
-const updateTripPlaceSnapshotByItineraryItem = `-- name: UpdateTripPlaceSnapshotByItineraryItem :one
+const updateTripPlaceSnapshotByScheduleItem = `-- name: UpdateTripPlaceSnapshotByScheduleItem :one
 WITH target AS (
   SELECT
-    ii.id,
-    ii.item_order,
-    ii.version,
-    ii.arrived_at,
-    ii.skipped_at,
-    ii.trip_place_id
-  FROM itinerary_items ii
-  WHERE ii.trip_id = $1::uuid
-    AND ii.scheduled_date = $2
-    AND ii.id = $3::uuid
+    si.id,
+    si.item_order,
+    si.version,
+    si.arrived_at,
+    si.skipped_at,
+    si.trip_place_id,
+    si.trip_day_id,
+    si.trip_id
+  FROM schedule_items si
+  JOIN trip_days td
+    ON td.id = si.trip_day_id
+   AND td.trip_id = si.trip_id
+   AND td.deleted_at IS NULL
+  WHERE si.trip_id = $1::uuid
+    AND si.trip_day_id = $2::uuid
+    AND si.id = $3::uuid
+    AND si.deleted_at IS NULL
 ), updated_place AS (
   UPDATE trip_places tp
   SET
@@ -1313,7 +1351,7 @@ WITH target AS (
     updated_at = now()
   FROM target
   WHERE tp.id = target.trip_place_id
-    AND tp.trip_id = $1::uuid
+    AND tp.trip_id = target.trip_id
   RETURNING
     tp.id::text AS id,
     tp.name,
@@ -1330,7 +1368,7 @@ SELECT
   target.version,
   target.arrived_at,
   target.skipped_at,
-  (dlp.trip_place_id IS NOT NULL) AS is_lodging,
+  COALESCE(td.lodging_trip_place_id = target.trip_place_id, false) AS is_lodging,
   updated_place.id AS trip_place_id,
   updated_place.name AS place_name,
   updated_place.place_type,
@@ -1341,22 +1379,21 @@ SELECT
   updated_place.longitude
 FROM target
 JOIN updated_place ON true
-LEFT JOIN day_lodging_places dlp
-  ON dlp.trip_id = $1::uuid
- AND dlp.lodging_date = $2
- AND dlp.trip_place_id = target.trip_place_id
+JOIN trip_days td
+  ON td.id = target.trip_day_id
+ AND td.trip_id = target.trip_id
 `
 
-type UpdateTripPlaceSnapshotByItineraryItemParams struct {
-	TripID        pgtype.UUID
-	ScheduledDate pgtype.Date
-	ItemID        pgtype.UUID
-	Name          string
-	Address       string
-	PlaceType     string
+type UpdateTripPlaceSnapshotByScheduleItemParams struct {
+	TripID         pgtype.UUID
+	TripDayID      pgtype.UUID
+	ScheduleItemID pgtype.UUID
+	Name           string
+	Address        string
+	PlaceType      string
 }
 
-type UpdateTripPlaceSnapshotByItineraryItemRow struct {
+type UpdateTripPlaceSnapshotByScheduleItemRow struct {
 	ID            string
 	ItemOrder     int32
 	Version       int32
@@ -1373,16 +1410,16 @@ type UpdateTripPlaceSnapshotByItineraryItemRow struct {
 	Longitude     pgtype.Float8
 }
 
-func (q *Queries) UpdateTripPlaceSnapshotByItineraryItem(ctx context.Context, arg UpdateTripPlaceSnapshotByItineraryItemParams) (UpdateTripPlaceSnapshotByItineraryItemRow, error) {
-	row := q.db.QueryRow(ctx, updateTripPlaceSnapshotByItineraryItem,
+func (q *Queries) UpdateTripPlaceSnapshotByScheduleItem(ctx context.Context, arg UpdateTripPlaceSnapshotByScheduleItemParams) (UpdateTripPlaceSnapshotByScheduleItemRow, error) {
+	row := q.db.QueryRow(ctx, updateTripPlaceSnapshotByScheduleItem,
 		arg.TripID,
-		arg.ScheduledDate,
-		arg.ItemID,
+		arg.TripDayID,
+		arg.ScheduleItemID,
 		arg.Name,
 		arg.Address,
 		arg.PlaceType,
 	)
-	var i UpdateTripPlaceSnapshotByItineraryItemRow
+	var i UpdateTripPlaceSnapshotByScheduleItemRow
 	err := row.Scan(
 		&i.ID,
 		&i.ItemOrder,

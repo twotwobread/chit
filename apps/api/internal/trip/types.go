@@ -34,13 +34,14 @@ type CreateInput struct {
 }
 
 type UpdateInput struct {
-	Name            *string
-	StartDate       *string
-	EndDate         *string
-	DefaultCurrency *string
+	Name                        *string
+	StartDate                   *string
+	EndDate                     *string
+	DefaultCurrency             *string
+	ConfirmOutOfRangeDayArchive *bool
 }
 
-type CreateManualDayItineraryItemInput struct {
+type CreateManualScheduleItemInput struct {
 	Name      string
 	Address   string
 	PlaceType string
@@ -51,19 +52,19 @@ type SetDayLodgingPlaceInput struct {
 }
 
 type CreateQuickExpenseInput struct {
-	ItineraryItemID    string
+	ScheduleItemID     string
 	AmountMinor        int64
 	PayerParticipantID string
 	ParticipantIDs     []string
 }
 
-type UpdateDayItineraryItemInput struct {
+type UpdateScheduleItemInput struct {
 	Name      *string
 	Address   *string
 	PlaceType *string
 }
 
-type ReorderDayItineraryMoveInput struct {
+type ReorderDayScheduleMoveInput struct {
 	ItemID        string
 	BeforeItemID  *string
 	AfterItemID   *string
@@ -87,64 +88,64 @@ type UpdateRecord struct {
 	DefaultCurrency string
 }
 
-type CreateManualDayItineraryItemRecord struct {
-	TripID        string
-	ScheduledDate string
-	Name          string
-	Address       string
-	PlaceType     string
+type CreateManualScheduleItemRecord struct {
+	TripID    string
+	TripDayID string
+	Name      string
+	Address   string
+	PlaceType string
 }
 
-type UpdateDayItineraryItemRecord struct {
-	TripID        string
-	ScheduledDate string
-	ItemID        string
-	Name          string
-	Address       string
-	PlaceType     string
+type UpdateScheduleItemRecord struct {
+	TripID    string
+	TripDayID string
+	ItemID    string
+	Name      string
+	Address   string
+	PlaceType string
 }
 
-type ReorderDayItineraryMoveRecord struct {
+type ReorderDayScheduleMoveRecord struct {
 	ItemID        string
 	BeforeItemID  *string
 	AfterItemID   *string
 	ClientVersion int
 }
 
-type ReorderDayItineraryItemsRecord struct {
-	TripID        string
-	ScheduledDate string
-	Moves         []ReorderDayItineraryMoveRecord
+type ReorderScheduleItemsRecord struct {
+	TripID    string
+	TripDayID string
+	Moves     []ReorderDayScheduleMoveRecord
 }
 
-type MarkDayItineraryItemArrivedRecord struct {
-	TripID        string
-	ScheduledDate string
-	ItemID        string
+type MarkScheduleItemArrivedRecord struct {
+	TripID    string
+	TripDayID string
+	ItemID    string
 }
 
-type MarkDayItineraryItemSkippedRecord struct {
-	TripID        string
-	ScheduledDate string
-	ItemID        string
+type MarkScheduleItemSkippedRecord struct {
+	TripID    string
+	TripDayID string
+	ItemID    string
 }
 
-type RestoreDayItineraryItemRecord struct {
-	TripID        string
-	ScheduledDate string
-	ItemID        string
+type RestoreScheduleItemRecord struct {
+	TripID    string
+	TripDayID string
+	ItemID    string
 }
 
 type SetDayLodgingPlaceRecord struct {
-	TripID        string
-	ScheduledDate string
-	TripPlaceID   string
+	TripID      string
+	TripDayID   string
+	TripPlaceID string
 }
 
 type CreateQuickExpenseRecord struct {
 	TripID             string
-	ScheduledDate      string
-	ItineraryItemID    string
+	TripDayID          string
+	ScheduleItemID     string
 	AmountMinor        int64
 	PayerParticipantID string
 	ParticipantIDs     []string
@@ -206,6 +207,7 @@ type ParticipantListItem struct {
 }
 
 type TripDay struct {
+	ID           string
 	Date         string
 	DayOrder     int
 	LodgingPlace *TripPlaceSummary
@@ -269,7 +271,7 @@ type TripPlaceSummary struct {
 	RoutablePlace *RoutablePlace
 }
 
-type DayItineraryItem struct {
+type ScheduleItem struct {
 	ID        string
 	ItemOrder int
 	Version   int
@@ -279,9 +281,9 @@ type DayItineraryItem struct {
 	Place     TripPlaceSummary
 }
 
-type GetDayItineraryResult struct {
+type GetDayScheduleItemsResult struct {
 	Day   TripDay
-	Items []DayItineraryItem
+	Items []ScheduleItem
 }
 
 type SetDayLodgingPlaceResult struct {
@@ -289,51 +291,51 @@ type SetDayLodgingPlaceResult struct {
 	LodgingPlace TripPlaceSummary
 }
 
-type CreateManualDayItineraryItemResult struct {
+type CreateManualScheduleItemResult struct {
 	Day  TripDay
-	Item DayItineraryItem
+	Item ScheduleItem
 }
 
-type UpdateDayItineraryItemResult struct {
-	Item DayItineraryItem
+type UpdateScheduleItemResult struct {
+	Item ScheduleItem
 }
 
-type ReorderDayItineraryItemsResult struct {
+type ReorderScheduleItemsResult struct {
 	Day   TripDay
-	Items []DayItineraryItem
+	Items []ScheduleItem
 }
 
-type MarkDayItineraryItemArrivedMutationResult struct {
-	Item  DayItineraryItem
-	Items []DayItineraryItem
+type MarkScheduleItemArrivedMutationResult struct {
+	Item  ScheduleItem
+	Items []ScheduleItem
 }
 
-type MarkDayItineraryItemSkippedMutationResult struct {
-	Item  DayItineraryItem
-	Items []DayItineraryItem
+type MarkScheduleItemSkippedMutationResult struct {
+	Item  ScheduleItem
+	Items []ScheduleItem
 }
 
-type RestoreDayItineraryItemMutationResult struct {
-	Item  DayItineraryItem
-	Items []DayItineraryItem
+type RestoreScheduleItemMutationResult struct {
+	Item  ScheduleItem
+	Items []ScheduleItem
 }
 
-type MarkDayItineraryItemArrivedResult struct {
+type MarkScheduleItemArrivedResult struct {
 	Day   TripDay
-	Item  DayItineraryItem
-	Items []DayItineraryItem
+	Item  ScheduleItem
+	Items []ScheduleItem
 }
 
-type MarkDayItineraryItemSkippedResult struct {
+type MarkScheduleItemSkippedResult struct {
 	Day   TripDay
-	Item  DayItineraryItem
-	Items []DayItineraryItem
+	Item  ScheduleItem
+	Items []ScheduleItem
 }
 
-type RestoreDayItineraryItemResult struct {
+type RestoreScheduleItemResult struct {
 	Day   TripDay
-	Item  DayItineraryItem
-	Items []DayItineraryItem
+	Item  ScheduleItem
+	Items []ScheduleItem
 }
 
 type ExpensePlaceSnapshot struct {
@@ -351,8 +353,10 @@ type ExpenseSplit struct {
 type Expense struct {
 	ID                 string
 	TripID             string
-	ScheduledDate      string
-	ItineraryItemID    *string
+	AnchorType         string
+	TripDayID          *string
+	ScheduleItemID     *string
+	ExpenseDate        string
 	TripPlaceID        *string
 	Place              ExpensePlaceSnapshot
 	AmountMinor        int64
@@ -419,20 +423,20 @@ type Repository interface {
 	ListTripParticipantPreviewNames(ctx context.Context, tripID string) ([]string, error)
 	ListTripParticipants(ctx context.Context, tripID string) ([]ParticipantListItem, error)
 	ListTripsByParticipantUser(ctx context.Context, userID string) ([]ListItem, error)
-	ListDayLodgingPlacesByTrip(ctx context.Context, tripID string) ([]DayLodgingPlace, error)
-	GetDayLodgingPlaceByTripAndDate(ctx context.Context, tripID string, date string) (TripPlaceSummary, bool, error)
+	ListActiveTripDaysByTrip(ctx context.Context, tripID string) ([]TripDay, error)
+	GetActiveTripDayByTripAndID(ctx context.Context, tripID string, tripDayID string) (TripDay, bool, error)
 	GetTripPlaceSummaryByTripAndPlace(ctx context.Context, tripID string, tripPlaceID string) (TripPlaceSummary, bool, error)
 	SetDayLodgingPlace(ctx context.Context, record SetDayLodgingPlaceRecord) (TripPlaceSummary, error)
-	DeleteDayLodgingPlace(ctx context.Context, tripID string, date string) error
-	ListItineraryItemsByTripAndDate(ctx context.Context, tripID string, date string) ([]DayItineraryItem, error)
-	ListDayExpensesByTripAndDate(ctx context.Context, tripID string, date string) ([]DayExpenseListItem, error)
+	DeleteDayLodgingPlace(ctx context.Context, tripID string, tripDayID string) error
+	ListScheduleItemsByTripDay(ctx context.Context, tripID string, tripDayID string) ([]ScheduleItem, error)
+	ListDayExpensesByTripDay(ctx context.Context, tripID string, tripDayID string) ([]DayExpenseListItem, error)
 	CreateQuickExpense(ctx context.Context, record CreateQuickExpenseRecord) (CreateQuickExpenseResult, error)
-	CreateManualDayItineraryItem(ctx context.Context, record CreateManualDayItineraryItemRecord) (DayItineraryItem, error)
-	GetItineraryItemByTripDateAndID(ctx context.Context, tripID string, date string, itemID string) (DayItineraryItem, bool, error)
-	ReorderDayItineraryItems(ctx context.Context, record ReorderDayItineraryItemsRecord) ([]DayItineraryItem, error)
-	MarkDayItineraryItemArrived(ctx context.Context, record MarkDayItineraryItemArrivedRecord) (MarkDayItineraryItemArrivedMutationResult, error)
-	MarkDayItineraryItemSkipped(ctx context.Context, record MarkDayItineraryItemSkippedRecord) (MarkDayItineraryItemSkippedMutationResult, error)
-	RestoreDayItineraryItem(ctx context.Context, record RestoreDayItineraryItemRecord) (RestoreDayItineraryItemMutationResult, error)
-	UpdateDayItineraryItemPlace(ctx context.Context, record UpdateDayItineraryItemRecord) (DayItineraryItem, error)
-	DeleteDayItineraryItem(ctx context.Context, tripID string, date string, itemID string) (bool, error)
+	CreateManualScheduleItem(ctx context.Context, record CreateManualScheduleItemRecord) (ScheduleItem, error)
+	GetScheduleItemByTripDayAndID(ctx context.Context, tripID string, tripDayID string, itemID string) (ScheduleItem, bool, error)
+	ReorderScheduleItems(ctx context.Context, record ReorderScheduleItemsRecord) ([]ScheduleItem, error)
+	MarkScheduleItemArrived(ctx context.Context, record MarkScheduleItemArrivedRecord) (MarkScheduleItemArrivedMutationResult, error)
+	MarkScheduleItemSkipped(ctx context.Context, record MarkScheduleItemSkippedRecord) (MarkScheduleItemSkippedMutationResult, error)
+	RestoreScheduleItem(ctx context.Context, record RestoreScheduleItemRecord) (RestoreScheduleItemMutationResult, error)
+	UpdateScheduleItemPlace(ctx context.Context, record UpdateScheduleItemRecord) (ScheduleItem, error)
+	DeleteScheduleItem(ctx context.Context, tripID string, tripDayID string, itemID string) (bool, error)
 }

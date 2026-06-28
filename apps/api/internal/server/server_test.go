@@ -1451,13 +1451,13 @@ func TestRemoveTripParticipantErrors(t *testing.T) {
 	}
 }
 
-func TestGetDayItineraryHandlerReturnsEmpty(t *testing.T) {
+func TestGetDayScheduleItemsHandlerReturnsEmpty(t *testing.T) {
 	backend := newFakeAuthBackend()
 	accessToken := loginTestUser(t, backend)
 	tripID := createTestTrip(t, backend, accessToken)
 
 	recorder := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodGet, "/trips/"+tripID+"/days/2026-07-10/itinerary", nil)
+	request := httptest.NewRequest(http.MethodGet, "/trips/"+tripID+"/days/2026-07-10/schedule-items", nil)
 	request.Header.Set("Authorization", "Bearer "+accessToken)
 
 	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
@@ -1471,7 +1471,7 @@ func TestGetDayItineraryHandlerReturnsEmpty(t *testing.T) {
 			Date     string `json:"date"`
 			DayOrder int    `json:"dayOrder"`
 		} `json:"day"`
-		Items []interface{} `json:"items"`
+		Items []interface{} `json:"scheduleItems"`
 	}
 	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
 		t.Fatalf("decode response: %v", err)
@@ -1480,15 +1480,15 @@ func TestGetDayItineraryHandlerReturnsEmpty(t *testing.T) {
 		t.Fatalf("unexpected day metadata: %#v", body.Day)
 	}
 	if len(body.Items) != 0 {
-		t.Fatalf("expected empty itinerary items, got %#v", body.Items)
+		t.Fatalf("expected empty schedule items, got %#v", body.Items)
 	}
 }
 
-func TestGetDayItineraryHandlerReturnsItems(t *testing.T) {
+func TestGetDayScheduleItemsHandlerReturnsItems(t *testing.T) {
 	backend := newFakeAuthBackend()
 	accessToken := loginTestUser(t, backend)
 	tripID := createTestTrip(t, backend, accessToken)
-	backend.dayItineraryItems[tripID+":2026-07-11"] = []tripdomain.DayItineraryItem{
+	backend.dayScheduleItems[tripID+":2026-07-11"] = []tripdomain.ScheduleItem{
 		{
 			ID:        "item-1",
 			ItemOrder: 1,
@@ -1503,7 +1503,7 @@ func TestGetDayItineraryHandlerReturnsItems(t *testing.T) {
 	}
 
 	recorder := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodGet, "/trips/"+tripID+"/days/2026-07-11/itinerary", nil)
+	request := httptest.NewRequest(http.MethodGet, "/trips/"+tripID+"/days/2026-07-11/schedule-items", nil)
 	request.Header.Set("Authorization", "Bearer "+accessToken)
 
 	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
@@ -1527,7 +1527,7 @@ func TestGetDayItineraryHandlerReturnsItems(t *testing.T) {
 				PlaceType string `json:"placeType"`
 				Address   string `json:"address"`
 			} `json:"place"`
-		} `json:"items"`
+		} `json:"scheduleItems"`
 	}
 	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
 		t.Fatalf("decode response: %v", err)
@@ -1536,7 +1536,7 @@ func TestGetDayItineraryHandlerReturnsItems(t *testing.T) {
 		t.Fatalf("unexpected day metadata: %#v", body.Day)
 	}
 	if len(body.Items) != 1 || body.Items[0].ItemOrder != 1 || body.Items[0].Version != 7 || body.Items[0].Place.Name != "우메다 공중정원" || body.Items[0].Place.PlaceType != "sights" || body.Items[0].Place.Address != "Umeda" {
-		t.Fatalf("unexpected itinerary items: %#v", body.Items)
+		t.Fatalf("unexpected schedule items: %#v", body.Items)
 	}
 }
 
@@ -1544,8 +1544,8 @@ func TestSetClearDayLodgingPlaceHandler(t *testing.T) {
 	backend := newFakeAuthBackend()
 	accessToken := loginTestUser(t, backend)
 	tripID := createTestTrip(t, backend, accessToken)
-	first := createTestDayItineraryItem(t, backend, accessToken, tripID, "2026-07-11", `{"name":"호텔 니코 오사카","address":"Nishi-Shinsaibashi","placeType":"lodging"}`)
-	second := createTestDayItineraryItem(t, backend, accessToken, tripID, "2026-07-11", `{"name":"도톤보리","address":"Dotonbori","placeType":"food"}`)
+	first := createTestScheduleItem(t, backend, accessToken, tripID, "2026-07-11", `{"name":"호텔 니코 오사카","address":"Nishi-Shinsaibashi","placeType":"lodging"}`)
+	second := createTestScheduleItem(t, backend, accessToken, tripID, "2026-07-11", `{"name":"도톤보리","address":"Dotonbori","placeType":"food"}`)
 
 	setRecorder := httptest.NewRecorder()
 	setRequest := httptest.NewRequest(http.MethodPut, "/trips/"+tripID+"/days/2026-07-11/lodging-place", bytes.NewReader([]byte(fmt.Sprintf(`{"tripPlaceId":%q}`, first.PlaceID))))
@@ -1560,7 +1560,7 @@ func TestSetClearDayLodgingPlaceHandler(t *testing.T) {
 		t.Fatalf("decode set response: %v", err)
 	}
 	if _, ok := setBody["items"]; ok {
-		t.Fatalf("set response must not include full itinerary items: %#v", setBody)
+		t.Fatalf("set response must not include full schedule items: %#v", setBody)
 	}
 	setDay := setBody["day"].(map[string]interface{})
 	setLodging := setBody["lodgingPlace"].(map[string]interface{})
@@ -1569,7 +1569,7 @@ func TestSetClearDayLodgingPlaceHandler(t *testing.T) {
 	}
 
 	getRecorder := httptest.NewRecorder()
-	getRequest := httptest.NewRequest(http.MethodGet, "/trips/"+tripID+"/days/2026-07-11/itinerary", nil)
+	getRequest := httptest.NewRequest(http.MethodGet, "/trips/"+tripID+"/days/2026-07-11/schedule-items", nil)
 	getRequest.Header.Set("Authorization", "Bearer "+accessToken)
 	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(getRecorder, getRequest)
 	if getRecorder.Code != http.StatusOK {
@@ -1586,7 +1586,7 @@ func TestSetClearDayLodgingPlaceHandler(t *testing.T) {
 				ID string `json:"id"`
 			} `json:"place"`
 			IsLodging bool `json:"isLodging"`
-		} `json:"items"`
+		} `json:"scheduleItems"`
 	}
 	if err := json.NewDecoder(getRecorder.Body).Decode(&getBody); err != nil {
 		t.Fatalf("decode get response: %v", err)
@@ -1616,7 +1616,7 @@ func TestSetClearDayLodgingPlaceHandler(t *testing.T) {
 	}
 
 	clearedRecorder := httptest.NewRecorder()
-	clearedRequest := httptest.NewRequest(http.MethodGet, "/trips/"+tripID+"/days/2026-07-11/itinerary", nil)
+	clearedRequest := httptest.NewRequest(http.MethodGet, "/trips/"+tripID+"/days/2026-07-11/schedule-items", nil)
 	clearedRequest.Header.Set("Authorization", "Bearer "+accessToken)
 	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(clearedRecorder, clearedRequest)
 	if clearedRecorder.Code != http.StatusOK {
@@ -1628,7 +1628,7 @@ func TestSetClearDayLodgingPlaceHandler(t *testing.T) {
 		} `json:"day"`
 		Items []struct {
 			IsLodging bool `json:"isLodging"`
-		} `json:"items"`
+		} `json:"scheduleItems"`
 	}
 	if err := json.NewDecoder(clearedRecorder.Body).Decode(&clearedBody); err != nil {
 		t.Fatalf("decode cleared get response: %v", err)
@@ -1642,11 +1642,11 @@ func TestSetDayLodgingPlaceValidationNotFoundAndForbidden(t *testing.T) {
 	backend := newFakeAuthBackend()
 	ownerToken := loginTestUser(t, backend)
 	tripID := createTestTrip(t, backend, ownerToken)
-	created := createTestDayItineraryItem(t, backend, ownerToken, tripID, "2026-07-11", `{"name":"호텔","address":"Address","placeType":"lodging"}`)
+	created := createTestScheduleItem(t, backend, ownerToken, tripID, "2026-07-11", `{"name":"호텔","address":"Address","placeType":"lodging"}`)
 	nonParticipantToken := loginTestUserWithSubject(t, backend, "apple-2", "지영")
 	otherOwnerToken := loginTestUserWithSubject(t, backend, "apple-3", "현우")
 	otherTripID := createTestTrip(t, backend, otherOwnerToken)
-	otherPlace := createTestDayItineraryItem(t, backend, otherOwnerToken, otherTripID, "2026-07-11", `{"name":"다른 호텔","address":"Other","placeType":"lodging"}`)
+	otherPlace := createTestScheduleItem(t, backend, otherOwnerToken, otherTripID, "2026-07-11", `{"name":"다른 호텔","address":"Other","placeType":"lodging"}`)
 
 	tests := []struct {
 		name       string
@@ -1721,10 +1721,10 @@ func TestClearDayLodgingPlaceRequiresAuthAndHandlesEmpty(t *testing.T) {
 	}
 }
 
-func TestGetDayItineraryRequiresAuth(t *testing.T) {
+func TestGetDayScheduleItemsRequiresAuth(t *testing.T) {
 	backend := newFakeAuthBackend()
 	recorder := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodGet, "/trips/00000000-0000-0000-0000-000000000001/days/2026-07-10/itinerary", nil)
+	request := httptest.NewRequest(http.MethodGet, "/trips/00000000-0000-0000-0000-000000000001/days/2026-07-10/schedule-items", nil)
 
 	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
 
@@ -1733,13 +1733,13 @@ func TestGetDayItineraryRequiresAuth(t *testing.T) {
 	}
 }
 
-func TestGetDayItineraryValidation(t *testing.T) {
+func TestGetDayScheduleItemsValidation(t *testing.T) {
 	backend := newFakeAuthBackend()
 	accessToken := loginTestUser(t, backend)
 
 	tests := []string{
-		"/trips/not-a-uuid/days/2026-07-10/itinerary",
-		"/trips/00000000-0000-0000-0000-000000000001/days/not-a-date/itinerary",
+		"/trips/not-a-uuid/days/2026-07-10/schedule-items",
+		"/trips/00000000-0000-0000-0000-000000000001/days/not-a-date/schedule-items",
 	}
 	for _, path := range tests {
 		t.Run(path, func(t *testing.T) {
@@ -1767,7 +1767,7 @@ func TestGetDayItineraryValidation(t *testing.T) {
 	}
 }
 
-func TestGetDayItineraryNotFoundAndForbidden(t *testing.T) {
+func TestGetDayScheduleItemsNotFoundAndForbidden(t *testing.T) {
 	backend := newFakeAuthBackend()
 	ownerToken := loginTestUser(t, backend)
 	tripID := createTestTrip(t, backend, ownerToken)
@@ -1779,9 +1779,9 @@ func TestGetDayItineraryNotFoundAndForbidden(t *testing.T) {
 		token      string
 		expectCode int
 	}{
-		{name: "missing trip", path: "/trips/00000000-0000-0000-0000-000000000404/days/2026-07-10/itinerary", token: ownerToken, expectCode: http.StatusNotFound},
-		{name: "out of range", path: "/trips/" + tripID + "/days/2026-07-14/itinerary", token: ownerToken, expectCode: http.StatusNotFound},
-		{name: "forbidden", path: "/trips/" + tripID + "/days/2026-07-10/itinerary", token: nonParticipantToken, expectCode: http.StatusForbidden},
+		{name: "missing trip", path: "/trips/00000000-0000-0000-0000-000000000404/days/2026-07-10/schedule-items", token: ownerToken, expectCode: http.StatusNotFound},
+		{name: "out of range", path: "/trips/" + tripID + "/days/2026-07-14/schedule-items", token: ownerToken, expectCode: http.StatusNotFound},
+		{name: "forbidden", path: "/trips/" + tripID + "/days/2026-07-10/schedule-items", token: nonParticipantToken, expectCode: http.StatusForbidden},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1798,13 +1798,13 @@ func TestGetDayItineraryNotFoundAndForbidden(t *testing.T) {
 	}
 }
 
-func TestCreateManualDayItineraryItemHandlerDisabled(t *testing.T) {
+func TestCreateManualScheduleItemHandlerDisabled(t *testing.T) {
 	backend := newFakeAuthBackend()
 	accessToken := loginTestUser(t, backend)
 	tripID := createTestTrip(t, backend, accessToken)
 
 	recorder := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/days/2026-07-11/itinerary-items", bytes.NewReader([]byte(`{
+	request := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/days/2026-07-11/schedule-items/manual", bytes.NewReader([]byte(`{
 		"name":"우메다 공중정원",
 		"address":"Umeda",
 		"placeType":"sights"
@@ -1830,10 +1830,10 @@ func TestCreateManualDayItineraryItemHandlerDisabled(t *testing.T) {
 	}
 }
 
-func TestCreateManualDayItineraryItemRequiresAuth(t *testing.T) {
+func TestCreateManualScheduleItemRequiresAuth(t *testing.T) {
 	backend := newFakeAuthBackend()
 	recorder := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPost, "/trips/00000000-0000-0000-0000-000000000001/days/2026-07-10/itinerary-items", bytes.NewReader([]byte(`{
+	request := httptest.NewRequest(http.MethodPost, "/trips/00000000-0000-0000-0000-000000000001/days/2026-07-10/schedule-items/manual", bytes.NewReader([]byte(`{
 		"name":"우메다",
 		"address":"Umeda",
 		"placeType":"sights"
@@ -1851,7 +1851,7 @@ func TestListDayExpensesHandler(t *testing.T) {
 	backend := newFakeAuthBackend()
 	ownerToken := loginTestUser(t, backend)
 	tripID := createTestTrip(t, backend, ownerToken)
-	item := createTestDayItineraryItem(t, backend, ownerToken, tripID, "2026-07-11", `{"name":"도톤보리","address":"Dotonbori","placeType":"food"}`)
+	item := createTestScheduleItem(t, backend, ownerToken, tripID, "2026-07-11", `{"name":"도톤보리","address":"Dotonbori","placeType":"food"}`)
 	_ = loginTestUserWithSubject(t, backend, "apple-2", "지영")
 	member := tripdomain.Participant{
 		ID:          testUUID(2222),
@@ -1866,7 +1866,7 @@ func TestListDayExpensesHandler(t *testing.T) {
 
 	createExpense := func(amountMinor int64) {
 		t.Helper()
-		requestBody := []byte(fmt.Sprintf(`{"itineraryItemId":%q,"amountMinor":%d,"payerParticipantId":%q,"participantIds":[%q,%q]}`, item.ID, amountMinor, payerID, payerID, member.ID))
+		requestBody := []byte(fmt.Sprintf(`{"scheduleItemId":%q,"amountMinor":%d,"payerParticipantId":%q,"participantIds":[%q,%q]}`, item.ID, amountMinor, payerID, payerID, member.ID))
 		recorder := httptest.NewRecorder()
 		request := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/days/2026-07-11/expenses/quick", bytes.NewReader(requestBody))
 		request.Header.Set("Content-Type", "application/json")
@@ -1932,7 +1932,7 @@ func TestListDayExpensesHandler(t *testing.T) {
 	if err := json.Unmarshal(responseBody, &rawBody); err != nil {
 		t.Fatalf("decode raw list response: %v", err)
 	}
-	for _, field := range []string{"itineraryItemId", "tripPlaceId", "payerParticipantId"} {
+	for _, field := range []string{"scheduleItemId", "tripPlaceId", "payerParticipantId"} {
 		if _, ok := rawBody.Expenses[0][field]; ok {
 			t.Fatalf("expected list item not to expose nullable source field %q: %#v", field, rawBody.Expenses[0])
 		}
@@ -2017,7 +2017,7 @@ func TestCreateQuickExpenseHandler(t *testing.T) {
 	backend := newFakeAuthBackend()
 	ownerToken := loginTestUser(t, backend)
 	tripID := createTestTrip(t, backend, ownerToken)
-	item := createTestDayItineraryItem(t, backend, ownerToken, tripID, "2026-07-11", `{"name":"도톤보리","address":"Dotonbori","placeType":"food"}`)
+	item := createTestScheduleItem(t, backend, ownerToken, tripID, "2026-07-11", `{"name":"도톤보리","address":"Dotonbori","placeType":"food"}`)
 	_ = loginTestUserWithSubject(t, backend, "apple-2", "지영")
 	member := tripdomain.Participant{
 		ID:          testUUID(2222),
@@ -2030,7 +2030,7 @@ func TestCreateQuickExpenseHandler(t *testing.T) {
 	backend.participants[tripID] = append(backend.participants[tripID], member)
 	payerID := backend.participants[tripID][0].ID
 
-	requestBody := []byte(fmt.Sprintf(`{"itineraryItemId":%q,"amountMinor":1001,"payerParticipantId":%q,"participantIds":[%q]}`, item.ID, payerID, member.ID))
+	requestBody := []byte(fmt.Sprintf(`{"scheduleItemId":%q,"amountMinor":1001,"payerParticipantId":%q,"participantIds":[%q]}`, item.ID, payerID, member.ID))
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/days/2026-07-11/expenses/quick", bytes.NewReader(requestBody))
 	request.Header.Set("Content-Type", "application/json")
@@ -2045,8 +2045,8 @@ func TestCreateQuickExpenseHandler(t *testing.T) {
 	var body struct {
 		Expense struct {
 			TripID             string `json:"tripId"`
-			ScheduledDate      string `json:"scheduledDate"`
-			ItineraryItemID    string `json:"itineraryItemId"`
+			TripDayID          string `json:"tripDayId"`
+			ScheduleItemID     string `json:"scheduleItemId"`
 			TripPlaceID        string `json:"tripPlaceId"`
 			AmountMinor        int64  `json:"amountMinor"`
 			Currency           string `json:"currency"`
@@ -2067,7 +2067,7 @@ func TestCreateQuickExpenseHandler(t *testing.T) {
 	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if body.Expense.TripID != tripID || body.Expense.ScheduledDate != "2026-07-11" || body.Expense.ItineraryItemID != item.ID || body.Expense.TripPlaceID != item.PlaceID {
+	if body.Expense.TripID != tripID || body.Expense.TripDayID != "2026-07-11" || body.Expense.ScheduleItemID != item.ID || body.Expense.TripPlaceID != item.PlaceID {
 		t.Fatalf("unexpected linked expense ids: %#v", body.Expense)
 	}
 	if body.Expense.AmountMinor != 1001 || body.Expense.Currency != "JPY" || body.Expense.PayerParticipantID != payerID || body.Expense.PayerDisplayName != "민수" {
@@ -2081,7 +2081,7 @@ func TestCreateQuickExpenseHandler(t *testing.T) {
 	}
 }
 
-func TestCreateQuickExpenseLinksRepeatedPlaceByItineraryItemOccurrence(t *testing.T) {
+func TestCreateQuickExpenseLinksRepeatedPlaceByScheduleItemOccurrence(t *testing.T) {
 	backend := newFakeAuthBackend()
 	ownerToken := loginTestUser(t, backend)
 	tripID := createTestTrip(t, backend, ownerToken)
@@ -2095,17 +2095,17 @@ func TestCreateQuickExpenseLinksRepeatedPlaceByItineraryItemOccurrence(t *testin
 		Types:            []string{"lodging", "point_of_interest"},
 	}}
 
-	createGoogleItem := func(body string) createdDayItineraryItem {
+	createGoogleItem := func(body string) createdScheduleItem {
 		t.Helper()
 
 		recorder := httptest.NewRecorder()
-		request := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/days/2026-07-11/places/google/itinerary-items", bytes.NewReader([]byte(body)))
+		request := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/days/2026-07-11/places/google/schedule-items", bytes.NewReader([]byte(body)))
 		request.Header.Set("Content-Type", "application/json")
 		request.Header.Set("Authorization", "Bearer "+ownerToken)
 
 		NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true, PlaceProvider: provider}).ServeHTTP(recorder, request)
 		if recorder.Code != http.StatusCreated {
-			t.Fatalf("expected create Google itinerary item status %d, got %d with body %s", http.StatusCreated, recorder.Code, recorder.Body.String())
+			t.Fatalf("expected create Google schedule item status %d, got %d with body %s", http.StatusCreated, recorder.Code, recorder.Body.String())
 		}
 
 		var response struct {
@@ -2114,22 +2114,22 @@ func TestCreateQuickExpenseLinksRepeatedPlaceByItineraryItemOccurrence(t *testin
 				Place struct {
 					ID string `json:"id"`
 				} `json:"place"`
-			} `json:"item"`
+			} `json:"scheduleItem"`
 		}
 		if err := json.NewDecoder(recorder.Body).Decode(&response); err != nil {
-			t.Fatalf("decode create Google itinerary item response: %v", err)
+			t.Fatalf("decode create Google schedule item response: %v", err)
 		}
-		return createdDayItineraryItem{ID: response.Item.ID, PlaceID: response.Item.Place.ID}
+		return createdScheduleItem{ID: response.Item.ID, PlaceID: response.Item.Place.ID}
 	}
 
 	first := createGoogleItem(`{"googlePlaceId":"google-lodging-repeat","duplicateConfirmed":false}`)
 	second := createGoogleItem(`{"googlePlaceId":"google-lodging-repeat","duplicateConfirmed":true}`)
 	if first.ID == second.ID || first.PlaceID != second.PlaceID {
-		t.Fatalf("expected two itinerary item occurrences for one trip place, got first=%#v second=%#v", first, second)
+		t.Fatalf("expected two schedule item occurrences for one trip place, got first=%#v second=%#v", first, second)
 	}
 
 	payerID := backend.participants[tripID][0].ID
-	requestBody := []byte(fmt.Sprintf(`{"itineraryItemId":%q,"amountMinor":4500,"payerParticipantId":%q,"participantIds":[%q]}`, second.ID, payerID, payerID))
+	requestBody := []byte(fmt.Sprintf(`{"scheduleItemId":%q,"amountMinor":4500,"payerParticipantId":%q,"participantIds":[%q]}`, second.ID, payerID, payerID))
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/days/2026-07-11/expenses/quick", bytes.NewReader(requestBody))
 	request.Header.Set("Content-Type", "application/json")
@@ -2143,9 +2143,9 @@ func TestCreateQuickExpenseLinksRepeatedPlaceByItineraryItemOccurrence(t *testin
 
 	var body struct {
 		Expense struct {
-			ItineraryItemID string `json:"itineraryItemId"`
-			TripPlaceID     string `json:"tripPlaceId"`
-			Place           struct {
+			ScheduleItemID string `json:"scheduleItemId"`
+			TripPlaceID    string `json:"tripPlaceId"`
+			Place          struct {
 				Name      string `json:"name"`
 				Address   string `json:"address"`
 				PlaceType string `json:"placeType"`
@@ -2155,7 +2155,7 @@ func TestCreateQuickExpenseLinksRepeatedPlaceByItineraryItemOccurrence(t *testin
 	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if body.Expense.ItineraryItemID != second.ID || body.Expense.ItineraryItemID == first.ID {
+	if body.Expense.ScheduleItemID != second.ID || body.Expense.ScheduleItemID == first.ID {
 		t.Fatalf("expected expense to link to second occurrence %q, got %#v", second.ID, body.Expense)
 	}
 	if body.Expense.TripPlaceID != second.PlaceID {
@@ -2169,7 +2169,7 @@ func TestCreateQuickExpenseLinksRepeatedPlaceByItineraryItemOccurrence(t *testin
 func TestCreateQuickExpenseRequiresAuth(t *testing.T) {
 	backend := newFakeAuthBackend()
 	recorder := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPost, "/trips/00000000-0000-0000-0000-000000000001/days/2026-07-10/expenses/quick", bytes.NewReader([]byte(`{"itineraryItemId":"00000000-0000-0000-0000-000000007001","amountMinor":1,"payerParticipantId":"00000000-0000-0000-0000-000000002001"}`)))
+	request := httptest.NewRequest(http.MethodPost, "/trips/00000000-0000-0000-0000-000000000001/days/2026-07-10/expenses/quick", bytes.NewReader([]byte(`{"scheduleItemId":"00000000-0000-0000-0000-000000007001","amountMinor":1,"payerParticipantId":"00000000-0000-0000-0000-000000002001"}`)))
 	request.Header.Set("Content-Type", "application/json")
 
 	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
@@ -2183,13 +2183,13 @@ func TestCreateQuickExpenseValidationNotFoundAndForbidden(t *testing.T) {
 	backend := newFakeAuthBackend()
 	ownerToken := loginTestUser(t, backend)
 	tripID := createTestTrip(t, backend, ownerToken)
-	item := createTestDayItineraryItem(t, backend, ownerToken, tripID, "2026-07-11", `{"name":"도톤보리","address":"Dotonbori","placeType":"food"}`)
+	item := createTestScheduleItem(t, backend, ownerToken, tripID, "2026-07-11", `{"name":"도톤보리","address":"Dotonbori","placeType":"food"}`)
 	payerID := backend.participants[tripID][0].ID
 	nonParticipantToken := loginTestUserWithSubject(t, backend, "apple-2", "지영")
-	bodyFor := func(itineraryItemID string, amountMinor int64, payerParticipantID string, participantIDs []string) string {
+	bodyFor := func(scheduleItemID string, amountMinor int64, payerParticipantID string, participantIDs []string) string {
 		t.Helper()
 		payload := map[string]interface{}{
-			"itineraryItemId":    itineraryItemID,
+			"scheduleItemId":     scheduleItemID,
 			"amountMinor":        amountMinor,
 			"payerParticipantId": payerParticipantID,
 		}
@@ -2239,14 +2239,14 @@ func TestCreateQuickExpenseValidationNotFoundAndForbidden(t *testing.T) {
 	}
 }
 
-func TestMarkDayItineraryItemArrivedHandler(t *testing.T) {
+func TestMarkScheduleItemArrivedHandler(t *testing.T) {
 	backend := newFakeAuthBackend()
 	accessToken := loginTestUser(t, backend)
 	tripID := createTestTrip(t, backend, accessToken)
-	first := createTestDayItineraryItem(t, backend, accessToken, tripID, "2026-07-11", `{"name":"도톤보리","address":"Dotonbori","placeType":"food"}`)
-	second := createTestDayItineraryItem(t, backend, accessToken, tripID, "2026-07-11", `{"name":"오사카성","address":"Osakajo","placeType":"sights"}`)
+	first := createTestScheduleItem(t, backend, accessToken, tripID, "2026-07-11", `{"name":"도톤보리","address":"Dotonbori","placeType":"food"}`)
+	second := createTestScheduleItem(t, backend, accessToken, tripID, "2026-07-11", `{"name":"오사카성","address":"Osakajo","placeType":"sights"}`)
 
-	path := "/trips/" + tripID + "/days/2026-07-11/itinerary/items/" + first.ID + "/arrive"
+	path := "/trips/" + tripID + "/days/2026-07-11/schedule-items/" + first.ID + "/arrive"
 	firstRecorder := httptest.NewRecorder()
 	firstRequest := httptest.NewRequest(http.MethodPost, path, nil)
 	firstRequest.Header.Set("Authorization", "Bearer "+accessToken)
@@ -2264,11 +2264,11 @@ func TestMarkDayItineraryItemArrivedHandler(t *testing.T) {
 		Item struct {
 			ID        string  `json:"id"`
 			ArrivedAt *string `json:"arrivedAt"`
-		} `json:"item"`
+		} `json:"scheduleItem"`
 		Items []struct {
 			ID        string  `json:"id"`
 			ArrivedAt *string `json:"arrivedAt"`
-		} `json:"items"`
+		} `json:"scheduleItems"`
 	}
 	if err := json.NewDecoder(firstRecorder.Body).Decode(&firstBody); err != nil {
 		t.Fatalf("decode first response: %v", err)
@@ -2293,7 +2293,7 @@ func TestMarkDayItineraryItemArrivedHandler(t *testing.T) {
 	var repeatBody struct {
 		Item struct {
 			ArrivedAt *string `json:"arrivedAt"`
-		} `json:"item"`
+		} `json:"scheduleItem"`
 	}
 	if err := json.NewDecoder(repeatRecorder.Body).Decode(&repeatBody); err != nil {
 		t.Fatalf("decode repeat response: %v", err)
@@ -2303,23 +2303,23 @@ func TestMarkDayItineraryItemArrivedHandler(t *testing.T) {
 	}
 }
 
-func TestMarkDayItineraryItemArrivedRequiresAuth(t *testing.T) {
+func TestMarkScheduleItemArrivedRequiresAuth(t *testing.T) {
 	backend := newFakeAuthBackend()
 	recorder := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPost, "/trips/00000000-0000-0000-0000-000000000001/days/2026-07-10/itinerary/items/00000000-0000-0000-0000-000000005001/arrive", nil)
+	request := httptest.NewRequest(http.MethodPost, "/trips/00000000-0000-0000-0000-000000000001/days/2026-07-10/schedule-items/00000000-0000-0000-0000-000000005001/arrive", nil)
 	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
 	if recorder.Code != http.StatusUnauthorized {
 		t.Fatalf("expected status %d, got %d with body %s", http.StatusUnauthorized, recorder.Code, recorder.Body.String())
 	}
 }
 
-func TestMarkDayItineraryItemArrivedValidationNotFoundForbiddenAndConflict(t *testing.T) {
+func TestMarkScheduleItemArrivedValidationNotFoundForbiddenAndConflict(t *testing.T) {
 	backend := newFakeAuthBackend()
 	ownerToken := loginTestUser(t, backend)
 	tripID := createTestTrip(t, backend, ownerToken)
-	first := createTestDayItineraryItem(t, backend, ownerToken, tripID, "2026-07-11", `{"name":"도톤보리","address":"Dotonbori","placeType":"food"}`)
-	second := createTestDayItineraryItem(t, backend, ownerToken, tripID, "2026-07-11", `{"name":"오사카성","address":"Osakajo","placeType":"sights"}`)
-	otherDay := createTestDayItineraryItem(t, backend, ownerToken, tripID, "2026-07-12", `{"name":"교토","address":"Kyoto","placeType":"sights"}`)
+	first := createTestScheduleItem(t, backend, ownerToken, tripID, "2026-07-11", `{"name":"도톤보리","address":"Dotonbori","placeType":"food"}`)
+	second := createTestScheduleItem(t, backend, ownerToken, tripID, "2026-07-11", `{"name":"오사카성","address":"Osakajo","placeType":"sights"}`)
+	otherDay := createTestScheduleItem(t, backend, ownerToken, tripID, "2026-07-12", `{"name":"교토","address":"Kyoto","placeType":"sights"}`)
 	nonParticipantToken := loginTestUserWithSubject(t, backend, "apple-2", "지영")
 
 	tests := []struct {
@@ -2329,14 +2329,14 @@ func TestMarkDayItineraryItemArrivedValidationNotFoundForbiddenAndConflict(t *te
 		expectCode int
 		expectErr  string
 	}{
-		{name: "invalid trip id", path: "/trips/not-a-uuid/days/2026-07-11/itinerary/items/" + first.ID + "/arrive", token: ownerToken, expectCode: http.StatusBadRequest, expectErr: "VALIDATION_ERROR"},
-		{name: "invalid date", path: "/trips/" + tripID + "/days/not-a-date/itinerary/items/" + first.ID + "/arrive", token: ownerToken, expectCode: http.StatusBadRequest, expectErr: "VALIDATION_ERROR"},
-		{name: "invalid item id", path: "/trips/" + tripID + "/days/2026-07-11/itinerary/items/not-a-uuid/arrive", token: ownerToken, expectCode: http.StatusBadRequest, expectErr: "VALIDATION_ERROR"},
-		{name: "missing trip", path: "/trips/00000000-0000-0000-0000-000000000404/days/2026-07-11/itinerary/items/" + first.ID + "/arrive", token: ownerToken, expectCode: http.StatusNotFound, expectErr: "NOT_FOUND"},
-		{name: "out of range", path: "/trips/" + tripID + "/days/2026-07-14/itinerary/items/" + first.ID + "/arrive", token: ownerToken, expectCode: http.StatusNotFound, expectErr: "NOT_FOUND"},
-		{name: "item not in selected day", path: "/trips/" + tripID + "/days/2026-07-11/itinerary/items/" + otherDay.ID + "/arrive", token: ownerToken, expectCode: http.StatusNotFound, expectErr: "NOT_FOUND"},
-		{name: "forbidden", path: "/trips/" + tripID + "/days/2026-07-11/itinerary/items/" + first.ID + "/arrive", token: nonParticipantToken, expectCode: http.StatusForbidden, expectErr: "FORBIDDEN"},
-		{name: "later pending conflict", path: "/trips/" + tripID + "/days/2026-07-11/itinerary/items/" + second.ID + "/arrive", token: ownerToken, expectCode: http.StatusConflict, expectErr: "CONFLICT"},
+		{name: "invalid trip id", path: "/trips/not-a-uuid/days/2026-07-11/schedule-items/" + first.ID + "/arrive", token: ownerToken, expectCode: http.StatusBadRequest, expectErr: "VALIDATION_ERROR"},
+		{name: "invalid date", path: "/trips/" + tripID + "/days/not-a-date/schedule-items/" + first.ID + "/arrive", token: ownerToken, expectCode: http.StatusBadRequest, expectErr: "VALIDATION_ERROR"},
+		{name: "invalid item id", path: "/trips/" + tripID + "/days/2026-07-11/schedule-items/not-a-uuid/arrive", token: ownerToken, expectCode: http.StatusBadRequest, expectErr: "VALIDATION_ERROR"},
+		{name: "missing trip", path: "/trips/00000000-0000-0000-0000-000000000404/days/2026-07-11/schedule-items/" + first.ID + "/arrive", token: ownerToken, expectCode: http.StatusNotFound, expectErr: "NOT_FOUND"},
+		{name: "out of range", path: "/trips/" + tripID + "/days/2026-07-14/schedule-items/" + first.ID + "/arrive", token: ownerToken, expectCode: http.StatusNotFound, expectErr: "NOT_FOUND"},
+		{name: "item not in selected day", path: "/trips/" + tripID + "/days/2026-07-11/schedule-items/" + otherDay.ID + "/arrive", token: ownerToken, expectCode: http.StatusNotFound, expectErr: "NOT_FOUND"},
+		{name: "forbidden", path: "/trips/" + tripID + "/days/2026-07-11/schedule-items/" + first.ID + "/arrive", token: nonParticipantToken, expectCode: http.StatusForbidden, expectErr: "FORBIDDEN"},
+		{name: "later pending conflict", path: "/trips/" + tripID + "/days/2026-07-11/schedule-items/" + second.ID + "/arrive", token: ownerToken, expectCode: http.StatusConflict, expectErr: "CONFLICT"},
 	}
 
 	for _, tt := range tests {
@@ -2363,14 +2363,14 @@ func TestMarkDayItineraryItemArrivedValidationNotFoundForbiddenAndConflict(t *te
 	}
 }
 
-func TestMarkDayItineraryItemSkippedAndRestoreHandlers(t *testing.T) {
+func TestMarkScheduleItemSkippedAndRestoreHandlers(t *testing.T) {
 	backend := newFakeAuthBackend()
 	accessToken := loginTestUser(t, backend)
 	tripID := createTestTrip(t, backend, accessToken)
-	first := createTestDayItineraryItem(t, backend, accessToken, tripID, "2026-07-11", `{"name":"도톤보리","address":"Dotonbori","placeType":"food"}`)
-	second := createTestDayItineraryItem(t, backend, accessToken, tripID, "2026-07-11", `{"name":"오사카성","address":"Osakajo","placeType":"sights"}`)
+	first := createTestScheduleItem(t, backend, accessToken, tripID, "2026-07-11", `{"name":"도톤보리","address":"Dotonbori","placeType":"food"}`)
+	second := createTestScheduleItem(t, backend, accessToken, tripID, "2026-07-11", `{"name":"오사카성","address":"Osakajo","placeType":"sights"}`)
 
-	skipPath := "/trips/" + tripID + "/days/2026-07-11/itinerary/items/" + first.ID + "/skip"
+	skipPath := "/trips/" + tripID + "/days/2026-07-11/schedule-items/" + first.ID + "/skip"
 	skipRecorder := httptest.NewRecorder()
 	skipRequest := httptest.NewRequest(http.MethodPost, skipPath, nil)
 	skipRequest.Header.Set("Authorization", "Bearer "+accessToken)
@@ -2383,11 +2383,11 @@ func TestMarkDayItineraryItemSkippedAndRestoreHandlers(t *testing.T) {
 		Item struct {
 			ID        string  `json:"id"`
 			SkippedAt *string `json:"skippedAt"`
-		} `json:"item"`
+		} `json:"scheduleItem"`
 		Items []struct {
 			ID        string  `json:"id"`
 			SkippedAt *string `json:"skippedAt"`
-		} `json:"items"`
+		} `json:"scheduleItems"`
 	}
 	if err := json.NewDecoder(skipRecorder.Body).Decode(&skipBody); err != nil {
 		t.Fatalf("decode skip response: %v", err)
@@ -2407,7 +2407,7 @@ func TestMarkDayItineraryItemSkippedAndRestoreHandlers(t *testing.T) {
 		t.Fatalf("expected repeat skip status %d, got %d with body %s", http.StatusOK, repeatRecorder.Code, repeatRecorder.Body.String())
 	}
 
-	restorePath := "/trips/" + tripID + "/days/2026-07-11/itinerary/items/" + first.ID + "/restore"
+	restorePath := "/trips/" + tripID + "/days/2026-07-11/schedule-items/" + first.ID + "/restore"
 	restoreRecorder := httptest.NewRecorder()
 	restoreRequest := httptest.NewRequest(http.MethodPost, restorePath, nil)
 	restoreRequest.Header.Set("Authorization", "Bearer "+accessToken)
@@ -2420,7 +2420,7 @@ func TestMarkDayItineraryItemSkippedAndRestoreHandlers(t *testing.T) {
 		Item struct {
 			ID        string  `json:"id"`
 			SkippedAt *string `json:"skippedAt"`
-		} `json:"item"`
+		} `json:"scheduleItem"`
 	}
 	if err := json.NewDecoder(restoreRecorder.Body).Decode(&restoreBody); err != nil {
 		t.Fatalf("decode restore response: %v", err)
@@ -2430,11 +2430,11 @@ func TestMarkDayItineraryItemSkippedAndRestoreHandlers(t *testing.T) {
 	}
 }
 
-func TestDayItineraryItemSkipAndRestoreRequiresAuth(t *testing.T) {
+func TestScheduleItemSkipAndRestoreRequiresAuth(t *testing.T) {
 	backend := newFakeAuthBackend()
 	for _, path := range []string{
-		"/trips/00000000-0000-0000-0000-000000000001/days/2026-07-10/itinerary/items/00000000-0000-0000-0000-000000005001/skip",
-		"/trips/00000000-0000-0000-0000-000000000001/days/2026-07-10/itinerary/items/00000000-0000-0000-0000-000000005001/restore",
+		"/trips/00000000-0000-0000-0000-000000000001/days/2026-07-10/schedule-items/00000000-0000-0000-0000-000000005001/skip",
+		"/trips/00000000-0000-0000-0000-000000000001/days/2026-07-10/schedule-items/00000000-0000-0000-0000-000000005001/restore",
 	} {
 		recorder := httptest.NewRecorder()
 		request := httptest.NewRequest(http.MethodPost, path, nil)
@@ -2445,13 +2445,13 @@ func TestDayItineraryItemSkipAndRestoreRequiresAuth(t *testing.T) {
 	}
 }
 
-func TestDayItineraryItemSkipAndRestoreValidationNotFoundForbiddenAndConflict(t *testing.T) {
+func TestScheduleItemSkipAndRestoreValidationNotFoundForbiddenAndConflict(t *testing.T) {
 	backend := newFakeAuthBackend()
 	ownerToken := loginTestUser(t, backend)
 	tripID := createTestTrip(t, backend, ownerToken)
-	first := createTestDayItineraryItem(t, backend, ownerToken, tripID, "2026-07-11", `{"name":"도톤보리","address":"Dotonbori","placeType":"food"}`)
-	second := createTestDayItineraryItem(t, backend, ownerToken, tripID, "2026-07-11", `{"name":"오사카성","address":"Osakajo","placeType":"sights"}`)
-	otherDay := createTestDayItineraryItem(t, backend, ownerToken, tripID, "2026-07-12", `{"name":"교토","address":"Kyoto","placeType":"sights"}`)
+	first := createTestScheduleItem(t, backend, ownerToken, tripID, "2026-07-11", `{"name":"도톤보리","address":"Dotonbori","placeType":"food"}`)
+	second := createTestScheduleItem(t, backend, ownerToken, tripID, "2026-07-11", `{"name":"오사카성","address":"Osakajo","placeType":"sights"}`)
+	otherDay := createTestScheduleItem(t, backend, ownerToken, tripID, "2026-07-12", `{"name":"교토","address":"Kyoto","placeType":"sights"}`)
 	nonParticipantToken := loginTestUserWithSubject(t, backend, "apple-2", "지영")
 
 	tests := []struct {
@@ -2460,12 +2460,12 @@ func TestDayItineraryItemSkipAndRestoreValidationNotFoundForbiddenAndConflict(t 
 		token      string
 		expectCode int
 	}{
-		{name: "skip invalid item id", path: "/trips/" + tripID + "/days/2026-07-11/itinerary/items/not-a-uuid/skip", token: ownerToken, expectCode: http.StatusBadRequest},
-		{name: "skip item not in selected day", path: "/trips/" + tripID + "/days/2026-07-11/itinerary/items/" + otherDay.ID + "/skip", token: ownerToken, expectCode: http.StatusNotFound},
-		{name: "skip forbidden", path: "/trips/" + tripID + "/days/2026-07-11/itinerary/items/" + first.ID + "/skip", token: nonParticipantToken, expectCode: http.StatusForbidden},
-		{name: "skip later pending conflict", path: "/trips/" + tripID + "/days/2026-07-11/itinerary/items/" + second.ID + "/skip", token: ownerToken, expectCode: http.StatusConflict},
-		{name: "restore invalid date", path: "/trips/" + tripID + "/days/not-a-date/itinerary/items/" + first.ID + "/restore", token: ownerToken, expectCode: http.StatusBadRequest},
-		{name: "restore item not in selected day", path: "/trips/" + tripID + "/days/2026-07-11/itinerary/items/" + otherDay.ID + "/restore", token: ownerToken, expectCode: http.StatusNotFound},
+		{name: "skip invalid item id", path: "/trips/" + tripID + "/days/2026-07-11/schedule-items/not-a-uuid/skip", token: ownerToken, expectCode: http.StatusBadRequest},
+		{name: "skip item not in selected day", path: "/trips/" + tripID + "/days/2026-07-11/schedule-items/" + otherDay.ID + "/skip", token: ownerToken, expectCode: http.StatusNotFound},
+		{name: "skip forbidden", path: "/trips/" + tripID + "/days/2026-07-11/schedule-items/" + first.ID + "/skip", token: nonParticipantToken, expectCode: http.StatusForbidden},
+		{name: "skip later pending conflict", path: "/trips/" + tripID + "/days/2026-07-11/schedule-items/" + second.ID + "/skip", token: ownerToken, expectCode: http.StatusConflict},
+		{name: "restore invalid date", path: "/trips/" + tripID + "/days/not-a-date/schedule-items/" + first.ID + "/restore", token: ownerToken, expectCode: http.StatusBadRequest},
+		{name: "restore item not in selected day", path: "/trips/" + tripID + "/days/2026-07-11/schedule-items/" + otherDay.ID + "/restore", token: ownerToken, expectCode: http.StatusNotFound},
 	}
 
 	for _, tt := range tests {
@@ -2481,18 +2481,18 @@ func TestDayItineraryItemSkipAndRestoreValidationNotFoundForbiddenAndConflict(t 
 	}
 }
 
-func TestUpdateDayItineraryItemHandler(t *testing.T) {
+func TestUpdateScheduleItemHandler(t *testing.T) {
 	backend := newFakeAuthBackend()
 	accessToken := loginTestUser(t, backend)
 	tripID := createTestTrip(t, backend, accessToken)
-	created := createTestDayItineraryItem(t, backend, accessToken, tripID, "2026-07-11", `{
+	created := createTestScheduleItem(t, backend, accessToken, tripID, "2026-07-11", `{
 		"name":"우메다 공중정원",
 		"address":"Umeda",
 		"placeType":"sights"
 	}`)
 
 	recorder := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPatch, "/trips/"+tripID+"/days/2026-07-11/itinerary/items/"+created.ID, bytes.NewReader([]byte(`{
+	request := httptest.NewRequest(http.MethodPatch, "/trips/"+tripID+"/days/2026-07-11/schedule-items/"+created.ID, bytes.NewReader([]byte(`{
 		"name":"  우메다 스카이빌딩  ",
 		"placeType":"food"
 	}`)))
@@ -2515,7 +2515,7 @@ func TestUpdateDayItineraryItemHandler(t *testing.T) {
 				PlaceType string `json:"placeType"`
 				Address   string `json:"address"`
 			} `json:"place"`
-		} `json:"item"`
+		} `json:"scheduleItem"`
 	}
 	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
 		t.Fatalf("decode response: %v", err)
@@ -2525,10 +2525,10 @@ func TestUpdateDayItineraryItemHandler(t *testing.T) {
 	}
 }
 
-func TestReorderDayItineraryItemsRequiresAuth(t *testing.T) {
+func TestReorderScheduleItemsRequiresAuth(t *testing.T) {
 	backend := newFakeAuthBackend()
 	recorder := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPatch, "/trips/00000000-0000-0000-0000-000000000001/days/2026-07-11/itinerary-items/order", bytes.NewReader([]byte(`{"moves":[]}`)))
+	request := httptest.NewRequest(http.MethodPatch, "/trips/00000000-0000-0000-0000-000000000001/days/2026-07-11/schedule-items/order", bytes.NewReader([]byte(`{"moves":[]}`)))
 	request.Header.Set("Content-Type", "application/json")
 
 	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
@@ -2538,25 +2538,25 @@ func TestReorderDayItineraryItemsRequiresAuth(t *testing.T) {
 	}
 }
 
-func TestReorderDayItineraryItemsValidation(t *testing.T) {
+func TestReorderScheduleItemsValidation(t *testing.T) {
 	backend := newFakeAuthBackend()
 	ownerToken := loginTestUser(t, backend)
 	tripID := createTestTrip(t, backend, ownerToken)
-	first := createTestDayItineraryItem(t, backend, ownerToken, tripID, "2026-07-11", `{"name":"우메다","address":"Umeda","placeType":"sights"}`)
-	second := createTestDayItineraryItem(t, backend, ownerToken, tripID, "2026-07-11", `{"name":"도톤보리","address":"Dotonbori","placeType":"food"}`)
+	first := createTestScheduleItem(t, backend, ownerToken, tripID, "2026-07-11", `{"name":"우메다","address":"Umeda","placeType":"sights"}`)
+	second := createTestScheduleItem(t, backend, ownerToken, tripID, "2026-07-11", `{"name":"도톤보리","address":"Dotonbori","placeType":"food"}`)
 
 	tests := []struct {
 		name string
 		path string
 		body string
 	}{
-		{name: "invalid trip id", path: "/trips/not-a-uuid/days/2026-07-11/itinerary-items/order", body: fmt.Sprintf(`{"moves":[{"itemId":%q,"beforeItemId":%q,"clientVersion":1}]}`, first.ID, second.ID)},
-		{name: "invalid date", path: "/trips/" + tripID + "/days/not-a-date/itinerary-items/order", body: fmt.Sprintf(`{"moves":[{"itemId":%q,"beforeItemId":%q,"clientVersion":1}]}`, first.ID, second.ID)},
-		{name: "empty moves", path: "/trips/" + tripID + "/days/2026-07-11/itinerary-items/order", body: `{"moves":[]}`},
-		{name: "both anchors nil", path: "/trips/" + tripID + "/days/2026-07-11/itinerary-items/order", body: fmt.Sprintf(`{"moves":[{"itemId":%q,"beforeItemId":null,"afterItemId":null,"clientVersion":1}]}`, first.ID)},
-		{name: "invalid client version", path: "/trips/" + tripID + "/days/2026-07-11/itinerary-items/order", body: fmt.Sprintf(`{"moves":[{"itemId":%q,"beforeItemId":%q,"clientVersion":0}]}`, first.ID, second.ID)},
-		{name: "item not in day", path: "/trips/" + tripID + "/days/2026-07-11/itinerary-items/order", body: fmt.Sprintf(`{"moves":[{"itemId":%q,"beforeItemId":%q,"clientVersion":1}]}`, testUUID(9999), second.ID)},
-		{name: "anchor not in day", path: "/trips/" + tripID + "/days/2026-07-11/itinerary-items/order", body: fmt.Sprintf(`{"moves":[{"itemId":%q,"beforeItemId":%q,"clientVersion":1}]}`, first.ID, testUUID(9999))},
+		{name: "invalid trip id", path: "/trips/not-a-uuid/days/2026-07-11/schedule-items/order", body: fmt.Sprintf(`{"moves":[{"scheduleItemId":%q,"beforeScheduleItemId":%q,"clientVersion":1}]}`, first.ID, second.ID)},
+		{name: "invalid date", path: "/trips/" + tripID + "/days/not-a-date/schedule-items/order", body: fmt.Sprintf(`{"moves":[{"scheduleItemId":%q,"beforeScheduleItemId":%q,"clientVersion":1}]}`, first.ID, second.ID)},
+		{name: "empty moves", path: "/trips/" + tripID + "/days/2026-07-11/schedule-items/order", body: `{"moves":[]}`},
+		{name: "both anchors nil", path: "/trips/" + tripID + "/days/2026-07-11/schedule-items/order", body: fmt.Sprintf(`{"moves":[{"scheduleItemId":%q,"beforeScheduleItemId":null,"afterScheduleItemId":null,"clientVersion":1}]}`, first.ID)},
+		{name: "invalid client version", path: "/trips/" + tripID + "/days/2026-07-11/schedule-items/order", body: fmt.Sprintf(`{"moves":[{"scheduleItemId":%q,"beforeScheduleItemId":%q,"clientVersion":0}]}`, first.ID, second.ID)},
+		{name: "item not in day", path: "/trips/" + tripID + "/days/2026-07-11/schedule-items/order", body: fmt.Sprintf(`{"moves":[{"scheduleItemId":%q,"beforeScheduleItemId":%q,"clientVersion":1}]}`, testUUID(9999), second.ID)},
+		{name: "anchor not in day", path: "/trips/" + tripID + "/days/2026-07-11/schedule-items/order", body: fmt.Sprintf(`{"moves":[{"scheduleItemId":%q,"beforeScheduleItemId":%q,"clientVersion":1}]}`, first.ID, testUUID(9999))},
 	}
 
 	for _, tt := range tests {
@@ -2587,14 +2587,14 @@ func TestReorderDayItineraryItemsValidation(t *testing.T) {
 	}
 }
 
-func TestReorderDayItineraryItemsNotFoundForbiddenAndConflict(t *testing.T) {
+func TestReorderScheduleItemsNotFoundForbiddenAndConflict(t *testing.T) {
 	backend := newFakeAuthBackend()
 	ownerToken := loginTestUser(t, backend)
 	tripID := createTestTrip(t, backend, ownerToken)
-	first := createTestDayItineraryItem(t, backend, ownerToken, tripID, "2026-07-11", `{"name":"우메다","address":"Umeda","placeType":"sights"}`)
-	second := createTestDayItineraryItem(t, backend, ownerToken, tripID, "2026-07-11", `{"name":"도톤보리","address":"Dotonbori","placeType":"food"}`)
+	first := createTestScheduleItem(t, backend, ownerToken, tripID, "2026-07-11", `{"name":"우메다","address":"Umeda","placeType":"sights"}`)
+	second := createTestScheduleItem(t, backend, ownerToken, tripID, "2026-07-11", `{"name":"도톤보리","address":"Dotonbori","placeType":"food"}`)
 	nonParticipantToken := loginTestUserWithSubject(t, backend, "apple-2", "지영")
-	validBody := fmt.Sprintf(`{"moves":[{"itemId":%q,"beforeItemId":%q,"clientVersion":1}]}`, first.ID, second.ID)
+	validBody := fmt.Sprintf(`{"moves":[{"scheduleItemId":%q,"beforeScheduleItemId":%q,"clientVersion":1}]}`, first.ID, second.ID)
 
 	tests := []struct {
 		name       string
@@ -2604,10 +2604,10 @@ func TestReorderDayItineraryItemsNotFoundForbiddenAndConflict(t *testing.T) {
 		expectCode int
 		expectErr  string
 	}{
-		{name: "missing trip", path: "/trips/00000000-0000-0000-0000-000000000404/days/2026-07-11/itinerary-items/order", token: ownerToken, expectCode: http.StatusNotFound, expectErr: "NOT_FOUND"},
-		{name: "out of range", path: "/trips/" + tripID + "/days/2026-07-14/itinerary-items/order", token: ownerToken, expectCode: http.StatusNotFound, expectErr: "NOT_FOUND"},
-		{name: "forbidden", path: "/trips/" + tripID + "/days/2026-07-11/itinerary-items/order", token: nonParticipantToken, expectCode: http.StatusForbidden, expectErr: "FORBIDDEN"},
-		{name: "conflict", path: "/trips/" + tripID + "/days/2026-07-11/itinerary-items/order", token: ownerToken, setup: func() { backend.reorderErr = tripdomain.ErrConflict }, expectCode: http.StatusConflict, expectErr: "CONFLICT"},
+		{name: "missing trip", path: "/trips/00000000-0000-0000-0000-000000000404/days/2026-07-11/schedule-items/order", token: ownerToken, expectCode: http.StatusNotFound, expectErr: "NOT_FOUND"},
+		{name: "out of range", path: "/trips/" + tripID + "/days/2026-07-14/schedule-items/order", token: ownerToken, expectCode: http.StatusNotFound, expectErr: "NOT_FOUND"},
+		{name: "forbidden", path: "/trips/" + tripID + "/days/2026-07-11/schedule-items/order", token: nonParticipantToken, expectCode: http.StatusForbidden, expectErr: "FORBIDDEN"},
+		{name: "conflict", path: "/trips/" + tripID + "/days/2026-07-11/schedule-items/order", token: ownerToken, setup: func() { backend.reorderErr = tripdomain.ErrConflict }, expectCode: http.StatusConflict, expectErr: "CONFLICT"},
 	}
 
 	for _, tt := range tests {
@@ -2641,24 +2641,24 @@ func TestReorderDayItineraryItemsNotFoundForbiddenAndConflict(t *testing.T) {
 	}
 }
 
-func TestUpdateDayItineraryItemValidation(t *testing.T) {
+func TestUpdateScheduleItemValidation(t *testing.T) {
 	backend := newFakeAuthBackend()
 	accessToken := loginTestUser(t, backend)
 	tripID := createTestTrip(t, backend, accessToken)
-	created := createTestDayItineraryItem(t, backend, accessToken, tripID, "2026-07-11", `{"name":"우메다","address":"Umeda","placeType":"sights"}`)
+	created := createTestScheduleItem(t, backend, accessToken, tripID, "2026-07-11", `{"name":"우메다","address":"Umeda","placeType":"sights"}`)
 
 	tests := []struct {
 		name string
 		path string
 		body string
 	}{
-		{name: "invalid trip id", path: "/trips/not-a-uuid/days/2026-07-11/itinerary/items/" + created.ID, body: `{"name":"도톤보리"}`},
-		{name: "invalid date", path: "/trips/" + tripID + "/days/not-a-date/itinerary/items/" + created.ID, body: `{"name":"도톤보리"}`},
-		{name: "invalid item id", path: "/trips/" + tripID + "/days/2026-07-11/itinerary/items/not-a-uuid", body: `{"name":"도톤보리"}`},
-		{name: "empty patch", path: "/trips/" + tripID + "/days/2026-07-11/itinerary/items/" + created.ID, body: `{}`},
-		{name: "unknown field", path: "/trips/" + tripID + "/days/2026-07-11/itinerary/items/" + created.ID, body: `{"memo":"x"}`},
-		{name: "blank name", path: "/trips/" + tripID + "/days/2026-07-11/itinerary/items/" + created.ID, body: `{"name":" "}`},
-		{name: "invalid place type", path: "/trips/" + tripID + "/days/2026-07-11/itinerary/items/" + created.ID, body: `{"placeType":"museum"}`},
+		{name: "invalid trip id", path: "/trips/not-a-uuid/days/2026-07-11/schedule-items/" + created.ID, body: `{"name":"도톤보리"}`},
+		{name: "invalid date", path: "/trips/" + tripID + "/days/not-a-date/schedule-items/" + created.ID, body: `{"name":"도톤보리"}`},
+		{name: "invalid item id", path: "/trips/" + tripID + "/days/2026-07-11/schedule-items/not-a-uuid", body: `{"name":"도톤보리"}`},
+		{name: "empty patch", path: "/trips/" + tripID + "/days/2026-07-11/schedule-items/" + created.ID, body: `{}`},
+		{name: "unknown field", path: "/trips/" + tripID + "/days/2026-07-11/schedule-items/" + created.ID, body: `{"memo":"x"}`},
+		{name: "blank name", path: "/trips/" + tripID + "/days/2026-07-11/schedule-items/" + created.ID, body: `{"name":" "}`},
+		{name: "invalid place type", path: "/trips/" + tripID + "/days/2026-07-11/schedule-items/" + created.ID, body: `{"placeType":"museum"}`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -2676,11 +2676,11 @@ func TestUpdateDayItineraryItemValidation(t *testing.T) {
 	}
 }
 
-func TestUpdateDayItineraryItemNotFoundAndForbidden(t *testing.T) {
+func TestUpdateScheduleItemNotFoundAndForbidden(t *testing.T) {
 	backend := newFakeAuthBackend()
 	ownerToken := loginTestUser(t, backend)
 	tripID := createTestTrip(t, backend, ownerToken)
-	created := createTestDayItineraryItem(t, backend, ownerToken, tripID, "2026-07-11", `{"name":"우메다","address":"Umeda","placeType":"sights"}`)
+	created := createTestScheduleItem(t, backend, ownerToken, tripID, "2026-07-11", `{"name":"우메다","address":"Umeda","placeType":"sights"}`)
 	nonParticipantToken := loginTestUserWithSubject(t, backend, "apple-2", "지영")
 
 	tests := []struct {
@@ -2689,10 +2689,10 @@ func TestUpdateDayItineraryItemNotFoundAndForbidden(t *testing.T) {
 		token      string
 		expectCode int
 	}{
-		{name: "missing trip", path: "/trips/00000000-0000-0000-0000-000000000404/days/2026-07-11/itinerary/items/" + created.ID, token: ownerToken, expectCode: http.StatusNotFound},
-		{name: "out of range", path: "/trips/" + tripID + "/days/2026-07-14/itinerary/items/" + created.ID, token: ownerToken, expectCode: http.StatusNotFound},
-		{name: "item not in selected day", path: "/trips/" + tripID + "/days/2026-07-12/itinerary/items/" + created.ID, token: ownerToken, expectCode: http.StatusNotFound},
-		{name: "forbidden", path: "/trips/" + tripID + "/days/2026-07-11/itinerary/items/" + created.ID, token: nonParticipantToken, expectCode: http.StatusForbidden},
+		{name: "missing trip", path: "/trips/00000000-0000-0000-0000-000000000404/days/2026-07-11/schedule-items/" + created.ID, token: ownerToken, expectCode: http.StatusNotFound},
+		{name: "out of range", path: "/trips/" + tripID + "/days/2026-07-14/schedule-items/" + created.ID, token: ownerToken, expectCode: http.StatusNotFound},
+		{name: "item not in selected day", path: "/trips/" + tripID + "/days/2026-07-12/schedule-items/" + created.ID, token: ownerToken, expectCode: http.StatusNotFound},
+		{name: "forbidden", path: "/trips/" + tripID + "/days/2026-07-11/schedule-items/" + created.ID, token: nonParticipantToken, expectCode: http.StatusForbidden},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -2710,14 +2710,14 @@ func TestUpdateDayItineraryItemNotFoundAndForbidden(t *testing.T) {
 	}
 }
 
-func TestDeleteDayItineraryItemHandler(t *testing.T) {
+func TestDeleteScheduleItemHandler(t *testing.T) {
 	backend := newFakeAuthBackend()
 	accessToken := loginTestUser(t, backend)
 	tripID := createTestTrip(t, backend, accessToken)
-	created := createTestDayItineraryItem(t, backend, accessToken, tripID, "2026-07-11", `{"name":"우메다","address":"Umeda","placeType":"sights"}`)
+	created := createTestScheduleItem(t, backend, accessToken, tripID, "2026-07-11", `{"name":"우메다","address":"Umeda","placeType":"sights"}`)
 
 	recorder := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodDelete, "/trips/"+tripID+"/days/2026-07-11/itinerary/items/"+created.ID, nil)
+	request := httptest.NewRequest(http.MethodDelete, "/trips/"+tripID+"/days/2026-07-11/schedule-items/"+created.ID, nil)
 	request.Header.Set("Authorization", "Bearer "+accessToken)
 
 	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
@@ -2730,14 +2730,14 @@ func TestDeleteDayItineraryItemHandler(t *testing.T) {
 	}
 
 	getRecorder := httptest.NewRecorder()
-	getRequest := httptest.NewRequest(http.MethodGet, "/trips/"+tripID+"/days/2026-07-11/itinerary", nil)
+	getRequest := httptest.NewRequest(http.MethodGet, "/trips/"+tripID+"/days/2026-07-11/schedule-items", nil)
 	getRequest.Header.Set("Authorization", "Bearer "+accessToken)
 	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(getRecorder, getRequest)
 	if getRecorder.Code != http.StatusOK {
 		t.Fatalf("expected get status %d, got %d with body %s", http.StatusOK, getRecorder.Code, getRecorder.Body.String())
 	}
 	var getBody struct {
-		Items []interface{} `json:"items"`
+		Items []interface{} `json:"scheduleItems"`
 	}
 	if err := json.NewDecoder(getRecorder.Body).Decode(&getBody); err != nil {
 		t.Fatalf("decode get response: %v", err)
@@ -2747,10 +2747,10 @@ func TestDeleteDayItineraryItemHandler(t *testing.T) {
 	}
 }
 
-func TestDeleteDayItineraryItemRequiresAuthBeforeValidation(t *testing.T) {
+func TestDeleteScheduleItemRequiresAuthBeforeValidation(t *testing.T) {
 	backend := newFakeAuthBackend()
 	recorder := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodDelete, "/trips/not-a-uuid/days/2026-07-10/itinerary/items/not-a-uuid", nil)
+	request := httptest.NewRequest(http.MethodDelete, "/trips/not-a-uuid/days/2026-07-10/schedule-items/not-a-uuid", nil)
 
 	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
 
@@ -2759,11 +2759,11 @@ func TestDeleteDayItineraryItemRequiresAuthBeforeValidation(t *testing.T) {
 	}
 }
 
-func TestDeleteDayItineraryItemValidationNotFoundAndForbidden(t *testing.T) {
+func TestDeleteScheduleItemValidationNotFoundAndForbidden(t *testing.T) {
 	backend := newFakeAuthBackend()
 	ownerToken := loginTestUser(t, backend)
 	tripID := createTestTrip(t, backend, ownerToken)
-	created := createTestDayItineraryItem(t, backend, ownerToken, tripID, "2026-07-11", `{"name":"우메다","address":"Umeda","placeType":"sights"}`)
+	created := createTestScheduleItem(t, backend, ownerToken, tripID, "2026-07-11", `{"name":"우메다","address":"Umeda","placeType":"sights"}`)
 	nonParticipantToken := loginTestUserWithSubject(t, backend, "apple-2", "지영")
 
 	tests := []struct {
@@ -2772,13 +2772,13 @@ func TestDeleteDayItineraryItemValidationNotFoundAndForbidden(t *testing.T) {
 		token      string
 		expectCode int
 	}{
-		{name: "invalid trip id", path: "/trips/not-a-uuid/days/2026-07-11/itinerary/items/" + created.ID, token: ownerToken, expectCode: http.StatusBadRequest},
-		{name: "invalid date", path: "/trips/" + tripID + "/days/not-a-date/itinerary/items/" + created.ID, token: ownerToken, expectCode: http.StatusBadRequest},
-		{name: "invalid item id", path: "/trips/" + tripID + "/days/2026-07-11/itinerary/items/not-a-uuid", token: ownerToken, expectCode: http.StatusBadRequest},
-		{name: "missing trip", path: "/trips/00000000-0000-0000-0000-000000000404/days/2026-07-11/itinerary/items/" + created.ID, token: ownerToken, expectCode: http.StatusNotFound},
-		{name: "out of range", path: "/trips/" + tripID + "/days/2026-07-14/itinerary/items/" + created.ID, token: ownerToken, expectCode: http.StatusNotFound},
-		{name: "item not in selected day", path: "/trips/" + tripID + "/days/2026-07-12/itinerary/items/" + created.ID, token: ownerToken, expectCode: http.StatusNotFound},
-		{name: "forbidden", path: "/trips/" + tripID + "/days/2026-07-11/itinerary/items/" + created.ID, token: nonParticipantToken, expectCode: http.StatusForbidden},
+		{name: "invalid trip id", path: "/trips/not-a-uuid/days/2026-07-11/schedule-items/" + created.ID, token: ownerToken, expectCode: http.StatusBadRequest},
+		{name: "invalid date", path: "/trips/" + tripID + "/days/not-a-date/schedule-items/" + created.ID, token: ownerToken, expectCode: http.StatusBadRequest},
+		{name: "invalid item id", path: "/trips/" + tripID + "/days/2026-07-11/schedule-items/not-a-uuid", token: ownerToken, expectCode: http.StatusBadRequest},
+		{name: "missing trip", path: "/trips/00000000-0000-0000-0000-000000000404/days/2026-07-11/schedule-items/" + created.ID, token: ownerToken, expectCode: http.StatusNotFound},
+		{name: "out of range", path: "/trips/" + tripID + "/days/2026-07-14/schedule-items/" + created.ID, token: ownerToken, expectCode: http.StatusNotFound},
+		{name: "item not in selected day", path: "/trips/" + tripID + "/days/2026-07-12/schedule-items/" + created.ID, token: ownerToken, expectCode: http.StatusNotFound},
+		{name: "forbidden", path: "/trips/" + tripID + "/days/2026-07-11/schedule-items/" + created.ID, token: nonParticipantToken, expectCode: http.StatusForbidden},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -2830,8 +2830,8 @@ func TestSearchGooglePlacesHandlerReturnsResults(t *testing.T) {
 	if len(body.Results) != 1 || body.Results[0].GooglePlaceID != "google-1" || body.Results[0].DisplayName != "도톤보리" || body.Results[0].FormattedAddress != "Osaka" || body.Results[0].PrimaryType != "tourist_attraction" {
 		t.Fatalf("unexpected search results: %#v", body.Results)
 	}
-	if len(backend.dayItineraryItems) != 0 {
-		t.Fatalf("expected search not to persist itinerary items, got %#v", backend.dayItineraryItems)
+	if len(backend.dayScheduleItems) != 0 {
+		t.Fatalf("expected search not to persist schedule items, got %#v", backend.dayScheduleItems)
 	}
 }
 
@@ -2951,7 +2951,7 @@ func TestSearchGooglePlacesProviderErrors(t *testing.T) {
 	}
 }
 
-func TestCreateGooglePlaceDayItineraryItemHandler(t *testing.T) {
+func TestCreateGooglePlaceScheduleItemHandler(t *testing.T) {
 	backend := newFakeAuthBackend()
 	accessToken := loginTestUser(t, backend)
 	tripID := createTestTrip(t, backend, accessToken)
@@ -2966,7 +2966,7 @@ func TestCreateGooglePlaceDayItineraryItemHandler(t *testing.T) {
 	}}
 
 	recorder := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/days/2026-07-11/places/google/itinerary-items", bytes.NewReader([]byte(`{"googlePlaceId":"google-1","duplicateConfirmed":false}`)))
+	request := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/days/2026-07-11/places/google/schedule-items", bytes.NewReader([]byte(`{"googlePlaceId":"google-1","duplicateConfirmed":false}`)))
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Authorization", "Bearer "+accessToken)
 
@@ -2992,7 +2992,7 @@ func TestCreateGooglePlaceDayItineraryItemHandler(t *testing.T) {
 				PlaceType string `json:"placeType"`
 				Address   string `json:"address"`
 			} `json:"place"`
-		} `json:"item"`
+		} `json:"scheduleItem"`
 	}
 	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
 		t.Fatalf("decode response: %v", err)
@@ -3000,13 +3000,13 @@ func TestCreateGooglePlaceDayItineraryItemHandler(t *testing.T) {
 	if body.Day.Date != "2026-07-11" || body.Day.DayOrder != 2 || body.Item.ItemOrder != 1 || body.Item.Place.Name != "도톤보리" || body.Item.Place.PlaceType != "sights" {
 		t.Fatalf("unexpected response %#v", body)
 	}
-	if len(backend.dayItineraryItems[tripID+":2026-07-11"]) != 1 {
-		t.Fatalf("expected created itinerary item, got %#v", backend.dayItineraryItems)
+	if len(backend.dayScheduleItems[tripID+":2026-07-11"]) != 1 {
+		t.Fatalf("expected created schedule item, got %#v", backend.dayScheduleItems)
 	}
 
 	provider.detailsCalled = false
 	recorder = httptest.NewRecorder()
-	request = httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/days/2026-07-12/places/google/itinerary-items", bytes.NewReader([]byte(`{"googlePlaceId":"google-1","duplicateConfirmed":false}`)))
+	request = httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/days/2026-07-12/places/google/schedule-items", bytes.NewReader([]byte(`{"googlePlaceId":"google-1","duplicateConfirmed":false}`)))
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Authorization", "Bearer "+accessToken)
 
@@ -3023,7 +3023,7 @@ func TestCreateGooglePlaceDayItineraryItemHandler(t *testing.T) {
 	}
 }
 
-func TestCreateGooglePlaceDayItineraryItemDuplicateConfirmation(t *testing.T) {
+func TestCreateGooglePlaceScheduleItemDuplicateConfirmation(t *testing.T) {
 	backend := newFakeAuthBackend()
 	accessToken := loginTestUser(t, backend)
 	tripID := createTestTrip(t, backend, accessToken)
@@ -3039,7 +3039,7 @@ func TestCreateGooglePlaceDayItineraryItemDuplicateConfirmation(t *testing.T) {
 
 	create := func(body string) *httptest.ResponseRecorder {
 		recorder := httptest.NewRecorder()
-		request := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/days/2026-07-11/places/google/itinerary-items", bytes.NewReader([]byte(body)))
+		request := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/days/2026-07-11/places/google/schedule-items", bytes.NewReader([]byte(body)))
 		request.Header.Set("Content-Type", "application/json")
 		request.Header.Set("Authorization", "Bearer "+accessToken)
 		NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true, PlaceProvider: provider}).ServeHTTP(recorder, request)
@@ -3070,12 +3070,12 @@ func TestCreateGooglePlaceDayItineraryItemDuplicateConfirmation(t *testing.T) {
 	if recorder := create(`{"googlePlaceId":"google-dup","duplicateConfirmed":true}`); recorder.Code != http.StatusCreated {
 		t.Fatalf("expected confirmed duplicate status %d, got %d with body %s", http.StatusCreated, recorder.Code, recorder.Body.String())
 	}
-	if len(backend.dayItineraryItems[tripID+":2026-07-11"]) != 2 {
-		t.Fatalf("expected confirmed duplicate to create second item, got %#v", backend.dayItineraryItems[tripID+":2026-07-11"])
+	if len(backend.dayScheduleItems[tripID+":2026-07-11"]) != 2 {
+		t.Fatalf("expected confirmed duplicate to create second item, got %#v", backend.dayScheduleItems[tripID+":2026-07-11"])
 	}
 }
 
-func TestCreateGooglePlaceDayItineraryItemValidationAuthAndProviderErrors(t *testing.T) {
+func TestCreateGooglePlaceScheduleItemValidationAuthAndProviderErrors(t *testing.T) {
 	backend := newFakeAuthBackend()
 	accessToken := loginTestUser(t, backend)
 	tripID := createTestTrip(t, backend, accessToken)
@@ -3089,13 +3089,13 @@ func TestCreateGooglePlaceDayItineraryItemValidationAuthAndProviderErrors(t *tes
 		expectCode int
 		expectErr  string
 	}{
-		{name: "requires auth", path: "/trips/" + tripID + "/days/2026-07-10/places/google/itinerary-items", token: "", body: `{"googlePlaceId":"google-1","duplicateConfirmed":false}`, provider: &fakePlaceProvider{}, expectCode: http.StatusUnauthorized, expectErr: "UNAUTHORIZED"},
-		{name: "invalid trip id", path: "/trips/not-a-uuid/days/2026-07-10/places/google/itinerary-items", token: accessToken, body: `{"googlePlaceId":"google-1","duplicateConfirmed":false}`, provider: &fakePlaceProvider{}, expectCode: http.StatusBadRequest, expectErr: "VALIDATION_ERROR"},
-		{name: "blank google place id", path: "/trips/" + tripID + "/days/2026-07-10/places/google/itinerary-items", token: accessToken, body: `{"googlePlaceId":" ","duplicateConfirmed":false}`, provider: &fakePlaceProvider{}, expectCode: http.StatusBadRequest, expectErr: "VALIDATION_ERROR"},
-		{name: "out of range", path: "/trips/" + tripID + "/days/2026-07-14/places/google/itinerary-items", token: accessToken, body: `{"googlePlaceId":"google-1","duplicateConfirmed":false}`, provider: &fakePlaceProvider{}, expectCode: http.StatusNotFound, expectErr: "NOT_FOUND"},
-		{name: "forbidden", path: "/trips/" + tripID + "/days/2026-07-10/places/google/itinerary-items", token: nonParticipantToken, body: `{"googlePlaceId":"google-1","duplicateConfirmed":false}`, provider: &fakePlaceProvider{}, expectCode: http.StatusForbidden, expectErr: "FORBIDDEN"},
-		{name: "provider unavailable", path: "/trips/" + tripID + "/days/2026-07-10/places/google/itinerary-items", token: accessToken, body: `{"googlePlaceId":"google-1","duplicateConfirmed":false}`, provider: &fakePlaceProvider{detailsErr: placedomain.ErrProviderUnavailable}, expectCode: http.StatusBadGateway, expectErr: "PLACE_PROVIDER_UNAVAILABLE"},
-		{name: "provider rate limited", path: "/trips/" + tripID + "/days/2026-07-10/places/google/itinerary-items", token: accessToken, body: `{"googlePlaceId":"google-1","duplicateConfirmed":false}`, provider: &fakePlaceProvider{detailsErr: placedomain.ErrProviderRateLimited}, expectCode: http.StatusTooManyRequests, expectErr: "PLACE_PROVIDER_RATE_LIMITED"},
+		{name: "requires auth", path: "/trips/" + tripID + "/days/2026-07-10/places/google/schedule-items", token: "", body: `{"googlePlaceId":"google-1","duplicateConfirmed":false}`, provider: &fakePlaceProvider{}, expectCode: http.StatusUnauthorized, expectErr: "UNAUTHORIZED"},
+		{name: "invalid trip id", path: "/trips/not-a-uuid/days/2026-07-10/places/google/schedule-items", token: accessToken, body: `{"googlePlaceId":"google-1","duplicateConfirmed":false}`, provider: &fakePlaceProvider{}, expectCode: http.StatusBadRequest, expectErr: "VALIDATION_ERROR"},
+		{name: "blank google place id", path: "/trips/" + tripID + "/days/2026-07-10/places/google/schedule-items", token: accessToken, body: `{"googlePlaceId":" ","duplicateConfirmed":false}`, provider: &fakePlaceProvider{}, expectCode: http.StatusBadRequest, expectErr: "VALIDATION_ERROR"},
+		{name: "out of range", path: "/trips/" + tripID + "/days/2026-07-14/places/google/schedule-items", token: accessToken, body: `{"googlePlaceId":"google-1","duplicateConfirmed":false}`, provider: &fakePlaceProvider{}, expectCode: http.StatusNotFound, expectErr: "NOT_FOUND"},
+		{name: "forbidden", path: "/trips/" + tripID + "/days/2026-07-10/places/google/schedule-items", token: nonParticipantToken, body: `{"googlePlaceId":"google-1","duplicateConfirmed":false}`, provider: &fakePlaceProvider{}, expectCode: http.StatusForbidden, expectErr: "FORBIDDEN"},
+		{name: "provider unavailable", path: "/trips/" + tripID + "/days/2026-07-10/places/google/schedule-items", token: accessToken, body: `{"googlePlaceId":"google-1","duplicateConfirmed":false}`, provider: &fakePlaceProvider{detailsErr: placedomain.ErrProviderUnavailable}, expectCode: http.StatusBadGateway, expectErr: "PLACE_PROVIDER_UNAVAILABLE"},
+		{name: "provider rate limited", path: "/trips/" + tripID + "/days/2026-07-10/places/google/schedule-items", token: accessToken, body: `{"googlePlaceId":"google-1","duplicateConfirmed":false}`, provider: &fakePlaceProvider{detailsErr: placedomain.ErrProviderRateLimited}, expectCode: http.StatusTooManyRequests, expectErr: "PLACE_PROVIDER_RATE_LIMITED"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -3130,9 +3130,9 @@ func TestCreateRoutePreviewHandler(t *testing.T) {
 	backend := newFakeAuthBackend()
 	accessToken := loginTestUser(t, backend)
 	tripID := createTestTrip(t, backend, accessToken)
-	item, err := backend.CreateGooglePlaceDayItineraryItem(context.Background(), placedomain.CreateGooglePlaceDayItineraryItemRecord{
+	item, err := backend.CreateGooglePlaceScheduleItem(context.Background(), placedomain.CreateGooglePlaceScheduleItemRecord{
 		TripID:             tripID,
-		ScheduledDate:      "2026-07-10",
+		TripDayID:          "2026-07-10",
 		GooglePlaceID:      "google-1",
 		Name:               "도톤보리",
 		Address:            "Dotonbori",
@@ -3142,7 +3142,7 @@ func TestCreateRoutePreviewHandler(t *testing.T) {
 		DuplicateConfirmed: true,
 	})
 	if err != nil {
-		t.Fatalf("create google itinerary fixture: %v", err)
+		t.Fatalf("create google schedule fixture: %v", err)
 	}
 	transfers := 1
 	provider := &fakeRouteProvider{result: routedomain.ProviderPreviewResult{
@@ -3157,7 +3157,7 @@ func TestCreateRoutePreviewHandler(t *testing.T) {
 	}}
 
 	recorder := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/days/2026-07-10/itinerary/items/"+item.ID+"/route-preview", bytes.NewReader([]byte(`{"origin":{"latitude":34.6,"longitude":135.5}}`)))
+	request := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/days/2026-07-10/schedule-items/"+item.ID+"/route-preview", bytes.NewReader([]byte(`{"origin":{"latitude":34.6,"longitude":135.5}}`)))
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Authorization", "Bearer "+accessToken)
 	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true, RouteProvider: provider}).ServeHTTP(recorder, request)
@@ -3191,10 +3191,10 @@ func TestCreateRoutePreviewUnsupportedManualPlace(t *testing.T) {
 	backend := newFakeAuthBackend()
 	accessToken := loginTestUser(t, backend)
 	tripID := createTestTrip(t, backend, accessToken)
-	item := createTestDayItineraryItem(t, backend, accessToken, tripID, "2026-07-10", `{"name":"수동 장소","address":"Address","placeType":"sights"}`)
+	item := createTestScheduleItem(t, backend, accessToken, tripID, "2026-07-10", `{"name":"수동 장소","address":"Address","placeType":"sights"}`)
 
 	recorder := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/days/2026-07-10/itinerary/items/"+item.ID+"/route-preview", bytes.NewReader([]byte(`{"origin":{"latitude":34.6,"longitude":135.5}}`)))
+	request := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/days/2026-07-10/schedule-items/"+item.ID+"/route-preview", bytes.NewReader([]byte(`{"origin":{"latitude":34.6,"longitude":135.5}}`)))
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Authorization", "Bearer "+accessToken)
 	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true, RouteProvider: &fakeRouteProvider{}}).ServeHTTP(recorder, request)
@@ -3612,31 +3612,31 @@ func TestReadyReturnsServiceUnavailable(t *testing.T) {
 
 type fakeAuthBackend struct {
 	fakeReadiness
-	users             map[string]auth.User
-	identityUser      map[string]string
-	sessions          map[string]auth.Session
-	deletedUsers      map[string]bool
-	trips             map[string]tripdomain.Trip
-	participants      map[string][]tripdomain.Participant
-	tripPlaces        map[string]tripdomain.TripPlaceSummary
-	googleTripPlaces  map[string]string
-	dayLodgingPlaces  map[string]tripdomain.TripPlaceSummary
-	dayItineraryItems map[string][]tripdomain.DayItineraryItem
-	dayExpenses       map[string][]tripdomain.DayExpenseListItem
-	tripInvites       map[string]tripdomain.TripInvite
-	reorderErr        error
-	arrivalErr        error
-	skipErr           error
-	restoreErr        error
-	listedTrips       []tripdomain.ListItem
-	listTripsUserID   string
-	nextUser          int
-	nextSession       int
-	nextTrip          int
-	nextInvite        int
-	nextPlace         int
-	nextItineraryItem int
-	nextExpense       int
+	users            map[string]auth.User
+	identityUser     map[string]string
+	sessions         map[string]auth.Session
+	deletedUsers     map[string]bool
+	trips            map[string]tripdomain.Trip
+	participants     map[string][]tripdomain.Participant
+	tripPlaces       map[string]tripdomain.TripPlaceSummary
+	googleTripPlaces map[string]string
+	dayLodgingPlaces map[string]tripdomain.TripPlaceSummary
+	dayScheduleItems map[string][]tripdomain.ScheduleItem
+	dayExpenses      map[string][]tripdomain.DayExpenseListItem
+	tripInvites      map[string]tripdomain.TripInvite
+	reorderErr       error
+	arrivalErr       error
+	skipErr          error
+	restoreErr       error
+	listedTrips      []tripdomain.ListItem
+	listTripsUserID  string
+	nextUser         int
+	nextSession      int
+	nextTrip         int
+	nextInvite       int
+	nextPlace        int
+	nextScheduleItem int
+	nextExpense      int
 }
 
 func loginTestUser(t *testing.T, backend *fakeAuthBackend) string {
@@ -3762,12 +3762,12 @@ func createTestTrip(t *testing.T, backend *fakeAuthBackend, accessToken string) 
 	return body.Trip.ID
 }
 
-type createdDayItineraryItem struct {
+type createdScheduleItem struct {
 	ID      string
 	PlaceID string
 }
 
-func createTestDayItineraryItem(t *testing.T, backend *fakeAuthBackend, _ string, tripID string, date string, body string) createdDayItineraryItem {
+func createTestScheduleItem(t *testing.T, backend *fakeAuthBackend, _ string, tripID string, date string, body string) createdScheduleItem {
 	t.Helper()
 
 	var request struct {
@@ -3776,36 +3776,36 @@ func createTestDayItineraryItem(t *testing.T, backend *fakeAuthBackend, _ string
 		PlaceType string `json:"placeType"`
 	}
 	if err := json.NewDecoder(bytes.NewReader([]byte(body))).Decode(&request); err != nil {
-		t.Fatalf("decode create itinerary item fixture: %v", err)
+		t.Fatalf("decode create schedule item fixture: %v", err)
 	}
-	item, err := backend.CreateManualDayItineraryItem(context.Background(), tripdomain.CreateManualDayItineraryItemRecord{
-		TripID:        tripID,
-		ScheduledDate: date,
-		Name:          request.Name,
-		Address:       request.Address,
-		PlaceType:     request.PlaceType,
+	item, err := backend.CreateManualScheduleItem(context.Background(), tripdomain.CreateManualScheduleItemRecord{
+		TripID:    tripID,
+		TripDayID: date,
+		Name:      request.Name,
+		Address:   request.Address,
+		PlaceType: request.PlaceType,
 	})
 	if err != nil {
-		t.Fatalf("create itinerary item fixture: %v", err)
+		t.Fatalf("create schedule item fixture: %v", err)
 	}
-	return createdDayItineraryItem{ID: item.ID, PlaceID: item.Place.ID}
+	return createdScheduleItem{ID: item.ID, PlaceID: item.Place.ID}
 }
 
 func newFakeAuthBackend() *fakeAuthBackend {
 	return &fakeAuthBackend{
-		fakeReadiness:     fakeReadiness{schema: "initialized"},
-		users:             map[string]auth.User{},
-		identityUser:      map[string]string{},
-		sessions:          map[string]auth.Session{},
-		deletedUsers:      map[string]bool{},
-		trips:             map[string]tripdomain.Trip{},
-		participants:      map[string][]tripdomain.Participant{},
-		tripPlaces:        map[string]tripdomain.TripPlaceSummary{},
-		googleTripPlaces:  map[string]string{},
-		dayLodgingPlaces:  map[string]tripdomain.TripPlaceSummary{},
-		dayItineraryItems: map[string][]tripdomain.DayItineraryItem{},
-		dayExpenses:       map[string][]tripdomain.DayExpenseListItem{},
-		tripInvites:       map[string]tripdomain.TripInvite{},
+		fakeReadiness:    fakeReadiness{schema: "initialized"},
+		users:            map[string]auth.User{},
+		identityUser:     map[string]string{},
+		sessions:         map[string]auth.Session{},
+		deletedUsers:     map[string]bool{},
+		trips:            map[string]tripdomain.Trip{},
+		participants:     map[string][]tripdomain.Participant{},
+		tripPlaces:       map[string]tripdomain.TripPlaceSummary{},
+		googleTripPlaces: map[string]string{},
+		dayLodgingPlaces: map[string]tripdomain.TripPlaceSummary{},
+		dayScheduleItems: map[string][]tripdomain.ScheduleItem{},
+		dayExpenses:      map[string][]tripdomain.DayExpenseListItem{},
+		tripInvites:      map[string]tripdomain.TripInvite{},
 	}
 }
 
@@ -3967,6 +3967,35 @@ func (b *fakeAuthBackend) CreateTripWithOwner(_ context.Context, record tripdoma
 func (b *fakeAuthBackend) GetTripByID(_ context.Context, tripID string) (tripdomain.Trip, bool, error) {
 	foundTrip, ok := b.trips[tripID]
 	return foundTrip, ok, nil
+}
+
+func (b *fakeAuthBackend) ListActiveTripDaysByTrip(_ context.Context, tripID string) ([]tripdomain.TripDay, error) {
+	tripRecord, ok := b.trips[tripID]
+	if !ok {
+		return []tripdomain.TripDay{}, nil
+	}
+	startDate, _ := time.Parse("2006-01-02", tripRecord.StartDate)
+	endDate, _ := time.Parse("2006-01-02", tripRecord.EndDate)
+	days := []tripdomain.TripDay{}
+	for current, order := startDate, 1; !current.After(endDate); current, order = current.AddDate(0, 0, 1), order+1 {
+		date := current.Format("2006-01-02")
+		day := tripdomain.TripDay{ID: date, Date: date, DayOrder: order}
+		if lodging, ok := b.dayLodgingPlaces[tripID+":"+date]; ok {
+			day.LodgingPlace = &lodging
+		}
+		days = append(days, day)
+	}
+	return days, nil
+}
+
+func (b *fakeAuthBackend) GetActiveTripDayByTripAndID(_ context.Context, tripID string, tripDayID string) (tripdomain.TripDay, bool, error) {
+	days, _ := b.ListActiveTripDaysByTrip(context.Background(), tripID)
+	for _, day := range days {
+		if day.ID == tripDayID || day.Date == tripDayID {
+			return day, true, nil
+		}
+	}
+	return tripdomain.TripDay{}, false, nil
 }
 
 func (b *fakeAuthBackend) IsTripParticipant(_ context.Context, tripID string, userID string) (bool, error) {
@@ -4132,23 +4161,23 @@ func (b *fakeAuthBackend) SetDayLodgingPlace(_ context.Context, record tripdomai
 	if !ok {
 		return tripdomain.TripPlaceSummary{}, tripdomain.ErrNotFound
 	}
-	b.dayLodgingPlaces[record.TripID+":"+record.ScheduledDate] = place
-	b.markDayItineraryLodging(record.TripID, record.ScheduledDate)
+	b.dayLodgingPlaces[record.TripID+":"+record.TripDayID] = place
+	b.markDayScheduleLodging(record.TripID, record.TripDayID)
 	return place, nil
 }
 
 func (b *fakeAuthBackend) DeleteDayLodgingPlace(_ context.Context, tripID string, date string) error {
 	delete(b.dayLodgingPlaces, tripID+":"+date)
-	b.markDayItineraryLodging(tripID, date)
+	b.markDayScheduleLodging(tripID, date)
 	return nil
 }
 
-func (b *fakeAuthBackend) ListItineraryItemsByTripAndDate(_ context.Context, tripID string, date string) ([]tripdomain.DayItineraryItem, error) {
-	b.markDayItineraryLodging(tripID, date)
-	return b.dayItineraryItems[tripID+":"+date], nil
+func (b *fakeAuthBackend) ListScheduleItemsByTripDay(_ context.Context, tripID string, date string) ([]tripdomain.ScheduleItem, error) {
+	b.markDayScheduleLodging(tripID, date)
+	return b.dayScheduleItems[tripID+":"+date], nil
 }
 
-func (b *fakeAuthBackend) ListDayExpensesByTripAndDate(_ context.Context, tripID string, date string) ([]tripdomain.DayExpenseListItem, error) {
+func (b *fakeAuthBackend) ListDayExpensesByTripDay(_ context.Context, tripID string, date string) ([]tripdomain.DayExpenseListItem, error) {
 	expenses := append([]tripdomain.DayExpenseListItem(nil), b.dayExpenses[tripID+":"+date]...)
 	sort.SliceStable(expenses, func(left, right int) bool {
 		if expenses[left].CreatedAt.Equal(expenses[right].CreatedAt) {
@@ -4165,9 +4194,9 @@ func (b *fakeAuthBackend) CreateQuickExpense(_ context.Context, record tripdomai
 		return tripdomain.CreateQuickExpenseResult{}, tripdomain.ErrNotFound
 	}
 
-	var foundItem tripdomain.DayItineraryItem
-	for _, item := range b.dayItineraryItems[record.TripID+":"+record.ScheduledDate] {
-		if item.ID == record.ItineraryItemID {
+	var foundItem tripdomain.ScheduleItem
+	for _, item := range b.dayScheduleItems[record.TripID+":"+record.TripDayID] {
+		if item.ID == record.ScheduleItemID {
 			foundItem = item
 			break
 		}
@@ -4216,7 +4245,7 @@ func (b *fakeAuthBackend) CreateQuickExpense(_ context.Context, record tripdomai
 	}
 
 	b.nextExpense++
-	itineraryItemID := foundItem.ID
+	scheduleItemID := foundItem.ID
 	tripPlaceID := foundItem.Place.ID
 	payerParticipantID := payer.ID
 	expenseID := testUUID(9000 + b.nextExpense)
@@ -4232,7 +4261,7 @@ func (b *fakeAuthBackend) CreateQuickExpense(_ context.Context, record tripdomai
 			AmountMinor: splitRecord.AmountMinor,
 		})
 	}
-	b.dayExpenses[record.TripID+":"+record.ScheduledDate] = append(b.dayExpenses[record.TripID+":"+record.ScheduledDate], tripdomain.DayExpenseListItem{
+	b.dayExpenses[record.TripID+":"+record.TripDayID] = append(b.dayExpenses[record.TripID+":"+record.TripDayID], tripdomain.DayExpenseListItem{
 		ID:               expenseID,
 		Place:            placeSnapshot,
 		AmountMinor:      record.AmountMinor,
@@ -4242,11 +4271,14 @@ func (b *fakeAuthBackend) CreateQuickExpense(_ context.Context, record tripdomai
 		CreatedAt:        createdAt,
 	})
 
+	tripDayID := record.TripDayID
 	return tripdomain.CreateQuickExpenseResult{Expense: tripdomain.Expense{
 		ID:                 expenseID,
 		TripID:             record.TripID,
-		ScheduledDate:      record.ScheduledDate,
-		ItineraryItemID:    &itineraryItemID,
+		AnchorType:         "schedule_item",
+		TripDayID:          &tripDayID,
+		ScheduleItemID:     &scheduleItemID,
+		ExpenseDate:        "2026-07-10",
 		TripPlaceID:        &tripPlaceID,
 		Place:              placeSnapshot,
 		AmountMinor:        record.AmountMinor,
@@ -4258,58 +4290,58 @@ func (b *fakeAuthBackend) CreateQuickExpense(_ context.Context, record tripdomai
 	}}, nil
 }
 
-func (b *fakeAuthBackend) CreateManualDayItineraryItem(_ context.Context, record tripdomain.CreateManualDayItineraryItemRecord) (tripdomain.DayItineraryItem, error) {
+func (b *fakeAuthBackend) CreateManualScheduleItem(_ context.Context, record tripdomain.CreateManualScheduleItemRecord) (tripdomain.ScheduleItem, error) {
 	b.nextPlace++
-	b.nextItineraryItem++
-	key := record.TripID + ":" + record.ScheduledDate
+	b.nextScheduleItem++
+	key := record.TripID + ":" + record.TripDayID
 	place := tripdomain.TripPlaceSummary{
 		ID:        testUUID(6000 + b.nextPlace),
 		Name:      record.Name,
 		PlaceType: record.PlaceType,
 		Address:   record.Address,
 	}
-	item := tripdomain.DayItineraryItem{
-		ID:        testUUID(5000 + b.nextItineraryItem),
-		ItemOrder: len(b.dayItineraryItems[key]) + 1,
+	item := tripdomain.ScheduleItem{
+		ID:        testUUID(5000 + b.nextScheduleItem),
+		ItemOrder: len(b.dayScheduleItems[key]) + 1,
 		Version:   1,
 		Place:     place,
 	}
 	b.tripPlaces[record.TripID+":"+place.ID] = place
-	b.dayItineraryItems[key] = append(b.dayItineraryItems[key], item)
-	b.markDayItineraryLodging(record.TripID, record.ScheduledDate)
+	b.dayScheduleItems[key] = append(b.dayScheduleItems[key], item)
+	b.markDayScheduleLodging(record.TripID, record.TripDayID)
 	return item, nil
 }
 
-func (b *fakeAuthBackend) AppendGooglePlaceDayItineraryItem(_ context.Context, record placedomain.AppendGooglePlaceDayItineraryItemRecord) (tripdomain.DayItineraryItem, error) {
+func (b *fakeAuthBackend) AppendGooglePlaceScheduleItem(_ context.Context, record placedomain.AppendGooglePlaceScheduleItemRecord) (tripdomain.ScheduleItem, error) {
 	place, ok := b.tripPlaces[record.TripID+":"+record.TripPlaceID]
 	if !ok {
-		return tripdomain.DayItineraryItem{}, placedomain.ErrNotFound
+		return tripdomain.ScheduleItem{}, placedomain.ErrNotFound
 	}
-	key := record.TripID + ":" + record.ScheduledDate
+	key := record.TripID + ":" + record.TripDayID
 	if !record.DuplicateConfirmed {
-		for _, item := range b.dayItineraryItems[key] {
+		for _, item := range b.dayScheduleItems[key] {
 			if item.Place.ID == record.TripPlaceID {
-				return tripdomain.DayItineraryItem{}, placedomain.DuplicateDayPlaceConfirmationError{TripPlaceID: record.TripPlaceID}
+				return tripdomain.ScheduleItem{}, placedomain.DuplicateDayPlaceConfirmationError{TripPlaceID: record.TripPlaceID}
 			}
 		}
 	}
-	b.nextItineraryItem++
-	item := tripdomain.DayItineraryItem{
-		ID:        testUUID(5000 + b.nextItineraryItem),
-		ItemOrder: len(b.dayItineraryItems[key]) + 1,
+	b.nextScheduleItem++
+	item := tripdomain.ScheduleItem{
+		ID:        testUUID(5000 + b.nextScheduleItem),
+		ItemOrder: len(b.dayScheduleItems[key]) + 1,
 		Version:   1,
 		Place:     place,
 	}
-	b.dayItineraryItems[key] = append(b.dayItineraryItems[key], item)
-	b.markDayItineraryLodging(record.TripID, record.ScheduledDate)
+	b.dayScheduleItems[key] = append(b.dayScheduleItems[key], item)
+	b.markDayScheduleLodging(record.TripID, record.TripDayID)
 	return item, nil
 }
 
-func (b *fakeAuthBackend) CreateGooglePlaceDayItineraryItem(ctx context.Context, record placedomain.CreateGooglePlaceDayItineraryItemRecord) (tripdomain.DayItineraryItem, error) {
+func (b *fakeAuthBackend) CreateGooglePlaceScheduleItem(ctx context.Context, record placedomain.CreateGooglePlaceScheduleItemRecord) (tripdomain.ScheduleItem, error) {
 	if placeID, ok := b.googleTripPlaces[record.TripID+":"+record.GooglePlaceID]; ok {
-		return b.AppendGooglePlaceDayItineraryItem(ctx, placedomain.AppendGooglePlaceDayItineraryItemRecord{
+		return b.AppendGooglePlaceScheduleItem(ctx, placedomain.AppendGooglePlaceScheduleItemRecord{
 			TripID:             record.TripID,
-			ScheduledDate:      record.ScheduledDate,
+			TripDayID:          record.TripDayID,
 			TripPlaceID:        placeID,
 			DuplicateConfirmed: record.DuplicateConfirmed,
 		})
@@ -4330,37 +4362,37 @@ func (b *fakeAuthBackend) CreateGooglePlaceDayItineraryItem(ctx context.Context,
 	}
 	b.tripPlaces[record.TripID+":"+place.ID] = place
 	b.googleTripPlaces[record.TripID+":"+record.GooglePlaceID] = place.ID
-	return b.AppendGooglePlaceDayItineraryItem(ctx, placedomain.AppendGooglePlaceDayItineraryItemRecord{
+	return b.AppendGooglePlaceScheduleItem(ctx, placedomain.AppendGooglePlaceScheduleItemRecord{
 		TripID:             record.TripID,
-		ScheduledDate:      record.ScheduledDate,
+		TripDayID:          record.TripDayID,
 		TripPlaceID:        place.ID,
 		DuplicateConfirmed: record.DuplicateConfirmed,
 	})
 }
 
-func (b *fakeAuthBackend) GetItineraryItemByTripDateAndID(_ context.Context, tripID string, date string, itemID string) (tripdomain.DayItineraryItem, bool, error) {
-	for _, item := range b.dayItineraryItems[tripID+":"+date] {
+func (b *fakeAuthBackend) GetScheduleItemByTripDayAndID(_ context.Context, tripID string, date string, itemID string) (tripdomain.ScheduleItem, bool, error) {
+	for _, item := range b.dayScheduleItems[tripID+":"+date] {
 		if item.ID == itemID {
 			return item, true, nil
 		}
 	}
-	return tripdomain.DayItineraryItem{}, false, nil
+	return tripdomain.ScheduleItem{}, false, nil
 }
 
-func (b *fakeAuthBackend) ReorderDayItineraryItems(_ context.Context, record tripdomain.ReorderDayItineraryItemsRecord) ([]tripdomain.DayItineraryItem, error) {
+func (b *fakeAuthBackend) ReorderScheduleItems(_ context.Context, record tripdomain.ReorderScheduleItemsRecord) ([]tripdomain.ScheduleItem, error) {
 	if b.reorderErr != nil {
 		return nil, b.reorderErr
 	}
-	return b.dayItineraryItems[record.TripID+":"+record.ScheduledDate], nil
+	return b.dayScheduleItems[record.TripID+":"+record.TripDayID], nil
 }
 
-func (b *fakeAuthBackend) MarkDayItineraryItemArrived(_ context.Context, record tripdomain.MarkDayItineraryItemArrivedRecord) (tripdomain.MarkDayItineraryItemArrivedMutationResult, error) {
+func (b *fakeAuthBackend) MarkScheduleItemArrived(_ context.Context, record tripdomain.MarkScheduleItemArrivedRecord) (tripdomain.MarkScheduleItemArrivedMutationResult, error) {
 	if b.arrivalErr != nil {
-		return tripdomain.MarkDayItineraryItemArrivedMutationResult{}, b.arrivalErr
+		return tripdomain.MarkScheduleItemArrivedMutationResult{}, b.arrivalErr
 	}
 
-	key := record.TripID + ":" + record.ScheduledDate
-	items := b.dayItineraryItems[key]
+	key := record.TripID + ":" + record.TripDayID
+	items := b.dayScheduleItems[key]
 	targetIndex := -1
 	firstPendingIndex := -1
 	for index, item := range items {
@@ -4372,34 +4404,34 @@ func (b *fakeAuthBackend) MarkDayItineraryItemArrived(_ context.Context, record 
 		}
 	}
 	if targetIndex < 0 {
-		return tripdomain.MarkDayItineraryItemArrivedMutationResult{}, tripdomain.ErrNotFound
+		return tripdomain.MarkScheduleItemArrivedMutationResult{}, tripdomain.ErrNotFound
 	}
 
 	if items[targetIndex].SkippedAt != nil {
-		return tripdomain.MarkDayItineraryItemArrivedMutationResult{}, tripdomain.ErrConflict
+		return tripdomain.MarkScheduleItemArrivedMutationResult{}, tripdomain.ErrConflict
 	}
 
 	if items[targetIndex].ArrivedAt == nil {
 		if firstPendingIndex < 0 || firstPendingIndex != targetIndex {
-			return tripdomain.MarkDayItineraryItemArrivedMutationResult{}, tripdomain.ErrConflict
+			return tripdomain.MarkScheduleItemArrivedMutationResult{}, tripdomain.ErrConflict
 		}
 		arrivedAt := time.Date(2026, 7, 10, 9, 30, 0, 0, time.UTC)
 		items[targetIndex].ArrivedAt = &arrivedAt
-		b.dayItineraryItems[key] = items
+		b.dayScheduleItems[key] = items
 	}
 
-	b.markDayItineraryLodging(record.TripID, record.ScheduledDate)
-	items = b.dayItineraryItems[key]
-	return tripdomain.MarkDayItineraryItemArrivedMutationResult{Item: items[targetIndex], Items: items}, nil
+	b.markDayScheduleLodging(record.TripID, record.TripDayID)
+	items = b.dayScheduleItems[key]
+	return tripdomain.MarkScheduleItemArrivedMutationResult{Item: items[targetIndex], Items: items}, nil
 }
 
-func (b *fakeAuthBackend) MarkDayItineraryItemSkipped(_ context.Context, record tripdomain.MarkDayItineraryItemSkippedRecord) (tripdomain.MarkDayItineraryItemSkippedMutationResult, error) {
+func (b *fakeAuthBackend) MarkScheduleItemSkipped(_ context.Context, record tripdomain.MarkScheduleItemSkippedRecord) (tripdomain.MarkScheduleItemSkippedMutationResult, error) {
 	if b.skipErr != nil {
-		return tripdomain.MarkDayItineraryItemSkippedMutationResult{}, b.skipErr
+		return tripdomain.MarkScheduleItemSkippedMutationResult{}, b.skipErr
 	}
 
-	key := record.TripID + ":" + record.ScheduledDate
-	items := b.dayItineraryItems[key]
+	key := record.TripID + ":" + record.TripDayID
+	items := b.dayScheduleItems[key]
 	targetIndex := -1
 	firstPendingIndex := -1
 	for index, item := range items {
@@ -4411,33 +4443,33 @@ func (b *fakeAuthBackend) MarkDayItineraryItemSkipped(_ context.Context, record 
 		}
 	}
 	if targetIndex < 0 {
-		return tripdomain.MarkDayItineraryItemSkippedMutationResult{}, tripdomain.ErrNotFound
+		return tripdomain.MarkScheduleItemSkippedMutationResult{}, tripdomain.ErrNotFound
 	}
 	if items[targetIndex].ArrivedAt != nil {
-		return tripdomain.MarkDayItineraryItemSkippedMutationResult{}, tripdomain.ErrConflict
+		return tripdomain.MarkScheduleItemSkippedMutationResult{}, tripdomain.ErrConflict
 	}
 
 	if items[targetIndex].SkippedAt == nil {
 		if firstPendingIndex < 0 || firstPendingIndex != targetIndex {
-			return tripdomain.MarkDayItineraryItemSkippedMutationResult{}, tripdomain.ErrConflict
+			return tripdomain.MarkScheduleItemSkippedMutationResult{}, tripdomain.ErrConflict
 		}
 		skippedAt := time.Date(2026, 7, 10, 10, 30, 0, 0, time.UTC)
 		items[targetIndex].SkippedAt = &skippedAt
-		b.dayItineraryItems[key] = items
+		b.dayScheduleItems[key] = items
 	}
 
-	b.markDayItineraryLodging(record.TripID, record.ScheduledDate)
-	items = b.dayItineraryItems[key]
-	return tripdomain.MarkDayItineraryItemSkippedMutationResult{Item: items[targetIndex], Items: items}, nil
+	b.markDayScheduleLodging(record.TripID, record.TripDayID)
+	items = b.dayScheduleItems[key]
+	return tripdomain.MarkScheduleItemSkippedMutationResult{Item: items[targetIndex], Items: items}, nil
 }
 
-func (b *fakeAuthBackend) RestoreDayItineraryItem(_ context.Context, record tripdomain.RestoreDayItineraryItemRecord) (tripdomain.RestoreDayItineraryItemMutationResult, error) {
+func (b *fakeAuthBackend) RestoreScheduleItem(_ context.Context, record tripdomain.RestoreScheduleItemRecord) (tripdomain.RestoreScheduleItemMutationResult, error) {
 	if b.restoreErr != nil {
-		return tripdomain.RestoreDayItineraryItemMutationResult{}, b.restoreErr
+		return tripdomain.RestoreScheduleItemMutationResult{}, b.restoreErr
 	}
 
-	key := record.TripID + ":" + record.ScheduledDate
-	items := b.dayItineraryItems[key]
+	key := record.TripID + ":" + record.TripDayID
+	items := b.dayScheduleItems[key]
 	targetIndex := -1
 	for index, item := range items {
 		if item.ID == record.ItemID {
@@ -4446,39 +4478,39 @@ func (b *fakeAuthBackend) RestoreDayItineraryItem(_ context.Context, record trip
 		}
 	}
 	if targetIndex < 0 {
-		return tripdomain.RestoreDayItineraryItemMutationResult{}, tripdomain.ErrNotFound
+		return tripdomain.RestoreScheduleItemMutationResult{}, tripdomain.ErrNotFound
 	}
 	if items[targetIndex].ArrivedAt != nil {
-		return tripdomain.RestoreDayItineraryItemMutationResult{}, tripdomain.ErrConflict
+		return tripdomain.RestoreScheduleItemMutationResult{}, tripdomain.ErrConflict
 	}
 
 	items[targetIndex].SkippedAt = nil
-	b.dayItineraryItems[key] = items
-	b.markDayItineraryLodging(record.TripID, record.ScheduledDate)
-	items = b.dayItineraryItems[key]
-	return tripdomain.RestoreDayItineraryItemMutationResult{Item: items[targetIndex], Items: items}, nil
+	b.dayScheduleItems[key] = items
+	b.markDayScheduleLodging(record.TripID, record.TripDayID)
+	items = b.dayScheduleItems[key]
+	return tripdomain.RestoreScheduleItemMutationResult{Item: items[targetIndex], Items: items}, nil
 }
 
-func (b *fakeAuthBackend) UpdateDayItineraryItemPlace(_ context.Context, record tripdomain.UpdateDayItineraryItemRecord) (tripdomain.DayItineraryItem, error) {
-	var updated tripdomain.DayItineraryItem
-	for key, items := range b.dayItineraryItems {
+func (b *fakeAuthBackend) UpdateScheduleItemPlace(_ context.Context, record tripdomain.UpdateScheduleItemRecord) (tripdomain.ScheduleItem, error) {
+	var updated tripdomain.ScheduleItem
+	for key, items := range b.dayScheduleItems {
 		if !strings.HasPrefix(key, record.TripID+":") {
 			continue
 		}
 		for index, item := range items {
-			if key == record.TripID+":"+record.ScheduledDate && item.ID == record.ItemID {
+			if key == record.TripID+":"+record.TripDayID && item.ID == record.ItemID {
 				item.Place.Name = record.Name
 				item.Place.Address = record.Address
 				item.Place.PlaceType = record.PlaceType
 				updated = item
 				items[index] = item
-				b.dayItineraryItems[key] = items
+				b.dayScheduleItems[key] = items
 				break
 			}
 		}
 	}
 	if updated.ID == "" {
-		return tripdomain.DayItineraryItem{}, tripdomain.ErrNotFound
+		return tripdomain.ScheduleItem{}, tripdomain.ErrNotFound
 	}
 	b.tripPlaces[record.TripID+":"+updated.Place.ID] = updated.Place
 	for lodgingKey, lodgingPlace := range b.dayLodgingPlaces {
@@ -4486,7 +4518,7 @@ func (b *fakeAuthBackend) UpdateDayItineraryItemPlace(_ context.Context, record 
 			b.dayLodgingPlaces[lodgingKey] = updated.Place
 		}
 	}
-	for key, items := range b.dayItineraryItems {
+	for key, items := range b.dayScheduleItems {
 		if !strings.HasPrefix(key, record.TripID+":") {
 			continue
 		}
@@ -4496,21 +4528,21 @@ func (b *fakeAuthBackend) UpdateDayItineraryItemPlace(_ context.Context, record 
 				items[index] = item
 			}
 		}
-		b.dayItineraryItems[key] = items
+		b.dayScheduleItems[key] = items
 	}
 	return updated, nil
 }
 
-func (b *fakeAuthBackend) DeleteDayItineraryItem(_ context.Context, tripID string, date string, itemID string) (bool, error) {
+func (b *fakeAuthBackend) DeleteScheduleItem(_ context.Context, tripID string, date string, itemID string) (bool, error) {
 	key := tripID + ":" + date
-	items := b.dayItineraryItems[key]
+	items := b.dayScheduleItems[key]
 	for index, item := range items {
 		if item.ID != itemID {
 			continue
 		}
 		placeID := item.Place.ID
-		b.dayItineraryItems[key] = append(items[:index], items[index+1:]...)
-		if !b.hasItineraryPlace(tripID, placeID) && !b.hasDayLodgingPlace(tripID, placeID) {
+		b.dayScheduleItems[key] = append(items[:index], items[index+1:]...)
+		if !b.hasSchedulePlace(tripID, placeID) && !b.hasDayLodgingPlace(tripID, placeID) {
 			delete(b.tripPlaces, tripID+":"+placeID)
 			for lodgingKey, lodgingPlace := range b.dayLodgingPlaces {
 				if strings.HasPrefix(lodgingKey, tripID+":") && lodgingPlace.ID == placeID {
@@ -4518,7 +4550,7 @@ func (b *fakeAuthBackend) DeleteDayItineraryItem(_ context.Context, tripID strin
 				}
 			}
 		}
-		b.markDayItineraryLodging(tripID, date)
+		b.markDayScheduleLodging(tripID, date)
 		return true, nil
 	}
 	return false, nil
@@ -4556,19 +4588,19 @@ func (b *fakeAuthBackend) ListTripParticipants(_ context.Context, tripID string)
 	return items, nil
 }
 
-func (b *fakeAuthBackend) markDayItineraryLodging(tripID string, date string) {
+func (b *fakeAuthBackend) markDayScheduleLodging(tripID string, date string) {
 	key := tripID + ":" + date
 	lodgingPlace, ok := b.dayLodgingPlaces[key]
-	items := b.dayItineraryItems[key]
+	items := b.dayScheduleItems[key]
 	for index, item := range items {
 		item.IsLodging = ok && item.Place.ID == lodgingPlace.ID
 		items[index] = item
 	}
-	b.dayItineraryItems[key] = items
+	b.dayScheduleItems[key] = items
 }
 
-func (b *fakeAuthBackend) hasItineraryPlace(tripID string, placeID string) bool {
-	for key, items := range b.dayItineraryItems {
+func (b *fakeAuthBackend) hasSchedulePlace(tripID string, placeID string) bool {
+	for key, items := range b.dayScheduleItems {
 		if !strings.HasPrefix(key, tripID+":") {
 			continue
 		}

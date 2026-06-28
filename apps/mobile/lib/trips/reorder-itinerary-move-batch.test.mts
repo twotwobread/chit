@@ -4,7 +4,7 @@ import { describe, it } from 'node:test';
 import type { DayItineraryViewModel } from './day-itinerary';
 import {
   buildDayItineraryReorderDraft,
-  buildReorderDayItineraryItemsRequest,
+  buildReorderScheduleItemsRequest,
   moveDayItineraryReorderItem,
 } from './reorder-itinerary';
 
@@ -64,18 +64,18 @@ describe('reorder itinerary move batch generation', () => {
       finalDraft.items.map((item) => item.id),
       ['item-3', 'item-1', 'item-4', 'item-2'],
     );
-    assert.deepEqual(buildReorderDayItineraryItemsRequest(finalDraft), {
+    assert.deepEqual(buildReorderScheduleItemsRequest(finalDraft), {
       moves: [
         {
-          itemId: 'item-3',
-          beforeItemId: null,
-          afterItemId: 'item-1',
+          scheduleItemId: 'item-3',
+          beforeScheduleItemId: null,
+          afterScheduleItemId: 'item-1',
           clientVersion: 8,
         },
         {
-          itemId: 'item-4',
-          beforeItemId: 'item-1',
-          afterItemId: 'item-2',
+          scheduleItemId: 'item-4',
+          beforeScheduleItemId: 'item-1',
+          afterScheduleItemId: 'item-2',
           clientVersion: 13,
         },
       ],

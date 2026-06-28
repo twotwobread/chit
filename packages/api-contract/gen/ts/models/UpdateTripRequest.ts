@@ -14,5 +14,9 @@ export type UpdateTripRequest = {
      */
     endDate?: string;
     defaultCurrency?: SupportedCurrency;
+    /**
+     * Set true after showing the shrink impact summary when a date range change archives out-of-range days.
+     */
+    confirmOutOfRangeDayArchive?: boolean;
 };
 

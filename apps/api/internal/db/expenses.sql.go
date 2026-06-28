@@ -11,52 +11,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const getQuickExpenseItineraryItem = `-- name: GetQuickExpenseItineraryItem :one
-SELECT
-  ii.id::text AS itinerary_item_id,
-  ii.scheduled_date,
-  tp.id::text AS trip_place_id,
-  tp.name AS place_name,
-  tp.place_type,
-  tp.address AS place_address
-FROM itinerary_items ii
-JOIN trip_places tp
-  ON tp.id = ii.trip_place_id
- AND tp.trip_id = ii.trip_id
-WHERE ii.trip_id = $1::uuid
-  AND ii.scheduled_date = $2
-  AND ii.id = $3::uuid
-`
-
-type GetQuickExpenseItineraryItemParams struct {
-	TripID          pgtype.UUID
-	ScheduledDate   pgtype.Date
-	ItineraryItemID pgtype.UUID
-}
-
-type GetQuickExpenseItineraryItemRow struct {
-	ItineraryItemID string
-	ScheduledDate   pgtype.Date
-	TripPlaceID     string
-	PlaceName       string
-	PlaceType       string
-	PlaceAddress    string
-}
-
-func (q *Queries) GetQuickExpenseItineraryItem(ctx context.Context, arg GetQuickExpenseItineraryItemParams) (GetQuickExpenseItineraryItemRow, error) {
-	row := q.db.QueryRow(ctx, getQuickExpenseItineraryItem, arg.TripID, arg.ScheduledDate, arg.ItineraryItemID)
-	var i GetQuickExpenseItineraryItemRow
-	err := row.Scan(
-		&i.ItineraryItemID,
-		&i.ScheduledDate,
-		&i.TripPlaceID,
-		&i.PlaceName,
-		&i.PlaceType,
-		&i.PlaceAddress,
-	)
-	return i, err
-}
-
 const getQuickExpensePayerParticipant = `-- name: GetQuickExpensePayerParticipant :one
 SELECT
   id::text,
@@ -85,6 +39,60 @@ func (q *Queries) GetQuickExpensePayerParticipant(ctx context.Context, arg GetQu
 	return i, err
 }
 
+const getQuickExpenseScheduleItem = `-- name: GetQuickExpenseScheduleItem :one
+SELECT
+  si.id::text AS schedule_item_id,
+  si.trip_day_id::text AS trip_day_id,
+  td.date AS trip_day_date,
+  tp.id::text AS trip_place_id,
+  tp.name AS place_name,
+  tp.place_type,
+  tp.address AS place_address
+FROM schedule_items si
+JOIN trip_days td
+  ON td.id = si.trip_day_id
+ AND td.trip_id = si.trip_id
+ AND td.deleted_at IS NULL
+JOIN trip_places tp
+  ON tp.id = si.trip_place_id
+ AND tp.trip_id = si.trip_id
+WHERE si.trip_id = $1::uuid
+  AND si.trip_day_id = $2::uuid
+  AND si.id = $3::uuid
+  AND si.deleted_at IS NULL
+`
+
+type GetQuickExpenseScheduleItemParams struct {
+	TripID         pgtype.UUID
+	TripDayID      pgtype.UUID
+	ScheduleItemID pgtype.UUID
+}
+
+type GetQuickExpenseScheduleItemRow struct {
+	ScheduleItemID string
+	TripDayID      string
+	TripDayDate    pgtype.Date
+	TripPlaceID    string
+	PlaceName      string
+	PlaceType      string
+	PlaceAddress   string
+}
+
+func (q *Queries) GetQuickExpenseScheduleItem(ctx context.Context, arg GetQuickExpenseScheduleItemParams) (GetQuickExpenseScheduleItemRow, error) {
+	row := q.db.QueryRow(ctx, getQuickExpenseScheduleItem, arg.TripID, arg.TripDayID, arg.ScheduleItemID)
+	var i GetQuickExpenseScheduleItemRow
+	err := row.Scan(
+		&i.ScheduleItemID,
+		&i.TripDayID,
+		&i.TripDayDate,
+		&i.TripPlaceID,
+		&i.PlaceName,
+		&i.PlaceType,
+		&i.PlaceAddress,
+	)
+	return i, err
+}
+
 const getTripDefaultCurrencyForQuickExpense = `-- name: GetTripDefaultCurrencyForQuickExpense :one
 SELECT
   id::text,
@@ -108,8 +116,10 @@ func (q *Queries) GetTripDefaultCurrencyForQuickExpense(ctx context.Context, tri
 const insertExpense = `-- name: InsertExpense :one
 INSERT INTO expenses (
   trip_id,
-  scheduled_date,
-  itinerary_item_id,
+  anchor_type,
+  trip_day_id,
+  schedule_item_id,
+  expense_date,
   trip_place_id,
   place_name,
   place_address,
@@ -125,19 +135,23 @@ INSERT INTO expenses (
   $3::uuid,
   $4::uuid,
   $5,
-  $6,
+  $6::uuid,
   $7,
   $8,
   $9,
-  $10::uuid,
+  $10,
   $11,
-  $12::uuid
+  $12::uuid,
+  $13,
+  $14::uuid
 )
 RETURNING
   id::text,
   trip_id::text,
-  scheduled_date,
-  itinerary_item_id::text,
+  anchor_type,
+  trip_day_id::text,
+  schedule_item_id::text,
+  expense_date,
   trip_place_id::text,
   place_name,
   place_address,
@@ -151,8 +165,10 @@ RETURNING
 
 type InsertExpenseParams struct {
 	TripID             pgtype.UUID
-	ScheduledDate      pgtype.Date
-	ItineraryItemID    pgtype.UUID
+	AnchorType         string
+	TripDayID          pgtype.UUID
+	ScheduleItemID     pgtype.UUID
+	ExpenseDate        pgtype.Date
 	TripPlaceID        pgtype.UUID
 	PlaceName          string
 	PlaceAddress       string
@@ -167,8 +183,10 @@ type InsertExpenseParams struct {
 type InsertExpenseRow struct {
 	ID                 string
 	TripID             string
-	ScheduledDate      pgtype.Date
-	ItineraryItemID    string
+	AnchorType         string
+	TripDayID          string
+	ScheduleItemID     string
+	ExpenseDate        pgtype.Date
 	TripPlaceID        string
 	PlaceName          string
 	PlaceAddress       string
@@ -183,8 +201,10 @@ type InsertExpenseRow struct {
 func (q *Queries) InsertExpense(ctx context.Context, arg InsertExpenseParams) (InsertExpenseRow, error) {
 	row := q.db.QueryRow(ctx, insertExpense,
 		arg.TripID,
-		arg.ScheduledDate,
-		arg.ItineraryItemID,
+		arg.AnchorType,
+		arg.TripDayID,
+		arg.ScheduleItemID,
+		arg.ExpenseDate,
 		arg.TripPlaceID,
 		arg.PlaceName,
 		arg.PlaceAddress,
@@ -199,8 +219,10 @@ func (q *Queries) InsertExpense(ctx context.Context, arg InsertExpenseParams) (I
 	err := row.Scan(
 		&i.ID,
 		&i.TripID,
-		&i.ScheduledDate,
-		&i.ItineraryItemID,
+		&i.AnchorType,
+		&i.TripDayID,
+		&i.ScheduleItemID,
+		&i.ExpenseDate,
 		&i.TripPlaceID,
 		&i.PlaceName,
 		&i.PlaceAddress,
@@ -229,6 +251,8 @@ INSERT INTO expense_splits (
   $5
 )
 RETURNING
+  id::text,
+  expense_id::text,
   participant_id::text,
   participant_display_name,
   amount_minor,
@@ -244,6 +268,8 @@ type InsertExpenseSplitParams struct {
 }
 
 type InsertExpenseSplitRow struct {
+	ID                     string
+	ExpenseID              string
 	ParticipantID          string
 	ParticipantDisplayName string
 	AmountMinor            int64
@@ -260,6 +286,8 @@ func (q *Queries) InsertExpenseSplit(ctx context.Context, arg InsertExpenseSplit
 	)
 	var i InsertExpenseSplitRow
 	err := row.Scan(
+		&i.ID,
+		&i.ExpenseID,
 		&i.ParticipantID,
 		&i.ParticipantDisplayName,
 		&i.AmountMinor,
@@ -311,7 +339,7 @@ func (q *Queries) ListDayExpenseSplitsByExpenseIDs(ctx context.Context, expenseI
 	return items, nil
 }
 
-const listDayExpensesByTripAndDate = `-- name: ListDayExpensesByTripAndDate :many
+const listDayExpensesByTripDay = `-- name: ListDayExpensesByTripDay :many
 SELECT
   id::text,
   place_name,
@@ -323,16 +351,17 @@ SELECT
   created_at
 FROM expenses
 WHERE trip_id = $1::uuid
-  AND scheduled_date = $2
+  AND trip_day_id = $2::uuid
+  AND anchor_type IN ('trip_day', 'schedule_item')
 ORDER BY created_at DESC, id DESC
 `
 
-type ListDayExpensesByTripAndDateParams struct {
-	TripID        pgtype.UUID
-	ScheduledDate pgtype.Date
+type ListDayExpensesByTripDayParams struct {
+	TripID    pgtype.UUID
+	TripDayID pgtype.UUID
 }
 
-type ListDayExpensesByTripAndDateRow struct {
+type ListDayExpensesByTripDayRow struct {
 	ID               string
 	PlaceName        string
 	PlaceAddress     string
@@ -343,15 +372,15 @@ type ListDayExpensesByTripAndDateRow struct {
 	CreatedAt        pgtype.Timestamptz
 }
 
-func (q *Queries) ListDayExpensesByTripAndDate(ctx context.Context, arg ListDayExpensesByTripAndDateParams) ([]ListDayExpensesByTripAndDateRow, error) {
-	rows, err := q.db.Query(ctx, listDayExpensesByTripAndDate, arg.TripID, arg.ScheduledDate)
+func (q *Queries) ListDayExpensesByTripDay(ctx context.Context, arg ListDayExpensesByTripDayParams) ([]ListDayExpensesByTripDayRow, error) {
+	rows, err := q.db.Query(ctx, listDayExpensesByTripDay, arg.TripID, arg.TripDayID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ListDayExpensesByTripAndDateRow
+	var items []ListDayExpensesByTripDayRow
 	for rows.Next() {
-		var i ListDayExpensesByTripAndDateRow
+		var i ListDayExpensesByTripDayRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.PlaceName,

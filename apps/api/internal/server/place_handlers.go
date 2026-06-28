@@ -4,12 +4,11 @@ import (
 	"errors"
 	"net/http"
 
-	openapi_types "github.com/oapi-codegen/runtime/types"
 	"github.com/twotwobread/i-um/apps/api/internal/openapi"
 	"github.com/twotwobread/i-um/apps/api/internal/place"
 )
 
-func (s apiServer) SearchGooglePlaces(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, params openapi.SearchGooglePlacesParams) {
+func (s apiServer) SearchGooglePlaces(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, params openapi.SearchGooglePlacesParams) {
 	if s.auth == nil || s.places == nil {
 		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "place search is not configured", nil)
 		return
@@ -24,7 +23,7 @@ func (s apiServer) SearchGooglePlaces(w http.ResponseWriter, r *http.Request, tr
 	if params.Limit != nil {
 		limit = *params.Limit
 	}
-	results, err := s.places.SearchGoogle(r.Context(), authContext.UserID, tripId, dateFromOpenAPI(date), place.SearchInput{
+	results, err := s.places.SearchGoogle(r.Context(), authContext.UserID, tripId, tripDayId, place.SearchInput{
 		Query: params.Query,
 		Limit: limit,
 	})
@@ -36,9 +35,9 @@ func (s apiServer) SearchGooglePlaces(w http.ResponseWriter, r *http.Request, tr
 	writeJSON(w, http.StatusOK, searchGooglePlacesResponseToOpenAPI(results))
 }
 
-func (s apiServer) CreateGooglePlaceDayItineraryItem(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date) {
+func (s apiServer) CreateGooglePlaceScheduleItem(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string) {
 	if s.auth == nil || s.places == nil {
-		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "google place itinerary creation is not configured", nil)
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "google place schedule creation is not configured", nil)
 		return
 	}
 
@@ -47,12 +46,12 @@ func (s apiServer) CreateGooglePlaceDayItineraryItem(w http.ResponseWriter, r *h
 		return
 	}
 
-	var body openapi.CreateGooglePlaceDayItineraryItemJSONRequestBody
+	var body openapi.CreateGooglePlaceScheduleItemJSONRequestBody
 	if !decodeJSON(w, r, &body) {
 		return
 	}
 
-	result, err := s.places.CreateGooglePlaceDayItineraryItem(r.Context(), authContext.UserID, tripId, dateFromOpenAPI(date), place.CreateGooglePlaceDayItineraryItemInput{
+	result, err := s.places.CreateGooglePlaceScheduleItem(r.Context(), authContext.UserID, tripId, tripDayId, place.CreateGooglePlaceScheduleItemInput{
 		GooglePlaceID:      body.GooglePlaceId,
 		DuplicateConfirmed: body.DuplicateConfirmed,
 	})
@@ -66,9 +65,9 @@ func (s apiServer) CreateGooglePlaceDayItineraryItem(w http.ResponseWriter, r *h
 			writeError(w, http.StatusConflict, "DUPLICATE_DAY_PLACE_CONFIRMATION_REQUIRED", "duplicate day place confirmation required", []map[string]interface{}{details})
 			return
 		}
-		writeGooglePlaceDayItineraryError(w, err)
+		writeGooglePlaceDayScheduleError(w, err)
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, createGooglePlaceDayItineraryItemResponseToOpenAPI(result))
+	writeJSON(w, http.StatusCreated, createGooglePlaceScheduleItemResponseToOpenAPI(result))
 }

@@ -7,7 +7,7 @@ import MapView, { Marker, Polyline } from 'react-native-maps';
 
 import {
   ApiError,
-  type GetDayItineraryResponse,
+  type GetDayScheduleItemsResponse,
   type GetTripDetailResponse,
   type TripListItem,
 } from '@i-um/api-contract';
@@ -21,9 +21,9 @@ import {
   getTripDayItinerary,
   getTripDetail,
   listMyTrips,
-  markDayItineraryItemArrived,
-  markDayItineraryItemSkipped,
-  restoreDayItineraryItem,
+  markScheduleItemArrived,
+  markScheduleItemSkipped,
+  restoreScheduleItem,
 } from '../lib/trips/client';
 import { localDateString } from '../lib/trips/status';
 import {
@@ -156,7 +156,7 @@ export default function HomeScreen() {
       }
 
       try {
-        const itinerary = await getTripDayItinerary(selectedTrip.trip.id, currentDay.date);
+        const itinerary = await getTripDayItinerary(selectedTrip.trip.id, currentDay.id);
         const context: TodayExecutionContext = {
           selectedTrip: selectedTrip.trip,
           tripDetail: detail,
@@ -203,10 +203,10 @@ export default function HomeScreen() {
   const applyTodayItineraryResponse = useCallback(
     (
       context: TodayExecutionContext,
-      response: Pick<GetDayItineraryResponse, 'day' | 'items'>,
+      response: Pick<GetDayScheduleItemsResponse, 'day' | 'scheduleItems'>,
       travelMode: TravelMode = defaultTravelMode,
     ) => {
-      const itinerary: GetDayItineraryResponse = { day: response.day, items: response.items };
+      const itinerary: GetDayScheduleItemsResponse = { day: response.day, scheduleItems: response.scheduleItems };
       setTodayState({
         status: 'ready',
         context,
@@ -319,7 +319,7 @@ export default function HomeScreen() {
       setNavigationRetrying(false);
       setRoutePreviewState({ status: 'idle' });
       try {
-        const response = await markDayItineraryItemArrived(action.tripId, action.date, action.itemId);
+        const response = await markScheduleItemArrived(action.tripId, action.date, action.itemId);
         applyTodayItineraryResponse(context, response, currentTravelMode);
       } catch (error) {
         if (await handleAuthError(error)) {
@@ -363,7 +363,7 @@ export default function HomeScreen() {
       setNavigationFallback(resetTodayNavigationFallbackState());
       setNavigationRetrying(false);
       try {
-        const response = await markDayItineraryItemSkipped(action.tripId, action.date, action.itemId);
+        const response = await markScheduleItemSkipped(action.tripId, action.date, action.itemId);
         applyTodayItineraryResponse(context, response, currentTravelMode);
       } catch (error) {
         if (await handleAuthError(error)) {
@@ -407,7 +407,7 @@ export default function HomeScreen() {
       setNavigationFallback(resetTodayNavigationFallbackState());
       setNavigationRetrying(false);
       try {
-        const response = await restoreDayItineraryItem(action.tripId, action.date, action.itemId);
+        const response = await restoreScheduleItem(action.tripId, action.date, action.itemId);
         applyTodayItineraryResponse(context, response, currentTravelMode);
       } catch (error) {
         if (await handleAuthError(error)) {

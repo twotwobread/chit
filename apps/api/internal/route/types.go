@@ -23,7 +23,8 @@ var (
 type Repository interface {
 	GetTripByID(ctx context.Context, tripID string) (trip.Trip, bool, error)
 	IsTripParticipant(ctx context.Context, tripID string, userID string) (bool, error)
-	ListItineraryItemsByTripAndDate(ctx context.Context, tripID string, date string) ([]trip.DayItineraryItem, error)
+	GetActiveTripDayByTripAndID(ctx context.Context, tripID string, tripDayID string) (trip.TripDay, bool, error)
+	ListScheduleItemsByTripDay(ctx context.Context, tripID string, tripDayID string) ([]trip.ScheduleItem, error)
 }
 
 type Provider interface {

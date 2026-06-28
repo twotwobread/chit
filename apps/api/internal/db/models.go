@@ -44,19 +44,13 @@ type AuthSession struct {
 	UpdatedAt             pgtype.Timestamptz
 }
 
-type DayLodgingPlace struct {
-	TripID      pgtype.UUID
-	LodgingDate pgtype.Date
-	TripPlaceID pgtype.UUID
-	CreatedAt   pgtype.Timestamptz
-	UpdatedAt   pgtype.Timestamptz
-}
-
 type Expense struct {
 	ID                 pgtype.UUID
 	TripID             pgtype.UUID
-	ScheduledDate      pgtype.Date
-	ItineraryItemID    pgtype.UUID
+	AnchorType         string
+	TripDayID          pgtype.UUID
+	ScheduleItemID     pgtype.UUID
+	ExpenseDate        pgtype.Date
 	TripPlaceID        pgtype.UUID
 	PlaceName          string
 	PlaceAddress       string
@@ -80,18 +74,19 @@ type ExpenseSplit struct {
 	CreatedAt              pgtype.Timestamptz
 }
 
-type ItineraryItem struct {
-	ID            pgtype.UUID
-	TripID        pgtype.UUID
-	ScheduledDate pgtype.Date
-	TripPlaceID   pgtype.UUID
-	ItemOrder     int32
-	Rank          string
-	Version       int32
-	ArrivedAt     pgtype.Timestamptz
-	SkippedAt     pgtype.Timestamptz
-	CreatedAt     pgtype.Timestamptz
-	UpdatedAt     pgtype.Timestamptz
+type ScheduleItem struct {
+	ID          pgtype.UUID
+	TripID      pgtype.UUID
+	TripDayID   pgtype.UUID
+	TripPlaceID pgtype.UUID
+	ItemOrder   int32
+	Rank        string
+	Version     int32
+	ArrivedAt   pgtype.Timestamptz
+	SkippedAt   pgtype.Timestamptz
+	DeletedAt   pgtype.Timestamptz
+	CreatedAt   pgtype.Timestamptz
+	UpdatedAt   pgtype.Timestamptz
 }
 
 type Trip struct {
@@ -103,6 +98,17 @@ type Trip struct {
 	CreatedBy       pgtype.UUID
 	CreatedAt       pgtype.Timestamptz
 	UpdatedAt       pgtype.Timestamptz
+}
+
+type TripDay struct {
+	ID                 pgtype.UUID
+	TripID             pgtype.UUID
+	Date               pgtype.Date
+	DayOrder           int32
+	LodgingTripPlaceID pgtype.UUID
+	DeletedAt          pgtype.Timestamptz
+	CreatedAt          pgtype.Timestamptz
+	UpdatedAt          pgtype.Timestamptz
 }
 
 type TripInvite struct {

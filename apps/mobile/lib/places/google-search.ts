@@ -1,6 +1,6 @@
 import type { Href } from 'expo-router';
 
-import type { CreateGooglePlaceDayItineraryItemRequest, GooglePlaceSearchResult } from '@i-um/api-contract';
+import type { CreateGooglePlaceScheduleItemRequest, GooglePlaceSearchResult } from '@i-um/api-contract';
 
 export const googlePlaceSearchMinLength = 2;
 export const googlePlaceSearchDefaultLimit = 5;
@@ -48,8 +48,8 @@ const typeHintByPrimaryType: Record<string, string> = {
   store: '쇼핑',
 };
 
-export function buildGooglePlaceSearchRoute(tripId: string, date: string): Href {
-  return `/trips/${tripId}/days/${date}/place-search` as Href;
+export function buildGooglePlaceSearchRoute(tripId: string, tripDayId: string): Href {
+  return `/trips/${tripId}/days/${tripDayId}/place-search` as Href;
 }
 
 export function normalizeGooglePlaceSearchQuery(value: string): string {
@@ -91,10 +91,10 @@ export function errorGooglePlaceAddState(): GooglePlaceAddViewState {
   return { status: 'error', message: googlePlaceAddFailureMessage };
 }
 
-export function buildCreateGooglePlaceDayItineraryItemRequest(
+export function buildCreateGooglePlaceScheduleItemRequest(
   googlePlaceId: string,
   duplicateConfirmed: boolean,
-): CreateGooglePlaceDayItineraryItemRequest {
+): CreateGooglePlaceScheduleItemRequest {
   return { googlePlaceId: googlePlaceId.trim(), duplicateConfirmed };
 }
 

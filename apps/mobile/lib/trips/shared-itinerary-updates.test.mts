@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import type { GetDayItineraryResponse } from '@i-um/api-contract';
+import type { GetDayScheduleItemsResponse } from '@i-um/api-contract';
 
 import {
   DAY_ITINERARY_SHARED_UPDATE_BANNER,
@@ -29,8 +29,8 @@ function baseLocalState(
   };
 }
 
-function baseResponse(overrides: Partial<GetDayItineraryResponse> = {}): GetDayItineraryResponse {
-  const response: GetDayItineraryResponse = {
+function baseResponse(overrides: Partial<GetDayScheduleItemsResponse> = {}): GetDayScheduleItemsResponse {
+  const response: GetDayScheduleItemsResponse = {
     day: { date: '2026-07-10', dayOrder: 1, lodgingPlace: null },
     items: [
       {
@@ -56,7 +56,7 @@ function baseResponse(overrides: Partial<GetDayItineraryResponse> = {}): GetDayI
   };
 }
 
-function withFirstItem(overrides: Partial<GetDayItineraryResponse['items'][number]>): GetDayItineraryResponse {
+function withFirstItem(overrides: Partial<GetDayScheduleItemsResponse['items'][number]>): GetDayScheduleItemsResponse {
   const response = baseResponse();
   return {
     ...response,
@@ -75,7 +75,7 @@ describe('shared itinerary update helpers', () => {
 
     assert.equal(buildDayItinerarySharedUpdateSignature(sameContentDifferentObject), signature);
 
-    const changes: GetDayItineraryResponse[] = [
+    const changes: GetDayScheduleItemsResponse[] = [
       withFirstItem({ itemOrder: 3 }),
       withFirstItem({ version: 8 }),
       withFirstItem({ isLodging: false }),

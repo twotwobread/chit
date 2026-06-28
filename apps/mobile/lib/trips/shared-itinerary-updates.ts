@@ -1,4 +1,6 @@
-import type { GetDayItineraryResponse } from '@i-um/api-contract';
+import type { GetDayScheduleItemsResponse } from '@i-um/api-contract';
+
+import { getScheduleItems } from './day-itinerary';
 
 export const DAY_ITINERARY_SHARED_UPDATE_POLL_INTERVAL_MS = 10_000;
 
@@ -33,13 +35,13 @@ export type DayItinerarySharedUpdateReduction = {
   state: DayItinerarySharedUpdateState;
 };
 
-export function buildDayItinerarySharedUpdateSignature(response: GetDayItineraryResponse): string {
+export function buildDayItinerarySharedUpdateSignature(response: GetDayScheduleItemsResponse): string {
   return JSON.stringify({
     day: {
       date: response.day.date,
       dayOrder: response.day.dayOrder,
     },
-    items: [...response.items]
+    items: [...getScheduleItems(response)]
       .sort((left, right) => {
         if (left.itemOrder !== right.itemOrder) {
           return left.itemOrder - right.itemOrder;
@@ -59,7 +61,9 @@ export function buildDayItinerarySharedUpdateSignature(response: GetDayItinerary
   });
 }
 
-export function markDayItinerarySharedUpdateApplied(response: GetDayItineraryResponse): DayItinerarySharedUpdateState {
+export function markDayItinerarySharedUpdateApplied(
+  response: GetDayScheduleItemsResponse,
+): DayItinerarySharedUpdateState {
   return {
     baselineSignature: buildDayItinerarySharedUpdateSignature(response),
     pendingSignature: null,
@@ -91,7 +95,7 @@ export function isDayItinerarySharedUpdateReloadDisabled(localState: DayItinerar
 
 export function reduceDayItinerarySharedUpdateFromResponse(
   state: DayItinerarySharedUpdateState,
-  response: GetDayItineraryResponse,
+  response: GetDayScheduleItemsResponse,
   localState: DayItinerarySharedUpdateLocalState,
 ): DayItinerarySharedUpdateReduction {
   const nextSignature = buildDayItinerarySharedUpdateSignature(response);

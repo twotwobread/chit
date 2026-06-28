@@ -4,7 +4,7 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 
 import {
   ApiError,
-  type GetDayItineraryResponse,
+  type GetDayScheduleItemsResponse,
   type SupportedCurrency,
   type TripParticipantListItem,
 } from '@i-um/api-contract';
@@ -36,7 +36,7 @@ type QuickExpenseState =
       status: 'success';
       tripName: string;
       currency: SupportedCurrency;
-      itinerary: GetDayItineraryResponse;
+      itinerary: GetDayScheduleItemsResponse;
       participants: TripParticipantListItem[];
       shouldChooseItem: boolean;
     }
@@ -97,7 +97,7 @@ export default function QuickExpenseScreen() {
         listTripParticipants(tripId),
       ]);
       const validRouteItem =
-        routeItemId && itinerary.items.some((item) => item.id === routeItemId) ? routeItemId : null;
+        routeItemId && itinerary.scheduleItems.some((item) => item.id === routeItemId) ? routeItemId : null;
       const participants = participantsResponse.participants;
       setSelectedItemId(validRouteItem);
       setPayerParticipantId(participants.length === 1 ? participants[0].participantId : null);
@@ -164,7 +164,7 @@ export default function QuickExpenseScreen() {
     const validation = buildCreateQuickExpenseRequest({
       amountInput,
       currency: state.currency,
-      itineraryItemId: selectedItemId,
+      scheduleItemId: selectedItemId,
       participantIds: selectedSplitParticipantIds,
       payerParticipantId,
     });
@@ -316,7 +316,7 @@ function QuickExpenseForm({
   const validation = buildCreateQuickExpenseRequest({
     amountInput,
     currency: viewModel.currency,
-    itineraryItemId: selectedItemId,
+    scheduleItemId: selectedItemId,
     participantIds: selectedSplitParticipantIds,
     payerParticipantId,
   });

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import type { GetDayItineraryResponse } from '@i-um/api-contract';
+import type { GetDayScheduleItemsResponse } from '@i-um/api-contract';
 
 import {
   buildDayItineraryRoute,
@@ -19,7 +19,7 @@ describe('day itinerary helpers', () => {
   });
 
   it('formats day header and ordered rows from the generated response type', () => {
-    const response: GetDayItineraryResponse = {
+    const response: GetDayScheduleItemsResponse = {
       day: {
         date: '2026-07-10',
         dayOrder: 1,
@@ -79,7 +79,7 @@ describe('day itinerary helpers', () => {
   });
 
   it('returns empty state for an in-range day with no items', () => {
-    const response: GetDayItineraryResponse = {
+    const response: GetDayScheduleItemsResponse = {
       day: { date: '2026-07-10', dayOrder: 1, lodgingPlace: null },
       items: [],
     };

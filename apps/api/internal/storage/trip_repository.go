@@ -17,6 +17,66 @@ import (
 
 var errRetryReorderRankCollision = errors.New("retry reorder rank collision")
 
+func syncActiveTripDays(ctx context.Context, tx pgx.Tx, tripID string, startDate pgtype.Date, endDate pgtype.Date) error {
+	tripUUID := mustUUID(tripID)
+	if _, err := tx.Exec(ctx, `
+		UPDATE trip_days
+		SET day_order = day_order + 10000,
+		    updated_at = now()
+		WHERE trip_id = $1::uuid
+		  AND deleted_at IS NULL
+	`, tripUUID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `
+		WITH excluded AS (
+		  UPDATE trip_days
+		  SET deleted_at = COALESCE(deleted_at, now()),
+		      lodging_trip_place_id = NULL,
+		      updated_at = now()
+		  WHERE trip_id = $1::uuid
+		    AND deleted_at IS NULL
+		    AND (date < $2 OR date > $3)
+		  RETURNING id
+		), archived_items AS (
+		  UPDATE schedule_items si
+		  SET deleted_at = COALESCE(si.deleted_at, now()),
+		      updated_at = now()
+		  FROM excluded
+		  WHERE si.trip_day_id = excluded.id
+		    AND si.deleted_at IS NULL
+		  RETURNING si.id
+		)
+		UPDATE expenses e
+		SET anchor_type = 'trip',
+		    trip_day_id = NULL,
+		    schedule_item_id = NULL,
+		    updated_at = now()
+		WHERE e.trip_id = $1::uuid
+		  AND (
+		    e.trip_day_id IN (SELECT id FROM excluded)
+		    OR e.schedule_item_id IN (SELECT id FROM archived_items)
+		  )
+	`, tripUUID, startDate, endDate); err != nil {
+		return err
+	}
+	_, err := tx.Exec(ctx, `
+		INSERT INTO trip_days (trip_id, date, day_order, deleted_at, updated_at)
+		SELECT
+		  $1::uuid,
+		  day::date,
+		  row_number() OVER (ORDER BY day::date)::integer,
+		  NULL,
+		  now()
+		FROM generate_series($2::date, $3::date, interval '1 day') AS day
+		ON CONFLICT (trip_id, date) DO UPDATE
+		SET day_order = EXCLUDED.day_order,
+		    deleted_at = NULL,
+		    updated_at = now()
+	`, tripUUID, startDate, endDate)
+	return err
+}
+
 func (s *Store) GetCreator(ctx context.Context, userID string) (trip.Creator, bool, error) {
 	row, err := s.queries.GetUserByID(ctx, mustUUID(userID))
 	if err == pgx.ErrNoRows {
@@ -54,6 +114,10 @@ func (s *Store) CreateTripWithOwner(ctx context.Context, record trip.CreateRecor
 		DisplayName: record.OwnerDisplayName,
 	})
 	if err != nil {
+		return trip.CreateResult{}, err
+	}
+
+	if err := syncActiveTripDays(ctx, tx, createdTrip.ID, createdTrip.StartDate, createdTrip.EndDate); err != nil {
 		return trip.CreateResult{}, err
 	}
 
@@ -133,7 +197,14 @@ func (s *Store) IsTripOwner(ctx context.Context, tripID string, userID string) (
 }
 
 func (s *Store) UpdateTripBasicInfo(ctx context.Context, record trip.UpdateRecord) (trip.Trip, error) {
-	row, err := s.queries.UpdateTripBasicInfo(ctx, db.UpdateTripBasicInfoParams{
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return trip.Trip{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	qtx := s.queries.WithTx(tx)
+	row, err := qtx.UpdateTripBasicInfo(ctx, db.UpdateTripBasicInfoParams{
 		Column1:         mustUUID(record.ID),
 		Name:            record.Name,
 		StartDate:       dateValue(record.StartDate),
@@ -141,6 +212,12 @@ func (s *Store) UpdateTripBasicInfo(ctx context.Context, record trip.UpdateRecor
 		DefaultCurrency: record.DefaultCurrency,
 	})
 	if err != nil {
+		return trip.Trip{}, err
+	}
+	if err := syncActiveTripDays(ctx, tx, row.ID, row.StartDate, row.EndDate); err != nil {
+		return trip.Trip{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
 		return trip.Trip{}, err
 	}
 
@@ -157,11 +234,32 @@ func (s *Store) UpdateTripBasicInfo(ctx context.Context, record trip.UpdateRecor
 }
 
 func (s *Store) DeleteTripByID(ctx context.Context, tripID string) (bool, error) {
-	_, err := s.queries.DeleteTripByID(ctx, mustUUID(tripID))
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	tripUUID := mustUUID(tripID)
+	if _, err := tx.Exec(ctx, `DELETE FROM expenses WHERE trip_id = $1::uuid`, tripUUID); err != nil {
+		return false, err
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM schedule_items WHERE trip_id = $1::uuid`, tripUUID); err != nil {
+		return false, err
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM trip_days WHERE trip_id = $1::uuid`, tripUUID); err != nil {
+		return false, err
+	}
+
+	qtx := s.queries.WithTx(tx)
+	_, err = qtx.DeleteTripByID(ctx, tripUUID)
 	if err == pgx.ErrNoRows {
 		return false, nil
 	}
 	if err != nil {
+		return false, err
+	}
+	if err := tx.Commit(ctx); err != nil {
 		return false, err
 	}
 	return true, nil
@@ -361,34 +459,85 @@ func (s *Store) ListTripsByParticipantUser(ctx context.Context, userID string) (
 	return trips, nil
 }
 
-func (s *Store) ListDayLodgingPlacesByTrip(ctx context.Context, tripID string) ([]trip.DayLodgingPlace, error) {
-	rows, err := s.queries.ListDayLodgingPlacesByTrip(ctx, mustUUID(tripID))
+func (s *Store) ListActiveTripDaysByTrip(ctx context.Context, tripID string) ([]trip.TripDay, error) {
+	rows, err := s.queries.ListActiveTripDaysByTrip(ctx, mustUUID(tripID))
 	if err != nil {
 		return nil, err
 	}
 
-	items := make([]trip.DayLodgingPlace, 0, len(rows))
+	days := make([]trip.TripDay, 0, len(rows))
 	for _, row := range rows {
-		items = append(items, trip.DayLodgingPlace{
-			Date:  dateString(row.LodgingDate),
-			Place: tripPlaceSummary(row.ID, row.Name, row.PlaceType, row.Address, row.Provider, row.GooglePlaceID, row.Latitude, row.Longitude),
+		days = append(days, trip.TripDay{
+			ID:           row.ID,
+			Date:         dateString(row.Date),
+			DayOrder:     int(row.DayOrder),
+			LodgingPlace: lodgingPlaceFromActiveTripDay(row.LodgingTripPlaceID, row.LodgingPlaceName, row.LodgingPlaceType, row.LodgingPlaceAddress, row.LodgingPlaceProvider, row.LodgingGooglePlaceID, row.LodgingLatitude, row.LodgingLongitude),
 		})
 	}
-	return items, nil
+	return days, nil
+}
+
+func (s *Store) GetActiveTripDayByTripAndID(ctx context.Context, tripID string, tripDayID string) (trip.TripDay, bool, error) {
+	row, err := s.queries.GetActiveTripDayByTripAndID(ctx, db.GetActiveTripDayByTripAndIDParams{
+		TripID:    mustUUID(tripID),
+		TripDayID: mustUUID(tripDayID),
+	})
+	if err == pgx.ErrNoRows {
+		return trip.TripDay{}, false, nil
+	}
+	if err != nil {
+		return trip.TripDay{}, false, err
+	}
+	return trip.TripDay{
+		ID:           row.ID,
+		Date:         dateString(row.Date),
+		DayOrder:     int(row.DayOrder),
+		LodgingPlace: lodgingPlaceFromActiveTripDay(row.LodgingTripPlaceID, row.LodgingPlaceName, row.LodgingPlaceType, row.LodgingPlaceAddress, row.LodgingPlaceProvider, row.LodgingGooglePlaceID, row.LodgingLatitude, row.LodgingLongitude),
+	}, true, nil
+}
+
+func (s *Store) ListDayLodgingPlacesByTrip(ctx context.Context, tripID string) ([]trip.DayLodgingPlace, error) {
+	days, err := s.ListActiveTripDaysByTrip(ctx, tripID)
+	if err != nil {
+		return nil, err
+	}
+	lodgingPlaces := make([]trip.DayLodgingPlace, 0)
+	for _, day := range days {
+		if day.LodgingPlace != nil {
+			lodgingPlaces = append(lodgingPlaces, trip.DayLodgingPlace{Date: day.Date, Place: *day.LodgingPlace})
+		}
+	}
+	return lodgingPlaces, nil
 }
 
 func (s *Store) GetDayLodgingPlaceByTripAndDate(ctx context.Context, tripID string, date string) (trip.TripPlaceSummary, bool, error) {
-	row, err := s.queries.GetDayLodgingPlaceByTripAndDate(ctx, db.GetDayLodgingPlaceByTripAndDateParams{
-		TripID:      mustUUID(tripID),
-		LodgingDate: dateTextValue(date),
-	})
-	if err == pgx.ErrNoRows {
+	row := s.pool.QueryRow(ctx, `
+		SELECT
+		  tp.id::text,
+		  tp.name,
+		  tp.place_type,
+		  tp.address,
+		  tp.provider,
+		  tp.google_place_id,
+		  tp.latitude,
+		  tp.longitude
+		FROM trip_days td
+		JOIN trip_places tp
+		  ON tp.id = td.lodging_trip_place_id
+		 AND tp.trip_id = td.trip_id
+		WHERE td.trip_id = $1::uuid
+		  AND td.date = $2
+		  AND td.deleted_at IS NULL
+	`, mustUUID(tripID), dateTextValue(date))
+	var id, name, placeType, address, provider string
+	var googlePlaceID pgtype.Text
+	var latitude, longitude pgtype.Float8
+	if err := row.Scan(&id, &name, &placeType, &address, &provider, &googlePlaceID, &latitude, &longitude); err == pgx.ErrNoRows {
 		return trip.TripPlaceSummary{}, false, nil
-	}
-	if err != nil {
+	} else if err != nil {
 		return trip.TripPlaceSummary{}, false, err
 	}
-	return tripPlaceSummary(row.ID, row.Name, row.PlaceType, row.Address, row.Provider, row.GooglePlaceID, row.Latitude, row.Longitude), true, nil
+	return tripPlaceSummary(id, name, placeType, address, provider, googlePlaceID, latitude, longitude), true, nil
 }
 
 func (s *Store) GetTripPlaceSummaryByTripAndPlace(ctx context.Context, tripID string, tripPlaceID string) (trip.TripPlaceSummary, bool, error) {
@@ -422,10 +571,13 @@ func (s *Store) GetGoogleTripPlaceByGooglePlaceID(ctx context.Context, tripID st
 func (s *Store) SetDayLodgingPlace(ctx context.Context, record trip.SetDayLodgingPlaceRecord) (trip.TripPlaceSummary, error) {
 	row, err := s.queries.SetDayLodgingPlace(ctx, db.SetDayLodgingPlaceParams{
 		TripID:      mustUUID(record.TripID),
-		LodgingDate: dateTextValue(record.ScheduledDate),
+		TripDayID:   mustUUID(record.TripDayID),
 		TripPlaceID: mustUUID(record.TripPlaceID),
 	})
-	if isForeignKeyConstraintViolation(err, "day_lodging_places_trip_place_fk") {
+	if isForeignKeyConstraintViolation(err, "trip_days_lodging_trip_place_fk") {
+		return trip.TripPlaceSummary{}, trip.ErrNotFound
+	}
+	if err == pgx.ErrNoRows {
 		return trip.TripPlaceSummary{}, trip.ErrNotFound
 	}
 	if err != nil {
@@ -434,29 +586,28 @@ func (s *Store) SetDayLodgingPlace(ctx context.Context, record trip.SetDayLodgin
 	return tripPlaceSummary(row.ID, row.Name, row.PlaceType, row.Address, row.Provider, row.GooglePlaceID, row.Latitude, row.Longitude), nil
 }
 
-func (s *Store) DeleteDayLodgingPlace(ctx context.Context, tripID string, date string) error {
+func (s *Store) DeleteDayLodgingPlace(ctx context.Context, tripID string, tripDayID string) error {
 	return s.queries.DeleteDayLodgingPlace(ctx, db.DeleteDayLodgingPlaceParams{
-		TripID:      mustUUID(tripID),
-		LodgingDate: dateTextValue(date),
+		TripID:    mustUUID(tripID),
+		TripDayID: mustUUID(tripDayID),
 	})
 }
 
-func (s *Store) ListItineraryItemsByTripAndDate(ctx context.Context, tripID string, date string) ([]trip.DayItineraryItem, error) {
-	rows, err := s.queries.ListItineraryItemsByTripAndDate(ctx, db.ListItineraryItemsByTripAndDateParams{
-		Column1:       mustUUID(tripID),
-		ScheduledDate: dateTextValue(date),
+func (s *Store) ListScheduleItemsByTripDay(ctx context.Context, tripID string, tripDayID string) ([]trip.ScheduleItem, error) {
+	rows, err := s.queries.ListScheduleItemsByTripDay(ctx, db.ListScheduleItemsByTripDayParams{
+		TripID:    mustUUID(tripID),
+		TripDayID: mustUUID(tripDayID),
 	})
 	if err != nil {
 		return nil, err
 	}
-
-	return mapDayItineraryItems(rows), nil
+	return mapScheduleItems(rows), nil
 }
 
-func (s *Store) ListDayExpensesByTripAndDate(ctx context.Context, tripID string, date string) ([]trip.DayExpenseListItem, error) {
-	expenseRows, err := s.queries.ListDayExpensesByTripAndDate(ctx, db.ListDayExpensesByTripAndDateParams{
-		TripID:        mustUUID(tripID),
-		ScheduledDate: dateTextValue(date),
+func (s *Store) ListDayExpensesByTripDay(ctx context.Context, tripID string, tripDayID string) ([]trip.DayExpenseListItem, error) {
+	expenseRows, err := s.queries.ListDayExpensesByTripDay(ctx, db.ListDayExpensesByTripDayParams{
+		TripID:    mustUUID(tripID),
+		TripDayID: mustUUID(tripDayID),
 	})
 	if err != nil {
 		return nil, err
@@ -501,7 +652,6 @@ func (s *Store) ListDayExpensesByTripAndDate(ctx context.Context, tripID string,
 			AmountMinor: splitRow.AmountMinor,
 		})
 	}
-
 	return expenses, nil
 }
 
@@ -521,10 +671,10 @@ func (s *Store) CreateQuickExpense(ctx context.Context, record trip.CreateQuickE
 		return trip.CreateQuickExpenseResult{}, err
 	}
 
-	itemRow, err := qtx.GetQuickExpenseItineraryItem(ctx, db.GetQuickExpenseItineraryItemParams{
-		TripID:          mustUUID(record.TripID),
-		ScheduledDate:   dateTextValue(record.ScheduledDate),
-		ItineraryItemID: mustUUID(record.ItineraryItemID),
+	itemRow, err := qtx.GetQuickExpenseScheduleItem(ctx, db.GetQuickExpenseScheduleItemParams{
+		TripID:         mustUUID(record.TripID),
+		TripDayID:      mustUUID(record.TripDayID),
+		ScheduleItemID: mustUUID(record.ScheduleItemID),
 	})
 	if err == pgx.ErrNoRows {
 		return trip.CreateQuickExpenseResult{}, trip.ErrNotFound
@@ -568,8 +718,10 @@ func (s *Store) CreateQuickExpense(ctx context.Context, record trip.CreateQuickE
 
 	expenseRow, err := qtx.InsertExpense(ctx, db.InsertExpenseParams{
 		TripID:             mustUUID(record.TripID),
-		ScheduledDate:      dateTextValue(record.ScheduledDate),
-		ItineraryItemID:    mustUUID(itemRow.ItineraryItemID),
+		AnchorType:         "schedule_item",
+		TripDayID:          mustUUID(itemRow.TripDayID),
+		ScheduleItemID:     mustUUID(itemRow.ScheduleItemID),
+		ExpenseDate:        itemRow.TripDayDate,
 		TripPlaceID:        mustUUID(itemRow.TripPlaceID),
 		PlaceName:          itemRow.PlaceName,
 		PlaceAddress:       itemRow.PlaceAddress,
@@ -614,14 +766,17 @@ func (s *Store) CreateQuickExpense(ctx context.Context, record trip.CreateQuickE
 		return trip.CreateQuickExpenseResult{}, err
 	}
 
-	itineraryItemID := expenseRow.ItineraryItemID
+	scheduleItemID := expenseRow.ScheduleItemID
+	tripDayID := expenseRow.TripDayID
 	tripPlaceID := expenseRow.TripPlaceID
 	payerParticipantID := expenseRow.PayerParticipantID
 	return trip.CreateQuickExpenseResult{Expense: trip.Expense{
 		ID:                 expenseRow.ID,
 		TripID:             expenseRow.TripID,
-		ScheduledDate:      dateString(expenseRow.ScheduledDate),
-		ItineraryItemID:    &itineraryItemID,
+		AnchorType:         expenseRow.AnchorType,
+		TripDayID:          &tripDayID,
+		ScheduleItemID:     &scheduleItemID,
+		ExpenseDate:        dateString(expenseRow.ExpenseDate),
 		TripPlaceID:        &tripPlaceID,
 		Place:              trip.ExpensePlaceSnapshot{Name: expenseRow.PlaceName, Address: expenseRow.PlaceAddress, PlaceType: expenseRow.PlaceType},
 		AmountMinor:        expenseRow.AmountMinor,
@@ -633,10 +788,10 @@ func (s *Store) CreateQuickExpense(ctx context.Context, record trip.CreateQuickE
 	}}, nil
 }
 
-func (s *Store) CreateManualDayItineraryItem(ctx context.Context, record trip.CreateManualDayItineraryItemRecord) (trip.DayItineraryItem, error) {
+func (s *Store) CreateManualScheduleItem(ctx context.Context, record trip.CreateManualScheduleItemRecord) (trip.ScheduleItem, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
-		return trip.DayItineraryItem{}, err
+		return trip.ScheduleItem{}, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
@@ -648,26 +803,26 @@ func (s *Store) CreateManualDayItineraryItem(ctx context.Context, record trip.Cr
 		PlaceType: record.PlaceType,
 	})
 	if err != nil {
-		return trip.DayItineraryItem{}, err
+		return trip.ScheduleItem{}, err
 	}
 
-	item, err := qtx.CreateItineraryItemAtEnd(ctx, db.CreateItineraryItemAtEndParams{
-		TripID:        mustUUID(record.TripID),
-		ScheduledDate: dateTextValue(record.ScheduledDate),
-		TripPlaceID:   mustUUID(place.ID),
+	item, err := qtx.CreateScheduleItemAtEnd(ctx, db.CreateScheduleItemAtEndParams{
+		TripID:      mustUUID(record.TripID),
+		TripDayID:   mustUUID(record.TripDayID),
+		TripPlaceID: mustUUID(place.ID),
 	})
 	if err != nil {
-		if isUniqueConstraintViolation(err, "itinerary_items_trip_date_order_unique") || isUniqueConstraintViolation(err, "itinerary_items_trip_date_rank_unique") {
-			return trip.DayItineraryItem{}, trip.ErrConflict
+		if isUniqueConstraintViolation(err, "schedule_items_active_day_order_unique") || isUniqueConstraintViolation(err, "schedule_items_active_day_rank_unique") {
+			return trip.ScheduleItem{}, trip.ErrConflict
 		}
-		return trip.DayItineraryItem{}, err
+		return trip.ScheduleItem{}, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return trip.DayItineraryItem{}, err
+		return trip.ScheduleItem{}, err
 	}
 
-	return trip.DayItineraryItem{
+	return trip.ScheduleItem{
 		ID:        item.ID,
 		ItemOrder: int(item.ItemOrder),
 		Version:   int(item.Version),
@@ -677,10 +832,10 @@ func (s *Store) CreateManualDayItineraryItem(ctx context.Context, record trip.Cr
 	}, nil
 }
 
-func (s *Store) AppendGooglePlaceDayItineraryItem(ctx context.Context, record place.AppendGooglePlaceDayItineraryItemRecord) (trip.DayItineraryItem, error) {
+func (s *Store) AppendGooglePlaceScheduleItem(ctx context.Context, record place.AppendGooglePlaceScheduleItemRecord) (trip.ScheduleItem, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
-		return trip.DayItineraryItem{}, err
+		return trip.ScheduleItem{}, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
@@ -690,41 +845,41 @@ func (s *Store) AppendGooglePlaceDayItineraryItem(ctx context.Context, record pl
 		TripPlaceID: mustUUID(record.TripPlaceID),
 	})
 	if err == pgx.ErrNoRows {
-		return trip.DayItineraryItem{}, place.ErrNotFound
+		return trip.ScheduleItem{}, place.ErrNotFound
 	}
 	if err != nil {
-		return trip.DayItineraryItem{}, err
+		return trip.ScheduleItem{}, err
 	}
 
-	duplicateCount, err := qtx.CountItineraryItemsByTripDateAndPlace(ctx, db.CountItineraryItemsByTripDateAndPlaceParams{
-		TripID:        mustUUID(record.TripID),
-		ScheduledDate: dateTextValue(record.ScheduledDate),
-		TripPlaceID:   mustUUID(record.TripPlaceID),
+	duplicateCount, err := qtx.CountScheduleItemsByTripDayAndPlace(ctx, db.CountScheduleItemsByTripDayAndPlaceParams{
+		TripID:      mustUUID(record.TripID),
+		TripDayID:   mustUUID(record.TripDayID),
+		TripPlaceID: mustUUID(record.TripPlaceID),
 	})
 	if err != nil {
-		return trip.DayItineraryItem{}, err
+		return trip.ScheduleItem{}, err
 	}
 	if duplicateCount > 0 && !record.DuplicateConfirmed {
-		return trip.DayItineraryItem{}, place.DuplicateDayPlaceConfirmationError{TripPlaceID: record.TripPlaceID}
+		return trip.ScheduleItem{}, place.DuplicateDayPlaceConfirmationError{TripPlaceID: record.TripPlaceID}
 	}
 
-	item, err := qtx.CreateItineraryItemAtEnd(ctx, db.CreateItineraryItemAtEndParams{
-		TripID:        mustUUID(record.TripID),
-		ScheduledDate: dateTextValue(record.ScheduledDate),
-		TripPlaceID:   mustUUID(record.TripPlaceID),
+	item, err := qtx.CreateScheduleItemAtEnd(ctx, db.CreateScheduleItemAtEndParams{
+		TripID:      mustUUID(record.TripID),
+		TripDayID:   mustUUID(record.TripDayID),
+		TripPlaceID: mustUUID(record.TripPlaceID),
 	})
 	if err != nil {
-		if isUniqueConstraintViolation(err, "itinerary_items_trip_date_order_unique") || isUniqueConstraintViolation(err, "itinerary_items_trip_date_rank_unique") {
-			return trip.DayItineraryItem{}, place.ErrConflict
+		if isUniqueConstraintViolation(err, "schedule_items_active_day_order_unique") || isUniqueConstraintViolation(err, "schedule_items_active_day_rank_unique") {
+			return trip.ScheduleItem{}, place.ErrConflict
 		}
-		return trip.DayItineraryItem{}, err
+		return trip.ScheduleItem{}, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return trip.DayItineraryItem{}, err
+		return trip.ScheduleItem{}, err
 	}
 
-	return trip.DayItineraryItem{
+	return trip.ScheduleItem{
 		ID:        item.ID,
 		ItemOrder: int(item.ItemOrder),
 		Version:   int(item.Version),
@@ -734,10 +889,10 @@ func (s *Store) AppendGooglePlaceDayItineraryItem(ctx context.Context, record pl
 	}, nil
 }
 
-func (s *Store) CreateGooglePlaceDayItineraryItem(ctx context.Context, record place.CreateGooglePlaceDayItineraryItemRecord) (trip.DayItineraryItem, error) {
+func (s *Store) CreateGooglePlaceScheduleItem(ctx context.Context, record place.CreateGooglePlaceScheduleItemRecord) (trip.ScheduleItem, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
-		return trip.DayItineraryItem{}, err
+		return trip.ScheduleItem{}, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
@@ -754,38 +909,38 @@ func (s *Store) CreateGooglePlaceDayItineraryItem(ctx context.Context, record pl
 		GoogleTypes:       record.GoogleTypes,
 	})
 	if err != nil {
-		return trip.DayItineraryItem{}, err
+		return trip.ScheduleItem{}, err
 	}
 
-	duplicateCount, err := qtx.CountItineraryItemsByTripDateAndPlace(ctx, db.CountItineraryItemsByTripDateAndPlaceParams{
-		TripID:        mustUUID(record.TripID),
-		ScheduledDate: dateTextValue(record.ScheduledDate),
-		TripPlaceID:   mustUUID(placeRow.ID),
+	duplicateCount, err := qtx.CountScheduleItemsByTripDayAndPlace(ctx, db.CountScheduleItemsByTripDayAndPlaceParams{
+		TripID:      mustUUID(record.TripID),
+		TripDayID:   mustUUID(record.TripDayID),
+		TripPlaceID: mustUUID(placeRow.ID),
 	})
 	if err != nil {
-		return trip.DayItineraryItem{}, err
+		return trip.ScheduleItem{}, err
 	}
 	if duplicateCount > 0 && !record.DuplicateConfirmed {
-		return trip.DayItineraryItem{}, place.DuplicateDayPlaceConfirmationError{TripPlaceID: placeRow.ID}
+		return trip.ScheduleItem{}, place.DuplicateDayPlaceConfirmationError{TripPlaceID: placeRow.ID}
 	}
 
-	item, err := qtx.CreateItineraryItemAtEnd(ctx, db.CreateItineraryItemAtEndParams{
-		TripID:        mustUUID(record.TripID),
-		ScheduledDate: dateTextValue(record.ScheduledDate),
-		TripPlaceID:   mustUUID(placeRow.ID),
+	item, err := qtx.CreateScheduleItemAtEnd(ctx, db.CreateScheduleItemAtEndParams{
+		TripID:      mustUUID(record.TripID),
+		TripDayID:   mustUUID(record.TripDayID),
+		TripPlaceID: mustUUID(placeRow.ID),
 	})
 	if err != nil {
-		if isUniqueConstraintViolation(err, "itinerary_items_trip_date_order_unique") || isUniqueConstraintViolation(err, "itinerary_items_trip_date_rank_unique") {
-			return trip.DayItineraryItem{}, place.ErrConflict
+		if isUniqueConstraintViolation(err, "schedule_items_active_day_order_unique") || isUniqueConstraintViolation(err, "schedule_items_active_day_rank_unique") {
+			return trip.ScheduleItem{}, place.ErrConflict
 		}
-		return trip.DayItineraryItem{}, err
+		return trip.ScheduleItem{}, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return trip.DayItineraryItem{}, err
+		return trip.ScheduleItem{}, err
 	}
 
-	return trip.DayItineraryItem{
+	return trip.ScheduleItem{
 		ID:        item.ID,
 		ItemOrder: int(item.ItemOrder),
 		Version:   int(item.Version),
@@ -795,19 +950,19 @@ func (s *Store) CreateGooglePlaceDayItineraryItem(ctx context.Context, record pl
 	}, nil
 }
 
-func (s *Store) GetItineraryItemByTripDateAndID(ctx context.Context, tripID string, date string, itemID string) (trip.DayItineraryItem, bool, error) {
-	row, err := s.queries.GetItineraryItemByTripDateAndID(ctx, db.GetItineraryItemByTripDateAndIDParams{
-		TripID:        mustUUID(tripID),
-		ScheduledDate: dateTextValue(date),
-		ItemID:        mustUUID(itemID),
+func (s *Store) GetScheduleItemByTripDayAndID(ctx context.Context, tripID string, tripDayID string, itemID string) (trip.ScheduleItem, bool, error) {
+	row, err := s.queries.GetScheduleItemByTripDayAndID(ctx, db.GetScheduleItemByTripDayAndIDParams{
+		TripID:         mustUUID(tripID),
+		TripDayID:      mustUUID(tripDayID),
+		ScheduleItemID: mustUUID(itemID),
 	})
 	if err == pgx.ErrNoRows {
-		return trip.DayItineraryItem{}, false, nil
+		return trip.ScheduleItem{}, false, nil
 	}
 	if err != nil {
-		return trip.DayItineraryItem{}, false, err
+		return trip.ScheduleItem{}, false, err
 	}
-	return trip.DayItineraryItem{
+	return trip.ScheduleItem{
 		ID:        row.ID,
 		ItemOrder: int(row.ItemOrder),
 		Version:   int(row.Version),
@@ -818,29 +973,29 @@ func (s *Store) GetItineraryItemByTripDateAndID(ctx context.Context, tripID stri
 	}, true, nil
 }
 
-func (s *Store) ReorderDayItineraryItems(ctx context.Context, record trip.ReorderDayItineraryItemsRecord) ([]trip.DayItineraryItem, error) {
+func (s *Store) ReorderScheduleItems(ctx context.Context, record trip.ReorderScheduleItemsRecord) ([]trip.ScheduleItem, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	current, err := loadOrderedItineraryRowsForUpdate(ctx, tx, record.TripID, record.ScheduledDate)
+	current, err := loadOrderedScheduleRowsForUpdate(ctx, tx, record.TripID, record.TripDayID)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, move := range record.Moves {
-		current, err = applyReorderMove(ctx, tx, record.TripID, record.ScheduledDate, current, move)
+		current, err = applyReorderMove(ctx, tx, record.TripID, record.TripDayID, current, move)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	qtx := s.queries.WithTx(tx)
-	rows, err := qtx.ListItineraryItemsByTripAndDate(ctx, db.ListItineraryItemsByTripAndDateParams{
-		Column1:       mustUUID(record.TripID),
-		ScheduledDate: dateTextValue(record.ScheduledDate),
+	rows, err := qtx.ListScheduleItemsByTripDay(ctx, db.ListScheduleItemsByTripDayParams{
+		TripID:    mustUUID(record.TripID),
+		TripDayID: mustUUID(record.TripDayID),
 	})
 	if err != nil {
 		return nil, err
@@ -850,202 +1005,202 @@ func (s *Store) ReorderDayItineraryItems(ctx context.Context, record trip.Reorde
 		return nil, err
 	}
 
-	return mapDayItineraryItems(rows), nil
+	return mapScheduleItems(rows), nil
 }
 
-func (s *Store) MarkDayItineraryItemArrived(ctx context.Context, record trip.MarkDayItineraryItemArrivedRecord) (trip.MarkDayItineraryItemArrivedMutationResult, error) {
+func (s *Store) MarkScheduleItemArrived(ctx context.Context, record trip.MarkScheduleItemArrivedRecord) (trip.MarkScheduleItemArrivedMutationResult, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
-		return trip.MarkDayItineraryItemArrivedMutationResult{}, err
+		return trip.MarkScheduleItemArrivedMutationResult{}, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	current, err := loadExecutionItineraryRowsForUpdate(ctx, tx, record.TripID, record.ScheduledDate)
+	current, err := loadExecutionScheduleRowsForUpdate(ctx, tx, record.TripID, record.TripDayID)
 	if err != nil {
-		return trip.MarkDayItineraryItemArrivedMutationResult{}, err
+		return trip.MarkScheduleItemArrivedMutationResult{}, err
 	}
 
-	targetIndex := indexExecutionItineraryItem(current, record.ItemID)
+	targetIndex := indexExecutionScheduleItem(current, record.ItemID)
 	if targetIndex < 0 {
-		return trip.MarkDayItineraryItemArrivedMutationResult{}, trip.ErrNotFound
+		return trip.MarkScheduleItemArrivedMutationResult{}, trip.ErrNotFound
 	}
 	if current[targetIndex].SkippedAt.Valid {
-		return trip.MarkDayItineraryItemArrivedMutationResult{}, trip.ErrConflict
+		return trip.MarkScheduleItemArrivedMutationResult{}, trip.ErrConflict
 	}
 
 	if !current[targetIndex].ArrivedAt.Valid {
-		firstPendingIndex := firstPendingExecutionItineraryItem(current)
+		firstPendingIndex := firstPendingExecutionScheduleItem(current)
 		if firstPendingIndex < 0 || current[firstPendingIndex].ID != record.ItemID {
-			return trip.MarkDayItineraryItemArrivedMutationResult{}, trip.ErrConflict
+			return trip.MarkScheduleItemArrivedMutationResult{}, trip.ErrConflict
 		}
 
 		commandTag, err := tx.Exec(ctx, `
-			UPDATE itinerary_items
+			UPDATE schedule_items
 			SET arrived_at = now(), updated_at = now()
 			WHERE trip_id = $1::uuid
-			  AND scheduled_date = $2
+			  AND trip_day_id = $2::uuid
 			  AND id = $3::uuid
 			  AND arrived_at IS NULL
 			  AND skipped_at IS NULL
-		`, mustUUID(record.TripID), dateTextValue(record.ScheduledDate), mustUUID(record.ItemID))
+		`, mustUUID(record.TripID), mustUUID(record.TripDayID), mustUUID(record.ItemID))
 		if err != nil {
-			return trip.MarkDayItineraryItemArrivedMutationResult{}, err
+			return trip.MarkScheduleItemArrivedMutationResult{}, err
 		}
 		if commandTag.RowsAffected() != 1 {
-			return trip.MarkDayItineraryItemArrivedMutationResult{}, trip.ErrConflict
+			return trip.MarkScheduleItemArrivedMutationResult{}, trip.ErrConflict
 		}
 	}
 
-	targetItem, items, err := s.latestDayItineraryMutationSnapshot(ctx, tx, record.TripID, record.ScheduledDate, record.ItemID)
+	targetItem, items, err := s.latestDayScheduleMutationSnapshot(ctx, tx, record.TripID, record.TripDayID, record.ItemID)
 	if err != nil {
-		return trip.MarkDayItineraryItemArrivedMutationResult{}, err
+		return trip.MarkScheduleItemArrivedMutationResult{}, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return trip.MarkDayItineraryItemArrivedMutationResult{}, err
+		return trip.MarkScheduleItemArrivedMutationResult{}, err
 	}
 
-	return trip.MarkDayItineraryItemArrivedMutationResult{Item: targetItem, Items: items}, nil
+	return trip.MarkScheduleItemArrivedMutationResult{Item: targetItem, Items: items}, nil
 }
 
-func (s *Store) MarkDayItineraryItemSkipped(ctx context.Context, record trip.MarkDayItineraryItemSkippedRecord) (trip.MarkDayItineraryItemSkippedMutationResult, error) {
+func (s *Store) MarkScheduleItemSkipped(ctx context.Context, record trip.MarkScheduleItemSkippedRecord) (trip.MarkScheduleItemSkippedMutationResult, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
-		return trip.MarkDayItineraryItemSkippedMutationResult{}, err
+		return trip.MarkScheduleItemSkippedMutationResult{}, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	current, err := loadExecutionItineraryRowsForUpdate(ctx, tx, record.TripID, record.ScheduledDate)
+	current, err := loadExecutionScheduleRowsForUpdate(ctx, tx, record.TripID, record.TripDayID)
 	if err != nil {
-		return trip.MarkDayItineraryItemSkippedMutationResult{}, err
+		return trip.MarkScheduleItemSkippedMutationResult{}, err
 	}
 
-	targetIndex := indexExecutionItineraryItem(current, record.ItemID)
+	targetIndex := indexExecutionScheduleItem(current, record.ItemID)
 	if targetIndex < 0 {
-		return trip.MarkDayItineraryItemSkippedMutationResult{}, trip.ErrNotFound
+		return trip.MarkScheduleItemSkippedMutationResult{}, trip.ErrNotFound
 	}
 	if current[targetIndex].ArrivedAt.Valid {
-		return trip.MarkDayItineraryItemSkippedMutationResult{}, trip.ErrConflict
+		return trip.MarkScheduleItemSkippedMutationResult{}, trip.ErrConflict
 	}
 
 	if !current[targetIndex].SkippedAt.Valid {
-		firstPendingIndex := firstPendingExecutionItineraryItem(current)
+		firstPendingIndex := firstPendingExecutionScheduleItem(current)
 		if firstPendingIndex < 0 || current[firstPendingIndex].ID != record.ItemID {
-			return trip.MarkDayItineraryItemSkippedMutationResult{}, trip.ErrConflict
+			return trip.MarkScheduleItemSkippedMutationResult{}, trip.ErrConflict
 		}
 
 		commandTag, err := tx.Exec(ctx, `
-			UPDATE itinerary_items
+			UPDATE schedule_items
 			SET skipped_at = now(), updated_at = now()
 			WHERE trip_id = $1::uuid
-			  AND scheduled_date = $2
+			  AND trip_day_id = $2::uuid
 			  AND id = $3::uuid
 			  AND arrived_at IS NULL
 			  AND skipped_at IS NULL
-		`, mustUUID(record.TripID), dateTextValue(record.ScheduledDate), mustUUID(record.ItemID))
+		`, mustUUID(record.TripID), mustUUID(record.TripDayID), mustUUID(record.ItemID))
 		if err != nil {
-			return trip.MarkDayItineraryItemSkippedMutationResult{}, err
+			return trip.MarkScheduleItemSkippedMutationResult{}, err
 		}
 		if commandTag.RowsAffected() != 1 {
-			return trip.MarkDayItineraryItemSkippedMutationResult{}, trip.ErrConflict
+			return trip.MarkScheduleItemSkippedMutationResult{}, trip.ErrConflict
 		}
 	}
 
-	targetItem, items, err := s.latestDayItineraryMutationSnapshot(ctx, tx, record.TripID, record.ScheduledDate, record.ItemID)
+	targetItem, items, err := s.latestDayScheduleMutationSnapshot(ctx, tx, record.TripID, record.TripDayID, record.ItemID)
 	if err != nil {
-		return trip.MarkDayItineraryItemSkippedMutationResult{}, err
+		return trip.MarkScheduleItemSkippedMutationResult{}, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return trip.MarkDayItineraryItemSkippedMutationResult{}, err
+		return trip.MarkScheduleItemSkippedMutationResult{}, err
 	}
 
-	return trip.MarkDayItineraryItemSkippedMutationResult{Item: targetItem, Items: items}, nil
+	return trip.MarkScheduleItemSkippedMutationResult{Item: targetItem, Items: items}, nil
 }
 
-func (s *Store) RestoreDayItineraryItem(ctx context.Context, record trip.RestoreDayItineraryItemRecord) (trip.RestoreDayItineraryItemMutationResult, error) {
+func (s *Store) RestoreScheduleItem(ctx context.Context, record trip.RestoreScheduleItemRecord) (trip.RestoreScheduleItemMutationResult, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
-		return trip.RestoreDayItineraryItemMutationResult{}, err
+		return trip.RestoreScheduleItemMutationResult{}, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	current, err := loadExecutionItineraryRowsForUpdate(ctx, tx, record.TripID, record.ScheduledDate)
+	current, err := loadExecutionScheduleRowsForUpdate(ctx, tx, record.TripID, record.TripDayID)
 	if err != nil {
-		return trip.RestoreDayItineraryItemMutationResult{}, err
+		return trip.RestoreScheduleItemMutationResult{}, err
 	}
 
-	targetIndex := indexExecutionItineraryItem(current, record.ItemID)
+	targetIndex := indexExecutionScheduleItem(current, record.ItemID)
 	if targetIndex < 0 {
-		return trip.RestoreDayItineraryItemMutationResult{}, trip.ErrNotFound
+		return trip.RestoreScheduleItemMutationResult{}, trip.ErrNotFound
 	}
 	if current[targetIndex].ArrivedAt.Valid {
-		return trip.RestoreDayItineraryItemMutationResult{}, trip.ErrConflict
+		return trip.RestoreScheduleItemMutationResult{}, trip.ErrConflict
 	}
 
 	if current[targetIndex].SkippedAt.Valid {
 		commandTag, err := tx.Exec(ctx, `
-			UPDATE itinerary_items
+			UPDATE schedule_items
 			SET skipped_at = NULL, updated_at = now()
 			WHERE trip_id = $1::uuid
-			  AND scheduled_date = $2
+			  AND trip_day_id = $2::uuid
 			  AND id = $3::uuid
 			  AND arrived_at IS NULL
 			  AND skipped_at IS NOT NULL
-		`, mustUUID(record.TripID), dateTextValue(record.ScheduledDate), mustUUID(record.ItemID))
+		`, mustUUID(record.TripID), mustUUID(record.TripDayID), mustUUID(record.ItemID))
 		if err != nil {
-			return trip.RestoreDayItineraryItemMutationResult{}, err
+			return trip.RestoreScheduleItemMutationResult{}, err
 		}
 		if commandTag.RowsAffected() != 1 {
-			return trip.RestoreDayItineraryItemMutationResult{}, trip.ErrConflict
+			return trip.RestoreScheduleItemMutationResult{}, trip.ErrConflict
 		}
 	}
 
-	targetItem, items, err := s.latestDayItineraryMutationSnapshot(ctx, tx, record.TripID, record.ScheduledDate, record.ItemID)
+	targetItem, items, err := s.latestDayScheduleMutationSnapshot(ctx, tx, record.TripID, record.TripDayID, record.ItemID)
 	if err != nil {
-		return trip.RestoreDayItineraryItemMutationResult{}, err
+		return trip.RestoreScheduleItemMutationResult{}, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return trip.RestoreDayItineraryItemMutationResult{}, err
+		return trip.RestoreScheduleItemMutationResult{}, err
 	}
 
-	return trip.RestoreDayItineraryItemMutationResult{Item: targetItem, Items: items}, nil
+	return trip.RestoreScheduleItemMutationResult{Item: targetItem, Items: items}, nil
 }
 
-func (s *Store) latestDayItineraryMutationSnapshot(ctx context.Context, tx pgx.Tx, tripID string, scheduledDate string, itemID string) (trip.DayItineraryItem, []trip.DayItineraryItem, error) {
+func (s *Store) latestDayScheduleMutationSnapshot(ctx context.Context, tx pgx.Tx, tripID string, tripDayID string, itemID string) (trip.ScheduleItem, []trip.ScheduleItem, error) {
 	qtx := s.queries.WithTx(tx)
-	rows, err := qtx.ListItineraryItemsByTripAndDate(ctx, db.ListItineraryItemsByTripAndDateParams{
-		Column1:       mustUUID(tripID),
-		ScheduledDate: dateTextValue(scheduledDate),
+	rows, err := qtx.ListScheduleItemsByTripDay(ctx, db.ListScheduleItemsByTripDayParams{
+		TripID:    mustUUID(tripID),
+		TripDayID: mustUUID(tripDayID),
 	})
 	if err != nil {
-		return trip.DayItineraryItem{}, nil, err
+		return trip.ScheduleItem{}, nil, err
 	}
-	items := mapDayItineraryItems(rows)
-	targetItem, ok := findDayItineraryItem(items, itemID)
+	items := mapScheduleItems(rows)
+	targetItem, ok := findScheduleItem(items, itemID)
 	if !ok {
-		return trip.DayItineraryItem{}, nil, trip.ErrNotFound
+		return trip.ScheduleItem{}, nil, trip.ErrNotFound
 	}
 	return targetItem, items, nil
 }
 
-func (s *Store) UpdateDayItineraryItemPlace(ctx context.Context, record trip.UpdateDayItineraryItemRecord) (trip.DayItineraryItem, error) {
-	row, err := s.queries.UpdateTripPlaceSnapshotByItineraryItem(ctx, db.UpdateTripPlaceSnapshotByItineraryItemParams{
-		TripID:        mustUUID(record.TripID),
-		ScheduledDate: dateTextValue(record.ScheduledDate),
-		ItemID:        mustUUID(record.ItemID),
-		Name:          record.Name,
-		Address:       record.Address,
-		PlaceType:     record.PlaceType,
+func (s *Store) UpdateScheduleItemPlace(ctx context.Context, record trip.UpdateScheduleItemRecord) (trip.ScheduleItem, error) {
+	row, err := s.queries.UpdateTripPlaceSnapshotByScheduleItem(ctx, db.UpdateTripPlaceSnapshotByScheduleItemParams{
+		TripID:         mustUUID(record.TripID),
+		TripDayID:      mustUUID(record.TripDayID),
+		ScheduleItemID: mustUUID(record.ItemID),
+		Name:           record.Name,
+		Address:        record.Address,
+		PlaceType:      record.PlaceType,
 	})
 	if err == pgx.ErrNoRows {
-		return trip.DayItineraryItem{}, trip.ErrNotFound
+		return trip.ScheduleItem{}, trip.ErrNotFound
 	}
 	if err != nil {
-		return trip.DayItineraryItem{}, err
+		return trip.ScheduleItem{}, err
 	}
-	return trip.DayItineraryItem{
+	return trip.ScheduleItem{
 		ID:        row.ID,
 		ItemOrder: int(row.ItemOrder),
 		Version:   int(row.Version),
@@ -1056,18 +1211,11 @@ func (s *Store) UpdateDayItineraryItemPlace(ctx context.Context, record trip.Upd
 	}, nil
 }
 
-func (s *Store) DeleteDayItineraryItem(ctx context.Context, tripID string, date string, itemID string) (bool, error) {
-	tx, err := s.pool.Begin(ctx)
-	if err != nil {
-		return false, err
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
-
-	qtx := s.queries.WithTx(tx)
-	placeID, err := qtx.DeleteItineraryItemByTripDateAndID(ctx, db.DeleteItineraryItemByTripDateAndIDParams{
-		TripID:        mustUUID(tripID),
-		ScheduledDate: dateTextValue(date),
-		ItemID:        mustUUID(itemID),
+func (s *Store) DeleteScheduleItem(ctx context.Context, tripID string, tripDayID string, itemID string) (bool, error) {
+	_, err := s.queries.SoftDeleteScheduleItemByTripDayAndID(ctx, db.SoftDeleteScheduleItemByTripDayAndIDParams{
+		TripID:         mustUUID(tripID),
+		TripDayID:      mustUUID(tripDayID),
+		ScheduleItemID: mustUUID(itemID),
 	})
 	if err == pgx.ErrNoRows {
 		return false, nil
@@ -1075,67 +1223,39 @@ func (s *Store) DeleteDayItineraryItem(ctx context.Context, tripID string, date 
 	if err != nil {
 		return false, err
 	}
-
-	remaining, err := qtx.CountItineraryItemsByTripPlaceID(ctx, db.CountItineraryItemsByTripPlaceIDParams{
-		TripID:      mustUUID(tripID),
-		TripPlaceID: mustUUID(placeID),
-	})
-	if err != nil {
-		return false, err
-	}
-	if remaining == 0 {
-		lodgingReferences, err := qtx.CountDayLodgingPlacesByTripPlaceID(ctx, db.CountDayLodgingPlacesByTripPlaceIDParams{
-			TripID:      mustUUID(tripID),
-			TripPlaceID: mustUUID(placeID),
-		})
-		if err != nil {
-			return false, err
-		}
-		if lodgingReferences == 0 {
-			if err := qtx.DeleteTripPlaceByID(ctx, db.DeleteTripPlaceByIDParams{
-				TripID:      mustUUID(tripID),
-				TripPlaceID: mustUUID(placeID),
-			}); err != nil {
-				return false, err
-			}
-		}
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return false, err
-	}
 	return true, nil
 }
 
-type orderedItineraryRow struct {
+type orderedScheduleRow struct {
 	ID      string
 	Rank    string
 	Version int
 }
 
-type executionItineraryRow struct {
+type executionScheduleRow struct {
 	ID        string
 	ArrivedAt pgtype.Timestamptz
 	SkippedAt pgtype.Timestamptz
 }
 
-func loadExecutionItineraryRowsForUpdate(ctx context.Context, tx pgx.Tx, tripID string, date string) ([]executionItineraryRow, error) {
+func loadExecutionScheduleRowsForUpdate(ctx context.Context, tx pgx.Tx, tripID string, date string) ([]executionScheduleRow, error) {
 	rows, err := tx.Query(ctx, `
 		SELECT id::text, arrived_at, skipped_at
-		FROM itinerary_items
+		FROM schedule_items
 		WHERE trip_id = $1::uuid
-		  AND scheduled_date = $2
+		  AND trip_day_id = $2::uuid
+		  AND deleted_at IS NULL
 		ORDER BY rank ASC, id ASC
 		FOR UPDATE
-	`, mustUUID(tripID), dateTextValue(date))
+	`, mustUUID(tripID), mustUUID(date))
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	ordered := make([]executionItineraryRow, 0)
+	ordered := make([]executionScheduleRow, 0)
 	for rows.Next() {
-		var item executionItineraryRow
+		var item executionScheduleRow
 		if err := rows.Scan(&item.ID, &item.ArrivedAt, &item.SkippedAt); err != nil {
 			return nil, err
 		}
@@ -1147,23 +1267,24 @@ func loadExecutionItineraryRowsForUpdate(ctx context.Context, tx pgx.Tx, tripID 
 	return ordered, nil
 }
 
-func loadOrderedItineraryRowsForUpdate(ctx context.Context, tx pgx.Tx, tripID string, date string) ([]orderedItineraryRow, error) {
+func loadOrderedScheduleRowsForUpdate(ctx context.Context, tx pgx.Tx, tripID string, date string) ([]orderedScheduleRow, error) {
 	rows, err := tx.Query(ctx, `
 		SELECT id::text, rank, version
-		FROM itinerary_items
+		FROM schedule_items
 		WHERE trip_id = $1::uuid
-		  AND scheduled_date = $2
+		  AND trip_day_id = $2::uuid
+		  AND deleted_at IS NULL
 		ORDER BY rank ASC, id ASC
 		FOR UPDATE
-	`, mustUUID(tripID), dateTextValue(date))
+	`, mustUUID(tripID), mustUUID(date))
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	ordered := make([]orderedItineraryRow, 0)
+	ordered := make([]orderedScheduleRow, 0)
 	for rows.Next() {
-		var item orderedItineraryRow
+		var item orderedScheduleRow
 		if err := rows.Scan(&item.ID, &item.Rank, &item.Version); err != nil {
 			return nil, err
 		}
@@ -1175,7 +1296,7 @@ func loadOrderedItineraryRowsForUpdate(ctx context.Context, tx pgx.Tx, tripID st
 	return ordered, nil
 }
 
-func applyReorderMove(ctx context.Context, tx pgx.Tx, tripID string, date string, current []orderedItineraryRow, move trip.ReorderDayItineraryMoveRecord) ([]orderedItineraryRow, error) {
+func applyReorderMove(ctx context.Context, tx pgx.Tx, tripID string, date string, current []orderedScheduleRow, move trip.ReorderDayScheduleMoveRecord) ([]orderedScheduleRow, error) {
 	ordered := current
 	for attempt := 0; attempt < 2; attempt++ {
 		next, err := applyReorderMoveOnce(ctx, tx, tripID, date, ordered, move)
@@ -1189,7 +1310,7 @@ func applyReorderMove(ctx context.Context, tx pgx.Tx, tripID string, date string
 			return nil, trip.ErrConflict
 		}
 
-		ordered, err = loadOrderedItineraryRowsForUpdate(ctx, tx, tripID, date)
+		ordered, err = loadOrderedScheduleRowsForUpdate(ctx, tx, tripID, date)
 		if err != nil {
 			return nil, err
 		}
@@ -1198,8 +1319,8 @@ func applyReorderMove(ctx context.Context, tx pgx.Tx, tripID string, date string
 	return nil, trip.ErrConflict
 }
 
-func applyReorderMoveOnce(ctx context.Context, tx pgx.Tx, tripID string, date string, current []orderedItineraryRow, move trip.ReorderDayItineraryMoveRecord) ([]orderedItineraryRow, error) {
-	movedIndex := indexOrderedItineraryItem(current, move.ItemID)
+func applyReorderMoveOnce(ctx context.Context, tx pgx.Tx, tripID string, date string, current []orderedScheduleRow, move trip.ReorderDayScheduleMoveRecord) ([]orderedScheduleRow, error) {
+	movedIndex := indexOrderedScheduleItem(current, move.ItemID)
 	if movedIndex < 0 {
 		return nil, trip.ErrConflict
 	}
@@ -1208,7 +1329,7 @@ func applyReorderMoveOnce(ctx context.Context, tx pgx.Tx, tripID string, date st
 	}
 
 	moved := current[movedIndex]
-	remaining := append(append([]orderedItineraryRow{}, current[:movedIndex]...), current[movedIndex+1:]...)
+	remaining := append(append([]orderedScheduleRow{}, current[:movedIndex]...), current[movedIndex+1:]...)
 	insertIndex, err := reorderInsertIndex(remaining, move)
 	if err != nil {
 		return nil, err
@@ -1221,7 +1342,7 @@ func applyReorderMoveOnce(ctx context.Context, tx pgx.Tx, tripID string, date st
 
 	commandTag, err := execReorderRankUpdate(ctx, tx, tripID, date, move.ItemID, newRank, move.ClientVersion)
 	if err != nil {
-		if isUniqueConstraintViolation(err, "itinerary_items_trip_date_rank_unique") {
+		if isUniqueConstraintViolation(err, "schedule_items_active_day_rank_unique") {
 			return nil, errRetryReorderRankCollision
 		}
 		return nil, err
@@ -1232,7 +1353,7 @@ func applyReorderMoveOnce(ctx context.Context, tx pgx.Tx, tripID string, date st
 
 	moved.Rank = newRank
 	moved.Version++
-	next := append([]orderedItineraryRow{}, remaining[:insertIndex]...)
+	next := append([]orderedScheduleRow{}, remaining[:insertIndex]...)
 	next = append(next, moved)
 	next = append(next, remaining[insertIndex:]...)
 	return next, nil
@@ -1244,13 +1365,14 @@ func execReorderRankUpdate(ctx context.Context, tx pgx.Tx, tripID string, date s
 	}
 
 	commandTag, err := tx.Exec(ctx, `
-		UPDATE itinerary_items
+		UPDATE schedule_items
 		SET rank = $4, version = version + 1
 		WHERE trip_id = $1::uuid
-		  AND scheduled_date = $2
+		  AND trip_day_id = $2::uuid
 		  AND id = $3::uuid
 		  AND version = $5
-	`, mustUUID(tripID), dateTextValue(date), mustUUID(itemID), newRank, clientVersion)
+		  AND deleted_at IS NULL
+	`, mustUUID(tripID), mustUUID(date), mustUUID(itemID), newRank, clientVersion)
 	if err != nil {
 		if rollbackErr := rollbackReorderRankUpdateSavepoint(ctx, tx); rollbackErr != nil {
 			return commandTag, rollbackErr
@@ -1272,7 +1394,7 @@ func rollbackReorderRankUpdateSavepoint(ctx context.Context, tx pgx.Tx) error {
 	return err
 }
 
-func reorderInsertIndex(remaining []orderedItineraryRow, move trip.ReorderDayItineraryMoveRecord) (int, error) {
+func reorderInsertIndex(remaining []orderedScheduleRow, move trip.ReorderDayScheduleMoveRecord) (int, error) {
 	if move.BeforeItemID == nil {
 		if len(remaining) == 0 || remaining[0].ID != *move.AfterItemID {
 			return 0, trip.ErrConflict
@@ -1286,14 +1408,14 @@ func reorderInsertIndex(remaining []orderedItineraryRow, move trip.ReorderDayIti
 		return len(remaining), nil
 	}
 
-	beforeIndex := indexOrderedItineraryItem(remaining, *move.BeforeItemID)
+	beforeIndex := indexOrderedScheduleItem(remaining, *move.BeforeItemID)
 	if beforeIndex < 0 || beforeIndex+1 >= len(remaining) || remaining[beforeIndex+1].ID != *move.AfterItemID {
 		return 0, trip.ErrConflict
 	}
 	return beforeIndex + 1, nil
 }
 
-func reorderedRank(remaining []orderedItineraryRow, insertIndex int) (string, error) {
+func reorderedRank(remaining []orderedScheduleRow, insertIndex int) (string, error) {
 	var previousRank *string
 	if insertIndex > 0 {
 		previousRank = &remaining[insertIndex-1].Rank
@@ -1346,7 +1468,7 @@ func formatRank(value *big.Int) string {
 	return fmt.Sprintf("%019s", value.String())
 }
 
-func indexOrderedItineraryItem(items []orderedItineraryRow, itemID string) int {
+func indexOrderedScheduleItem(items []orderedScheduleRow, itemID string) int {
 	for index, item := range items {
 		if item.ID == itemID {
 			return index
@@ -1355,7 +1477,7 @@ func indexOrderedItineraryItem(items []orderedItineraryRow, itemID string) int {
 	return -1
 }
 
-func indexExecutionItineraryItem(items []executionItineraryRow, itemID string) int {
+func indexExecutionScheduleItem(items []executionScheduleRow, itemID string) int {
 	for index, item := range items {
 		if item.ID == itemID {
 			return index
@@ -1364,7 +1486,7 @@ func indexExecutionItineraryItem(items []executionItineraryRow, itemID string) i
 	return -1
 }
 
-func firstPendingExecutionItineraryItem(items []executionItineraryRow) int {
+func firstPendingExecutionScheduleItem(items []executionScheduleRow) int {
 	for index, item := range items {
 		if !item.ArrivedAt.Valid && !item.SkippedAt.Valid {
 			return index
@@ -1373,10 +1495,10 @@ func firstPendingExecutionItineraryItem(items []executionItineraryRow) int {
 	return -1
 }
 
-func mapDayItineraryItems(rows []db.ListItineraryItemsByTripAndDateRow) []trip.DayItineraryItem {
-	items := make([]trip.DayItineraryItem, 0, len(rows))
+func mapScheduleItems(rows []db.ListScheduleItemsByTripDayRow) []trip.ScheduleItem {
+	items := make([]trip.ScheduleItem, 0, len(rows))
 	for index, row := range rows {
-		items = append(items, trip.DayItineraryItem{
+		items = append(items, trip.ScheduleItem{
 			ID:        row.ID,
 			ItemOrder: index + 1,
 			Version:   int(row.Version),
@@ -1387,6 +1509,14 @@ func mapDayItineraryItems(rows []db.ListItineraryItemsByTripAndDateRow) []trip.D
 		})
 	}
 	return items
+}
+
+func lodgingPlaceFromActiveTripDay(id string, name pgtype.Text, placeType pgtype.Text, address pgtype.Text, provider pgtype.Text, googlePlaceID pgtype.Text, latitude pgtype.Float8, longitude pgtype.Float8) *trip.TripPlaceSummary {
+	if id == "" || !name.Valid || !placeType.Valid || !address.Valid || !provider.Valid {
+		return nil
+	}
+	place := tripPlaceSummary(id, name.String, placeType.String, address.String, provider.String, googlePlaceID, latitude, longitude)
+	return &place
 }
 
 func tripPlaceSummary(id string, name string, placeType string, address string, provider string, googlePlaceID pgtype.Text, latitude pgtype.Float8, longitude pgtype.Float8) trip.TripPlaceSummary {
@@ -1411,13 +1541,13 @@ func routablePlace(provider string, googlePlaceID pgtype.Text, latitude pgtype.F
 	}
 }
 
-func findDayItineraryItem(items []trip.DayItineraryItem, itemID string) (trip.DayItineraryItem, bool) {
+func findScheduleItem(items []trip.ScheduleItem, itemID string) (trip.ScheduleItem, bool) {
 	for _, item := range items {
 		if item.ID == itemID {
 			return item, true
 		}
 	}
-	return trip.DayItineraryItem{}, false
+	return trip.ScheduleItem{}, false
 }
 
 func boolFromSQL(value interface{}) bool {

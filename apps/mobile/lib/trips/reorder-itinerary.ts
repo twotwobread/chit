@@ -1,4 +1,4 @@
-import type { GetDayItineraryResponse, ReorderDayItineraryItemsRequest } from '@i-um/api-contract';
+import type { GetDayScheduleItemsResponse, ReorderScheduleItemsRequest } from '@i-um/api-contract';
 
 import { buildDayItineraryViewModel, type DayItineraryRowViewModel, type DayItineraryViewModel } from './day-itinerary';
 
@@ -111,16 +111,16 @@ export function buildDayItineraryReorderSubmitState(
   return hasDayItineraryReorderChanges(draft) ? { disabled: false, label: '저장' } : { disabled: true, label: '저장' };
 }
 
-export function buildReorderDayItineraryItemsRequest(
+export function buildReorderScheduleItemsRequest(
   draft: DayItineraryReorderDraftViewModel,
-): ReorderDayItineraryItemsRequest | null {
+): ReorderScheduleItemsRequest | null {
   if (!hasDayItineraryReorderChanges(draft)) {
     return null;
   }
 
   const workingIds = draft.originalItems.map((item) => item.id);
   const versionByItemId = new Map(draft.originalItems.map((item) => [item.id, item.version]));
-  const moves: ReorderDayItineraryItemsRequest['moves'] = [];
+  const moves: ReorderScheduleItemsRequest['moves'] = [];
 
   for (const [targetIndex, finalItem] of draft.items.entries()) {
     const currentIndex = workingIds.indexOf(finalItem.id);
@@ -132,9 +132,9 @@ export function buildReorderDayItineraryItemsRequest(
     workingIds.splice(targetIndex, 0, finalItem.id);
 
     moves.push({
-      itemId: finalItem.id,
-      beforeItemId: targetIndex === 0 ? null : workingIds[targetIndex - 1],
-      afterItemId: targetIndex === workingIds.length - 1 ? null : workingIds[targetIndex + 1],
+      scheduleItemId: finalItem.id,
+      beforeScheduleItemId: targetIndex === 0 ? null : workingIds[targetIndex - 1],
+      afterScheduleItemId: targetIndex === workingIds.length - 1 ? null : workingIds[targetIndex + 1],
       clientVersion: versionByItemId.get(finalItem.id) ?? finalItem.version,
     });
   }
@@ -144,9 +144,9 @@ export function buildReorderDayItineraryItemsRequest(
 
 export async function submitDayItineraryReorder<T>(
   draft: DayItineraryReorderDraftViewModel,
-  submit: (request: ReorderDayItineraryItemsRequest) => Promise<T>,
+  submit: (request: ReorderScheduleItemsRequest) => Promise<T>,
 ): Promise<T | null> {
-  const request = buildReorderDayItineraryItemsRequest(draft);
+  const request = buildReorderScheduleItemsRequest(draft);
   if (!request) {
     return null;
   }
@@ -155,7 +155,7 @@ export async function submitDayItineraryReorder<T>(
 }
 
 export function buildDayItineraryReorderSuccessViewModel(
-  response: GetDayItineraryResponse,
+  response: GetDayScheduleItemsResponse,
 ): DayItineraryReorderSuccessViewModel {
   return {
     reorderFeedback: null,

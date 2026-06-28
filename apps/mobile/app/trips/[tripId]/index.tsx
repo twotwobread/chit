@@ -273,8 +273,8 @@ function TripDayList({ days, tripId }: { days: GetTripDetailResponse['days']; tr
         {viewModels.map((day) => (
           <Pressable
             accessibilityRole="button"
-            key={day.date}
-            onPress={() => router.push(buildDayItineraryRoute(tripId, day.date))}
+            key={day.id}
+            onPress={() => router.push(buildDayItineraryRoute(tripId, day.id))}
             style={styles.dayRow}
           >
             <View style={styles.dayRowMain}>

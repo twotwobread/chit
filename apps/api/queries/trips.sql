@@ -208,67 +208,47 @@ JOIN trips t ON t.id = ti.trip_id
 WHERE ti.token = sqlc.arg(token)
 FOR UPDATE OF ti;
 
--- name: ListItineraryItemsByTripAndDate :many
+-- name: ListActiveTripDaysByTrip :many
 SELECT
-  ii.id::text AS id,
-  ii.version,
-  ii.arrived_at,
-  ii.skipped_at,
-  (dlp.trip_place_id IS NOT NULL) AS is_lodging,
-  tp.id::text AS trip_place_id,
-  tp.name AS place_name,
-  tp.place_type,
-  tp.address,
-  tp.provider,
-  tp.google_place_id,
-  tp.latitude,
-  tp.longitude
-FROM itinerary_items ii
-JOIN trip_places tp
-  ON tp.id = ii.trip_place_id
- AND tp.trip_id = ii.trip_id
-LEFT JOIN day_lodging_places dlp
-  ON dlp.trip_id = ii.trip_id
- AND dlp.lodging_date = ii.scheduled_date
- AND dlp.trip_place_id = ii.trip_place_id
-WHERE ii.trip_id = $1::uuid
-  AND ii.scheduled_date = $2
-ORDER BY ii.rank ASC, ii.id ASC;
+  td.id::text AS id,
+  td.date,
+  td.day_order,
+  COALESCE(tp.id::text, ''::text)::text AS lodging_trip_place_id,
+  tp.name AS lodging_place_name,
+  tp.place_type AS lodging_place_type,
+  tp.address AS lodging_place_address,
+  tp.provider AS lodging_place_provider,
+  tp.google_place_id AS lodging_google_place_id,
+  tp.latitude AS lodging_latitude,
+  tp.longitude AS lodging_longitude
+FROM trip_days td
+LEFT JOIN trip_places tp
+  ON tp.id = td.lodging_trip_place_id
+ AND tp.trip_id = td.trip_id
+WHERE td.trip_id = $1::uuid
+  AND td.deleted_at IS NULL
+ORDER BY td.day_order ASC, td.date ASC;
 
--- name: ListDayLodgingPlacesByTrip :many
+-- name: GetActiveTripDayByTripAndID :one
 SELECT
-  dlp.lodging_date,
-  tp.id::text AS id,
-  tp.name,
-  tp.place_type,
-  tp.address,
-  tp.provider,
-  tp.google_place_id,
-  tp.latitude,
-  tp.longitude
-FROM day_lodging_places dlp
-JOIN trip_places tp
-  ON tp.id = dlp.trip_place_id
- AND tp.trip_id = dlp.trip_id
-WHERE dlp.trip_id = $1::uuid
-ORDER BY dlp.lodging_date ASC;
-
--- name: GetDayLodgingPlaceByTripAndDate :one
-SELECT
-  tp.id::text AS id,
-  tp.name,
-  tp.place_type,
-  tp.address,
-  tp.provider,
-  tp.google_place_id,
-  tp.latitude,
-  tp.longitude
-FROM day_lodging_places dlp
-JOIN trip_places tp
-  ON tp.id = dlp.trip_place_id
- AND tp.trip_id = dlp.trip_id
-WHERE dlp.trip_id = sqlc.arg(trip_id)::uuid
-  AND dlp.lodging_date = sqlc.arg(lodging_date);
+  td.id::text AS id,
+  td.date,
+  td.day_order,
+  COALESCE(tp.id::text, ''::text)::text AS lodging_trip_place_id,
+  tp.name AS lodging_place_name,
+  tp.place_type AS lodging_place_type,
+  tp.address AS lodging_place_address,
+  tp.provider AS lodging_place_provider,
+  tp.google_place_id AS lodging_google_place_id,
+  tp.latitude AS lodging_latitude,
+  tp.longitude AS lodging_longitude
+FROM trip_days td
+LEFT JOIN trip_places tp
+  ON tp.id = td.lodging_trip_place_id
+ AND tp.trip_id = td.trip_id
+WHERE td.trip_id = sqlc.arg(trip_id)::uuid
+  AND td.id = sqlc.arg(trip_day_id)::uuid
+  AND td.deleted_at IS NULL;
 
 -- name: GetTripPlaceSummaryByTripAndPlace :one
 SELECT
@@ -298,35 +278,6 @@ FROM trip_places
 WHERE trip_id = sqlc.arg(trip_id)::uuid
   AND provider = 'google'
   AND google_place_id = sqlc.arg(google_place_id);
-
--- name: SetDayLodgingPlace :one
-WITH upserted AS (
-  INSERT INTO day_lodging_places (trip_id, lodging_date, trip_place_id)
-  VALUES (sqlc.arg(trip_id)::uuid, sqlc.arg(lodging_date), sqlc.arg(trip_place_id)::uuid)
-  ON CONFLICT (trip_id, lodging_date) DO UPDATE
-  SET
-    trip_place_id = EXCLUDED.trip_place_id,
-    updated_at = now()
-  RETURNING trip_id, trip_place_id
-)
-SELECT
-  tp.id::text AS id,
-  tp.name,
-  tp.place_type,
-  tp.address,
-  tp.provider,
-  tp.google_place_id,
-  tp.latitude,
-  tp.longitude
-FROM upserted
-JOIN trip_places tp
-  ON tp.id = upserted.trip_place_id
- AND tp.trip_id = upserted.trip_id;
-
--- name: DeleteDayLodgingPlace :exec
-DELETE FROM day_lodging_places
-WHERE trip_id = sqlc.arg(trip_id)::uuid
-  AND lodging_date = sqlc.arg(lodging_date);
 
 -- name: CreateTripPlace :one
 INSERT INTO trip_places (
@@ -386,36 +337,69 @@ RETURNING
   latitude,
   longitude;
 
--- name: CountItineraryItemsByTripDateAndPlace :one
-SELECT count(*)::int
-FROM itinerary_items
-WHERE trip_id = sqlc.arg(trip_id)::uuid
-  AND scheduled_date = sqlc.arg(scheduled_date)
-  AND trip_place_id = sqlc.arg(trip_place_id)::uuid;
+-- name: SetDayLodgingPlace :one
+WITH updated AS (
+  UPDATE trip_days
+  SET lodging_trip_place_id = sqlc.arg(trip_place_id)::uuid,
+      updated_at = now()
+  WHERE trip_id = sqlc.arg(trip_id)::uuid
+    AND id = sqlc.arg(trip_day_id)::uuid
+    AND deleted_at IS NULL
+  RETURNING trip_id, lodging_trip_place_id
+)
+SELECT
+  tp.id::text AS id,
+  tp.name,
+  tp.place_type,
+  tp.address,
+  tp.provider,
+  tp.google_place_id,
+  tp.latitude,
+  tp.longitude
+FROM updated
+JOIN trip_places tp
+  ON tp.id = updated.lodging_trip_place_id
+ AND tp.trip_id = updated.trip_id;
 
--- name: CreateItineraryItemAtEnd :one
-INSERT INTO itinerary_items (
+-- name: DeleteDayLodgingPlace :exec
+UPDATE trip_days
+SET lodging_trip_place_id = NULL,
+    updated_at = now()
+WHERE trip_id = sqlc.arg(trip_id)::uuid
+  AND id = sqlc.arg(trip_day_id)::uuid
+  AND deleted_at IS NULL;
+
+-- name: CountScheduleItemsByTripDayAndPlace :one
+SELECT count(*)::int
+FROM schedule_items
+WHERE trip_id = sqlc.arg(trip_id)::uuid
+  AND trip_day_id = sqlc.arg(trip_day_id)::uuid
+  AND trip_place_id = sqlc.arg(trip_place_id)::uuid
+  AND deleted_at IS NULL;
+
+-- name: CreateScheduleItemAtEnd :one
+INSERT INTO schedule_items (
   trip_id,
-  scheduled_date,
+  trip_day_id,
   trip_place_id,
   item_order,
   rank
 ) VALUES (
   sqlc.arg(trip_id)::uuid,
-  sqlc.arg(scheduled_date),
+  sqlc.arg(trip_day_id)::uuid,
   sqlc.arg(trip_place_id)::uuid,
   (
     SELECT COALESCE(MAX(item_order), 0) + 1
-    FROM itinerary_items
-    WHERE trip_id = sqlc.arg(trip_id)::uuid
-      AND scheduled_date = sqlc.arg(scheduled_date)
+    FROM schedule_items
+    WHERE trip_day_id = sqlc.arg(trip_day_id)::uuid
+      AND deleted_at IS NULL
   ),
   lpad(
     (
       SELECT COALESCE(MAX(rank::bigint), 0) + 1024
-      FROM itinerary_items
-      WHERE trip_id = sqlc.arg(trip_id)::uuid
-        AND scheduled_date = sqlc.arg(scheduled_date)
+      FROM schedule_items
+      WHERE trip_day_id = sqlc.arg(trip_day_id)::uuid
+        AND deleted_at IS NULL
     )::text,
     19,
     '0'
@@ -428,14 +412,14 @@ RETURNING
   arrived_at,
   skipped_at;
 
--- name: GetItineraryItemByTripDateAndID :one
+-- name: ListScheduleItemsByTripDay :many
 SELECT
-  ii.id::text AS id,
-  ii.item_order,
-  ii.version,
-  ii.arrived_at,
-  ii.skipped_at,
-  (dlp.trip_place_id IS NOT NULL) AS is_lodging,
+  si.id::text AS id,
+  si.item_order,
+  si.version,
+  si.arrived_at,
+  si.skipped_at,
+  COALESCE(td.lodging_trip_place_id = si.trip_place_id, false) AS is_lodging,
   tp.id::text AS trip_place_id,
   tp.name AS place_name,
   tp.place_type,
@@ -444,31 +428,68 @@ SELECT
   tp.google_place_id,
   tp.latitude,
   tp.longitude
-FROM itinerary_items ii
+FROM schedule_items si
+JOIN trip_days td
+  ON td.id = si.trip_day_id
+ AND td.trip_id = si.trip_id
+ AND td.deleted_at IS NULL
 JOIN trip_places tp
-  ON tp.id = ii.trip_place_id
- AND tp.trip_id = ii.trip_id
-LEFT JOIN day_lodging_places dlp
-  ON dlp.trip_id = ii.trip_id
- AND dlp.lodging_date = ii.scheduled_date
- AND dlp.trip_place_id = ii.trip_place_id
-WHERE ii.trip_id = sqlc.arg(trip_id)::uuid
-  AND ii.scheduled_date = sqlc.arg(scheduled_date)
-  AND ii.id = sqlc.arg(item_id)::uuid;
+  ON tp.id = si.trip_place_id
+ AND tp.trip_id = si.trip_id
+WHERE si.trip_id = sqlc.arg(trip_id)::uuid
+  AND si.trip_day_id = sqlc.arg(trip_day_id)::uuid
+  AND si.deleted_at IS NULL
+ORDER BY si.rank ASC, si.id ASC;
 
--- name: UpdateTripPlaceSnapshotByItineraryItem :one
+-- name: GetScheduleItemByTripDayAndID :one
+SELECT
+  si.id::text AS id,
+  si.item_order,
+  si.version,
+  si.arrived_at,
+  si.skipped_at,
+  COALESCE(td.lodging_trip_place_id = si.trip_place_id, false) AS is_lodging,
+  tp.id::text AS trip_place_id,
+  tp.name AS place_name,
+  tp.place_type,
+  tp.address,
+  tp.provider,
+  tp.google_place_id,
+  tp.latitude,
+  tp.longitude
+FROM schedule_items si
+JOIN trip_days td
+  ON td.id = si.trip_day_id
+ AND td.trip_id = si.trip_id
+ AND td.deleted_at IS NULL
+JOIN trip_places tp
+  ON tp.id = si.trip_place_id
+ AND tp.trip_id = si.trip_id
+WHERE si.trip_id = sqlc.arg(trip_id)::uuid
+  AND si.trip_day_id = sqlc.arg(trip_day_id)::uuid
+  AND si.id = sqlc.arg(schedule_item_id)::uuid
+  AND si.deleted_at IS NULL;
+
+-- name: UpdateTripPlaceSnapshotByScheduleItem :one
 WITH target AS (
   SELECT
-    ii.id,
-    ii.item_order,
-    ii.version,
-    ii.arrived_at,
-    ii.skipped_at,
-    ii.trip_place_id
-  FROM itinerary_items ii
-  WHERE ii.trip_id = sqlc.arg(trip_id)::uuid
-    AND ii.scheduled_date = sqlc.arg(scheduled_date)
-    AND ii.id = sqlc.arg(item_id)::uuid
+    si.id,
+    si.item_order,
+    si.version,
+    si.arrived_at,
+    si.skipped_at,
+    si.trip_place_id,
+    si.trip_day_id,
+    si.trip_id
+  FROM schedule_items si
+  JOIN trip_days td
+    ON td.id = si.trip_day_id
+   AND td.trip_id = si.trip_id
+   AND td.deleted_at IS NULL
+  WHERE si.trip_id = sqlc.arg(trip_id)::uuid
+    AND si.trip_day_id = sqlc.arg(trip_day_id)::uuid
+    AND si.id = sqlc.arg(schedule_item_id)::uuid
+    AND si.deleted_at IS NULL
 ), updated_place AS (
   UPDATE trip_places tp
   SET
@@ -478,7 +499,7 @@ WITH target AS (
     updated_at = now()
   FROM target
   WHERE tp.id = target.trip_place_id
-    AND tp.trip_id = sqlc.arg(trip_id)::uuid
+    AND tp.trip_id = target.trip_id
   RETURNING
     tp.id::text AS id,
     tp.name,
@@ -495,7 +516,7 @@ SELECT
   target.version,
   target.arrived_at,
   target.skipped_at,
-  (dlp.trip_place_id IS NOT NULL) AS is_lodging,
+  COALESCE(td.lodging_trip_place_id = target.trip_place_id, false) AS is_lodging,
   updated_place.id AS trip_place_id,
   updated_place.name AS place_name,
   updated_place.place_type,
@@ -506,29 +527,33 @@ SELECT
   updated_place.longitude
 FROM target
 JOIN updated_place ON true
-LEFT JOIN day_lodging_places dlp
-  ON dlp.trip_id = sqlc.arg(trip_id)::uuid
- AND dlp.lodging_date = sqlc.arg(scheduled_date)
- AND dlp.trip_place_id = target.trip_place_id;
+JOIN trip_days td
+  ON td.id = target.trip_day_id
+ AND td.trip_id = target.trip_id;
 
--- name: DeleteItineraryItemByTripDateAndID :one
-DELETE FROM itinerary_items
+-- name: SoftDeleteScheduleItemByTripDayAndID :one
+UPDATE schedule_items
+SET deleted_at = now(),
+    updated_at = now()
 WHERE trip_id = sqlc.arg(trip_id)::uuid
-  AND scheduled_date = sqlc.arg(scheduled_date)
-  AND id = sqlc.arg(item_id)::uuid
+  AND trip_day_id = sqlc.arg(trip_day_id)::uuid
+  AND id = sqlc.arg(schedule_item_id)::uuid
+  AND deleted_at IS NULL
 RETURNING trip_place_id::text;
 
--- name: CountItineraryItemsByTripPlaceID :one
+-- name: CountScheduleItemsByTripPlaceID :one
 SELECT count(*)::int AS total_count
-FROM itinerary_items
+FROM schedule_items
 WHERE trip_id = sqlc.arg(trip_id)::uuid
-  AND trip_place_id = sqlc.arg(trip_place_id)::uuid;
+  AND trip_place_id = sqlc.arg(trip_place_id)::uuid
+  AND deleted_at IS NULL;
 
--- name: CountDayLodgingPlacesByTripPlaceID :one
+-- name: CountTripDaysByLodgingPlaceID :one
 SELECT count(*)::int AS total_count
-FROM day_lodging_places
+FROM trip_days
 WHERE trip_id = sqlc.arg(trip_id)::uuid
-  AND trip_place_id = sqlc.arg(trip_place_id)::uuid;
+  AND lodging_trip_place_id = sqlc.arg(trip_place_id)::uuid
+  AND deleted_at IS NULL;
 
 -- name: DeleteTripPlaceByID :exec
 DELETE FROM trip_places

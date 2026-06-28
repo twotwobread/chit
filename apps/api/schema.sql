@@ -161,49 +161,76 @@ CREATE UNIQUE INDEX trip_places_trip_google_place_unique
   ON trip_places (trip_id, google_place_id)
   WHERE provider = 'google';
 
-CREATE TABLE day_lodging_places (
-  trip_id uuid NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
-  lodging_date date NOT NULL,
-  trip_place_id uuid NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (trip_id, lodging_date),
-  CONSTRAINT day_lodging_places_trip_place_fk
-    FOREIGN KEY (trip_place_id, trip_id)
-    REFERENCES trip_places(id, trip_id)
-    ON DELETE CASCADE
-);
-
-CREATE INDEX day_lodging_places_trip_place_id_idx
-  ON day_lodging_places (trip_place_id);
-
-CREATE TABLE itinerary_items (
+CREATE TABLE trip_days (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   trip_id uuid NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
-  scheduled_date date NOT NULL,
+  date date NOT NULL,
+  day_order integer NOT NULL,
+  lodging_trip_place_id uuid,
+  deleted_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT trip_days_day_order_check CHECK (day_order >= 1),
+  CONSTRAINT trip_days_trip_date_unique UNIQUE (trip_id, date),
+  CONSTRAINT trip_days_id_trip_unique UNIQUE (id, trip_id),
+  CONSTRAINT trip_days_lodging_trip_place_fk
+    FOREIGN KEY (lodging_trip_place_id, trip_id)
+    REFERENCES trip_places(id, trip_id)
+    ON DELETE SET NULL (lodging_trip_place_id)
+);
+
+CREATE UNIQUE INDEX trip_days_active_order_unique
+  ON trip_days (trip_id, day_order)
+  WHERE deleted_at IS NULL;
+
+CREATE INDEX trip_days_trip_active_date_idx
+  ON trip_days (trip_id, date)
+  WHERE deleted_at IS NULL;
+
+CREATE TABLE schedule_items (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  trip_id uuid NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+  trip_day_id uuid NOT NULL,
   trip_place_id uuid NOT NULL,
   item_order integer NOT NULL,
   rank text COLLATE "C" NOT NULL,
   version integer NOT NULL DEFAULT 1,
   arrived_at timestamptz,
   skipped_at timestamptz,
+  deleted_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT itinerary_items_item_order_check CHECK (item_order >= 1),
-  CONSTRAINT itinerary_items_version_check CHECK (version >= 1),
-  CONSTRAINT itinerary_items_arrived_skipped_exclusive CHECK (arrived_at IS NULL OR skipped_at IS NULL),
-  CONSTRAINT itinerary_items_trip_place_fk FOREIGN KEY (trip_place_id, trip_id) REFERENCES trip_places(id, trip_id) ON DELETE CASCADE,
-  CONSTRAINT itinerary_items_trip_date_order_unique UNIQUE (trip_id, scheduled_date, item_order),
-  CONSTRAINT itinerary_items_trip_date_rank_unique UNIQUE (trip_id, scheduled_date, rank)
+  CONSTRAINT schedule_items_item_order_check CHECK (item_order >= 1),
+  CONSTRAINT schedule_items_version_check CHECK (version >= 1),
+  CONSTRAINT schedule_items_arrived_skipped_exclusive CHECK (arrived_at IS NULL OR skipped_at IS NULL),
+  CONSTRAINT schedule_items_trip_day_fk FOREIGN KEY (trip_day_id, trip_id) REFERENCES trip_days(id, trip_id) ON DELETE RESTRICT,
+  CONSTRAINT schedule_items_trip_place_fk FOREIGN KEY (trip_place_id, trip_id) REFERENCES trip_places(id, trip_id) ON DELETE RESTRICT,
+  CONSTRAINT schedule_items_id_day_trip_unique UNIQUE (id, trip_day_id, trip_id)
 );
 
-CREATE INDEX itinerary_items_trip_date_rank_idx ON itinerary_items (trip_id, scheduled_date, rank);
+CREATE UNIQUE INDEX schedule_items_active_day_order_unique
+  ON schedule_items (trip_day_id, item_order)
+  WHERE deleted_at IS NULL;
+
+CREATE UNIQUE INDEX schedule_items_active_day_rank_unique
+  ON schedule_items (trip_day_id, rank)
+  WHERE deleted_at IS NULL;
+
+CREATE INDEX schedule_items_trip_day_rank_idx
+  ON schedule_items (trip_day_id, rank)
+  WHERE deleted_at IS NULL;
+
+CREATE INDEX schedule_items_trip_place_idx
+  ON schedule_items (trip_id, trip_place_id)
+  WHERE deleted_at IS NULL;
 
 CREATE TABLE expenses (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   trip_id uuid NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
-  scheduled_date date NOT NULL,
-  itinerary_item_id uuid REFERENCES itinerary_items(id) ON DELETE SET NULL,
+  anchor_type text NOT NULL,
+  trip_day_id uuid,
+  schedule_item_id uuid,
+  expense_date date NOT NULL,
   trip_place_id uuid REFERENCES trip_places(id) ON DELETE SET NULL,
   place_name text NOT NULL,
   place_address text NOT NULL,
@@ -215,6 +242,14 @@ CREATE TABLE expenses (
   created_by uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT expenses_anchor_type_check CHECK (anchor_type IN ('trip', 'trip_day', 'schedule_item')),
+  CONSTRAINT expenses_anchor_columns_check CHECK (
+    (anchor_type = 'trip' AND trip_day_id IS NULL AND schedule_item_id IS NULL)
+    OR (anchor_type = 'trip_day' AND trip_day_id IS NOT NULL AND schedule_item_id IS NULL)
+    OR (anchor_type = 'schedule_item' AND trip_day_id IS NOT NULL AND schedule_item_id IS NOT NULL)
+  ),
+  CONSTRAINT expenses_trip_day_fk FOREIGN KEY (trip_day_id, trip_id) REFERENCES trip_days(id, trip_id) ON DELETE RESTRICT,
+  CONSTRAINT expenses_schedule_item_fk FOREIGN KEY (schedule_item_id, trip_day_id, trip_id) REFERENCES schedule_items(id, trip_day_id, trip_id) ON DELETE RESTRICT,
   CONSTRAINT expenses_place_name_length_check CHECK (char_length(place_name) BETWEEN 1 AND 120),
   CONSTRAINT expenses_place_address_length_check CHECK (char_length(place_address) BETWEEN 1 AND 240),
   CONSTRAINT expenses_place_type_check CHECK (place_type IN ('sights', 'food', 'lodging', 'cafe', 'shopping', 'etc')),
@@ -223,8 +258,9 @@ CREATE TABLE expenses (
   CONSTRAINT expenses_payer_display_name_length_check CHECK (char_length(payer_display_name) BETWEEN 1 AND 80)
 );
 
-CREATE INDEX expenses_trip_date_created_idx ON expenses (trip_id, scheduled_date, created_at DESC);
-CREATE INDEX expenses_trip_itinerary_item_idx ON expenses (trip_id, itinerary_item_id) WHERE itinerary_item_id IS NOT NULL;
+CREATE INDEX expenses_trip_anchor_date_created_idx ON expenses (trip_id, anchor_type, expense_date DESC, created_at DESC);
+CREATE INDEX expenses_trip_day_created_idx ON expenses (trip_id, trip_day_id, created_at DESC) WHERE trip_day_id IS NOT NULL;
+CREATE INDEX expenses_trip_schedule_item_idx ON expenses (trip_id, schedule_item_id) WHERE schedule_item_id IS NOT NULL;
 CREATE INDEX expenses_trip_place_idx ON expenses (trip_id, trip_place_id) WHERE trip_place_id IS NOT NULL;
 CREATE INDEX expenses_payer_participant_idx ON expenses (payer_participant_id) WHERE payer_participant_id IS NOT NULL;
 

@@ -2,7 +2,7 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-export type CreateGooglePlaceDayItineraryItemRequest = {
+export type CreateGooglePlaceScheduleItemRequest = {
     googlePlaceId: string;
     /**
      * Set true only after the user confirms adding the same Google place to the same Day again.

@@ -3,7 +3,6 @@ package server
 import (
 	"net/http"
 
-	openapi_types "github.com/oapi-codegen/runtime/types"
 	"github.com/twotwobread/i-um/apps/api/internal/openapi"
 	"github.com/twotwobread/i-um/apps/api/internal/route"
 	"github.com/twotwobread/i-um/apps/api/internal/trip"
@@ -162,7 +161,7 @@ func (s apiServer) RemoveTripParticipant(w http.ResponseWriter, r *http.Request,
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (s apiServer) SetDayLodgingPlace(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date) {
+func (s apiServer) SetDayLodgingPlace(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string) {
 	if s.auth == nil || s.trips == nil {
 		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "day lodging place is not configured", nil)
 		return
@@ -178,7 +177,7 @@ func (s apiServer) SetDayLodgingPlace(w http.ResponseWriter, r *http.Request, tr
 		return
 	}
 
-	result, err := s.trips.SetDayLodgingPlace(r.Context(), authContext.UserID, tripId, dateFromOpenAPI(date), trip.SetDayLodgingPlaceInput{
+	result, err := s.trips.SetDayLodgingPlace(r.Context(), authContext.UserID, tripId, tripDayId, trip.SetDayLodgingPlaceInput{
 		TripPlaceID: body.TripPlaceId,
 	})
 	if err != nil {
@@ -189,7 +188,7 @@ func (s apiServer) SetDayLodgingPlace(w http.ResponseWriter, r *http.Request, tr
 	writeJSON(w, http.StatusOK, setDayLodgingPlaceResponseToOpenAPI(result))
 }
 
-func (s apiServer) ClearDayLodgingPlace(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date) {
+func (s apiServer) ClearDayLodgingPlace(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string) {
 	if s.auth == nil || s.trips == nil {
 		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "day lodging place is not configured", nil)
 		return
@@ -200,7 +199,7 @@ func (s apiServer) ClearDayLodgingPlace(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 
-	if err := s.trips.ClearDayLodgingPlace(r.Context(), authContext.UserID, tripId, dateFromOpenAPI(date)); err != nil {
+	if err := s.trips.ClearDayLodgingPlace(r.Context(), authContext.UserID, tripId, tripDayId); err != nil {
 		writeDayLodgingPlaceError(w, err)
 		return
 	}
@@ -208,9 +207,9 @@ func (s apiServer) ClearDayLodgingPlace(w http.ResponseWriter, r *http.Request, 
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (s apiServer) GetDayItinerary(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date) {
+func (s apiServer) GetDayScheduleItems(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string) {
 	if s.auth == nil || s.trips == nil {
-		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "day itinerary is not configured", nil)
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "day schedule is not configured", nil)
 		return
 	}
 
@@ -219,16 +218,16 @@ func (s apiServer) GetDayItinerary(w http.ResponseWriter, r *http.Request, tripI
 		return
 	}
 
-	result, err := s.trips.GetDayItinerary(r.Context(), authContext.UserID, tripId, dateFromOpenAPI(date))
+	result, err := s.trips.GetDayScheduleItems(r.Context(), authContext.UserID, tripId, tripDayId)
 	if err != nil {
-		writeTripDayItineraryError(w, err)
+		writeTripDayScheduleError(w, err)
 		return
 	}
 
-	writeJSON(w, http.StatusOK, getDayItineraryResponseToOpenAPI(result))
+	writeJSON(w, http.StatusOK, getDayScheduleResponseToOpenAPI(result))
 }
 
-func (s apiServer) ListDayExpenses(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date) {
+func (s apiServer) ListDayExpenses(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string) {
 	if s.auth == nil || s.trips == nil {
 		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "day expense listing is not configured", nil)
 		return
@@ -239,7 +238,7 @@ func (s apiServer) ListDayExpenses(w http.ResponseWriter, r *http.Request, tripI
 		return
 	}
 
-	result, err := s.trips.ListDayExpenses(r.Context(), authContext.UserID, tripId, dateFromOpenAPI(date))
+	result, err := s.trips.ListDayExpenses(r.Context(), authContext.UserID, tripId, tripDayId)
 	if err != nil {
 		writeDayExpenseListError(w, err)
 		return
@@ -248,7 +247,7 @@ func (s apiServer) ListDayExpenses(w http.ResponseWriter, r *http.Request, tripI
 	writeJSON(w, http.StatusOK, listDayExpensesResponseToOpenAPI(result))
 }
 
-func (s apiServer) CreateQuickExpense(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date) {
+func (s apiServer) CreateQuickExpense(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string) {
 	if s.auth == nil || s.trips == nil {
 		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "quick expense creation is not configured", nil)
 		return
@@ -264,8 +263,8 @@ func (s apiServer) CreateQuickExpense(w http.ResponseWriter, r *http.Request, tr
 		return
 	}
 
-	result, err := s.trips.CreateQuickExpense(r.Context(), authContext.UserID, tripId, dateFromOpenAPI(date), trip.CreateQuickExpenseInput{
-		ItineraryItemID:    body.ItineraryItemId,
+	result, err := s.trips.CreateQuickExpense(r.Context(), authContext.UserID, tripId, tripDayId, trip.CreateQuickExpenseInput{
+		ScheduleItemID:     body.ScheduleItemId,
 		AmountMinor:        body.AmountMinor,
 		PayerParticipantID: body.PayerParticipantId,
 		ParticipantIDs:     body.ParticipantIds,
@@ -278,9 +277,9 @@ func (s apiServer) CreateQuickExpense(w http.ResponseWriter, r *http.Request, tr
 	writeJSON(w, http.StatusCreated, createQuickExpenseResponseToOpenAPI(result))
 }
 
-func (s apiServer) CreateManualDayItineraryItem(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date) {
+func (s apiServer) CreateManualScheduleItem(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string) {
 	if s.auth == nil || s.trips == nil {
-		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "day itinerary creation is not configured", nil)
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "day schedule creation is not configured", nil)
 		return
 	}
 
@@ -293,9 +292,9 @@ func (s apiServer) CreateManualDayItineraryItem(w http.ResponseWriter, r *http.R
 	writeError(w, http.StatusGone, "MANUAL_PLACE_CREATION_DISABLED", "manual place creation is disabled; use google place search", nil)
 }
 
-func (s apiServer) ReorderDayItineraryItems(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date) {
+func (s apiServer) ReorderScheduleItems(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string) {
 	if s.auth == nil || s.trips == nil {
-		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "day itinerary reorder is not configured", nil)
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "day schedule reorder is not configured", nil)
 		return
 	}
 
@@ -304,33 +303,33 @@ func (s apiServer) ReorderDayItineraryItems(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	var body openapi.ReorderDayItineraryItemsJSONRequestBody
+	var body openapi.ReorderScheduleItemsJSONRequestBody
 	if !decodeJSON(w, r, &body) {
 		return
 	}
 
-	moves := make([]trip.ReorderDayItineraryMoveInput, 0, len(body.Moves))
+	moves := make([]trip.ReorderDayScheduleMoveInput, 0, len(body.Moves))
 	for _, move := range body.Moves {
-		moves = append(moves, trip.ReorderDayItineraryMoveInput{
-			ItemID:        move.ItemId,
-			BeforeItemID:  move.BeforeItemId,
-			AfterItemID:   move.AfterItemId,
+		moves = append(moves, trip.ReorderDayScheduleMoveInput{
+			ItemID:        move.ScheduleItemId,
+			BeforeItemID:  move.BeforeScheduleItemId,
+			AfterItemID:   move.AfterScheduleItemId,
 			ClientVersion: move.ClientVersion,
 		})
 	}
 
-	result, err := s.trips.ReorderDayItineraryItems(r.Context(), authContext.UserID, tripId, dateFromOpenAPI(date), moves)
+	result, err := s.trips.ReorderScheduleItems(r.Context(), authContext.UserID, tripId, tripDayId, moves)
 	if err != nil {
-		writeDayItineraryReorderError(w, err)
+		writeDayScheduleReorderError(w, err)
 		return
 	}
 
-	writeJSON(w, http.StatusOK, reorderDayItineraryItemsResponseToOpenAPI(result))
+	writeJSON(w, http.StatusOK, reorderScheduleItemsResponseToOpenAPI(result))
 }
 
-func (s apiServer) MarkDayItineraryItemArrived(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, itemId string) {
+func (s apiServer) MarkScheduleItemArrived(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, scheduleItemId string) {
 	if s.auth == nil || s.trips == nil {
-		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "day itinerary arrival is not configured", nil)
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "day schedule arrival is not configured", nil)
 		return
 	}
 
@@ -339,18 +338,18 @@ func (s apiServer) MarkDayItineraryItemArrived(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	result, err := s.trips.MarkDayItineraryItemArrived(r.Context(), authContext.UserID, tripId, dateFromOpenAPI(date), itemId)
+	result, err := s.trips.MarkScheduleItemArrived(r.Context(), authContext.UserID, tripId, tripDayId, scheduleItemId)
 	if err != nil {
-		writeDayItineraryArrivalError(w, err)
+		writeDayScheduleArrivalError(w, err)
 		return
 	}
 
-	writeJSON(w, http.StatusOK, markDayItineraryItemArrivedResponseToOpenAPI(result))
+	writeJSON(w, http.StatusOK, markScheduleItemArrivedResponseToOpenAPI(result))
 }
 
-func (s apiServer) MarkDayItineraryItemSkipped(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, itemId string) {
+func (s apiServer) MarkScheduleItemSkipped(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, scheduleItemId string) {
 	if s.auth == nil || s.trips == nil {
-		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "day itinerary skip is not configured", nil)
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "day schedule skip is not configured", nil)
 		return
 	}
 
@@ -359,18 +358,18 @@ func (s apiServer) MarkDayItineraryItemSkipped(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	result, err := s.trips.MarkDayItineraryItemSkipped(r.Context(), authContext.UserID, tripId, dateFromOpenAPI(date), itemId)
+	result, err := s.trips.MarkScheduleItemSkipped(r.Context(), authContext.UserID, tripId, tripDayId, scheduleItemId)
 	if err != nil {
-		writeDayItinerarySkipError(w, err)
+		writeDayScheduleSkipError(w, err)
 		return
 	}
 
-	writeJSON(w, http.StatusOK, markDayItineraryItemSkippedResponseToOpenAPI(result))
+	writeJSON(w, http.StatusOK, markScheduleItemSkippedResponseToOpenAPI(result))
 }
 
-func (s apiServer) RestoreDayItineraryItem(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, itemId string) {
+func (s apiServer) RestoreScheduleItem(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, scheduleItemId string) {
 	if s.auth == nil || s.trips == nil {
-		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "day itinerary restore is not configured", nil)
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "day schedule restore is not configured", nil)
 		return
 	}
 
@@ -379,16 +378,16 @@ func (s apiServer) RestoreDayItineraryItem(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	result, err := s.trips.RestoreDayItineraryItem(r.Context(), authContext.UserID, tripId, dateFromOpenAPI(date), itemId)
+	result, err := s.trips.RestoreScheduleItem(r.Context(), authContext.UserID, tripId, tripDayId, scheduleItemId)
 	if err != nil {
-		writeDayItineraryRestoreError(w, err)
+		writeDayScheduleRestoreError(w, err)
 		return
 	}
 
-	writeJSON(w, http.StatusOK, restoreDayItineraryItemResponseToOpenAPI(result))
+	writeJSON(w, http.StatusOK, restoreScheduleItemResponseToOpenAPI(result))
 }
 
-func (s apiServer) CreateRoutePreview(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, itemId string) {
+func (s apiServer) CreateRoutePreview(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, scheduleItemId string) {
 	if s.auth == nil || s.routes == nil {
 		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "route preview is not configured", nil)
 		return
@@ -404,7 +403,7 @@ func (s apiServer) CreateRoutePreview(w http.ResponseWriter, r *http.Request, tr
 		return
 	}
 
-	result, err := s.routes.CreatePreview(r.Context(), authContext.UserID, tripId, dateFromOpenAPI(date), itemId, route.PreviewInput{
+	result, err := s.routes.CreatePreview(r.Context(), authContext.UserID, tripId, tripDayId, scheduleItemId, route.PreviewInput{
 		Origin: route.GeoPoint{Latitude: body.Origin.Latitude, Longitude: body.Origin.Longitude},
 	})
 	if err != nil {
@@ -415,9 +414,9 @@ func (s apiServer) CreateRoutePreview(w http.ResponseWriter, r *http.Request, tr
 	writeJSON(w, http.StatusOK, routePreviewResponseToOpenAPI(result))
 }
 
-func (s apiServer) UpdateDayItineraryItem(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, itemId string) {
+func (s apiServer) UpdateScheduleItem(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, scheduleItemId string) {
 	if s.auth == nil || s.trips == nil {
-		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "day itinerary update is not configured", nil)
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "day schedule update is not configured", nil)
 		return
 	}
 
@@ -426,27 +425,27 @@ func (s apiServer) UpdateDayItineraryItem(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	var body openapi.UpdateDayItineraryItemJSONRequestBody
+	var body openapi.UpdateScheduleItemJSONRequestBody
 	if !decodeJSON(w, r, &body) {
 		return
 	}
 
-	result, err := s.trips.UpdateDayItineraryItem(r.Context(), authContext.UserID, tripId, dateFromOpenAPI(date), itemId, trip.UpdateDayItineraryItemInput{
+	result, err := s.trips.UpdateScheduleItem(r.Context(), authContext.UserID, tripId, tripDayId, scheduleItemId, trip.UpdateScheduleItemInput{
 		Name:      body.Name,
 		Address:   body.Address,
 		PlaceType: optionalPlaceTypeFromOpenAPI(body.PlaceType),
 	})
 	if err != nil {
-		writeTripDayItineraryError(w, err)
+		writeTripDayScheduleError(w, err)
 		return
 	}
 
-	writeJSON(w, http.StatusOK, updateDayItineraryItemResponseToOpenAPI(result))
+	writeJSON(w, http.StatusOK, updateScheduleItemResponseToOpenAPI(result))
 }
 
-func (s apiServer) DeleteDayItineraryItem(w http.ResponseWriter, r *http.Request, tripId string, date openapi_types.Date, itemId string) {
+func (s apiServer) DeleteScheduleItem(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, scheduleItemId string) {
 	if s.auth == nil || s.trips == nil {
-		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "day itinerary deletion is not configured", nil)
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "day schedule deletion is not configured", nil)
 		return
 	}
 
@@ -455,8 +454,8 @@ func (s apiServer) DeleteDayItineraryItem(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if err := s.trips.DeleteDayItineraryItem(r.Context(), authContext.UserID, tripId, dateFromOpenAPI(date), itemId); err != nil {
-		writeTripDayItineraryError(w, err)
+	if err := s.trips.DeleteScheduleItem(r.Context(), authContext.UserID, tripId, tripDayId, scheduleItemId); err != nil {
+		writeTripDayScheduleError(w, err)
 		return
 	}
 

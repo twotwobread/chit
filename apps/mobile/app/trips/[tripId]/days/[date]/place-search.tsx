@@ -7,7 +7,7 @@ import { ApiError } from '@i-um/api-contract';
 import { MobileAuthError } from '../../../../../lib/auth/client';
 import { theme } from '../../../../../lib/design';
 import { resolveDayItineraryAddPlaceReturnNavigation } from '../../../../../lib/trips/day-itinerary-add-place-navigation';
-import { createGooglePlaceDayItineraryItem, searchGooglePlaces } from '../../../../../lib/places/client';
+import { createGooglePlaceScheduleItem, searchGooglePlaces } from '../../../../../lib/places/client';
 import {
   addingGooglePlaceState,
   buildGooglePlaceSearchInputState,
@@ -113,7 +113,7 @@ export default function GooglePlaceSearchScreen() {
 
     setAddState(addingGooglePlaceState(result.id));
     try {
-      await createGooglePlaceDayItineraryItem(tripId, date, result.id, duplicateConfirmed);
+      await createGooglePlaceScheduleItem(tripId, date, result.id, duplicateConfirmed);
       returnToDay();
     } catch (error) {
       if (

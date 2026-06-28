@@ -1,4 +1,4 @@
-import type { TripPlaceType, UpdateDayItineraryItemRequest } from '@i-um/api-contract';
+import type { TripPlaceType, UpdateScheduleItemRequest } from '@i-um/api-contract';
 
 import type { DayItineraryRowViewModel } from './day-itinerary';
 import { manualPlaceTypeValues } from './manual-place';
@@ -17,7 +17,7 @@ export type DayItineraryEditFormErrors = {
 };
 
 export type DayItineraryEditValidationResult =
-  | { ok: true; request: UpdateDayItineraryItemRequest }
+  | { ok: true; request: UpdateScheduleItemRequest }
   | { ok: false; errors: DayItineraryEditFormErrors };
 
 export type DayItineraryMutationFailureViewModel = {
@@ -80,7 +80,7 @@ export function validateDayItineraryEditForm(
   const originalName = original.name.trim();
   const originalAddress = original.address.trim();
   const originalPlaceType = isTripPlaceType(original.placeType) ? original.placeType : undefined;
-  const request: UpdateDayItineraryItemRequest = {};
+  const request: UpdateScheduleItemRequest = {};
 
   if (name !== originalName) {
     request.name = name;

@@ -526,7 +526,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-  /trips/{tripId}/days/{date}/lodging-place:
+  /trips/{tripId}/days/{tripDayId}/lodging-place:
     put:
       operationId: setDayLodgingPlace
       summary: Set a trip day lodging place
@@ -541,12 +541,11 @@ paths:
           required: true
           schema:
             type: string
-        - name: date
+        - name: tripDayId
           in: path
           required: true
           schema:
             type: string
-            format: date
       requestBody:
         required: true
         content:
@@ -579,7 +578,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '404':
-          description: Trip, virtual day, or trip place not found.
+          description: Trip, trip day, or trip place not found.
           content:
             application/json:
               schema:
@@ -604,12 +603,11 @@ paths:
           required: true
           schema:
             type: string
-        - name: date
+        - name: tripDayId
           in: path
           required: true
           schema:
             type: string
-            format: date
       responses:
         '204':
           description: Day lodging place cleared or already empty.
@@ -632,7 +630,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '404':
-          description: Trip or virtual day not found.
+          description: Trip or trip day not found.
           content:
             application/json:
               schema:
@@ -643,11 +641,11 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-  /trips/{tripId}/days/{date}/itinerary:
+  /trips/{tripId}/days/{tripDayId}/schedule-items:
     get:
-      operationId: getDayItinerary
-      summary: Get a trip day itinerary
-      description: Returns the ordered read-only itinerary items for a selected virtual trip day.
+      operationId: getDayScheduleItems
+      summary: Get a trip day schedule
+      description: Returns the ordered read-only schedule items for a selected virtual trip day.
       tags:
         - Trips
       security:
@@ -658,19 +656,18 @@ paths:
           required: true
           schema:
             type: string
-        - name: date
+        - name: tripDayId
           in: path
           required: true
           schema:
             type: string
-            format: date
       responses:
         '200':
-          description: Day itinerary.
+          description: Day schedule.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/GetDayItineraryResponse'
+                $ref: '#/components/schemas/GetDayScheduleItemsResponse'
         '400':
           description: Validation error.
           content:
@@ -690,7 +687,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '404':
-          description: Trip or virtual day not found.
+          description: Trip or trip day not found.
           content:
             application/json:
               schema:
@@ -701,7 +698,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-  /trips/{tripId}/days/{date}/expenses:
+  /trips/{tripId}/days/{tripDayId}/expenses:
     get:
       operationId: listDayExpenses
       summary: List expenses for a trip day
@@ -716,12 +713,11 @@ paths:
           required: true
           schema:
             type: string
-        - name: date
+        - name: tripDayId
           in: path
           required: true
           schema:
             type: string
-            format: date
       responses:
         '200':
           description: Day expenses.
@@ -748,7 +744,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '404':
-          description: Trip or virtual day not found.
+          description: Trip or trip day not found.
           content:
             application/json:
               schema:
@@ -759,11 +755,11 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-  /trips/{tripId}/days/{date}/expenses/quick:
+  /trips/{tripId}/days/{tripDayId}/expenses/quick:
     post:
       operationId: createQuickExpense
       summary: Create a quick expense for a trip day place
-      description: Creates an expense from a selected itinerary item, using the trip default currency and equal splits across the submitted selected current trip participants.
+      description: Creates an expense from a selected schedule item, using the trip default currency and equal splits across the submitted selected current trip participants.
       tags:
         - Trips
       security:
@@ -774,12 +770,11 @@ paths:
           required: true
           schema:
             type: string
-        - name: date
+        - name: tripDayId
           in: path
           required: true
           schema:
             type: string
-            format: date
       requestBody:
         required: true
         content:
@@ -812,13 +807,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '404':
-          description: Trip, virtual day, itinerary item, or payer participant not found.
+          description: Trip, trip day, schedule item, or payer participant not found.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '409':
-          description: Participant or itinerary state changed during creation.
+          description: Participant or schedule state changed during creation.
           content:
             application/json:
               schema:
@@ -829,11 +824,11 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-  /trips/{tripId}/days/{date}/itinerary-items:
+  /trips/{tripId}/days/{tripDayId}/schedule-items/manual:
     post:
-      operationId: createManualDayItineraryItem
-      summary: Add a manual place to a trip day itinerary
-      description: Deprecated. Manual Day itinerary item creation is disabled for normal app use; add Google-backed places instead.
+      operationId: createManualScheduleItem
+      summary: Add a manual place to a trip day schedule
+      description: Deprecated. Manual Day schedule item creation is disabled for normal app use; add Google-backed places instead.
       deprecated: true
       tags:
         - Trips
@@ -845,25 +840,24 @@ paths:
           required: true
           schema:
             type: string
-        - name: date
+        - name: tripDayId
           in: path
           required: true
           schema:
             type: string
-            format: date
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateManualDayItineraryItemRequest'
+              $ref: '#/components/schemas/CreateManualScheduleItemRequest'
       responses:
         '201':
-          description: Manual place added to the selected Day itinerary.
+          description: Manual place added to the selected Day schedule.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CreateManualDayItineraryItemResponse'
+                $ref: '#/components/schemas/CreateManualScheduleItemResponse'
         '400':
           description: Validation error.
           content:
@@ -883,7 +877,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '404':
-          description: Trip or virtual day not found.
+          description: Trip or trip day not found.
           content:
             application/json:
               schema:
@@ -906,11 +900,11 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-  /trips/{tripId}/days/{date}/itinerary-items/order:
+  /trips/{tripId}/days/{tripDayId}/schedule-items/order:
     patch:
-      operationId: reorderDayItineraryItems
-      summary: Reorder a trip day itinerary
-      description: Applies an ordered batch of same-Day itinerary item moves inside one transaction and returns the latest Day itinerary.
+      operationId: reorderScheduleItems
+      summary: Reorder a trip day schedule
+      description: Applies an ordered batch of same-Day schedule item moves inside one transaction and returns the latest Day schedule.
       tags:
         - Trips
       security:
@@ -921,25 +915,24 @@ paths:
           required: true
           schema:
             type: string
-        - name: date
+        - name: tripDayId
           in: path
           required: true
           schema:
             type: string
-            format: date
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ReorderDayItineraryItemsRequest'
+              $ref: '#/components/schemas/ReorderScheduleItemsRequest'
       responses:
         '200':
-          description: Day itinerary reordered.
+          description: Day schedule reordered.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ReorderDayItineraryItemsResponse'
+                $ref: '#/components/schemas/ReorderScheduleItemsResponse'
         '400':
           description: Validation error.
           content:
@@ -959,7 +952,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '404':
-          description: Trip or virtual day not found.
+          description: Trip or trip day not found.
           content:
             application/json:
               schema:
@@ -976,11 +969,11 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-  /trips/{tripId}/days/{date}/itinerary/items/{itemId}/arrive:
+  /trips/{tripId}/days/{tripDayId}/schedule-items/{scheduleItemId}/arrive:
     post:
-      operationId: markDayItineraryItemArrived
-      summary: Mark a trip day itinerary item arrived
-      description: Marks the selected itinerary item instance arrived when it is the first pending item for the selected Day, and returns the latest Day itinerary snapshot.
+      operationId: markScheduleItemArrived
+      summary: Mark a trip day schedule item arrived
+      description: Marks the selected schedule item instance arrived when it is the first pending item for the selected Day, and returns the latest Day schedule snapshot.
       tags:
         - Trips
       security:
@@ -991,24 +984,23 @@ paths:
           required: true
           schema:
             type: string
-        - name: date
+        - name: tripDayId
           in: path
           required: true
           schema:
             type: string
-            format: date
-        - name: itemId
+        - name: scheduleItemId
           in: path
           required: true
           schema:
             type: string
       responses:
         '200':
-          description: Day itinerary item arrived, or already arrived idempotently.
+          description: Day schedule item arrived, or already arrived idempotently.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MarkDayItineraryItemArrivedResponse'
+                $ref: '#/components/schemas/MarkScheduleItemArrivedResponse'
         '400':
           description: Validation error.
           content:
@@ -1028,7 +1020,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '404':
-          description: Trip, virtual day, or itinerary item not found.
+          description: Trip, trip day, or schedule item not found.
           content:
             application/json:
               schema:
@@ -1045,11 +1037,11 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-  /trips/{tripId}/days/{date}/itinerary/items/{itemId}/skip:
+  /trips/{tripId}/days/{tripDayId}/schedule-items/{scheduleItemId}/skip:
     post:
-      operationId: markDayItineraryItemSkipped
-      summary: Mark a trip day itinerary item skipped
-      description: Marks the selected itinerary item instance skipped when it is the first pending item for the selected Day, and returns the latest Day itinerary snapshot.
+      operationId: markScheduleItemSkipped
+      summary: Mark a trip day schedule item skipped
+      description: Marks the selected schedule item instance skipped when it is the first pending item for the selected Day, and returns the latest Day schedule snapshot.
       tags:
         - Trips
       security:
@@ -1060,24 +1052,23 @@ paths:
           required: true
           schema:
             type: string
-        - name: date
+        - name: tripDayId
           in: path
           required: true
           schema:
             type: string
-            format: date
-        - name: itemId
+        - name: scheduleItemId
           in: path
           required: true
           schema:
             type: string
       responses:
         '200':
-          description: Day itinerary item skipped, or already skipped idempotently.
+          description: Day schedule item skipped, or already skipped idempotently.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MarkDayItineraryItemSkippedResponse'
+                $ref: '#/components/schemas/MarkScheduleItemSkippedResponse'
         '400':
           description: Validation error.
           content:
@@ -1097,7 +1088,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '404':
-          description: Trip, virtual day, or itinerary item not found.
+          description: Trip, trip day, or schedule item not found.
           content:
             application/json:
               schema:
@@ -1114,11 +1105,11 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-  /trips/{tripId}/days/{date}/itinerary/items/{itemId}/restore:
+  /trips/{tripId}/days/{tripDayId}/schedule-items/{scheduleItemId}/restore:
     post:
-      operationId: restoreDayItineraryItem
-      summary: Restore a skipped trip day itinerary item
-      description: Clears skipped state for the selected itinerary item instance and returns the latest Day itinerary snapshot.
+      operationId: restoreScheduleItem
+      summary: Restore a skipped trip day schedule item
+      description: Clears skipped state for the selected schedule item instance and returns the latest Day schedule snapshot.
       tags:
         - Trips
       security:
@@ -1129,24 +1120,23 @@ paths:
           required: true
           schema:
             type: string
-        - name: date
+        - name: tripDayId
           in: path
           required: true
           schema:
             type: string
-            format: date
-        - name: itemId
+        - name: scheduleItemId
           in: path
           required: true
           schema:
             type: string
       responses:
         '200':
-          description: Day itinerary item restored, or already pending idempotently.
+          description: Day schedule item restored, or already pending idempotently.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RestoreDayItineraryItemResponse'
+                $ref: '#/components/schemas/RestoreScheduleItemResponse'
         '400':
           description: Validation error.
           content:
@@ -1166,7 +1156,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '404':
-          description: Trip, virtual day, or itinerary item not found.
+          description: Trip, trip day, or schedule item not found.
           content:
             application/json:
               schema:
@@ -1183,11 +1173,11 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-  /trips/{tripId}/days/{date}/itinerary/items/{itemId}/route-preview:
+  /trips/{tripId}/days/{tripDayId}/schedule-items/{scheduleItemId}/route-preview:
     post:
       operationId: createRoutePreview
-      summary: Create an in-app route preview for a trip day itinerary item
-      description: Returns a lightweight current-location-to-next-place route preview for the selected first pending itinerary item. Detailed navigation remains delegated to Google Maps.
+      summary: Create an in-app route preview for a trip day schedule item
+      description: Returns a lightweight current-location-to-next-place route preview for the selected first pending schedule item. Detailed navigation remains delegated to Google Maps.
       tags:
         - Trips
       security:
@@ -1198,13 +1188,12 @@ paths:
           required: true
           schema:
             type: string
-        - name: date
+        - name: tripDayId
           in: path
           required: true
           schema:
             type: string
-            format: date
-        - name: itemId
+        - name: scheduleItemId
           in: path
           required: true
           schema:
@@ -1241,7 +1230,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '404':
-          description: Trip, virtual day, itinerary item, or provider route not found.
+          description: Trip, trip day, schedule item, or provider route not found.
           content:
             application/json:
               schema:
@@ -1270,11 +1259,11 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-  /trips/{tripId}/days/{date}/itinerary/items/{itemId}:
+  /trips/{tripId}/days/{tripDayId}/schedule-items/{scheduleItemId}:
     patch:
-      operationId: updateDayItineraryItem
-      summary: Update a trip day itinerary item place snapshot
-      description: Updates name, address, and/or place type for the trip place snapshot linked from the selected Day itinerary item.
+      operationId: updateScheduleItem
+      summary: Update a trip day schedule item place snapshot
+      description: Updates name, address, and/or place type for the trip place snapshot linked from the selected Day schedule item.
       tags:
         - Trips
       security:
@@ -1285,13 +1274,12 @@ paths:
           required: true
           schema:
             type: string
-        - name: date
+        - name: tripDayId
           in: path
           required: true
           schema:
             type: string
-            format: date
-        - name: itemId
+        - name: scheduleItemId
           in: path
           required: true
           schema:
@@ -1301,14 +1289,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UpdateDayItineraryItemRequest'
+              $ref: '#/components/schemas/UpdateScheduleItemRequest'
       responses:
         '200':
-          description: Day itinerary item updated.
+          description: Day schedule item updated.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UpdateDayItineraryItemResponse'
+                $ref: '#/components/schemas/UpdateScheduleItemResponse'
         '400':
           description: Validation error.
           content:
@@ -1328,7 +1316,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '404':
-          description: Trip, virtual day, or itinerary item not found.
+          description: Trip, trip day, or schedule item not found.
           content:
             application/json:
               schema:
@@ -1340,9 +1328,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
     delete:
-      operationId: deleteDayItineraryItem
-      summary: Delete a trip day itinerary item
-      description: Removes the selected itinerary item from the virtual Day and orphan-cleans the linked trip place when unreferenced.
+      operationId: deleteScheduleItem
+      summary: Delete a trip day schedule item
+      description: Soft-deletes the selected schedule item from the Day while retaining linked place history.
       tags:
         - Trips
       security:
@@ -1353,20 +1341,19 @@ paths:
           required: true
           schema:
             type: string
-        - name: date
+        - name: tripDayId
           in: path
           required: true
           schema:
             type: string
-            format: date
-        - name: itemId
+        - name: scheduleItemId
           in: path
           required: true
           schema:
             type: string
       responses:
         '204':
-          description: Day itinerary item deleted.
+          description: Day schedule item deleted.
         '400':
           description: Validation error.
           content:
@@ -1386,7 +1373,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '404':
-          description: Trip, virtual day, or itinerary item not found.
+          description: Trip, trip day, or schedule item not found.
           content:
             application/json:
               schema:
@@ -1397,7 +1384,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-  /trips/{tripId}/days/{date}/places/google/search:
+  /trips/{tripId}/days/{tripDayId}/places/google/search:
     get:
       operationId: searchGooglePlaces
       summary: Search Google Places for a trip day
@@ -1412,12 +1399,11 @@ paths:
           required: true
           schema:
             type: string
-        - name: date
+        - name: tripDayId
           in: path
           required: true
           schema:
             type: string
-            format: date
         - name: query
           in: query
           required: true
@@ -1459,7 +1445,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '404':
-          description: Trip or virtual day not found.
+          description: Trip or trip day not found.
           content:
             application/json:
               schema:
@@ -1482,11 +1468,11 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-  /trips/{tripId}/days/{date}/places/google/itinerary-items:
+  /trips/{tripId}/days/{tripDayId}/places/google/schedule-items:
     post:
-      operationId: createGooglePlaceDayItineraryItem
-      summary: Add a Google Place result to a trip day itinerary
-      description: Resolves a Google-backed place server-side, reuses the trip-level place by googlePlaceId when present, and appends a Day itinerary item. Same-Day duplicates require explicit confirmation.
+      operationId: createGooglePlaceScheduleItem
+      summary: Add a Google Place result to a trip day schedule
+      description: Resolves a Google-backed place server-side, reuses the trip-level place by googlePlaceId when present, and appends a Day schedule item. Same-Day duplicates require explicit confirmation.
       tags:
         - Places
       security:
@@ -1497,25 +1483,24 @@ paths:
           required: true
           schema:
             type: string
-        - name: date
+        - name: tripDayId
           in: path
           required: true
           schema:
             type: string
-            format: date
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateGooglePlaceDayItineraryItemRequest'
+              $ref: '#/components/schemas/CreateGooglePlaceScheduleItemRequest'
       responses:
         '201':
-          description: Google-backed place added to the selected Day itinerary.
+          description: Google-backed place added to the selected Day schedule.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CreateGooglePlaceDayItineraryItemResponse'
+                $ref: '#/components/schemas/CreateGooglePlaceScheduleItemResponse'
         '400':
           description: Validation error.
           content:
@@ -1535,7 +1520,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '404':
-          description: Trip or virtual day not found.
+          description: Trip or trip day not found.
           content:
             application/json:
               schema:
@@ -2007,10 +1992,13 @@ components:
     TripDay:
       type: object
       required:
+        - id
         - date
         - dayOrder
         - lodgingPlace
       properties:
+        id:
+          type: string
         date:
           type: string
           format: date
@@ -2148,13 +2136,13 @@ components:
     RoutePreviewResponse:
       type: object
       required:
-        - itemId
+        - scheduleItemId
         - mode
         - summary
         - map
         - generatedAt
       properties:
-        itemId:
+        scheduleItemId:
           type: string
         mode:
           type: string
@@ -2169,7 +2157,7 @@ components:
         generatedAt:
           type: string
           format: date-time
-    DayItineraryItem:
+    ScheduleItem:
       type: object
       required:
         - id
@@ -2194,26 +2182,26 @@ components:
           type: string
           format: date-time
           nullable: true
-          description: Server-generated arrival timestamp for this itinerary item instance. Null means pending when skippedAt is also null.
+          description: Server-generated arrival timestamp for this schedule item instance. Null means pending when skippedAt is also null.
         skippedAt:
           type: string
           format: date-time
           nullable: true
-          description: Server-generated skip timestamp for this itinerary item instance. Null means the item is not currently skipped.
+          description: Server-generated skip timestamp for this schedule item instance. Null means the item is not currently skipped.
         place:
           $ref: '#/components/schemas/TripPlaceSummary'
-    GetDayItineraryResponse:
+    GetDayScheduleItemsResponse:
       type: object
       required:
         - day
-        - items
+        - scheduleItems
       properties:
         day:
           $ref: '#/components/schemas/TripDay'
-        items:
+        scheduleItems:
           type: array
           items:
-            $ref: '#/components/schemas/DayItineraryItem'
+            $ref: '#/components/schemas/ScheduleItem'
     ListDayExpensesResponse:
       type: object
       additionalProperties: false
@@ -2278,14 +2266,14 @@ components:
       type: object
       additionalProperties: false
       required:
-        - itineraryItemId
+        - scheduleItemId
         - amountMinor
         - payerParticipantId
         - participantIds
       properties:
-        itineraryItemId:
+        scheduleItemId:
           type: string
-          description: Required itinerary item for the selected Day. Must belong to tripId/date.
+          description: Required schedule item for the selected Day. Must belong to tripId/tripDayId.
         amountMinor:
           type: integer
           format: int64
@@ -2313,8 +2301,10 @@ components:
       required:
         - id
         - tripId
-        - scheduledDate
-        - itineraryItemId
+        - anchorType
+        - tripDayId
+        - scheduleItemId
+        - expenseDate
         - tripPlaceId
         - place
         - amountMinor
@@ -2328,13 +2318,22 @@ components:
           type: string
         tripId:
           type: string
-        scheduledDate:
+        anchorType:
           type: string
-          format: date
-        itineraryItemId:
+          enum:
+            - trip
+            - trip_day
+            - schedule_item
+        tripDayId:
           type: string
           nullable: true
-          description: Source itinerary item. Present at creation; may become null later if the source item is deleted and history is retained.
+        scheduleItemId:
+          type: string
+          nullable: true
+          description: Source schedule item. Present for schedule-item expenses; may become null if later detached to trip-level.
+        expenseDate:
+          type: string
+          format: date
         tripPlaceId:
           type: string
           nullable: true
@@ -2405,80 +2404,80 @@ components:
           $ref: '#/components/schemas/TripDay'
         lodgingPlace:
           $ref: '#/components/schemas/TripPlaceSummary'
-    MarkDayItineraryItemArrivedResponse:
+    MarkScheduleItemArrivedResponse:
       type: object
       required:
         - day
-        - item
-        - items
+        - scheduleItem
+        - scheduleItems
       properties:
         day:
           $ref: '#/components/schemas/TripDay'
-        item:
-          $ref: '#/components/schemas/DayItineraryItem'
-        items:
+        scheduleItem:
+          $ref: '#/components/schemas/ScheduleItem'
+        scheduleItems:
           type: array
-          description: Latest server source-of-truth itinerary items for the selected day, ordered by itinerary order/rank.
+          description: Latest server source-of-truth schedule items for the selected day, ordered by schedule order/rank.
           items:
-            $ref: '#/components/schemas/DayItineraryItem'
-    MarkDayItineraryItemSkippedResponse:
+            $ref: '#/components/schemas/ScheduleItem'
+    MarkScheduleItemSkippedResponse:
       type: object
       required:
         - day
-        - item
-        - items
+        - scheduleItem
+        - scheduleItems
       properties:
         day:
           $ref: '#/components/schemas/TripDay'
-        item:
-          $ref: '#/components/schemas/DayItineraryItem'
-        items:
+        scheduleItem:
+          $ref: '#/components/schemas/ScheduleItem'
+        scheduleItems:
           type: array
-          description: Latest server source-of-truth itinerary items for the selected day, ordered by itinerary order/rank.
+          description: Latest server source-of-truth schedule items for the selected day, ordered by schedule order/rank.
           items:
-            $ref: '#/components/schemas/DayItineraryItem'
-    RestoreDayItineraryItemResponse:
+            $ref: '#/components/schemas/ScheduleItem'
+    RestoreScheduleItemResponse:
       type: object
       required:
         - day
-        - item
-        - items
+        - scheduleItem
+        - scheduleItems
       properties:
         day:
           $ref: '#/components/schemas/TripDay'
-        item:
-          $ref: '#/components/schemas/DayItineraryItem'
-        items:
+        scheduleItem:
+          $ref: '#/components/schemas/ScheduleItem'
+        scheduleItems:
           type: array
-          description: Latest server source-of-truth itinerary items for the selected day, ordered by itinerary order/rank.
+          description: Latest server source-of-truth schedule items for the selected day, ordered by schedule order/rank.
           items:
-            $ref: '#/components/schemas/DayItineraryItem'
-    ReorderDayItineraryMove:
+            $ref: '#/components/schemas/ScheduleItem'
+    ReorderDayScheduleMove:
       type: object
       additionalProperties: false
       required:
-        - itemId
-        - beforeItemId
-        - afterItemId
+        - scheduleItemId
+        - beforeScheduleItemId
+        - afterScheduleItemId
         - clientVersion
       properties:
-        itemId:
+        scheduleItemId:
           type: string
-          description: The itinerary item being moved.
-        beforeItemId:
-          type: string
-          nullable: true
-          description: The itinerary item that must be immediately before the moved item after this move, or null when moving to the first position.
-        afterItemId:
+          description: The schedule item being moved.
+        beforeScheduleItemId:
           type: string
           nullable: true
-          description: The itinerary item that must be immediately after the moved item after this move, or null when moving to the last position.
+          description: The schedule item that must be immediately before the moved item after this move, or null when moving to the first position.
+        afterScheduleItemId:
+          type: string
+          nullable: true
+          description: The schedule item that must be immediately after the moved item after this move, or null when moving to the last position.
         clientVersion:
           type: integer
           minimum: 1
           description: The moved item's optimistic locking version observed by the client.
-      description: Ordered move operation. The server applies moves sequentially inside one transaction. `beforeItemId` and `afterItemId` cannot both be null, and all present ids must be distinct.
-    ReorderDayItineraryItemsRequest:
+      description: Ordered move operation. The server applies moves sequentially inside one transaction. `beforeScheduleItemId` and `afterScheduleItemId` cannot both be null, and all present ids must be distinct.
+    ReorderScheduleItemsRequest:
       type: object
       additionalProperties: false
       required:
@@ -2489,21 +2488,21 @@ components:
           minItems: 1
           description: Ordered same-Day move operations. Applying them sequentially must produce the client's final local order.
           items:
-            $ref: '#/components/schemas/ReorderDayItineraryMove'
-    ReorderDayItineraryItemsResponse:
+            $ref: '#/components/schemas/ReorderDayScheduleMove'
+    ReorderScheduleItemsResponse:
       type: object
       required:
         - day
-        - items
+        - scheduleItems
       properties:
         day:
           $ref: '#/components/schemas/TripDay'
-        items:
+        scheduleItems:
           type: array
-          description: Latest server source-of-truth itinerary items ordered by rank.
+          description: Latest server source-of-truth schedule items ordered by rank.
           items:
-            $ref: '#/components/schemas/DayItineraryItem'
-    CreateManualDayItineraryItemRequest:
+            $ref: '#/components/schemas/ScheduleItem'
+    CreateManualScheduleItemRequest:
       type: object
       additionalProperties: false
       required:
@@ -2523,17 +2522,17 @@ components:
           example: 1 Chome-1-88 Oyodonaka, Kita Ward, Osaka
         placeType:
           $ref: '#/components/schemas/TripPlaceType'
-    CreateManualDayItineraryItemResponse:
+    CreateManualScheduleItemResponse:
       type: object
       required:
         - day
-        - item
+        - scheduleItem
       properties:
         day:
           $ref: '#/components/schemas/TripDay'
-        item:
-          $ref: '#/components/schemas/DayItineraryItem'
-    CreateGooglePlaceDayItineraryItemRequest:
+        scheduleItem:
+          $ref: '#/components/schemas/ScheduleItem'
+    CreateGooglePlaceScheduleItemRequest:
       type: object
       additionalProperties: false
       required:
@@ -2549,17 +2548,17 @@ components:
           type: boolean
           description: Set true only after the user confirms adding the same Google place to the same Day again.
           example: false
-    CreateGooglePlaceDayItineraryItemResponse:
+    CreateGooglePlaceScheduleItemResponse:
       type: object
       required:
         - day
-        - item
+        - scheduleItem
       properties:
         day:
           $ref: '#/components/schemas/TripDay'
-        item:
-          $ref: '#/components/schemas/DayItineraryItem'
-    UpdateDayItineraryItemRequest:
+        scheduleItem:
+          $ref: '#/components/schemas/ScheduleItem'
+    UpdateScheduleItemRequest:
       type: object
       additionalProperties: false
       minProperties: 1
@@ -2576,13 +2575,13 @@ components:
           example: 1 Chome-1-88 Oyodonaka, Kita Ward, Osaka
         placeType:
           $ref: '#/components/schemas/TripPlaceType'
-    UpdateDayItineraryItemResponse:
+    UpdateScheduleItemResponse:
       type: object
       required:
-        - item
+        - scheduleItem
       properties:
-        item:
-          $ref: '#/components/schemas/DayItineraryItem'
+        scheduleItem:
+          $ref: '#/components/schemas/ScheduleItem'
     GooglePlaceSearchResult:
       type: object
       required:
@@ -2634,6 +2633,9 @@ components:
           example: '2026-07-14'
         defaultCurrency:
           $ref: '#/components/schemas/SupportedCurrency'
+        confirmOutOfRangeDayArchive:
+          type: boolean
+          description: Set true after showing the shrink impact summary when a date range change archives out-of-range days.
     UpdateTripResponse:
       type: object
       required:
