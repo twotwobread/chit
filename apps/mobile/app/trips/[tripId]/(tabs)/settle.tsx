@@ -11,6 +11,8 @@ import { buildDayItineraryRoute } from '../../../../lib/trips/day-itinerary';
 import {
   buildSettlementTransferViewModel,
   settlementTransferFailureState,
+  type SettlementBalanceDirection,
+  type SettlementNoTransferNoticeViewModel,
   type SettlementTransferFailureViewModel,
   type SettlementTransferViewModel,
 } from '../../../../lib/trips/settlement';
@@ -55,7 +57,7 @@ export default function TripSettleTabScreen() {
 
   return (
     <TripScreen>
-      <TripScreenHeader helper="누가 누구에게 얼마를 보내면 되는지 확인해요." title="정산" />
+      <TripScreenHeader helper="사람별 결제/부담과 보낼 정산을 확인해요." title="정산" />
 
       {state.status === 'loading' ? <TripStateCard loading title="정산을 불러오는 중..." /> : null}
       {state.status === 'auth' ? (
@@ -111,8 +113,38 @@ function SettlementContent({ viewModel }: { viewModel: SettlementTransferViewMod
         </View>
       </TripListCard>
 
+      {viewModel.balanceSections.map((section) => (
+        <TripListCard key={`balance-${section.currency}`}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>{section.title}</Text>
+            <Text style={styles.sectionHelper}>{section.helper}</Text>
+          </View>
+          <View style={styles.balanceList}>
+            {section.rows.map((row, index) => (
+              <View key={`${section.currency}-${index}-${row.displayName}-${row.netMinor}`} style={styles.balanceRow}>
+                <View style={styles.balanceRowHeader}>
+                  <Text style={styles.balanceName}>{row.displayName}</Text>
+                  {row.statusLabel ? (
+                    <View style={styles.statusBadge}>
+                      <Text style={styles.statusBadgeText}>{row.statusLabel}</Text>
+                    </View>
+                  ) : null}
+                </View>
+                <View style={styles.balanceMetricList}>
+                  <BalanceMetric label="결제" value={row.paidAmountLabel} />
+                  <BalanceMetric label="부담" value={row.shareAmountLabel} />
+                  <BalanceMetric direction={row.netDirection} label={row.netLabel} value={row.netAmountLabel} />
+                </View>
+              </View>
+            ))}
+          </View>
+        </TripListCard>
+      ))}
+
+      {viewModel.noTransferNotice ? <NoTransferNoticeCard notice={viewModel.noTransferNotice} /> : null}
+
       {viewModel.sections.map((section) => (
-        <TripListCard key={section.currency}>
+        <TripListCard key={`transfer-${section.currency}`}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>{section.title}</Text>
             <Text style={styles.sectionHelper}>{section.helper}</Text>
@@ -134,6 +166,51 @@ function SettlementContent({ viewModel }: { viewModel: SettlementTransferViewMod
   );
 }
 
+function BalanceMetric({
+  direction,
+  label,
+  value,
+}: {
+  direction?: SettlementBalanceDirection;
+  label: string;
+  value: string;
+}) {
+  return (
+    <View style={styles.balanceMetric}>
+      <Text style={styles.balanceMetricLabel}>{label}</Text>
+      <Text style={[styles.balanceMetricValue, direction ? netAmountStyle(direction) : null]}>{value}</Text>
+    </View>
+  );
+}
+
+function NoTransferNoticeCard({ notice }: { notice: SettlementNoTransferNoticeViewModel }) {
+  const primaryAction = notice.primaryAction;
+  return (
+    <TripStateCard
+      helper={notice.helper}
+      primaryAction={
+        primaryAction
+          ? {
+              label: primaryAction.label,
+              onPress: () => router.push(primaryAction.route as Href),
+            }
+          : undefined
+      }
+      title={notice.title}
+    />
+  );
+}
+
+function netAmountStyle(direction: SettlementBalanceDirection) {
+  if (direction === 'receive') {
+    return styles.balanceMetricValueReceive;
+  }
+  if (direction === 'send') {
+    return styles.balanceMetricValueSend;
+  }
+  return styles.balanceMetricValueSettled;
+}
+
 function settleFailureState(error: unknown): TripSettleState {
   const failure = settlementTransferFailureState(error);
   if (failure.status === 'auth') {
@@ -146,6 +223,64 @@ function settleFailureState(error: unknown): TripSettleState {
 }
 
 const styles = StyleSheet.create({
+  balanceList: {
+    gap: theme.space[3],
+    paddingBottom: theme.space[4],
+  },
+  balanceMetric: {
+    backgroundColor: theme.color.surfaceSunken,
+    borderRadius: theme.radius.md,
+    flex: 1,
+    gap: theme.space[1],
+    minWidth: 88,
+    paddingHorizontal: theme.space[4],
+    paddingVertical: theme.space[3],
+  },
+  balanceMetricLabel: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.micro,
+  },
+  balanceMetricList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.space[3],
+  },
+  balanceMetricValue: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.label,
+    fontWeight: theme.font.weight.bold,
+  },
+  balanceMetricValueReceive: {
+    color: theme.color.credit,
+  },
+  balanceMetricValueSend: {
+    color: theme.color.debit,
+  },
+  balanceMetricValueSettled: {
+    color: theme.color.textMuted,
+  },
+  balanceName: {
+    color: theme.color.textStrong,
+    flexShrink: 1,
+    fontFamily: theme.font.family.semibold,
+    fontSize: theme.font.size.body,
+    fontWeight: theme.font.weight.semibold,
+  },
+  balanceRow: {
+    borderTopColor: theme.color.borderSubtle,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    gap: theme.space[3],
+    paddingHorizontal: theme.space[1],
+    paddingTop: theme.space[4],
+  },
+  balanceRowHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.space[3],
+  },
   sectionHeader: {
     gap: theme.space[1],
     paddingHorizontal: theme.space[1],
@@ -161,6 +296,18 @@ const styles = StyleSheet.create({
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.subhead,
     fontWeight: theme.font.weight.bold,
+  },
+  statusBadge: {
+    backgroundColor: theme.color.surfaceSunken,
+    borderRadius: theme.radius.pill,
+    paddingHorizontal: theme.space[3],
+    paddingVertical: theme.space[2],
+  },
+  statusBadgeText: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.semibold,
+    fontSize: theme.font.size.micro,
+    fontWeight: theme.font.weight.semibold,
   },
   successStack: {
     gap: theme.space[4],
