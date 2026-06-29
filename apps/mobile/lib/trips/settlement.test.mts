@@ -1,9 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import type { GetTripSettlementResponse } from '@i-um/api-contract';
+
 import {
+  buildSettlementTransferViewModel,
   computeSettlementBalances,
   getAuthoritativeSettlementCurrencySummaries,
+  settlementTransferFailureState,
   suggestSettlementTransfers,
 } from './settlement';
 
@@ -42,6 +46,120 @@ test('uses authoritative settlement summaries returned by the API', () => {
   };
 
   assert.strictEqual(getAuthoritativeSettlementCurrencySummaries(settlement), settlement.currencySummaries);
+});
+
+test('builds transfer sections from authoritative API response without client sorting', () => {
+  const settlement = {
+    tripId: 'trip-1',
+    defaultCurrency: 'JPY',
+    currencySummaries: [
+      {
+        currency: 'USD',
+        totalPaidMinor: 1234,
+        totalShareMinor: 1234,
+        balances: [],
+        suggestedTransfers: [
+          {
+            fromParticipant: { participantId: 'b', displayName: '지영', participantStatus: 'current' as const },
+            toParticipant: { participantId: 'a', displayName: '민수', participantStatus: 'current' as const },
+            amountMinor: 1234,
+          },
+        ],
+      },
+      {
+        currency: 'JPY',
+        totalPaidMinor: 0,
+        totalShareMinor: 0,
+        balances: [],
+        suggestedTransfers: [],
+      },
+      {
+        currency: 'KRW',
+        totalPaidMinor: 50000,
+        totalShareMinor: 50000,
+        balances: [],
+        suggestedTransfers: [
+          {
+            fromParticipant: { participantId: 'c', displayName: '유나', participantStatus: 'current' as const },
+            toParticipant: { participantId: 'a', displayName: '민수', participantStatus: 'current' as const },
+            amountMinor: 18500,
+          },
+          {
+            fromParticipant: { participantId: null, displayName: '삭제된 친구', participantStatus: 'removed' as const },
+            toParticipant: { participantId: 'b', displayName: '지영', participantStatus: 'current' as const },
+            amountMinor: 3200,
+          },
+        ],
+      },
+    ],
+  } satisfies GetTripSettlementResponse;
+
+  const viewModel = buildSettlementTransferViewModel({ settlement });
+
+  assert.equal(viewModel.status, 'success');
+  assert.equal(viewModel.totalTransferCount, 3);
+  assert.equal(viewModel.summaryTitle, '총 3건을 보내면 정산이 맞아요.');
+  assert.deepEqual(
+    viewModel.sections.map((section) => [section.currency, section.title, section.transferCount]),
+    [
+      ['USD', 'USD 정산', 1],
+      ['KRW', 'KRW 정산', 2],
+    ],
+  );
+  assert.deepEqual(
+    viewModel.sections.flatMap((section) => section.transfers.map((transfer) => transfer.amountLabel)),
+    ['$12.34', '18,500원', '3,200원'],
+  );
+  assert.deepEqual(
+    viewModel.sections.flatMap((section) =>
+      section.transfers.map((transfer) => `${transfer.fromName}->${transfer.toName}`),
+    ),
+    ['지영->민수', '유나->민수', '삭제된 친구->지영'],
+  );
+});
+
+test('builds no-transfer state with optional today route action', () => {
+  const emptySettlement = {
+    tripId: 'trip-1',
+    defaultCurrency: 'JPY',
+    currencySummaries: [],
+  } satisfies GetTripSettlementResponse;
+
+  assert.deepEqual(buildSettlementTransferViewModel({ settlement: emptySettlement }), {
+    helper: '모든 지출이 이미 맞춰졌거나 아직 정산할 지출이 없어요.',
+    primaryAction: null,
+    status: 'empty',
+    title: '보낼 정산이 없어요.',
+  });
+  assert.deepEqual(
+    buildSettlementTransferViewModel({ settlement: emptySettlement, todayRoute: '/trips/trip-1/days/2026-07-10' }),
+    {
+      helper: '모든 지출이 이미 맞춰졌거나 아직 정산할 지출이 없어요.',
+      primaryAction: { label: '오늘 일정 보기', route: '/trips/trip-1/days/2026-07-10' },
+      status: 'empty',
+      title: '보낼 정산이 없어요.',
+    },
+  );
+});
+
+test('maps settlement transfer API failures to user-facing states', () => {
+  assert.deepEqual(settlementTransferFailureState({ code: 'UNAUTHORIZED' }), { status: 'auth' });
+  assert.deepEqual(settlementTransferFailureState({ status: 403 }), { status: 'notFound' });
+  assert.deepEqual(
+    settlementTransferFailureState({ status: 409, body: { error: { code: 'SETTLEMENT_DATA_INCONSISTENT' } } }),
+    {
+      actionLabel: '다시 시도',
+      helper: '지출 내역을 다시 확인한 뒤 시도해주세요.',
+      status: 'error',
+      title: '정산을 계산할 수 없어요.',
+    },
+  );
+  assert.deepEqual(settlementTransferFailureState(new Error('network')), {
+    actionLabel: '다시 시도',
+    helper: '잠시 후 다시 시도해주세요.',
+    status: 'error',
+    title: '정산을 불러오지 못했어요.',
+  });
 });
 
 test('computes deterministic paid share and net balances with integer remainder distribution', () => {
