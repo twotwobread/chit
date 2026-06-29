@@ -10,6 +10,7 @@ import {
   type CreateTripRequest,
   type CreateTripResponse,
   type GetDayScheduleItemsResponse,
+  type GetExpenseResponse,
   type GetTripDetailResponse,
   type ListDayExpensesResponse,
   type ListTripParticipantsResponse,
@@ -22,6 +23,8 @@ import {
   type SetDayLodgingPlaceRequest,
   type SetDayLodgingPlaceResponse,
   type RestoreScheduleItemResponse,
+  type UpdateExpenseRequest,
+  type UpdateExpenseResponse,
   type UpdateScheduleItemRequest,
   type UpdateScheduleItemResponse,
   type UpdateTripRequest,
@@ -68,6 +71,26 @@ export async function getTripDayItinerary(tripId: string, tripDayId: string): Pr
 export async function listDayExpenses(tripId: string, tripDayId: string): Promise<ListDayExpensesResponse> {
   await getMeWithRefresh();
   return TripsService.listDayExpenses(tripId, tripDayId);
+}
+
+export async function getDayExpense(tripId: string, tripDayId: string, expenseId: string): Promise<GetExpenseResponse> {
+  await getMeWithRefresh();
+  return TripsService.getDayExpense(tripId, tripDayId, expenseId);
+}
+
+export async function updateExpense(
+  tripId: string,
+  tripDayId: string,
+  expenseId: string,
+  request: UpdateExpenseRequest,
+): Promise<UpdateExpenseResponse> {
+  await getMeWithRefresh();
+  return TripsService.updateExpense(tripId, tripDayId, expenseId, request);
+}
+
+export async function deleteExpense(tripId: string, tripDayId: string, expenseId: string): Promise<void> {
+  await getMeWithRefresh();
+  return TripsService.deleteExpense(tripId, tripDayId, expenseId);
 }
 
 export async function createManualScheduleItem(

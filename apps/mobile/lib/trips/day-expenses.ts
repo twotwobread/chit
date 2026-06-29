@@ -17,6 +17,7 @@ export type DayExpenseRowViewModel = {
   detailLine: string;
   category: ExpenseCategory;
   accessibilityLabel: string;
+  editRoute: Href;
 };
 
 export type DayExpensesViewModel =
@@ -41,6 +42,10 @@ export type DayExpensesFailureViewModel = {
 };
 
 const sectionTitle = '지출';
+
+export function buildExpenseEditRoute(tripId: string, tripDayId: string, expenseId: string): Href {
+  return `/trips/${tripId}/days/${tripDayId}/expenses/${expenseId}/edit` as Href;
+}
 
 export function buildDayExpensesViewModel({
   expenses,
@@ -83,6 +88,7 @@ export function buildDayExpensesViewModel({
         detailLine,
         category: expenseCategory(expense.place?.placeType),
         accessibilityLabel: `${placeName} ${amountLabel}. ${detailLine}`,
+        editRoute: buildExpenseEditRoute(tripId, date, expense.id),
       };
     }),
   };

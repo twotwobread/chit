@@ -58,6 +58,14 @@ type CreateQuickExpenseInput struct {
 	ParticipantIDs     []string
 }
 
+type UpdateExpenseInput struct {
+	AmountMinor        int64
+	PayerParticipantID string
+	ParticipantIDs     []string
+	Memo               *string
+	ScheduleItemID     *string
+}
+
 type UpdateScheduleItemInput struct {
 	Name      *string
 	Address   *string
@@ -150,6 +158,17 @@ type CreateQuickExpenseRecord struct {
 	PayerParticipantID string
 	ParticipantIDs     []string
 	CreatedBy          string
+}
+
+type UpdateExpenseRecord struct {
+	TripID             string
+	TripDayID          string
+	ExpenseID          string
+	AmountMinor        int64
+	PayerParticipantID string
+	ParticipantIDs     []string
+	Memo               *string
+	ScheduleItemID     *string
 }
 
 type ExpenseSplitParticipant struct {
@@ -375,9 +394,18 @@ type Expense struct {
 	AmountMinor    int64
 	Currency       string
 	Payer          ExpenseParticipantDisplay
+	Memo           *string
 	SplitPolicy    string
 	Splits         []ExpenseSplit
 	CreatedAt      time.Time
+}
+
+type GetExpenseResult struct {
+	Expense Expense
+}
+
+type UpdateExpenseResult struct {
+	Expense Expense
 }
 
 type CreateQuickExpenseResult struct {
@@ -449,6 +477,9 @@ type Repository interface {
 	DeleteDayLodgingPlace(ctx context.Context, tripID string, tripDayID string) error
 	ListScheduleItemsByTripDay(ctx context.Context, tripID string, tripDayID string) ([]ScheduleItem, error)
 	ListDayExpensesByTripDay(ctx context.Context, tripID string, tripDayID string) ([]DayExpenseListItem, error)
+	GetExpenseByTripDayAndID(ctx context.Context, tripID string, tripDayID string, expenseID string) (Expense, bool, error)
+	UpdateExpense(ctx context.Context, record UpdateExpenseRecord) (Expense, error)
+	DeleteExpenseByTripDayAndID(ctx context.Context, tripID string, tripDayID string, expenseID string) (bool, error)
 	CreateQuickExpense(ctx context.Context, record CreateQuickExpenseRecord) (CreateQuickExpenseResult, error)
 	CreateManualScheduleItem(ctx context.Context, record CreateManualScheduleItemRecord) (ScheduleItem, error)
 	GetScheduleItemByTripDayAndID(ctx context.Context, tripID string, tripDayID string, itemID string) (ScheduleItem, bool, error)

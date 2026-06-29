@@ -1447,14 +1447,20 @@ function DayExpensesSection({
       {successViewModel ? (
         <View style={styles.expenseList}>
           {successViewModel.rows.map((row) => (
-            <View key={row.id} accessible accessibilityLabel={row.accessibilityLabel} style={styles.expenseRow}>
+            <Pressable
+              key={row.id}
+              accessibilityLabel={row.accessibilityLabel}
+              accessibilityRole="button"
+              onPress={() => router.push(row.editRoute)}
+              style={styles.expenseRow}
+            >
               <ListRow
                 first
                 subtitle={row.detailLine}
                 title={<Text style={styles.expensePlaceName}>{row.placeName}</Text>}
                 trailing={<Text style={styles.expenseAmount}>{row.amountLabel}</Text>}
               />
-            </View>
+            </Pressable>
           ))}
         </View>
       ) : null}

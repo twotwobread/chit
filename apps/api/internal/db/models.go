@@ -60,6 +60,7 @@ type Expense struct {
 	SplitPolicy        string
 	PayerParticipantID pgtype.UUID
 	PayerDisplayName   string
+	Memo               pgtype.Text
 	CreatedBy          pgtype.UUID
 	CreatedAt          pgtype.Timestamptz
 	UpdatedAt          pgtype.Timestamptz

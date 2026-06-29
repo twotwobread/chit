@@ -755,6 +755,198 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /trips/{tripId}/days/{tripDayId}/expenses/{expenseId}:
+    get:
+      operationId: getDayExpense
+      summary: Get a day expense for editing
+      description: Returns editable detail for one expense in the selected trip day.
+      tags:
+        - Trips
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: tripDayId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: expenseId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Expense detail.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetExpenseResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip, trip day, or expense not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    patch:
+      operationId: updateExpense
+      summary: Update a day expense
+      description: Updates amount, payer, memo, and linked schedule item for an expense, then recalculates equal splits.
+      tags:
+        - Trips
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: tripDayId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: expenseId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateExpenseRequest'
+      responses:
+        '200':
+          description: Expense updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateExpenseResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip, trip day, expense, payer, split participant, or linked schedule item not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict while updating the expense.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      operationId: deleteExpense
+      summary: Delete a day expense
+      description: Hard-deletes an expense in the selected trip day.
+      tags:
+        - Trips
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: tripDayId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: expenseId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Expense deleted.
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip, trip day, or expense not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /trips/{tripId}/days/{tripDayId}/expenses/quick:
     post:
       operationId: createQuickExpense
@@ -2285,6 +2477,55 @@ components:
           type: integer
           format: int64
           minimum: 0
+    GetExpenseResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - expense
+      properties:
+        expense:
+          $ref: '#/components/schemas/Expense'
+    UpdateExpenseRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - amountMinor
+        - payerParticipantId
+        - participantIds
+        - memo
+        - scheduleItemId
+      properties:
+        amountMinor:
+          type: integer
+          format: int64
+          minimum: 1
+        payerParticipantId:
+          type: string
+          description: Required current trip participant who paid the expense.
+        participantIds:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+          description: Current accepted trip participants selected as equal split targets.
+        memo:
+          type: string
+          nullable: true
+          maxLength: 240
+          description: Optional memo. Empty strings are normalized to null by the server.
+        scheduleItemId:
+          type: string
+          nullable: true
+          description: Same-day schedule item to link, or null to clear the linked place.
+    UpdateExpenseResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - expense
+      properties:
+        expense:
+          $ref: '#/components/schemas/Expense'
     CreateQuickExpenseRequest:
       type: object
       additionalProperties: false
@@ -2335,6 +2576,7 @@ components:
         - amountMinor
         - currency
         - payer
+        - memo
         - splitPolicy
         - splits
         - createdAt
@@ -2371,6 +2613,10 @@ components:
           $ref: '#/components/schemas/SupportedCurrency'
         payer:
           $ref: '#/components/schemas/ExpenseParticipantDisplay'
+        memo:
+          type: string
+          nullable: true
+          maxLength: 240
         splitPolicy:
           $ref: '#/components/schemas/ExpenseSplitPolicy'
         splits:

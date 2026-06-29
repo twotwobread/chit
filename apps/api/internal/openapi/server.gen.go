@@ -321,6 +321,7 @@ type Expense struct {
 	DisplayTitle string                    `json:"displayTitle"`
 	ExpenseDate  openapi_types.Date        `json:"expenseDate"`
 	Id           string                    `json:"id"`
+	Memo         *string                   `json:"memo"`
 	Payer        ExpenseParticipantDisplay `json:"payer"`
 	Place        *ExpensePlaceDisplay      `json:"place"`
 
@@ -385,6 +386,11 @@ type GeoPoint struct {
 type GetDayScheduleItemsResponse struct {
 	Day           TripDay        `json:"day"`
 	ScheduleItems []ScheduleItem `json:"scheduleItems"`
+}
+
+// GetExpenseResponse defines model for GetExpenseResponse.
+type GetExpenseResponse struct {
+	Expense Expense `json:"expense"`
 }
 
 // GetTripDetailResponse defines model for GetTripDetailResponse.
@@ -717,6 +723,28 @@ type TripPlaceSummary struct {
 // TripPlaceType defines model for TripPlaceType.
 type TripPlaceType string
 
+// UpdateExpenseRequest defines model for UpdateExpenseRequest.
+type UpdateExpenseRequest struct {
+	AmountMinor int64 `json:"amountMinor"`
+
+	// Memo Optional memo. Empty strings are normalized to null by the server.
+	Memo *string `json:"memo"`
+
+	// ParticipantIds Current accepted trip participants selected as equal split targets.
+	ParticipantIds []string `json:"participantIds"`
+
+	// PayerParticipantId Required current trip participant who paid the expense.
+	PayerParticipantId string `json:"payerParticipantId"`
+
+	// ScheduleItemId Same-day schedule item to link, or null to clear the linked place.
+	ScheduleItemId *string `json:"scheduleItemId"`
+}
+
+// UpdateExpenseResponse defines model for UpdateExpenseResponse.
+type UpdateExpenseResponse struct {
+	Expense Expense `json:"expense"`
+}
+
 // UpdateMeRequest defines model for UpdateMeRequest.
 type UpdateMeRequest struct {
 	// DisplayName Server trims leading/trailing whitespace, counts Unicode code points after trim, then validates and persists the value.
@@ -780,6 +808,9 @@ type UpdateTripJSONRequestBody = UpdateTripRequest
 
 // CreateQuickExpenseJSONRequestBody defines body for CreateQuickExpense for application/json ContentType.
 type CreateQuickExpenseJSONRequestBody = CreateQuickExpenseRequest
+
+// UpdateExpenseJSONRequestBody defines body for UpdateExpense for application/json ContentType.
+type UpdateExpenseJSONRequestBody = UpdateExpenseRequest
 
 // SetDayLodgingPlaceJSONRequestBody defines body for SetDayLodgingPlace for application/json ContentType.
 type SetDayLodgingPlaceJSONRequestBody = SetDayLodgingPlaceRequest
@@ -855,6 +886,15 @@ type ServerInterface interface {
 	// Create a quick expense for a trip day place
 	// (POST /trips/{tripId}/days/{tripDayId}/expenses/quick)
 	CreateQuickExpense(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string)
+	// Delete a day expense
+	// (DELETE /trips/{tripId}/days/{tripDayId}/expenses/{expenseId})
+	DeleteExpense(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, expenseId string)
+	// Get a day expense for editing
+	// (GET /trips/{tripId}/days/{tripDayId}/expenses/{expenseId})
+	GetDayExpense(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, expenseId string)
+	// Update a day expense
+	// (PATCH /trips/{tripId}/days/{tripDayId}/expenses/{expenseId})
+	UpdateExpense(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, expenseId string)
 	// Clear a trip day lodging place
 	// (DELETE /trips/{tripId}/days/{tripDayId}/lodging-place)
 	ClearDayLodgingPlace(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string)
@@ -1014,6 +1054,24 @@ func (_ Unimplemented) ListDayExpenses(w http.ResponseWriter, r *http.Request, t
 // Create a quick expense for a trip day place
 // (POST /trips/{tripId}/days/{tripDayId}/expenses/quick)
 func (_ Unimplemented) CreateQuickExpense(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Delete a day expense
+// (DELETE /trips/{tripId}/days/{tripDayId}/expenses/{expenseId})
+func (_ Unimplemented) DeleteExpense(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, expenseId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Get a day expense for editing
+// (GET /trips/{tripId}/days/{tripDayId}/expenses/{expenseId})
+func (_ Unimplemented) GetDayExpense(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, expenseId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Update a day expense
+// (PATCH /trips/{tripId}/days/{tripDayId}/expenses/{expenseId})
+func (_ Unimplemented) UpdateExpense(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, expenseId string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1533,6 +1591,153 @@ func (siw *ServerInterfaceWrapper) CreateQuickExpense(w http.ResponseWriter, r *
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateQuickExpense(w, r, tripId, tripDayId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteExpense operation middleware
+func (siw *ServerInterfaceWrapper) DeleteExpense(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "tripDayId" -------------
+	var tripDayId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripDayId", chi.URLParam(r, "tripDayId"), &tripDayId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripDayId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "expenseId" -------------
+	var expenseId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "expenseId", chi.URLParam(r, "expenseId"), &expenseId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "expenseId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteExpense(w, r, tripId, tripDayId, expenseId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetDayExpense operation middleware
+func (siw *ServerInterfaceWrapper) GetDayExpense(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "tripDayId" -------------
+	var tripDayId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripDayId", chi.URLParam(r, "tripDayId"), &tripDayId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripDayId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "expenseId" -------------
+	var expenseId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "expenseId", chi.URLParam(r, "expenseId"), &expenseId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "expenseId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetDayExpense(w, r, tripId, tripDayId, expenseId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateExpense operation middleware
+func (siw *ServerInterfaceWrapper) UpdateExpense(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "tripDayId" -------------
+	var tripDayId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripDayId", chi.URLParam(r, "tripDayId"), &tripDayId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripDayId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "expenseId" -------------
+	var expenseId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "expenseId", chi.URLParam(r, "expenseId"), &expenseId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "expenseId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateExpense(w, r, tripId, tripDayId, expenseId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2410,6 +2615,15 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/trips/{tripId}/days/{tripDayId}/expenses/quick", wrapper.CreateQuickExpense)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/trips/{tripId}/days/{tripDayId}/expenses/{expenseId}", wrapper.DeleteExpense)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/trips/{tripId}/days/{tripDayId}/expenses/{expenseId}", wrapper.GetDayExpense)
+	})
+	r.Group(func(r chi.Router) {
+		r.Patch(options.BaseURL+"/trips/{tripId}/days/{tripDayId}/expenses/{expenseId}", wrapper.UpdateExpense)
 	})
 	r.Group(func(r chi.Router) {
 		r.Delete(options.BaseURL+"/trips/{tripId}/days/{tripDayId}/lodging-place", wrapper.ClearDayLodgingPlace)
