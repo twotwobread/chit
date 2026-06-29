@@ -49,6 +49,7 @@ export type { LinkedIdentity } from './models/LinkedIdentity';
 export type { ListDayExpensesResponse } from './models/ListDayExpensesResponse';
 export type { ListTripParticipantsResponse } from './models/ListTripParticipantsResponse';
 export type { ListTripsResponse } from './models/ListTripsResponse';
+export type { ManualExpenseSplitInput } from './models/ManualExpenseSplitInput';
 export type { MarkScheduleItemArrivedResponse } from './models/MarkScheduleItemArrivedResponse';
 export type { MarkScheduleItemSkippedResponse } from './models/MarkScheduleItemSkippedResponse';
 export type { MetadataReadinessCheck } from './models/MetadataReadinessCheck';

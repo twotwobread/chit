@@ -754,11 +754,7 @@ func (s *Store) UpdateExpense(ctx context.Context, record trip.UpdateExpenseReco
 			JoinedAt:      participantRow.JoinedAt.Time,
 		})
 	}
-	participants, err := trip.SelectExpenseSplitParticipants(allParticipants, record.ParticipantIDs)
-	if err != nil {
-		return trip.Expense{}, err
-	}
-	splitRecords, err := trip.AllocateEqualExpenseSplits(record.AmountMinor, participants)
+	splitRecords, err := trip.BuildExpenseSplitRecords(record.AmountMinor, record.SplitPolicy, allParticipants, record.ParticipantIDs, record.ManualSplits)
 	if err != nil {
 		return trip.Expense{}, err
 	}
@@ -771,6 +767,7 @@ func (s *Store) UpdateExpense(ctx context.Context, record trip.UpdateExpenseReco
 		PlaceAddress:       placeAddress,
 		PlaceType:          placeType,
 		AmountMinor:        record.AmountMinor,
+		SplitPolicy:        record.SplitPolicy,
 		PayerParticipantID: mustUUID(payerRow.ID),
 		PayerDisplayName:   trip.NormalizeParticipantDisplayName(payerRow.DisplayName),
 		Memo:               nullableText(record.Memo),
@@ -888,12 +885,7 @@ func (s *Store) CreateQuickExpense(ctx context.Context, record trip.CreateQuickE
 			JoinedAt:      participantRow.JoinedAt.Time,
 		})
 	}
-	participants, err := trip.SelectExpenseSplitParticipants(allParticipants, record.ParticipantIDs)
-	if err != nil {
-		return trip.CreateQuickExpenseResult{}, err
-	}
-
-	splitRecords, err := trip.AllocateEqualExpenseSplits(record.AmountMinor, participants)
+	splitRecords, err := trip.BuildExpenseSplitRecords(record.AmountMinor, record.SplitPolicy, allParticipants, record.ParticipantIDs, record.ManualSplits)
 	if err != nil {
 		return trip.CreateQuickExpenseResult{}, err
 	}
@@ -910,7 +902,7 @@ func (s *Store) CreateQuickExpense(ctx context.Context, record trip.CreateQuickE
 		PlaceType:          textValue(itemRow.PlaceType),
 		AmountMinor:        record.AmountMinor,
 		Currency:           tripRow.DefaultCurrency,
-		SplitPolicy:        trip.ExpenseSplitPolicyEqual,
+		SplitPolicy:        record.SplitPolicy,
 		PayerParticipantID: mustUUID(payerRow.ID),
 		PayerDisplayName:   trip.NormalizeParticipantDisplayName(payerRow.DisplayName),
 		CreatedBy:          mustUUID(record.CreatedBy),

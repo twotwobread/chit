@@ -200,6 +200,7 @@ func TestExpenseDisplayUsesLiveRowsThenFallback(t *testing.T) {
 		ScheduleItemID:     scheduleItemID,
 		AmountMinor:        1001,
 		PayerParticipantID: ownerParticipantID,
+		SplitPolicy:        trip.ExpenseSplitPolicyEqual,
 		ParticipantIDs:     []string{ownerParticipantID, memberParticipantID},
 		CreatedBy:          ownerUserID,
 	})

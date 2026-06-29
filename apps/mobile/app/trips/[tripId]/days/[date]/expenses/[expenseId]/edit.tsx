@@ -21,6 +21,7 @@ import {
 } from '../../../../../../../lib/trips/client';
 import {
   buildExpenseEditInitialAmountInput,
+  buildExpenseEditInitialManualSplitInputs,
   buildExpenseEditParticipantIds,
   buildExpenseEditViewModel,
   buildUpdateExpenseRequest,
@@ -29,6 +30,12 @@ import {
   type ExpenseEditFormErrors,
   type ExpenseEditViewModel,
 } from '../../../../../../../lib/trips/expense-edit';
+import {
+  buildQuickExpenseManualSplitSummary,
+  formatMoney,
+  type QuickExpenseManualSplitInput,
+  type QuickExpenseSplitPolicy,
+} from '../../../../../../../lib/trips/quick-expense';
 
 const dayRoute = (tripId: string, date: string): Href => `/trips/${tripId}/days/${date}` as Href;
 
@@ -64,6 +71,8 @@ export default function ExpenseEditScreen() {
   const [memoInput, setMemoInput] = useState('');
   const [payerParticipantId, setPayerParticipantId] = useState<string | null>(null);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [splitPolicy, setSplitPolicy] = useState<QuickExpenseSplitPolicy>('equal');
+  const [manualSplitInputs, setManualSplitInputs] = useState<QuickExpenseManualSplitInput[]>([]);
   const [errors, setErrors] = useState<ExpenseEditFormErrors>({});
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -111,6 +120,10 @@ export default function ExpenseEditScreen() {
           : null,
       );
       setSelectedItemId(expense.scheduleItemId && itemIDs.has(expense.scheduleItemId) ? expense.scheduleItemId : null);
+      setSplitPolicy(expense.splitPolicy === 'manual' ? 'manual' : 'equal');
+      setManualSplitInputs(
+        buildExpenseEditInitialManualSplitInputs(expense, expense.currency, participantsResponse.participants),
+      );
       setState({ status: 'success', expense, itinerary, participants: participantsResponse.participants });
     } catch (error) {
       if (await handleAuthError(error)) {
@@ -138,9 +151,11 @@ export default function ExpenseEditScreen() {
     const validation = buildUpdateExpenseRequest({
       amountInput,
       currency: state.expense.currency,
+      splitPolicy,
       payerParticipantId,
       memoInput,
       participantIds: buildExpenseEditParticipantIds(state.participants),
+      manualSplitInputs,
       scheduleItemId: selectedItemId,
     });
     if (!validation.ok) {
@@ -169,10 +184,12 @@ export default function ExpenseEditScreen() {
     deleting,
     expenseId,
     handleAuthError,
+    manualSplitInputs,
     memoInput,
     payerParticipantId,
     saving,
     selectedItemId,
+    splitPolicy,
     state,
     tripId,
   ]);
@@ -196,6 +213,20 @@ export default function ExpenseEditScreen() {
       setDeleting(false);
     }
   }, [date, deleting, expenseId, handleAuthError, saving, tripId]);
+
+  const updateManualSplitInput = useCallback((participantId: string, amount: string) => {
+    setManualSplitInputs((current) => {
+      const existing = current.find((split) => split.participantId === participantId);
+      if (!existing) {
+        return [...current, { participantId, amountInput: amount }];
+      }
+      return current.map((split) =>
+        split.participantId === participantId ? { ...split, amountInput: amount } : split,
+      );
+    });
+    setErrors((current) => ({ ...current, participants: undefined }));
+    setFormMessage(null);
+  }, []);
 
   const confirmDelete = useCallback(() => {
     Alert.alert('이 지출을 삭제할까요?', '삭제하면 되돌릴 수 없어요.', [
@@ -265,7 +296,11 @@ export default function ExpenseEditScreen() {
           onPayerChange={setPayerParticipantId}
           onPlaceChange={setSelectedItemId}
           onSave={() => void submitSave()}
+          onSplitPolicyChange={setSplitPolicy}
+          onUpdateManualSplitInput={updateManualSplitInput}
           saving={saving}
+          splitPolicy={splitPolicy}
+          manualSplitInputs={manualSplitInputs}
           viewModel={viewModel}
         />
       ) : null}
@@ -285,7 +320,11 @@ function ExpenseEditForm({
   onPayerChange,
   onPlaceChange,
   onSave,
+  onSplitPolicyChange,
+  onUpdateManualSplitInput,
   saving,
+  splitPolicy,
+  manualSplitInputs,
   viewModel,
 }: {
   amountInput: string;
@@ -299,9 +338,27 @@ function ExpenseEditForm({
   onPayerChange: (value: string) => void;
   onPlaceChange: (value: string | null) => void;
   onSave: () => void;
+  onSplitPolicyChange: (value: QuickExpenseSplitPolicy) => void;
+  onUpdateManualSplitInput: (participantId: string, amount: string) => void;
   saving: boolean;
+  splitPolicy: QuickExpenseSplitPolicy;
+  manualSplitInputs: QuickExpenseManualSplitInput[];
   viewModel: ExpenseEditViewModel;
 }) {
+  const selectedPayerParticipantId = viewModel.payerOptions.find((option) => option.selected)?.participantId ?? null;
+  const selectedScheduleItemId = viewModel.placeOptions.find((option) => option.selected)?.itemId ?? null;
+  const saveValidation = buildUpdateExpenseRequest({
+    amountInput,
+    currency: viewModel.currency,
+    splitPolicy,
+    participantIds: viewModel.payerOptions.map((option) => option.participantId),
+    manualSplitInputs,
+    scheduleItemId: selectedScheduleItemId,
+    memoInput,
+    payerParticipantId: selectedPayerParticipantId,
+  });
+  const canSave = saveValidation.ok && !saving && !deleting;
+
   return (
     <Card>
       <View style={styles.headerBlock}>
@@ -377,28 +434,65 @@ function ExpenseEditForm({
       </View>
 
       <View style={styles.fieldGroup}>
-        <Text style={styles.label}>분담 미리보기</Text>
-        {viewModel.splitPreviewMessage ? (
-          <Text style={styles.validationText}>{viewModel.splitPreviewMessage}</Text>
-        ) : null}
-        {viewModel.splitPreviewRows.length > 0 ? (
-          <View style={styles.splitList}>
-            {viewModel.splitPreviewRows.map((row) => (
-              <View key={row.participantId ?? row.displayName} style={styles.splitRow}>
-                <Text style={styles.message}>{row.displayName}</Text>
-                <Text style={styles.amountText}>{row.amountLabel}</Text>
-              </View>
-            ))}
-          </View>
-        ) : (
-          <Text style={styles.message}>금액을 입력하면 현재 참여자 기준으로 나눠 보여줘요.</Text>
-        )}
+        <Text style={styles.label}>분할 방식</Text>
+        <View style={styles.optionList}>
+          {(['equal', 'manual'] as const).map((policy) => (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ selected: splitPolicy === policy }}
+              key={policy}
+              onPress={() => onSplitPolicyChange(policy)}
+              style={[styles.optionChip, splitPolicy === policy ? styles.optionChipSelected : null]}
+            >
+              <Text style={[styles.optionText, splitPolicy === policy ? styles.optionTextSelected : null]}>
+                {policy === 'equal' ? '균등 분할' : '직접 입력'}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
       </View>
+
+      {splitPolicy === 'equal' ? (
+        <View style={styles.fieldGroup}>
+          <Text style={styles.label}>분담 미리보기</Text>
+          {viewModel.splitPreviewMessage ? (
+            <Text style={styles.validationText}>{viewModel.splitPreviewMessage}</Text>
+          ) : null}
+          {viewModel.splitPreviewRows.length > 0 ? (
+            <View style={styles.splitList}>
+              {viewModel.splitPreviewRows.map((row) => (
+                <View key={row.participantId ?? row.displayName} style={styles.splitRow}>
+                  <Text style={styles.message}>{row.displayName}</Text>
+                  <Text style={styles.amountText}>{row.amountLabel}</Text>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <Text style={styles.message}>금액을 입력하면 현재 참여자 기준으로 나눠 보여줘요.</Text>
+          )}
+          {errors.participants ? <Text style={styles.validationText}>{errors.participants}</Text> : null}
+        </View>
+      ) : (
+        <ExpenseEditManualSplitSection
+          amountInput={amountInput}
+          currency={viewModel.currency}
+          errorMessage={errors.participants ?? null}
+          manualSplitInputs={manualSplitInputs}
+          onUpdateManualSplitInput={onUpdateManualSplitInput}
+          participants={viewModel.payerOptions}
+        />
+      )}
 
       {formMessage ? <Text style={styles.validationText}>{formMessage}</Text> : null}
 
       <View style={styles.actions}>
-        <PrimaryButton label={viewModel.saveLabel} loading={saving} loadingLabel="저장 중..." onPress={onSave} />
+        <PrimaryButton
+          disabled={!canSave}
+          label={viewModel.saveLabel}
+          loading={saving}
+          loadingLabel="저장 중..."
+          onPress={onSave}
+        />
         <SecondaryButton
           disabled={saving || deleting}
           label={deleting ? '삭제 중...' : viewModel.deleteLabel}
@@ -407,6 +501,66 @@ function ExpenseEditForm({
       </View>
     </Card>
   );
+}
+
+function ExpenseEditManualSplitSection({
+  amountInput,
+  currency,
+  errorMessage,
+  manualSplitInputs,
+  onUpdateManualSplitInput,
+  participants,
+}: {
+  amountInput: string;
+  currency: Expense['currency'];
+  errorMessage: string | null;
+  manualSplitInputs: QuickExpenseManualSplitInput[];
+  onUpdateManualSplitInput: (participantId: string, amount: string) => void;
+  participants: ExpenseEditViewModel['payerOptions'];
+}) {
+  const summary = buildQuickExpenseManualSplitSummary({ amountInput, currency, manualSplitInputs });
+  const inputByParticipantId = new Map(manualSplitInputs.map((split) => [split.participantId, split.amountInput]));
+  const differenceLabel = manualSplitDifferenceLabel(summary.differenceMinor, currency);
+  return (
+    <View style={styles.fieldGroup}>
+      <Text style={styles.label}>직접 입력</Text>
+      <Text style={styles.readOnlyText}>참여자별 부담 금액을 입력해주세요. 합계가 총 지출 금액과 같아야 해요.</Text>
+      <View style={styles.splitList}>
+        {participants.map((participant) => (
+          <View key={participant.participantId} style={styles.manualSplitRow}>
+            <Text style={styles.message}>{participant.displayName}</Text>
+            <TextInput
+              accessibilityLabel={`${participant.displayName} 부담 금액`}
+              keyboardType={currency === 'KRW' || currency === 'JPY' ? 'number-pad' : 'decimal-pad'}
+              onChangeText={(value) => onUpdateManualSplitInput(participant.participantId, value)}
+              placeholder="0"
+              placeholderTextColor={theme.color.textFaint}
+              style={styles.manualSplitInput}
+              value={inputByParticipantId.get(participant.participantId) ?? ''}
+            />
+          </View>
+        ))}
+      </View>
+      <Text style={styles.readOnlyText}>
+        입력 합계 {formatMoney(summary.splitAmountMinor, currency)} / 총액{' '}
+        {summary.totalAmountMinor === null ? '-' : formatMoney(summary.totalAmountMinor, currency)}
+      </Text>
+      {differenceLabel ? <Text style={styles.readOnlyText}>{differenceLabel}</Text> : null}
+      {errorMessage || summary.validationMessage ? (
+        <Text style={styles.validationText}>{errorMessage ?? summary.validationMessage}</Text>
+      ) : null}
+    </View>
+  );
+}
+
+function manualSplitDifferenceLabel(differenceMinor: number | null, currency: Expense['currency']): string | null {
+  if (differenceMinor === null || differenceMinor === 0) {
+    return null;
+  }
+  if (differenceMinor > 0) {
+    return `남은 금액 ${formatMoney(differenceMinor, currency)}`;
+  }
+  return `초과 금액 ${formatMoney(Math.abs(differenceMinor), currency)}`;
 }
 
 const styles = StyleSheet.create({
@@ -539,6 +693,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     padding: theme.space[3],
+  },
+  manualSplitRow: {
+    alignItems: 'center',
+    borderBottomColor: theme.color.borderSubtle,
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    gap: theme.space[3],
+    justifyContent: 'space-between',
+    padding: theme.space[3],
+  },
+  manualSplitInput: {
+    backgroundColor: theme.color.surfaceSunken,
+    borderColor: theme.color.borderDefault,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.regular,
+    minWidth: 120,
+    paddingHorizontal: theme.space[3],
+    paddingVertical: theme.space[2],
+    textAlign: 'right',
   },
   amountText: {
     color: theme.color.textStrong,

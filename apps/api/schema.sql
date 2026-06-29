@@ -257,7 +257,7 @@ CREATE TABLE expenses (
   CONSTRAINT expenses_place_type_check CHECK (place_type IN ('sights', 'food', 'lodging', 'cafe', 'shopping', 'etc')),
   CONSTRAINT expenses_amount_minor_check CHECK (amount_minor > 0),
   CONSTRAINT expenses_currency_check CHECK (currency IN ('KRW', 'JPY', 'USD', 'EUR')),
-  CONSTRAINT expenses_split_policy_check CHECK (split_policy IN ('equal')),
+  CONSTRAINT expenses_split_policy_check CHECK (split_policy IN ('equal', 'manual')),
   CONSTRAINT expenses_payer_display_name_length_check CHECK (char_length(payer_display_name) BETWEEN 1 AND 80),
   CONSTRAINT expenses_memo_length_check CHECK (memo IS NULL OR char_length(memo) <= 240)
 );

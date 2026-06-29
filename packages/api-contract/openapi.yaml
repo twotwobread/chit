@@ -2485,15 +2485,30 @@ components:
       properties:
         expense:
           $ref: '#/components/schemas/Expense'
+    ManualExpenseSplitInput:
+      type: object
+      additionalProperties: false
+      required:
+        - participantId
+        - amountMinor
+      properties:
+        participantId:
+          type: string
+          description: Current trip participant who has a positive manual burden.
+        amountMinor:
+          type: integer
+          format: int64
+          minimum: 1
+          description: Positive burden amount in currency minor units.
     UpdateExpenseRequest:
       type: object
       additionalProperties: false
       required:
         - amountMinor
         - payerParticipantId
-        - participantIds
         - memo
         - scheduleItemId
+        - splitPolicy
       properties:
         amountMinor:
           type: integer
@@ -2502,13 +2517,21 @@ components:
         payerParticipantId:
           type: string
           description: Required current trip participant who paid the expense.
+        splitPolicy:
+          $ref: '#/components/schemas/ExpenseSplitPolicy'
         participantIds:
           type: array
           minItems: 1
           uniqueItems: true
           items:
             type: string
-          description: Current accepted trip participants selected as equal split targets.
+          description: Required only when splitPolicy is equal. Must be omitted for manual.
+        splits:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/ManualExpenseSplitInput'
+          description: Required only when splitPolicy is manual. Must be omitted for equal.
         memo:
           type: string
           nullable: true
@@ -2533,7 +2556,7 @@ components:
         - scheduleItemId
         - amountMinor
         - payerParticipantId
-        - participantIds
+        - splitPolicy
       properties:
         scheduleItemId:
           type: string
@@ -2546,13 +2569,21 @@ components:
         payerParticipantId:
           type: string
           description: Active trip participant who paid the expense.
+        splitPolicy:
+          $ref: '#/components/schemas/ExpenseSplitPolicy'
         participantIds:
           type: array
           minItems: 1
           uniqueItems: true
           items:
             type: string
-          description: Current accepted trip participants selected as equal split targets.
+          description: Required only when splitPolicy is equal. Must be omitted for manual.
+        splits:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/ManualExpenseSplitInput'
+          description: Required only when splitPolicy is manual. Must be omitted for equal.
     CreateQuickExpenseResponse:
       type: object
       additionalProperties: false
@@ -2642,7 +2673,8 @@ components:
       type: string
       enum:
         - equal
-      description: Persisted split policy for current quick expenses. Future custom split support may add enum values.
+        - manual
+      description: Persisted split policy for current quick expenses.
     ExpensePlaceDisplay:
       type: object
       additionalProperties: false

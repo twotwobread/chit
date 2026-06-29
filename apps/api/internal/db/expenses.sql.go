@@ -708,13 +708,14 @@ SET
   place_address = $5,
   place_type = $6,
   amount_minor = $7,
-  payer_participant_id = $8::uuid,
-  payer_display_name = $9,
-  memo = $10,
+  split_policy = $8,
+  payer_participant_id = $9::uuid,
+  payer_display_name = $10,
+  memo = $11,
   updated_at = now()
-WHERE trip_id = $11::uuid
-  AND trip_day_id = $12::uuid
-  AND id = $13::uuid
+WHERE trip_id = $12::uuid
+  AND trip_day_id = $13::uuid
+  AND id = $14::uuid
   AND anchor_type IN ('trip_day', 'schedule_item')
 RETURNING
   id::text,
@@ -744,6 +745,7 @@ type UpdateExpenseParams struct {
 	PlaceAddress       pgtype.Text
 	PlaceType          pgtype.Text
 	AmountMinor        int64
+	SplitPolicy        string
 	PayerParticipantID pgtype.UUID
 	PayerDisplayName   string
 	Memo               pgtype.Text
@@ -781,6 +783,7 @@ func (q *Queries) UpdateExpense(ctx context.Context, arg UpdateExpenseParams) (U
 		arg.PlaceAddress,
 		arg.PlaceType,
 		arg.AmountMinor,
+		arg.SplitPolicy,
 		arg.PayerParticipantID,
 		arg.PayerDisplayName,
 		arg.Memo,

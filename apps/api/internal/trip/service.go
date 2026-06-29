@@ -451,7 +451,7 @@ func (s *Service) GetDayExpense(ctx context.Context, userID string, tripID strin
 func (s *Service) UpdateExpense(ctx context.Context, userID string, tripID string, tripDayID string, expenseID string, input UpdateExpenseInput) (UpdateExpenseResult, error) {
 	expenseID = strings.TrimSpace(expenseID)
 	payerParticipantID := strings.TrimSpace(input.PayerParticipantID)
-	participantIDs, err := normalizeQuickExpenseParticipantIDs(input.ParticipantIDs)
+	splitPolicy, participantIDs, manualSplits, err := normalizeExpenseSplitInput(input.SplitPolicy, input.ParticipantIDs, input.ManualSplits, input.AmountMinor)
 	if err != nil {
 		return UpdateExpenseResult{}, err
 	}
@@ -480,7 +480,9 @@ func (s *Service) UpdateExpense(ctx context.Context, userID string, tripID strin
 		ExpenseID:          expenseID,
 		AmountMinor:        input.AmountMinor,
 		PayerParticipantID: payerParticipantID,
+		SplitPolicy:        splitPolicy,
 		ParticipantIDs:     participantIDs,
+		ManualSplits:       manualSplits,
 		Memo:               memo,
 		ScheduleItemID:     scheduleItemID,
 	})
@@ -511,7 +513,7 @@ func (s *Service) DeleteExpense(ctx context.Context, userID string, tripID strin
 func (s *Service) CreateQuickExpense(ctx context.Context, userID string, tripID string, tripDayID string, input CreateQuickExpenseInput) (CreateQuickExpenseResult, error) {
 	scheduleItemID := strings.TrimSpace(input.ScheduleItemID)
 	payerParticipantID := strings.TrimSpace(input.PayerParticipantID)
-	participantIDs, err := normalizeQuickExpenseParticipantIDs(input.ParticipantIDs)
+	splitPolicy, participantIDs, manualSplits, err := normalizeExpenseSplitInput(input.SplitPolicy, input.ParticipantIDs, input.ManualSplits, input.AmountMinor)
 	if err != nil {
 		return CreateQuickExpenseResult{}, err
 	}
@@ -528,7 +530,9 @@ func (s *Service) CreateQuickExpense(ctx context.Context, userID string, tripID 
 		ScheduleItemID:     scheduleItemID,
 		AmountMinor:        input.AmountMinor,
 		PayerParticipantID: payerParticipantID,
+		SplitPolicy:        splitPolicy,
 		ParticipantIDs:     participantIDs,
+		ManualSplits:       manualSplits,
 		CreatedBy:          userID,
 	})
 }
@@ -545,6 +549,36 @@ func normalizeExpenseMemo(value *string) (*string, error) {
 		return nil, ErrValidation
 	}
 	return &memo, nil
+}
+
+func normalizeExpenseSplitInput(policy string, participantIDs []string, manualSplits []ManualExpenseSplitInput, amountMinor int64) (string, []string, []ManualExpenseSplitInput, error) {
+	if amountMinor < 1 {
+		return "", nil, nil, ErrValidation
+	}
+
+	splitPolicy := strings.ToLower(strings.TrimSpace(policy))
+	switch splitPolicy {
+	case ExpenseSplitPolicyEqual:
+		if manualSplits != nil {
+			return "", nil, nil, ErrValidation
+		}
+		normalizedParticipantIDs, err := normalizeQuickExpenseParticipantIDs(participantIDs)
+		if err != nil {
+			return "", nil, nil, err
+		}
+		return splitPolicy, normalizedParticipantIDs, nil, nil
+	case ExpenseSplitPolicyManual:
+		if participantIDs != nil {
+			return "", nil, nil, ErrValidation
+		}
+		normalizedManualSplits, err := normalizeManualExpenseSplits(manualSplits, amountMinor)
+		if err != nil {
+			return "", nil, nil, err
+		}
+		return splitPolicy, nil, normalizedManualSplits, nil
+	default:
+		return "", nil, nil, ErrValidation
+	}
 }
 
 func normalizeQuickExpenseParticipantIDs(participantIDs []string) ([]string, error) {
@@ -564,6 +598,35 @@ func normalizeQuickExpenseParticipantIDs(participantIDs []string) ([]string, err
 		}
 		seen[participantID] = struct{}{}
 		normalized = append(normalized, participantID)
+	}
+	return normalized, nil
+}
+
+func normalizeManualExpenseSplits(manualSplits []ManualExpenseSplitInput, amountMinor int64) ([]ManualExpenseSplitInput, error) {
+	if len(manualSplits) == 0 {
+		return nil, ErrValidation
+	}
+
+	seen := make(map[string]struct{}, len(manualSplits))
+	normalized := make([]ManualExpenseSplitInput, 0, len(manualSplits))
+	var total int64
+	for _, rawSplit := range manualSplits {
+		participantID := strings.ToLower(strings.TrimSpace(rawSplit.ParticipantID))
+		if !isUUID(participantID) || rawSplit.AmountMinor < 1 {
+			return nil, ErrValidation
+		}
+		if _, ok := seen[participantID]; ok {
+			return nil, ErrValidation
+		}
+		seen[participantID] = struct{}{}
+		total += rawSplit.AmountMinor
+		if total > amountMinor {
+			return nil, ErrValidation
+		}
+		normalized = append(normalized, ManualExpenseSplitInput{ParticipantID: participantID, AmountMinor: rawSplit.AmountMinor})
+	}
+	if total != amountMinor {
+		return nil, ErrValidation
 	}
 	return normalized, nil
 }
@@ -1148,6 +1211,73 @@ func SelectExpenseSplitParticipants(participants []ExpenseSplitParticipant, part
 		return nil, ErrValidation
 	}
 	return selectedParticipants, nil
+}
+
+func BuildExpenseSplitRecords(amountMinor int64, splitPolicy string, participants []ExpenseSplitParticipant, participantIDs []string, manualSplits []ManualExpenseSplitInput) ([]CreateExpenseSplitRecord, error) {
+	switch splitPolicy {
+	case ExpenseSplitPolicyEqual:
+		selectedParticipants, err := SelectExpenseSplitParticipants(participants, participantIDs)
+		if err != nil {
+			return nil, err
+		}
+		return AllocateEqualExpenseSplits(amountMinor, selectedParticipants)
+	case ExpenseSplitPolicyManual:
+		return BuildManualExpenseSplits(amountMinor, participants, manualSplits)
+	default:
+		return nil, ErrValidation
+	}
+}
+
+func BuildManualExpenseSplits(amountMinor int64, participants []ExpenseSplitParticipant, manualSplits []ManualExpenseSplitInput) ([]CreateExpenseSplitRecord, error) {
+	if amountMinor < 1 || len(manualSplits) == 0 {
+		return nil, ErrValidation
+	}
+
+	amountByParticipantID := make(map[string]int64, len(manualSplits))
+	var total int64
+	for _, split := range manualSplits {
+		if split.ParticipantID == "" || split.AmountMinor < 1 {
+			return nil, ErrValidation
+		}
+		if _, ok := amountByParticipantID[split.ParticipantID]; ok {
+			return nil, ErrValidation
+		}
+		amountByParticipantID[split.ParticipantID] = split.AmountMinor
+		total += split.AmountMinor
+		if total > amountMinor {
+			return nil, ErrValidation
+		}
+	}
+	if total != amountMinor {
+		return nil, ErrValidation
+	}
+
+	ordered := append([]ExpenseSplitParticipant(nil), participants...)
+	sort.SliceStable(ordered, func(i, j int) bool {
+		if !ordered[i].JoinedAt.Equal(ordered[j].JoinedAt) {
+			return ordered[i].JoinedAt.Before(ordered[j].JoinedAt)
+		}
+		return ordered[i].ParticipantID < ordered[j].ParticipantID
+	})
+
+	splitRecords := make([]CreateExpenseSplitRecord, 0, len(manualSplits))
+	for _, participant := range ordered {
+		amount, ok := amountByParticipantID[participant.ParticipantID]
+		if !ok {
+			continue
+		}
+		splitRecords = append(splitRecords, CreateExpenseSplitRecord{
+			ParticipantID:          participant.ParticipantID,
+			ParticipantDisplayName: participantDisplayName(participant.DisplayName),
+			AmountMinor:            amount,
+			SplitOrder:             len(splitRecords) + 1,
+		})
+		delete(amountByParticipantID, participant.ParticipantID)
+	}
+	if len(amountByParticipantID) > 0 || len(splitRecords) == 0 {
+		return nil, ErrValidation
+	}
+	return splitRecords, nil
 }
 
 func AllocateEqualExpenseSplits(amountMinor int64, participants []ExpenseSplitParticipant) ([]CreateExpenseSplitRecord, error) {
