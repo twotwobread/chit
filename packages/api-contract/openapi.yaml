@@ -421,6 +421,64 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /trips/{tripId}/settlement:
+    get:
+      operationId: getTripSettlement
+      summary: Get trip settlement calculation
+      description: Returns authoritative per-currency participant balances and deterministic suggested transfers for an authenticated current trip participant.
+      tags:
+        - Trips
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Trip settlement calculation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetTripSettlementResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Settlement data is inconsistent.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /trips/{tripId}/participants:
     get:
       operationId: listTripParticipants
@@ -3057,6 +3115,113 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/TripParticipantListItem'
+    SettlementParticipantStatus:
+      type: string
+      enum:
+        - current
+        - removed
+      description: Whether a settlement participant is a current trip participant or a removed/unresolved historical snapshot.
+    SettlementParticipantSnapshot:
+      type: object
+      additionalProperties: false
+      required:
+        - participantId
+        - displayName
+        - participantStatus
+      properties:
+        participantId:
+          type: string
+          nullable: true
+          description: Current participant id, or null for removed/unresolved historical rows.
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 80
+        participantStatus:
+          $ref: '#/components/schemas/SettlementParticipantStatus'
+    SettlementBalance:
+      type: object
+      additionalProperties: false
+      required:
+        - participant
+        - paidMinor
+        - shareMinor
+        - netMinor
+      properties:
+        participant:
+          $ref: '#/components/schemas/SettlementParticipantSnapshot'
+        paidMinor:
+          type: integer
+          format: int64
+          minimum: 0
+        shareMinor:
+          type: integer
+          format: int64
+          minimum: 0
+        netMinor:
+          type: integer
+          format: int64
+          description: Positive means the participant should receive; negative means they should pay.
+    SettlementTransfer:
+      type: object
+      additionalProperties: false
+      required:
+        - fromParticipant
+        - toParticipant
+        - amountMinor
+      properties:
+        fromParticipant:
+          $ref: '#/components/schemas/SettlementParticipantSnapshot'
+        toParticipant:
+          $ref: '#/components/schemas/SettlementParticipantSnapshot'
+        amountMinor:
+          type: integer
+          format: int64
+          minimum: 1
+    SettlementCurrencySummary:
+      type: object
+      additionalProperties: false
+      required:
+        - currency
+        - totalPaidMinor
+        - totalShareMinor
+        - balances
+        - suggestedTransfers
+      properties:
+        currency:
+          $ref: '#/components/schemas/SupportedCurrency'
+        totalPaidMinor:
+          type: integer
+          format: int64
+          minimum: 0
+        totalShareMinor:
+          type: integer
+          format: int64
+          minimum: 0
+        balances:
+          type: array
+          items:
+            $ref: '#/components/schemas/SettlementBalance'
+        suggestedTransfers:
+          type: array
+          items:
+            $ref: '#/components/schemas/SettlementTransfer'
+    GetTripSettlementResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - tripId
+        - defaultCurrency
+        - currencySummaries
+      properties:
+        tripId:
+          type: string
+        defaultCurrency:
+          $ref: '#/components/schemas/SupportedCurrency'
+        currencySummaries:
+          type: array
+          items:
+            $ref: '#/components/schemas/SettlementCurrencySummary'
     TripParticipant:
       type: object
       required:

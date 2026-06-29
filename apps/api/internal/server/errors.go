@@ -45,6 +45,23 @@ func writeTripDetailError(w http.ResponseWriter, err error) {
 	}
 }
 
+func writeTripSettlementError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, trip.ErrValidation):
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid trip id", nil)
+	case errors.Is(err, trip.ErrUnauthorized):
+		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "unauthorized", nil)
+	case errors.Is(err, trip.ErrForbidden):
+		writeError(w, http.StatusForbidden, "FORBIDDEN", "forbidden", nil)
+	case errors.Is(err, trip.ErrNotFound):
+		writeError(w, http.StatusNotFound, "NOT_FOUND", "trip not found", nil)
+	case errors.Is(err, trip.ErrSettlementDataInconsistent):
+		writeError(w, http.StatusConflict, "SETTLEMENT_DATA_INCONSISTENT", "정산 데이터를 계산할 수 없어요. 지출 내역을 다시 확인해주세요.", nil)
+	default:
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error", nil)
+	}
+}
+
 func writeTripDayScheduleError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, trip.ErrValidation):

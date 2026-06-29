@@ -1282,6 +1282,132 @@ func TestListTripParticipantsForbidden(t *testing.T) {
 	}
 }
 
+func TestGetTripSettlementHandler(t *testing.T) {
+	backend := newFakeAuthBackend()
+	accessToken := loginTestUser(t, backend)
+	tripID := createTestTrip(t, backend, accessToken)
+	ownerParticipant := backend.participants[tripID][0]
+	memberParticipantID := testUUID(2202)
+	backend.participants[tripID] = append(backend.participants[tripID], tripdomain.Participant{
+		ID:          memberParticipantID,
+		TripID:      tripID,
+		UserID:      "user-2",
+		Role:        tripdomain.RoleMember,
+		DisplayName: "지영",
+		JoinedAt:    ownerParticipant.JoinedAt.Add(time.Hour),
+	})
+
+	ownerID := ownerParticipant.ID
+	backend.dayExpenses[tripID+":2026-07-10"] = []tripdomain.DayExpenseListItem{
+		{
+			ID:          testUUID(3301),
+			AmountMinor: 1000,
+			Currency:    "JPY",
+			Payer:       tripdomain.ExpenseParticipantDisplay{ParticipantID: &ownerID, DisplayName: "민수", Source: tripdomain.ExpenseDisplaySourceLive},
+			Splits: []tripdomain.DayExpenseSplitListItem{
+				{SplitOrder: 1, Participant: tripdomain.ExpenseParticipantDisplay{ParticipantID: &ownerID, DisplayName: "민수", Source: tripdomain.ExpenseDisplaySourceLive}, AmountMinor: 500},
+				{SplitOrder: 2, Participant: tripdomain.ExpenseParticipantDisplay{ParticipantID: &memberParticipantID, DisplayName: "지영", Source: tripdomain.ExpenseDisplaySourceLive}, AmountMinor: 500},
+			},
+			CreatedAt: time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC),
+		},
+	}
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/trips/"+tripID+"/settlement", nil)
+	request.Header.Set("Authorization", "Bearer "+accessToken)
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusOK, recorder.Code, recorder.Body.String())
+	}
+	var body struct {
+		TripID            string `json:"tripId"`
+		DefaultCurrency   string `json:"defaultCurrency"`
+		CurrencySummaries []struct {
+			Currency        string `json:"currency"`
+			TotalPaidMinor  int64  `json:"totalPaidMinor"`
+			TotalShareMinor int64  `json:"totalShareMinor"`
+			Balances        []struct {
+				Participant struct {
+					ParticipantID     *string `json:"participantId"`
+					DisplayName       string  `json:"displayName"`
+					ParticipantStatus string  `json:"participantStatus"`
+				} `json:"participant"`
+				PaidMinor  int64 `json:"paidMinor"`
+				ShareMinor int64 `json:"shareMinor"`
+				NetMinor   int64 `json:"netMinor"`
+			} `json:"balances"`
+			SuggestedTransfers []struct {
+				AmountMinor     int64 `json:"amountMinor"`
+				FromParticipant struct {
+					ParticipantID *string `json:"participantId"`
+					DisplayName   string  `json:"displayName"`
+				} `json:"fromParticipant"`
+				ToParticipant struct {
+					ParticipantID *string `json:"participantId"`
+					DisplayName   string  `json:"displayName"`
+				} `json:"toParticipant"`
+			} `json:"suggestedTransfers"`
+		} `json:"currencySummaries"`
+	}
+	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+		t.Fatalf("decode settlement response: %v", err)
+	}
+	if body.TripID != tripID || body.DefaultCurrency != "JPY" || len(body.CurrencySummaries) != 1 {
+		t.Fatalf("unexpected settlement body: %#v", body)
+	}
+	summary := body.CurrencySummaries[0]
+	if summary.Currency != "JPY" || summary.TotalPaidMinor != 1000 || summary.TotalShareMinor != 1000 || len(summary.Balances) != 2 || len(summary.SuggestedTransfers) != 1 {
+		t.Fatalf("unexpected settlement summary: %#v", summary)
+	}
+	if summary.SuggestedTransfers[0].FromParticipant.DisplayName != "지영" || summary.SuggestedTransfers[0].ToParticipant.DisplayName != "민수" || summary.SuggestedTransfers[0].AmountMinor != 500 {
+		t.Fatalf("unexpected transfer: %#v", summary.SuggestedTransfers[0])
+	}
+}
+
+func TestGetTripSettlementDataInconsistent(t *testing.T) {
+	backend := newFakeAuthBackend()
+	accessToken := loginTestUser(t, backend)
+	tripID := createTestTrip(t, backend, accessToken)
+	ownerParticipant := backend.participants[tripID][0]
+	ownerID := ownerParticipant.ID
+	backend.dayExpenses[tripID+":2026-07-10"] = []tripdomain.DayExpenseListItem{
+		{
+			ID:          testUUID(3301),
+			AmountMinor: 1000,
+			Currency:    "JPY",
+			Payer:       tripdomain.ExpenseParticipantDisplay{ParticipantID: &ownerID, DisplayName: "민수", Source: tripdomain.ExpenseDisplaySourceLive},
+			Splits: []tripdomain.DayExpenseSplitListItem{
+				{SplitOrder: 1, Participant: tripdomain.ExpenseParticipantDisplay{ParticipantID: &ownerID, DisplayName: "민수", Source: tripdomain.ExpenseDisplaySourceLive}, AmountMinor: 999},
+			},
+			CreatedAt: time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC),
+		},
+	}
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/trips/"+tripID+"/settlement", nil)
+	request.Header.Set("Authorization", "Bearer "+accessToken)
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusConflict {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusConflict, recorder.Code, recorder.Body.String())
+	}
+	var body struct {
+		Error struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+		t.Fatalf("decode error response: %v", err)
+	}
+	if body.Error.Code != "SETTLEMENT_DATA_INCONSISTENT" {
+		t.Fatalf("unexpected error body: %#v", body)
+	}
+}
+
 func TestRemoveTripParticipantHandlerRemovesMemberAndAllowsReinvite(t *testing.T) {
 	backend := newFakeAuthBackend()
 	ownerToken := loginTestUser(t, backend)
@@ -4366,6 +4492,55 @@ func (b *fakeAuthBackend) ListDayExpensesByTripDay(_ context.Context, tripID str
 		return expenses[left].CreatedAt.After(expenses[right].CreatedAt)
 	})
 	return expenses, nil
+}
+
+func (b *fakeAuthBackend) GetTripSettlementInput(_ context.Context, tripID string) (tripdomain.SettlementInput, error) {
+	participants := make([]tripdomain.SettlementParticipantInput, 0, len(b.participants[tripID]))
+	for _, participant := range b.participants[tripID] {
+		participants = append(participants, tripdomain.SettlementParticipantInput{
+			ParticipantID: participant.ID,
+			DisplayName:   participant.DisplayName,
+			JoinedAt:      participant.JoinedAt,
+		})
+	}
+
+	expenses := make([]tripdomain.SettlementExpenseInput, 0)
+	prefix := tripID + ":"
+	for key, dayExpenses := range b.dayExpenses {
+		if !strings.HasPrefix(key, prefix) {
+			continue
+		}
+		for _, dayExpense := range dayExpenses {
+			splits := make([]tripdomain.SettlementSplitInput, 0, len(dayExpense.Splits))
+			for _, split := range dayExpense.Splits {
+				splits = append(splits, tripdomain.SettlementSplitInput{
+					ParticipantID:   copyStringPtr(split.Participant.ParticipantID),
+					DisplayName:     split.Participant.DisplayName,
+					ParticipantLive: split.Participant.ParticipantID != nil,
+					AmountMinor:     split.AmountMinor,
+					SplitOrder:      split.SplitOrder,
+				})
+			}
+			expenses = append(expenses, tripdomain.SettlementExpenseInput{
+				ExpenseID:            dayExpense.ID,
+				Currency:             dayExpense.Currency,
+				AmountMinor:          dayExpense.AmountMinor,
+				PayerParticipantID:   copyStringPtr(dayExpense.Payer.ParticipantID),
+				PayerDisplayName:     dayExpense.Payer.DisplayName,
+				PayerParticipantLive: dayExpense.Payer.ParticipantID != nil,
+				Splits:               splits,
+			})
+		}
+	}
+	return tripdomain.SettlementInput{Participants: participants, Expenses: expenses}, nil
+}
+
+func copyStringPtr(value *string) *string {
+	if value == nil || *value == "" {
+		return nil
+	}
+	copyValue := *value
+	return &copyValue
 }
 
 func (b *fakeAuthBackend) GetExpenseByTripDayAndID(_ context.Context, tripID string, tripDayID string, expenseID string) (tripdomain.Expense, bool, error) {

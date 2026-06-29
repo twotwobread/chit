@@ -1,3 +1,16 @@
+import type {
+  GetTripSettlementResponse,
+  SettlementCurrencySummary as ApiSettlementCurrencySummary,
+} from '@i-um/api-contract';
+
+export type AuthoritativeTripSettlement = GetTripSettlementResponse;
+
+export function getAuthoritativeSettlementCurrencySummaries(
+  settlement: GetTripSettlementResponse,
+): ApiSettlementCurrencySummary[] {
+  return settlement.currencySummaries;
+}
+
 export type SettlementParticipant = {
   id: string;
   name: string;

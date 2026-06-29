@@ -666,6 +666,56 @@ func (s *Store) ListDayExpensesByTripDay(ctx context.Context, tripID string, tri
 	return expenses, nil
 }
 
+func (s *Store) GetTripSettlementInput(ctx context.Context, tripID string) (trip.SettlementInput, error) {
+	tripUUID := mustUUID(tripID)
+	participantRows, err := s.queries.ListSettlementParticipantsByTrip(ctx, tripUUID)
+	if err != nil {
+		return trip.SettlementInput{}, err
+	}
+	participants := make([]trip.SettlementParticipantInput, 0, len(participantRows))
+	for _, row := range participantRows {
+		participants = append(participants, trip.SettlementParticipantInput{
+			ParticipantID: row.ID,
+			DisplayName:   row.DisplayName,
+			JoinedAt:      row.JoinedAt.Time,
+		})
+	}
+
+	settlementRows, err := s.queries.ListSettlementRowsByTrip(ctx, tripUUID)
+	if err != nil {
+		return trip.SettlementInput{}, err
+	}
+	expenseIndexByID := make(map[string]int, len(settlementRows))
+	expenses := make([]trip.SettlementExpenseInput, 0)
+	for _, row := range settlementRows {
+		expenseIndex, ok := expenseIndexByID[row.ExpenseID]
+		if !ok {
+			expenses = append(expenses, trip.SettlementExpenseInput{
+				ExpenseID:            row.ExpenseID,
+				Currency:             row.Currency,
+				AmountMinor:          row.ExpenseAmountMinor,
+				PayerParticipantID:   optionalString(row.PayerParticipantID),
+				PayerDisplayName:     row.PayerDisplayName,
+				PayerParticipantLive: row.PayerParticipantLive,
+				Splits:               []trip.SettlementSplitInput{},
+			})
+			expenseIndex = len(expenses) - 1
+			expenseIndexByID[row.ExpenseID] = expenseIndex
+		}
+		if row.SplitOrder > 0 {
+			expenses[expenseIndex].Splits = append(expenses[expenseIndex].Splits, trip.SettlementSplitInput{
+				ParticipantID:   optionalString(row.SplitParticipantID),
+				DisplayName:     row.SplitParticipantDisplayName,
+				ParticipantLive: row.SplitParticipantLive,
+				AmountMinor:     row.SplitAmountMinor,
+				SplitOrder:      int(row.SplitOrder),
+			})
+		}
+	}
+
+	return trip.SettlementInput{Participants: participants, Expenses: expenses}, nil
+}
+
 func (s *Store) GetExpenseByTripDayAndID(ctx context.Context, tripID string, tripDayID string, expenseID string) (trip.Expense, bool, error) {
 	expenseRow, err := s.queries.GetExpenseByTripDayAndID(ctx, db.GetExpenseByTripDayAndIDParams{
 		TripID:    mustUUID(tripID),

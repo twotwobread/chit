@@ -12,13 +12,14 @@ const (
 )
 
 var (
-	ErrValidation     = errors.New("validation error")
-	ErrUnauthorized   = errors.New("unauthorized")
-	ErrForbidden      = errors.New("forbidden")
-	ErrNotFound       = errors.New("not found")
-	ErrConflict       = errors.New("conflict")
-	ErrInviteNotFound = errors.New("invite not found")
-	ErrInviteExpired  = errors.New("invite expired")
+	ErrValidation                 = errors.New("validation error")
+	ErrUnauthorized               = errors.New("unauthorized")
+	ErrForbidden                  = errors.New("forbidden")
+	ErrNotFound                   = errors.New("not found")
+	ErrConflict                   = errors.New("conflict")
+	ErrSettlementDataInconsistent = errors.New("settlement data inconsistent")
+	ErrInviteNotFound             = errors.New("invite not found")
+	ErrInviteExpired              = errors.New("invite expired")
 )
 
 type Creator struct {
@@ -457,6 +458,74 @@ type DayLodgingPlace struct {
 	Place TripPlaceSummary
 }
 
+const (
+	SettlementParticipantStatusCurrent = "current"
+	SettlementParticipantStatusRemoved = "removed"
+)
+
+type SettlementParticipantSnapshot struct {
+	ParticipantID     *string
+	DisplayName       string
+	ParticipantStatus string
+}
+
+type SettlementBalance struct {
+	Participant SettlementParticipantSnapshot
+	PaidMinor   int64
+	ShareMinor  int64
+	NetMinor    int64
+}
+
+type SettlementTransfer struct {
+	FromParticipant SettlementParticipantSnapshot
+	ToParticipant   SettlementParticipantSnapshot
+	AmountMinor     int64
+}
+
+type SettlementCurrencySummary struct {
+	Currency           string
+	TotalPaidMinor     int64
+	TotalShareMinor    int64
+	Balances           []SettlementBalance
+	SuggestedTransfers []SettlementTransfer
+}
+
+type GetTripSettlementResult struct {
+	TripID            string
+	DefaultCurrency   string
+	CurrencySummaries []SettlementCurrencySummary
+}
+
+type SettlementInput struct {
+	Participants []SettlementParticipantInput
+	Expenses     []SettlementExpenseInput
+}
+
+type SettlementParticipantInput struct {
+	ParticipantID string
+	DisplayName   string
+	JoinedAt      time.Time
+}
+
+type SettlementExpenseInput struct {
+	ExpenseID             string
+	Currency              string
+	AmountMinor           int64
+	PayerParticipantID    *string
+	PayerDisplayName      string
+	PayerParticipantLive  bool
+	PayerParticipantOrder int
+	Splits                []SettlementSplitInput
+}
+
+type SettlementSplitInput struct {
+	ParticipantID   *string
+	DisplayName     string
+	ParticipantLive bool
+	AmountMinor     int64
+	SplitOrder      int
+}
+
 type ListItem struct {
 	ID               string
 	Name             string
@@ -491,6 +560,7 @@ type Repository interface {
 	DeleteDayLodgingPlace(ctx context.Context, tripID string, tripDayID string) error
 	ListScheduleItemsByTripDay(ctx context.Context, tripID string, tripDayID string) ([]ScheduleItem, error)
 	ListDayExpensesByTripDay(ctx context.Context, tripID string, tripDayID string) ([]DayExpenseListItem, error)
+	GetTripSettlementInput(ctx context.Context, tripID string) (SettlementInput, error)
 	GetExpenseByTripDayAndID(ctx context.Context, tripID string, tripDayID string, expenseID string) (Expense, bool, error)
 	UpdateExpense(ctx context.Context, record UpdateExpenseRecord) (Expense, error)
 	DeleteExpenseByTripDayAndID(ctx context.Context, tripID string, tripDayID string, expenseID string) (bool, error)

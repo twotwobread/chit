@@ -78,6 +78,26 @@ func (s apiServer) GetTripDetail(w http.ResponseWriter, r *http.Request, tripId 
 	writeJSON(w, http.StatusOK, getTripDetailResponseToOpenAPI(result))
 }
 
+func (s apiServer) GetTripSettlement(w http.ResponseWriter, r *http.Request, tripId string) {
+	if s.auth == nil || s.trips == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "trip settlement is not configured", nil)
+		return
+	}
+
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	result, err := s.trips.GetTripSettlement(r.Context(), authContext.UserID, tripId)
+	if err != nil {
+		writeTripSettlementError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, getTripSettlementResponseToOpenAPI(result))
+}
+
 func (s apiServer) CreateTripInvite(w http.ResponseWriter, r *http.Request, tripId string) {
 	if s.auth == nil || s.trips == nil {
 		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "trip invite creation is not configured", nil)

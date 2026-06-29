@@ -162,6 +162,41 @@ LEFT JOIN trip_participants participant
 WHERE es.expense_id = ANY(sqlc.arg(expense_ids)::uuid[])
 ORDER BY es.expense_id ASC, es.split_order ASC;
 
+-- name: ListSettlementParticipantsByTrip :many
+SELECT
+  id::text,
+  display_name,
+  joined_at
+FROM trip_participants
+WHERE trip_id = sqlc.arg(trip_id)::uuid
+ORDER BY joined_at ASC, id ASC;
+
+-- name: ListSettlementRowsByTrip :many
+SELECT
+  e.id::text AS expense_id,
+  e.currency,
+  e.amount_minor AS expense_amount_minor,
+  COALESCE(payer.id::text, '')::text AS payer_participant_id,
+  COALESCE(payer.display_name, e.payer_display_name, '여행자')::text AS payer_display_name,
+  (payer.id IS NOT NULL)::boolean AS payer_participant_live,
+  COALESCE(es.split_order, 0)::integer AS split_order,
+  COALESCE(split_participant.id::text, '')::text AS split_participant_id,
+  COALESCE(split_participant.display_name, es.participant_display_name, '여행자')::text AS split_participant_display_name,
+  (split_participant.id IS NOT NULL)::boolean AS split_participant_live,
+  COALESCE(es.amount_minor, 0)::bigint AS split_amount_minor
+FROM expenses e
+LEFT JOIN trip_participants payer
+  ON payer.id = e.payer_participant_id
+ AND payer.trip_id = e.trip_id
+LEFT JOIN expense_splits es
+  ON es.expense_id = e.id
+LEFT JOIN trip_participants split_participant
+  ON split_participant.id = es.participant_id
+ AND split_participant.trip_id = e.trip_id
+WHERE e.trip_id = sqlc.arg(trip_id)::uuid
+  AND e.anchor_type IN ('trip', 'trip_day', 'schedule_item')
+ORDER BY e.currency ASC, e.created_at ASC, e.id ASC, es.split_order ASC;
+
 -- name: GetExpenseByTripDayAndID :one
 SELECT
   e.id::text AS id,

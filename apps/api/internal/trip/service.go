@@ -402,6 +402,39 @@ func (s *Service) ListParticipants(ctx context.Context, userID string, tripID st
 	return participants, nil
 }
 
+func (s *Service) GetTripSettlement(ctx context.Context, userID string, tripID string) (GetTripSettlementResult, error) {
+	if strings.TrimSpace(userID) == "" {
+		return GetTripSettlementResult{}, ErrUnauthorized
+	}
+
+	tripID = strings.TrimSpace(tripID)
+	if !isUUID(tripID) {
+		return GetTripSettlementResult{}, ErrValidation
+	}
+
+	foundTrip, ok, err := s.repo.GetTripByID(ctx, tripID)
+	if err != nil {
+		return GetTripSettlementResult{}, err
+	}
+	if !ok {
+		return GetTripSettlementResult{}, ErrNotFound
+	}
+
+	isParticipant, err := s.repo.IsTripParticipant(ctx, tripID, userID)
+	if err != nil {
+		return GetTripSettlementResult{}, err
+	}
+	if !isParticipant {
+		return GetTripSettlementResult{}, ErrForbidden
+	}
+
+	input, err := s.repo.GetTripSettlementInput(ctx, tripID)
+	if err != nil {
+		return GetTripSettlementResult{}, err
+	}
+	return BuildTripSettlement(foundTrip.ID, foundTrip.DefaultCurrency, input)
+}
+
 func (s *Service) GetDayScheduleItems(ctx context.Context, userID string, tripID string, tripDayID string) (GetDayScheduleItemsResult, error) {
 	day, err := s.activeTripDay(ctx, userID, tripID, tripDayID)
 	if err != nil {
@@ -1181,6 +1214,274 @@ func NormalizeParticipantDisplayName(value string) string {
 		return "여행자"
 	}
 	return name
+}
+
+func BuildTripSettlement(tripID string, defaultCurrency string, input SettlementInput) (GetTripSettlementResult, error) {
+	currentParticipants := orderedSettlementParticipants(input.Participants)
+	participantByID := make(map[string]SettlementParticipantInput, len(currentParticipants))
+	for _, participant := range currentParticipants {
+		participantByID[participant.ParticipantID] = participant
+	}
+
+	summariesByCurrency := make(map[string]*settlementCurrencyAccumulator)
+	for _, expense := range input.Expenses {
+		if expense.AmountMinor < 1 || !isSupportedCurrency(expense.Currency) {
+			return GetTripSettlementResult{}, ErrSettlementDataInconsistent
+		}
+		summary := summariesByCurrency[expense.Currency]
+		if summary == nil {
+			summary = newSettlementCurrencyAccumulator(expense.Currency, currentParticipants)
+			summariesByCurrency[expense.Currency] = summary
+		}
+		summary.totalPaidMinor += expense.AmountMinor
+		payerKey, payerRow := settlementRowForSnapshot(expense.PayerParticipantID, expense.PayerDisplayName, expense.PayerParticipantLive, participantByID)
+		summary.addPaid(payerKey, payerRow, expense.AmountMinor)
+		for _, split := range expense.Splits {
+			if split.AmountMinor < 0 {
+				return GetTripSettlementResult{}, ErrSettlementDataInconsistent
+			}
+			summary.totalShareMinor += split.AmountMinor
+			if split.AmountMinor == 0 {
+				continue
+			}
+			splitKey, splitRow := settlementRowForSnapshot(split.ParticipantID, split.DisplayName, split.ParticipantLive, participantByID)
+			summary.addShare(splitKey, splitRow, split.AmountMinor)
+		}
+	}
+
+	currencies := make([]string, 0, len(summariesByCurrency))
+	for currency := range summariesByCurrency {
+		currencies = append(currencies, currency)
+	}
+	sort.Slice(currencies, func(i, j int) bool {
+		if currencies[i] == defaultCurrency && currencies[j] != defaultCurrency {
+			return true
+		}
+		if currencies[j] == defaultCurrency && currencies[i] != defaultCurrency {
+			return false
+		}
+		return currencies[i] < currencies[j]
+	})
+
+	result := GetTripSettlementResult{TripID: tripID, DefaultCurrency: defaultCurrency, CurrencySummaries: []SettlementCurrencySummary{}}
+	for _, currency := range currencies {
+		summary, err := summariesByCurrency[currency].build()
+		if err != nil {
+			return GetTripSettlementResult{}, err
+		}
+		result.CurrencySummaries = append(result.CurrencySummaries, summary)
+	}
+	return result, nil
+}
+
+type settlementParticipantRow struct {
+	participant SettlementParticipantSnapshot
+	paidMinor   int64
+	shareMinor  int64
+	current     bool
+	joinedAt    time.Time
+	orderKey    string
+}
+
+type settlementCurrencyAccumulator struct {
+	currency        string
+	totalPaidMinor  int64
+	totalShareMinor int64
+	rows            map[string]*settlementParticipantRow
+}
+
+func newSettlementCurrencyAccumulator(currency string, currentParticipants []SettlementParticipantInput) *settlementCurrencyAccumulator {
+	rows := make(map[string]*settlementParticipantRow, len(currentParticipants))
+	for _, participant := range currentParticipants {
+		participantID := participant.ParticipantID
+		key := settlementCurrentKey(participantID)
+		rows[key] = &settlementParticipantRow{
+			participant: SettlementParticipantSnapshot{
+				ParticipantID:     &participantID,
+				DisplayName:       participantDisplayName(participant.DisplayName),
+				ParticipantStatus: SettlementParticipantStatusCurrent,
+			},
+			current:  true,
+			joinedAt: participant.JoinedAt,
+			orderKey: participant.ParticipantID,
+		}
+	}
+	return &settlementCurrencyAccumulator{currency: currency, rows: rows}
+}
+
+func (s *settlementCurrencyAccumulator) addPaid(key string, row settlementParticipantRow, amountMinor int64) {
+	existing := s.ensureRow(key, row)
+	existing.paidMinor += amountMinor
+}
+
+func (s *settlementCurrencyAccumulator) addShare(key string, row settlementParticipantRow, amountMinor int64) {
+	existing := s.ensureRow(key, row)
+	existing.shareMinor += amountMinor
+}
+
+func (s *settlementCurrencyAccumulator) ensureRow(key string, row settlementParticipantRow) *settlementParticipantRow {
+	if existing, ok := s.rows[key]; ok {
+		return existing
+	}
+	copyRow := row
+	s.rows[key] = &copyRow
+	return &copyRow
+}
+
+func (s *settlementCurrencyAccumulator) build() (SettlementCurrencySummary, error) {
+	if s.totalPaidMinor != s.totalShareMinor {
+		return SettlementCurrencySummary{}, ErrSettlementDataInconsistent
+	}
+
+	rows := make([]settlementParticipantRow, 0, len(s.rows))
+	var netTotal int64
+	for _, row := range s.rows {
+		netMinor := row.paidMinor - row.shareMinor
+		if !row.current && row.paidMinor == 0 && row.shareMinor == 0 && netMinor == 0 {
+			continue
+		}
+		rowCopy := *row
+		rows = append(rows, rowCopy)
+		netTotal += netMinor
+	}
+	if netTotal != 0 {
+		return SettlementCurrencySummary{}, ErrSettlementDataInconsistent
+	}
+
+	sort.SliceStable(rows, func(i, j int) bool {
+		if rows[i].current != rows[j].current {
+			return rows[i].current
+		}
+		if rows[i].current {
+			if !rows[i].joinedAt.Equal(rows[j].joinedAt) {
+				return rows[i].joinedAt.Before(rows[j].joinedAt)
+			}
+			return rows[i].orderKey < rows[j].orderKey
+		}
+		if rows[i].participant.DisplayName != rows[j].participant.DisplayName {
+			return rows[i].participant.DisplayName < rows[j].participant.DisplayName
+		}
+		return rows[i].orderKey < rows[j].orderKey
+	})
+
+	balances := make([]SettlementBalance, 0, len(rows))
+	for _, row := range rows {
+		balances = append(balances, SettlementBalance{
+			Participant: row.participant,
+			PaidMinor:   row.paidMinor,
+			ShareMinor:  row.shareMinor,
+			NetMinor:    row.paidMinor - row.shareMinor,
+		})
+	}
+
+	return SettlementCurrencySummary{
+		Currency:           s.currency,
+		TotalPaidMinor:     s.totalPaidMinor,
+		TotalShareMinor:    s.totalShareMinor,
+		Balances:           balances,
+		SuggestedTransfers: buildSettlementTransfers(balances),
+	}, nil
+}
+
+type settlementRemainingBalance struct {
+	balance   SettlementBalance
+	remaining int64
+	order     int
+}
+
+func buildSettlementTransfers(balances []SettlementBalance) []SettlementTransfer {
+	creditors := make([]settlementRemainingBalance, 0)
+	debtors := make([]settlementRemainingBalance, 0)
+	for index, balance := range balances {
+		switch {
+		case balance.NetMinor > 0:
+			creditors = append(creditors, settlementRemainingBalance{balance: balance, remaining: balance.NetMinor, order: index})
+		case balance.NetMinor < 0:
+			debtors = append(debtors, settlementRemainingBalance{balance: balance, remaining: -balance.NetMinor, order: index})
+		}
+	}
+	compare := func(left, right settlementRemainingBalance) bool {
+		if left.remaining != right.remaining {
+			return left.remaining > right.remaining
+		}
+		return left.order < right.order
+	}
+	sort.SliceStable(creditors, func(i, j int) bool { return compare(creditors[i], creditors[j]) })
+	sort.SliceStable(debtors, func(i, j int) bool { return compare(debtors[i], debtors[j]) })
+
+	transfers := make([]SettlementTransfer, 0)
+	debtorIndex := 0
+	creditorIndex := 0
+	for debtorIndex < len(debtors) && creditorIndex < len(creditors) {
+		amount := debtors[debtorIndex].remaining
+		if creditors[creditorIndex].remaining < amount {
+			amount = creditors[creditorIndex].remaining
+		}
+		if amount > 0 {
+			transfers = append(transfers, SettlementTransfer{
+				FromParticipant: debtors[debtorIndex].balance.Participant,
+				ToParticipant:   creditors[creditorIndex].balance.Participant,
+				AmountMinor:     amount,
+			})
+		}
+		debtors[debtorIndex].remaining -= amount
+		creditors[creditorIndex].remaining -= amount
+		if debtors[debtorIndex].remaining == 0 {
+			debtorIndex++
+		}
+		if creditors[creditorIndex].remaining == 0 {
+			creditorIndex++
+		}
+	}
+	return transfers
+}
+
+func orderedSettlementParticipants(participants []SettlementParticipantInput) []SettlementParticipantInput {
+	ordered := append([]SettlementParticipantInput(nil), participants...)
+	sort.SliceStable(ordered, func(i, j int) bool {
+		if !ordered[i].JoinedAt.Equal(ordered[j].JoinedAt) {
+			return ordered[i].JoinedAt.Before(ordered[j].JoinedAt)
+		}
+		return ordered[i].ParticipantID < ordered[j].ParticipantID
+	})
+	return ordered
+}
+
+func settlementRowForSnapshot(participantID *string, displayName string, participantLive bool, currentParticipants map[string]SettlementParticipantInput) (string, settlementParticipantRow) {
+	if participantID != nil && participantLive {
+		if participant, ok := currentParticipants[*participantID]; ok {
+			participantIDCopy := participant.ParticipantID
+			return settlementCurrentKey(participant.ParticipantID), settlementParticipantRow{
+				participant: SettlementParticipantSnapshot{
+					ParticipantID:     &participantIDCopy,
+					DisplayName:       participantDisplayName(participant.DisplayName),
+					ParticipantStatus: SettlementParticipantStatusCurrent,
+				},
+				current:  true,
+				joinedAt: participant.JoinedAt,
+				orderKey: participant.ParticipantID,
+			}
+		}
+	}
+
+	normalizedName := participantDisplayName(displayName)
+	return settlementRemovedKey(normalizedName), settlementParticipantRow{
+		participant: SettlementParticipantSnapshot{
+			ParticipantID:     nil,
+			DisplayName:       normalizedName,
+			ParticipantStatus: SettlementParticipantStatusRemoved,
+		},
+		current:  false,
+		orderKey: normalizedName,
+	}
+}
+
+func settlementCurrentKey(participantID string) string {
+	return "current:" + participantID
+}
+
+func settlementRemovedKey(displayName string) string {
+	return "removed:" + displayName
 }
 
 func SelectExpenseSplitParticipants(participants []ExpenseSplitParticipant, participantIDs []string) ([]ExpenseSplitParticipant, error) {

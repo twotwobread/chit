@@ -98,6 +98,12 @@ const (
 	Transit RoutePreviewResponseMode = "transit"
 )
 
+// Defines values for SettlementParticipantStatus.
+const (
+	Current SettlementParticipantStatus = "current"
+	Removed SettlementParticipantStatus = "removed"
+)
+
 // Defines values for SupportedCurrency.
 const (
 	EUR SupportedCurrency = "EUR"
@@ -407,6 +413,13 @@ type GetTripDetailResponse struct {
 	Trip               Trip                   `json:"trip"`
 }
 
+// GetTripSettlementResponse defines model for GetTripSettlementResponse.
+type GetTripSettlementResponse struct {
+	CurrencySummaries []SettlementCurrencySummary `json:"currencySummaries"`
+	DefaultCurrency   SupportedCurrency           `json:"defaultCurrency"`
+	TripId            string                      `json:"tripId"`
+}
+
 // GooglePlaceSearchResult defines model for GooglePlaceSearchResult.
 type GooglePlaceSearchResult struct {
 	DisplayName      string `json:"displayName"`
@@ -645,6 +658,45 @@ type SetDayLodgingPlaceRequest struct {
 type SetDayLodgingPlaceResponse struct {
 	Day          TripDay          `json:"day"`
 	LodgingPlace TripPlaceSummary `json:"lodgingPlace"`
+}
+
+// SettlementBalance defines model for SettlementBalance.
+type SettlementBalance struct {
+	// NetMinor Positive means the participant should receive; negative means they should pay.
+	NetMinor    int64                         `json:"netMinor"`
+	PaidMinor   int64                         `json:"paidMinor"`
+	Participant SettlementParticipantSnapshot `json:"participant"`
+	ShareMinor  int64                         `json:"shareMinor"`
+}
+
+// SettlementCurrencySummary defines model for SettlementCurrencySummary.
+type SettlementCurrencySummary struct {
+	Balances           []SettlementBalance  `json:"balances"`
+	Currency           SupportedCurrency    `json:"currency"`
+	SuggestedTransfers []SettlementTransfer `json:"suggestedTransfers"`
+	TotalPaidMinor     int64                `json:"totalPaidMinor"`
+	TotalShareMinor    int64                `json:"totalShareMinor"`
+}
+
+// SettlementParticipantSnapshot defines model for SettlementParticipantSnapshot.
+type SettlementParticipantSnapshot struct {
+	DisplayName string `json:"displayName"`
+
+	// ParticipantId Current participant id, or null for removed/unresolved historical rows.
+	ParticipantId *string `json:"participantId"`
+
+	// ParticipantStatus Whether a settlement participant is a current trip participant or a removed/unresolved historical snapshot.
+	ParticipantStatus SettlementParticipantStatus `json:"participantStatus"`
+}
+
+// SettlementParticipantStatus Whether a settlement participant is a current trip participant or a removed/unresolved historical snapshot.
+type SettlementParticipantStatus string
+
+// SettlementTransfer defines model for SettlementTransfer.
+type SettlementTransfer struct {
+	AmountMinor     int64                         `json:"amountMinor"`
+	FromParticipant SettlementParticipantSnapshot `json:"fromParticipant"`
+	ToParticipant   SettlementParticipantSnapshot `json:"toParticipant"`
 }
 
 // SupportedCurrency defines model for SupportedCurrency.
@@ -965,6 +1017,9 @@ type ServerInterface interface {
 	// Remove a trip participant
 	// (DELETE /trips/{tripId}/participants/{participantId})
 	RemoveTripParticipant(w http.ResponseWriter, r *http.Request, tripId string, participantId string)
+	// Get trip settlement calculation
+	// (GET /trips/{tripId}/settlement)
+	GetTripSettlement(w http.ResponseWriter, r *http.Request, tripId string)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
@@ -1190,6 +1245,12 @@ func (_ Unimplemented) ListTripParticipants(w http.ResponseWriter, r *http.Reque
 // Remove a trip participant
 // (DELETE /trips/{tripId}/participants/{participantId})
 func (_ Unimplemented) RemoveTripParticipant(w http.ResponseWriter, r *http.Request, tripId string, participantId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Get trip settlement calculation
+// (GET /trips/{tripId}/settlement)
+func (_ Unimplemented) GetTripSettlement(w http.ResponseWriter, r *http.Request, tripId string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -2471,6 +2532,37 @@ func (siw *ServerInterfaceWrapper) RemoveTripParticipant(w http.ResponseWriter, 
 	handler.ServeHTTP(w, r)
 }
 
+// GetTripSettlement operation middleware
+func (siw *ServerInterfaceWrapper) GetTripSettlement(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetTripSettlement(w, r, tripId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 type UnescapedCookieParamError struct {
 	ParamName string
 	Err       error
@@ -2694,6 +2786,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Delete(options.BaseURL+"/trips/{tripId}/participants/{participantId}", wrapper.RemoveTripParticipant)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/trips/{tripId}/settlement", wrapper.GetTripSettlement)
 	})
 
 	return r

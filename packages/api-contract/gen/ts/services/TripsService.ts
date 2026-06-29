@@ -14,6 +14,7 @@ import type { CreateTripResponse } from '../models/CreateTripResponse';
 import type { GetDayScheduleItemsResponse } from '../models/GetDayScheduleItemsResponse';
 import type { GetExpenseResponse } from '../models/GetExpenseResponse';
 import type { GetTripDetailResponse } from '../models/GetTripDetailResponse';
+import type { GetTripSettlementResponse } from '../models/GetTripSettlementResponse';
 import type { ListDayExpensesResponse } from '../models/ListDayExpensesResponse';
 import type { ListTripParticipantsResponse } from '../models/ListTripParticipantsResponse';
 import type { ListTripsResponse } from '../models/ListTripsResponse';
@@ -199,6 +200,32 @@ export class TripsService {
                 401: `Unauthorized.`,
                 404: `Invite token not found.`,
                 410: `Invite token expired or deactivated.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
+     * Get trip settlement calculation
+     * Returns authoritative per-currency participant balances and deterministic suggested transfers for an authenticated current trip participant.
+     * @param tripId
+     * @returns GetTripSettlementResponse Trip settlement calculation.
+     * @throws ApiError
+     */
+    public static getTripSettlement(
+        tripId: string,
+    ): CancelablePromise<GetTripSettlementResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/trips/{tripId}/settlement',
+            path: {
+                'tripId': tripId,
+            },
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                403: `Forbidden.`,
+                404: `Trip not found.`,
+                409: `Settlement data is inconsistent.`,
                 500: `Unexpected server error.`,
             },
         });

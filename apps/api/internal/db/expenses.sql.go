@@ -698,6 +698,115 @@ func (q *Queries) ListQuickExpenseSplitParticipants(ctx context.Context, tripID 
 	return items, nil
 }
 
+const listSettlementParticipantsByTrip = `-- name: ListSettlementParticipantsByTrip :many
+SELECT
+  id::text,
+  display_name,
+  joined_at
+FROM trip_participants
+WHERE trip_id = $1::uuid
+ORDER BY joined_at ASC, id ASC
+`
+
+type ListSettlementParticipantsByTripRow struct {
+	ID          string
+	DisplayName string
+	JoinedAt    pgtype.Timestamptz
+}
+
+func (q *Queries) ListSettlementParticipantsByTrip(ctx context.Context, tripID pgtype.UUID) ([]ListSettlementParticipantsByTripRow, error) {
+	rows, err := q.db.Query(ctx, listSettlementParticipantsByTrip, tripID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListSettlementParticipantsByTripRow
+	for rows.Next() {
+		var i ListSettlementParticipantsByTripRow
+		if err := rows.Scan(&i.ID, &i.DisplayName, &i.JoinedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listSettlementRowsByTrip = `-- name: ListSettlementRowsByTrip :many
+SELECT
+  e.id::text AS expense_id,
+  e.currency,
+  e.amount_minor AS expense_amount_minor,
+  COALESCE(payer.id::text, '')::text AS payer_participant_id,
+  COALESCE(payer.display_name, e.payer_display_name, '여행자')::text AS payer_display_name,
+  (payer.id IS NOT NULL)::boolean AS payer_participant_live,
+  COALESCE(es.split_order, 0)::integer AS split_order,
+  COALESCE(split_participant.id::text, '')::text AS split_participant_id,
+  COALESCE(split_participant.display_name, es.participant_display_name, '여행자')::text AS split_participant_display_name,
+  (split_participant.id IS NOT NULL)::boolean AS split_participant_live,
+  COALESCE(es.amount_minor, 0)::bigint AS split_amount_minor
+FROM expenses e
+LEFT JOIN trip_participants payer
+  ON payer.id = e.payer_participant_id
+ AND payer.trip_id = e.trip_id
+LEFT JOIN expense_splits es
+  ON es.expense_id = e.id
+LEFT JOIN trip_participants split_participant
+  ON split_participant.id = es.participant_id
+ AND split_participant.trip_id = e.trip_id
+WHERE e.trip_id = $1::uuid
+  AND e.anchor_type IN ('trip', 'trip_day', 'schedule_item')
+ORDER BY e.currency ASC, e.created_at ASC, e.id ASC, es.split_order ASC
+`
+
+type ListSettlementRowsByTripRow struct {
+	ExpenseID                   string
+	Currency                    string
+	ExpenseAmountMinor          int64
+	PayerParticipantID          string
+	PayerDisplayName            string
+	PayerParticipantLive        bool
+	SplitOrder                  int32
+	SplitParticipantID          string
+	SplitParticipantDisplayName string
+	SplitParticipantLive        bool
+	SplitAmountMinor            int64
+}
+
+func (q *Queries) ListSettlementRowsByTrip(ctx context.Context, tripID pgtype.UUID) ([]ListSettlementRowsByTripRow, error) {
+	rows, err := q.db.Query(ctx, listSettlementRowsByTrip, tripID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListSettlementRowsByTripRow
+	for rows.Next() {
+		var i ListSettlementRowsByTripRow
+		if err := rows.Scan(
+			&i.ExpenseID,
+			&i.Currency,
+			&i.ExpenseAmountMinor,
+			&i.PayerParticipantID,
+			&i.PayerDisplayName,
+			&i.PayerParticipantLive,
+			&i.SplitOrder,
+			&i.SplitParticipantID,
+			&i.SplitParticipantDisplayName,
+			&i.SplitParticipantLive,
+			&i.SplitAmountMinor,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateExpense = `-- name: UpdateExpense :one
 UPDATE expenses
 SET
