@@ -1,35 +1,28 @@
 import { useCallback, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import type { Href } from 'expo-router';
 
-import { ApiError } from '@i-um/api-contract';
-
-import { MobileAuthError } from '../../../../lib/auth/client';
 import { theme } from '../../../../lib/design';
-import { ExpenseRow } from '../../../../lib/trip-ui/ExpenseRow';
+import { TransferRow } from '../../../../lib/trip-ui/TransferRow';
 import { TripListCard, TripScreen, TripScreenHeader, TripStateCard } from '../../../../lib/trip-ui/TripScreenScaffold';
-import { getTripDetail, listDayExpenses } from '../../../../lib/trips/client';
-import {
-  buildDayExpensesViewModel,
-  dayExpensesFailureState,
-  type DayExpensesFailureViewModel,
-  type DayExpensesViewModel,
-} from '../../../../lib/trips/day-expenses';
+import { getTripDetail, getTripSettlement } from '../../../../lib/trips/client';
 import { buildDayItineraryRoute } from '../../../../lib/trips/day-itinerary';
 import {
-  buildTripTabUnavailableViewModel,
-  findTripCalendarDay,
-  type TripTabUnavailableViewModel,
-} from '../../../../lib/trips/trip-tabs';
+  buildSettlementTransferViewModel,
+  settlementTransferFailureState,
+  type SettlementTransferFailureViewModel,
+  type SettlementTransferViewModel,
+} from '../../../../lib/trips/settlement';
 import { localDateString } from '../../../../lib/trips/status';
+import { findTripCalendarDay } from '../../../../lib/trips/trip-tabs';
 
 type TripSettleState =
   | { status: 'loading' }
-  | { status: 'success'; viewModel: DayExpensesViewModel; dayRoute: ReturnType<typeof buildDayItineraryRoute> }
-  | { status: 'unavailable'; viewModel: TripTabUnavailableViewModel }
+  | { status: 'settlement'; viewModel: SettlementTransferViewModel }
   | { status: 'auth' }
   | { status: 'notFound' }
-  | { status: 'error'; error: DayExpensesFailureViewModel };
+  | { status: 'error'; error: Extract<SettlementTransferFailureViewModel, { status: 'error' }> };
 
 export default function TripSettleTabScreen() {
   const { tripId: tripIdParam } = useLocalSearchParams<{ tripId?: string | string[] }>();
@@ -44,19 +37,11 @@ export default function TripSettleTabScreen() {
 
     setState({ status: 'loading' });
     try {
-      const detail = await getTripDetail(tripId);
+      const [detail, settlement] = await Promise.all([getTripDetail(tripId), getTripSettlement(tripId)]);
       const currentDay = findTripCalendarDay(detail.days, localDateString());
-      if (!currentDay) {
-        setState({ status: 'unavailable', viewModel: buildTripTabUnavailableViewModel('settle', tripId) });
-        return;
-      }
+      const todayRoute = currentDay ? String(buildDayItineraryRoute(tripId, currentDay.id)) : null;
 
-      const expenses = await listDayExpenses(tripId, currentDay.id);
-      setState({
-        status: 'success',
-        dayRoute: buildDayItineraryRoute(tripId, currentDay.id),
-        viewModel: buildDayExpensesViewModel({ date: currentDay.id, expenses: expenses.expenses, tripId }),
-      });
+      setState({ status: 'settlement', viewModel: buildSettlementTransferViewModel({ settlement, todayRoute }) });
     } catch (error) {
       setState(settleFailureState(error));
     }
@@ -70,9 +55,9 @@ export default function TripSettleTabScreen() {
 
   return (
     <TripScreen>
-      <TripScreenHeader helper="오늘 기록된 지출을 확인해 정산 흐름을 준비해요." title="정산" />
+      <TripScreenHeader helper="누가 누구에게 얼마를 보내면 되는지 확인해요." title="정산" />
 
-      {state.status === 'loading' ? <TripStateCard loading title="지출을 불러오는 중..." /> : null}
+      {state.status === 'loading' ? <TripStateCard loading title="정산을 불러오는 중..." /> : null}
       {state.status === 'auth' ? (
         <TripStateCard
           primaryAction={{ label: '로그인하기', onPress: () => router.replace('/login') }}
@@ -93,84 +78,95 @@ export default function TripSettleTabScreen() {
           title={state.error.title}
         />
       ) : null}
-      {state.status === 'unavailable' ? <UnavailableState viewModel={state.viewModel} /> : null}
-      {state.status === 'success' ? <SettleContent dayRoute={state.dayRoute} viewModel={state.viewModel} /> : null}
+      {state.status === 'settlement' ? <SettlementContent viewModel={state.viewModel} /> : null}
     </TripScreen>
   );
 }
 
-function SettleContent({
-  dayRoute,
-  viewModel,
-}: {
-  viewModel: DayExpensesViewModel;
-  dayRoute: ReturnType<typeof buildDayItineraryRoute>;
-}) {
+function SettlementContent({ viewModel }: { viewModel: SettlementTransferViewModel }) {
   if (viewModel.status === 'empty') {
+    const primaryAction = viewModel.primaryAction;
     return (
       <TripStateCard
-        helper="지출 등록은 Day 상세 화면에서 이어갈 수 있어요."
-        primaryAction={{ label: '오늘 일정 보기', onPress: () => router.push(dayRoute) }}
-        title={viewModel.emptyTitle}
+        helper={viewModel.helper}
+        primaryAction={
+          primaryAction
+            ? {
+                label: primaryAction.label,
+                onPress: () => router.push(primaryAction.route as Href),
+              }
+            : undefined
+        }
+        title={viewModel.title}
       />
     );
   }
 
   return (
-    <TripListCard>
-      <View style={styles.summary}>
-        <Text style={styles.summaryTitle}>{viewModel.title}</Text>
-        <Text style={styles.summaryHelper}>오늘 등록된 지출 {viewModel.rows.length}건</Text>
-      </View>
-      {viewModel.rows.map((row, index) => (
-        <ExpenseRow
-          amount={row.amountMinor}
-          category={row.category}
-          currency={row.currency}
-          first={index === 0}
-          key={row.id}
-          payerLabel={row.payerLabel}
-          splitLabel={row.splitLabel}
-          title={row.placeName}
-        />
-      ))}
-    </TripListCard>
-  );
-}
+    <View style={styles.successStack}>
+      <TripListCard>
+        <View style={styles.summary}>
+          <Text style={styles.summaryTitle}>{viewModel.summaryTitle}</Text>
+          <Text style={styles.summaryHelper}>{viewModel.summaryHelper}</Text>
+        </View>
+      </TripListCard>
 
-function UnavailableState({ viewModel }: { viewModel: TripTabUnavailableViewModel }) {
-  return (
-    <TripStateCard
-      helper={viewModel.helper}
-      primaryAction={{
-        label: viewModel.primaryAction.label,
-        onPress: () => router.push(viewModel.primaryAction.route),
-      }}
-      secondaryAction={{
-        label: viewModel.secondaryAction.label,
-        onPress: () => router.push(viewModel.secondaryAction.route),
-      }}
-      title={viewModel.title}
-    />
+      {viewModel.sections.map((section) => (
+        <TripListCard key={section.currency}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>{section.title}</Text>
+            <Text style={styles.sectionHelper}>{section.helper}</Text>
+          </View>
+          <View style={styles.transferList}>
+            {section.transfers.map((transfer, index) => (
+              <TransferRow
+                amount={transfer.amountMinor}
+                currency={section.currency}
+                fromName={transfer.fromName}
+                key={`${section.currency}-${index}-${transfer.fromName}-${transfer.toName}-${transfer.amountMinor}`}
+                toName={transfer.toName}
+              />
+            ))}
+          </View>
+        </TripListCard>
+      ))}
+    </View>
   );
 }
 
 function settleFailureState(error: unknown): TripSettleState {
-  if (error instanceof MobileAuthError && (error.code === 'UNAUTHORIZED' || error.code === 'INVALID_REFRESH_TOKEN')) {
+  const failure = settlementTransferFailureState(error);
+  if (failure.status === 'auth') {
     return { status: 'auth' };
   }
-  if (error instanceof ApiError) {
-    if (error.status === 401) {
-      return { status: 'auth' };
-    }
-    if (error.status === 400 || error.status === 403 || error.status === 404) {
-      return { status: 'notFound' };
-    }
+  if (failure.status === 'notFound') {
+    return { status: 'notFound' };
   }
-  return { status: 'error', error: dayExpensesFailureState() };
+  return { status: 'error', error: failure };
 }
 
 const styles = StyleSheet.create({
+  sectionHeader: {
+    gap: theme.space[1],
+    paddingHorizontal: theme.space[1],
+    paddingVertical: theme.space[4],
+  },
+  sectionHelper: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.caption,
+  },
+  sectionTitle: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.subhead,
+    fontWeight: theme.font.weight.bold,
+  },
+  successStack: {
+    gap: theme.space[4],
+    maxWidth: theme.layout.cardMaxW,
+    width: '100%',
+  },
   summary: {
     gap: theme.space[1],
     paddingHorizontal: theme.space[1],
@@ -179,12 +175,17 @@ const styles = StyleSheet.create({
   summaryHelper: {
     color: theme.color.textMuted,
     fontFamily: theme.font.family.regular,
-    fontSize: theme.font.size.caption,
+    fontSize: theme.font.size.body,
+    lineHeight: theme.font.size.body * theme.font.leading.normal,
   },
   summaryTitle: {
     color: theme.color.textStrong,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.subhead,
     fontWeight: theme.font.weight.bold,
+  },
+  transferList: {
+    gap: theme.space[3],
+    paddingBottom: theme.space[4],
   },
 });
