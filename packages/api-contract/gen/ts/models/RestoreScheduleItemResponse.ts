@@ -12,4 +12,3 @@ export type RestoreScheduleItemResponse = {
      */
     scheduleItems: Array<ScheduleItem>;
 };
-

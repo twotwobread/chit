@@ -6,4 +6,3 @@ import type { GooglePlaceSearchResult } from './GooglePlaceSearchResult';
 export type SearchGooglePlacesResponse = {
     results: Array<GooglePlaceSearchResult>;
 };
-

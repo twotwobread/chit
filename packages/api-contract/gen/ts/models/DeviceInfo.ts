@@ -6,4 +6,3 @@ export type DeviceInfo = {
     deviceName?: string | null;
     platform?: string | null;
 };
-

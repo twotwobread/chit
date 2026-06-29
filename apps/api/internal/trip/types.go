@@ -12,14 +12,15 @@ const (
 )
 
 var (
-	ErrValidation                 = errors.New("validation error")
-	ErrUnauthorized               = errors.New("unauthorized")
-	ErrForbidden                  = errors.New("forbidden")
-	ErrNotFound                   = errors.New("not found")
-	ErrConflict                   = errors.New("conflict")
-	ErrSettlementDataInconsistent = errors.New("settlement data inconsistent")
-	ErrInviteNotFound             = errors.New("invite not found")
-	ErrInviteExpired              = errors.New("invite expired")
+	ErrValidation                   = errors.New("validation error")
+	ErrUnauthorized                 = errors.New("unauthorized")
+	ErrForbidden                    = errors.New("forbidden")
+	ErrNotFound                     = errors.New("not found")
+	ErrConflict                     = errors.New("conflict")
+	ErrSettlementDataInconsistent   = errors.New("settlement data inconsistent")
+	ErrSettlementSummaryUnavailable = errors.New("settlement summary unavailable")
+	ErrInviteNotFound               = errors.New("invite not found")
+	ErrInviteExpired                = errors.New("invite expired")
 )
 
 type Creator struct {
@@ -496,6 +497,32 @@ type GetTripSettlementResult struct {
 	CurrencySummaries []SettlementCurrencySummary
 }
 
+type MySettlementDirection string
+
+const (
+	MySettlementDirectionSend    MySettlementDirection = "send"
+	MySettlementDirectionReceive MySettlementDirection = "receive"
+)
+
+type MySettlementCurrencySummary struct {
+	Currency  string
+	Direction MySettlementDirection
+	NetMinor  int64
+}
+
+type MySettlementTripSummary struct {
+	TripID            string
+	TripName          string
+	StartDate         string
+	EndDate           string
+	DefaultCurrency   string
+	CurrencySummaries []MySettlementCurrencySummary
+}
+
+type GetMySettlementSummaryResult struct {
+	Trips []MySettlementTripSummary
+}
+
 type SettlementInput struct {
 	Participants []SettlementParticipantInput
 	Expenses     []SettlementExpenseInput
@@ -528,6 +555,7 @@ type SettlementSplitInput struct {
 
 type ListItem struct {
 	ID               string
+	ParticipantID    string
 	Name             string
 	StartDate        string
 	EndDate          string

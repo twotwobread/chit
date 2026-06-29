@@ -11,4 +11,3 @@ export type TripPlaceSummary = {
     address: string;
     routablePlace: RoutablePlace | null;
 };
-

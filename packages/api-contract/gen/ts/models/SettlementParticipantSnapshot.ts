@@ -11,4 +11,3 @@ export type SettlementParticipantSnapshot = {
     displayName: string;
     participantStatus: SettlementParticipantStatus;
 };
-

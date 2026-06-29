@@ -8,4 +8,3 @@ export type DayExpenseSplitListItem = {
     participant: ExpenseParticipantDisplay;
     amountMinor: number;
 };
-

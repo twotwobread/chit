@@ -7,6 +7,7 @@ import type { AuthLoginResponse } from '../models/AuthLoginResponse';
 import type { AuthLogoutResponse } from '../models/AuthLogoutResponse';
 import type { AuthMeResponse } from '../models/AuthMeResponse';
 import type { AuthRefreshResponse } from '../models/AuthRefreshResponse';
+import type { GetMySettlementSummaryResponse } from '../models/GetMySettlementSummaryResponse';
 import type { OAuthLinkRequest } from '../models/OAuthLinkRequest';
 import type { OAuthLoginRequest } from '../models/OAuthLoginRequest';
 import type { RefreshTokenRequest } from '../models/RefreshTokenRequest';
@@ -91,6 +92,23 @@ export class AuthService {
             url: '/auth/logout',
             errors: {
                 401: `Unauthorized.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
+     * Return current user's settlement summary
+     * Returns trips where the authenticated current user has a non-zero per-currency settlement balance.
+     * @returns GetMySettlementSummaryResponse Current user's non-zero settlement summaries by trip.
+     * @throws ApiError
+     */
+    public static getMySettlementSummary(): CancelablePromise<GetMySettlementSummaryResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/me/settlement-summary',
+            errors: {
+                401: `Unauthorized.`,
+                409: `Settlement summary cannot be calculated.`,
                 500: `Unexpected server error.`,
             },
         });

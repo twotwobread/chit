@@ -6,4 +6,3 @@ import type { TripParticipantListItem } from './TripParticipantListItem';
 export type ListTripParticipantsResponse = {
     participants: Array<TripParticipantListItem>;
 };
-

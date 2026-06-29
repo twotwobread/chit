@@ -8,4 +8,3 @@ export type AuthTokens = {
     refreshToken: string;
     refreshTokenExpiresAt: string;
 };
-

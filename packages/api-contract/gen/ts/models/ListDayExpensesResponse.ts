@@ -6,4 +6,3 @@ import type { DayExpenseListItem } from './DayExpenseListItem';
 export type ListDayExpensesResponse = {
     expenses: Array<DayExpenseListItem>;
 };
-

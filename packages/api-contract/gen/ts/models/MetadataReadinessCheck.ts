@@ -6,4 +6,3 @@ export type MetadataReadinessCheck = {
     status: 'ok';
     schema: 'initialized';
 };
-

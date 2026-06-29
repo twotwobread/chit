@@ -10,4 +10,3 @@ export type OAuthLoginRequest = {
     credential: OAuthCredential;
     device?: DeviceInfo;
 };
-

@@ -9,4 +9,3 @@ export type ErrorResponse = {
         details: Array<Record<string, any>>;
     };
 };
-

@@ -28,4 +28,3 @@ export type UpdateExpenseRequest = {
      */
     scheduleItemId: string | null;
 };
-

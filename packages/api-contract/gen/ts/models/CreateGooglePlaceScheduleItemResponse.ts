@@ -8,4 +8,3 @@ export type CreateGooglePlaceScheduleItemResponse = {
     day: TripDay;
     scheduleItem: ScheduleItem;
 };
-

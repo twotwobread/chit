@@ -31,4 +31,3 @@ export type Expense = {
     splits: Array<ExpenseSplit>;
     createdAt: string;
 };
-

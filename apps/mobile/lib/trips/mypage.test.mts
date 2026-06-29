@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import type { TripListItem } from '@i-um/api-contract';
+import type { GetMySettlementSummaryResponse, TripListItem } from '@i-um/api-contract';
 
 import {
+  buildMySettlementSummaryViewModel,
   buildMyTripsSuccessViewModel,
   formatTripDateRange,
   participantCountLabel,
@@ -11,6 +12,13 @@ import {
   tripDetailPath,
   tripRoleLabel,
 } from './mypage.ts';
+
+function settlementSummary(overrides: Partial<GetMySettlementSummaryResponse> = {}): GetMySettlementSummaryResponse {
+  return {
+    trips: [],
+    ...overrides,
+  };
+}
 
 function trip(overrides: Partial<TripListItem>): TripListItem {
   return {
@@ -26,6 +34,62 @@ function trip(overrides: Partial<TripListItem>): TripListItem {
     ...overrides,
   };
 }
+
+test('builds empty MyPage settlement summary state', () => {
+  assert.deepEqual(buildMySettlementSummaryViewModel(settlementSummary()), {
+    helper: '보내거나 받을 금액이 있는 여행이 없어요.',
+    status: 'empty',
+    title: '정산할 여행이 없어요.',
+  });
+});
+
+test('builds populated MyPage settlement summary rows with per-currency labels in API order', () => {
+  const viewModel = buildMySettlementSummaryViewModel(
+    settlementSummary({
+      trips: [
+        {
+          tripId: 'trip-a',
+          tripName: '오사카',
+          startDate: '2026-07-10',
+          endDate: '2026-07-14',
+          defaultCurrency: 'KRW',
+          currencySummaries: [
+            { currency: 'USD', direction: 'receive', netMinor: 1234 },
+            { currency: 'KRW', direction: 'send', netMinor: 18500 },
+          ],
+        },
+      ],
+    }),
+  );
+
+  assert.equal(viewModel.status, 'ready');
+  assert.equal(viewModel.title, '정산 요약');
+  assert.equal(viewModel.helper, '보내거나 받을 금액이 있는 여행 1개');
+  assert.deepEqual(viewModel.trips, [
+    {
+      tripId: 'trip-a',
+      tripName: '오사카',
+      dateRangeLabel: '2026.07.10 ~ 2026.07.14',
+      route: '/trips/trip-a/settle',
+      currencySummaries: [
+        {
+          amountLabel: '$12.34',
+          currency: 'USD',
+          direction: 'receive',
+          directionLabel: '받을 금액',
+          summaryLabel: '받을 금액 $12.34',
+        },
+        {
+          amountLabel: '18,500원',
+          currency: 'KRW',
+          direction: 'send',
+          directionLabel: '보낼 금액',
+          summaryLabel: '보낼 금액 18,500원',
+        },
+      ],
+    },
+  ]);
+});
 
 test('omits the current trip shortcut model when no trip is ongoing', () => {
   const viewModel = buildMyTripsSuccessViewModel(

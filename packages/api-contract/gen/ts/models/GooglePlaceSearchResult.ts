@@ -8,4 +8,3 @@ export type GooglePlaceSearchResult = {
     formattedAddress: string;
     primaryType: string;
 };
-

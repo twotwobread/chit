@@ -18,4 +18,3 @@ export type ScheduleItem = {
     skippedAt: string | null;
     place: TripPlaceSummary;
 };
-

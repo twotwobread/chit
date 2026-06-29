@@ -6,4 +6,3 @@ import type { ScheduleItem } from './ScheduleItem';
 export type UpdateScheduleItemResponse = {
     scheduleItem: ScheduleItem;
 };
-

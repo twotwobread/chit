@@ -7,4 +7,3 @@ export type ExpenseSplit = {
     participant: ExpenseParticipantDisplay;
     amountMinor: number;
 };
-

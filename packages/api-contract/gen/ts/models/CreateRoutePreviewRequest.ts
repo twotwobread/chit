@@ -6,4 +6,3 @@ import type { GeoPoint } from './GeoPoint';
 export type CreateRoutePreviewRequest = {
     origin: GeoPoint;
 };
-

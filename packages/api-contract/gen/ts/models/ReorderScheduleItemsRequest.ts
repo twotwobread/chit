@@ -9,4 +9,3 @@ export type ReorderScheduleItemsRequest = {
      */
     moves: Array<ReorderDayScheduleMove>;
 };
-

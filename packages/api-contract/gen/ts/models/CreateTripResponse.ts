@@ -8,4 +8,3 @@ export type CreateTripResponse = {
     trip: Trip;
     ownerParticipant: TripParticipant;
 };
-

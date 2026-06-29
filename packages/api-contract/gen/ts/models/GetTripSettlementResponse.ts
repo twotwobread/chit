@@ -9,4 +9,3 @@ export type GetTripSettlementResponse = {
     defaultCurrency: SupportedCurrency;
     currencySummaries: Array<SettlementCurrencySummary>;
 };
-

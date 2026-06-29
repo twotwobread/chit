@@ -8,4 +8,3 @@ export type CreateManualScheduleItemResponse = {
     day: TripDay;
     scheduleItem: ScheduleItem;
 };
-

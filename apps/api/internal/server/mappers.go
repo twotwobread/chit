@@ -156,6 +156,29 @@ func settlementParticipantToOpenAPI(participant trip.SettlementParticipantSnapsh
 	}
 }
 
+func getMySettlementSummaryResponseToOpenAPI(result trip.GetMySettlementSummaryResult) openapi.GetMySettlementSummaryResponse {
+	trips := make([]openapi.MySettlementTripSummary, 0, len(result.Trips))
+	for _, tripSummary := range result.Trips {
+		currencySummaries := make([]openapi.MySettlementCurrencySummary, 0, len(tripSummary.CurrencySummaries))
+		for _, currencySummary := range tripSummary.CurrencySummaries {
+			currencySummaries = append(currencySummaries, openapi.MySettlementCurrencySummary{
+				Currency:  openapi.SupportedCurrency(currencySummary.Currency),
+				Direction: openapi.MySettlementDirection(currencySummary.Direction),
+				NetMinor:  currencySummary.NetMinor,
+			})
+		}
+		trips = append(trips, openapi.MySettlementTripSummary{
+			TripId:            tripSummary.TripID,
+			TripName:          tripSummary.TripName,
+			StartDate:         dateToOpenAPI(tripSummary.StartDate),
+			EndDate:           dateToOpenAPI(tripSummary.EndDate),
+			DefaultCurrency:   openapi.SupportedCurrency(tripSummary.DefaultCurrency),
+			CurrencySummaries: currencySummaries,
+		})
+	}
+	return openapi.GetMySettlementSummaryResponse{Trips: trips}
+}
+
 func createTripInviteResponseToOpenAPI(result trip.CreateTripInviteResult) openapi.CreateTripInviteResponse {
 	return openapi.CreateTripInviteResponse{
 		Invite: openapi.TripInvite{

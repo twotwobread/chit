@@ -7,4 +7,3 @@ export type AuthLinkResponse = {
     result: 'provider_link_success';
     linkedIdentity: LinkedIdentity;
 };
-

@@ -11,4 +11,3 @@ export type TripParticipant = {
     displayName: string;
     joinedAt: string;
 };
-

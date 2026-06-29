@@ -9,4 +9,3 @@ export type TripParticipantListItem = {
     role: TripParticipantRole;
     joinedAt: string;
 };
-

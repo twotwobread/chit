@@ -8,4 +8,3 @@ export type SetDayLodgingPlaceResponse = {
     day: TripDay;
     lodgingPlace: TripPlaceSummary;
 };
-

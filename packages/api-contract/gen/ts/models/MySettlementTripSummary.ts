@@ -2,14 +2,13 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
+import type { MySettlementCurrencySummary } from './MySettlementCurrencySummary';
 import type { SupportedCurrency } from './SupportedCurrency';
-export type Trip = {
-    id: string;
-    name: string;
+export type MySettlementTripSummary = {
+    tripId: string;
+    tripName: string;
     startDate: string;
     endDate: string;
     defaultCurrency: SupportedCurrency;
-    createdBy: string;
-    createdAt: string;
-    updatedAt: string;
+    currencySummaries: Array<MySettlementCurrencySummary>;
 };

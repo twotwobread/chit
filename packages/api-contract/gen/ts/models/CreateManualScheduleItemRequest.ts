@@ -8,4 +8,3 @@ export type CreateManualScheduleItemRequest = {
     address: string;
     placeType: TripPlaceType;
 };
-

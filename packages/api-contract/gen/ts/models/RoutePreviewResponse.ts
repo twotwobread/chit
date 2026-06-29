@@ -11,4 +11,3 @@ export type RoutePreviewResponse = {
     map: RoutePreviewMap | null;
     generatedAt: string;
 };
-

@@ -12,4 +12,3 @@ export type MarkScheduleItemArrivedResponse = {
      */
     scheduleItems: Array<ScheduleItem>;
 };
-

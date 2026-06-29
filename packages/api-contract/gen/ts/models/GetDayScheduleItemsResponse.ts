@@ -8,4 +8,3 @@ export type GetDayScheduleItemsResponse = {
     day: TripDay;
     scheduleItems: Array<ScheduleItem>;
 };
-

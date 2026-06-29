@@ -5,4 +5,3 @@
 export type AuthLogoutResponse = {
     result: 'logout_success';
 };
-

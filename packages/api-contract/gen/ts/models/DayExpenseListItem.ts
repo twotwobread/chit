@@ -26,4 +26,3 @@ export type DayExpenseListItem = {
     splits: Array<DayExpenseSplitListItem>;
     createdAt: string;
 };
-

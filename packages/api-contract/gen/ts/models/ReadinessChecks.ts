@@ -8,4 +8,3 @@ export type ReadinessChecks = {
     database: ReadinessCheck;
     metadata: MetadataReadinessCheck;
 };
-

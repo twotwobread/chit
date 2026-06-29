@@ -8,4 +8,3 @@ export type UpdateScheduleItemRequest = {
     address?: string;
     placeType?: TripPlaceType;
 };
-

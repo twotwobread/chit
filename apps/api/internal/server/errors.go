@@ -45,6 +45,17 @@ func writeTripDetailError(w http.ResponseWriter, err error) {
 	}
 }
 
+func writeMySettlementSummaryError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, trip.ErrUnauthorized):
+		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "unauthorized", nil)
+	case errors.Is(err, trip.ErrSettlementSummaryUnavailable):
+		writeError(w, http.StatusConflict, "SETTLEMENT_SUMMARY_UNAVAILABLE", "정산 요약을 계산할 수 없어요. 지출 내역을 다시 확인해주세요.", nil)
+	default:
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error", nil)
+	}
+}
+
 func writeTripSettlementError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, trip.ErrValidation):

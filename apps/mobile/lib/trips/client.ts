@@ -1,4 +1,5 @@
 import {
+  AuthService,
   TripsService,
   type AcceptTripInviteResponse,
   type CreateManualScheduleItemRequest,
@@ -11,6 +12,7 @@ import {
   type CreateTripResponse,
   type GetDayScheduleItemsResponse,
   type GetExpenseResponse,
+  type GetMySettlementSummaryResponse,
   type GetTripDetailResponse,
   type GetTripSettlementResponse,
   type ListDayExpensesResponse,
@@ -205,4 +207,9 @@ export async function deleteTrip(tripId: string): Promise<void> {
 export async function listMyTrips(): Promise<ListTripsResponse> {
   await getMeWithRefresh();
   return TripsService.listTrips();
+}
+
+export async function getMySettlementSummary(): Promise<GetMySettlementSummaryResponse> {
+  await getMeWithRefresh();
+  return AuthService.getMySettlementSummary();
 }

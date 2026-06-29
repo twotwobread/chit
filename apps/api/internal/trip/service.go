@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"errors"
 	"sort"
 	"strings"
 	"time"
@@ -101,6 +102,69 @@ func (s *Service) List(ctx context.Context, userID string) ([]ListItem, error) {
 	}
 
 	return s.repo.ListTripsByParticipantUser(ctx, userID)
+}
+
+func (s *Service) GetMySettlementSummary(ctx context.Context, userID string) (GetMySettlementSummaryResult, error) {
+	if strings.TrimSpace(userID) == "" {
+		return GetMySettlementSummaryResult{}, ErrUnauthorized
+	}
+
+	trips, err := s.repo.ListTripsByParticipantUser(ctx, userID)
+	if err != nil {
+		return GetMySettlementSummaryResult{}, err
+	}
+
+	result := GetMySettlementSummaryResult{Trips: []MySettlementTripSummary{}}
+	for _, listItem := range trips {
+		participantID := strings.TrimSpace(listItem.ParticipantID)
+		if participantID == "" {
+			return GetMySettlementSummaryResult{}, ErrSettlementSummaryUnavailable
+		}
+
+		input, err := s.repo.GetTripSettlementInput(ctx, listItem.ID)
+		if err != nil {
+			return GetMySettlementSummaryResult{}, err
+		}
+		settlement, err := BuildTripSettlement(listItem.ID, listItem.DefaultCurrency, input)
+		if err != nil {
+			if errors.Is(err, ErrSettlementDataInconsistent) {
+				return GetMySettlementSummaryResult{}, ErrSettlementSummaryUnavailable
+			}
+			return GetMySettlementSummaryResult{}, err
+		}
+
+		tripSummary := MySettlementTripSummary{
+			TripID:            listItem.ID,
+			TripName:          listItem.Name,
+			StartDate:         listItem.StartDate,
+			EndDate:           listItem.EndDate,
+			DefaultCurrency:   listItem.DefaultCurrency,
+			CurrencySummaries: []MySettlementCurrencySummary{},
+		}
+		for _, currencySummary := range settlement.CurrencySummaries {
+			for _, balance := range currencySummary.Balances {
+				if balance.Participant.ParticipantID == nil || *balance.Participant.ParticipantID != participantID {
+					continue
+				}
+				if balance.NetMinor != 0 {
+					tripSummary.CurrencySummaries = append(tripSummary.CurrencySummaries, mySettlementCurrencySummary(currencySummary.Currency, balance.NetMinor))
+				}
+				break
+			}
+		}
+		if len(tripSummary.CurrencySummaries) > 0 {
+			result.Trips = append(result.Trips, tripSummary)
+		}
+	}
+
+	return result, nil
+}
+
+func mySettlementCurrencySummary(currency string, netMinor int64) MySettlementCurrencySummary {
+	if netMinor > 0 {
+		return MySettlementCurrencySummary{Currency: currency, Direction: MySettlementDirectionReceive, NetMinor: netMinor}
+	}
+	return MySettlementCurrencySummary{Currency: currency, Direction: MySettlementDirectionSend, NetMinor: -netMinor}
 }
 
 func (s *Service) Update(ctx context.Context, userID string, tripID string, input UpdateInput) (UpdateResult, error) {

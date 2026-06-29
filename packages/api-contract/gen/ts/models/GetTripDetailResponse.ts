@@ -10,4 +10,3 @@ export type GetTripDetailResponse = {
     participantSummary: TripParticipantSummary;
     days: Array<TripDay>;
 };
-

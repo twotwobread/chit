@@ -9,4 +9,3 @@ export type TripDay = {
     dayOrder: number;
     lodgingPlace: TripPlaceSummary | null;
 };
-

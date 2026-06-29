@@ -10,4 +10,3 @@ export type CreateTripInviteResponse = {
      */
     created: boolean;
 };
-

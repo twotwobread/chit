@@ -8,4 +8,3 @@ export type RoutePreviewSummary = {
     summaryText: string;
     transferCount: number | null;
 };
-

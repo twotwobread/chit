@@ -16,4 +16,3 @@ export type OAuthCredential = {
     displayName?: string | null;
     avatarUrl?: string | null;
 };
-

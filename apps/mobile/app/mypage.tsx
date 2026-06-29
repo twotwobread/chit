@@ -1,8 +1,9 @@
 import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
+import type { Href } from 'expo-router';
 
-import type { AuthMeResponse, AuthProvider, TripListItem } from '@i-um/api-contract';
+import type { AuthMeResponse, AuthProvider, GetMySettlementSummaryResponse, TripListItem } from '@i-um/api-contract';
 
 import {
   buildAppInfoLegalRows,
@@ -19,10 +20,12 @@ import { clearStoredSession, readStoredSession } from '../lib/auth/session';
 import { theme } from '../lib/design';
 import { ActiveTripCard, PastTripRow, UpcomingTripRow } from '../lib/home-ui/TripCards';
 import { BottomMenu } from '../lib/navigation/BottomMenu';
-import { listMyTrips } from '../lib/trips/client';
+import { getMySettlementSummary, listMyTrips } from '../lib/trips/client';
 import {
+  buildMySettlementSummaryViewModel,
   buildMyTripsSuccessViewModel,
   tripDetailPath,
+  type MySettlementSummaryViewModel,
   type MyTripCardViewModel,
   type MyTripsStatusSectionViewModel,
 } from '../lib/trips/mypage';
@@ -36,9 +39,15 @@ type MyPageState =
 
 type TripListState = { status: 'loading' } | { status: 'ready'; trips: TripListItem[] } | { status: 'error' };
 
+type SettlementSummaryState =
+  | { status: 'loading' }
+  | { status: 'ready'; summary: GetMySettlementSummaryResponse }
+  | { status: 'error' };
+
 export default function MyPageScreen() {
   const [state, setState] = useState<MyPageState>({ status: 'loading' });
   const [tripState, setTripState] = useState<TripListState>({ status: 'loading' });
+  const [settlementSummaryState, setSettlementSummaryState] = useState<SettlementSummaryState>({ status: 'loading' });
   const [legalLinkState, setLegalLinkState] = useState<LegalLinkOpenState>(initialLegalLinkOpenState);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const legalLinkStateRef = useRef<LegalLinkOpenState>(initialLegalLinkOpenState);
@@ -79,9 +88,24 @@ export default function MyPageScreen() {
     }
   }, [handleAuthError]);
 
+  const loadSettlementSummary = useCallback(async () => {
+    setSettlementSummaryState({ status: 'loading' });
+
+    try {
+      const response = await getMySettlementSummary();
+      setSettlementSummaryState({ status: 'ready', summary: response });
+    } catch (error) {
+      if (await handleAuthError(error)) {
+        return;
+      }
+      setSettlementSummaryState({ status: 'error' });
+    }
+  }, [handleAuthError]);
+
   const load = useCallback(async () => {
     setState({ status: 'loading' });
     setTripState({ status: 'loading' });
+    setSettlementSummaryState({ status: 'loading' });
     updateLegalLinkState(initialLegalLinkOpenState);
 
     try {
@@ -97,6 +121,7 @@ export default function MyPageScreen() {
 
       const me = await getMeWithRefresh();
       setState({ status: 'ready', me });
+      void loadSettlementSummary();
       void loadTrips();
     } catch (error) {
       if (await handleAuthError(error)) {
@@ -104,7 +129,7 @@ export default function MyPageScreen() {
       }
       setState({ status: 'error' });
     }
-  }, [handleAuthError, loadTrips, updateLegalLinkState]);
+  }, [handleAuthError, loadSettlementSummary, loadTrips, updateLegalLinkState]);
 
   useFocusEffect(
     useCallback(() => {
@@ -181,6 +206,8 @@ export default function MyPageScreen() {
               providerLabel={providerSummary(state.me.linkedProviders)}
             />
 
+            <MySettlementSummarySection state={settlementSummaryState} onRetry={loadSettlementSummary} />
+
             <MyTripsSection state={tripState} onRetry={loadTrips} />
 
             <SettingsList title="설정">
@@ -240,6 +267,94 @@ function AppInfoLegalRow({
       label={row.label}
       onPress={() => onOpen(row.id)}
     />
+  );
+}
+
+function MySettlementSummarySection({ state, onRetry }: { state: SettlementSummaryState; onRetry: () => void }) {
+  const viewModel = state.status === 'ready' ? buildMySettlementSummaryViewModel(state.summary) : null;
+
+  return (
+    <View style={styles.sectionStack}>
+      <Text style={styles.sectionTitle}>정산 요약</Text>
+
+      {state.status === 'loading' ? (
+        <View style={styles.card}>
+          <ActivityIndicator color={theme.color.primary} />
+          <Text style={styles.message}>정산 요약을 불러오는 중...</Text>
+        </View>
+      ) : null}
+
+      {state.status === 'error' ? (
+        <View style={styles.card}>
+          <Text style={styles.errorMessage}>정산 요약을 불러올 수 없어요.</Text>
+          <Text style={styles.message}>잠시 후 다시 시도해주세요.</Text>
+          <Pressable accessibilityRole="button" onPress={onRetry} style={styles.secondaryButton}>
+            <Text style={styles.secondaryButtonText}>다시 시도</Text>
+          </Pressable>
+        </View>
+      ) : null}
+
+      {viewModel?.status === 'empty' ? (
+        <View style={styles.card}>
+          <Text style={styles.emptyTitle}>{viewModel.title}</Text>
+          <Text style={styles.message}>{viewModel.helper}</Text>
+        </View>
+      ) : null}
+
+      {viewModel?.status === 'ready' ? <MySettlementSummaryList viewModel={viewModel} /> : null}
+    </View>
+  );
+}
+
+function MySettlementSummaryList({
+  viewModel,
+}: {
+  viewModel: Extract<MySettlementSummaryViewModel, { status: 'ready' }>;
+}) {
+  return (
+    <View style={styles.settlementStack}>
+      <View style={styles.card}>
+        <Text style={styles.settlementSummaryTitle}>{viewModel.title}</Text>
+        <Text style={styles.message}>{viewModel.helper}</Text>
+      </View>
+      <View style={styles.settlementList}>
+        {viewModel.trips.map((trip) => (
+          <Pressable
+            accessibilityRole="button"
+            key={trip.tripId}
+            onPress={() => router.push(trip.route as Href)}
+            style={styles.settlementRow}
+          >
+            <View style={styles.settlementRowHeader}>
+              <Text style={styles.settlementTripName}>{trip.tripName}</Text>
+              <Text style={styles.settlementDate}>{trip.dateRangeLabel}</Text>
+            </View>
+            <View style={styles.settlementChipList}>
+              {trip.currencySummaries.map((summary) => (
+                <View
+                  key={`${trip.tripId}-${summary.currency}-${summary.direction}`}
+                  style={[
+                    styles.settlementChip,
+                    summary.direction === 'receive' ? styles.settlementChipReceive : styles.settlementChipSend,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.settlementChipText,
+                      summary.direction === 'receive'
+                        ? styles.settlementChipTextReceive
+                        : styles.settlementChipTextSend,
+                    ]}
+                  >
+                    {summary.summaryLabel}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </Pressable>
+        ))}
+      </View>
+    </View>
   );
 }
 
@@ -479,6 +594,67 @@ const styles = StyleSheet.create({
     fontFamily: theme.font.family.bold,
     fontWeight: theme.font.weight.bold,
     textAlign: 'center',
+  },
+  settlementChip: {
+    borderRadius: theme.radius.pill,
+    paddingHorizontal: theme.space[3],
+    paddingVertical: theme.space[2],
+  },
+  settlementChipList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.space[2],
+  },
+  settlementChipReceive: {
+    backgroundColor: theme.color.primarySoft,
+  },
+  settlementChipSend: {
+    backgroundColor: theme.color.red[100],
+  },
+  settlementChipText: {
+    fontFamily: theme.font.family.semibold,
+    fontSize: theme.font.size.caption,
+    fontWeight: theme.font.weight.semibold,
+  },
+  settlementChipTextReceive: {
+    color: theme.color.credit,
+  },
+  settlementChipTextSend: {
+    color: theme.color.debit,
+  },
+  settlementDate: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.caption,
+  },
+  settlementList: {
+    backgroundColor: theme.color.surface,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.xl,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  settlementRow: {
+    gap: theme.space[3],
+    padding: theme.space[5],
+  },
+  settlementRowHeader: {
+    gap: theme.space[1],
+  },
+  settlementStack: {
+    gap: theme.space[3],
+  },
+  settlementSummaryTitle: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.subhead,
+    fontWeight: theme.font.weight.bold,
+  },
+  settlementTripName: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.body,
+    fontWeight: theme.font.weight.bold,
   },
   sectionStack: {
     gap: theme.space[4],

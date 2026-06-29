@@ -7,4 +7,3 @@ export type AuthRefreshResponse = {
     result: 'refresh_success';
     tokens: AuthTokens;
 };
-
