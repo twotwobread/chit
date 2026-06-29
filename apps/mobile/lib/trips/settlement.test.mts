@@ -118,6 +118,99 @@ test('builds transfer sections from authoritative API response without client so
   );
 });
 
+test('builds single-currency settlement rule notice from visible API summaries', () => {
+  const settlement = {
+    tripId: 'trip-1',
+    defaultCurrency: 'KRW',
+    currencySummaries: [
+      {
+        currency: 'JPY',
+        totalPaidMinor: 0,
+        totalShareMinor: 0,
+        balances: [],
+        suggestedTransfers: [],
+      },
+      {
+        currency: 'KRW',
+        totalPaidMinor: 30000,
+        totalShareMinor: 30000,
+        balances: [
+          {
+            participant: { participantId: 'a', displayName: '민수', participantStatus: 'current' as const },
+            paidMinor: 30000,
+            shareMinor: 15000,
+            netMinor: 15000,
+          },
+        ],
+        suggestedTransfers: [],
+      },
+    ],
+  } satisfies GetTripSettlementResponse;
+
+  const viewModel = buildSettlementTransferViewModel({ settlement });
+
+  assert.equal(viewModel.status, 'success');
+  assert.deepEqual(viewModel.currencyRuleNotice, {
+    currencies: ['KRW'],
+    helper: 'KRW 기준으로 결제/부담과 송금 안내를 보여줘요.',
+    mode: 'single',
+    title: '한 통화로 정산해요.',
+  });
+});
+
+test('builds multi-currency settlement rule notice without sorting or converting currencies', () => {
+  const settlement = {
+    tripId: 'trip-1',
+    defaultCurrency: 'KRW',
+    currencySummaries: [
+      {
+        currency: 'USD',
+        totalPaidMinor: 1234,
+        totalShareMinor: 1234,
+        balances: [],
+        suggestedTransfers: [
+          {
+            fromParticipant: { participantId: 'b', displayName: '지영', participantStatus: 'current' as const },
+            toParticipant: { participantId: 'a', displayName: '민수', participantStatus: 'current' as const },
+            amountMinor: 1234,
+          },
+        ],
+      },
+      {
+        currency: 'JPY',
+        totalPaidMinor: 0,
+        totalShareMinor: 0,
+        balances: [],
+        suggestedTransfers: [],
+      },
+      {
+        currency: 'KRW',
+        totalPaidMinor: 30000,
+        totalShareMinor: 30000,
+        balances: [
+          {
+            participant: { participantId: 'a', displayName: '민수', participantStatus: 'current' as const },
+            paidMinor: 30000,
+            shareMinor: 15000,
+            netMinor: 15000,
+          },
+        ],
+        suggestedTransfers: [],
+      },
+    ],
+  } satisfies GetTripSettlementResponse;
+
+  const viewModel = buildSettlementTransferViewModel({ settlement });
+
+  assert.equal(viewModel.status, 'success');
+  assert.deepEqual(viewModel.currencyRuleNotice, {
+    currencies: ['USD', 'KRW'],
+    helper: '환율 변환 없이 USD, KRW 금액을 각각 계산해 보여줘요.',
+    mode: 'separate',
+    title: '통화별로 따로 정산해요.',
+  });
+});
+
 test('builds participant balance sections from authoritative API response without client sorting', () => {
   const settlement = {
     tripId: 'trip-1',

@@ -52,12 +52,22 @@ export type SettlementNoTransferNoticeViewModel = {
   primaryAction: { label: string; route: string } | null;
 };
 
+export type SettlementCurrencyRuleMode = 'single' | 'separate';
+
+export type SettlementCurrencyRuleNoticeViewModel = {
+  mode: SettlementCurrencyRuleMode;
+  title: string;
+  helper: string;
+  currencies: SupportedCurrency[];
+};
+
 export type SettlementTransferViewModel =
   | {
       status: 'success';
       summaryTitle: string;
       summaryHelper: string;
       totalTransferCount: number;
+      currencyRuleNotice: SettlementCurrencyRuleNoticeViewModel;
       balanceSections: SettlementBalanceCurrencySectionViewModel[];
       sections: SettlementTransferCurrencySectionViewModel[];
       noTransferNotice: SettlementNoTransferNoticeViewModel | null;
@@ -84,6 +94,13 @@ export function buildSettlementTransferViewModel({
   settlement: GetTripSettlementResponse;
   todayRoute?: string | null;
 }): SettlementTransferViewModel {
+  const visibleCurrencies = settlement.currencySummaries.flatMap((summary): SupportedCurrency[] => {
+    if (summary.balances.length === 0 && summary.suggestedTransfers.length === 0) {
+      return [];
+    }
+    return [summary.currency];
+  });
+
   const balanceSections = settlement.currencySummaries.flatMap(
     (summary): SettlementBalanceCurrencySectionViewModel[] => {
       if (summary.balances.length === 0) {
@@ -157,9 +174,29 @@ export function buildSettlementTransferViewModel({
     summaryHelper:
       totalTransferCount > 0 ? '서버가 계산한 최종 송금 안내예요.' : '서버가 계산한 사람별 정산 요약이에요.',
     totalTransferCount,
+    currencyRuleNotice: buildCurrencyRuleNotice(visibleCurrencies),
     balanceSections,
     sections,
     noTransferNotice,
+  };
+}
+
+function buildCurrencyRuleNotice(currencies: SupportedCurrency[]): SettlementCurrencyRuleNoticeViewModel {
+  if (currencies.length <= 1) {
+    const currency = currencies[0] ?? 'KRW';
+    return {
+      mode: 'single',
+      title: '한 통화로 정산해요.',
+      helper: `${currency} 기준으로 결제/부담과 송금 안내를 보여줘요.`,
+      currencies: [currency],
+    };
+  }
+
+  return {
+    mode: 'separate',
+    title: '통화별로 따로 정산해요.',
+    helper: `환율 변환 없이 ${currencies.join(', ')} 금액을 각각 계산해 보여줘요.`,
+    currencies,
   };
 }
 

@@ -12,6 +12,7 @@ import {
   buildSettlementTransferViewModel,
   settlementTransferFailureState,
   type SettlementBalanceDirection,
+  type SettlementCurrencyRuleNoticeViewModel,
   type SettlementNoTransferNoticeViewModel,
   type SettlementTransferFailureViewModel,
   type SettlementTransferViewModel,
@@ -113,6 +114,8 @@ function SettlementContent({ viewModel }: { viewModel: SettlementTransferViewMod
         </View>
       </TripListCard>
 
+      <CurrencyRuleNoticeCard notice={viewModel.currencyRuleNotice} />
+
       {viewModel.balanceSections.map((section) => (
         <TripListCard key={`balance-${section.currency}`}>
           <View style={styles.sectionHeader}>
@@ -163,6 +166,20 @@ function SettlementContent({ viewModel }: { viewModel: SettlementTransferViewMod
         </TripListCard>
       ))}
     </View>
+  );
+}
+
+function CurrencyRuleNoticeCard({ notice }: { notice: SettlementCurrencyRuleNoticeViewModel }) {
+  return (
+    <TripListCard>
+      <View style={styles.currencyRuleNotice}>
+        <View style={styles.currencyRuleBadge}>
+          <Text style={styles.currencyRuleBadgeText}>{notice.mode === 'single' ? '단일 통화' : '통화별 정산'}</Text>
+        </View>
+        <Text style={styles.currencyRuleTitle}>{notice.title}</Text>
+        <Text style={styles.currencyRuleHelper}>{notice.helper}</Text>
+      </View>
+    </TripListCard>
   );
 }
 
@@ -280,6 +297,36 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: theme.space[3],
+  },
+  currencyRuleBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: theme.color.primarySoft,
+    borderRadius: theme.radius.pill,
+    paddingHorizontal: theme.space[3],
+    paddingVertical: theme.space[2],
+  },
+  currencyRuleBadgeText: {
+    color: theme.color.primary,
+    fontFamily: theme.font.family.semibold,
+    fontSize: theme.font.size.micro,
+    fontWeight: theme.font.weight.semibold,
+  },
+  currencyRuleHelper: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.body,
+    lineHeight: theme.font.size.body * theme.font.leading.normal,
+  },
+  currencyRuleNotice: {
+    gap: theme.space[3],
+    paddingHorizontal: theme.space[1],
+    paddingVertical: theme.space[4],
+  },
+  currencyRuleTitle: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.subhead,
+    fontWeight: theme.font.weight.bold,
   },
   sectionHeader: {
     gap: theme.space[1],
