@@ -8,4 +8,3 @@ export type ExpenseParticipantDisplay = {
     displayName: string;
     source: ExpenseDisplaySource;
 };
-

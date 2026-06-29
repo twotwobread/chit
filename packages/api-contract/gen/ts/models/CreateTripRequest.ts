@@ -15,4 +15,3 @@ export type CreateTripRequest = {
     endDate: string;
     defaultCurrency: SupportedCurrency;
 };
-

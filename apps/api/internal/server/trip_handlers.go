@@ -28,6 +28,26 @@ func (s apiServer) ListTrips(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, listTripsResponseToOpenAPI(trips))
 }
 
+func (s apiServer) GetMySettlementSummary(w http.ResponseWriter, r *http.Request) {
+	if s.auth == nil || s.trips == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "settlement summary is not configured", nil)
+		return
+	}
+
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	result, err := s.trips.GetMySettlementSummary(r.Context(), authContext.UserID)
+	if err != nil {
+		writeMySettlementSummaryError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, getMySettlementSummaryResponseToOpenAPI(result))
+}
+
 func (s apiServer) CreateTrip(w http.ResponseWriter, r *http.Request) {
 	if s.auth == nil || s.trips == nil {
 		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "trip creation is not configured", nil)

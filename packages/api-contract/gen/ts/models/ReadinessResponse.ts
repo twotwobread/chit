@@ -7,4 +7,3 @@ export type ReadinessResponse = {
     status: 'ok';
     checks: ReadinessChecks;
 };
-

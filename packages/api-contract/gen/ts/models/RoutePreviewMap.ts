@@ -10,4 +10,3 @@ export type RoutePreviewMap = {
     destination: GeoPoint;
     bounds: GeoBounds;
 };
-

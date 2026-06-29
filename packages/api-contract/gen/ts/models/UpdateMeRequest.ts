@@ -8,4 +8,3 @@ export type UpdateMeRequest = {
      */
     displayName: string;
 };
-

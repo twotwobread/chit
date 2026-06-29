@@ -72,6 +72,7 @@ type fakeRepository struct {
 	listDayExpensesCalled    bool
 	listDayExpensesErr       error
 	settlementData           SettlementInput
+	settlementDataByTrip     map[string]SettlementInput
 	settlementDataTripID     string
 	settlementDataCalled     bool
 	settlementDataErr        error
@@ -354,7 +355,13 @@ func (r *fakeRepository) ListDayExpensesByTripDay(_ context.Context, tripID stri
 func (r *fakeRepository) GetTripSettlementInput(_ context.Context, tripID string) (SettlementInput, error) {
 	r.settlementDataTripID = tripID
 	r.settlementDataCalled = true
-	return r.settlementData, r.settlementDataErr
+	if r.settlementDataErr != nil {
+		return SettlementInput{}, r.settlementDataErr
+	}
+	if r.settlementDataByTrip != nil {
+		return r.settlementDataByTrip[tripID], nil
+	}
+	return r.settlementData, nil
 }
 
 func (r *fakeRepository) GetExpenseByTripDayAndID(_ context.Context, tripID string, tripDayID string, expenseID string) (Expense, bool, error) {
@@ -2497,6 +2504,121 @@ func TestServiceDeleteScheduleItemFailures(t *testing.T) {
 				t.Fatalf("expected %v, got %v", tt.want, err)
 			}
 		})
+	}
+}
+
+func TestServiceGetMySettlementSummaryFiltersCurrentUserNonZeroBalances(t *testing.T) {
+	currentParticipant := testUUID(2001)
+	friendParticipant := testUUID(2002)
+	thirdParticipant := testUUID(2003)
+	joinedAt := time.Date(2026, 6, 21, 12, 0, 0, 0, time.UTC)
+	repo := &fakeRepository{
+		listed: []ListItem{
+			{
+				ID:              testUUID(1001),
+				ParticipantID:   currentParticipant,
+				Name:            "오사카",
+				StartDate:       "2026-07-10",
+				EndDate:         "2026-07-14",
+				DefaultCurrency: "KRW",
+			},
+			{
+				ID:              testUUID(1002),
+				ParticipantID:   currentParticipant,
+				Name:            "도쿄",
+				StartDate:       "2026-08-01",
+				EndDate:         "2026-08-03",
+				DefaultCurrency: "USD",
+			},
+			{
+				ID:              testUUID(1003),
+				ParticipantID:   currentParticipant,
+				Name:            "정산 완료",
+				StartDate:       "2026-09-01",
+				EndDate:         "2026-09-02",
+				DefaultCurrency: "KRW",
+			},
+		},
+		settlementDataByTrip: map[string]SettlementInput{
+			testUUID(1001): {
+				Participants: []SettlementParticipantInput{
+					{ParticipantID: currentParticipant, DisplayName: "민수", JoinedAt: joinedAt},
+					{ParticipantID: friendParticipant, DisplayName: "지영", JoinedAt: joinedAt.Add(time.Hour)},
+				},
+				Expenses: []SettlementExpenseInput{
+					settlementExpense(testUUID(3001), "KRW", 1000, friendParticipant, []SettlementSplitInput{{ParticipantID: stringPtr(currentParticipant), DisplayName: "민수", ParticipantLive: true, AmountMinor: 500}, {ParticipantID: stringPtr(friendParticipant), DisplayName: "지영", ParticipantLive: true, AmountMinor: 500}}),
+				},
+			},
+			testUUID(1002): {
+				Participants: []SettlementParticipantInput{
+					{ParticipantID: currentParticipant, DisplayName: "민수", JoinedAt: joinedAt},
+					{ParticipantID: thirdParticipant, DisplayName: "유나", JoinedAt: joinedAt.Add(time.Hour)},
+				},
+				Expenses: []SettlementExpenseInput{
+					settlementExpense(testUUID(3002), "USD", 700, currentParticipant, []SettlementSplitInput{{ParticipantID: stringPtr(currentParticipant), DisplayName: "민수", ParticipantLive: true, AmountMinor: 700}}),
+					settlementExpense(testUUID(3003), "JPY", 900, currentParticipant, []SettlementSplitInput{{ParticipantID: stringPtr(currentParticipant), DisplayName: "민수", ParticipantLive: true, AmountMinor: 450}, {ParticipantID: stringPtr(thirdParticipant), DisplayName: "유나", ParticipantLive: true, AmountMinor: 450}}),
+				},
+			},
+			testUUID(1003): {
+				Participants: []SettlementParticipantInput{
+					{ParticipantID: currentParticipant, DisplayName: "민수", JoinedAt: joinedAt},
+				},
+			},
+		},
+	}
+
+	result, err := newTestService(repo).GetMySettlementSummary(context.Background(), "user-1")
+	if err != nil {
+		t.Fatalf("GetMySettlementSummary returned error: %v", err)
+	}
+	if repo.listedUserID != "user-1" {
+		t.Fatalf("expected listed user user-1, got %q", repo.listedUserID)
+	}
+	if len(result.Trips) != 2 {
+		t.Fatalf("expected two non-zero trip summaries, got %#v", result.Trips)
+	}
+
+	first := result.Trips[0]
+	if first.TripID != testUUID(1001) || first.TripName != "오사카" || first.StartDate != "2026-07-10" || first.EndDate != "2026-07-14" {
+		t.Fatalf("unexpected first trip metadata: %#v", first)
+	}
+	if len(first.CurrencySummaries) != 1 || first.CurrencySummaries[0].Currency != "KRW" || first.CurrencySummaries[0].Direction != MySettlementDirectionSend || first.CurrencySummaries[0].NetMinor != 500 {
+		t.Fatalf("unexpected first trip summary: %#v", first.CurrencySummaries)
+	}
+
+	second := result.Trips[1]
+	if second.TripID != testUUID(1002) || second.TripName != "도쿄" {
+		t.Fatalf("unexpected second trip metadata: %#v", second)
+	}
+	if len(second.CurrencySummaries) != 1 || second.CurrencySummaries[0].Currency != "JPY" || second.CurrencySummaries[0].Direction != MySettlementDirectionReceive || second.CurrencySummaries[0].NetMinor != 450 {
+		t.Fatalf("expected only non-zero JPY receive summary, got %#v", second.CurrencySummaries)
+	}
+}
+
+func TestServiceGetMySettlementSummaryRejectsBlankUser(t *testing.T) {
+	_, err := newTestService(&fakeRepository{}).GetMySettlementSummary(context.Background(), " ")
+	if !errors.Is(err, ErrUnauthorized) {
+		t.Fatalf("expected unauthorized, got %v", err)
+	}
+}
+
+func TestServiceGetMySettlementSummaryMapsInconsistentSettlement(t *testing.T) {
+	currentParticipant := testUUID(2001)
+	repo := &fakeRepository{
+		listed: []ListItem{{ID: testUUID(1001), ParticipantID: currentParticipant, Name: "오사카", StartDate: "2026-07-10", EndDate: "2026-07-14", DefaultCurrency: "KRW"}},
+		settlementDataByTrip: map[string]SettlementInput{
+			testUUID(1001): {
+				Participants: []SettlementParticipantInput{{ParticipantID: currentParticipant, DisplayName: "민수", JoinedAt: time.Date(2026, 6, 21, 12, 0, 0, 0, time.UTC)}},
+				Expenses: []SettlementExpenseInput{
+					settlementExpense(testUUID(3001), "KRW", 1000, currentParticipant, []SettlementSplitInput{{ParticipantID: stringPtr(currentParticipant), DisplayName: "민수", ParticipantLive: true, AmountMinor: 900}}),
+				},
+			},
+		},
+	}
+
+	_, err := newTestService(repo).GetMySettlementSummary(context.Background(), "user-1")
+	if !errors.Is(err, ErrSettlementSummaryUnavailable) {
+		t.Fatalf("expected settlement summary unavailable, got %v", err)
 	}
 }
 

@@ -8,4 +8,3 @@ export type OAuthLinkRequest = {
     provider: AuthProvider;
     credential: OAuthCredential;
 };
-

@@ -6,4 +6,3 @@ import type { Expense } from './Expense';
 export type UpdateExpenseResponse = {
     expense: Expense;
 };
-

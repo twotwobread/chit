@@ -455,6 +455,7 @@ func (s *Store) ListTripsByParticipantUser(ctx context.Context, userID string) (
 	for _, row := range rows {
 		trips = append(trips, trip.ListItem{
 			ID:               row.ID,
+			ParticipantID:    row.ParticipantID,
 			Name:             row.Name,
 			StartDate:        dateString(row.StartDate),
 			EndDate:          dateString(row.EndDate),

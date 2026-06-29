@@ -2,7 +2,4 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-import type { Expense } from './Expense';
-export type GetExpenseResponse = {
-    expense: Expense;
-};
+export type MySettlementDirection = 'send' | 'receive';

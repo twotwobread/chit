@@ -644,6 +644,129 @@ func TestListTripsHandler(t *testing.T) {
 	}
 }
 
+func TestGetMySettlementSummaryHandler(t *testing.T) {
+	backend := newFakeAuthBackend()
+	accessToken := loginTestUser(t, backend)
+	tripID := createTestTrip(t, backend, accessToken)
+	currentParticipant := backend.participants[tripID][0]
+	friendParticipant := tripdomain.Participant{ID: testUUID(9002), TripID: tripID, UserID: "friend-1", Role: tripdomain.RoleMember, DisplayName: "지영", JoinedAt: currentParticipant.JoinedAt.Add(time.Hour)}
+	backend.participants[tripID] = append(backend.participants[tripID], friendParticipant)
+	backend.dayExpenses[tripID+":2026-07-10"] = []tripdomain.DayExpenseListItem{
+		{
+			ID:           testUUID(9101),
+			AnchorType:   "trip_day",
+			TripDayID:    testStringPtr("2026-07-10"),
+			ExpenseDate:  "2026-07-10",
+			DisplayTitle: "점심",
+			AmountMinor:  1000,
+			Currency:     "JPY",
+			Payer:        tripdomain.ExpenseParticipantDisplay{ParticipantID: &friendParticipant.ID, DisplayName: friendParticipant.DisplayName, Source: tripdomain.ExpenseDisplaySourceLive},
+			SplitPolicy:  "equal",
+			CreatedAt:    time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC),
+			Splits: []tripdomain.DayExpenseSplitListItem{
+				{SplitOrder: 0, Participant: tripdomain.ExpenseParticipantDisplay{ParticipantID: &currentParticipant.ID, DisplayName: currentParticipant.DisplayName, Source: tripdomain.ExpenseDisplaySourceLive}, AmountMinor: 500},
+				{SplitOrder: 1, Participant: tripdomain.ExpenseParticipantDisplay{ParticipantID: &friendParticipant.ID, DisplayName: friendParticipant.DisplayName, Source: tripdomain.ExpenseDisplaySourceLive}, AmountMinor: 500},
+			},
+		},
+	}
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/me/settlement-summary", nil)
+	request.Header.Set("Authorization", "Bearer "+accessToken)
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusOK, recorder.Code, recorder.Body.String())
+	}
+	if backend.listTripsUserID != "user-1" {
+		t.Fatalf("expected list user user-1, got %q", backend.listTripsUserID)
+	}
+
+	var body struct {
+		Trips []struct {
+			TripID            string `json:"tripId"`
+			TripName          string `json:"tripName"`
+			StartDate         string `json:"startDate"`
+			EndDate           string `json:"endDate"`
+			DefaultCurrency   string `json:"defaultCurrency"`
+			CurrencySummaries []struct {
+				Currency  string `json:"currency"`
+				Direction string `json:"direction"`
+				NetMinor  int64  `json:"netMinor"`
+			} `json:"currencySummaries"`
+		} `json:"trips"`
+	}
+	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(body.Trips) != 1 {
+		t.Fatalf("expected one settlement trip, got %#v", body.Trips)
+	}
+	tripSummary := body.Trips[0]
+	if tripSummary.TripID != tripID || tripSummary.TripName == "" || tripSummary.StartDate != "2026-07-10" || tripSummary.EndDate != "2026-07-13" || tripSummary.DefaultCurrency != "JPY" {
+		t.Fatalf("unexpected trip summary metadata: %#v", tripSummary)
+	}
+	if len(tripSummary.CurrencySummaries) != 1 || tripSummary.CurrencySummaries[0].Currency != "JPY" || tripSummary.CurrencySummaries[0].Direction != "send" || tripSummary.CurrencySummaries[0].NetMinor != 500 {
+		t.Fatalf("unexpected currency summaries: %#v", tripSummary.CurrencySummaries)
+	}
+}
+
+func TestGetMySettlementSummaryRequiresAuth(t *testing.T) {
+	backend := newFakeAuthBackend()
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/me/settlement-summary", nil)
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusUnauthorized, recorder.Code, recorder.Body.String())
+	}
+}
+
+func TestGetMySettlementSummaryDataInconsistent(t *testing.T) {
+	backend := newFakeAuthBackend()
+	accessToken := loginTestUser(t, backend)
+	tripID := createTestTrip(t, backend, accessToken)
+	currentParticipant := backend.participants[tripID][0]
+	backend.dayExpenses[tripID+":2026-07-10"] = []tripdomain.DayExpenseListItem{
+		{
+			ID:           testUUID(9201),
+			AnchorType:   "trip_day",
+			TripDayID:    testStringPtr("2026-07-10"),
+			ExpenseDate:  "2026-07-10",
+			DisplayTitle: "점심",
+			AmountMinor:  1000,
+			Currency:     "JPY",
+			Payer:        tripdomain.ExpenseParticipantDisplay{ParticipantID: &currentParticipant.ID, DisplayName: currentParticipant.DisplayName, Source: tripdomain.ExpenseDisplaySourceLive},
+			SplitPolicy:  "manual",
+			CreatedAt:    time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC),
+			Splits:       []tripdomain.DayExpenseSplitListItem{{SplitOrder: 0, Participant: tripdomain.ExpenseParticipantDisplay{ParticipantID: &currentParticipant.ID, DisplayName: currentParticipant.DisplayName, Source: tripdomain.ExpenseDisplaySourceLive}, AmountMinor: 900}},
+		},
+	}
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/me/settlement-summary", nil)
+	request.Header.Set("Authorization", "Bearer "+accessToken)
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusConflict {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusConflict, recorder.Code, recorder.Body.String())
+	}
+	var body struct {
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Error.Code != "SETTLEMENT_SUMMARY_UNAVAILABLE" {
+		t.Fatalf("expected SETTLEMENT_SUMMARY_UNAVAILABLE, got %q", body.Error.Code)
+	}
+}
+
 func TestListTripsReturnsEmpty(t *testing.T) {
 	backend := newFakeAuthBackend()
 	accessToken := loginTestUser(t, backend)
@@ -4535,6 +4658,10 @@ func (b *fakeAuthBackend) GetTripSettlementInput(_ context.Context, tripID strin
 	return tripdomain.SettlementInput{Participants: participants, Expenses: expenses}, nil
 }
 
+func testStringPtr(value string) *string {
+	return &value
+}
+
 func copyStringPtr(value *string) *string {
 	if value == nil || *value == "" {
 		return nil
@@ -5162,6 +5289,7 @@ func (b *fakeAuthBackend) ListTripsByParticipantUser(_ context.Context, userID s
 			foundTrip := b.trips[tripID]
 			trips = append(trips, tripdomain.ListItem{
 				ID:               foundTrip.ID,
+				ParticipantID:    participant.ID,
 				Name:             foundTrip.Name,
 				StartDate:        foundTrip.StartDate,
 				EndDate:          foundTrip.EndDate,

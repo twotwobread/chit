@@ -1,6 +1,13 @@
-import type { TripListItem, TripParticipantRole } from '@i-um/api-contract';
+import type {
+  GetMySettlementSummaryResponse,
+  MySettlementDirection,
+  SupportedCurrency,
+  TripListItem,
+  TripParticipantRole,
+} from '@i-um/api-contract';
 
-import { tripDetailPath } from './routes';
+import { formatMoney } from './quick-expense';
+import { tripDetailPath, tripSettlePath } from './routes';
 import { groupTripsByStatus, localDateString, type TripStatusSection } from './status';
 
 export type MyTripCardViewModel = TripListItem & {
@@ -19,6 +26,70 @@ export type MyTripsSuccessViewModel = {
   currentTrip: MyTripCardViewModel | null;
   sections: MyTripsStatusSectionViewModel[];
 };
+
+export type MySettlementCurrencySummaryViewModel = {
+  currency: SupportedCurrency;
+  direction: MySettlementDirection;
+  directionLabel: string;
+  amountLabel: string;
+  summaryLabel: string;
+};
+
+export type MySettlementTripSummaryViewModel = {
+  tripId: string;
+  tripName: string;
+  dateRangeLabel: string;
+  route: string;
+  currencySummaries: MySettlementCurrencySummaryViewModel[];
+};
+
+export type MySettlementSummaryViewModel =
+  | {
+      status: 'empty';
+      title: string;
+      helper: string;
+    }
+  | {
+      status: 'ready';
+      title: string;
+      helper: string;
+      trips: MySettlementTripSummaryViewModel[];
+    };
+
+export function buildMySettlementSummaryViewModel(
+  response: GetMySettlementSummaryResponse,
+): MySettlementSummaryViewModel {
+  if (response.trips.length === 0) {
+    return {
+      status: 'empty',
+      title: '정산할 여행이 없어요.',
+      helper: '보내거나 받을 금액이 있는 여행이 없어요.',
+    };
+  }
+
+  return {
+    status: 'ready',
+    title: '정산 요약',
+    helper: `보내거나 받을 금액이 있는 여행 ${response.trips.length}개`,
+    trips: response.trips.map((trip) => ({
+      tripId: trip.tripId,
+      tripName: trip.tripName,
+      dateRangeLabel: formatTripDateRange(trip.startDate, trip.endDate),
+      route: tripSettlePath(trip.tripId),
+      currencySummaries: trip.currencySummaries.map((summary) => {
+        const directionLabel = mySettlementDirectionLabel(summary.direction);
+        const amountLabel = formatMoney(summary.netMinor, summary.currency);
+        return {
+          currency: summary.currency,
+          direction: summary.direction,
+          directionLabel,
+          amountLabel,
+          summaryLabel: `${directionLabel} ${amountLabel}`,
+        };
+      }),
+    })),
+  };
+}
 
 export function buildMyTripsSuccessViewModel(
   trips: TripListItem[],
@@ -72,6 +143,19 @@ export function tripRoleLabel(role: TripParticipantRole): string {
 
 export function participantCountLabel(count: number): string {
   return `참여자 ${count}명`;
+}
+
+function mySettlementDirectionLabel(direction: MySettlementDirection): string {
+  switch (direction) {
+    case 'send':
+      return '보낼 금액';
+    case 'receive':
+      return '받을 금액';
+    default: {
+      const exhaustive: never = direction;
+      throw new Error(`Unsupported settlement direction: ${exhaustive}`);
+    }
+  }
 }
 
 export { tripDetailPath };

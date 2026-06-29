@@ -6,4 +6,3 @@ import type { Trip } from './Trip';
 export type UpdateTripResponse = {
     trip: Trip;
 };
-

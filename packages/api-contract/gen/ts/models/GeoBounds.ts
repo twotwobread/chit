@@ -7,4 +7,3 @@ export type GeoBounds = {
     northeast: GeoPoint;
     southwest: GeoPoint;
 };
-

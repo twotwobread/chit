@@ -12,4 +12,3 @@ export type ManualExpenseSplitInput = {
      */
     amountMinor: number;
 };
-

@@ -1105,6 +1105,7 @@ func (q *Queries) ListTripParticipantsByTripID(ctx context.Context, dollar_1 pgt
 const listTripsByParticipantUser = `-- name: ListTripsByParticipantUser :many
 SELECT
   t.id::text AS id,
+  tp.id::text AS participant_id,
   t.name,
   t.start_date,
   t.end_date,
@@ -1125,6 +1126,7 @@ ORDER BY tp.joined_at DESC, t.created_at DESC, t.id DESC
 
 type ListTripsByParticipantUserRow struct {
 	ID               string
+	ParticipantID    string
 	Name             string
 	StartDate        pgtype.Date
 	EndDate          pgtype.Date
@@ -1146,6 +1148,7 @@ func (q *Queries) ListTripsByParticipantUser(ctx context.Context, dollar_1 pgtyp
 		var i ListTripsByParticipantUserRow
 		if err := rows.Scan(
 			&i.ID,
+			&i.ParticipantID,
 			&i.Name,
 			&i.StartDate,
 			&i.EndDate,

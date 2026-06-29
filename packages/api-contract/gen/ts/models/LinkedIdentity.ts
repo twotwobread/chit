@@ -8,4 +8,3 @@ export type LinkedIdentity = {
     email?: string | null;
     emailVerified: boolean;
 };
-

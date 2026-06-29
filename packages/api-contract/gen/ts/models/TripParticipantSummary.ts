@@ -7,4 +7,3 @@ export type TripParticipantSummary = {
     previewNames: Array<string>;
     overflowCount: number;
 };
-

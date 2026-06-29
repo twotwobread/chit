@@ -8,4 +8,3 @@ export type AuthMeResponse = {
     user: AuthUser;
     linkedProviders: Array<AuthProvider>;
 };
-

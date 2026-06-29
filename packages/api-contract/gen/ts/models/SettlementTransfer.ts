@@ -8,4 +8,3 @@ export type SettlementTransfer = {
     toParticipant: SettlementParticipantSnapshot;
     amountMinor: number;
 };
-

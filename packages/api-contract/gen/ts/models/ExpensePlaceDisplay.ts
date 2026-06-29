@@ -11,4 +11,3 @@ export type ExpensePlaceDisplay = {
     placeType: TripPlaceType | null;
     source: ExpenseDisplaySource;
 };
-

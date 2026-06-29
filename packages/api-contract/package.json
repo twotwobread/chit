@@ -14,7 +14,7 @@
   "scripts": {
     "generate": "pnpm run generate:go && pnpm run generate:ts",
     "generate:go": "go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.4.1 -generate types,chi-server -package openapi -o ../../apps/api/internal/openapi/server.gen.go openapi.yaml",
-    "generate:ts": "openapi --input openapi.yaml --output gen/ts --client fetch --useUnionTypes"
+    "generate:ts": "openapi --input openapi.yaml --output gen/ts --client fetch --useUnionTypes && node scripts/normalize-generated-ts.mjs"
   },
   "devDependencies": {
     "openapi-typescript-codegen": "0.29.0"

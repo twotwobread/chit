@@ -107,6 +107,7 @@ RETURNING
 -- name: ListTripsByParticipantUser :many
 SELECT
   t.id::text AS id,
+  tp.id::text AS participant_id,
   t.name,
   t.start_date,
   t.end_date,

@@ -19,4 +19,3 @@ export type UpdateTripRequest = {
      */
     confirmOutOfRangeDayArchive?: boolean;
 };
-

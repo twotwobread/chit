@@ -20,4 +20,3 @@ export type TripInvite = {
     createdAt: string;
     createdBy: string;
 };
-

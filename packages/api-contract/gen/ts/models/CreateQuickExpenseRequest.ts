@@ -27,4 +27,3 @@ export type CreateQuickExpenseRequest = {
      */
     splits?: Array<ManualExpenseSplitInput>;
 };
-

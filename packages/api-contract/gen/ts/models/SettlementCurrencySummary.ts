@@ -12,4 +12,3 @@ export type SettlementCurrencySummary = {
     balances: Array<SettlementBalance>;
     suggestedTransfers: Array<SettlementTransfer>;
 };
-

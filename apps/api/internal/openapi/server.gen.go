@@ -78,6 +78,12 @@ const (
 	MetadataReadinessCheckStatusOk MetadataReadinessCheckStatus = "ok"
 )
 
+// Defines values for MySettlementDirection.
+const (
+	Receive MySettlementDirection = "receive"
+	Send    MySettlementDirection = "send"
+)
+
 // Defines values for ReadinessCheckStatus.
 const (
 	ReadinessCheckStatusOk ReadinessCheckStatus = "ok"
@@ -406,6 +412,11 @@ type GetExpenseResponse struct {
 	Expense Expense `json:"expense"`
 }
 
+// GetMySettlementSummaryResponse defines model for GetMySettlementSummaryResponse.
+type GetMySettlementSummaryResponse struct {
+	Trips []MySettlementTripSummary `json:"trips"`
+}
+
 // GetTripDetailResponse defines model for GetTripDetailResponse.
 type GetTripDetailResponse struct {
 	Days               []TripDay              `json:"days"`
@@ -496,6 +507,28 @@ type MetadataReadinessCheckSchema string
 
 // MetadataReadinessCheckStatus defines model for MetadataReadinessCheck.Status.
 type MetadataReadinessCheckStatus string
+
+// MySettlementCurrencySummary defines model for MySettlementCurrencySummary.
+type MySettlementCurrencySummary struct {
+	Currency  SupportedCurrency     `json:"currency"`
+	Direction MySettlementDirection `json:"direction"`
+
+	// NetMinor Absolute non-zero current-user settlement amount in minor units.
+	NetMinor int64 `json:"netMinor"`
+}
+
+// MySettlementDirection defines model for MySettlementDirection.
+type MySettlementDirection string
+
+// MySettlementTripSummary defines model for MySettlementTripSummary.
+type MySettlementTripSummary struct {
+	CurrencySummaries []MySettlementCurrencySummary `json:"currencySummaries"`
+	DefaultCurrency   SupportedCurrency             `json:"defaultCurrency"`
+	EndDate           openapi_types.Date            `json:"endDate"`
+	StartDate         openapi_types.Date            `json:"startDate"`
+	TripId            string                        `json:"tripId"`
+	TripName          string                        `json:"tripName"`
+}
 
 // OAuthCredential Provider credential. Apple uses identityToken/authorizationCode/nonce. Kakao uses accessToken. dev* fields are accepted only when server dev OAuth is enabled.
 type OAuthCredential struct {
@@ -936,6 +969,9 @@ type ServerInterface interface {
 	// Update the current user's display name
 	// (PATCH /me)
 	UpdateMe(w http.ResponseWriter, r *http.Request)
+	// Return current user's settlement summary
+	// (GET /me/settlement-summary)
+	GetMySettlementSummary(w http.ResponseWriter, r *http.Request)
 	// Check API readiness
 	// (GET /ready)
 	GetReady(w http.ResponseWriter, r *http.Request)
@@ -1083,6 +1119,12 @@ func (_ Unimplemented) GetMe(w http.ResponseWriter, r *http.Request) {
 // Update the current user's display name
 // (PATCH /me)
 func (_ Unimplemented) UpdateMe(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Return current user's settlement summary
+// (GET /me/settlement-summary)
+func (_ Unimplemented) GetMySettlementSummary(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1447,6 +1489,26 @@ func (siw *ServerInterfaceWrapper) UpdateMe(w http.ResponseWriter, r *http.Reque
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateMe(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetMySettlementSummary operation middleware
+func (siw *ServerInterfaceWrapper) GetMySettlementSummary(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetMySettlementSummary(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2705,6 +2767,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Patch(options.BaseURL+"/me", wrapper.UpdateMe)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/me/settlement-summary", wrapper.GetMySettlementSummary)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/ready", wrapper.GetReady)
