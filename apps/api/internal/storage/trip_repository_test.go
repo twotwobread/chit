@@ -1630,6 +1630,209 @@ func TestReorderScheduleItemsReturnsConflictWhenRankUniqueRetryStillCollides(t *
 	}
 }
 
+func TestReorderScheduleItemsRebalancesDenseRanksAndPreservesVersionPolicy(t *testing.T) {
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("DATABASE_URL is required for storage integration test")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	store, err := Open(ctx, databaseURL)
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer store.Close()
+
+	tripID, tripDayID, itemIDs := createRankedDayScheduleFixture(t, ctx, store, "순서 변경 rank rebalance 테스트", []string{
+		"0000000000000000001",
+		"0000000000000000002",
+		"0000000000000000003",
+	}, []int{4, 7, 1})
+
+	reordered, err := store.ReorderScheduleItems(ctx, trip.ReorderScheduleItemsRecord{
+		TripID:    tripID,
+		TripDayID: tripDayID,
+		Moves: []trip.ReorderDayScheduleMoveRecord{{
+			ItemID:        itemIDs[2],
+			BeforeItemID:  stringPtr(itemIDs[0]),
+			AfterItemID:   stringPtr(itemIDs[1]),
+			ClientVersion: 1,
+		}},
+	})
+	if err != nil {
+		t.Fatalf("reorder with dense ranks: %v", err)
+	}
+
+	wantOrder := []string{itemIDs[0], itemIDs[2], itemIDs[1]}
+	wantVersions := map[string]int{itemIDs[0]: 4, itemIDs[1]: 7, itemIDs[2]: 2}
+	for index, wantID := range wantOrder {
+		if reordered[index].ID != wantID {
+			t.Fatalf("expected response item %d to be %q, got %#v", index, wantID, reordered)
+		}
+		if reordered[index].Version != wantVersions[wantID] {
+			t.Fatalf("expected response version for %q to be %d, got %#v", wantID, wantVersions[wantID], reordered[index])
+		}
+	}
+
+	persisted := loadPersistedOrderedScheduleRows(t, ctx, store, tripID, tripDayID)
+	wantRanks := []string{"0000000000000001024", "0000000000000002048", "0000000000000003072"}
+	for index, wantID := range wantOrder {
+		if persisted[index].ID != wantID {
+			t.Fatalf("expected persisted item %d to be %q, got %#v", index, wantID, persisted)
+		}
+		if persisted[index].Rank != wantRanks[index] {
+			t.Fatalf("expected persisted rank %d to be %q, got %#v", index, wantRanks[index], persisted)
+		}
+		if persisted[index].Version != wantVersions[wantID] {
+			t.Fatalf("expected persisted version for %q to be %d, got %#v", wantID, wantVersions[wantID], persisted[index])
+		}
+	}
+}
+
+func TestReorderScheduleItemsRebalancesExistingOverWidthRank(t *testing.T) {
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("DATABASE_URL is required for storage integration test")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	store, err := Open(ctx, databaseURL)
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer store.Close()
+
+	tripID, tripDayID, itemIDs := createRankedDayScheduleFixture(t, ctx, store, "순서 변경 rank 길이 rebalance 테스트", []string{
+		"0000000000000001024",
+		"0000000000000002048",
+		"10000000000000000000",
+	}, []int{1, 1, 3})
+
+	reordered, err := store.ReorderScheduleItems(ctx, trip.ReorderScheduleItemsRecord{
+		TripID:    tripID,
+		TripDayID: tripDayID,
+		Moves: []trip.ReorderDayScheduleMoveRecord{{
+			ItemID:        itemIDs[2],
+			BeforeItemID:  stringPtr(itemIDs[0]),
+			AfterItemID:   stringPtr(itemIDs[1]),
+			ClientVersion: 3,
+		}},
+	})
+	if err != nil {
+		t.Fatalf("reorder with over-width rank: %v", err)
+	}
+
+	wantOrder := []string{itemIDs[0], itemIDs[2], itemIDs[1]}
+	if reordered[0].ID != wantOrder[0] || reordered[1].ID != wantOrder[1] || reordered[2].ID != wantOrder[2] {
+		t.Fatalf("unexpected reordered response: %#v", reordered)
+	}
+	if reordered[1].Version != 4 || reordered[0].Version != 1 || reordered[2].Version != 1 {
+		t.Fatalf("expected only moved item version to increment, got %#v", reordered)
+	}
+
+	persisted := loadPersistedOrderedScheduleRows(t, ctx, store, tripID, tripDayID)
+	wantRanks := []string{"0000000000000001024", "0000000000000002048", "0000000000000003072"}
+	for index, wantID := range wantOrder {
+		if persisted[index].ID != wantID || persisted[index].Rank != wantRanks[index] {
+			t.Fatalf("unexpected persisted row %d: got %#v want id=%q rank=%q", index, persisted[index], wantID, wantRanks[index])
+		}
+	}
+}
+
+func TestReorderScheduleItemsRollsBackWhenRebalanceRewriteFails(t *testing.T) {
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("DATABASE_URL is required for storage integration test")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	store, err := Open(ctx, databaseURL)
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer store.Close()
+
+	tripID, tripDayID, itemIDs := createRankedDayScheduleFixture(t, ctx, store, "순서 변경 rebalance 롤백 테스트", []string{
+		"0000000000000000001",
+		"0000000000000000002",
+		"0000000000000000003",
+	}, []int{1, 1, 1})
+	initial := loadPersistedOrderedScheduleRows(t, ctx, store, tripID, tripDayID)
+	installForcedReorderRankCollision(t, ctx, store, itemIDs[2], 1)
+
+	_, err = store.ReorderScheduleItems(ctx, trip.ReorderScheduleItemsRecord{
+		TripID:    tripID,
+		TripDayID: tripDayID,
+		Moves: []trip.ReorderDayScheduleMoveRecord{{
+			ItemID:        itemIDs[2],
+			BeforeItemID:  stringPtr(itemIDs[0]),
+			AfterItemID:   stringPtr(itemIDs[1]),
+			ClientVersion: 1,
+		}},
+	})
+	if !errors.Is(err, trip.ErrConflict) {
+		t.Fatalf("expected rebalance rewrite conflict, got %v", err)
+	}
+
+	persisted := loadPersistedOrderedScheduleRows(t, ctx, store, tripID, tripDayID)
+	for index := range initial {
+		if persisted[index] != initial[index] {
+			t.Fatalf("expected rollback to preserve row %d, got %#v want %#v", index, persisted[index], initial[index])
+		}
+	}
+}
+
+func TestCreateManualScheduleItemRebalancesBeforeAppendWhenRankWouldExceedWidth(t *testing.T) {
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("DATABASE_URL is required for storage integration test")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	store, err := Open(ctx, databaseURL)
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer store.Close()
+
+	tripID, tripDayID, itemIDs := createRankedDayScheduleFixture(t, ctx, store, "장소 추가 rank rebalance 테스트", []string{
+		"9999999999999999999",
+	}, []int{5})
+
+	created, err := store.CreateManualScheduleItem(ctx, trip.CreateManualScheduleItemRecord{
+		TripID:    tripID,
+		TripDayID: tripDayID,
+		Name:      "난바 야사카 신사",
+		Address:   "Namba",
+		PlaceType: "sights",
+	})
+	if err != nil {
+		t.Fatalf("create manual item after over-width append candidate: %v", err)
+	}
+	if created.ItemOrder != 2 || created.Version != 1 {
+		t.Fatalf("expected appended item order 2 version 1, got %#v", created)
+	}
+
+	persisted := loadPersistedOrderedScheduleRows(t, ctx, store, tripID, tripDayID)
+	if len(persisted) != 2 {
+		t.Fatalf("expected two persisted rows, got %#v", persisted)
+	}
+	if persisted[0].ID != itemIDs[0] || persisted[0].Rank != "0000000000000001024" || persisted[0].Version != 5 {
+		t.Fatalf("expected existing row to be rebalanced without version change, got %#v", persisted[0])
+	}
+	if persisted[1].ID != created.ID || persisted[1].Rank != "0000000000000002048" || persisted[1].Version != 1 {
+		t.Fatalf("expected created row to append after rebalanced rank, got %#v", persisted[1])
+	}
+}
+
 func TestUpdateScheduleItemPlaceUpdatesSharedPlaceSnapshot(t *testing.T) {
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
@@ -2542,6 +2745,88 @@ func tripRepositoryTestDayID(t *testing.T, ctx context.Context, store *Store, tr
 
 func stringPtr(value string) *string {
 	return &value
+}
+
+func createRankedDayScheduleFixture(t *testing.T, ctx context.Context, store *Store, label string, ranks []string, versions []int) (string, string, []string) {
+	t.Helper()
+	if len(ranks) != len(versions) {
+		t.Fatalf("ranks/versions length mismatch: %d != %d", len(ranks), len(versions))
+	}
+
+	var userID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO users (display_name)
+		VALUES ($1)
+		RETURNING id::text
+	`, label).Scan(&userID); err != nil {
+		t.Fatalf("insert user: %v", err)
+	}
+	t.Cleanup(func() { _, _ = store.pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1::uuid`, userID) })
+
+	var tripID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO trips (name, start_date, end_date, default_currency, created_by)
+		VALUES ($1, '2026-07-10', '2026-07-13', 'JPY', $2::uuid)
+		RETURNING id::text
+	`, label+" 여행", userID).Scan(&tripID); err != nil {
+		t.Fatalf("insert trip: %v", err)
+	}
+	tripDayID := tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-11")
+
+	itemIDs := make([]string, 0, len(ranks))
+	for index, rank := range ranks {
+		var placeID string
+		placeName := fmt.Sprintf("%s 장소 %d", label, index+1)
+		if err := store.pool.QueryRow(ctx, `
+			INSERT INTO trip_places (trip_id, name, address, place_type)
+			VALUES ($1::uuid, $2, $3, 'sights')
+			RETURNING id::text
+		`, tripID, placeName, placeName+" 주소").Scan(&placeID); err != nil {
+			t.Fatalf("insert trip place %d: %v", index, err)
+		}
+
+		var itemID string
+		if err := store.pool.QueryRow(ctx, `
+			INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, item_order, rank, version)
+			VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6)
+			RETURNING id::text
+		`, tripID, tripDayID, placeID, index+1, rank, versions[index]).Scan(&itemID); err != nil {
+			t.Fatalf("insert schedule item %d: %v", index, err)
+		}
+		itemIDs = append(itemIDs, itemID)
+	}
+
+	return tripID, tripDayID, itemIDs
+}
+
+func loadPersistedOrderedScheduleRows(t *testing.T, ctx context.Context, store *Store, tripID string, tripDayID string) []orderedScheduleRow {
+	t.Helper()
+
+	rows, err := store.pool.Query(ctx, `
+		SELECT id::text, rank, version
+		FROM schedule_items
+		WHERE trip_id = $1::uuid
+		  AND trip_day_id = $2::uuid
+		  AND deleted_at IS NULL
+		ORDER BY rank ASC, id ASC
+	`, tripID, tripDayID)
+	if err != nil {
+		t.Fatalf("query persisted schedule rows: %v", err)
+	}
+	defer rows.Close()
+
+	items := make([]orderedScheduleRow, 0)
+	for rows.Next() {
+		var item orderedScheduleRow
+		if err := rows.Scan(&item.ID, &item.Rank, &item.Version); err != nil {
+			t.Fatalf("scan persisted schedule row: %v", err)
+		}
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("iterate persisted schedule rows: %v", err)
+	}
+	return items
 }
 
 func createReorderDayScheduleFixture(t *testing.T, ctx context.Context, store *Store, label string) (string, []string, map[string]string) {
