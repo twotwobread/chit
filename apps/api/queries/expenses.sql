@@ -238,6 +238,7 @@ SET
   place_address = sqlc.narg(place_address),
   place_type = sqlc.narg(place_type),
   amount_minor = sqlc.arg(amount_minor),
+  split_policy = sqlc.arg(split_policy),
   payer_participant_id = sqlc.arg(payer_participant_id)::uuid,
   payer_display_name = sqlc.arg(payer_display_name),
   memo = sqlc.narg(memo),

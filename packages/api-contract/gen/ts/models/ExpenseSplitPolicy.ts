@@ -3,6 +3,6 @@
 /* tslint:disable */
 /* eslint-disable */
 /**
- * Persisted split policy for current quick expenses. Future custom split support may add enum values.
+ * Persisted split policy for current quick expenses.
  */
-export type ExpenseSplitPolicy = 'equal';
+export type ExpenseSplitPolicy = 'equal' | 'manual';

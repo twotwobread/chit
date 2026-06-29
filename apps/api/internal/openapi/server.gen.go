@@ -59,7 +59,8 @@ const (
 
 // Defines values for ExpenseSplitPolicy.
 const (
-	Equal ExpenseSplitPolicy = "equal"
+	Equal  ExpenseSplitPolicy = "equal"
+	Manual ExpenseSplitPolicy = "manual"
 )
 
 // Defines values for HealthResponseStatus.
@@ -222,14 +223,20 @@ type CreateQuickExpenseRequest struct {
 	// AmountMinor Positive amount in currency minor units.
 	AmountMinor int64 `json:"amountMinor"`
 
-	// ParticipantIds Current accepted trip participants selected as equal split targets.
-	ParticipantIds []string `json:"participantIds"`
+	// ParticipantIds Required only when splitPolicy is equal. Must be omitted for manual.
+	ParticipantIds *[]string `json:"participantIds,omitempty"`
 
 	// PayerParticipantId Active trip participant who paid the expense.
 	PayerParticipantId string `json:"payerParticipantId"`
 
 	// ScheduleItemId Required schedule item for the selected Day. Must belong to tripId/tripDayId.
 	ScheduleItemId string `json:"scheduleItemId"`
+
+	// SplitPolicy Persisted split policy for current quick expenses.
+	SplitPolicy ExpenseSplitPolicy `json:"splitPolicy"`
+
+	// Splits Required only when splitPolicy is manual. Must be omitted for equal.
+	Splits *[]ManualExpenseSplitInput `json:"splits,omitempty"`
 }
 
 // CreateQuickExpenseResponse defines model for CreateQuickExpenseResponse.
@@ -282,7 +289,7 @@ type DayExpenseListItem struct {
 	Place          *ExpensePlaceDisplay      `json:"place"`
 	ScheduleItemId *string                   `json:"scheduleItemId"`
 
-	// SplitPolicy Persisted split policy for current quick expenses. Future custom split support may add enum values.
+	// SplitPolicy Persisted split policy for current quick expenses.
 	SplitPolicy ExpenseSplitPolicy        `json:"splitPolicy"`
 	Splits      []DayExpenseSplitListItem `json:"splits"`
 	TripDayId   *string                   `json:"tripDayId"`
@@ -328,7 +335,7 @@ type Expense struct {
 	// ScheduleItemId Source schedule item. Present for schedule-item expenses; may become null if later detached to trip-level.
 	ScheduleItemId *string `json:"scheduleItemId"`
 
-	// SplitPolicy Persisted split policy for current quick expenses. Future custom split support may add enum values.
+	// SplitPolicy Persisted split policy for current quick expenses.
 	SplitPolicy ExpenseSplitPolicy `json:"splitPolicy"`
 	Splits      []ExpenseSplit     `json:"splits"`
 	TripDayId   *string            `json:"tripDayId"`
@@ -367,7 +374,7 @@ type ExpenseSplit struct {
 	Participant ExpenseParticipantDisplay `json:"participant"`
 }
 
-// ExpenseSplitPolicy Persisted split policy for current quick expenses. Future custom split support may add enum values.
+// ExpenseSplitPolicy Persisted split policy for current quick expenses.
 type ExpenseSplitPolicy string
 
 // GeoBounds defines model for GeoBounds.
@@ -436,6 +443,15 @@ type ListTripParticipantsResponse struct {
 // ListTripsResponse defines model for ListTripsResponse.
 type ListTripsResponse struct {
 	Trips []TripListItem `json:"trips"`
+}
+
+// ManualExpenseSplitInput defines model for ManualExpenseSplitInput.
+type ManualExpenseSplitInput struct {
+	// AmountMinor Positive burden amount in currency minor units.
+	AmountMinor int64 `json:"amountMinor"`
+
+	// ParticipantId Current trip participant who has a positive manual burden.
+	ParticipantId string `json:"participantId"`
 }
 
 // MarkScheduleItemArrivedResponse defines model for MarkScheduleItemArrivedResponse.
@@ -730,14 +746,20 @@ type UpdateExpenseRequest struct {
 	// Memo Optional memo. Empty strings are normalized to null by the server.
 	Memo *string `json:"memo"`
 
-	// ParticipantIds Current accepted trip participants selected as equal split targets.
-	ParticipantIds []string `json:"participantIds"`
+	// ParticipantIds Required only when splitPolicy is equal. Must be omitted for manual.
+	ParticipantIds *[]string `json:"participantIds,omitempty"`
 
 	// PayerParticipantId Required current trip participant who paid the expense.
 	PayerParticipantId string `json:"payerParticipantId"`
 
 	// ScheduleItemId Same-day schedule item to link, or null to clear the linked place.
 	ScheduleItemId *string `json:"scheduleItemId"`
+
+	// SplitPolicy Persisted split policy for current quick expenses.
+	SplitPolicy ExpenseSplitPolicy `json:"splitPolicy"`
+
+	// Splits Required only when splitPolicy is manual. Must be omitted for equal.
+	Splits *[]ManualExpenseSplitInput `json:"splits,omitempty"`
 }
 
 // UpdateExpenseResponse defines model for UpdateExpenseResponse.

@@ -5,6 +5,7 @@ import type { Expense, GetDayScheduleItemsResponse, TripParticipantListItem } fr
 
 import {
   buildExpenseEditInitialAmountInput,
+  buildExpenseEditInitialManualSplitInputs,
   buildExpenseEditParticipantIds,
   buildExpenseEditViewModel,
   buildUpdateExpenseRequest,
@@ -110,7 +111,9 @@ test('builds update expense request with trimmed memo and nullable place', () =>
   const result = buildUpdateExpenseRequest({
     amountInput: '2,500',
     currency: 'JPY',
+    splitPolicy: 'equal',
     participantIds: buildExpenseEditParticipantIds(participants),
+    manualSplitInputs: [],
     payerParticipantId: 'participant-a',
     memoInput: '  저녁 식사  ',
     scheduleItemId: null,
@@ -123,6 +126,7 @@ test('builds update expense request with trimmed memo and nullable place', () =>
   assert.deepEqual(result.request, {
     amountMinor: 2500,
     payerParticipantId: 'participant-a',
+    splitPolicy: 'equal',
     participantIds: ['participant-a', 'participant-b'],
     memo: '저녁 식사',
     scheduleItemId: null,
@@ -134,7 +138,9 @@ test('validates update expense request', () => {
   const result = buildUpdateExpenseRequest({
     amountInput: '0',
     currency: 'JPY',
+    splitPolicy: 'equal',
     participantIds: [],
+    manualSplitInputs: [],
     payerParticipantId: null,
     memoInput: longMemo,
     scheduleItemId: 'item-a',
@@ -150,6 +156,54 @@ test('validates update expense request', () => {
     participants: '분할할 사람을 1명 이상 선택해주세요.',
     memo: '메모는 240자 이내로 입력해주세요.',
   });
+});
+
+test('builds update expense request with manual split rows', () => {
+  const result = buildUpdateExpenseRequest({
+    amountInput: '1,000',
+    currency: 'JPY',
+    splitPolicy: 'manual',
+    participantIds: ['participant-a'],
+    manualSplitInputs: [
+      { participantId: 'participant-a', amountInput: '300' },
+      { participantId: 'participant-b', amountInput: '700' },
+    ],
+    payerParticipantId: 'participant-payer',
+    memoInput: '',
+    scheduleItemId: 'item-a',
+  });
+
+  assert.equal(result.ok, true);
+  if (!result.ok) {
+    return;
+  }
+  assert.deepEqual(result.request, {
+    amountMinor: 1000,
+    payerParticipantId: 'participant-payer',
+    splitPolicy: 'manual',
+    splits: [
+      { participantId: 'participant-a', amountMinor: 300 },
+      { participantId: 'participant-b', amountMinor: 700 },
+    ],
+    memo: null,
+    scheduleItemId: 'item-a',
+  });
+});
+
+test('initializes manual edit amounts from server-returned expense splits', () => {
+  const manualExpense = expense({
+    splitPolicy: 'manual',
+    amountMinor: 1000,
+    splits: [
+      { participant: { participantId: 'participant-b', displayName: '지영', source: 'live' }, amountMinor: 700 },
+      { participant: { participantId: 'participant-a', displayName: '민수', source: 'live' }, amountMinor: 300 },
+    ],
+  });
+
+  assert.deepEqual(buildExpenseEditInitialManualSplitInputs(manualExpense, 'JPY', participants), [
+    { participantId: 'participant-a', amountInput: '300' },
+    { participantId: 'participant-b', amountInput: '700' },
+  ]);
 });
 
 test('builds save and delete failure copy', () => {

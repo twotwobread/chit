@@ -397,7 +397,7 @@ func (r *fakeRepository) UpdateExpense(_ context.Context, record UpdateExpenseRe
 		Currency:       r.trip.DefaultCurrency,
 		Payer:          ExpenseParticipantDisplay{ParticipantID: &payerID, DisplayName: "민수", Source: ExpenseDisplaySourceLive},
 		Memo:           record.Memo,
-		SplitPolicy:    ExpenseSplitPolicyEqual,
+		SplitPolicy:    record.SplitPolicy,
 		Splits:         []ExpenseSplit{{Participant: ExpenseParticipantDisplay{ParticipantID: &payerID, DisplayName: "민수", Source: ExpenseDisplaySourceLive}, AmountMinor: record.AmountMinor}},
 		CreatedAt:      time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC),
 	}, nil
@@ -441,7 +441,7 @@ func (r *fakeRepository) CreateQuickExpense(_ context.Context, record CreateQuic
 		AmountMinor:    record.AmountMinor,
 		Currency:       r.trip.DefaultCurrency,
 		Payer:          ExpenseParticipantDisplay{ParticipantID: &payerID, DisplayName: "민수", Source: ExpenseDisplaySourceLive},
-		SplitPolicy:    ExpenseSplitPolicyEqual,
+		SplitPolicy:    record.SplitPolicy,
 		Splits:         []ExpenseSplit{{Participant: ExpenseParticipantDisplay{ParticipantID: &payerID, DisplayName: "민수", Source: ExpenseDisplaySourceLive}, AmountMinor: record.AmountMinor}},
 		CreatedAt:      time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC),
 	}}, nil
@@ -1457,6 +1457,72 @@ func TestServiceListDayExpensesValidationAuthAndRange(t *testing.T) {
 	}
 }
 
+func TestServiceUpdateExpenseManualSplit(t *testing.T) {
+	payerID := testUUID(2001)
+	participantA := testUUID(2002)
+	participantB := testUUID(2003)
+	expenseID := testUUID(9001)
+	repo := &fakeRepository{
+		trip:          Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13", DefaultCurrency: "JPY"},
+		tripFound:     true,
+		isParticipant: true,
+	}
+	service := newTestService(repo)
+
+	_, err := service.UpdateExpense(context.Background(), "user-1", testTripID, "2026-07-11", expenseID, UpdateExpenseInput{
+		AmountMinor:        1200,
+		PayerParticipantID: payerID,
+		SplitPolicy:        ExpenseSplitPolicyManual,
+		ManualSplits: []ManualExpenseSplitInput{
+			{ParticipantID: strings.ToUpper(participantA), AmountMinor: 500},
+			{ParticipantID: participantB, AmountMinor: 700},
+		},
+	})
+	if err != nil {
+		t.Fatalf("UpdateExpense returned error: %v", err)
+	}
+
+	if !repo.updatedExpenseCalled {
+		t.Fatal("expected repository update expense to be called")
+	}
+	if repo.updatedExpenseRecord.SplitPolicy != ExpenseSplitPolicyManual || len(repo.updatedExpenseRecord.ParticipantIDs) != 0 {
+		t.Fatalf("unexpected update split policy record: %#v", repo.updatedExpenseRecord)
+	}
+	if len(repo.updatedExpenseRecord.ManualSplits) != 2 || repo.updatedExpenseRecord.ManualSplits[0].ParticipantID != participantA || repo.updatedExpenseRecord.ManualSplits[0].AmountMinor != 500 || repo.updatedExpenseRecord.ManualSplits[1].ParticipantID != participantB || repo.updatedExpenseRecord.ManualSplits[1].AmountMinor != 700 {
+		t.Fatalf("unexpected manual update split records: %#v", repo.updatedExpenseRecord.ManualSplits)
+	}
+}
+
+func TestServiceUpdateExpenseManualValidation(t *testing.T) {
+	payerID := testUUID(2001)
+	expenseID := testUUID(9001)
+	validTrip := Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13", DefaultCurrency: "JPY"}
+	tests := []struct {
+		name  string
+		input UpdateExpenseInput
+	}{
+		{name: "missing policy", input: UpdateExpenseInput{AmountMinor: 1000, PayerParticipantID: payerID, ParticipantIDs: []string{payerID}}},
+		{name: "manual rejects participant ids", input: UpdateExpenseInput{AmountMinor: 1000, PayerParticipantID: payerID, SplitPolicy: ExpenseSplitPolicyManual, ParticipantIDs: []string{payerID}, ManualSplits: []ManualExpenseSplitInput{{ParticipantID: payerID, AmountMinor: 1000}}}},
+		{name: "manual rejects empty participant id array", input: UpdateExpenseInput{AmountMinor: 1000, PayerParticipantID: payerID, SplitPolicy: ExpenseSplitPolicyManual, ParticipantIDs: []string{}, ManualSplits: []ManualExpenseSplitInput{{ParticipantID: payerID, AmountMinor: 1000}}}},
+		{name: "manual mismatch", input: UpdateExpenseInput{AmountMinor: 1000, PayerParticipantID: payerID, SplitPolicy: ExpenseSplitPolicyManual, ManualSplits: []ManualExpenseSplitInput{{ParticipantID: payerID, AmountMinor: 999}}}},
+		{name: "equal rejects manual splits", input: UpdateExpenseInput{AmountMinor: 1000, PayerParticipantID: payerID, SplitPolicy: ExpenseSplitPolicyEqual, ParticipantIDs: []string{payerID}, ManualSplits: []ManualExpenseSplitInput{{ParticipantID: payerID, AmountMinor: 1000}}}},
+		{name: "equal rejects empty manual split array", input: UpdateExpenseInput{AmountMinor: 1000, PayerParticipantID: payerID, SplitPolicy: ExpenseSplitPolicyEqual, ParticipantIDs: []string{payerID}, ManualSplits: []ManualExpenseSplitInput{}}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := &fakeRepository{trip: validTrip, tripFound: true, isParticipant: true}
+			_, err := newTestService(repo).UpdateExpense(context.Background(), "user-1", testTripID, "2026-07-11", expenseID, tt.input)
+			if !errors.Is(err, ErrValidation) {
+				t.Fatalf("expected ErrValidation, got %v", err)
+			}
+			if repo.updatedExpenseCalled {
+				t.Fatal("expected invalid manual update not to call repository")
+			}
+		})
+	}
+}
+
 func TestServiceCreateQuickExpense(t *testing.T) {
 	payerID := testUUID(2001)
 	splitParticipantID := testUUID(2002)
@@ -1472,6 +1538,7 @@ func TestServiceCreateQuickExpense(t *testing.T) {
 		ScheduleItemID:     itemID,
 		AmountMinor:        1001,
 		PayerParticipantID: payerID,
+		SplitPolicy:        ExpenseSplitPolicyEqual,
 		ParticipantIDs:     []string{strings.ToUpper(splitParticipantID)},
 	})
 	if err != nil {
@@ -1481,7 +1548,7 @@ func TestServiceCreateQuickExpense(t *testing.T) {
 	if !repo.quickExpenseCalled {
 		t.Fatal("expected repository quick expense creation to be called")
 	}
-	if repo.quickExpenseRecord.TripID != testTripID || repo.quickExpenseRecord.TripDayID != "2026-07-11" || repo.quickExpenseRecord.ScheduleItemID != itemID || repo.quickExpenseRecord.PayerParticipantID != payerID || repo.quickExpenseRecord.AmountMinor != 1001 || repo.quickExpenseRecord.CreatedBy != "user-1" {
+	if repo.quickExpenseRecord.TripID != testTripID || repo.quickExpenseRecord.TripDayID != "2026-07-11" || repo.quickExpenseRecord.ScheduleItemID != itemID || repo.quickExpenseRecord.PayerParticipantID != payerID || repo.quickExpenseRecord.AmountMinor != 1001 || repo.quickExpenseRecord.SplitPolicy != ExpenseSplitPolicyEqual || repo.quickExpenseRecord.CreatedBy != "user-1" {
 		t.Fatalf("unexpected quick expense record: %#v", repo.quickExpenseRecord)
 	}
 	if len(repo.quickExpenseRecord.ParticipantIDs) != 1 || repo.quickExpenseRecord.ParticipantIDs[0] != splitParticipantID {
@@ -1492,13 +1559,53 @@ func TestServiceCreateQuickExpense(t *testing.T) {
 	}
 }
 
+func TestServiceCreateQuickExpenseManualSplit(t *testing.T) {
+	payerID := testUUID(2001)
+	participantA := testUUID(2002)
+	participantB := testUUID(2003)
+	itemID := testUUID(7001)
+	repo := &fakeRepository{
+		trip:          Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13", DefaultCurrency: "JPY"},
+		tripFound:     true,
+		isParticipant: true,
+	}
+	service := newTestService(repo)
+
+	_, err := service.CreateQuickExpense(context.Background(), "user-1", testTripID, "2026-07-11", CreateQuickExpenseInput{
+		ScheduleItemID:     itemID,
+		AmountMinor:        1000,
+		PayerParticipantID: payerID,
+		SplitPolicy:        ExpenseSplitPolicyManual,
+		ManualSplits: []ManualExpenseSplitInput{
+			{ParticipantID: strings.ToUpper(participantA), AmountMinor: 300},
+			{ParticipantID: participantB, AmountMinor: 700},
+		},
+	})
+	if err != nil {
+		t.Fatalf("CreateQuickExpense returned error: %v", err)
+	}
+
+	if !repo.quickExpenseCalled {
+		t.Fatal("expected repository quick expense creation to be called")
+	}
+	if repo.quickExpenseRecord.SplitPolicy != ExpenseSplitPolicyManual {
+		t.Fatalf("expected manual split policy, got %#v", repo.quickExpenseRecord)
+	}
+	if len(repo.quickExpenseRecord.ParticipantIDs) != 0 {
+		t.Fatalf("manual record must not carry equal participant IDs: %#v", repo.quickExpenseRecord.ParticipantIDs)
+	}
+	if len(repo.quickExpenseRecord.ManualSplits) != 2 || repo.quickExpenseRecord.ManualSplits[0].ParticipantID != participantA || repo.quickExpenseRecord.ManualSplits[0].AmountMinor != 300 || repo.quickExpenseRecord.ManualSplits[1].ParticipantID != participantB || repo.quickExpenseRecord.ManualSplits[1].AmountMinor != 700 {
+		t.Fatalf("unexpected manual split records: %#v", repo.quickExpenseRecord.ManualSplits)
+	}
+}
+
 func TestServiceCreateQuickExpenseValidationAuthAndRange(t *testing.T) {
 	payerID := testUUID(2001)
 	splitParticipantID := testUUID(2002)
 	itemID := testUUID(7001)
 	validTrip := Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13", DefaultCurrency: "JPY"}
 	validInput := func() CreateQuickExpenseInput {
-		return CreateQuickExpenseInput{ScheduleItemID: itemID, AmountMinor: 1, PayerParticipantID: payerID, ParticipantIDs: []string{payerID, splitParticipantID}}
+		return CreateQuickExpenseInput{ScheduleItemID: itemID, AmountMinor: 1, PayerParticipantID: payerID, SplitPolicy: ExpenseSplitPolicyEqual, ParticipantIDs: []string{payerID, splitParticipantID}}
 	}
 	tests := []struct {
 		name   string
@@ -1512,12 +1619,22 @@ func TestServiceCreateQuickExpenseValidationAuthAndRange(t *testing.T) {
 		{name: "requires auth", repo: &fakeRepository{}, userID: " ", tripID: testTripID, date: "2026-07-10", input: validInput(), want: ErrUnauthorized},
 		{name: "invalid trip id", repo: &fakeRepository{}, userID: "user-1", tripID: "not-a-uuid", date: "2026-07-10", input: validInput(), want: ErrValidation},
 		{name: "invalid date", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, date: "2026/07/10", input: validInput(), want: ErrValidation},
-		{name: "invalid item id", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, date: "2026-07-10", input: CreateQuickExpenseInput{ScheduleItemID: "bad", AmountMinor: 1, PayerParticipantID: payerID, ParticipantIDs: []string{payerID}}, want: ErrValidation},
-		{name: "invalid payer id", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, date: "2026-07-10", input: CreateQuickExpenseInput{ScheduleItemID: itemID, AmountMinor: 1, PayerParticipantID: "bad", ParticipantIDs: []string{payerID}}, want: ErrValidation},
-		{name: "invalid amount", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, date: "2026-07-10", input: CreateQuickExpenseInput{ScheduleItemID: itemID, AmountMinor: 0, PayerParticipantID: payerID, ParticipantIDs: []string{payerID}}, want: ErrValidation},
-		{name: "missing split participants", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, date: "2026-07-10", input: CreateQuickExpenseInput{ScheduleItemID: itemID, AmountMinor: 1, PayerParticipantID: payerID}, want: ErrValidation},
-		{name: "invalid split participant id", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, date: "2026-07-10", input: CreateQuickExpenseInput{ScheduleItemID: itemID, AmountMinor: 1, PayerParticipantID: payerID, ParticipantIDs: []string{"bad"}}, want: ErrValidation},
-		{name: "duplicate split participant ids", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, date: "2026-07-10", input: CreateQuickExpenseInput{ScheduleItemID: itemID, AmountMinor: 1, PayerParticipantID: payerID, ParticipantIDs: []string{splitParticipantID, splitParticipantID}}, want: ErrValidation},
+		{name: "invalid item id", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, date: "2026-07-10", input: CreateQuickExpenseInput{ScheduleItemID: "bad", AmountMinor: 1, PayerParticipantID: payerID, SplitPolicy: ExpenseSplitPolicyEqual, ParticipantIDs: []string{payerID}}, want: ErrValidation},
+		{name: "invalid payer id", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, date: "2026-07-10", input: CreateQuickExpenseInput{ScheduleItemID: itemID, AmountMinor: 1, PayerParticipantID: "bad", SplitPolicy: ExpenseSplitPolicyEqual, ParticipantIDs: []string{payerID}}, want: ErrValidation},
+		{name: "invalid amount", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, date: "2026-07-10", input: CreateQuickExpenseInput{ScheduleItemID: itemID, AmountMinor: 0, PayerParticipantID: payerID, SplitPolicy: ExpenseSplitPolicyEqual, ParticipantIDs: []string{payerID}}, want: ErrValidation},
+		{name: "missing split policy", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, date: "2026-07-10", input: CreateQuickExpenseInput{ScheduleItemID: itemID, AmountMinor: 1, PayerParticipantID: payerID, ParticipantIDs: []string{payerID}}, want: ErrValidation},
+		{name: "missing equal split participants", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, date: "2026-07-10", input: CreateQuickExpenseInput{ScheduleItemID: itemID, AmountMinor: 1, PayerParticipantID: payerID, SplitPolicy: ExpenseSplitPolicyEqual}, want: ErrValidation},
+		{name: "invalid equal split participant id", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, date: "2026-07-10", input: CreateQuickExpenseInput{ScheduleItemID: itemID, AmountMinor: 1, PayerParticipantID: payerID, SplitPolicy: ExpenseSplitPolicyEqual, ParticipantIDs: []string{"bad"}}, want: ErrValidation},
+		{name: "duplicate equal split participant ids", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, date: "2026-07-10", input: CreateQuickExpenseInput{ScheduleItemID: itemID, AmountMinor: 1, PayerParticipantID: payerID, SplitPolicy: ExpenseSplitPolicyEqual, ParticipantIDs: []string{splitParticipantID, splitParticipantID}}, want: ErrValidation},
+		{name: "equal rejects manual splits", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, date: "2026-07-10", input: CreateQuickExpenseInput{ScheduleItemID: itemID, AmountMinor: 1, PayerParticipantID: payerID, SplitPolicy: ExpenseSplitPolicyEqual, ParticipantIDs: []string{payerID}, ManualSplits: []ManualExpenseSplitInput{{ParticipantID: payerID, AmountMinor: 1}}}, want: ErrValidation},
+		{name: "equal rejects empty manual split array", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, date: "2026-07-10", input: CreateQuickExpenseInput{ScheduleItemID: itemID, AmountMinor: 1, PayerParticipantID: payerID, SplitPolicy: ExpenseSplitPolicyEqual, ParticipantIDs: []string{payerID}, ManualSplits: []ManualExpenseSplitInput{}}, want: ErrValidation},
+		{name: "manual rejects participant ids", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, date: "2026-07-10", input: CreateQuickExpenseInput{ScheduleItemID: itemID, AmountMinor: 1, PayerParticipantID: payerID, SplitPolicy: ExpenseSplitPolicyManual, ParticipantIDs: []string{payerID}, ManualSplits: []ManualExpenseSplitInput{{ParticipantID: payerID, AmountMinor: 1}}}, want: ErrValidation},
+		{name: "manual rejects empty participant id array", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, date: "2026-07-10", input: CreateQuickExpenseInput{ScheduleItemID: itemID, AmountMinor: 1, PayerParticipantID: payerID, SplitPolicy: ExpenseSplitPolicyManual, ParticipantIDs: []string{}, ManualSplits: []ManualExpenseSplitInput{{ParticipantID: payerID, AmountMinor: 1}}}, want: ErrValidation},
+		{name: "manual missing splits", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, date: "2026-07-10", input: CreateQuickExpenseInput{ScheduleItemID: itemID, AmountMinor: 1, PayerParticipantID: payerID, SplitPolicy: ExpenseSplitPolicyManual}, want: ErrValidation},
+		{name: "manual split sum mismatch", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, date: "2026-07-10", input: CreateQuickExpenseInput{ScheduleItemID: itemID, AmountMinor: 1000, PayerParticipantID: payerID, SplitPolicy: ExpenseSplitPolicyManual, ManualSplits: []ManualExpenseSplitInput{{ParticipantID: payerID, AmountMinor: 999}}}, want: ErrValidation},
+		{name: "manual duplicate participants", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, date: "2026-07-10", input: CreateQuickExpenseInput{ScheduleItemID: itemID, AmountMinor: 1000, PayerParticipantID: payerID, SplitPolicy: ExpenseSplitPolicyManual, ManualSplits: []ManualExpenseSplitInput{{ParticipantID: payerID, AmountMinor: 500}, {ParticipantID: payerID, AmountMinor: 500}}}, want: ErrValidation},
+		{name: "manual non-positive amount", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, date: "2026-07-10", input: CreateQuickExpenseInput{ScheduleItemID: itemID, AmountMinor: 1000, PayerParticipantID: payerID, SplitPolicy: ExpenseSplitPolicyManual, ManualSplits: []ManualExpenseSplitInput{{ParticipantID: payerID, AmountMinor: 0}, {ParticipantID: splitParticipantID, AmountMinor: 1000}}}, want: ErrValidation},
+		{name: "manual invalid participant id", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, date: "2026-07-10", input: CreateQuickExpenseInput{ScheduleItemID: itemID, AmountMinor: 1000, PayerParticipantID: payerID, SplitPolicy: ExpenseSplitPolicyManual, ManualSplits: []ManualExpenseSplitInput{{ParticipantID: "bad", AmountMinor: 1000}}}, want: ErrValidation},
 		{name: "missing trip", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, date: "2026-07-10", input: validInput(), want: ErrNotFound},
 		{name: "forbidden", repo: &fakeRepository{trip: validTrip, tripFound: true}, userID: "user-1", tripID: testTripID, date: "2026-07-10", input: validInput(), want: ErrForbidden},
 		{name: "out of range", repo: &fakeRepository{trip: validTrip, tripFound: true, isParticipant: true}, userID: "user-1", tripID: testTripID, date: "2026-07-14", input: validInput(), want: ErrNotFound},

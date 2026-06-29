@@ -19,6 +19,22 @@ export type QuickExpenseFormErrors = {
   participants?: string;
 };
 
+export type QuickExpenseSplitPolicy = 'equal' | 'manual';
+
+export type QuickExpenseManualSplitInput = {
+  participantId: string;
+  amountInput: string;
+};
+
+export type QuickExpenseManualSplitSummary = {
+  totalAmountMinor: number | null;
+  splitAmountMinor: number;
+  differenceMinor: number | null;
+  canSubmit: boolean;
+  validationMessage: string | null;
+  requestSplits: { participantId: string; amountMinor: number }[];
+};
+
 export type QuickExpenseItemOption = {
   itemId: string;
   orderLabel: string;
@@ -227,6 +243,13 @@ export function formatMoney(amountMinor: number, currency: SupportedCurrency): s
   return `${prefix}${formatInteger(Number(major))}.${fraction}`;
 }
 
+export function formatAmountInput(amountMinor: number, currency: SupportedCurrency): string {
+  if (currency === 'KRW' || currency === 'JPY') {
+    return String(amountMinor);
+  }
+  return (amountMinor / 100).toFixed(2);
+}
+
 export function buildDefaultEqualSplitPreview({
   amountMinor,
   currency,
@@ -275,17 +298,109 @@ export function buildSavedEqualSplitSummary({
   };
 }
 
+export function buildQuickExpenseManualSplitInputsFromRows(
+  rows: { participantId: string | null; amountMinor: number }[],
+  currency: SupportedCurrency,
+): QuickExpenseManualSplitInput[] {
+  return rows
+    .filter((row): row is { participantId: string; amountMinor: number } => row.participantId !== null)
+    .map((row) => ({ participantId: row.participantId, amountInput: formatAmountInput(row.amountMinor, currency) }));
+}
+
+export function buildQuickExpenseManualSplitSummary({
+  amountInput,
+  currency,
+  manualSplitInputs,
+}: {
+  amountInput: string;
+  currency: SupportedCurrency;
+  manualSplitInputs: QuickExpenseManualSplitInput[];
+}): QuickExpenseManualSplitSummary {
+  const parsedTotal = parseAmountMinor(amountInput, currency);
+  const totalAmountMinor = parsedTotal.ok ? parsedTotal.amountMinor : null;
+  const requestSplits: { participantId: string; amountMinor: number }[] = [];
+  let splitAmountMinor = 0;
+  let invalidManualAmount = false;
+
+  for (const splitInput of manualSplitInputs) {
+    const parsedSplit = parseManualSplitAmountInput(splitInput.amountInput, currency);
+    if (parsedSplit.status === 'invalid') {
+      invalidManualAmount = true;
+      continue;
+    }
+    if (parsedSplit.status === 'empty') {
+      continue;
+    }
+    requestSplits.push({ participantId: splitInput.participantId, amountMinor: parsedSplit.amountMinor });
+    splitAmountMinor += parsedSplit.amountMinor;
+  }
+
+  if (invalidManualAmount) {
+    return {
+      totalAmountMinor,
+      splitAmountMinor,
+      differenceMinor: totalAmountMinor === null ? null : totalAmountMinor - splitAmountMinor,
+      canSubmit: false,
+      validationMessage: '금액을 1 이상 입력해주세요.',
+      requestSplits,
+    };
+  }
+  if (requestSplits.length === 0) {
+    return {
+      totalAmountMinor,
+      splitAmountMinor,
+      differenceMinor: totalAmountMinor === null ? null : totalAmountMinor - splitAmountMinor,
+      canSubmit: false,
+      validationMessage: '분할할 금액을 1명 이상 입력해주세요.',
+      requestSplits,
+    };
+  }
+  if (totalAmountMinor === null) {
+    return {
+      totalAmountMinor,
+      splitAmountMinor,
+      differenceMinor: null,
+      canSubmit: false,
+      validationMessage: null,
+      requestSplits,
+    };
+  }
+  const differenceMinor = totalAmountMinor - splitAmountMinor;
+  if (differenceMinor !== 0) {
+    return {
+      totalAmountMinor,
+      splitAmountMinor,
+      differenceMinor,
+      canSubmit: false,
+      validationMessage: '분할 금액의 합계가 총 지출 금액과 같아야 해요.',
+      requestSplits,
+    };
+  }
+  return {
+    totalAmountMinor,
+    splitAmountMinor,
+    differenceMinor: 0,
+    canSubmit: true,
+    validationMessage: null,
+    requestSplits,
+  };
+}
+
 export function buildCreateQuickExpenseRequest({
   amountInput,
   currency,
   scheduleItemId,
+  splitPolicy,
   participantIds,
+  manualSplitInputs,
   payerParticipantId,
 }: {
   amountInput: string;
   currency: SupportedCurrency;
   scheduleItemId: string | null;
+  splitPolicy: QuickExpenseSplitPolicy;
   participantIds: string[];
+  manualSplitInputs: QuickExpenseManualSplitInput[];
   payerParticipantId: string | null;
 }): { ok: true; request: CreateQuickExpenseRequest } | { ok: false; errors: QuickExpenseFormErrors } {
   const errors: QuickExpenseFormErrors = {};
@@ -299,27 +414,50 @@ export function buildCreateQuickExpenseRequest({
   if (!payerParticipantId) {
     errors.payer = '결제자를 선택해주세요.';
   }
-  if (participantIds.length === 0) {
-    errors.participants = '분할할 사람을 1명 이상 선택해주세요.';
+
+  if (splitPolicy === 'equal') {
+    if (participantIds.length === 0) {
+      errors.participants = '분할할 사람을 1명 이상 선택해주세요.';
+    }
+  } else {
+    const manualSummary = buildQuickExpenseManualSplitSummary({ amountInput, currency, manualSplitInputs });
+    if (!manualSummary.canSubmit) {
+      errors.participants = manualSummary.validationMessage ?? '분할 금액의 합계가 총 지출 금액과 같아야 해요.';
+    }
   }
 
-  if (
-    Object.keys(errors).length > 0 ||
-    !parsedAmount.ok ||
-    !scheduleItemId ||
-    !payerParticipantId ||
-    participantIds.length === 0
-  ) {
+  if (Object.keys(errors).length > 0 || !parsedAmount.ok || !scheduleItemId || !payerParticipantId) {
     return { ok: false, errors };
   }
 
+  if (splitPolicy === 'equal') {
+    return {
+      ok: true,
+      request: {
+        scheduleItemId,
+        amountMinor: parsedAmount.amountMinor,
+        payerParticipantId,
+        splitPolicy,
+        participantIds,
+      },
+    };
+  }
+
+  const manualSummary = buildQuickExpenseManualSplitSummary({ amountInput, currency, manualSplitInputs });
+  if (!manualSummary.canSubmit) {
+    return {
+      ok: false,
+      errors: { participants: manualSummary.validationMessage ?? '분할 금액의 합계가 총 지출 금액과 같아야 해요.' },
+    };
+  }
   return {
     ok: true,
     request: {
       scheduleItemId,
       amountMinor: parsedAmount.amountMinor,
       payerParticipantId,
-      participantIds,
+      splitPolicy,
+      splits: manualSummary.requestSplits,
     },
   };
 }
@@ -350,6 +488,24 @@ function toItemOption(item: ScheduleItem, selectedItemId: string | null): QuickE
 
 function orderedItems(items: ScheduleItem[]): ScheduleItem[] {
   return [...items].sort((left, right) => left.itemOrder - right.itemOrder);
+}
+
+function parseManualSplitAmountInput(
+  input: string,
+  currency: SupportedCurrency,
+): { status: 'empty' } | { status: 'valid'; amountMinor: number } | { status: 'invalid' } {
+  const normalized = input.trim().replaceAll(',', '');
+  if (normalized === '') {
+    return { status: 'empty' };
+  }
+  if (zeroDecimalCurrencies.has(currency) ? /^0+$/.test(normalized) : /^0+(\.0{1,2})?$/.test(normalized)) {
+    return { status: 'empty' };
+  }
+  const parsed = parseAmountMinor(input, currency);
+  if (!parsed.ok) {
+    return { status: 'invalid' };
+  }
+  return { status: 'valid', amountMinor: parsed.amountMinor };
 }
 
 function compareParticipantsForSplit(left: TripParticipantListItem, right: TripParticipantListItem): number {

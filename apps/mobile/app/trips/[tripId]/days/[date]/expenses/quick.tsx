@@ -22,10 +22,15 @@ import { buildDayItineraryRoute } from '../../../../../../lib/trips/day-itinerar
 import {
   buildCreateQuickExpenseRequest,
   buildDefaultSplitParticipantIds,
+  buildQuickExpenseManualSplitInputsFromRows,
+  buildQuickExpenseManualSplitSummary,
   buildQuickExpenseViewModel,
   buildSavedEqualSplitSummary,
+  formatMoney,
   quickExpenseFailureMessage,
   type QuickExpenseFormErrors,
+  type QuickExpenseManualSplitInput,
+  type QuickExpenseSplitPolicy,
   toggleQuickExpenseSplitParticipant,
   type QuickExpenseSavedSplitSummary,
   type QuickExpenseViewModel,
@@ -61,6 +66,8 @@ export default function QuickExpenseScreen() {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [payerParticipantId, setPayerParticipantId] = useState<string | null>(null);
   const [selectedSplitParticipantIds, setSelectedSplitParticipantIds] = useState<string[]>([]);
+  const [splitPolicy, setSplitPolicy] = useState<QuickExpenseSplitPolicy>('equal');
+  const [manualSplitInputs, setManualSplitInputs] = useState<QuickExpenseManualSplitInput[]>([]);
   const [errors, setErrors] = useState<QuickExpenseFormErrors>({});
   const [saving, setSaving] = useState(false);
   const [formMessage, setFormMessage] = useState<string | null>(null);
@@ -103,6 +110,8 @@ export default function QuickExpenseScreen() {
       setSelectedItemId(validRouteItem);
       setPayerParticipantId(participants.length === 1 ? participants[0].participantId : null);
       setSelectedSplitParticipantIds(buildDefaultSplitParticipantIds(participants));
+      setSplitPolicy('equal');
+      setManualSplitInputs([]);
       setAmountInput('');
       setState({
         status: 'success',
@@ -157,6 +166,33 @@ export default function QuickExpenseScreen() {
     setFormMessage(null);
   };
 
+  const selectSplitPolicy = (
+    policy: QuickExpenseSplitPolicy,
+    previewRows: QuickExpenseViewModel['splitPreviewRows'],
+  ) => {
+    setSplitPolicy(policy);
+    if (policy === 'manual' && manualSplitInputs.length === 0) {
+      const currency = state.status === 'success' ? state.currency : 'KRW';
+      setManualSplitInputs(buildQuickExpenseManualSplitInputsFromRows(previewRows, currency));
+    }
+    setErrors((current) => ({ ...current, participants: undefined }));
+    setFormMessage(null);
+  };
+
+  const updateManualSplitInput = (participantId: string, amount: string) => {
+    setManualSplitInputs((current) => {
+      const index = current.findIndex((split) => split.participantId === participantId);
+      if (index < 0) {
+        return [...current, { participantId, amountInput: amount }];
+      }
+      return current.map((split) =>
+        split.participantId === participantId ? { ...split, amountInput: amount } : split,
+      );
+    });
+    setErrors((current) => ({ ...current, participants: undefined }));
+    setFormMessage(null);
+  };
+
   const submit = async () => {
     if (state.status !== 'success' || !tripId || !date || saving) {
       return;
@@ -166,7 +202,9 @@ export default function QuickExpenseScreen() {
       amountInput,
       currency: state.currency,
       scheduleItemId: selectedItemId,
+      splitPolicy,
       participantIds: selectedSplitParticipantIds,
+      manualSplitInputs,
       payerParticipantId,
     });
     if (!validation.ok) {
@@ -239,13 +277,17 @@ export default function QuickExpenseScreen() {
           onBack={backToDay}
           onSelectItem={selectItem}
           onSelectPayer={selectPayer}
+          onSelectSplitPolicy={selectSplitPolicy}
           onSubmit={() => void submit()}
           onToggleSplitParticipant={toggleSplitParticipant}
           onUpdateAmount={updateAmountInput}
+          onUpdateManualSplitInput={updateManualSplitInput}
           payerParticipantId={payerParticipantId}
           saving={saving}
           selectedItemId={selectedItemId}
           selectedSplitParticipantIds={selectedSplitParticipantIds}
+          splitPolicy={splitPolicy}
+          manualSplitInputs={manualSplitInputs}
           tripName={state.tripName}
           viewModel={buildQuickExpenseViewModel({
             amountInput,
@@ -294,13 +336,17 @@ function QuickExpenseForm({
   onBack,
   onSelectItem,
   onSelectPayer,
+  onSelectSplitPolicy,
   onSubmit,
   onToggleSplitParticipant,
   onUpdateAmount,
+  onUpdateManualSplitInput,
   payerParticipantId,
   saving,
   selectedItemId,
   selectedSplitParticipantIds,
+  splitPolicy,
+  manualSplitInputs,
   tripName,
   viewModel,
 }: {
@@ -310,13 +356,20 @@ function QuickExpenseForm({
   onBack: () => void;
   onSelectItem: (itemId: string) => void;
   onSelectPayer: (participantId: string) => void;
+  onSelectSplitPolicy: (
+    policy: QuickExpenseSplitPolicy,
+    previewRows: QuickExpenseViewModel['splitPreviewRows'],
+  ) => void;
   onSubmit: () => void;
   onToggleSplitParticipant: (participantId: string) => void;
   onUpdateAmount: (value: string) => void;
+  onUpdateManualSplitInput: (participantId: string, amount: string) => void;
   payerParticipantId: string | null;
   saving: boolean;
   selectedItemId: string | null;
   selectedSplitParticipantIds: string[];
+  splitPolicy: QuickExpenseSplitPolicy;
+  manualSplitInputs: QuickExpenseManualSplitInput[];
   tripName: string;
   viewModel: QuickExpenseViewModel;
 }) {
@@ -324,7 +377,9 @@ function QuickExpenseForm({
     amountInput,
     currency: viewModel.currency,
     scheduleItemId: selectedItemId,
+    splitPolicy,
     participantIds: selectedSplitParticipantIds,
+    manualSplitInputs,
     payerParticipantId,
   });
   const canSubmit = validation.ok && !saving && !viewModel.emptyMessage;
@@ -423,38 +478,74 @@ function QuickExpenseForm({
       </View>
 
       <View style={styles.fieldGroup}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.label}>분할 대상</Text>
-          <Text style={styles.splitHelper}>체크한 사람에게만 아래 금액으로 나눠져요. 결제자도 제외할 수 있어요.</Text>
-        </View>
-        <View style={styles.optionList}>
-          {viewModel.splitParticipantOptions.map((option) => (
+        <Text style={styles.label}>분할 방식</Text>
+        <View style={styles.modeRow}>
+          {(['equal', 'manual'] as const).map((policy) => (
             <Pressable
-              accessibilityRole="checkbox"
-              accessibilityState={{ checked: option.selected }}
+              accessibilityRole="button"
+              accessibilityState={{ selected: splitPolicy === policy }}
               disabled={saving || Boolean(viewModel.emptyMessage)}
-              key={option.participantId}
-              onPress={() => onToggleSplitParticipant(option.participantId)}
-              style={[styles.payerChip, option.selected ? styles.optionCardSelected : null]}
+              key={policy}
+              onPress={() => onSelectSplitPolicy(policy, viewModel.splitPreviewRows)}
+              style={[styles.modeChip, splitPolicy === policy ? styles.optionCardSelected : null]}
             >
-              <Text style={option.selected ? styles.payerChipTextSelected : styles.payerChipText}>
-                {option.displayName}
+              <Text style={splitPolicy === policy ? styles.payerChipTextSelected : styles.payerChipText}>
+                {policy === 'equal' ? '균등 분할' : '직접 입력'}
               </Text>
             </Pressable>
           ))}
         </View>
-        {errors.participants || viewModel.splitParticipantError ? (
-          <Text style={styles.errorMessage}>{errors.participants ?? viewModel.splitParticipantError}</Text>
-        ) : null}
       </View>
 
-      {viewModel.splitPreviewRows.length > 0 ? (
-        <SplitRowsSection
-          helper="저장하면 선택한 참여자에게 아래 금액으로 나눠져요."
-          rows={viewModel.splitPreviewRows}
-          title="기본 1/N 분할"
+      {splitPolicy === 'equal' ? (
+        <>
+          <View style={styles.fieldGroup}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.label}>분할 대상</Text>
+              <Text style={styles.splitHelper}>
+                체크한 사람에게만 아래 금액으로 나눠져요. 결제자도 제외할 수 있어요.
+              </Text>
+            </View>
+            <View style={styles.optionList}>
+              {viewModel.splitParticipantOptions.map((option) => (
+                <Pressable
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: option.selected }}
+                  disabled={saving || Boolean(viewModel.emptyMessage)}
+                  key={option.participantId}
+                  onPress={() => onToggleSplitParticipant(option.participantId)}
+                  style={[styles.payerChip, option.selected ? styles.optionCardSelected : null]}
+                >
+                  <Text style={option.selected ? styles.payerChipTextSelected : styles.payerChipText}>
+                    {option.displayName}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+            {errors.participants || viewModel.splitParticipantError ? (
+              <Text style={styles.errorMessage}>{errors.participants ?? viewModel.splitParticipantError}</Text>
+            ) : null}
+          </View>
+
+          {viewModel.splitPreviewRows.length > 0 ? (
+            <SplitRowsSection
+              helper="저장하면 선택한 참여자에게 아래 금액으로 나눠져요."
+              rows={viewModel.splitPreviewRows}
+              title="기본 1/N 분할"
+            />
+          ) : null}
+        </>
+      ) : (
+        <ManualSplitSection
+          amountInput={amountInput}
+          currency={viewModel.currency}
+          disabled={saving || Boolean(viewModel.emptyMessage)}
+          errorMessage={errors.participants ?? null}
+          manualSplitInputs={manualSplitInputs}
+          onUpdateManualSplitInput={onUpdateManualSplitInput}
+          participants={viewModel.splitParticipantOptions}
         />
-      ) : null}
+      )}
 
       {viewModel.splitPreviewMessage ? <Text style={styles.errorMessage}>{viewModel.splitPreviewMessage}</Text> : null}
 
@@ -489,6 +580,71 @@ function QuickExpenseSavedSummaryCard({
       <PrimaryButton label="확인" onPress={onDone} />
     </Card>
   );
+}
+
+function ManualSplitSection({
+  amountInput,
+  currency,
+  disabled,
+  errorMessage,
+  manualSplitInputs,
+  onUpdateManualSplitInput,
+  participants,
+}: {
+  amountInput: string;
+  currency: SupportedCurrency;
+  disabled: boolean;
+  errorMessage: string | null;
+  manualSplitInputs: QuickExpenseManualSplitInput[];
+  onUpdateManualSplitInput: (participantId: string, amount: string) => void;
+  participants: QuickExpenseViewModel['splitParticipantOptions'];
+}) {
+  const summary = buildQuickExpenseManualSplitSummary({ amountInput, currency, manualSplitInputs });
+  const inputByParticipantId = new Map(manualSplitInputs.map((split) => [split.participantId, split.amountInput]));
+  const differenceLabel = manualSplitDifferenceLabel(summary.differenceMinor, currency);
+  return (
+    <View style={styles.splitSection}>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.label}>직접 입력</Text>
+        <Text style={styles.splitHelper}>참여자별 부담 금액을 입력해주세요. 합계가 총 지출 금액과 같아야 해요.</Text>
+      </View>
+      <View style={styles.splitRowList}>
+        {participants.map((participant) => (
+          <View key={participant.participantId} style={styles.manualSplitRow}>
+            <Text style={styles.splitName}>{participant.displayName}</Text>
+            <TextInput
+              accessibilityLabel={`${participant.displayName} 부담 금액`}
+              editable={!disabled}
+              keyboardType={currency === 'KRW' || currency === 'JPY' ? 'number-pad' : 'decimal-pad'}
+              onChangeText={(value) => onUpdateManualSplitInput(participant.participantId, value)}
+              placeholder="0"
+              placeholderTextColor={theme.color.textFaint}
+              style={styles.manualSplitInput}
+              value={inputByParticipantId.get(participant.participantId) ?? ''}
+            />
+          </View>
+        ))}
+      </View>
+      <Text style={styles.splitHelper}>
+        입력 합계 {formatMoney(summary.splitAmountMinor, currency)} / 총액{' '}
+        {summary.totalAmountMinor === null ? '-' : formatMoney(summary.totalAmountMinor, currency)}
+      </Text>
+      {differenceLabel ? <Text style={styles.splitHelper}>{differenceLabel}</Text> : null}
+      {errorMessage || summary.validationMessage ? (
+        <Text style={styles.errorMessage}>{errorMessage ?? summary.validationMessage}</Text>
+      ) : null}
+    </View>
+  );
+}
+
+function manualSplitDifferenceLabel(differenceMinor: number | null, currency: SupportedCurrency): string | null {
+  if (differenceMinor === null || differenceMinor === 0) {
+    return null;
+  }
+  if (differenceMinor > 0) {
+    return `남은 금액 ${formatMoney(differenceMinor, currency)}`;
+  }
+  return `초과 금액 ${formatMoney(Math.abs(differenceMinor), currency)}`;
 }
 
 function SplitRowsSection({
@@ -621,6 +777,23 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: theme.space[3],
   },
+  manualSplitRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: theme.space[3],
+  },
+  manualSplitInput: {
+    backgroundColor: theme.color.surface,
+    borderColor: theme.color.borderDefault,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.regular,
+    minWidth: 120,
+    paddingHorizontal: theme.space[3],
+    paddingVertical: theme.space[2],
+    textAlign: 'right',
+  },
   splitName: {
     color: theme.color.textBody,
     flex: 1,
@@ -643,6 +816,19 @@ const styles = StyleSheet.create({
   },
   optionList: {
     gap: theme.space[3],
+  },
+  modeRow: {
+    flexDirection: 'row',
+    gap: theme.space[3],
+  },
+  modeChip: {
+    alignItems: 'center',
+    borderColor: theme.color.borderDefault,
+    borderRadius: theme.radius.pill,
+    borderWidth: 1,
+    flex: 1,
+    paddingHorizontal: theme.space[4],
+    paddingVertical: theme.space[3],
   },
   optionCard: {
     backgroundColor: theme.color.surfaceSunken,

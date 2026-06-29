@@ -12,8 +12,12 @@ import { formatTripDayDate } from './days';
 import {
   buildDefaultEqualSplitPreview,
   buildDefaultSplitParticipantIds,
+  buildQuickExpenseManualSplitSummary,
+  formatAmountInput,
   formatMoney,
   parseAmountMinor,
+  type QuickExpenseManualSplitInput,
+  type QuickExpenseSplitPolicy,
   type QuickExpenseSplitRow,
 } from './quick-expense';
 
@@ -107,14 +111,18 @@ export function buildExpenseEditInitialAmountInput(expense: Expense): string {
 export function buildUpdateExpenseRequest({
   amountInput,
   currency,
+  splitPolicy,
   participantIds,
+  manualSplitInputs,
   scheduleItemId,
   memoInput,
   payerParticipantId,
 }: {
   amountInput: string;
   currency: SupportedCurrency;
+  splitPolicy: QuickExpenseSplitPolicy;
   participantIds: string[];
+  manualSplitInputs: QuickExpenseManualSplitInput[];
   scheduleItemId: string | null;
   memoInput: string;
   payerParticipantId: string | null;
@@ -127,8 +135,15 @@ export function buildUpdateExpenseRequest({
   if (!payerParticipantId) {
     errors.payer = '결제자를 선택해주세요.';
   }
-  if (participantIds.length === 0) {
-    errors.participants = '분할할 사람을 1명 이상 선택해주세요.';
+  if (splitPolicy === 'equal') {
+    if (participantIds.length === 0) {
+      errors.participants = '분할할 사람을 1명 이상 선택해주세요.';
+    }
+  } else {
+    const manualSummary = buildQuickExpenseManualSplitSummary({ amountInput, currency, manualSplitInputs });
+    if (!manualSummary.canSubmit) {
+      errors.participants = manualSummary.validationMessage ?? '분할 금액의 합계가 총 지출 금액과 같아야 해요.';
+    }
   }
   const memo = memoInput.trim();
   if ([...memo].length > 240) {
@@ -139,16 +154,57 @@ export function buildUpdateExpenseRequest({
     return { ok: false, errors };
   }
 
+  if (splitPolicy === 'equal') {
+    return {
+      ok: true,
+      request: {
+        amountMinor: parsedAmount.amountMinor,
+        payerParticipantId,
+        splitPolicy,
+        participantIds,
+        memo: memo === '' ? null : memo,
+        scheduleItemId,
+      },
+    };
+  }
+
+  const manualSummary = buildQuickExpenseManualSplitSummary({ amountInput, currency, manualSplitInputs });
+  if (!manualSummary.canSubmit) {
+    return {
+      ok: false,
+      errors: { participants: manualSummary.validationMessage ?? '분할 금액의 합계가 총 지출 금액과 같아야 해요.' },
+    };
+  }
   return {
     ok: true,
     request: {
       amountMinor: parsedAmount.amountMinor,
       payerParticipantId,
-      participantIds,
+      splitPolicy,
+      splits: manualSummary.requestSplits,
       memo: memo === '' ? null : memo,
       scheduleItemId,
     },
   };
+}
+
+export function buildExpenseEditInitialManualSplitInputs(
+  expense: Expense,
+  currency: SupportedCurrency,
+  participants: TripParticipantListItem[],
+): QuickExpenseManualSplitInput[] {
+  const amountByParticipantId = new Map<string, number>();
+  for (const split of expense.splits) {
+    if (split.participant.participantId !== null) {
+      amountByParticipantId.set(split.participant.participantId, split.amountMinor);
+    }
+  }
+  return participants.map((participant) => ({
+    participantId: participant.participantId,
+    amountInput: amountByParticipantId.has(participant.participantId)
+      ? formatAmountInput(amountByParticipantId.get(participant.participantId) ?? 0, currency)
+      : '',
+  }));
 }
 
 export function buildExpenseEditParticipantIds(participants: TripParticipantListItem[]): string[] {

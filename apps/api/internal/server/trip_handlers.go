@@ -280,7 +280,9 @@ func (s apiServer) UpdateExpense(w http.ResponseWriter, r *http.Request, tripId 
 	result, err := s.trips.UpdateExpense(r.Context(), authContext.UserID, tripId, tripDayId, expenseId, trip.UpdateExpenseInput{
 		AmountMinor:        body.AmountMinor,
 		PayerParticipantID: body.PayerParticipantId,
-		ParticipantIDs:     body.ParticipantIds,
+		SplitPolicy:        string(body.SplitPolicy),
+		ParticipantIDs:     optionalStringSlice(body.ParticipantIds),
+		ManualSplits:       manualExpenseSplitsFromOpenAPI(body.Splits),
 		Memo:               body.Memo,
 		ScheduleItemID:     body.ScheduleItemId,
 	})
@@ -327,7 +329,9 @@ func (s apiServer) CreateQuickExpense(w http.ResponseWriter, r *http.Request, tr
 		ScheduleItemID:     body.ScheduleItemId,
 		AmountMinor:        body.AmountMinor,
 		PayerParticipantID: body.PayerParticipantId,
-		ParticipantIDs:     body.ParticipantIds,
+		SplitPolicy:        string(body.SplitPolicy),
+		ParticipantIDs:     optionalStringSlice(body.ParticipantIds),
+		ManualSplits:       manualExpenseSplitsFromOpenAPI(body.Splits),
 	})
 	if err != nil {
 		writeQuickExpenseError(w, err)
@@ -335,6 +339,24 @@ func (s apiServer) CreateQuickExpense(w http.ResponseWriter, r *http.Request, tr
 	}
 
 	writeJSON(w, http.StatusCreated, createQuickExpenseResponseToOpenAPI(result))
+}
+
+func optionalStringSlice(value *[]string) []string {
+	if value == nil {
+		return nil
+	}
+	return *value
+}
+
+func manualExpenseSplitsFromOpenAPI(value *[]openapi.ManualExpenseSplitInput) []trip.ManualExpenseSplitInput {
+	if value == nil {
+		return nil
+	}
+	splits := make([]trip.ManualExpenseSplitInput, 0, len(*value))
+	for _, split := range *value {
+		splits = append(splits, trip.ManualExpenseSplitInput{ParticipantID: split.ParticipantId, AmountMinor: split.AmountMinor})
+	}
+	return splits
 }
 
 func (s apiServer) CreateManualScheduleItem(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string) {

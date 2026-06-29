@@ -275,7 +275,9 @@ export default function TripTodayTabScreen() {
         amountInput: String(amount),
         currency: quickExpenseState.currency,
         scheduleItemId: itemId,
+        splitPolicy: 'equal',
         participantIds: splitParticipantIds,
+        manualSplitInputs: [],
         payerParticipantId,
       });
       if (!validation.ok) {

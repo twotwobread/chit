@@ -1866,7 +1866,7 @@ func TestListDayExpensesHandler(t *testing.T) {
 
 	createExpense := func(amountMinor int64) {
 		t.Helper()
-		requestBody := []byte(fmt.Sprintf(`{"scheduleItemId":%q,"amountMinor":%d,"payerParticipantId":%q,"participantIds":[%q,%q]}`, item.ID, amountMinor, payerID, payerID, member.ID))
+		requestBody := []byte(fmt.Sprintf(`{"scheduleItemId":%q,"amountMinor":%d,"payerParticipantId":%q,"splitPolicy":"equal","participantIds":[%q,%q]}`, item.ID, amountMinor, payerID, payerID, member.ID))
 		recorder := httptest.NewRecorder()
 		request := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/days/2026-07-11/expenses/quick", bytes.NewReader(requestBody))
 		request.Header.Set("Content-Type", "application/json")
@@ -2044,7 +2044,7 @@ func TestCreateQuickExpenseHandler(t *testing.T) {
 	backend.participants[tripID] = append(backend.participants[tripID], member)
 	payerID := backend.participants[tripID][0].ID
 
-	requestBody := []byte(fmt.Sprintf(`{"scheduleItemId":%q,"amountMinor":1001,"payerParticipantId":%q,"participantIds":[%q]}`, item.ID, payerID, member.ID))
+	requestBody := []byte(fmt.Sprintf(`{"scheduleItemId":%q,"amountMinor":1001,"payerParticipantId":%q,"splitPolicy":"equal","participantIds":[%q]}`, item.ID, payerID, member.ID))
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/days/2026-07-11/expenses/quick", bytes.NewReader(requestBody))
 	request.Header.Set("Content-Type", "application/json")
@@ -2104,6 +2104,55 @@ func TestCreateQuickExpenseHandler(t *testing.T) {
 	}
 }
 
+func TestCreateQuickExpenseHandlerManualSplit(t *testing.T) {
+	backend := newFakeAuthBackend()
+	ownerToken := loginTestUser(t, backend)
+	tripID := createTestTrip(t, backend, ownerToken)
+	item := createTestScheduleItem(t, backend, ownerToken, tripID, "2026-07-11", `{"name":"도톤보리","address":"Dotonbori","placeType":"food"}`)
+	member := tripdomain.Participant{
+		ID:          testUUID(2222),
+		TripID:      tripID,
+		UserID:      "user-2",
+		Role:        tripdomain.RoleMember,
+		DisplayName: "지영",
+		JoinedAt:    time.Date(2026, 6, 22, 15, 0, 0, 0, time.UTC),
+	}
+	backend.participants[tripID] = append(backend.participants[tripID], member)
+	payerID := backend.participants[tripID][0].ID
+
+	requestBody := []byte(fmt.Sprintf(`{"scheduleItemId":%q,"amountMinor":1000,"payerParticipantId":%q,"splitPolicy":"manual","splits":[{"participantId":%q,"amountMinor":300},{"participantId":%q,"amountMinor":700}]}`, item.ID, payerID, payerID, member.ID))
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/days/2026-07-11/expenses/quick", bytes.NewReader(requestBody))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", "Bearer "+ownerToken)
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusCreated, recorder.Code, recorder.Body.String())
+	}
+	var body struct {
+		Expense struct {
+			SplitPolicy string `json:"splitPolicy"`
+			Splits      []struct {
+				Participant struct {
+					ParticipantID string `json:"participantId"`
+				} `json:"participant"`
+				AmountMinor int64 `json:"amountMinor"`
+			} `json:"splits"`
+		} `json:"expense"`
+	}
+	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Expense.SplitPolicy != "manual" {
+		t.Fatalf("expected manual split policy, got %#v", body.Expense)
+	}
+	if len(body.Expense.Splits) != 2 || body.Expense.Splits[0].Participant.ParticipantID != payerID || body.Expense.Splits[0].AmountMinor != 300 || body.Expense.Splits[1].Participant.ParticipantID != member.ID || body.Expense.Splits[1].AmountMinor != 700 {
+		t.Fatalf("unexpected manual splits: %#v", body.Expense.Splits)
+	}
+}
+
 func TestCreateQuickExpenseLinksRepeatedPlaceByScheduleItemOccurrence(t *testing.T) {
 	backend := newFakeAuthBackend()
 	ownerToken := loginTestUser(t, backend)
@@ -2152,7 +2201,7 @@ func TestCreateQuickExpenseLinksRepeatedPlaceByScheduleItemOccurrence(t *testing
 	}
 
 	payerID := backend.participants[tripID][0].ID
-	requestBody := []byte(fmt.Sprintf(`{"scheduleItemId":%q,"amountMinor":4500,"payerParticipantId":%q,"participantIds":[%q]}`, second.ID, payerID, payerID))
+	requestBody := []byte(fmt.Sprintf(`{"scheduleItemId":%q,"amountMinor":4500,"payerParticipantId":%q,"splitPolicy":"equal","participantIds":[%q]}`, second.ID, payerID, payerID))
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/days/2026-07-11/expenses/quick", bytes.NewReader(requestBody))
 	request.Header.Set("Content-Type", "application/json")
@@ -2207,7 +2256,7 @@ func TestGetUpdateDeleteExpenseHandlers(t *testing.T) {
 	backend.participants[tripID] = append(backend.participants[tripID], member)
 	ownerParticipantID := backend.participants[tripID][0].ID
 
-	createBody := []byte(fmt.Sprintf(`{"scheduleItemId":%q,"amountMinor":1200,"payerParticipantId":%q,"participantIds":[%q,%q]}`, item.ID, ownerParticipantID, ownerParticipantID, member.ID))
+	createBody := []byte(fmt.Sprintf(`{"scheduleItemId":%q,"amountMinor":1200,"payerParticipantId":%q,"splitPolicy":"equal","participantIds":[%q,%q]}`, item.ID, ownerParticipantID, ownerParticipantID, member.ID))
 	createRecorder := httptest.NewRecorder()
 	createRequest := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/days/2026-07-11/expenses/quick", bytes.NewReader(createBody))
 	createRequest.Header.Set("Content-Type", "application/json")
@@ -2246,7 +2295,7 @@ func TestGetUpdateDeleteExpenseHandlers(t *testing.T) {
 		t.Fatalf("unexpected get expense response: %#v", got.Expense)
 	}
 
-	patchBody := []byte(fmt.Sprintf(`{"amountMinor":1501,"payerParticipantId":%q,"participantIds":[%q,%q],"memo":"  저녁  ","scheduleItemId":null}`, member.ID, ownerParticipantID, member.ID))
+	patchBody := []byte(fmt.Sprintf(`{"amountMinor":1501,"payerParticipantId":%q,"splitPolicy":"equal","participantIds":[%q,%q],"memo":"  저녁  ","scheduleItemId":null}`, member.ID, ownerParticipantID, member.ID))
 	patchRecorder := httptest.NewRecorder()
 	patchRequest := httptest.NewRequest(http.MethodPatch, "/trips/"+tripID+"/days/2026-07-11/expenses/"+created.Expense.ID, bytes.NewReader(patchBody))
 	patchRequest.Header.Set("Content-Type", "application/json")
@@ -2323,6 +2372,7 @@ func TestCreateQuickExpenseValidationNotFoundAndForbidden(t *testing.T) {
 			"amountMinor":        amountMinor,
 			"payerParticipantId": payerParticipantID,
 		}
+		payload["splitPolicy"] = "equal"
 		if participantIDs != nil {
 			payload["participantIds"] = participantIDs
 		}
@@ -4364,11 +4414,7 @@ func (b *fakeAuthBackend) UpdateExpense(_ context.Context, record tripdomain.Upd
 			JoinedAt:      participant.JoinedAt,
 		})
 	}
-	splitParticipants, err := tripdomain.SelectExpenseSplitParticipants(allParticipants, record.ParticipantIDs)
-	if err != nil {
-		return tripdomain.Expense{}, err
-	}
-	splitRecords, err := tripdomain.AllocateEqualExpenseSplits(record.AmountMinor, splitParticipants)
+	splitRecords, err := tripdomain.BuildExpenseSplitRecords(record.AmountMinor, record.SplitPolicy, allParticipants, record.ParticipantIDs, record.ManualSplits)
 	if err != nil {
 		return tripdomain.Expense{}, err
 	}
@@ -4426,7 +4472,7 @@ func (b *fakeAuthBackend) UpdateExpense(_ context.Context, record tripdomain.Upd
 		AmountMinor:    record.AmountMinor,
 		Currency:       foundTrip.DefaultCurrency,
 		Payer:          payerDisplay,
-		SplitPolicy:    tripdomain.ExpenseSplitPolicyEqual,
+		SplitPolicy:    record.SplitPolicy,
 		Splits:         daySplits,
 		CreatedAt:      existing.CreatedAt,
 	}
@@ -4525,12 +4571,7 @@ func (b *fakeAuthBackend) CreateQuickExpense(_ context.Context, record tripdomai
 			JoinedAt:      participant.JoinedAt,
 		})
 	}
-	splitParticipants, err := tripdomain.SelectExpenseSplitParticipants(allParticipants, record.ParticipantIDs)
-	if err != nil {
-		return tripdomain.CreateQuickExpenseResult{}, err
-	}
-
-	splitRecords, err := tripdomain.AllocateEqualExpenseSplits(record.AmountMinor, splitParticipants)
+	splitRecords, err := tripdomain.BuildExpenseSplitRecords(record.AmountMinor, record.SplitPolicy, allParticipants, record.ParticipantIDs, record.ManualSplits)
 	if err != nil {
 		return tripdomain.CreateQuickExpenseResult{}, err
 	}
@@ -4576,7 +4617,7 @@ func (b *fakeAuthBackend) CreateQuickExpense(_ context.Context, record tripdomai
 		AmountMinor:    record.AmountMinor,
 		Currency:       foundTrip.DefaultCurrency,
 		Payer:          payerDisplay,
-		SplitPolicy:    tripdomain.ExpenseSplitPolicyEqual,
+		SplitPolicy:    record.SplitPolicy,
 		Splits:         daySplits,
 		CreatedAt:      createdAt,
 	})
@@ -4593,7 +4634,7 @@ func (b *fakeAuthBackend) CreateQuickExpense(_ context.Context, record tripdomai
 		AmountMinor:    record.AmountMinor,
 		Currency:       foundTrip.DefaultCurrency,
 		Payer:          payerDisplay,
-		SplitPolicy:    tripdomain.ExpenseSplitPolicyEqual,
+		SplitPolicy:    record.SplitPolicy,
 		Splits:         splits,
 		CreatedAt:      createdAt,
 	}}, nil

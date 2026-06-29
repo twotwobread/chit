@@ -2,6 +2,8 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
+import type { ExpenseSplitPolicy } from './ExpenseSplitPolicy';
+import type { ManualExpenseSplitInput } from './ManualExpenseSplitInput';
 export type CreateQuickExpenseRequest = {
     /**
      * Required schedule item for the selected Day. Must belong to tripId/tripDayId.
@@ -15,9 +17,14 @@ export type CreateQuickExpenseRequest = {
      * Active trip participant who paid the expense.
      */
     payerParticipantId: string;
+    splitPolicy: ExpenseSplitPolicy;
     /**
-     * Current accepted trip participants selected as equal split targets.
+     * Required only when splitPolicy is equal. Must be omitted for manual.
      */
-    participantIds: Array<string>;
+    participantIds?: Array<string>;
+    /**
+     * Required only when splitPolicy is manual. Must be omitted for equal.
+     */
+    splits?: Array<ManualExpenseSplitInput>;
 };
 

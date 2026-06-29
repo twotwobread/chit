@@ -13,6 +13,8 @@ import equalSplitCases from '../../../../packages/api-contract/fixtures/equal-sp
 import {
   buildCreateQuickExpenseRequest,
   buildDefaultEqualSplitPreview,
+  buildQuickExpenseManualSplitInputsFromRows,
+  buildQuickExpenseManualSplitSummary,
   buildDefaultSplitParticipantIds,
   buildQuickExpenseRoute,
   buildQuickExpenseViewModel,
@@ -362,7 +364,9 @@ test('builds create quick expense request and validation errors', () => {
       amountInput: '18,500',
       currency: 'KRW',
       scheduleItemId: 'item-a',
+      splitPolicy: 'equal',
       participantIds: ['participant-b'],
+      manualSplitInputs: [],
       payerParticipantId: 'participant-a',
     }),
     {
@@ -371,6 +375,7 @@ test('builds create quick expense request and validation errors', () => {
         scheduleItemId: 'item-a',
         amountMinor: 18500,
         payerParticipantId: 'participant-a',
+        splitPolicy: 'equal',
         participantIds: ['participant-b'],
       },
     },
@@ -381,7 +386,9 @@ test('builds create quick expense request and validation errors', () => {
       amountInput: '0',
       currency: 'KRW',
       scheduleItemId: null,
+      splitPolicy: 'equal',
       participantIds: [],
+      manualSplitInputs: [],
       payerParticipantId: null,
     }),
     {
@@ -394,6 +401,89 @@ test('builds create quick expense request and validation errors', () => {
       },
     },
   );
+});
+
+test('builds manual quick expense request only when split sum matches total', () => {
+  assert.deepEqual(
+    buildCreateQuickExpenseRequest({
+      amountInput: '1,000',
+      currency: 'JPY',
+      scheduleItemId: 'item-a',
+      splitPolicy: 'manual',
+      participantIds: ['participant-a'],
+      manualSplitInputs: [
+        { participantId: 'participant-a', amountInput: '300' },
+        { participantId: 'participant-b', amountInput: '700' },
+        { participantId: 'participant-c', amountInput: '0' },
+      ],
+      payerParticipantId: 'participant-payer',
+    }),
+    {
+      ok: true,
+      request: {
+        scheduleItemId: 'item-a',
+        amountMinor: 1000,
+        payerParticipantId: 'participant-payer',
+        splitPolicy: 'manual',
+        splits: [
+          { participantId: 'participant-a', amountMinor: 300 },
+          { participantId: 'participant-b', amountMinor: 700 },
+        ],
+      },
+    },
+  );
+
+  assert.deepEqual(
+    buildCreateQuickExpenseRequest({
+      amountInput: '1,200',
+      currency: 'JPY',
+      scheduleItemId: 'item-a',
+      splitPolicy: 'manual',
+      participantIds: [],
+      manualSplitInputs: [
+        { participantId: 'participant-a', amountInput: '300' },
+        { participantId: 'participant-b', amountInput: '700' },
+      ],
+      payerParticipantId: 'participant-payer',
+    }),
+    {
+      ok: false,
+      errors: {
+        participants: '분할 금액의 합계가 총 지출 금액과 같아야 해요.',
+      },
+    },
+  );
+});
+
+test('builds manual split summary without mutating entered amounts when total changes', () => {
+  const manualSplitInputs = buildQuickExpenseManualSplitInputsFromRows(
+    [
+      { participantId: 'participant-a', displayName: '민수', amountMinor: 300, amountLabel: '300엔' },
+      { participantId: 'participant-b', displayName: '지영', amountMinor: 700, amountLabel: '700엔' },
+    ],
+    'JPY',
+  );
+
+  assert.deepEqual(manualSplitInputs, [
+    { participantId: 'participant-a', amountInput: '300' },
+    { participantId: 'participant-b', amountInput: '700' },
+  ]);
+
+  const changedTotal = buildQuickExpenseManualSplitSummary({
+    amountInput: '1200',
+    currency: 'JPY',
+    manualSplitInputs,
+  });
+
+  assert.equal(changedTotal.totalAmountMinor, 1200);
+  assert.equal(changedTotal.splitAmountMinor, 1000);
+  assert.equal(changedTotal.differenceMinor, 200);
+  assert.equal(changedTotal.canSubmit, false);
+  assert.equal(changedTotal.validationMessage, '분할 금액의 합계가 총 지출 금액과 같아야 해요.');
+  assert.deepEqual(manualSplitInputs, [
+    { participantId: 'participant-a', amountInput: '300' },
+    { participantId: 'participant-b', amountInput: '700' },
+  ]);
 });
 
 test('builds route with optional inferred item id', () => {

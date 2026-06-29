@@ -55,15 +55,24 @@ type CreateQuickExpenseInput struct {
 	ScheduleItemID     string
 	AmountMinor        int64
 	PayerParticipantID string
+	SplitPolicy        string
 	ParticipantIDs     []string
+	ManualSplits       []ManualExpenseSplitInput
 }
 
 type UpdateExpenseInput struct {
 	AmountMinor        int64
 	PayerParticipantID string
+	SplitPolicy        string
 	ParticipantIDs     []string
+	ManualSplits       []ManualExpenseSplitInput
 	Memo               *string
 	ScheduleItemID     *string
+}
+
+type ManualExpenseSplitInput struct {
+	ParticipantID string
+	AmountMinor   int64
 }
 
 type UpdateScheduleItemInput struct {
@@ -156,7 +165,9 @@ type CreateQuickExpenseRecord struct {
 	ScheduleItemID     string
 	AmountMinor        int64
 	PayerParticipantID string
+	SplitPolicy        string
 	ParticipantIDs     []string
+	ManualSplits       []ManualExpenseSplitInput
 	CreatedBy          string
 }
 
@@ -166,7 +177,9 @@ type UpdateExpenseRecord struct {
 	ExpenseID          string
 	AmountMinor        int64
 	PayerParticipantID string
+	SplitPolicy        string
 	ParticipantIDs     []string
+	ManualSplits       []ManualExpenseSplitInput
 	Memo               *string
 	ScheduleItemID     *string
 }
@@ -361,6 +374,7 @@ const (
 	ExpenseDisplaySourceLive     = "live"
 	ExpenseDisplaySourceFallback = "fallback"
 	ExpenseSplitPolicyEqual      = "equal"
+	ExpenseSplitPolicyManual     = "manual"
 )
 
 type ExpensePlaceDisplay struct {
