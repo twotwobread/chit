@@ -1,3 +1,15 @@
+
+<!--
+GENERATED FILE. DO NOT EDIT.
+
+Source:
+.harness/rules/core/completion-report.md
+
+To modify this adapter:
+edit the source file, then run:
+pnpm harness:sync
+-->
+
 # Completion Report Rule
 
 Use at the end of implementation, PR lifecycle, or docs cleanup tasks.

@@ -1,3 +1,15 @@
+
+<!--
+GENERATED FILE. DO NOT EDIT.
+
+Source:
+.harness/rules/code/testing.md
+
+To modify this adapter:
+edit the source file, then run:
+pnpm harness:sync
+-->
+
 # Testing Rule
 
 Use when planning or running tests, or when changed behavior needs regression coverage.

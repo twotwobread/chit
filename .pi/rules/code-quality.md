@@ -1,3 +1,15 @@
+
+<!--
+GENERATED FILE. DO NOT EDIT.
+
+Source:
+.harness/rules/code/code-quality.md
+
+To modify this adapter:
+edit the source file, then run:
+pnpm harness:sync
+-->
+
 # Code Quality Rule
 
 Use when a change risks duplication, oversized files, or layer confusion.

@@ -1,0 +1,22 @@
+schema_version: feature-spec.v1
+required:
+  - schema_version
+  - id
+  - title
+  - status
+  - summary
+  - scope
+  - acceptance_criteria
+  - test_plan
+  - open_questions
+  - provider
+fields:
+  status:
+    enum: [draft, review, approved]
+  scope:
+    required: [in, out]
+  provider:
+    required: [name, evidence]
+notes:
+  - This is a lightweight schema draft for agent-readable canonical artifacts.
+  - Add executable validation in .harness/gates/check-spec when needed.

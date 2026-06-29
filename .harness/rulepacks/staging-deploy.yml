@@ -1,0 +1,11 @@
+name: staging-deploy
+version: 1
+
+always:
+  - .harness/rules/core/agent-operating-rules.md
+  - .harness/rules/core/git-safety.md
+  - .harness/rules/phase/deploy.rules.md
+
+conditional:
+  completion:
+    - .harness/rules/core/completion-report.md

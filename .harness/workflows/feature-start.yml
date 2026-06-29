@@ -1,0 +1,129 @@
+name: feature-start
+version: 1
+
+rulepack: ".harness/rulepacks/feature-start.yml"
+
+artifacts:
+  run_dir: ".harness/runs/{run_id}"
+  classification: ".harness/runs/{run_id}/classification.yaml"
+  canonical_spec: ".harness/runs/{run_id}/feature.spec.yaml"
+  spec_review: ".harness/runs/{run_id}/spec-review.md"
+  implementation_plan: ".harness/runs/{run_id}/implementation-plan.md"
+  evaluation_report: ".harness/runs/{run_id}/evaluation-report.md"
+  ledger: ".harness/runs/{run_id}/ledger.md"
+
+classification_axes:
+  type: [feature, bugfix, refactor, docs, deploy, investigation]
+  size: [small, normal, large, epic]
+  ambiguity: [low, medium, high]
+  risk: [low, medium, high, critical]
+  testability: [low, medium, high]
+  architecture_impact: [local, cross-module, cross-service]
+  domain_sensitivity: [auth, privacy, billing, audit-log, security, data-migration]
+  product_direction_unclear: [true, false]
+  implementation_requires_exploration: [true, false]
+
+phases:
+  change.classify:
+    contract: ".harness/contracts/change-classify.contract.md"
+    provider: "default-change-classifier"
+
+  spec.author:
+    contract: ".harness/contracts/spec-authoring.contract.md"
+    provider_policy: "spec-authoring-policy"
+
+  spec.review:
+    contract: ".harness/contracts/spec-review.contract.md"
+    provider: "default-spec-review"
+
+  implementation.plan:
+    contract: ".harness/contracts/implementation-plan.contract.md"
+    provider: "default-implementation-planner"
+
+  implementation.execute:
+    contract: ".harness/contracts/implementation.contract.md"
+    provider_policy: "implementation-policy"
+
+  evaluation.checklist:
+    contract: ".harness/contracts/evaluation.contract.md"
+    provider: "checklist-evaluator"
+
+  pr.create:
+    contract: ".harness/contracts/pr.contract.md"
+    provider: "github-pr"
+
+  review.request:
+    contract: ".harness/contracts/review-request.contract.md"
+    provider: "default-review-request"
+
+provider_policies:
+  spec-authoring-policy:
+    default: "micro-spec-author"
+    rules:
+      - when: "product_direction_unclear == true"
+        provider: "product-direction-review"
+        reason: "Product/design/QA direction needs broader framing before implementation."
+
+      - when: "size in ['large', 'epic'] or risk in ['high', 'critical'] or ambiguity in ['medium', 'high']"
+        provider: "ouroboros-spec-author"
+        reason: "Large, risky, or ambiguous work needs the full clarification/seed loop."
+
+      - when: "risk == 'low' and ambiguity == 'low' and testability in ['medium', 'high'] and architecture_impact == 'local'"
+        provider: "micro-spec-author"
+        reason: "Small clear work should stay lightweight; implementation policy may choose Superpowers TDD."
+
+  implementation-policy:
+    default: "default-implementation"
+    rules:
+      - when: "testability in ['medium', 'high'] and ambiguity == 'low' and risk in ['low', 'medium']"
+        provider: "superpowers-tdd"
+        reason: "Clear, testable work benefits from test-first implementation."
+
+      - when: "implementation_requires_exploration == true or ambiguity in ['medium', 'high']"
+        provider: "default-implementation"
+        reason: "Exploratory implementation should not force a rigid TDD loop before unknowns are resolved."
+
+workflow_tiers:
+  small_tdd:
+    when: "size == 'small' and risk == 'low' and ambiguity == 'low' and testability in ['medium', 'high']"
+    intent: "Micro spec plus Superpowers-style TDD implementation."
+    required_artifacts:
+      - classification
+      - canonical_spec
+      - implementation_plan
+      - evaluation_report
+      - ledger
+
+  normal:
+    when: "size == 'normal' and risk in ['low', 'medium'] and ambiguity in ['low', 'medium']"
+    intent: "Canonical spec/review and focused implementation."
+    required_artifacts:
+      - classification
+      - canonical_spec
+      - spec_review
+      - implementation_plan
+      - evaluation_report
+      - ledger
+
+  full_ouroboros_loop:
+    when: "size in ['large', 'epic'] or risk in ['high', 'critical'] or ambiguity == 'high'"
+    intent: "Ouroboros-backed clarification/seed loop, stricter review, and explicit approval before implementation."
+    required_artifacts:
+      - classification
+      - canonical_spec
+      - spec_review
+      - implementation_plan
+      - evaluation_report
+      - ledger
+
+gates:
+  before_implementation:
+    - require_artifact: "canonical_spec"
+    - require_contract_pass: "spec.author"
+    - require_contract_pass: "spec.review"
+      except_when: "workflow_tier == 'small_tdd' and user_approved_skip_spec_review == true"
+
+  before_pr:
+    - require_artifact: "evaluation_report"
+    - require_contract_pass: "evaluation.checklist"
+    - require_clean_secret_scan: true

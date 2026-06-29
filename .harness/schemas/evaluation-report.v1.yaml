@@ -1,0 +1,11 @@
+schema_version: evaluation-report.v1
+required_sections:
+  - Verdict
+  - Spec coverage
+  - Test evidence
+  - Rule/gate evidence
+  - Regression gaps
+  - Manual smoke / deploy
+  - Risks
+verdict:
+  enum: [Passed, Failed, Blocked]

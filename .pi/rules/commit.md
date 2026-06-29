@@ -1,3 +1,15 @@
+
+<!--
+GENERATED FILE. DO NOT EDIT.
+
+Source:
+.harness/rules/core/commit.md
+
+To modify this adapter:
+edit the source file, then run:
+pnpm harness:sync
+-->
+
 # Commit Rule
 
 Use before committing or creating a PR.

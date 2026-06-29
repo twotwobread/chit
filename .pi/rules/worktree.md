@@ -1,3 +1,15 @@
+
+<!--
+GENERATED FILE. DO NOT EDIT.
+
+Source:
+.harness/rules/core/worktree.md
+
+To modify this adapter:
+edit the source file, then run:
+pnpm harness:sync
+-->
+
 # Worktree Rule
 
 Use when creating or selecting a worktree for feature/doc/issue PR work. Feature spec/plan drafting counts as feature work; triaged bugfix/small implementation PRs use the same worktree policy.

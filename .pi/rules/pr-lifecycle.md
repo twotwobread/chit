@@ -1,3 +1,15 @@
+
+<!--
+GENERATED FILE. DO NOT EDIT.
+
+Source:
+.harness/rules/phase/pr-lifecycle.rules.md
+
+To modify this adapter:
+edit the source file, then run:
+pnpm harness:sync
+-->
+
 # PR Lifecycle Rule
 
 Use when the user asks to create, update, inspect, or merge an existing PR/worktree. Do not treat this as feature implementation.
@@ -19,7 +31,7 @@ If PR metadata is missing, read only the top section of the feature spec with `o
 
 1. Confirm target worktree path and branch.
 2. Run `git status --short`.
-3. Read `.pi/rules/commit.md` and confirm the commit stack is reviewable.
+3. Read `.harness/rules/core/commit.md` and confirm the commit stack is reviewable.
 4. Confirm commits/diff are ready: `git log`, `git diff --stat`, or PR branch comparison.
 5. Treat feature specs/plans plus implementation as one feature PR when they share the same feature branch; do not split them into separate PRs by default.
 6. Check existing PR state before creating a new one.

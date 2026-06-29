@@ -1,0 +1,8 @@
+schema_version: spec-review.v1
+required_sections:
+  - Verdict
+  - Findings
+  - Required changes before implementation
+  - Provider notes
+verdict:
+  enum: [Approved, Changes requested, Blocked]

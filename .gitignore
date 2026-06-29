@@ -32,6 +32,10 @@ tfplan
 crash.log
 crash.*.log
 
+# Harness run artifacts
+.harness/runs/*
+!.harness/runs/.gitkeep
+
 # Logs
 *.log
 .pi/harness-audit/

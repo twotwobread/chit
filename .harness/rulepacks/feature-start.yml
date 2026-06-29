@@ -1,0 +1,78 @@
+name: feature-start
+version: 1
+
+always:
+  - .harness/rules/core/agent-operating-rules.md
+  - .harness/rules/core/git-safety.md
+  - .harness/rules/code/architecture.md
+  - .harness/rules/code/testing.md
+
+by_phase:
+  change.classify:
+    - .harness/rules/ai/context-management.md
+    - .harness/rules/phase/task-triage.rules.md
+
+  spec.author:
+    - .harness/rules/phase/spec-authoring.rules.md
+
+  spec.review:
+    - .harness/rules/phase/spec-review.rules.md
+
+  implementation.plan:
+    - .harness/rules/phase/implementation.rules.md
+    - .harness/rules/phase/feature-implement.rules.md
+
+  implementation.execute:
+    - .harness/rules/phase/implementation.rules.md
+    - .harness/rules/phase/feature-implement.rules.md
+    - .harness/rules/ai/anti-patterns.md
+
+  evaluation.checklist:
+    - .harness/rules/phase/evaluation.rules.md
+
+  pr.create:
+    - .harness/rules/phase/pr.rules.md
+    - .harness/rules/phase/pr-lifecycle.rules.md
+    - .harness/rules/core/commit.md
+
+by_change_area:
+  api_db:
+    - .harness/rules/code/api-db.md
+
+  mobile_ui:
+    - .harness/rules/code/mobile-ui.md
+
+  code_quality:
+    - .harness/rules/code/code-quality.md
+
+  worktree:
+    - .harness/rules/core/worktree.md
+
+  completion:
+    - .harness/rules/core/completion-report.md
+
+by_risk:
+  high:
+    - .harness/rules/domain/security-sensitive.md
+    - .harness/rules/code/database.md
+
+  critical:
+    - .harness/rules/domain/security-sensitive.md
+    - .harness/rules/code/database.md
+
+by_domain_sensitivity:
+  auth:
+    - .harness/rules/domain/security-sensitive.md
+
+  privacy:
+    - .harness/rules/domain/security-sensitive.md
+
+  billing:
+    - .harness/rules/domain/security-sensitive.md
+
+  audit-log:
+    - .harness/rules/domain/security-sensitive.md
+
+  data-migration:
+    - .harness/rules/code/database.md
+    - .harness/rules/code/api-db.md
