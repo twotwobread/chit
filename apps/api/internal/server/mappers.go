@@ -110,6 +110,52 @@ func listTripParticipantsResponseToOpenAPI(participants []trip.ParticipantListIt
 	return openapi.ListTripParticipantsResponse{Participants: items}
 }
 
+func getTripSettlementResponseToOpenAPI(result trip.GetTripSettlementResult) openapi.GetTripSettlementResponse {
+	summaries := make([]openapi.SettlementCurrencySummary, 0, len(result.CurrencySummaries))
+	for _, summary := range result.CurrencySummaries {
+		balances := make([]openapi.SettlementBalance, 0, len(summary.Balances))
+		for _, balance := range summary.Balances {
+			balances = append(balances, openapi.SettlementBalance{
+				Participant: settlementParticipantToOpenAPI(balance.Participant),
+				PaidMinor:   balance.PaidMinor,
+				ShareMinor:  balance.ShareMinor,
+				NetMinor:    balance.NetMinor,
+			})
+		}
+
+		transfers := make([]openapi.SettlementTransfer, 0, len(summary.SuggestedTransfers))
+		for _, transfer := range summary.SuggestedTransfers {
+			transfers = append(transfers, openapi.SettlementTransfer{
+				FromParticipant: settlementParticipantToOpenAPI(transfer.FromParticipant),
+				ToParticipant:   settlementParticipantToOpenAPI(transfer.ToParticipant),
+				AmountMinor:     transfer.AmountMinor,
+			})
+		}
+
+		summaries = append(summaries, openapi.SettlementCurrencySummary{
+			Currency:           openapi.SupportedCurrency(summary.Currency),
+			TotalPaidMinor:     summary.TotalPaidMinor,
+			TotalShareMinor:    summary.TotalShareMinor,
+			Balances:           balances,
+			SuggestedTransfers: transfers,
+		})
+	}
+
+	return openapi.GetTripSettlementResponse{
+		TripId:            result.TripID,
+		DefaultCurrency:   openapi.SupportedCurrency(result.DefaultCurrency),
+		CurrencySummaries: summaries,
+	}
+}
+
+func settlementParticipantToOpenAPI(participant trip.SettlementParticipantSnapshot) openapi.SettlementParticipantSnapshot {
+	return openapi.SettlementParticipantSnapshot{
+		ParticipantId:     participant.ParticipantID,
+		DisplayName:       participant.DisplayName,
+		ParticipantStatus: openapi.SettlementParticipantStatus(participant.ParticipantStatus),
+	}
+}
+
 func createTripInviteResponseToOpenAPI(result trip.CreateTripInviteResult) openapi.CreateTripInviteResponse {
 	return openapi.CreateTripInviteResponse{
 		Invite: openapi.TripInvite{

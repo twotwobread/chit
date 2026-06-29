@@ -113,6 +113,97 @@ func TestListScheduleItemsByTripDayFiltersSortsAndJoinsPlaces(t *testing.T) {
 	}
 }
 
+func TestTripSettlementInputUsesLiveAndFallbackParticipantSnapshots(t *testing.T) {
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("DATABASE_URL is required for storage integration test")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	store, err := Open(ctx, databaseURL)
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer store.Close()
+
+	var ownerUserID string
+	if err := store.pool.QueryRow(ctx, `INSERT INTO users (display_name) VALUES ('민수') RETURNING id::text`).Scan(&ownerUserID); err != nil {
+		t.Fatalf("insert owner user: %v", err)
+	}
+	var memberUserID string
+	if err := store.pool.QueryRow(ctx, `INSERT INTO users (display_name) VALUES ('지영') RETURNING id::text`).Scan(&memberUserID); err != nil {
+		t.Fatalf("insert member user: %v", err)
+	}
+	defer func() {
+		_, _ = store.pool.Exec(context.Background(), `DELETE FROM users WHERE id = ANY($1::uuid[])`, []string{ownerUserID, memberUserID})
+	}()
+
+	var tripID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO trips (name, start_date, end_date, default_currency, created_by)
+		VALUES ('정산 입력 테스트 여행', '2026-07-10', '2026-07-13', 'JPY', $1::uuid)
+		RETURNING id::text
+	`, ownerUserID).Scan(&tripID); err != nil {
+		t.Fatalf("insert trip: %v", err)
+	}
+	defer func() { _, _ = store.pool.Exec(context.Background(), `DELETE FROM trips WHERE id = $1::uuid`, tripID) }()
+
+	var ownerParticipantID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO trip_participants (trip_id, user_id, role, display_name, joined_at)
+		VALUES ($1::uuid, $2::uuid, 'owner', '민수', '2026-07-01T00:00:00Z')
+		RETURNING id::text
+	`, tripID, ownerUserID).Scan(&ownerParticipantID); err != nil {
+		t.Fatalf("insert owner participant: %v", err)
+	}
+	var memberParticipantID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO trip_participants (trip_id, user_id, role, display_name, joined_at)
+		VALUES ($1::uuid, $2::uuid, 'member', '지영', '2026-07-02T00:00:00Z')
+		RETURNING id::text
+	`, tripID, memberUserID).Scan(&memberParticipantID); err != nil {
+		t.Fatalf("insert member participant: %v", err)
+	}
+
+	var expenseID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO expenses (trip_id, anchor_type, expense_date, amount_minor, currency, split_policy, payer_participant_id, payer_display_name, created_by)
+		VALUES ($1::uuid, 'trip', '2026-07-10', 700, 'JPY', 'manual', $2::uuid, '지영', $3::uuid)
+		RETURNING id::text
+	`, tripID, memberParticipantID, ownerUserID).Scan(&expenseID); err != nil {
+		t.Fatalf("insert expense: %v", err)
+	}
+	if _, err := store.pool.Exec(ctx, `
+		INSERT INTO expense_splits (expense_id, participant_id, participant_display_name, amount_minor, split_order)
+		VALUES ($1::uuid, $2::uuid, '민수', 700, 1)
+	`, expenseID, ownerParticipantID); err != nil {
+		t.Fatalf("insert split: %v", err)
+	}
+	if _, err := store.pool.Exec(ctx, `DELETE FROM trip_participants WHERE id = $1::uuid`, memberParticipantID); err != nil {
+		t.Fatalf("delete member participant: %v", err)
+	}
+
+	input, err := store.GetTripSettlementInput(ctx, tripID)
+	if err != nil {
+		t.Fatalf("GetTripSettlementInput returned error: %v", err)
+	}
+	if len(input.Participants) != 1 || input.Participants[0].ParticipantID != ownerParticipantID || input.Participants[0].DisplayName != "민수" {
+		t.Fatalf("unexpected current participants: %#v", input.Participants)
+	}
+	if len(input.Expenses) != 1 {
+		t.Fatalf("expected one expense input, got %#v", input.Expenses)
+	}
+	expense := input.Expenses[0]
+	if expense.PayerParticipantID != nil || expense.PayerDisplayName != "지영" || expense.PayerParticipantLive {
+		t.Fatalf("expected fallback payer snapshot, got %#v", expense)
+	}
+	if len(expense.Splits) != 1 || expense.Splits[0].ParticipantID == nil || *expense.Splits[0].ParticipantID != ownerParticipantID || !expense.Splits[0].ParticipantLive || expense.Splits[0].AmountMinor != 700 {
+		t.Fatalf("unexpected split input: %#v", expense.Splits)
+	}
+}
+
 func TestExpenseDisplayUsesLiveRowsThenFallback(t *testing.T) {
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {

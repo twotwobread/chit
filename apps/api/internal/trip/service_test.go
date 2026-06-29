@@ -71,6 +71,10 @@ type fakeRepository struct {
 	listedDayExpensesDate    string
 	listDayExpensesCalled    bool
 	listDayExpensesErr       error
+	settlementData           SettlementInput
+	settlementDataTripID     string
+	settlementDataCalled     bool
+	settlementDataErr        error
 	expense                  Expense
 	expenseFound             bool
 	expenseLookupTripID      string
@@ -345,6 +349,12 @@ func (r *fakeRepository) ListDayExpensesByTripDay(_ context.Context, tripID stri
 		return r.dayExpenses, nil
 	}
 	return []DayExpenseListItem{}, nil
+}
+
+func (r *fakeRepository) GetTripSettlementInput(_ context.Context, tripID string) (SettlementInput, error) {
+	r.settlementDataTripID = tripID
+	r.settlementDataCalled = true
+	return r.settlementData, r.settlementDataErr
 }
 
 func (r *fakeRepository) GetExpenseByTripDayAndID(_ context.Context, tripID string, tripDayID string, expenseID string) (Expense, bool, error) {
@@ -2487,6 +2497,288 @@ func TestServiceDeleteScheduleItemFailures(t *testing.T) {
 				t.Fatalf("expected %v, got %v", tt.want, err)
 			}
 		})
+	}
+}
+
+func TestServiceGetTripSettlementCalculatesBalancesAndTransfers(t *testing.T) {
+	participantA := testUUID(2001)
+	participantB := testUUID(2002)
+	participantC := testUUID(2003)
+	joinedAt := time.Date(2026, 6, 21, 12, 0, 0, 0, time.UTC)
+	repo := &fakeRepository{
+		trip:          Trip{ID: testTripID, DefaultCurrency: "KRW"},
+		tripFound:     true,
+		isParticipant: true,
+		settlementData: SettlementInput{
+			Participants: []SettlementParticipantInput{
+				{ParticipantID: participantB, DisplayName: "지영", JoinedAt: joinedAt.Add(2 * time.Hour)},
+				{ParticipantID: participantA, DisplayName: "민수", JoinedAt: joinedAt},
+				{ParticipantID: participantC, DisplayName: "유나", JoinedAt: joinedAt.Add(3 * time.Hour)},
+			},
+			Expenses: []SettlementExpenseInput{
+				{
+					ExpenseID:             testUUID(3001),
+					Currency:              "KRW",
+					AmountMinor:           1000,
+					PayerParticipantID:    stringPtr(participantA),
+					PayerDisplayName:      "민수",
+					PayerParticipantLive:  true,
+					PayerParticipantOrder: 0,
+					Splits: []SettlementSplitInput{
+						{ParticipantID: stringPtr(participantA), DisplayName: "민수", ParticipantLive: true, AmountMinor: 500},
+						{ParticipantID: stringPtr(participantB), DisplayName: "지영", ParticipantLive: true, AmountMinor: 500},
+					},
+				},
+			},
+		},
+	}
+
+	result, err := newTestService(repo).GetTripSettlement(context.Background(), "user-1", testTripID)
+	if err != nil {
+		t.Fatalf("GetTripSettlement returned error: %v", err)
+	}
+
+	if result.TripID != testTripID || result.DefaultCurrency != "KRW" {
+		t.Fatalf("unexpected settlement metadata: %#v", result)
+	}
+	if len(result.CurrencySummaries) != 1 {
+		t.Fatalf("expected one currency summary, got %#v", result.CurrencySummaries)
+	}
+	summary := result.CurrencySummaries[0]
+	if summary.Currency != "KRW" || summary.TotalPaidMinor != 1000 || summary.TotalShareMinor != 1000 {
+		t.Fatalf("unexpected summary totals: %#v", summary)
+	}
+	if len(summary.Balances) != 3 {
+		t.Fatalf("expected all current participants including zero rows, got %#v", summary.Balances)
+	}
+	assertSettlementBalance(t, summary.Balances[0], participantA, "민수", SettlementParticipantStatusCurrent, 1000, 500, 500)
+	assertSettlementBalance(t, summary.Balances[1], participantB, "지영", SettlementParticipantStatusCurrent, 0, 500, -500)
+	assertSettlementBalance(t, summary.Balances[2], participantC, "유나", SettlementParticipantStatusCurrent, 0, 0, 0)
+	if len(summary.SuggestedTransfers) != 1 {
+		t.Fatalf("expected one transfer, got %#v", summary.SuggestedTransfers)
+	}
+	assertSettlementTransfer(t, summary.SuggestedTransfers[0], participantB, "지영", participantA, "민수", 500)
+}
+
+func TestServiceGetTripSettlementEmptyTrip(t *testing.T) {
+	repo := &fakeRepository{
+		trip:          Trip{ID: testTripID, DefaultCurrency: "JPY"},
+		tripFound:     true,
+		isParticipant: true,
+		settlementData: SettlementInput{
+			Participants: []SettlementParticipantInput{{ParticipantID: testUUID(2001), DisplayName: "민수", JoinedAt: time.Date(2026, 6, 21, 12, 0, 0, 0, time.UTC)}},
+		},
+	}
+
+	result, err := newTestService(repo).GetTripSettlement(context.Background(), "user-1", testTripID)
+	if err != nil {
+		t.Fatalf("GetTripSettlement returned error: %v", err)
+	}
+	if result.DefaultCurrency != "JPY" || len(result.CurrencySummaries) != 0 {
+		t.Fatalf("expected empty settlement summaries, got %#v", result)
+	}
+}
+
+func TestServiceGetTripSettlementSortsCurrenciesAndDoesNotNetAcrossCurrencies(t *testing.T) {
+	participantA := testUUID(2001)
+	participantB := testUUID(2002)
+	joinedAt := time.Date(2026, 6, 21, 12, 0, 0, 0, time.UTC)
+	repo := &fakeRepository{
+		trip:          Trip{ID: testTripID, DefaultCurrency: "KRW"},
+		tripFound:     true,
+		isParticipant: true,
+		settlementData: SettlementInput{
+			Participants: []SettlementParticipantInput{
+				{ParticipantID: participantA, DisplayName: "민수", JoinedAt: joinedAt},
+				{ParticipantID: participantB, DisplayName: "지영", JoinedAt: joinedAt.Add(time.Hour)},
+			},
+			Expenses: []SettlementExpenseInput{
+				settlementExpense(testUUID(3001), "USD", 900, participantA, []SettlementSplitInput{{ParticipantID: stringPtr(participantA), DisplayName: "민수", ParticipantLive: true, AmountMinor: 450}, {ParticipantID: stringPtr(participantB), DisplayName: "지영", ParticipantLive: true, AmountMinor: 450}}),
+				settlementExpense(testUUID(3002), "KRW", 300, participantB, []SettlementSplitInput{{ParticipantID: stringPtr(participantA), DisplayName: "민수", ParticipantLive: true, AmountMinor: 150}, {ParticipantID: stringPtr(participantB), DisplayName: "지영", ParticipantLive: true, AmountMinor: 150}}),
+			},
+		},
+	}
+
+	result, err := newTestService(repo).GetTripSettlement(context.Background(), "user-1", testTripID)
+	if err != nil {
+		t.Fatalf("GetTripSettlement returned error: %v", err)
+	}
+	if len(result.CurrencySummaries) != 2 || result.CurrencySummaries[0].Currency != "KRW" || result.CurrencySummaries[1].Currency != "USD" {
+		t.Fatalf("expected default currency first and independent USD summary, got %#v", result.CurrencySummaries)
+	}
+	assertSettlementTransfer(t, result.CurrencySummaries[0].SuggestedTransfers[0], participantA, "민수", participantB, "지영", 150)
+	assertSettlementTransfer(t, result.CurrencySummaries[1].SuggestedTransfers[0], participantB, "지영", participantA, "민수", 450)
+}
+
+func TestServiceGetTripSettlementIncludesRemovedSnapshots(t *testing.T) {
+	participantA := testUUID(2001)
+	joinedAt := time.Date(2026, 6, 21, 12, 0, 0, 0, time.UTC)
+	repo := &fakeRepository{
+		trip:          Trip{ID: testTripID, DefaultCurrency: "KRW"},
+		tripFound:     true,
+		isParticipant: true,
+		settlementData: SettlementInput{
+			Participants: []SettlementParticipantInput{{ParticipantID: participantA, DisplayName: "민수", JoinedAt: joinedAt}},
+			Expenses: []SettlementExpenseInput{
+				{
+					ExpenseID:        testUUID(3001),
+					Currency:         "KRW",
+					AmountMinor:      600,
+					PayerDisplayName: "탈퇴한 사용자",
+					Splits: []SettlementSplitInput{
+						{ParticipantID: stringPtr(participantA), DisplayName: "민수", ParticipantLive: true, AmountMinor: 600},
+					},
+				},
+			},
+		},
+	}
+
+	result, err := newTestService(repo).GetTripSettlement(context.Background(), "user-1", testTripID)
+	if err != nil {
+		t.Fatalf("GetTripSettlement returned error: %v", err)
+	}
+	summary := result.CurrencySummaries[0]
+	if len(summary.Balances) != 2 {
+		t.Fatalf("expected current and removed balance rows, got %#v", summary.Balances)
+	}
+	assertSettlementBalance(t, summary.Balances[0], participantA, "민수", SettlementParticipantStatusCurrent, 0, 600, -600)
+	assertRemovedSettlementBalance(t, summary.Balances[1], "탈퇴한 사용자", 600, 0, 600)
+	if summary.SuggestedTransfers[0].ToParticipant.ParticipantID != nil || summary.SuggestedTransfers[0].ToParticipant.ParticipantStatus != SettlementParticipantStatusRemoved {
+		t.Fatalf("expected transfer to removed participant snapshot, got %#v", summary.SuggestedTransfers[0])
+	}
+	assertSettlementTransfer(t, summary.SuggestedTransfers[0], participantA, "민수", "", "탈퇴한 사용자", 600)
+}
+
+func TestServiceGetTripSettlementDeterministicGreedyTransfers(t *testing.T) {
+	participantA := testUUID(2001)
+	participantB := testUUID(2002)
+	participantC := testUUID(2003)
+	participantD := testUUID(2004)
+	joinedAt := time.Date(2026, 6, 21, 12, 0, 0, 0, time.UTC)
+	repo := &fakeRepository{
+		trip:          Trip{ID: testTripID, DefaultCurrency: "KRW"},
+		tripFound:     true,
+		isParticipant: true,
+		settlementData: SettlementInput{
+			Participants: []SettlementParticipantInput{
+				{ParticipantID: participantA, DisplayName: "민수", JoinedAt: joinedAt},
+				{ParticipantID: participantB, DisplayName: "지영", JoinedAt: joinedAt.Add(time.Hour)},
+				{ParticipantID: participantC, DisplayName: "유나", JoinedAt: joinedAt.Add(2 * time.Hour)},
+				{ParticipantID: participantD, DisplayName: "준호", JoinedAt: joinedAt.Add(3 * time.Hour)},
+			},
+			Expenses: []SettlementExpenseInput{
+				settlementExpense(testUUID(3001), "KRW", 400, participantA, []SettlementSplitInput{{ParticipantID: stringPtr(participantC), DisplayName: "유나", ParticipantLive: true, AmountMinor: 300}, {ParticipantID: stringPtr(participantD), DisplayName: "준호", ParticipantLive: true, AmountMinor: 100}}),
+				settlementExpense(testUUID(3002), "KRW", 100, participantB, []SettlementSplitInput{{ParticipantID: stringPtr(participantD), DisplayName: "준호", ParticipantLive: true, AmountMinor: 100}}),
+			},
+		},
+	}
+
+	result, err := newTestService(repo).GetTripSettlement(context.Background(), "user-1", testTripID)
+	if err != nil {
+		t.Fatalf("GetTripSettlement returned error: %v", err)
+	}
+	transfers := result.CurrencySummaries[0].SuggestedTransfers
+	if len(transfers) != 3 {
+		t.Fatalf("expected three deterministic transfers, got %#v", transfers)
+	}
+	assertSettlementTransfer(t, transfers[0], participantC, "유나", participantA, "민수", 300)
+	assertSettlementTransfer(t, transfers[1], participantD, "준호", participantA, "민수", 100)
+	assertSettlementTransfer(t, transfers[2], participantD, "준호", participantB, "지영", 100)
+}
+
+func TestServiceGetTripSettlementRejectsInconsistentData(t *testing.T) {
+	participantA := testUUID(2001)
+	repo := &fakeRepository{
+		trip:          Trip{ID: testTripID, DefaultCurrency: "KRW"},
+		tripFound:     true,
+		isParticipant: true,
+		settlementData: SettlementInput{
+			Participants: []SettlementParticipantInput{{ParticipantID: participantA, DisplayName: "민수", JoinedAt: time.Date(2026, 6, 21, 12, 0, 0, 0, time.UTC)}},
+			Expenses: []SettlementExpenseInput{
+				settlementExpense(testUUID(3001), "KRW", 1000, participantA, []SettlementSplitInput{{ParticipantID: stringPtr(participantA), DisplayName: "민수", ParticipantLive: true, AmountMinor: 999}}),
+			},
+		},
+	}
+
+	_, err := newTestService(repo).GetTripSettlement(context.Background(), "user-1", testTripID)
+	if !errors.Is(err, ErrSettlementDataInconsistent) {
+		t.Fatalf("expected ErrSettlementDataInconsistent, got %v", err)
+	}
+}
+
+func TestServiceGetTripSettlementValidationAuthAndAccess(t *testing.T) {
+	validTrip := Trip{ID: testTripID, DefaultCurrency: "KRW"}
+	tests := []struct {
+		name   string
+		repo   *fakeRepository
+		userID string
+		tripID string
+		want   error
+	}{
+		{name: "requires auth", repo: &fakeRepository{}, userID: " ", tripID: testTripID, want: ErrUnauthorized},
+		{name: "invalid trip id", repo: &fakeRepository{}, userID: "user-1", tripID: "bad", want: ErrValidation},
+		{name: "missing trip", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, want: ErrNotFound},
+		{name: "forbidden", repo: &fakeRepository{trip: validTrip, tripFound: true}, userID: "user-1", tripID: testTripID, want: ErrForbidden},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := newTestService(tt.repo).GetTripSettlement(context.Background(), tt.userID, tt.tripID)
+			if !errors.Is(err, tt.want) {
+				t.Fatalf("expected %v, got %v", tt.want, err)
+			}
+			if (errors.Is(tt.want, ErrValidation) || errors.Is(tt.want, ErrUnauthorized) || errors.Is(tt.want, ErrNotFound) || errors.Is(tt.want, ErrForbidden)) && tt.repo.settlementDataCalled {
+				t.Fatal("expected invalid settlement request not to load settlement data")
+			}
+		})
+	}
+}
+
+func settlementExpense(expenseID string, currency string, amountMinor int64, payerParticipantID string, splits []SettlementSplitInput) SettlementExpenseInput {
+	return SettlementExpenseInput{
+		ExpenseID:             expenseID,
+		Currency:              currency,
+		AmountMinor:           amountMinor,
+		PayerParticipantID:    stringPtr(payerParticipantID),
+		PayerDisplayName:      payerParticipantID,
+		PayerParticipantLive:  true,
+		PayerParticipantOrder: 0,
+		Splits:                splits,
+	}
+}
+
+func assertSettlementBalance(t *testing.T, balance SettlementBalance, participantID string, displayName string, status string, paidMinor int64, shareMinor int64, netMinor int64) {
+	t.Helper()
+	if balance.Participant.ParticipantID == nil || *balance.Participant.ParticipantID != participantID || balance.Participant.DisplayName != displayName || balance.Participant.ParticipantStatus != status || balance.PaidMinor != paidMinor || balance.ShareMinor != shareMinor || balance.NetMinor != netMinor {
+		t.Fatalf("unexpected balance: %#v", balance)
+	}
+}
+
+func assertRemovedSettlementBalance(t *testing.T, balance SettlementBalance, displayName string, paidMinor int64, shareMinor int64, netMinor int64) {
+	t.Helper()
+	if balance.Participant.ParticipantID != nil || balance.Participant.DisplayName != displayName || balance.Participant.ParticipantStatus != SettlementParticipantStatusRemoved || balance.PaidMinor != paidMinor || balance.ShareMinor != shareMinor || balance.NetMinor != netMinor {
+		t.Fatalf("unexpected removed balance: %#v", balance)
+	}
+}
+
+func assertSettlementTransfer(t *testing.T, transfer SettlementTransfer, fromParticipantID string, fromName string, toParticipantID string, toName string, amountMinor int64) {
+	t.Helper()
+	if transfer.FromParticipant.DisplayName != fromName || transfer.ToParticipant.DisplayName != toName || transfer.AmountMinor != amountMinor {
+		t.Fatalf("unexpected transfer: %#v", transfer)
+	}
+	if fromParticipantID == "" {
+		if transfer.FromParticipant.ParticipantID != nil {
+			t.Fatalf("expected nil from participant id, got %#v", transfer.FromParticipant)
+		}
+	} else if transfer.FromParticipant.ParticipantID == nil || *transfer.FromParticipant.ParticipantID != fromParticipantID {
+		t.Fatalf("unexpected from participant: %#v", transfer.FromParticipant)
+	}
+	if toParticipantID == "" {
+		if transfer.ToParticipant.ParticipantID != nil {
+			t.Fatalf("expected nil to participant id, got %#v", transfer.ToParticipant)
+		}
+	} else if transfer.ToParticipant.ParticipantID == nil || *transfer.ToParticipant.ParticipantID != toParticipantID {
+		t.Fatalf("unexpected to participant: %#v", transfer.ToParticipant)
 	}
 }
 

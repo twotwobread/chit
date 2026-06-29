@@ -1,13 +1,48 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { computeSettlementBalances, suggestSettlementTransfers } from './settlement';
+import {
+  computeSettlementBalances,
+  getAuthoritativeSettlementCurrencySummaries,
+  suggestSettlementTransfers,
+} from './settlement';
 
 const participants = [
   { id: 'a', name: '민수' },
   { id: 'b', name: '지영' },
   { id: 'c', name: '유나' },
 ];
+
+test('uses authoritative settlement summaries returned by the API', () => {
+  const settlement = {
+    tripId: 'trip-1',
+    defaultCurrency: 'JPY',
+    currencySummaries: [
+      {
+        currency: 'JPY',
+        totalPaidMinor: 1000,
+        totalShareMinor: 1000,
+        balances: [
+          {
+            participant: { participantId: 'a', displayName: '민수', participantStatus: 'current' as const },
+            paidMinor: 1000,
+            shareMinor: 500,
+            netMinor: 500,
+          },
+        ],
+        suggestedTransfers: [
+          {
+            fromParticipant: { participantId: 'b', displayName: '지영', participantStatus: 'current' as const },
+            toParticipant: { participantId: 'a', displayName: '민수', participantStatus: 'current' as const },
+            amountMinor: 500,
+          },
+        ],
+      },
+    ],
+  };
+
+  assert.strictEqual(getAuthoritativeSettlementCurrencySummaries(settlement), settlement.currencySummaries);
+});
 
 test('computes deterministic paid share and net balances with integer remainder distribution', () => {
   const balances = computeSettlementBalances({

@@ -12,6 +12,7 @@ import {
   type GetDayScheduleItemsResponse,
   type GetExpenseResponse,
   type GetTripDetailResponse,
+  type GetTripSettlementResponse,
   type ListDayExpensesResponse,
   type ListTripParticipantsResponse,
   type ListTripsResponse,
@@ -46,6 +47,11 @@ export async function getTripDetail(tripId: string): Promise<GetTripDetailRespon
 export async function listTripParticipants(tripId: string): Promise<ListTripParticipantsResponse> {
   await getMeWithRefresh();
   return TripsService.listTripParticipants(tripId);
+}
+
+export async function getTripSettlement(tripId: string): Promise<GetTripSettlementResponse> {
+  await getMeWithRefresh();
+  return TripsService.getTripSettlement(tripId);
 }
 
 export async function removeTripParticipant(tripId: string, participantId: string): Promise<void> {
