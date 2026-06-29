@@ -163,6 +163,14 @@ func createManualScheduleItemResponseToOpenAPI(result trip.CreateManualScheduleI
 	}
 }
 
+func getExpenseResponseToOpenAPI(result trip.GetExpenseResult) openapi.GetExpenseResponse {
+	return openapi.GetExpenseResponse{Expense: expenseToOpenAPI(result.Expense)}
+}
+
+func updateExpenseResponseToOpenAPI(result trip.UpdateExpenseResult) openapi.UpdateExpenseResponse {
+	return openapi.UpdateExpenseResponse{Expense: expenseToOpenAPI(result.Expense)}
+}
+
 func createQuickExpenseResponseToOpenAPI(result trip.CreateQuickExpenseResult) openapi.CreateQuickExpenseResponse {
 	return openapi.CreateQuickExpenseResponse{Expense: expenseToOpenAPI(result.Expense)}
 }
@@ -218,6 +226,7 @@ func expenseToOpenAPI(expense trip.Expense) openapi.Expense {
 		AmountMinor:    expense.AmountMinor,
 		Currency:       openapi.SupportedCurrency(expense.Currency),
 		Payer:          expenseParticipantDisplayToOpenAPI(expense.Payer),
+		Memo:           expense.Memo,
 		SplitPolicy:    openapi.ExpenseSplitPolicy(expense.SplitPolicy),
 		Splits:         splits,
 		CreatedAt:      expense.CreatedAt.UTC(),

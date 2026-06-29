@@ -240,6 +240,7 @@ CREATE TABLE expenses (
   split_policy text NOT NULL DEFAULT 'equal',
   payer_participant_id uuid REFERENCES trip_participants(id) ON DELETE SET NULL,
   payer_display_name text NOT NULL,
+  memo text,
   created_by uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
@@ -257,7 +258,8 @@ CREATE TABLE expenses (
   CONSTRAINT expenses_amount_minor_check CHECK (amount_minor > 0),
   CONSTRAINT expenses_currency_check CHECK (currency IN ('KRW', 'JPY', 'USD', 'EUR')),
   CONSTRAINT expenses_split_policy_check CHECK (split_policy IN ('equal')),
-  CONSTRAINT expenses_payer_display_name_length_check CHECK (char_length(payer_display_name) BETWEEN 1 AND 80)
+  CONSTRAINT expenses_payer_display_name_length_check CHECK (char_length(payer_display_name) BETWEEN 1 AND 80),
+  CONSTRAINT expenses_memo_length_check CHECK (memo IS NULL OR char_length(memo) <= 240)
 );
 
 CREATE INDEX expenses_trip_anchor_date_created_idx ON expenses (trip_id, anchor_type, expense_date DESC, created_at DESC);

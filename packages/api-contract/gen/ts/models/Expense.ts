@@ -26,6 +26,7 @@ export type Expense = {
     amountMinor: number;
     currency: SupportedCurrency;
     payer: ExpenseParticipantDisplay;
+    memo: string | null;
     splitPolicy: ExpenseSplitPolicy;
     splits: Array<ExpenseSplit>;
     createdAt: string;

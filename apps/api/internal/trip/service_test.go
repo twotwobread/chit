@@ -71,6 +71,21 @@ type fakeRepository struct {
 	listedDayExpensesDate    string
 	listDayExpensesCalled    bool
 	listDayExpensesErr       error
+	expense                  Expense
+	expenseFound             bool
+	expenseLookupTripID      string
+	expenseLookupTripDayID   string
+	expenseLookupExpenseID   string
+	updatedExpenseRecord     UpdateExpenseRecord
+	updatedExpenseCalled     bool
+	updatedExpense           Expense
+	updateExpenseErr         error
+	deletedExpenseTripID     string
+	deletedExpenseTripDayID  string
+	deletedExpenseID         string
+	deletedExpenseCalled     bool
+	deletedExpenseOK         bool
+	deleteExpenseErr         error
 	quickExpenseRecord       CreateQuickExpenseRecord
 	quickExpenseCalled       bool
 	quickExpenseResult       CreateQuickExpenseResult
@@ -330,6 +345,73 @@ func (r *fakeRepository) ListDayExpensesByTripDay(_ context.Context, tripID stri
 		return r.dayExpenses, nil
 	}
 	return []DayExpenseListItem{}, nil
+}
+
+func (r *fakeRepository) GetExpenseByTripDayAndID(_ context.Context, tripID string, tripDayID string, expenseID string) (Expense, bool, error) {
+	r.expenseLookupTripID = tripID
+	r.expenseLookupTripDayID = tripDayID
+	r.expenseLookupExpenseID = expenseID
+	if r.expenseFound {
+		return r.expense, true, nil
+	}
+	return Expense{}, false, nil
+}
+
+func (r *fakeRepository) UpdateExpense(_ context.Context, record UpdateExpenseRecord) (Expense, error) {
+	r.updatedExpenseRecord = record
+	r.updatedExpenseCalled = true
+	if r.updateExpenseErr != nil {
+		return Expense{}, r.updateExpenseErr
+	}
+	if r.updatedExpense.ID != "" {
+		return r.updatedExpense, nil
+	}
+	itemID := ""
+	anchorType := "trip_day"
+	var scheduleItemID *string
+	placeID := testUUID(8001)
+	placeName := "장소 없음"
+	placeAddress := "연결된 장소 없음"
+	placeType := "etc"
+	placeSource := ExpenseDisplaySourceFallback
+	if record.ScheduleItemID != nil {
+		itemID = *record.ScheduleItemID
+		scheduleItemID = &itemID
+		anchorType = "schedule_item"
+		placeName = "도톤보리"
+		placeAddress = "Dotonbori"
+		placeType = "food"
+		placeSource = ExpenseDisplaySourceLive
+	}
+	payerID := record.PayerParticipantID
+	return Expense{
+		ID:             record.ExpenseID,
+		TripID:         record.TripID,
+		AnchorType:     anchorType,
+		TripDayID:      &record.TripDayID,
+		ScheduleItemID: scheduleItemID,
+		ExpenseDate:    "2026-07-10",
+		DisplayTitle:   placeName,
+		Place:          &ExpensePlaceDisplay{TripPlaceID: &placeID, Name: placeName, Address: &placeAddress, PlaceType: &placeType, Source: placeSource},
+		AmountMinor:    record.AmountMinor,
+		Currency:       r.trip.DefaultCurrency,
+		Payer:          ExpenseParticipantDisplay{ParticipantID: &payerID, DisplayName: "민수", Source: ExpenseDisplaySourceLive},
+		Memo:           record.Memo,
+		SplitPolicy:    ExpenseSplitPolicyEqual,
+		Splits:         []ExpenseSplit{{Participant: ExpenseParticipantDisplay{ParticipantID: &payerID, DisplayName: "민수", Source: ExpenseDisplaySourceLive}, AmountMinor: record.AmountMinor}},
+		CreatedAt:      time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC),
+	}, nil
+}
+
+func (r *fakeRepository) DeleteExpenseByTripDayAndID(_ context.Context, tripID string, tripDayID string, expenseID string) (bool, error) {
+	r.deletedExpenseTripID = tripID
+	r.deletedExpenseTripDayID = tripDayID
+	r.deletedExpenseID = expenseID
+	r.deletedExpenseCalled = true
+	if r.deleteExpenseErr != nil {
+		return false, r.deleteExpenseErr
+	}
+	return r.deletedExpenseOK, nil
 }
 
 func (r *fakeRepository) CreateQuickExpense(_ context.Context, record CreateQuickExpenseRecord) (CreateQuickExpenseResult, error) {

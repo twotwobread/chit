@@ -12,6 +12,7 @@ import type { CreateTripInviteResponse } from '../models/CreateTripInviteRespons
 import type { CreateTripRequest } from '../models/CreateTripRequest';
 import type { CreateTripResponse } from '../models/CreateTripResponse';
 import type { GetDayScheduleItemsResponse } from '../models/GetDayScheduleItemsResponse';
+import type { GetExpenseResponse } from '../models/GetExpenseResponse';
 import type { GetTripDetailResponse } from '../models/GetTripDetailResponse';
 import type { ListDayExpensesResponse } from '../models/ListDayExpensesResponse';
 import type { ListTripParticipantsResponse } from '../models/ListTripParticipantsResponse';
@@ -24,6 +25,8 @@ import type { RestoreScheduleItemResponse } from '../models/RestoreScheduleItemR
 import type { RoutePreviewResponse } from '../models/RoutePreviewResponse';
 import type { SetDayLodgingPlaceRequest } from '../models/SetDayLodgingPlaceRequest';
 import type { SetDayLodgingPlaceResponse } from '../models/SetDayLodgingPlaceResponse';
+import type { UpdateExpenseRequest } from '../models/UpdateExpenseRequest';
+import type { UpdateExpenseResponse } from '../models/UpdateExpenseResponse';
 import type { UpdateScheduleItemRequest } from '../models/UpdateScheduleItemRequest';
 import type { UpdateScheduleItemResponse } from '../models/UpdateScheduleItemResponse';
 import type { UpdateTripRequest } from '../models/UpdateTripRequest';
@@ -365,6 +368,104 @@ export class TripsService {
                 401: `Unauthorized.`,
                 403: `Forbidden.`,
                 404: `Trip or trip day not found.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
+     * Get a day expense for editing
+     * Returns editable detail for one expense in the selected trip day.
+     * @param tripId
+     * @param tripDayId
+     * @param expenseId
+     * @returns GetExpenseResponse Expense detail.
+     * @throws ApiError
+     */
+    public static getDayExpense(
+        tripId: string,
+        tripDayId: string,
+        expenseId: string,
+    ): CancelablePromise<GetExpenseResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/trips/{tripId}/days/{tripDayId}/expenses/{expenseId}',
+            path: {
+                'tripId': tripId,
+                'tripDayId': tripDayId,
+                'expenseId': expenseId,
+            },
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                403: `Forbidden.`,
+                404: `Trip, trip day, or expense not found.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
+     * Update a day expense
+     * Updates amount, payer, memo, and linked schedule item for an expense, then recalculates equal splits.
+     * @param tripId
+     * @param tripDayId
+     * @param expenseId
+     * @param requestBody
+     * @returns UpdateExpenseResponse Expense updated.
+     * @throws ApiError
+     */
+    public static updateExpense(
+        tripId: string,
+        tripDayId: string,
+        expenseId: string,
+        requestBody: UpdateExpenseRequest,
+    ): CancelablePromise<UpdateExpenseResponse> {
+        return __request(OpenAPI, {
+            method: 'PATCH',
+            url: '/trips/{tripId}/days/{tripDayId}/expenses/{expenseId}',
+            path: {
+                'tripId': tripId,
+                'tripDayId': tripDayId,
+                'expenseId': expenseId,
+            },
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                403: `Forbidden.`,
+                404: `Trip, trip day, expense, payer, split participant, or linked schedule item not found.`,
+                409: `Conflict while updating the expense.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
+     * Delete a day expense
+     * Hard-deletes an expense in the selected trip day.
+     * @param tripId
+     * @param tripDayId
+     * @param expenseId
+     * @returns void
+     * @throws ApiError
+     */
+    public static deleteExpense(
+        tripId: string,
+        tripDayId: string,
+        expenseId: string,
+    ): CancelablePromise<void> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/trips/{tripId}/days/{tripDayId}/expenses/{expenseId}',
+            path: {
+                'tripId': tripId,
+                'tripDayId': tripDayId,
+                'expenseId': expenseId,
+            },
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                403: `Forbidden.`,
+                404: `Trip, trip day, or expense not found.`,
                 500: `Unexpected server error.`,
             },
         });

@@ -3,7 +3,12 @@ import test from 'node:test';
 
 import type { DayExpenseListItem } from '@i-um/api-contract';
 
-import { buildDayExpensesViewModel, buildSplitSummary, dayExpensesFailureState } from './day-expenses.ts';
+import {
+  buildDayExpensesViewModel,
+  buildExpenseEditRoute,
+  buildSplitSummary,
+  dayExpensesFailureState,
+} from './day-expenses.ts';
 
 function participant(displayName: string, participantId: string | null = 'participant-a') {
   return { participantId, displayName, source: participantId ? 'live' : 'fallback' } as const;
@@ -55,6 +60,7 @@ test('builds compact read-only day expense rows from canonical API display data'
       detailLine: '결제 민수 · 분담 민수 600엔 · 지영 600엔',
       category: 'food',
       accessibilityLabel: '도톤보리 1,200엔. 결제 민수 · 분담 민수 600엔 · 지영 600엔',
+      editRoute: '/trips/trip-a/days/2026-07-10/expenses/expense-a/edit',
     },
   ]);
 });
@@ -73,6 +79,13 @@ test('preserves API newest-first expense order in the view model', () => {
   assert.deepEqual(
     viewModel.rows.map((row) => row.id),
     ['newer', 'older'],
+  );
+});
+
+test('builds expense edit route', () => {
+  assert.equal(
+    buildExpenseEditRoute('trip-a', '2026-07-10', 'expense-a'),
+    '/trips/trip-a/days/2026-07-10/expenses/expense-a/edit',
   );
 });
 

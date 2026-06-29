@@ -429,6 +429,85 @@ func (s *Service) ListDayExpenses(ctx context.Context, userID string, tripID str
 	return ListDayExpensesResult{Expenses: expenses}, nil
 }
 
+func (s *Service) GetDayExpense(ctx context.Context, userID string, tripID string, tripDayID string, expenseID string) (GetExpenseResult, error) {
+	expenseID = strings.TrimSpace(expenseID)
+	if !isUUID(expenseID) {
+		return GetExpenseResult{}, ErrValidation
+	}
+	if _, err := s.activeTripDay(ctx, userID, tripID, tripDayID); err != nil {
+		return GetExpenseResult{}, err
+	}
+
+	expense, ok, err := s.repo.GetExpenseByTripDayAndID(ctx, strings.TrimSpace(tripID), strings.TrimSpace(tripDayID), expenseID)
+	if err != nil {
+		return GetExpenseResult{}, err
+	}
+	if !ok {
+		return GetExpenseResult{}, ErrNotFound
+	}
+	return GetExpenseResult{Expense: expense}, nil
+}
+
+func (s *Service) UpdateExpense(ctx context.Context, userID string, tripID string, tripDayID string, expenseID string, input UpdateExpenseInput) (UpdateExpenseResult, error) {
+	expenseID = strings.TrimSpace(expenseID)
+	payerParticipantID := strings.TrimSpace(input.PayerParticipantID)
+	participantIDs, err := normalizeQuickExpenseParticipantIDs(input.ParticipantIDs)
+	if err != nil {
+		return UpdateExpenseResult{}, err
+	}
+	if !isUUID(expenseID) || !isUUID(payerParticipantID) || input.AmountMinor < 1 {
+		return UpdateExpenseResult{}, ErrValidation
+	}
+	var scheduleItemID *string
+	if input.ScheduleItemID != nil {
+		trimmedScheduleItemID := strings.TrimSpace(*input.ScheduleItemID)
+		if !isUUID(trimmedScheduleItemID) {
+			return UpdateExpenseResult{}, ErrValidation
+		}
+		scheduleItemID = &trimmedScheduleItemID
+	}
+	memo, err := normalizeExpenseMemo(input.Memo)
+	if err != nil {
+		return UpdateExpenseResult{}, err
+	}
+	if _, err := s.activeTripDay(ctx, userID, tripID, tripDayID); err != nil {
+		return UpdateExpenseResult{}, err
+	}
+
+	expense, err := s.repo.UpdateExpense(ctx, UpdateExpenseRecord{
+		TripID:             strings.TrimSpace(tripID),
+		TripDayID:          strings.TrimSpace(tripDayID),
+		ExpenseID:          expenseID,
+		AmountMinor:        input.AmountMinor,
+		PayerParticipantID: payerParticipantID,
+		ParticipantIDs:     participantIDs,
+		Memo:               memo,
+		ScheduleItemID:     scheduleItemID,
+	})
+	if err != nil {
+		return UpdateExpenseResult{}, err
+	}
+	return UpdateExpenseResult{Expense: expense}, nil
+}
+
+func (s *Service) DeleteExpense(ctx context.Context, userID string, tripID string, tripDayID string, expenseID string) error {
+	expenseID = strings.TrimSpace(expenseID)
+	if !isUUID(expenseID) {
+		return ErrValidation
+	}
+	if _, err := s.activeTripDay(ctx, userID, tripID, tripDayID); err != nil {
+		return err
+	}
+	deleted, err := s.repo.DeleteExpenseByTripDayAndID(ctx, strings.TrimSpace(tripID), strings.TrimSpace(tripDayID), expenseID)
+	if err != nil {
+		return err
+	}
+	if !deleted {
+		return ErrNotFound
+	}
+	return nil
+}
+
 func (s *Service) CreateQuickExpense(ctx context.Context, userID string, tripID string, tripDayID string, input CreateQuickExpenseInput) (CreateQuickExpenseResult, error) {
 	scheduleItemID := strings.TrimSpace(input.ScheduleItemID)
 	payerParticipantID := strings.TrimSpace(input.PayerParticipantID)
@@ -452,6 +531,20 @@ func (s *Service) CreateQuickExpense(ctx context.Context, userID string, tripID 
 		ParticipantIDs:     participantIDs,
 		CreatedBy:          userID,
 	})
+}
+
+func normalizeExpenseMemo(value *string) (*string, error) {
+	if value == nil {
+		return nil, nil
+	}
+	memo := strings.TrimSpace(*value)
+	if memo == "" {
+		return nil, nil
+	}
+	if len([]rune(memo)) > 240 {
+		return nil, ErrValidation
+	}
+	return &memo, nil
 }
 
 func normalizeQuickExpenseParticipantIDs(participantIDs []string) ([]string, error) {
