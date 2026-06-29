@@ -1,3 +1,15 @@
+
+<!--
+GENERATED FILE. DO NOT EDIT.
+
+Source:
+.harness/rules/phase/deploy.rules.md
+
+To modify this adapter:
+edit the source file, then run:
+pnpm harness:sync
+-->
+
 # Deploy Rule
 
 Use only when the user asks for staging/internal deploy, build, rollback, or environment smoke checks.

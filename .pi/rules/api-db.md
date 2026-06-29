@@ -1,3 +1,15 @@
+
+<!--
+GENERATED FILE. DO NOT EDIT.
+
+Source:
+.harness/rules/code/api-db.md
+
+To modify this adapter:
+edit the source file, then run:
+pnpm harness:sync
+-->
+
 # API and DB Rule
 
 Use when changing API contract, Go API behavior, SQL, migrations, or core domain schema.

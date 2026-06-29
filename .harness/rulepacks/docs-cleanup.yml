@@ -1,0 +1,14 @@
+name: docs-cleanup
+version: 1
+
+always:
+  - .harness/rules/core/agent-operating-rules.md
+  - .harness/rules/core/git-safety.md
+  - .harness/rules/phase/docs-cleanup.rules.md
+
+conditional:
+  worktree:
+    - .harness/rules/core/worktree.md
+
+  completion:
+    - .harness/rules/core/completion-report.md

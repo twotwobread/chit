@@ -1,0 +1,18 @@
+name: pr-lifecycle
+version: 1
+
+rulepack: ".harness/rulepacks/pr-lifecycle.yml"
+
+phases:
+  pr.lifecycle:
+    contract: ".harness/contracts/pr-lifecycle.contract.md"
+    provider: "pr-lifecycle-provider"
+
+gates:
+  before_pr_create_or_update:
+    - require_reviewable_commit_stack: true
+    - require_pr_template_when_creating: true
+
+  before_merge:
+    - require_requested_merge: true
+    - require_acceptable_checks_or_explicit_risk_acceptance: true

@@ -1,20 +1,32 @@
+
+<!--
+GENERATED FILE. DO NOT EDIT.
+
+Source:
+.harness/rules/phase/feature-implement.rules.md
+
+To modify this adapter:
+edit the source file, then run:
+pnpm harness:sync
+-->
+
 # Feature / Issue Implementation Rule
 
 Use for implementing an approved `docs/features/<id>.md` spec or a triaged no-spec issue/bug fix. Do not use this rule to create or substantially revise a feature spec/plan.
 
 ## Minimal reads
 
-1. `.pi/rules/task-triage.md` when no approved spec already defines the work, or when the user/issue classification may be wrong.
+1. `.harness/rules/phase/task-triage.rules.md` when no approved spec already defines the work, or when the user/issue classification may be wrong.
 2. Target feature spec when present.
-3. `.pi/rules/worktree.md` if a worktree must be created or selected.
+3. `.harness/rules/core/worktree.md` if a worktree must be created or selected.
 4. Conditional rules only when the spec or triaged scope changes that area:
-   - API/DB/domain schema: `.pi/rules/api-db.md`
-   - Mobile UI: `.pi/rules/mobile-ui.md`
-   - Tests/verification: `.pi/rules/testing.md`
-   - Code structure concerns: `.pi/rules/code-quality.md`
-   - Commit preparation: `.pi/rules/commit.md`
+   - API/DB/domain schema: `.harness/rules/code/api-db.md`
+   - Mobile UI: `.harness/rules/code/mobile-ui.md`
+   - Tests/verification: `.harness/rules/code/testing.md`
+   - Code structure concerns: `.harness/rules/code/code-quality.md`
+   - Commit preparation: `.harness/rules/core/commit.md`
 
-Do not read delivery/DoD/testing umbrella docs. Those rules live in `.pi/rules`.
+Do not read delivery/DoD/testing umbrella docs. Those rules live in `.harness/rules`.
 
 Read `docs/decisions/` only when the work changes or revisits product/technical/domain/API/DB/ops direction.
 

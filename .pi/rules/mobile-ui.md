@@ -1,3 +1,15 @@
+
+<!--
+GENERATED FILE. DO NOT EDIT.
+
+Source:
+.harness/rules/code/mobile-ui.md
+
+To modify this adapter:
+edit the source file, then run:
+pnpm harness:sync
+-->
+
 # Mobile UI Rule
 
 Use when changing Expo screens, mobile UI state, styling, copy, or navigation.

@@ -1,3 +1,15 @@
+
+<!--
+GENERATED FILE. DO NOT EDIT.
+
+Source:
+.harness/rules/phase/task-triage.rules.md
+
+To modify this adapter:
+edit the source file, then run:
+pnpm harness:sync
+-->
+
 # Task Triage Rule
 
 Use when the user asks to implement, fix, debug, or resolve an issue and did not explicitly ask to create or revise a feature spec/plan. Use this because user-provided labels such as “bug”, “feature”, or “simple” can be wrong.
@@ -14,7 +26,7 @@ Use when the user asks to implement, fix, debug, or resolve an issue and did not
 ## Light triage budget
 
 - Inspect only the request, linked issue, existing linked spec/labels, relevant error/log, and narrow code/contract snippets needed to classify the work.
-- Do not read broad docs or run Ouroboros during triage.
+- Do not read broad docs or run heavyweight spec providers during triage.
 - Prefer evidence over labels; treat “bug vs feature” as a hypothesis, not a source of truth.
 - State assumptions when they affect the route.
 
@@ -38,7 +50,7 @@ Use this when the expected behavior is clear but the cause or implementation is 
 
 ## Spec escalation triggers
 
-Stop and recommend an Ouroboros-backed feature spec/plan when any trigger appears:
+Stop and recommend a `.harness` provider-policy-backed feature spec/plan when any trigger appears:
 
 - “Correct” behavior is unclear or requires a product/domain/UX decision.
 - The work adds a new capability or materially changes existing behavior rather than restoring already-defined behavior.
@@ -53,7 +65,7 @@ Stop and recommend an Ouroboros-backed feature spec/plan when any trigger appear
 
 - Do not silently switch to the heavy flow.
 - Pause before implementation, summarize the evidence, explain why no-spec is risky, and ask whether to use `i-um-feature-spec-plan`.
-- If the user approves, continue with the spec/plan workflow in the appropriate worktree.
+- If the user approves, continue with the `.harness/workflows/feature-start.yml` spec phases in the appropriate worktree; the workflow policy chooses the provider.
 - If the user declines, narrow the scope, record assumptions/risks, and avoid product/domain decisions beyond the approved scope.
 
 ## Re-triage during work

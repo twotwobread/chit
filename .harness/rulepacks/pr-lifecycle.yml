@@ -1,0 +1,12 @@
+name: pr-lifecycle
+version: 1
+
+always:
+  - .harness/rules/core/agent-operating-rules.md
+  - .harness/rules/core/git-safety.md
+  - .harness/rules/core/commit.md
+  - .harness/rules/phase/pr-lifecycle.rules.md
+
+conditional:
+  completion:
+    - .harness/rules/core/completion-report.md
