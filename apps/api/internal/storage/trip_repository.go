@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -15,7 +16,15 @@ import (
 	"github.com/twotwobread/i-um/apps/api/internal/trip"
 )
 
-var errRetryReorderRankCollision = errors.New("retry reorder rank collision")
+const (
+	scheduleRankStep  int64 = 1024
+	scheduleRankWidth       = 19
+)
+
+var (
+	errRetryReorderRankCollision = errors.New("retry reorder rank collision")
+	errRebalanceScheduleRanks    = errors.New("rebalance schedule ranks")
+)
 
 func syncActiveTripDays(ctx context.Context, tx pgx.Tx, tripID string, startDate pgtype.Date, endDate pgtype.Date) error {
 	tripUUID := mustUUID(tripID)
@@ -804,13 +813,9 @@ func (s *Store) CreateManualScheduleItem(ctx context.Context, record trip.Create
 		return trip.ScheduleItem{}, err
 	}
 
-	item, err := qtx.CreateScheduleItemAtEnd(ctx, db.CreateScheduleItemAtEndParams{
-		TripID:      mustUUID(record.TripID),
-		TripDayID:   mustUUID(record.TripDayID),
-		TripPlaceID: mustUUID(place.ID),
-	})
+	item, err := createScheduleItemAtEnd(ctx, tx, record.TripID, record.TripDayID, place.ID)
 	if err != nil {
-		if isUniqueConstraintViolation(err, "schedule_items_active_day_order_unique") || isUniqueConstraintViolation(err, "schedule_items_active_day_rank_unique") {
+		if errors.Is(err, trip.ErrConflict) || isUniqueConstraintViolation(err, "schedule_items_active_day_order_unique") || isUniqueConstraintViolation(err, "schedule_items_active_day_rank_unique") {
 			return trip.ScheduleItem{}, trip.ErrConflict
 		}
 		return trip.ScheduleItem{}, err
@@ -861,13 +866,9 @@ func (s *Store) AppendGooglePlaceScheduleItem(ctx context.Context, record place.
 		return trip.ScheduleItem{}, place.DuplicateDayPlaceConfirmationError{TripPlaceID: record.TripPlaceID}
 	}
 
-	item, err := qtx.CreateScheduleItemAtEnd(ctx, db.CreateScheduleItemAtEndParams{
-		TripID:      mustUUID(record.TripID),
-		TripDayID:   mustUUID(record.TripDayID),
-		TripPlaceID: mustUUID(record.TripPlaceID),
-	})
+	item, err := createScheduleItemAtEnd(ctx, tx, record.TripID, record.TripDayID, record.TripPlaceID)
 	if err != nil {
-		if isUniqueConstraintViolation(err, "schedule_items_active_day_order_unique") || isUniqueConstraintViolation(err, "schedule_items_active_day_rank_unique") {
+		if errors.Is(err, trip.ErrConflict) || isUniqueConstraintViolation(err, "schedule_items_active_day_order_unique") || isUniqueConstraintViolation(err, "schedule_items_active_day_rank_unique") {
 			return trip.ScheduleItem{}, place.ErrConflict
 		}
 		return trip.ScheduleItem{}, err
@@ -922,13 +923,9 @@ func (s *Store) CreateGooglePlaceScheduleItem(ctx context.Context, record place.
 		return trip.ScheduleItem{}, place.DuplicateDayPlaceConfirmationError{TripPlaceID: placeRow.ID}
 	}
 
-	item, err := qtx.CreateScheduleItemAtEnd(ctx, db.CreateScheduleItemAtEndParams{
-		TripID:      mustUUID(record.TripID),
-		TripDayID:   mustUUID(record.TripDayID),
-		TripPlaceID: mustUUID(placeRow.ID),
-	})
+	item, err := createScheduleItemAtEnd(ctx, tx, record.TripID, record.TripDayID, placeRow.ID)
 	if err != nil {
-		if isUniqueConstraintViolation(err, "schedule_items_active_day_order_unique") || isUniqueConstraintViolation(err, "schedule_items_active_day_rank_unique") {
+		if errors.Is(err, trip.ErrConflict) || isUniqueConstraintViolation(err, "schedule_items_active_day_order_unique") || isUniqueConstraintViolation(err, "schedule_items_active_day_rank_unique") {
 			return trip.ScheduleItem{}, place.ErrConflict
 		}
 		return trip.ScheduleItem{}, err
@@ -946,6 +943,78 @@ func (s *Store) CreateGooglePlaceScheduleItem(ctx context.Context, record place.
 		SkippedAt: timePtrFromTimestamptz(item.SkippedAt),
 		Place:     tripPlaceSummary(placeRow.ID, placeRow.Name, placeRow.PlaceType, placeRow.Address, placeRow.Provider, placeRow.GooglePlaceID, placeRow.Latitude, placeRow.Longitude),
 	}, nil
+}
+
+type appendedScheduleItemRow struct {
+	ID        string
+	ItemOrder int
+	Version   int
+	ArrivedAt pgtype.Timestamptz
+	SkippedAt pgtype.Timestamptz
+}
+
+func createScheduleItemAtEnd(ctx context.Context, tx pgx.Tx, tripID string, tripDayID string, placeID string) (appendedScheduleItemRow, error) {
+	if err := lockSameDayScheduleOrdering(ctx, tx, tripID, tripDayID); err != nil {
+		return appendedScheduleItemRow{}, err
+	}
+
+	current, err := loadOrderedScheduleRowsForUpdate(ctx, tx, tripID, tripDayID)
+	if err != nil {
+		return appendedScheduleItemRow{}, err
+	}
+	if needsRebalance, err := orderedScheduleRanksNeedRebalance(current); err != nil {
+		return appendedScheduleItemRow{}, err
+	} else if needsRebalance {
+		current, err = rebalanceScheduleRanks(ctx, tx, tripID, tripDayID, current)
+		if err != nil {
+			return appendedScheduleItemRow{}, err
+		}
+	}
+
+	nextRank, err := nextAppendScheduleRank(current)
+	if errors.Is(err, errRebalanceScheduleRanks) {
+		current, err = rebalanceScheduleRanks(ctx, tx, tripID, tripDayID, current)
+		if err != nil {
+			return appendedScheduleItemRow{}, err
+		}
+		nextRank, err = nextAppendScheduleRank(current)
+	}
+	if errors.Is(err, errRebalanceScheduleRanks) {
+		return appendedScheduleItemRow{}, trip.ErrConflict
+	}
+	if err != nil {
+		return appendedScheduleItemRow{}, err
+	}
+
+	var item appendedScheduleItemRow
+	err = tx.QueryRow(ctx, `
+		INSERT INTO schedule_items (
+			trip_id,
+			trip_day_id,
+			trip_place_id,
+			item_order,
+			rank
+		) VALUES (
+			$1::uuid,
+			$2::uuid,
+			$3::uuid,
+			(
+				SELECT COALESCE(MAX(item_order), 0) + 1
+				FROM schedule_items
+				WHERE trip_day_id = $2::uuid
+				  AND deleted_at IS NULL
+			),
+			$4
+		)
+		RETURNING id::text, item_order, version, arrived_at, skipped_at
+	`, mustUUID(tripID), mustUUID(tripDayID), mustUUID(placeID), nextRank).Scan(&item.ID, &item.ItemOrder, &item.Version, &item.ArrivedAt, &item.SkippedAt)
+	if err != nil {
+		if isUniqueConstraintViolation(err, "schedule_items_active_day_order_unique") || isUniqueConstraintViolation(err, "schedule_items_active_day_rank_unique") {
+			return appendedScheduleItemRow{}, trip.ErrConflict
+		}
+		return appendedScheduleItemRow{}, err
+	}
+	return item, nil
 }
 
 func (s *Store) GetScheduleItemByTripDayAndID(ctx context.Context, tripID string, tripDayID string, itemID string) (trip.ScheduleItem, bool, error) {
@@ -977,6 +1046,10 @@ func (s *Store) ReorderScheduleItems(ctx context.Context, record trip.ReorderSch
 		return nil, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
+
+	if err := lockSameDayScheduleOrdering(ctx, tx, record.TripID, record.TripDayID); err != nil {
+		return nil, err
+	}
 
 	current, err := loadOrderedScheduleRowsForUpdate(ctx, tx, record.TripID, record.TripDayID)
 	if err != nil {
@@ -1210,7 +1283,18 @@ func (s *Store) UpdateScheduleItemPlace(ctx context.Context, record trip.UpdateS
 }
 
 func (s *Store) DeleteScheduleItem(ctx context.Context, tripID string, tripDayID string, itemID string) (bool, error) {
-	_, err := s.queries.SoftDeleteScheduleItemByTripDayAndID(ctx, db.SoftDeleteScheduleItemByTripDayAndIDParams{
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	if err := lockSameDayScheduleOrdering(ctx, tx, tripID, tripDayID); err != nil {
+		return false, err
+	}
+
+	qtx := s.queries.WithTx(tx)
+	_, err = qtx.SoftDeleteScheduleItemByTripDayAndID(ctx, db.SoftDeleteScheduleItemByTripDayAndIDParams{
 		TripID:         mustUUID(tripID),
 		TripDayID:      mustUUID(tripDayID),
 		ScheduleItemID: mustUUID(itemID),
@@ -1219,6 +1303,9 @@ func (s *Store) DeleteScheduleItem(ctx context.Context, tripID string, tripDayID
 		return false, nil
 	}
 	if err != nil {
+		return false, err
+	}
+	if err := tx.Commit(ctx); err != nil {
 		return false, err
 	}
 	return true, nil
@@ -1294,46 +1381,72 @@ func loadOrderedScheduleRowsForUpdate(ctx context.Context, tx pgx.Tx, tripID str
 	return ordered, nil
 }
 
+type reorderMovePlan struct {
+	moved       orderedScheduleRow
+	remaining   []orderedScheduleRow
+	insertIndex int
+	target      []orderedScheduleRow
+}
+
+func lockSameDayScheduleOrdering(ctx context.Context, tx pgx.Tx, tripID string, tripDayID string) error {
+	_, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))`, "schedule_items:"+tripID+":"+tripDayID)
+	return err
+}
+
 func applyReorderMove(ctx context.Context, tx pgx.Tx, tripID string, date string, current []orderedScheduleRow, move trip.ReorderDayScheduleMoveRecord) ([]orderedScheduleRow, error) {
 	ordered := current
-	for attempt := 0; attempt < 2; attempt++ {
+	retriedRankCollision := false
+	rebalanced := false
+	for {
 		next, err := applyReorderMoveOnce(ctx, tx, tripID, date, ordered, move)
 		if err == nil {
 			return next, nil
 		}
-		if !errors.Is(err, errRetryReorderRankCollision) {
-			return nil, err
+
+		if errors.Is(err, errRetryReorderRankCollision) && !retriedRankCollision {
+			retriedRankCollision = true
+			ordered, err = loadOrderedScheduleRowsForUpdate(ctx, tx, tripID, date)
+			if err != nil {
+				return nil, err
+			}
+			continue
 		}
-		if attempt == 1 {
+
+		if errors.Is(err, errRebalanceScheduleRanks) && !rebalanced {
+			plan, planErr := planReorderMove(ordered, move)
+			if planErr != nil {
+				return nil, planErr
+			}
+			ordered, err = rebalanceScheduleRanks(ctx, tx, tripID, date, plan.target)
+			if err != nil {
+				return nil, err
+			}
+			rebalanced = true
+			continue
+		}
+
+		if errors.Is(err, errRetryReorderRankCollision) || errors.Is(err, errRebalanceScheduleRanks) {
 			return nil, trip.ErrConflict
 		}
-
-		ordered, err = loadOrderedScheduleRowsForUpdate(ctx, tx, tripID, date)
-		if err != nil {
-			return nil, err
-		}
+		return nil, err
 	}
-
-	return nil, trip.ErrConflict
 }
 
 func applyReorderMoveOnce(ctx context.Context, tx pgx.Tx, tripID string, date string, current []orderedScheduleRow, move trip.ReorderDayScheduleMoveRecord) ([]orderedScheduleRow, error) {
-	movedIndex := indexOrderedScheduleItem(current, move.ItemID)
-	if movedIndex < 0 {
-		return nil, trip.ErrConflict
-	}
-	if current[movedIndex].Version != move.ClientVersion {
-		return nil, trip.ErrConflict
-	}
-
-	moved := current[movedIndex]
-	remaining := append(append([]orderedScheduleRow{}, current[:movedIndex]...), current[movedIndex+1:]...)
-	insertIndex, err := reorderInsertIndex(remaining, move)
+	plan, err := planReorderMove(current, move)
 	if err != nil {
 		return nil, err
 	}
 
-	newRank, err := reorderedRank(remaining, insertIndex)
+	needsRebalance, err := orderedScheduleRanksNeedRebalance(current)
+	if err != nil {
+		return nil, err
+	}
+	if needsRebalance {
+		return nil, errRebalanceScheduleRanks
+	}
+
+	newRank, err := reorderedRank(plan.remaining, plan.insertIndex)
 	if err != nil {
 		return nil, err
 	}
@@ -1349,12 +1462,34 @@ func applyReorderMoveOnce(ctx context.Context, tx pgx.Tx, tripID string, date st
 		return nil, trip.ErrConflict
 	}
 
+	moved := plan.moved
 	moved.Rank = newRank
 	moved.Version++
-	next := append([]orderedScheduleRow{}, remaining[:insertIndex]...)
+	next := append([]orderedScheduleRow{}, plan.remaining[:plan.insertIndex]...)
 	next = append(next, moved)
-	next = append(next, remaining[insertIndex:]...)
+	next = append(next, plan.remaining[plan.insertIndex:]...)
 	return next, nil
+}
+
+func planReorderMove(current []orderedScheduleRow, move trip.ReorderDayScheduleMoveRecord) (reorderMovePlan, error) {
+	movedIndex := indexOrderedScheduleItem(current, move.ItemID)
+	if movedIndex < 0 {
+		return reorderMovePlan{}, trip.ErrConflict
+	}
+	if current[movedIndex].Version != move.ClientVersion {
+		return reorderMovePlan{}, trip.ErrConflict
+	}
+
+	moved := current[movedIndex]
+	remaining := append(append([]orderedScheduleRow{}, current[:movedIndex]...), current[movedIndex+1:]...)
+	insertIndex, err := reorderInsertIndex(remaining, move)
+	if err != nil {
+		return reorderMovePlan{}, err
+	}
+	target := append([]orderedScheduleRow{}, remaining[:insertIndex]...)
+	target = append(target, moved)
+	target = append(target, remaining[insertIndex:]...)
+	return reorderMovePlan{moved: moved, remaining: remaining, insertIndex: insertIndex, target: target}, nil
 }
 
 func execReorderRankUpdate(ctx context.Context, tx pgx.Tx, tripID string, date string, itemID string, newRank string, clientVersion int) (pgconn.CommandTag, error) {
@@ -1393,6 +1528,9 @@ func rollbackReorderRankUpdateSavepoint(ctx context.Context, tx pgx.Tx) error {
 }
 
 func reorderInsertIndex(remaining []orderedScheduleRow, move trip.ReorderDayScheduleMoveRecord) (int, error) {
+	if move.BeforeItemID == nil && move.AfterItemID == nil {
+		return 0, trip.ErrConflict
+	}
 	if move.BeforeItemID == nil {
 		if len(remaining) == 0 || remaining[0].ID != *move.AfterItemID {
 			return 0, trip.ErrConflict
@@ -1425,45 +1563,155 @@ func reorderedRank(remaining []orderedScheduleRow, insertIndex int) (string, err
 	return rankBetween(previousRank, nextRank)
 }
 
-func rankBetween(previousRank *string, nextRank *string) (string, error) {
-	const rankStep int64 = 1024
+func nextAppendScheduleRank(current []orderedScheduleRow) (string, error) {
+	if len(current) == 0 {
+		return rankForPosition(1)
+	}
+	previousValue, err := parsePositiveDecimalRank(current[len(current)-1].Rank)
+	if err != nil {
+		return "", err
+	}
+	return formatRankWithinLimit(new(big.Int).Add(previousValue, big.NewInt(scheduleRankStep)))
+}
 
+func orderedScheduleRanksNeedRebalance(items []orderedScheduleRow) (bool, error) {
+	for _, item := range items {
+		if _, err := parsePositiveDecimalRank(item.Rank); err != nil {
+			return false, err
+		}
+		if len(item.Rank) > scheduleRankWidth {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func rebalanceScheduleRanks(ctx context.Context, tx pgx.Tx, tripID string, tripDayID string, ordered []orderedScheduleRow) ([]orderedScheduleRow, error) {
+	finalRanks := make([]string, len(ordered))
+	for index := range ordered {
+		rank, err := rankForPosition(index + 1)
+		if errors.Is(err, errRebalanceScheduleRanks) {
+			return nil, trip.ErrConflict
+		}
+		if err != nil {
+			return nil, err
+		}
+		finalRanks[index] = rank
+	}
+
+	for index, item := range ordered {
+		temporaryRank := fmt.Sprintf("rebalance:%04d:%s", index, item.ID)
+		commandTag, err := tx.Exec(ctx, `
+			UPDATE schedule_items
+			SET rank = $4
+			WHERE trip_id = $1::uuid
+			  AND trip_day_id = $2::uuid
+			  AND id = $3::uuid
+			  AND deleted_at IS NULL
+		`, mustUUID(tripID), mustUUID(tripDayID), mustUUID(item.ID), temporaryRank)
+		if err != nil {
+			if isUniqueConstraintViolation(err, "schedule_items_active_day_rank_unique") {
+				return nil, trip.ErrConflict
+			}
+			return nil, err
+		}
+		if commandTag.RowsAffected() != 1 {
+			return nil, trip.ErrConflict
+		}
+	}
+
+	rebalanced := make([]orderedScheduleRow, len(ordered))
+	for index, item := range ordered {
+		commandTag, err := tx.Exec(ctx, `
+			UPDATE schedule_items
+			SET rank = $4
+			WHERE trip_id = $1::uuid
+			  AND trip_day_id = $2::uuid
+			  AND id = $3::uuid
+			  AND deleted_at IS NULL
+		`, mustUUID(tripID), mustUUID(tripDayID), mustUUID(item.ID), finalRanks[index])
+		if err != nil {
+			if isUniqueConstraintViolation(err, "schedule_items_active_day_rank_unique") {
+				return nil, trip.ErrConflict
+			}
+			return nil, err
+		}
+		if commandTag.RowsAffected() != 1 {
+			return nil, trip.ErrConflict
+		}
+		rebalanced[index] = item
+		rebalanced[index].Rank = finalRanks[index]
+	}
+	return rebalanced, nil
+}
+
+func rankBetween(previousRank *string, nextRank *string) (string, error) {
 	if previousRank == nil && nextRank == nil {
 		return "", trip.ErrConflict
 	}
 	if previousRank == nil {
-		nextValue, ok := new(big.Int).SetString(*nextRank, 10)
-		if !ok {
-			return "", fmt.Errorf("parse next rank %q", *nextRank)
+		nextValue, err := parsePositiveDecimalRank(*nextRank)
+		if err != nil {
+			return "", fmt.Errorf("parse next rank %q: %w", *nextRank, err)
 		}
 		candidate := new(big.Int).Div(nextValue, big.NewInt(2))
 		if candidate.Sign() <= 0 || candidate.Cmp(nextValue) >= 0 {
-			return "", trip.ErrConflict
+			return "", errRebalanceScheduleRanks
 		}
-		return formatRank(candidate), nil
+		return formatRankWithinLimit(candidate)
 	}
 
-	previousValue, ok := new(big.Int).SetString(*previousRank, 10)
-	if !ok {
-		return "", fmt.Errorf("parse previous rank %q", *previousRank)
+	previousValue, err := parsePositiveDecimalRank(*previousRank)
+	if err != nil {
+		return "", fmt.Errorf("parse previous rank %q: %w", *previousRank, err)
 	}
 	if nextRank == nil {
-		return formatRank(new(big.Int).Add(previousValue, big.NewInt(rankStep))), nil
+		return formatRankWithinLimit(new(big.Int).Add(previousValue, big.NewInt(scheduleRankStep)))
 	}
 
-	nextValue, ok := new(big.Int).SetString(*nextRank, 10)
-	if !ok {
-		return "", fmt.Errorf("parse next rank %q", *nextRank)
+	nextValue, err := parsePositiveDecimalRank(*nextRank)
+	if err != nil {
+		return "", fmt.Errorf("parse next rank %q: %w", *nextRank, err)
 	}
 	gap := new(big.Int).Sub(nextValue, previousValue)
 	if gap.Cmp(big.NewInt(1)) <= 0 {
+		return "", errRebalanceScheduleRanks
+	}
+	return formatRankWithinLimit(new(big.Int).Add(previousValue, new(big.Int).Div(gap, big.NewInt(2))))
+}
+
+func rankForPosition(position int) (string, error) {
+	if position <= 0 {
 		return "", trip.ErrConflict
 	}
-	return formatRank(new(big.Int).Add(previousValue, new(big.Int).Div(gap, big.NewInt(2)))), nil
+	return formatRankWithinLimit(new(big.Int).Mul(big.NewInt(int64(position)), big.NewInt(scheduleRankStep)))
+}
+
+func parsePositiveDecimalRank(rank string) (*big.Int, error) {
+	value, ok := new(big.Int).SetString(rank, 10)
+	if !ok || value.Sign() <= 0 {
+		return nil, fmt.Errorf("invalid positive decimal rank")
+	}
+	return value, nil
+}
+
+func formatRankWithinLimit(value *big.Int) (string, error) {
+	if value.Sign() <= 0 {
+		return "", errRebalanceScheduleRanks
+	}
+	formatted := formatRank(value)
+	if len(formatted) > scheduleRankWidth {
+		return "", errRebalanceScheduleRanks
+	}
+	return formatted, nil
 }
 
 func formatRank(value *big.Int) string {
-	return fmt.Sprintf("%019s", value.String())
+	raw := value.String()
+	if len(raw) >= scheduleRankWidth {
+		return raw
+	}
+	return strings.Repeat("0", scheduleRankWidth-len(raw)) + raw
 }
 
 func indexOrderedScheduleItem(items []orderedScheduleRow, itemID string) int {
