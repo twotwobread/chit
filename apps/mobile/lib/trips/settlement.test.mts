@@ -118,6 +118,135 @@ test('builds transfer sections from authoritative API response without client so
   );
 });
 
+test('builds participant balance sections from authoritative API response without client sorting', () => {
+  const settlement = {
+    tripId: 'trip-1',
+    defaultCurrency: 'KRW',
+    currencySummaries: [
+      {
+        currency: 'USD',
+        totalPaidMinor: 1234,
+        totalShareMinor: 1234,
+        balances: [
+          {
+            participant: { participantId: 'b', displayName: '지영', participantStatus: 'current' as const },
+            paidMinor: 1234,
+            shareMinor: 1234,
+            netMinor: 0,
+          },
+        ],
+        suggestedTransfers: [],
+      },
+      {
+        currency: 'KRW',
+        totalPaidMinor: 50000,
+        totalShareMinor: 50000,
+        balances: [
+          {
+            participant: { participantId: 'a', displayName: '민수', participantStatus: 'current' as const },
+            paidMinor: 50000,
+            shareMinor: 31500,
+            netMinor: 18500,
+          },
+          {
+            participant: { participantId: 'c', displayName: '유나', participantStatus: 'current' as const },
+            paidMinor: 0,
+            shareMinor: 18500,
+            netMinor: -18500,
+          },
+          {
+            participant: { participantId: null, displayName: '삭제된 친구', participantStatus: 'removed' as const },
+            paidMinor: 0,
+            shareMinor: 0,
+            netMinor: 0,
+          },
+        ],
+        suggestedTransfers: [
+          {
+            fromParticipant: { participantId: 'c', displayName: '유나', participantStatus: 'current' as const },
+            toParticipant: { participantId: 'a', displayName: '민수', participantStatus: 'current' as const },
+            amountMinor: 18500,
+          },
+        ],
+      },
+    ],
+  } satisfies GetTripSettlementResponse;
+
+  const viewModel = buildSettlementTransferViewModel({ settlement });
+
+  assert.equal(viewModel.status, 'success');
+  assert.deepEqual(
+    viewModel.balanceSections.map((section) => [section.currency, section.title, section.participantCount]),
+    [
+      ['USD', 'USD 사람별 요약', 1],
+      ['KRW', 'KRW 사람별 요약', 3],
+    ],
+  );
+  assert.deepEqual(
+    viewModel.balanceSections.flatMap((section) =>
+      section.rows.map((row) => [
+        row.displayName,
+        row.statusLabel,
+        row.paidAmountLabel,
+        row.shareAmountLabel,
+        row.netLabel,
+        row.netAmountLabel,
+        row.netDirection,
+      ]),
+    ),
+    [
+      ['지영', null, '$12.34', '$12.34', '차액 없음', '$0.00', 'settled'],
+      ['민수', null, '50,000원', '31,500원', '받을 금액', '18,500원', 'receive'],
+      ['유나', null, '0원', '18,500원', '보낼 금액', '18,500원', 'send'],
+      ['삭제된 친구', '이전 참여자', '0원', '0원', '차액 없음', '0원', 'settled'],
+    ],
+  );
+});
+
+test('keeps balance summaries visible when there are no suggested transfers', () => {
+  const settlement = {
+    tripId: 'trip-1',
+    defaultCurrency: 'KRW',
+    currencySummaries: [
+      {
+        currency: 'KRW',
+        totalPaidMinor: 20000,
+        totalShareMinor: 20000,
+        balances: [
+          {
+            participant: { participantId: 'a', displayName: '민수', participantStatus: 'current' as const },
+            paidMinor: 10000,
+            shareMinor: 10000,
+            netMinor: 0,
+          },
+          {
+            participant: { participantId: 'b', displayName: '지영', participantStatus: 'current' as const },
+            paidMinor: 10000,
+            shareMinor: 10000,
+            netMinor: 0,
+          },
+        ],
+        suggestedTransfers: [],
+      },
+    ],
+  } satisfies GetTripSettlementResponse;
+
+  const viewModel = buildSettlementTransferViewModel({
+    settlement,
+    todayRoute: '/trips/trip-1/days/day-1',
+  });
+
+  assert.equal(viewModel.status, 'success');
+  assert.equal(viewModel.totalTransferCount, 0);
+  assert.equal(viewModel.sections.length, 0);
+  assert.equal(viewModel.balanceSections.length, 1);
+  assert.deepEqual(viewModel.noTransferNotice, {
+    helper: '모든 지출이 이미 맞춰졌거나 아직 정산할 지출이 없어요.',
+    primaryAction: { label: '오늘 일정 보기', route: '/trips/trip-1/days/day-1' },
+    title: '보낼 정산이 없어요.',
+  });
+});
+
 test('builds no-transfer state with optional today route action', () => {
   const emptySettlement = {
     tripId: 'trip-1',

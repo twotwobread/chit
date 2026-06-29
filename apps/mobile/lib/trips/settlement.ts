@@ -23,20 +23,48 @@ export type SettlementTransferCurrencySectionViewModel = {
   transfers: SettlementTransferRowViewModel[];
 };
 
+export type SettlementBalanceDirection = 'receive' | 'send' | 'settled';
+
+export type SettlementBalanceRowViewModel = {
+  displayName: string;
+  statusLabel: string | null;
+  paidMinor: number;
+  paidAmountLabel: string;
+  shareMinor: number;
+  shareAmountLabel: string;
+  netMinor: number;
+  netDirection: SettlementBalanceDirection;
+  netLabel: string;
+  netAmountLabel: string;
+};
+
+export type SettlementBalanceCurrencySectionViewModel = {
+  currency: SupportedCurrency;
+  title: string;
+  helper: string;
+  participantCount: number;
+  rows: SettlementBalanceRowViewModel[];
+};
+
+export type SettlementNoTransferNoticeViewModel = {
+  title: string;
+  helper: string;
+  primaryAction: { label: string; route: string } | null;
+};
+
 export type SettlementTransferViewModel =
   | {
       status: 'success';
       summaryTitle: string;
       summaryHelper: string;
       totalTransferCount: number;
+      balanceSections: SettlementBalanceCurrencySectionViewModel[];
       sections: SettlementTransferCurrencySectionViewModel[];
+      noTransferNotice: SettlementNoTransferNoticeViewModel | null;
     }
-  | {
+  | ({
       status: 'empty';
-      title: string;
-      helper: string;
-      primaryAction: { label: string; route: string } | null;
-    };
+    } & SettlementNoTransferNoticeViewModel);
 
 export type SettlementTransferFailureViewModel =
   | { status: 'auth' }
@@ -56,6 +84,40 @@ export function buildSettlementTransferViewModel({
   settlement: GetTripSettlementResponse;
   todayRoute?: string | null;
 }): SettlementTransferViewModel {
+  const balanceSections = settlement.currencySummaries.flatMap(
+    (summary): SettlementBalanceCurrencySectionViewModel[] => {
+      if (summary.balances.length === 0) {
+        return [];
+      }
+
+      const rows = summary.balances.map((balance) => {
+        const netDirection = settlementNetDirection(balance.netMinor);
+        return {
+          displayName: balance.participant.displayName,
+          statusLabel: balance.participant.participantStatus === 'removed' ? '이전 참여자' : null,
+          paidMinor: balance.paidMinor,
+          paidAmountLabel: formatMoney(balance.paidMinor, summary.currency),
+          shareMinor: balance.shareMinor,
+          shareAmountLabel: formatMoney(balance.shareMinor, summary.currency),
+          netMinor: balance.netMinor,
+          netDirection,
+          netLabel: settlementNetLabel(netDirection),
+          netAmountLabel: formatMoney(Math.abs(balance.netMinor), summary.currency),
+        };
+      });
+
+      return [
+        {
+          currency: summary.currency,
+          title: `${summary.currency} 사람별 요약`,
+          helper: `${rows.length}명`,
+          participantCount: rows.length,
+          rows,
+        },
+      ];
+    },
+  );
+
   const sections = settlement.currencySummaries.flatMap((summary): SettlementTransferCurrencySectionViewModel[] => {
     if (summary.suggestedTransfers.length === 0) {
       return [];
@@ -80,22 +142,53 @@ export function buildSettlementTransferViewModel({
   });
 
   const totalTransferCount = sections.reduce((total, section) => total + section.transferCount, 0);
-  if (totalTransferCount === 0) {
+  const noTransferNotice = totalTransferCount === 0 ? buildNoTransferNotice(todayRoute) : null;
+  if (balanceSections.length === 0 && totalTransferCount === 0) {
     return {
       status: 'empty',
-      title: '보낼 정산이 없어요.',
-      helper: '모든 지출이 이미 맞춰졌거나 아직 정산할 지출이 없어요.',
-      primaryAction: todayRoute ? { label: '오늘 일정 보기', route: todayRoute } : null,
+      ...buildNoTransferNotice(todayRoute),
     };
   }
 
   return {
     status: 'success',
-    summaryTitle: `총 ${totalTransferCount}건을 보내면 정산이 맞아요.`,
-    summaryHelper: '서버가 계산한 최종 송금 안내예요.',
+    summaryTitle:
+      totalTransferCount > 0 ? `총 ${totalTransferCount}건을 보내면 정산이 맞아요.` : '사람별 결제와 부담을 확인해요.',
+    summaryHelper:
+      totalTransferCount > 0 ? '서버가 계산한 최종 송금 안내예요.' : '서버가 계산한 사람별 정산 요약이에요.',
     totalTransferCount,
+    balanceSections,
     sections,
+    noTransferNotice,
   };
+}
+
+function buildNoTransferNotice(todayRoute?: string | null): SettlementNoTransferNoticeViewModel {
+  return {
+    title: '보낼 정산이 없어요.',
+    helper: '모든 지출이 이미 맞춰졌거나 아직 정산할 지출이 없어요.',
+    primaryAction: todayRoute ? { label: '오늘 일정 보기', route: todayRoute } : null,
+  };
+}
+
+function settlementNetDirection(netMinor: number): SettlementBalanceDirection {
+  if (netMinor > 0) {
+    return 'receive';
+  }
+  if (netMinor < 0) {
+    return 'send';
+  }
+  return 'settled';
+}
+
+function settlementNetLabel(direction: SettlementBalanceDirection): string {
+  if (direction === 'receive') {
+    return '받을 금액';
+  }
+  if (direction === 'send') {
+    return '보낼 금액';
+  }
+  return '차액 없음';
 }
 
 export function settlementTransferFailureState(error: unknown): SettlementTransferFailureViewModel {
