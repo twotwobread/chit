@@ -103,6 +103,14 @@ describe('today route preview helpers', () => {
     );
     assert.equal(buildTodayRoutePreviewHeroChip({ status: 'idle' }), '경로 정보를 준비 중이에요');
     assert.equal(
+      buildTodayRoutePreviewHeroChip(todayRoutePreviewUnavailableState()),
+      '경로 미리보기를 불러올 수 없어요.',
+    );
+    assert.equal(
+      buildTodayRoutePreviewHeroChip(todayRoutePreviewPermissionNeededState()),
+      '현재 위치 권한이 필요해요.',
+    );
+    assert.equal(
       buildTodayRoutePreviewHeroChip({
         status: 'success',
         viewModel: {
