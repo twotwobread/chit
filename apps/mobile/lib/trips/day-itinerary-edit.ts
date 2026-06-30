@@ -7,12 +7,16 @@ export type DayItineraryEditFormValues = {
   name: string;
   address: string;
   placeType?: TripPlaceType | string;
+  startTime: string;
+  endTime: string;
 };
 
 export type DayItineraryEditFormErrors = {
   name?: string;
   address?: string;
   placeType?: string;
+  startTime?: string;
+  endTime?: string;
   form?: string;
 };
 
@@ -45,6 +49,8 @@ export function buildDayItineraryEditForm(item: DayItineraryRowViewModel): DayIt
     name: item.placeName,
     address: item.address,
     placeType: item.placeType,
+    startTime: item.startTime ?? '',
+    endTime: item.endTime ?? '',
   };
 }
 
@@ -55,6 +61,8 @@ export function validateDayItineraryEditForm(
   const name = current.name.trim();
   const address = current.address.trim();
   const placeType = isTripPlaceType(current.placeType) ? current.placeType : undefined;
+  const startTime = current.startTime.trim();
+  const endTime = current.endTime.trim();
   const errors: DayItineraryEditFormErrors = {};
 
   if (name.length === 0) {
@@ -73,6 +81,19 @@ export function validateDayItineraryEditForm(
     errors.placeType = '장소 타입을 선택해주세요.';
   }
 
+  if (startTime.length > 0 && !isScheduleItemTimeText(startTime)) {
+    errors.startTime = '시작 시간은 HH:mm 형식으로 입력해주세요.';
+  }
+  if (endTime.length > 0 && !isScheduleItemTimeText(endTime)) {
+    errors.endTime = '종료 시간은 HH:mm 형식으로 입력해주세요.';
+  }
+  if (!errors.startTime && !errors.endTime && endTime.length > 0 && startTime.length === 0) {
+    errors.endTime = '종료 시간은 시작 시간과 함께 입력해주세요.';
+  }
+  if (!errors.startTime && !errors.endTime && startTime.length > 0 && endTime.length > 0 && endTime <= startTime) {
+    errors.endTime = '종료 시간은 시작 시간보다 늦어야 해요.';
+  }
+
   if (Object.keys(errors).length > 0 || !placeType) {
     return { ok: false, errors };
   }
@@ -80,6 +101,8 @@ export function validateDayItineraryEditForm(
   const originalName = original.name.trim();
   const originalAddress = original.address.trim();
   const originalPlaceType = isTripPlaceType(original.placeType) ? original.placeType : undefined;
+  const originalStartTime = original.startTime.trim();
+  const originalEndTime = original.endTime.trim();
   const request: UpdateScheduleItemRequest = {};
 
   if (name !== originalName) {
@@ -90,6 +113,12 @@ export function validateDayItineraryEditForm(
   }
   if (placeType !== originalPlaceType) {
     request.placeType = placeType;
+  }
+  if (startTime !== originalStartTime) {
+    request.startTime = startTime;
+  }
+  if (endTime !== originalEndTime) {
+    request.endTime = endTime;
   }
 
   if (Object.keys(request).length === 0) {
@@ -167,4 +196,8 @@ export function dayItineraryMutationFailureState(action: 'update' | 'delete'): D
 
 function isTripPlaceType(value: DayItineraryEditFormValues['placeType']): value is TripPlaceType {
   return typeof value === 'string' && manualPlaceTypeValues.includes(value as TripPlaceType);
+}
+
+function isScheduleItemTimeText(value: string): boolean {
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
 }

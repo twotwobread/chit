@@ -556,6 +556,8 @@ func (s apiServer) UpdateScheduleItem(w http.ResponseWriter, r *http.Request, tr
 		Name:      body.Name,
 		Address:   body.Address,
 		PlaceType: optionalPlaceTypeFromOpenAPI(body.PlaceType),
+		StartTime: body.StartTime,
+		EndTime:   body.EndTime,
 	})
 	if err != nil {
 		writeTripDayScheduleError(w, err)

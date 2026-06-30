@@ -19,6 +19,9 @@ const item: DayItineraryRowViewModel = {
   placeType: 'sights',
   placeTypeLabel: '관광지',
   address: 'Umeda',
+  startTime: '09:30',
+  endTime: '11:00',
+  timeLabel: '09:30–11:00',
 };
 
 describe('day itinerary edit/delete helpers', () => {
@@ -27,6 +30,8 @@ describe('day itinerary edit/delete helpers', () => {
       name: '우메다 공중정원',
       address: 'Umeda',
       placeType: 'sights',
+      startTime: '09:30',
+      endTime: '11:00',
     });
   });
 
@@ -38,12 +43,33 @@ describe('day itinerary edit/delete helpers', () => {
         name: ' 우메다 스카이빌딩 ',
         address: 'Umeda',
         placeType: 'food',
+        startTime: '09:30',
+        endTime: '11:00',
       }),
       {
         ok: true,
         request: {
           name: '우메다 스카이빌딩',
           placeType: 'food',
+        },
+      },
+    );
+  });
+
+  it('builds time set and clear patch fields from changed time values', () => {
+    const original = buildDayItineraryEditForm(item);
+
+    assert.deepEqual(
+      validateDayItineraryEditForm(original, {
+        ...original,
+        startTime: '10:00',
+        endTime: '',
+      }),
+      {
+        ok: true,
+        request: {
+          startTime: '10:00',
+          endTime: '',
         },
       },
     );
@@ -66,6 +92,8 @@ describe('day itinerary edit/delete helpers', () => {
         name: ' ',
         address: '나'.repeat(301),
         placeType: 'museum',
+        startTime: '9:00',
+        endTime: '8:00',
       }),
       {
         ok: false,
@@ -73,9 +101,24 @@ describe('day itinerary edit/delete helpers', () => {
           name: '장소명을 입력해주세요.',
           address: '주소는 300자 이하로 입력해주세요.',
           placeType: '장소 타입을 선택해주세요.',
+          startTime: '시작 시간은 HH:mm 형식으로 입력해주세요.',
+          endTime: '종료 시간은 HH:mm 형식으로 입력해주세요.',
         },
       },
     );
+  });
+
+  it('rejects end time without start time or before start time', () => {
+    const original = buildDayItineraryEditForm({ ...item, startTime: null, endTime: null, timeLabel: undefined });
+
+    assert.deepEqual(validateDayItineraryEditForm(original, { ...original, endTime: '10:00' }), {
+      ok: false,
+      errors: { endTime: '종료 시간은 시작 시간과 함께 입력해주세요.' },
+    });
+    assert.deepEqual(validateDayItineraryEditForm(original, { ...original, startTime: '11:00', endTime: '10:00' }), {
+      ok: false,
+      errors: { endTime: '종료 시간은 시작 시간보다 늦어야 해요.' },
+    });
   });
 
   it('maps saving and deleting labels to disabled submit states', () => {

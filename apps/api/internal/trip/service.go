@@ -1052,7 +1052,7 @@ func isEmptyUpdate(input UpdateInput) bool {
 }
 
 func isEmptyScheduleItemUpdate(input UpdateScheduleItemInput) bool {
-	return input.Name == nil && input.Address == nil && input.PlaceType == nil
+	return input.Name == nil && input.Address == nil && input.PlaceType == nil && input.StartTime == nil && input.EndTime == nil
 }
 
 func validateUpdateScheduleItemInput(input UpdateScheduleItemInput) error {
@@ -1072,6 +1072,16 @@ func validateUpdateScheduleItemInput(input UpdateScheduleItemInput) error {
 		placeType := strings.TrimSpace(*input.PlaceType)
 		if !isSupportedPlaceType(placeType) {
 			return ErrValidation
+		}
+	}
+	if input.StartTime != nil {
+		if _, err := normalizeOptionalScheduleItemTime(*input.StartTime); err != nil {
+			return err
+		}
+	}
+	if input.EndTime != nil {
+		if _, err := normalizeOptionalScheduleItemTime(*input.EndTime); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -1102,6 +1112,32 @@ func mergeUpdateScheduleItemInput(tripID string, tripDayID string, itemID string
 		return UpdateScheduleItemRecord{}, ErrValidation
 	}
 
+	startTime := foundItem.StartTime
+	endTime := foundItem.EndTime
+	if input.StartTime != nil {
+		normalized, err := normalizeOptionalScheduleItemTime(*input.StartTime)
+		if err != nil {
+			return UpdateScheduleItemRecord{}, err
+		}
+		startTime = normalized
+		if startTime == nil {
+			endTime = nil
+		}
+	}
+	if input.EndTime != nil {
+		normalized, err := normalizeOptionalScheduleItemTime(*input.EndTime)
+		if err != nil {
+			return UpdateScheduleItemRecord{}, err
+		}
+		endTime = normalized
+	}
+	if endTime != nil && startTime == nil {
+		return UpdateScheduleItemRecord{}, ErrValidation
+	}
+	if startTime != nil && endTime != nil && *endTime <= *startTime {
+		return UpdateScheduleItemRecord{}, ErrValidation
+	}
+
 	return UpdateScheduleItemRecord{
 		TripID:    tripID,
 		TripDayID: tripDayID,
@@ -1109,7 +1145,23 @@ func mergeUpdateScheduleItemInput(tripID string, tripDayID string, itemID string
 		Name:      name,
 		Address:   address,
 		PlaceType: placeType,
+		StartTime: startTime,
+		EndTime:   endTime,
 	}, nil
+}
+
+func normalizeOptionalScheduleItemTime(value string) (*string, error) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return nil, nil
+	}
+	if len(trimmed) != 5 || trimmed[2] != ':' {
+		return nil, ErrValidation
+	}
+	if _, err := time.Parse("15:04", trimmed); err != nil {
+		return nil, ErrValidation
+	}
+	return &trimmed, nil
 }
 
 func parseDate(value string) (time.Time, error) {

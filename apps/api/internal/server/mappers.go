@@ -443,6 +443,8 @@ func dayScheduleItemToOpenAPI(item trip.ScheduleItem) openapi.ScheduleItem {
 		ItemOrder: item.ItemOrder,
 		Version:   item.Version,
 		IsLodging: item.IsLodging,
+		StartTime: item.StartTime,
+		EndTime:   item.EndTime,
 		ArrivedAt: optionalTimeToOpenAPI(item.ArrivedAt),
 		SkippedAt: optionalTimeToOpenAPI(item.SkippedAt),
 		Place:     tripPlaceSummaryToOpenAPI(item.Place),

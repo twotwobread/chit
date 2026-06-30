@@ -10,6 +10,9 @@ export type DayItineraryRowViewModel = {
   version: number;
   orderLabel: string;
   isLodging?: boolean;
+  startTime?: string | null;
+  endTime?: string | null;
+  timeLabel?: string;
   placeId?: string;
   placeName: string;
   placeType: TripPlaceType;
@@ -78,6 +81,9 @@ export function buildDayItineraryViewModel(response: GetDayScheduleItemsResponse
         version: item.version,
         orderLabel: String(item.itemOrder),
         isLodging: item.isLodging,
+        startTime: item.startTime,
+        endTime: item.endTime,
+        timeLabel: formatScheduleItemTimeLabel(item.startTime, item.endTime),
         placeId: item.place.id,
         placeName: item.place.name,
         placeType: item.place.placeType,
@@ -92,7 +98,15 @@ export function getScheduleItems(response: GetDayScheduleItemsResponse): Schedul
 }
 
 export function buildDayItineraryPlaceAccessibilityLabel(item: DayItineraryRowViewModel): string {
-  return `${item.orderLabel}번째 장소 ${item.placeName}. ${item.placeTypeLabel}. ${item.address}`;
+  const timeText = item.timeLabel ? `${item.timeLabel}. ` : '';
+  return `${item.orderLabel}번째 장소 ${timeText}${item.placeName}. ${item.placeTypeLabel}. ${item.address}`;
+}
+
+export function formatScheduleItemTimeLabel(startTime?: string | null, endTime?: string | null): string | undefined {
+  if (!startTime) {
+    return undefined;
+  }
+  return endTime ? `${startTime}–${endTime}` : startTime;
 }
 
 export function dayItineraryFailureState(status?: number): DayItineraryFailureViewModel {

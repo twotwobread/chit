@@ -1251,6 +1251,7 @@ function DayItineraryContent({
                       <PlaceTag type={item.placeType} />
                       {lodging.badgeLabel ? <Badge label={lodging.badgeLabel} tone="primary" /> : null}
                     </View>
+                    {item.timeLabel ? <Text style={styles.timeLabel}>{item.timeLabel}</Text> : null}
                     <Text style={styles.address}>{item.address}</Text>
                     <View style={styles.rowActionGroup}>
                       <Pressable
@@ -1568,6 +1569,7 @@ function ReorderPlaceList({
             <Text style={styles.placeName}>{item.placeName}</Text>
             <PlaceTag type={item.placeType} />
           </View>
+          {item.timeLabel ? <Text style={styles.timeLabel}>{item.timeLabel}</Text> : null}
           <Text style={styles.address}>{item.address}</Text>
         </View>
         <View
@@ -1627,6 +1629,39 @@ function EditPlacePanel({
           value={editState.values.address}
         />
         {editState.errors.address ? <Text style={styles.fieldError}>{editState.errors.address}</Text> : null}
+      </View>
+
+      <View style={styles.fieldGroup}>
+        <Text style={styles.label}>시간</Text>
+        <View style={styles.timeFieldRow}>
+          <View style={styles.timeField}>
+            <TextInput
+              accessibilityLabel="시작 시간"
+              editable={!isSaving}
+              keyboardType="numbers-and-punctuation"
+              onChangeText={(startTime) => onUpdateValues({ ...editState.values, startTime })}
+              placeholder="시작 HH:mm"
+              placeholderTextColor={theme.color.textFaint}
+              style={styles.input}
+              value={editState.values.startTime}
+            />
+            {editState.errors.startTime ? <Text style={styles.fieldError}>{editState.errors.startTime}</Text> : null}
+          </View>
+          <View style={styles.timeField}>
+            <TextInput
+              accessibilityLabel="종료 시간"
+              editable={!isSaving}
+              keyboardType="numbers-and-punctuation"
+              onChangeText={(endTime) => onUpdateValues({ ...editState.values, endTime })}
+              placeholder="종료 HH:mm"
+              placeholderTextColor={theme.color.textFaint}
+              style={styles.input}
+              value={editState.values.endTime}
+            />
+            {editState.errors.endTime ? <Text style={styles.fieldError}>{editState.errors.endTime}</Text> : null}
+          </View>
+        </View>
+        <Text style={styles.fieldHelper}>비워두면 순서만 있는 일정으로 유지돼요.</Text>
       </View>
 
       <View style={styles.fieldGroup}>
@@ -1905,6 +1940,12 @@ const styles = StyleSheet.create({
     fontFamily: theme.font.family.regular,
     fontSize: theme.font.size.caption,
   },
+  timeLabel: {
+    color: theme.color.primary,
+    fontFamily: theme.font.family.semibold,
+    fontSize: theme.font.size.caption,
+    fontWeight: theme.font.weight.semibold,
+  },
   rowActionGroup: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -2058,6 +2099,19 @@ const styles = StyleSheet.create({
   },
   addressInput: {
     minHeight: theme.layout.controlHLg,
+  },
+  timeFieldRow: {
+    flexDirection: 'row',
+    gap: theme.space[3],
+  },
+  timeField: {
+    flex: 1,
+    gap: theme.space[2],
+  },
+  fieldHelper: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.caption,
   },
   fieldError: {
     color: theme.color.danger,

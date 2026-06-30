@@ -2923,7 +2923,9 @@ func TestUpdateScheduleItemHandler(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPatch, "/trips/"+tripID+"/days/2026-07-11/schedule-items/"+created.ID, bytes.NewReader([]byte(`{
 		"name":"  우메다 스카이빌딩  ",
-		"placeType":"food"
+		"placeType":"food",
+		"startTime":"09:30",
+		"endTime":"11:00"
 	}`)))
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Authorization", "Bearer "+accessToken)
@@ -2936,8 +2938,10 @@ func TestUpdateScheduleItemHandler(t *testing.T) {
 
 	var body struct {
 		Item struct {
-			ID        string `json:"id"`
-			ItemOrder int    `json:"itemOrder"`
+			ID        string  `json:"id"`
+			ItemOrder int     `json:"itemOrder"`
+			StartTime *string `json:"startTime"`
+			EndTime   *string `json:"endTime"`
 			Place     struct {
 				ID        string `json:"id"`
 				Name      string `json:"name"`
@@ -2951,6 +2955,9 @@ func TestUpdateScheduleItemHandler(t *testing.T) {
 	}
 	if body.Item.ID != created.ID || body.Item.ItemOrder != 1 || body.Item.Place.ID != created.PlaceID || body.Item.Place.Name != "우메다 스카이빌딩" || body.Item.Place.Address != "Umeda" || body.Item.Place.PlaceType != "food" {
 		t.Fatalf("unexpected updated item: %#v", body.Item)
+	}
+	if body.Item.StartTime == nil || *body.Item.StartTime != "09:30" || body.Item.EndTime == nil || *body.Item.EndTime != "11:00" {
+		t.Fatalf("expected response time fields, got start=%v end=%v", body.Item.StartTime, body.Item.EndTime)
 	}
 }
 
@@ -5154,6 +5161,8 @@ func (b *fakeAuthBackend) UpdateScheduleItemPlace(_ context.Context, record trip
 				item.Place.Name = record.Name
 				item.Place.Address = record.Address
 				item.Place.PlaceType = record.PlaceType
+				item.StartTime = record.StartTime
+				item.EndTime = record.EndTime
 				updated = item
 				items[index] = item
 				b.dayScheduleItems[key] = items

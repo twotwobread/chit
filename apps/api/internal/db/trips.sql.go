@@ -640,6 +640,8 @@ SELECT
   si.id::text AS id,
   si.item_order,
   si.version,
+  si.start_time,
+  si.end_time,
   si.arrived_at,
   si.skipped_at,
   COALESCE(td.lodging_trip_place_id = si.trip_place_id, false) AS is_lodging,
@@ -675,6 +677,8 @@ type GetScheduleItemByTripDayAndIDRow struct {
 	ID            string
 	ItemOrder     int32
 	Version       int32
+	StartTime     pgtype.Time
+	EndTime       pgtype.Time
 	ArrivedAt     pgtype.Timestamptz
 	SkippedAt     pgtype.Timestamptz
 	IsLodging     interface{}
@@ -695,6 +699,8 @@ func (q *Queries) GetScheduleItemByTripDayAndID(ctx context.Context, arg GetSche
 		&i.ID,
 		&i.ItemOrder,
 		&i.Version,
+		&i.StartTime,
+		&i.EndTime,
 		&i.ArrivedAt,
 		&i.SkippedAt,
 		&i.IsLodging,
@@ -943,6 +949,8 @@ SELECT
   si.id::text AS id,
   si.item_order,
   si.version,
+  si.start_time,
+  si.end_time,
   si.arrived_at,
   si.skipped_at,
   COALESCE(td.lodging_trip_place_id = si.trip_place_id, false) AS is_lodging,
@@ -977,6 +985,8 @@ type ListScheduleItemsByTripDayRow struct {
 	ID            string
 	ItemOrder     int32
 	Version       int32
+	StartTime     pgtype.Time
+	EndTime       pgtype.Time
 	ArrivedAt     pgtype.Timestamptz
 	SkippedAt     pgtype.Timestamptz
 	IsLodging     interface{}
@@ -1003,6 +1013,8 @@ func (q *Queries) ListScheduleItemsByTripDay(ctx context.Context, arg ListSchedu
 			&i.ID,
 			&i.ItemOrder,
 			&i.Version,
+			&i.StartTime,
+			&i.EndTime,
 			&i.ArrivedAt,
 			&i.SkippedAt,
 			&i.IsLodging,
@@ -1365,6 +1377,8 @@ WITH target AS (
     si.id,
     si.item_order,
     si.version,
+    si.start_time,
+    si.end_time,
     si.arrived_at,
     si.skipped_at,
     si.trip_place_id,
@@ -1379,12 +1393,32 @@ WITH target AS (
     AND si.trip_day_id = $2::uuid
     AND si.id = $3::uuid
     AND si.deleted_at IS NULL
+), updated_item AS (
+  UPDATE schedule_items si
+  SET
+    start_time = $4::time,
+    end_time = $5::time,
+    updated_at = now()
+  FROM target
+  WHERE si.id = target.id
+    AND si.trip_id = target.trip_id
+  RETURNING
+    si.id,
+    si.item_order,
+    si.version,
+    si.start_time,
+    si.end_time,
+    si.arrived_at,
+    si.skipped_at,
+    si.trip_place_id,
+    si.trip_day_id,
+    si.trip_id
 ), updated_place AS (
   UPDATE trip_places tp
   SET
-    name = $4,
-    address = $5,
-    place_type = $6,
+    name = $6,
+    address = $7,
+    place_type = $8,
     updated_at = now()
   FROM target
   WHERE tp.id = target.trip_place_id
@@ -1400,12 +1434,14 @@ WITH target AS (
     tp.longitude
 )
 SELECT
-  target.id::text AS id,
-  target.item_order,
-  target.version,
-  target.arrived_at,
-  target.skipped_at,
-  COALESCE(td.lodging_trip_place_id = target.trip_place_id, false) AS is_lodging,
+  updated_item.id::text AS id,
+  updated_item.item_order,
+  updated_item.version,
+  updated_item.start_time,
+  updated_item.end_time,
+  updated_item.arrived_at,
+  updated_item.skipped_at,
+  COALESCE(td.lodging_trip_place_id = updated_item.trip_place_id, false) AS is_lodging,
   updated_place.id AS trip_place_id,
   updated_place.name AS place_name,
   updated_place.place_type,
@@ -1414,17 +1450,19 @@ SELECT
   updated_place.google_place_id,
   updated_place.latitude,
   updated_place.longitude
-FROM target
+FROM updated_item
 JOIN updated_place ON true
 JOIN trip_days td
-  ON td.id = target.trip_day_id
- AND td.trip_id = target.trip_id
+  ON td.id = updated_item.trip_day_id
+ AND td.trip_id = updated_item.trip_id
 `
 
 type UpdateTripPlaceSnapshotByScheduleItemParams struct {
 	TripID         pgtype.UUID
 	TripDayID      pgtype.UUID
 	ScheduleItemID pgtype.UUID
+	StartTime      pgtype.Time
+	EndTime        pgtype.Time
 	Name           string
 	Address        string
 	PlaceType      string
@@ -1434,6 +1472,8 @@ type UpdateTripPlaceSnapshotByScheduleItemRow struct {
 	ID            string
 	ItemOrder     int32
 	Version       int32
+	StartTime     pgtype.Time
+	EndTime       pgtype.Time
 	ArrivedAt     pgtype.Timestamptz
 	SkippedAt     pgtype.Timestamptz
 	IsLodging     interface{}
@@ -1452,6 +1492,8 @@ func (q *Queries) UpdateTripPlaceSnapshotByScheduleItem(ctx context.Context, arg
 		arg.TripID,
 		arg.TripDayID,
 		arg.ScheduleItemID,
+		arg.StartTime,
+		arg.EndTime,
 		arg.Name,
 		arg.Address,
 		arg.PlaceType,
@@ -1461,6 +1503,8 @@ func (q *Queries) UpdateTripPlaceSnapshotByScheduleItem(ctx context.Context, arg
 		&i.ID,
 		&i.ItemOrder,
 		&i.Version,
+		&i.StartTime,
+		&i.EndTime,
 		&i.ArrivedAt,
 		&i.SkippedAt,
 		&i.IsLodging,

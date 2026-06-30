@@ -53,6 +53,8 @@ export function buildDayItinerarySharedUpdateSignature(response: GetDayScheduleI
         itemOrder: item.itemOrder,
         version: item.version,
         isLodging: item.isLodging,
+        startTime: item.startTime,
+        endTime: item.endTime,
         placeId: item.place.id,
         placeName: item.place.name,
         placeType: item.place.placeType,

@@ -81,6 +81,8 @@ type UpdateScheduleItemInput struct {
 	Name      *string
 	Address   *string
 	PlaceType *string
+	StartTime *string
+	EndTime   *string
 }
 
 type ReorderDayScheduleMoveInput struct {
@@ -122,6 +124,8 @@ type UpdateScheduleItemRecord struct {
 	Name      string
 	Address   string
 	PlaceType string
+	StartTime *string
+	EndTime   *string
 }
 
 type ReorderDayScheduleMoveRecord struct {
@@ -310,6 +314,8 @@ type ScheduleItem struct {
 	ItemOrder int
 	Version   int
 	IsLodging bool
+	StartTime *string
+	EndTime   *string
 	ArrivedAt *time.Time
 	SkippedAt *time.Time
 	Place     TripPlaceSummary
