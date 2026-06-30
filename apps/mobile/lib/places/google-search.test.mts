@@ -4,6 +4,7 @@ import { describe, it } from 'node:test';
 import {
   addingGooglePlaceState,
   buildCreateGooglePlaceScheduleItemRequest,
+  buildGooglePlaceExplorationDetail,
   buildGooglePlaceSearchInputState,
   buildGooglePlaceSearchRoute,
   canSearchGooglePlaces,
@@ -94,6 +95,27 @@ describe('google place search helpers', () => {
     );
     assert.equal(isDuplicateDayPlaceConfirmationError({ error: { code: 'CONFLICT' } }), false);
     assert.equal(isDuplicateDayPlaceConfirmationError(undefined), false);
+  });
+
+  it('builds exploration detail fallback for photos and reviews', () => {
+    assert.deepEqual(
+      buildGooglePlaceExplorationDetail({
+        id: 'google-1',
+        placeName: '우메다 카페',
+        address: 'Umeda',
+        typeHint: '카페',
+      }),
+      {
+        id: 'google-1',
+        placeName: '우메다 카페',
+        address: 'Umeda',
+        typeHint: '카페',
+        photoReviewTitle: '사진 · 리뷰',
+        photoReviewHelper:
+          '현재 지도 검색 API 응답에는 사진과 리뷰가 포함되지 않아요. Google Maps에서 자세히 확인해 주세요.',
+        mapSearchLabel: 'Google Maps에서 보기',
+      },
+    );
   });
 
   it('builds result row view models with Google primary type hints', () => {
