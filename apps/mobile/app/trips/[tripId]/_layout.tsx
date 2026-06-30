@@ -287,7 +287,8 @@ export default function TripLayout() {
 
   const detail = shellState.status === 'success' ? shellState.detail : null;
   const tripName = detail?.trip.name.trim() || '여행';
-  const tripsForSheet = buildSwitchableTrips(switchableTrips, tripId ?? '');
+  const selectedTripId = detail?.trip.id ?? tripId ?? '';
+  const tripsForSheet = buildSwitchableTrips(switchableTrips, selectedTripId);
   const isRootTripTab = tripId ? isTripRootTabPath(pathname, tripId) : false;
   const companionsSuccess = companionsState.status === 'success' ? companionsState : null;
   const companionParticipants = companionsSuccess
