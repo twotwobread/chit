@@ -1,18 +1,18 @@
 import { useCallback, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Share, StyleSheet, Text, View } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import type { Href } from 'expo-router';
 
-import { theme } from '../../../../lib/design';
+import { PrimaryButton, SecondaryButton, theme } from '../../../../lib/design';
 import { TransferRow } from '../../../../lib/trip-ui/TransferRow';
 import { TripListCard, TripScreen, TripScreenHeader, TripStateCard } from '../../../../lib/trip-ui/TripScreenScaffold';
 import { getTripDetail, getTripSettlement } from '../../../../lib/trips/client';
-import { buildDayItineraryRoute } from '../../../../lib/trips/day-itinerary';
+import { buildQuickExpenseRoute } from '../../../../lib/trips/quick-expense';
 import {
+  buildSettlementRequestMessage,
   buildSettlementTransferViewModel,
   settlementTransferFailureState,
   type SettlementBalanceDirection,
-  type SettlementCurrencyRuleNoticeViewModel,
   type SettlementNoTransferNoticeViewModel,
   type SettlementTransferFailureViewModel,
   type SettlementTransferViewModel,
@@ -22,7 +22,7 @@ import { findTripCalendarDay } from '../../../../lib/trips/trip-tabs';
 
 type TripSettleState =
   | { status: 'loading' }
-  | { status: 'settlement'; viewModel: SettlementTransferViewModel }
+  | { status: 'settlement'; expenseEntryRoute: Href | null; tripName: string; viewModel: SettlementTransferViewModel }
   | { status: 'auth' }
   | { status: 'notFound' }
   | { status: 'error'; error: Extract<SettlementTransferFailureViewModel, { status: 'error' }> };
@@ -42,9 +42,14 @@ export default function TripSettleTabScreen() {
     try {
       const [detail, settlement] = await Promise.all([getTripDetail(tripId), getTripSettlement(tripId)]);
       const currentDay = findTripCalendarDay(detail.days, localDateString());
-      const todayRoute = currentDay ? String(buildDayItineraryRoute(tripId, currentDay.id)) : null;
+      const expenseEntryRoute = currentDay ? buildQuickExpenseRoute(tripId, currentDay.id) : null;
 
-      setState({ status: 'settlement', viewModel: buildSettlementTransferViewModel({ settlement, todayRoute }) });
+      setState({
+        status: 'settlement',
+        expenseEntryRoute,
+        tripName: detail.trip.name.trim() || '여행',
+        viewModel: buildSettlementTransferViewModel({ settlement }),
+      });
     } catch (error) {
       setState(settleFailureState(error));
     }
@@ -58,7 +63,7 @@ export default function TripSettleTabScreen() {
 
   return (
     <TripScreen>
-      <TripScreenHeader helper="사람별 결제/부담과 보낼 정산을 확인해요." title="정산" />
+      <TripScreenHeader helper="지출을 등록하고 송금 요청을 보낼 수 있어요." title="정산" />
 
       {state.status === 'loading' ? <TripStateCard loading title="정산을 불러오는 중..." /> : null}
       {state.status === 'auth' ? (
@@ -81,27 +86,34 @@ export default function TripSettleTabScreen() {
           title={state.error.title}
         />
       ) : null}
-      {state.status === 'settlement' ? <SettlementContent viewModel={state.viewModel} /> : null}
+      {state.status === 'settlement' ? (
+        <SettlementContent
+          expenseEntryRoute={state.expenseEntryRoute}
+          tripName={state.tripName}
+          viewModel={state.viewModel}
+        />
+      ) : null}
     </TripScreen>
   );
 }
 
-function SettlementContent({ viewModel }: { viewModel: SettlementTransferViewModel }) {
+function SettlementContent({
+  expenseEntryRoute,
+  tripName,
+  viewModel,
+}: {
+  expenseEntryRoute: Href | null;
+  tripName: string;
+  viewModel: SettlementTransferViewModel;
+}) {
   if (viewModel.status === 'empty') {
-    const primaryAction = viewModel.primaryAction;
     return (
-      <TripStateCard
-        helper={viewModel.helper}
-        primaryAction={
-          primaryAction
-            ? {
-                label: primaryAction.label,
-                onPress: () => router.push(primaryAction.route as Href),
-              }
-            : undefined
-        }
-        title={viewModel.title}
-      />
+      <View style={styles.successStack}>
+        <TripStateCard helper={viewModel.helper} title={viewModel.title} />
+        {expenseEntryRoute ? (
+          <PrimaryButton label="지출 등록하기" onPress={() => router.push(expenseEntryRoute)} />
+        ) : null}
+      </View>
     );
   }
 
@@ -114,7 +126,9 @@ function SettlementContent({ viewModel }: { viewModel: SettlementTransferViewMod
         </View>
       </TripListCard>
 
-      <CurrencyRuleNoticeCard notice={viewModel.currencyRuleNotice} />
+      {expenseEntryRoute ? (
+        <PrimaryButton label="지출 등록하기" onPress={() => router.push(expenseEntryRoute)} />
+      ) : null}
 
       {viewModel.balanceSections.map((section) => (
         <TripListCard key={`balance-${section.currency}`}>
@@ -165,22 +179,25 @@ function SettlementContent({ viewModel }: { viewModel: SettlementTransferViewMod
           </View>
         </TripListCard>
       ))}
+
+      <SettlementRequestButton tripName={tripName} viewModel={viewModel} />
     </View>
   );
 }
 
-function CurrencyRuleNoticeCard({ notice }: { notice: SettlementCurrencyRuleNoticeViewModel }) {
-  return (
-    <TripListCard>
-      <View style={styles.currencyRuleNotice}>
-        <View style={styles.currencyRuleBadge}>
-          <Text style={styles.currencyRuleBadgeText}>{notice.mode === 'single' ? '단일 통화' : '통화별 정산'}</Text>
-        </View>
-        <Text style={styles.currencyRuleTitle}>{notice.title}</Text>
-        <Text style={styles.currencyRuleHelper}>{notice.helper}</Text>
-      </View>
-    </TripListCard>
-  );
+function SettlementRequestButton({
+  tripName,
+  viewModel,
+}: {
+  tripName: string;
+  viewModel: SettlementTransferViewModel;
+}) {
+  const message = buildSettlementRequestMessage(viewModel, tripName);
+  if (!message) {
+    return null;
+  }
+
+  return <SecondaryButton label="정산 요청하기" onPress={() => void Share.share({ message })} />;
 }
 
 function BalanceMetric({

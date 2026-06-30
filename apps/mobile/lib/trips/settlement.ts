@@ -169,10 +169,8 @@ export function buildSettlementTransferViewModel({
 
   return {
     status: 'success',
-    summaryTitle:
-      totalTransferCount > 0 ? `총 ${totalTransferCount}건을 보내면 정산이 맞아요.` : '사람별 결제와 부담을 확인해요.',
-    summaryHelper:
-      totalTransferCount > 0 ? '서버가 계산한 최종 송금 안내예요.' : '서버가 계산한 사람별 정산 요약이에요.',
+    summaryTitle: totalTransferCount > 0 ? `총 ${totalTransferCount}건을 보내면 정산이 맞아요.` : '정산 현황',
+    summaryHelper: totalTransferCount > 0 ? '서버가 계산한 최종 송금 안내예요.' : '서버가 계산한 사람별 요약이에요.',
     totalTransferCount,
     currencyRuleNotice: buildCurrencyRuleNotice(visibleCurrencies),
     balanceSections,
@@ -200,11 +198,11 @@ function buildCurrencyRuleNotice(currencies: SupportedCurrency[]): SettlementCur
   };
 }
 
-function buildNoTransferNotice(todayRoute?: string | null): SettlementNoTransferNoticeViewModel {
+function buildNoTransferNotice(_todayRoute?: string | null): SettlementNoTransferNoticeViewModel {
   return {
     title: '보낼 정산이 없어요.',
     helper: '모든 지출이 이미 맞춰졌거나 아직 정산할 지출이 없어요.',
-    primaryAction: todayRoute ? { label: '오늘 일정 보기', route: todayRoute } : null,
+    primaryAction: null,
   };
 }
 
@@ -226,6 +224,24 @@ function settlementNetLabel(direction: SettlementBalanceDirection): string {
     return '보낼 금액';
   }
   return '차액 없음';
+}
+
+export function buildSettlementRequestMessage(
+  viewModel: SettlementTransferViewModel,
+  tripName = '여행',
+): string | null {
+  if (viewModel.status !== 'success' || viewModel.sections.length === 0) {
+    return null;
+  }
+
+  const lines = viewModel.sections.flatMap((section) =>
+    section.transfers.map((transfer) => `${transfer.fromName}님 → ${transfer.toName}님 ${transfer.amountLabel}`),
+  );
+  if (lines.length === 0) {
+    return null;
+  }
+
+  return [`[i-um] ${tripName} 정산 요청`, ...lines, '확인 후 송금 부탁드려요.'].join('\n');
 }
 
 export function settlementTransferFailureState(error: unknown): SettlementTransferFailureViewModel {
