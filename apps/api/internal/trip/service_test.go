@@ -570,6 +570,8 @@ func (r *fakeRepository) UpdateScheduleItemPlace(_ context.Context, record Updat
 		ID:        record.ItemID,
 		ItemOrder: r.dayItem.ItemOrder,
 		Version:   r.dayItem.Version,
+		StartTime: record.StartTime,
+		EndTime:   record.EndTime,
 		Place: TripPlaceSummary{
 			ID:        r.dayItem.Place.ID,
 			Name:      record.Name,
@@ -2052,6 +2054,8 @@ func TestServiceUpdateScheduleItem(t *testing.T) {
 		dayItem: ScheduleItem{
 			ID:        testUUID(7001),
 			ItemOrder: 2,
+			StartTime: stringPtr("09:00"),
+			EndTime:   stringPtr("10:00"),
 			Place: TripPlaceSummary{
 				ID:        testUUID(8001),
 				Name:      "우메다 공중정원",
@@ -2064,8 +2068,10 @@ func TestServiceUpdateScheduleItem(t *testing.T) {
 	service := newTestService(repo)
 
 	result, err := service.UpdateScheduleItem(context.Background(), "user-1", testTripID, "2026-07-11", testUUID(7001), UpdateScheduleItemInput{
-		Name:    stringPtr("  우메다 스카이빌딩  "),
-		Address: stringPtr("  Umeda Sky Building  "),
+		Name:      stringPtr("  우메다 스카이빌딩  "),
+		Address:   stringPtr("  Umeda Sky Building  "),
+		StartTime: stringPtr(" 09:30 "),
+		EndTime:   stringPtr(""),
 	})
 	if err != nil {
 		t.Fatalf("UpdateScheduleItem returned error: %v", err)
@@ -2082,6 +2088,9 @@ func TestServiceUpdateScheduleItem(t *testing.T) {
 	}
 	if repo.updatedDayItemRecord.TripID != testTripID || repo.updatedDayItemRecord.TripDayID != "2026-07-11" || repo.updatedDayItemRecord.ItemID != testUUID(7001) || repo.updatedDayItemRecord.Name != "우메다 스카이빌딩" || repo.updatedDayItemRecord.Address != "Umeda Sky Building" || repo.updatedDayItemRecord.PlaceType != "sights" {
 		t.Fatalf("expected merged trimmed update record, got %#v", repo.updatedDayItemRecord)
+	}
+	if repo.updatedDayItemRecord.StartTime == nil || *repo.updatedDayItemRecord.StartTime != "09:30" || repo.updatedDayItemRecord.EndTime != nil {
+		t.Fatalf("expected start time set and end time cleared, got start=%v end=%v", repo.updatedDayItemRecord.StartTime, repo.updatedDayItemRecord.EndTime)
 	}
 }
 
@@ -2103,6 +2112,11 @@ func TestServiceUpdateScheduleItemValidation(t *testing.T) {
 		{name: "blank address", tripID: testTripID, date: "2026-07-10", itemID: testUUID(7001), input: UpdateScheduleItemInput{Address: stringPtr(" ")}},
 		{name: "too long address", tripID: testTripID, date: "2026-07-10", itemID: testUUID(7001), input: UpdateScheduleItemInput{Address: stringPtr(strings.Repeat("가", 301))}},
 		{name: "invalid place type", tripID: testTripID, date: "2026-07-10", itemID: testUUID(7001), input: UpdateScheduleItemInput{PlaceType: stringPtr("museum")}},
+		{name: "invalid start time", tripID: testTripID, date: "2026-07-10", itemID: testUUID(7001), input: UpdateScheduleItemInput{StartTime: stringPtr("9:00")}},
+		{name: "end time without start time", tripID: testTripID, date: "2026-07-10", itemID: testUUID(7001), input: UpdateScheduleItemInput{EndTime: stringPtr("10:00")}},
+		{name: "end time before start time", tripID: testTripID, date: "2026-07-10", itemID: testUUID(7001), input: UpdateScheduleItemInput{StartTime: stringPtr("11:00"), EndTime: stringPtr("10:00")}},
+		{name: "end time equal start time", tripID: testTripID, date: "2026-07-10", itemID: testUUID(7001), input: UpdateScheduleItemInput{StartTime: stringPtr("10:00"), EndTime: stringPtr("10:00")}},
+		{name: "clearing start clears existing end", tripID: testTripID, date: "2026-07-10", itemID: testUUID(7001), input: UpdateScheduleItemInput{StartTime: stringPtr(""), EndTime: stringPtr("10:00")}},
 	}
 
 	for _, tt := range tests {

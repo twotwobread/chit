@@ -2024,12 +2024,32 @@ func TestUpdateScheduleItemPlaceUpdatesSharedPlaceSnapshot(t *testing.T) {
 		Name:      "우메다 스카이빌딩",
 		Address:   "Umeda Sky Building",
 		PlaceType: "food",
+		StartTime: stringPtr("09:30"),
+		EndTime:   stringPtr("11:00"),
 	})
 	if err != nil {
 		t.Fatalf("update day schedule item place: %v", err)
 	}
 	if updated.ID != firstItemID || updated.ItemOrder != 1 || updated.Version != 1 || updated.Place.ID != placeID || updated.Place.Name != "우메다 스카이빌딩" || updated.Place.Address != "Umeda Sky Building" || updated.Place.PlaceType != "food" {
 		t.Fatalf("unexpected updated item: %#v", updated)
+	}
+	if updated.StartTime == nil || *updated.StartTime != "09:30" || updated.EndTime == nil || *updated.EndTime != "11:00" {
+		t.Fatalf("expected persisted schedule item times, got start=%v end=%v", updated.StartTime, updated.EndTime)
+	}
+
+	updated, err = store.UpdateScheduleItemPlace(ctx, trip.UpdateScheduleItemRecord{
+		TripID:    tripID,
+		TripDayID: tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-11"),
+		ItemID:    firstItemID,
+		Name:      "우메다 스카이빌딩",
+		Address:   "Umeda Sky Building",
+		PlaceType: "food",
+	})
+	if err != nil {
+		t.Fatalf("clear schedule item time: %v", err)
+	}
+	if updated.StartTime != nil || updated.EndTime != nil {
+		t.Fatalf("expected cleared schedule item times, got start=%v end=%v", updated.StartTime, updated.EndTime)
 	}
 
 	otherDayItems, err := store.ListScheduleItemsByTripDay(ctx, tripID, tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-12"))

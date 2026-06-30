@@ -7,4 +7,12 @@ export type UpdateScheduleItemRequest = {
     name?: string;
     address?: string;
     placeType?: TripPlaceType;
+    /**
+     * Optional local start time in HH:mm. Empty string clears start and end time; absent leaves unchanged.
+     */
+    startTime?: string;
+    /**
+     * Optional local end time in HH:mm. Empty string clears end time; absent leaves unchanged.
+     */
+    endTime?: string;
 };

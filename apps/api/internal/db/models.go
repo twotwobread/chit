@@ -84,6 +84,8 @@ type ScheduleItem struct {
 	ItemOrder   int32
 	Rank        string
 	Version     int32
+	StartTime   pgtype.Time
+	EndTime     pgtype.Time
 	ArrivedAt   pgtype.Timestamptz
 	SkippedAt   pgtype.Timestamptz
 	DeletedAt   pgtype.Timestamptz

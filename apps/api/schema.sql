@@ -195,6 +195,8 @@ CREATE TABLE schedule_items (
   item_order integer NOT NULL,
   rank text COLLATE "C" NOT NULL,
   version integer NOT NULL DEFAULT 1,
+  start_time time,
+  end_time time,
   arrived_at timestamptz,
   skipped_at timestamptz,
   deleted_at timestamptz,
@@ -203,6 +205,7 @@ CREATE TABLE schedule_items (
   CONSTRAINT schedule_items_item_order_check CHECK (item_order >= 1),
   CONSTRAINT schedule_items_version_check CHECK (version >= 1),
   CONSTRAINT schedule_items_arrived_skipped_exclusive CHECK (arrived_at IS NULL OR skipped_at IS NULL),
+  CONSTRAINT schedule_items_time_range_check CHECK (end_time IS NULL OR (start_time IS NOT NULL AND end_time > start_time)),
   CONSTRAINT schedule_items_trip_day_fk FOREIGN KEY (trip_day_id, trip_id) REFERENCES trip_days(id, trip_id) ON DELETE RESTRICT,
   CONSTRAINT schedule_items_trip_place_fk FOREIGN KEY (trip_place_id, trip_id) REFERENCES trip_places(id, trip_id) ON DELETE RESTRICT,
   CONSTRAINT schedule_items_id_day_trip_unique UNIQUE (id, trip_day_id, trip_id)

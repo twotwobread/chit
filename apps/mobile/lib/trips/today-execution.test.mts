@@ -109,6 +109,8 @@ function item(overrides: Partial<ScheduleItem>): ScheduleItem {
     itemOrder: 1,
     version: 1,
     isLodging: false,
+    startTime: null,
+    endTime: null,
     arrivedAt: null,
     skippedAt: null,
     place: {

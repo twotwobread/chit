@@ -2448,6 +2448,8 @@ components:
         - itemOrder
         - version
         - isLodging
+        - startTime
+        - endTime
         - arrivedAt
         - skippedAt
         - place
@@ -2462,6 +2464,18 @@ components:
           minimum: 1
         isLodging:
           type: boolean
+        startTime:
+          type: string
+          nullable: true
+          pattern: '^([01]\\d|2[0-3]):[0-5]\\d$'
+          description: Optional local start time in HH:mm. Null means order-only/untimed.
+          example: '09:30'
+        endTime:
+          type: string
+          nullable: true
+          pattern: '^([01]\\d|2[0-3]):[0-5]\\d$'
+          description: Optional local end time in HH:mm. Must be later than startTime when present.
+          example: '11:00'
         arrivedAt:
           type: string
           format: date-time
@@ -3010,6 +3024,14 @@ components:
           example: 1 Chome-1-88 Oyodonaka, Kita Ward, Osaka
         placeType:
           $ref: '#/components/schemas/TripPlaceType'
+        startTime:
+          type: string
+          description: Optional local start time in HH:mm. Empty string clears start and end time; absent leaves unchanged.
+          example: '09:30'
+        endTime:
+          type: string
+          description: Optional local end time in HH:mm. Empty string clears end time; absent leaves unchanged.
+          example: '11:00'
     UpdateScheduleItemResponse:
       type: object
       required:

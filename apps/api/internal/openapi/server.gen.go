@@ -666,7 +666,10 @@ type RoutePreviewSummary struct {
 // ScheduleItem defines model for ScheduleItem.
 type ScheduleItem struct {
 	// ArrivedAt Server-generated arrival timestamp for this schedule item instance. Null means pending when skippedAt is also null.
-	ArrivedAt *time.Time       `json:"arrivedAt"`
+	ArrivedAt *time.Time `json:"arrivedAt"`
+
+	// EndTime Optional local end time in HH:mm. Must be later than startTime when present.
+	EndTime   *string          `json:"endTime"`
 	Id        string           `json:"id"`
 	IsLodging bool             `json:"isLodging"`
 	ItemOrder int              `json:"itemOrder"`
@@ -674,7 +677,10 @@ type ScheduleItem struct {
 
 	// SkippedAt Server-generated skip timestamp for this schedule item instance. Null means the item is not currently skipped.
 	SkippedAt *time.Time `json:"skippedAt"`
-	Version   int        `json:"version"`
+
+	// StartTime Optional local start time in HH:mm. Null means order-only/untimed.
+	StartTime *string `json:"startTime"`
+	Version   int     `json:"version"`
 }
 
 // SearchGooglePlacesResponse defines model for SearchGooglePlacesResponse.
@@ -860,9 +866,15 @@ type UpdateMeRequest struct {
 
 // UpdateScheduleItemRequest defines model for UpdateScheduleItemRequest.
 type UpdateScheduleItemRequest struct {
-	Address   *string        `json:"address,omitempty"`
+	Address *string `json:"address,omitempty"`
+
+	// EndTime Optional local end time in HH:mm. Empty string clears end time; absent leaves unchanged.
+	EndTime   *string        `json:"endTime,omitempty"`
 	Name      *string        `json:"name,omitempty"`
 	PlaceType *TripPlaceType `json:"placeType,omitempty"`
+
+	// StartTime Optional local start time in HH:mm. Empty string clears start and end time; absent leaves unchanged.
+	StartTime *string `json:"startTime,omitempty"`
 }
 
 // UpdateScheduleItemResponse defines model for UpdateScheduleItemResponse.

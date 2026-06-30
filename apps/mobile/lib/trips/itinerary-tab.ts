@@ -16,6 +16,8 @@ export function buildItineraryTimelineItems(viewModel: DayItineraryViewModel): I
     type: item.placeType,
     name: item.placeName,
     area: item.address || item.placeTypeLabel,
+    startTime: item.startTime,
+    endTime: item.endTime,
     status: 'todo',
     isLodging: item.isLodging,
   }));

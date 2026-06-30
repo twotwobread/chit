@@ -1248,6 +1248,8 @@ func (s *Store) GetScheduleItemByTripDayAndID(ctx context.Context, tripID string
 		ItemOrder: int(row.ItemOrder),
 		Version:   int(row.Version),
 		IsLodging: boolFromSQL(row.IsLodging),
+		StartTime: timeTextPtrFromSQL(row.StartTime),
+		EndTime:   timeTextPtrFromSQL(row.EndTime),
 		ArrivedAt: timePtrFromTimestamptz(row.ArrivedAt),
 		SkippedAt: timePtrFromTimestamptz(row.SkippedAt),
 		Place:     tripPlaceSummary(row.TripPlaceID, row.PlaceName, row.PlaceType, row.Address, row.Provider, row.GooglePlaceID, row.Latitude, row.Longitude),
@@ -1475,6 +1477,8 @@ func (s *Store) UpdateScheduleItemPlace(ctx context.Context, record trip.UpdateS
 		TripID:         mustUUID(record.TripID),
 		TripDayID:      mustUUID(record.TripDayID),
 		ScheduleItemID: mustUUID(record.ItemID),
+		StartTime:      timeTextPtrToSQL(record.StartTime),
+		EndTime:        timeTextPtrToSQL(record.EndTime),
 		Name:           record.Name,
 		Address:        record.Address,
 		PlaceType:      record.PlaceType,
@@ -1490,6 +1494,8 @@ func (s *Store) UpdateScheduleItemPlace(ctx context.Context, record trip.UpdateS
 		ItemOrder: int(row.ItemOrder),
 		Version:   int(row.Version),
 		IsLodging: boolFromSQL(row.IsLodging),
+		StartTime: timeTextPtrFromSQL(row.StartTime),
+		EndTime:   timeTextPtrFromSQL(row.EndTime),
 		ArrivedAt: timePtrFromTimestamptz(row.ArrivedAt),
 		SkippedAt: timePtrFromTimestamptz(row.SkippedAt),
 		Place:     tripPlaceSummary(row.TripPlaceID, row.PlaceName, row.PlaceType, row.Address, row.Provider, row.GooglePlaceID, row.Latitude, row.Longitude),
@@ -1963,6 +1969,8 @@ func mapScheduleItems(rows []db.ListScheduleItemsByTripDayRow) []trip.ScheduleIt
 			ItemOrder: index + 1,
 			Version:   int(row.Version),
 			IsLodging: boolFromSQL(row.IsLodging),
+			StartTime: timeTextPtrFromSQL(row.StartTime),
+			EndTime:   timeTextPtrFromSQL(row.EndTime),
 			ArrivedAt: timePtrFromTimestamptz(row.ArrivedAt),
 			SkippedAt: timePtrFromTimestamptz(row.SkippedAt),
 			Place:     tripPlaceSummary(row.TripPlaceID, row.PlaceName, row.PlaceType, row.Address, row.Provider, row.GooglePlaceID, row.Latitude, row.Longitude),
@@ -2021,6 +2029,29 @@ func timePtrFromTimestamptz(value pgtype.Timestamptz) *time.Time {
 	}
 	timestamp := value.Time.UTC()
 	return &timestamp
+}
+
+func timeTextPtrFromSQL(value pgtype.Time) *string {
+	if !value.Valid {
+		return nil
+	}
+	totalMinutes := value.Microseconds / int64(time.Minute/time.Microsecond)
+	hours := totalMinutes / 60
+	minutes := totalMinutes % 60
+	text := fmt.Sprintf("%02d:%02d", hours, minutes)
+	return &text
+}
+
+func timeTextPtrToSQL(value *string) pgtype.Time {
+	if value == nil {
+		return pgtype.Time{}
+	}
+	parsed, err := time.Parse("15:04", *value)
+	if err != nil {
+		return pgtype.Time{}
+	}
+	microseconds := int64(parsed.Hour())*int64(time.Hour/time.Microsecond) + int64(parsed.Minute())*int64(time.Minute/time.Microsecond)
+	return pgtype.Time{Microseconds: microseconds, Valid: true}
 }
 
 func (s *Store) listExpenseSplits(ctx context.Context, queries *db.Queries, expenseID string) ([]trip.ExpenseSplit, error) {

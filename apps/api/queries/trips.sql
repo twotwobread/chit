@@ -418,6 +418,8 @@ SELECT
   si.id::text AS id,
   si.item_order,
   si.version,
+  si.start_time,
+  si.end_time,
   si.arrived_at,
   si.skipped_at,
   COALESCE(td.lodging_trip_place_id = si.trip_place_id, false) AS is_lodging,
@@ -447,6 +449,8 @@ SELECT
   si.id::text AS id,
   si.item_order,
   si.version,
+  si.start_time,
+  si.end_time,
   si.arrived_at,
   si.skipped_at,
   COALESCE(td.lodging_trip_place_id = si.trip_place_id, false) AS is_lodging,
@@ -477,6 +481,8 @@ WITH target AS (
     si.id,
     si.item_order,
     si.version,
+    si.start_time,
+    si.end_time,
     si.arrived_at,
     si.skipped_at,
     si.trip_place_id,
@@ -491,6 +497,26 @@ WITH target AS (
     AND si.trip_day_id = sqlc.arg(trip_day_id)::uuid
     AND si.id = sqlc.arg(schedule_item_id)::uuid
     AND si.deleted_at IS NULL
+), updated_item AS (
+  UPDATE schedule_items si
+  SET
+    start_time = sqlc.narg(start_time)::time,
+    end_time = sqlc.narg(end_time)::time,
+    updated_at = now()
+  FROM target
+  WHERE si.id = target.id
+    AND si.trip_id = target.trip_id
+  RETURNING
+    si.id,
+    si.item_order,
+    si.version,
+    si.start_time,
+    si.end_time,
+    si.arrived_at,
+    si.skipped_at,
+    si.trip_place_id,
+    si.trip_day_id,
+    si.trip_id
 ), updated_place AS (
   UPDATE trip_places tp
   SET
@@ -512,12 +538,14 @@ WITH target AS (
     tp.longitude
 )
 SELECT
-  target.id::text AS id,
-  target.item_order,
-  target.version,
-  target.arrived_at,
-  target.skipped_at,
-  COALESCE(td.lodging_trip_place_id = target.trip_place_id, false) AS is_lodging,
+  updated_item.id::text AS id,
+  updated_item.item_order,
+  updated_item.version,
+  updated_item.start_time,
+  updated_item.end_time,
+  updated_item.arrived_at,
+  updated_item.skipped_at,
+  COALESCE(td.lodging_trip_place_id = updated_item.trip_place_id, false) AS is_lodging,
   updated_place.id AS trip_place_id,
   updated_place.name AS place_name,
   updated_place.place_type,
@@ -526,11 +554,11 @@ SELECT
   updated_place.google_place_id,
   updated_place.latitude,
   updated_place.longitude
-FROM target
+FROM updated_item
 JOIN updated_place ON true
 JOIN trip_days td
-  ON td.id = target.trip_day_id
- AND td.trip_id = target.trip_id;
+  ON td.id = updated_item.trip_day_id
+ AND td.trip_id = updated_item.trip_id;
 
 -- name: SoftDeleteScheduleItemByTripDayAndID :one
 WITH target AS (
