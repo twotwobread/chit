@@ -44,7 +44,7 @@ export type QuickExpenseFormProps = {
 
 type QuickExpenseErrors = Partial<Record<'amount' | 'item' | 'payer' | 'participants', string>>;
 
-const SPLIT_OPTIONS = ['전체 1/N', '직접 선택'];
+const SPLIT_OPTIONS = ['1/N 분할', '직접 분할'];
 
 export function QuickExpenseForm({
   currency = 'JPY',
@@ -102,7 +102,7 @@ export function QuickExpenseForm({
       nextErrors.amount = '금액을 입력해주세요.';
     }
     if (!draft.itemId) {
-      nextErrors.item = '지출을 연결할 장소를 선택해주세요.';
+      nextErrors.item = '지출을 연결할 일정을 선택해주세요.';
     }
     if (!draft.payerParticipantId) {
       nextErrors.payer = '결제자를 선택해주세요.';
@@ -141,9 +141,9 @@ export function QuickExpenseForm({
       </View>
       {errors.amount ? <Text style={styles.errorText}>{errors.amount}</Text> : null}
 
-      <Text style={styles.label}>연결할 장소</Text>
+      <Text style={styles.label}>연결할 일정</Text>
       {itemOptions.length === 0 ? (
-        <Text style={styles.helperText}>연결할 장소가 없어요.</Text>
+        <Text style={styles.helperText}>연결할 일정이 없어요.</Text>
       ) : (
         <View style={styles.optionList}>
           {itemOptions.map((item) => (
