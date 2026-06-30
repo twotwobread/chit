@@ -126,7 +126,7 @@ export default function NewTripScreen() {
   return (
     <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" style={styles.scroll}>
       <View style={styles.header}>
-        <Text style={styles.title}>새 여행 만들기</Text>
+        <Text style={styles.title}>여행 생성</Text>
         <Text style={styles.subtitle}>이름과 기간만 정하면 바로 시작할 수 있어요.</Text>
       </View>
 
@@ -156,7 +156,12 @@ export default function NewTripScreen() {
 
         {activeDateField ? (
           <TripDatePicker
-            helperText="오늘 이전 날짜는 선택할 수 없어요."
+            anchorDate={activeDateField === 'endDate' ? form.startDate : undefined}
+            helperText={
+              activeDateField === 'startDate'
+                ? '오늘 이전 날짜는 선택할 수 없어요.'
+                : '시작일 이전 날짜는 선택할 수 없어요.'
+            }
             label={activeDateField === 'startDate' ? '시작일 선택' : '종료일 선택'}
             minDate={minDateForField(activeDateField, form.startDate, today)}
             month={calendarMonth}
