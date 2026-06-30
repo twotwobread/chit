@@ -2,15 +2,13 @@ import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 
-import { ApiError, type GetTripDetailResponse } from '@i-um/api-contract';
+import { ApiError, type GetTripDetailResponse, type TripParticipantListItem } from '@i-um/api-contract';
 
 import { MobileAuthError } from '../../../lib/auth/client';
 import { getStoredSession } from '../../../lib/auth/session';
-import { SecondaryButton, theme } from '../../../lib/design';
-import { deleteTrip, getTripDetail } from '../../../lib/trips/client';
-import { buildDayItineraryRoute } from '../../../lib/trips/day-itinerary';
-import { buildTripDayViewModels, formatTripDayDate } from '../../../lib/trips/days';
-import { tripParticipantsPath } from '../../../lib/trips/participants';
+import { Badge, theme } from '../../../lib/design';
+import { deleteTrip, getTripDetail, listTripParticipants } from '../../../lib/trips/client';
+import { formatTripDayDate } from '../../../lib/trips/days';
 import {
   beginTripDelete,
   cancelTripDelete,
@@ -21,7 +19,13 @@ import {
 
 type DetailState =
   | { status: 'loading' }
-  | { status: 'success'; detail: GetTripDetailResponse; currentUserId?: string }
+  | {
+      status: 'success';
+      detail: GetTripDetailResponse;
+      participants: TripParticipantListItem[];
+      participantsLoadFailed: boolean;
+      currentUserId?: string;
+    }
   | { status: 'auth' }
   | { status: 'notFound' }
   | { status: 'error' };
@@ -39,9 +43,21 @@ export default function TripDetailScreen() {
 
     setState({ status: 'loading' });
     try {
-      const detail = await getTripDetail(tripId);
-      const session = await getStoredSession();
-      setState({ status: 'success', detail, currentUserId: session?.user.id });
+      const [detail, participantsResult, session] = await Promise.all([
+        getTripDetail(tripId),
+        listTripParticipants(tripId).then(
+          (response) => ({ status: 'fulfilled' as const, participants: response.participants }),
+          () => ({ status: 'rejected' as const, participants: [] as TripParticipantListItem[] }),
+        ),
+        getStoredSession(),
+      ]);
+      setState({
+        status: 'success',
+        detail,
+        participants: participantsResult.participants,
+        participantsLoadFailed: participantsResult.status === 'rejected',
+        currentUserId: session?.user.id,
+      });
     } catch (error) {
       if (
         error instanceof MobileAuthError &&
@@ -83,7 +99,14 @@ export default function TripDetailScreen() {
         </View>
       ) : null}
 
-      {state.status === 'success' ? <TripDetailCard currentUserId={state.currentUserId} detail={state.detail} /> : null}
+      {state.status === 'success' ? (
+        <TripDetailCard
+          currentUserId={state.currentUserId}
+          detail={state.detail}
+          participants={state.participants}
+          participantsLoadFailed={state.participantsLoadFailed}
+        />
+      ) : null}
 
       {state.status === 'auth' ? (
         <View style={styles.card}>
@@ -117,7 +140,17 @@ export default function TripDetailScreen() {
   );
 }
 
-function TripDetailCard({ currentUserId, detail }: { currentUserId?: string; detail: GetTripDetailResponse }) {
+function TripDetailCard({
+  currentUserId,
+  detail,
+  participants,
+  participantsLoadFailed,
+}: {
+  currentUserId?: string;
+  detail: GetTripDetailResponse;
+  participants: TripParticipantListItem[];
+  participantsLoadFailed: boolean;
+}) {
   const canManage = currentUserId === detail.trip.createdBy;
   const [deleteState, setDeleteState] = useState<TripDeleteState>({ status: 'idle' });
   const deletingRef = useRef(false);
@@ -160,10 +193,13 @@ function TripDetailCard({ currentUserId, detail }: { currentUserId?: string; det
           value={`${formatTripDayDate(detail.trip.startDate)} ~ ${formatTripDayDate(detail.trip.endDate)}`}
         />
         <InfoRow label="기본 통화" value={detail.trip.defaultCurrency} />
-        <InfoRow label="참여자" value={formatParticipantSummary(detail.participantSummary)} />
+        <InfoRow label="참여자" value={`참여자 ${detail.participantSummary.totalCount}명`} />
       </View>
-      <SecondaryButton label="참여자 모두 보기" onPress={() => router.push(tripParticipantsPath(detail.trip.id))} />
-      <TripDayList days={detail.days} tripId={detail.trip.id} />
+      <ParticipantSection
+        fallbackSummary={detail.participantSummary}
+        loadFailed={participantsLoadFailed}
+        participants={participants}
+      />
       {canManage ? (
         <>
           <Pressable
@@ -260,48 +296,64 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function TripDayList({ days, tripId }: { days: GetTripDetailResponse['days']; tripId: string }) {
-  const viewModels = buildTripDayViewModels(days);
+function ParticipantSection({
+  fallbackSummary,
+  loadFailed,
+  participants,
+}: {
+  fallbackSummary: GetTripDetailResponse['participantSummary'];
+  loadFailed: boolean;
+  participants: TripParticipantListItem[];
+}) {
+  const rows = participants.length > 0 ? participants : fallbackParticipants(fallbackSummary);
 
   return (
-    <View style={styles.daySection}>
-      <View style={styles.daySectionHeader}>
-        <Text style={styles.sectionTitle}>여행 일정</Text>
-        <Text style={styles.sectionHelper}>여행 기간에 맞춰 날짜별 일정이 준비됐어요.</Text>
+    <View style={styles.participantSection}>
+      <View style={styles.participantSectionHeader}>
+        <Text style={styles.sectionTitle}>참여자</Text>
+        <Text style={styles.sectionHelper}>
+          {loadFailed ? '전체 참여자 목록을 불러오지 못해 요약 정보를 보여줘요.' : `총 ${fallbackSummary.totalCount}명`}
+        </Text>
       </View>
-      <View style={styles.dayList}>
-        {viewModels.map((day) => (
-          <Pressable
-            accessibilityRole="button"
-            key={day.id}
-            onPress={() => router.push(buildDayItineraryRoute(tripId, day.id))}
-            style={styles.dayRow}
+      <View style={styles.participantList}>
+        {rows.map((participant, index) => (
+          <View
+            key={`${participant.participantId}-${index}`}
+            style={[styles.participantRow, index === 0 ? null : styles.participantDivider]}
           >
-            <View style={styles.dayRowMain}>
-              <Text style={styles.dayLabel}>{day.dayLabel}</Text>
-              <Text style={styles.dayDate}>{day.formattedDate}</Text>
+            <View style={styles.participantAvatar}>
+              <Text style={styles.participantAvatarText}>{participant.displayName.trim().slice(0, 1) || '여'}</Text>
             </View>
-            {day.lodgingSummary ? (
-              <View style={styles.dayLodgingSummary}>
-                <Text style={styles.dayLodgingLabel}>{day.lodgingSummary.label}</Text>
-                <Text style={styles.dayLodgingName}>{day.lodgingSummary.placeName}</Text>
-              </View>
-            ) : null}
-          </Pressable>
+            <Text style={styles.participantName}>{participant.displayName.trim() || '여행자'}</Text>
+            {participant.role === 'owner' ? <Badge label="주최자" tone="primary" /> : <Badge label="동행자" />}
+          </View>
         ))}
       </View>
     </View>
   );
 }
 
-function formatParticipantSummary(summary: GetTripDetailResponse['participantSummary']): string {
-  const countText = `참여자 ${summary.totalCount}명`;
-  const names = summary.previewNames.map((name) => name.trim() || '여행자');
-  if (names.length === 0) {
-    return countText;
+function fallbackParticipants(summary: GetTripDetailResponse['participantSummary']): TripParticipantListItem[] {
+  const previewRows = summary.previewNames.map((name, index) => ({
+    displayName: name.trim() || '여행자',
+    joinedAt: '',
+    participantId: `preview-${index}`,
+    role: 'member' as const,
+  }));
+
+  if (summary.overflowCount <= 0) {
+    return previewRows;
   }
-  const overflowText = summary.overflowCount > 0 ? ` 외 ${summary.overflowCount}명` : '';
-  return `${countText} · ${names.join(', ')}${overflowText}`;
+
+  return [
+    ...previewRows,
+    {
+      displayName: `외 ${summary.overflowCount}명`,
+      joinedAt: '',
+      participantId: 'preview-overflow',
+      role: 'member' as const,
+    },
+  ];
 }
 
 const styles = StyleSheet.create({
@@ -438,6 +490,56 @@ const styles = StyleSheet.create({
     color: theme.color.textBody,
     fontFamily: theme.font.family.regular,
     textAlign: 'center',
+  },
+  participantAvatar: {
+    alignItems: 'center',
+    backgroundColor: theme.color.primarySoft,
+    borderRadius: theme.radius.pill,
+    height: 34,
+    justifyContent: 'center',
+    width: 34,
+  },
+  participantAvatarText: {
+    color: theme.color.primary,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.caption,
+    fontWeight: theme.font.weight.bold,
+  },
+  participantDivider: {
+    borderTopColor: theme.color.borderSubtle,
+    borderTopWidth: 1,
+  },
+  participantList: {
+    backgroundColor: theme.color.surface,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  participantName: {
+    color: theme.color.textStrong,
+    flex: 1,
+    fontFamily: theme.font.family.semibold,
+    fontSize: theme.font.size.body,
+    fontWeight: theme.font.weight.semibold,
+  },
+  participantRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: theme.space[3],
+    paddingHorizontal: theme.space[4],
+    paddingVertical: theme.space[3],
+  },
+  participantSection: {
+    backgroundColor: theme.color.surfaceSunken,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    gap: theme.space[4],
+    padding: theme.space[5],
+  },
+  participantSectionHeader: {
+    gap: theme.space[2],
   },
   errorTitle: {
     color: theme.color.danger,
