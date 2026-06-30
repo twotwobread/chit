@@ -1,5 +1,5 @@
-import { useCallback, useRef, useState } from 'react';
-import { Linking, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { Linking, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 
@@ -24,7 +24,13 @@ import {
 } from '../../../../lib/trips/day-itinerary-map-actions';
 import { tripItineraryPath } from '../../../../lib/trips/routes';
 import { localDateString } from '../../../../lib/trips/status';
-import { buildRouteMapPlaces, buildTripMapDayChips, resolveTripMapSelectedDay } from '../../../../lib/trips/trip-map';
+import {
+  buildRouteMapPlaces,
+  buildTripMapDayChips,
+  resolveMapRouteSheetState,
+  resolveTripMapSelectedDay,
+  type MapRouteSheetState,
+} from '../../../../lib/trips/trip-map';
 import type { RouteMapPlace } from '../../../../lib/trip-ui/RouteMap';
 import { buildTripTabUnavailableViewModel, type TripTabUnavailableViewModel } from '../../../../lib/trips/trip-tabs';
 
@@ -175,32 +181,64 @@ function MapContent({
   copyAddress: (address: string) => void;
   onSelectDay: (dayId: string) => void;
 }) {
+  const [sheetState, setSheetState] = useState<MapRouteSheetState>('collapsed');
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gestureState) => Math.abs(gestureState.dy) > 8,
+        onPanResponderRelease: (_, gestureState) => {
+          setSheetState((current) => resolveMapRouteSheetState(current, gestureState.dy));
+        },
+      }),
+    [],
+  );
+  const expanded = sheetState === 'expanded';
+
   return (
     <>
       <DayChips days={dayChips} selectedDayId={selectedDayId} onSelectDay={onSelectDay} />
-      <View style={styles.mapWrap}>
+      <View style={styles.mapSheetWrap}>
         <RouteMap
           emptyHelper="좌표가 있는 장소를 추가하면 지도에 핀이 표시돼요."
           emptyTitle={`${viewModel.dayLabel}에 표시할 좌표가 없어요`}
           places={mapPlaces}
-          style={styles.map}
+          style={[styles.map, expanded ? styles.mapExpanded : styles.mapCollapsed]}
         />
+        <View style={[styles.routeSheet, expanded ? styles.routeSheetExpanded : styles.routeSheetCollapsed]}>
+          <Pressable
+            accessibilityLabel={expanded ? '지도 동선 목록 접기' : '지도 동선 목록 펼치기'}
+            accessibilityRole="button"
+            onPress={() => setSheetState(expanded ? 'collapsed' : 'expanded')}
+            style={styles.sheetHandleArea}
+            {...panResponder.panHandlers}
+          >
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>{`${viewModel.dayLabel} 지도 동선`}</Text>
+            <Text style={styles.sheetHelper}>
+              {expanded
+                ? '아래로 스와이프하면 지도를 크게 볼 수 있어요.'
+                : '위로 스와이프하면 날짜별 동선을 볼 수 있어요.'}
+            </Text>
+          </Pressable>
+          {expanded ? (
+            viewModel.status === 'empty' ? (
+              <TripStateCard
+                helper="선택한 Day에 장소를 추가하면 지도에서 바로 열 수 있어요."
+                primaryAction={{ label: '일정 보기', onPress: () => router.push(tripItineraryPath(tripId)) }}
+                title={`${viewModel.dayLabel}에 등록된 장소가 없어요.`}
+              />
+            ) : (
+              <SelectedDayList
+                copyAddress={copyAddress}
+                items={viewModel.items}
+                openMap={openMap}
+                summary={`${viewModel.formattedDate} · 일정 ${viewModel.items.length}개 · 지도 ${mapPlaces.length}곳`}
+                title={`${viewModel.dayLabel} 지도 동선`}
+              />
+            )
+          ) : null}
+        </View>
       </View>
-      {viewModel.status === 'empty' ? (
-        <TripStateCard
-          helper="선택한 Day에 장소를 추가하면 지도에서 바로 열 수 있어요."
-          primaryAction={{ label: '일정 보기', onPress: () => router.push(tripItineraryPath(tripId)) }}
-          title={`${viewModel.dayLabel}에 등록된 장소가 없어요.`}
-        />
-      ) : (
-        <SelectedDayList
-          copyAddress={copyAddress}
-          items={viewModel.items}
-          openMap={openMap}
-          summary={`${viewModel.formattedDate} · 장소 ${viewModel.items.length}곳 · 지도 ${mapPlaces.length}곳`}
-          title={`${viewModel.dayLabel} 지도 동선`}
-        />
-      )}
       {feedback ? (
         <TripStateCard helper={feedback.kind === 'error' ? undefined : feedback.message} title={feedback.message} />
       ) : null}
@@ -313,16 +351,39 @@ const styles = StyleSheet.create({
     fontSize: theme.font.size.caption,
   },
   map: {
-    height: 240,
     width: '100%',
   },
-  mapWrap: {
+  mapCollapsed: {
+    height: 520,
+  },
+  mapExpanded: {
+    height: 260,
+  },
+  mapSheetWrap: {
     borderColor: theme.color.borderSubtle,
     borderRadius: theme.radius.xl,
     borderWidth: 1,
     maxWidth: theme.layout.cardMaxW,
     overflow: 'hidden',
+    position: 'relative',
     width: '100%',
+  },
+  routeSheet: {
+    backgroundColor: theme.color.surface,
+    borderTopLeftRadius: theme.radius.xl,
+    borderTopRightRadius: theme.radius.xl,
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    ...theme.shadow.md,
+  },
+  routeSheetCollapsed: {
+    maxHeight: 104,
+  },
+  routeSheetExpanded: {
+    maxHeight: '78%',
+    position: 'relative',
   },
   rowButton: {
     minHeight: 34,
@@ -331,6 +392,31 @@ const styles = StyleSheet.create({
   },
   rowSubtitle: {
     gap: theme.space[2],
+  },
+  sheetHandle: {
+    alignSelf: 'center',
+    backgroundColor: theme.color.borderDefault,
+    borderRadius: theme.radius.pill,
+    height: 4,
+    width: 42,
+  },
+  sheetHandleArea: {
+    gap: theme.space[2],
+    paddingHorizontal: theme.space[5],
+    paddingVertical: theme.space[4],
+  },
+  sheetHelper: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.caption,
+    textAlign: 'center',
+  },
+  sheetTitle: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.subhead,
+    fontWeight: theme.font.weight.bold,
+    textAlign: 'center',
   },
   summary: {
     gap: theme.space[1],
