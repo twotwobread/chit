@@ -309,7 +309,7 @@ export default function TripLayout() {
       return;
     }
 
-    if (isRootTripTab) {
+    if (isRootTripTab || pathname.split('?')[0] === `/trips/${tripId}/detail`) {
       markExplicitHomeIntent();
       router.replace('/');
       return;

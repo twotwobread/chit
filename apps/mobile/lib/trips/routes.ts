@@ -79,7 +79,7 @@ export function tripFallbackPath(input: TripRouteFallbackInput): Href {
     case 'rootTab':
       return '/' as Href;
     case 'detail':
-      return tripTodayPath(input.tripId);
+      return '/' as Href;
     case 'edit':
     case 'participants':
       return tripDetailPath(input.tripId);

@@ -44,7 +44,7 @@ test('recognizes concrete trip root tab route names for custom tab navigation', 
 
 test('encodes no-history fallback matrix for trip shell routes', () => {
   assert.equal(tripFallbackPath({ kind: 'rootTab', tripId: 'trip-a' }), '/');
-  assert.equal(tripFallbackPath({ kind: 'detail', tripId: 'trip-a' }), '/trips/trip-a/today');
+  assert.equal(tripFallbackPath({ kind: 'detail', tripId: 'trip-a' }), '/');
   assert.equal(tripFallbackPath({ kind: 'edit', tripId: 'trip-a' }), '/trips/trip-a/detail');
   assert.equal(tripFallbackPath({ kind: 'participants', tripId: 'trip-a' }), '/trips/trip-a/detail');
   assert.equal(tripFallbackPath({ kind: 'day', tripId: 'trip-a' }), '/trips/trip-a/itinerary');
@@ -64,7 +64,7 @@ test('encodes no-history fallback matrix for trip shell routes', () => {
 
 test('derives fallback from concrete trip pathnames', () => {
   assert.equal(tripFallbackPathForPathname('/trips/trip-a/today', 'trip-a'), '/');
-  assert.equal(tripFallbackPathForPathname('/trips/trip-a/detail', 'trip-a'), '/trips/trip-a/today');
+  assert.equal(tripFallbackPathForPathname('/trips/trip-a/detail', 'trip-a'), '/');
   assert.equal(tripFallbackPathForPathname('/trips/trip-a/edit', 'trip-a'), '/trips/trip-a/detail');
   assert.equal(tripFallbackPathForPathname('/trips/trip-a/participants', 'trip-a'), '/trips/trip-a/detail');
   assert.equal(tripFallbackPathForPathname('/trips/trip-a/days/day-1', 'trip-a'), '/trips/trip-a/itinerary');
