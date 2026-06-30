@@ -9,7 +9,12 @@ import type {
   TripParticipantListItem,
 } from '@i-um/api-contract';
 
-import { getPlaceTypeLabel, getScheduleItems } from './day-itinerary';
+import {
+  formatScheduleItemTimeLabel,
+  getNonPlaceCategoryLabel,
+  getPlaceTypeLabel,
+  getScheduleItems,
+} from './day-itinerary';
 import { formatTripDayDate } from './days';
 
 export type QuickExpenseFormErrors = {
@@ -41,6 +46,7 @@ export type QuickExpenseItemOption = {
   placeName: string;
   placeTypeLabel: string;
   address: string;
+  timeLabel: string | null;
   selected: boolean;
 };
 
@@ -154,7 +160,7 @@ export function buildQuickExpenseViewModel({
 }): QuickExpenseViewModel {
   const itemOptions = orderedItems(getScheduleItems(itinerary)).map((item) => toItemOption(item, selectedItemId));
   const selectedItem = itemOptions.find((item) => item.selected) ?? null;
-  const showItemSelector = shouldChooseItem || selectedItem === null;
+  const showItemSelector = itemOptions.length > 0;
   const selectedParticipantSet = new Set(selectedSplitParticipantIds ?? buildDefaultSplitParticipantIds(participants));
   const selectedParticipants = participants.filter((participant) =>
     selectedParticipantSet.has(participant.participantId),
@@ -192,10 +198,10 @@ export function buildQuickExpenseViewModel({
       participants.length > 0 && selectedParticipants.length === 0 ? '분할할 사람을 1명 이상 선택해주세요.' : null,
     showItemSelector,
     helper:
-      showItemSelector && itemOptions.length > 0
-        ? '현재 장소를 확정할 수 없어 오늘 일정에서 장소를 선택해주세요.'
+      shouldChooseItem && itemOptions.length > 0
+        ? '현재 일정을 확정할 수 없어 오늘 일정에서 연결할 일정을 선택해주세요.'
         : null,
-    emptyMessage: itemOptions.length === 0 ? '오늘 일정에 등록된 장소가 없어 지출을 저장할 수 없어요.' : null,
+    emptyMessage: itemOptions.length === 0 ? '오늘 일정에 등록된 일정이 없어 지출을 저장할 수 없어요.' : null,
   };
 }
 
@@ -409,7 +415,7 @@ export function buildCreateQuickExpenseRequest({
     errors.amount = parsedAmount.message;
   }
   if (!scheduleItemId) {
-    errors.item = '지출을 연결할 장소를 선택해주세요.';
+    errors.item = '지출을 연결할 일정을 선택해주세요.';
   }
   if (!payerParticipantId) {
     errors.payer = '결제자를 선택해주세요.';
@@ -464,10 +470,10 @@ export function buildCreateQuickExpenseRequest({
 
 export function quickExpenseFailureMessage(status?: number): string {
   if (status === 400) {
-    return '금액, 장소, 참여자를 다시 확인해주세요.';
+    return '금액, 일정, 참여자를 다시 확인해주세요.';
   }
   if (status === 403 || status === 404) {
-    return '여행이나 장소, 참여자를 더 이상 사용할 수 없어요. 다시 불러와주세요.';
+    return '여행이나 일정, 참여자를 더 이상 사용할 수 없어요. 다시 불러와주세요.';
   }
   if (status === 409) {
     return '일정이나 참여자가 바뀌었어요. 다시 불러와주세요.';
@@ -480,9 +486,10 @@ function toItemOption(item: ScheduleItem, selectedItemId: string | null): QuickE
     return {
       itemId: item.id,
       orderLabel: String(item.itemOrder),
-      placeName: '장소 없는 일정',
-      placeTypeLabel: '일정',
-      address: '',
+      placeName: item.nonPlace?.title ?? '장소 없는 일정',
+      placeTypeLabel: item.nonPlace ? getNonPlaceCategoryLabel(item.nonPlace.category) : '일정',
+      address: item.nonPlace?.memo ?? '',
+      timeLabel: formatScheduleItemTimeLabel(item.startTime, item.endTime) ?? null,
       selected: item.id === selectedItemId,
     };
   }
@@ -492,12 +499,13 @@ function toItemOption(item: ScheduleItem, selectedItemId: string | null): QuickE
     placeName: item.place.name,
     placeTypeLabel: getPlaceTypeLabel(item.place.placeType),
     address: item.place.address,
+    timeLabel: formatScheduleItemTimeLabel(item.startTime, item.endTime) ?? null,
     selected: item.id === selectedItemId,
   };
 }
 
 function orderedItems(items: ScheduleItem[]): ScheduleItem[] {
-  return [...items].filter((item) => item.place !== null).sort((left, right) => left.itemOrder - right.itemOrder);
+  return [...items].sort((left, right) => left.itemOrder - right.itemOrder);
 }
 
 function parseManualSplitAmountInput(

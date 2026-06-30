@@ -102,11 +102,11 @@ test('requires explicit chooser when no pending item is inferred', () => {
   });
 
   assert.equal(viewModel.showItemSelector, true);
-  assert.equal(viewModel.helper, '현재 장소를 확정할 수 없어 오늘 일정에서 장소를 선택해주세요.');
+  assert.equal(viewModel.helper, '현재 일정을 확정할 수 없어 오늘 일정에서 연결할 일정을 선택해주세요.');
   assert.equal(viewModel.itemOptions.length, 1);
 });
 
-test('builds item options only from today itinerary items and marks selected item', () => {
+test('builds schedule item options with time labels and marks selected item', () => {
   const viewModel = buildQuickExpenseViewModel({
     currency: 'JPY',
     itinerary: itinerary([
@@ -114,19 +114,44 @@ test('builds item options only from today itinerary items and marks selected ite
         id: 'item-b',
         itemOrder: 2,
         place: { id: 'place-b', name: '오사카성', placeType: 'sights', address: 'Osakajo' },
+        startTime: '13:00',
+        endTime: '14:30',
       }),
-      item({ id: 'item-a', itemOrder: 1 }),
+      item({ id: 'item-a', itemOrder: 1, startTime: '09:00', endTime: '10:00' }),
+      item({
+        id: 'item-non-place',
+        itemOrder: 3,
+        place: null,
+        itemType: 'non_place',
+        nonPlace: {
+          category: 'memo',
+          title: '체크인 준비',
+          memo: '프론트 데스크',
+          link: null,
+          transportMode: null,
+          referenceNumber: null,
+          bookingReference: null,
+          originText: null,
+          destinationText: null,
+          terminalText: null,
+          gateText: null,
+        },
+      }),
     ]),
     participants: [participant({ participantId: 'participant-a', displayName: ' 민수 ' })],
     selectedItemId: 'item-b',
     shouldChooseItem: false,
   });
 
-  assert.equal(viewModel.showItemSelector, false);
+  assert.equal(viewModel.showItemSelector, true);
   assert.equal(viewModel.selectedItem?.itemId, 'item-b');
   assert.deepEqual(
-    viewModel.itemOptions.map((option) => option.itemId),
-    ['item-a', 'item-b'],
+    viewModel.itemOptions.map((option) => [option.itemId, option.placeName, option.placeTypeLabel, option.timeLabel]),
+    [
+      ['item-a', '도톤보리', '식당', '09:00–10:00'],
+      ['item-b', '오사카성', '관광지', '13:00–14:30'],
+      ['item-non-place', '체크인 준비', '메모', null],
+    ],
   );
   assert.equal(viewModel.itemOptions[1].selected, true);
   assert.equal(viewModel.payerOptions[0].displayName, '민수');
@@ -397,7 +422,7 @@ test('builds create quick expense request and validation errors', () => {
       ok: false,
       errors: {
         amount: '금액을 1 이상 입력해주세요.',
-        item: '지출을 연결할 장소를 선택해주세요.',
+        item: '지출을 연결할 일정을 선택해주세요.',
         payer: '결제자를 선택해주세요.',
         participants: '분할할 사람을 1명 이상 선택해주세요.',
       },
