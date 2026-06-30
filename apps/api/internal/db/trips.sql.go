@@ -1114,6 +1114,61 @@ func (q *Queries) ListTripParticipantsByTripID(ctx context.Context, dollar_1 pgt
 	return items, nil
 }
 
+const listTripPlacesByTrip = `-- name: ListTripPlacesByTrip :many
+SELECT
+  id::text AS id,
+  name,
+  place_type,
+  address,
+  provider,
+  google_place_id,
+  latitude,
+  longitude
+FROM trip_places
+WHERE trip_id = $1::uuid
+ORDER BY created_at ASC, id ASC
+`
+
+type ListTripPlacesByTripRow struct {
+	ID            string
+	Name          string
+	PlaceType     string
+	Address       string
+	Provider      string
+	GooglePlaceID pgtype.Text
+	Latitude      pgtype.Float8
+	Longitude     pgtype.Float8
+}
+
+func (q *Queries) ListTripPlacesByTrip(ctx context.Context, tripID pgtype.UUID) ([]ListTripPlacesByTripRow, error) {
+	rows, err := q.db.Query(ctx, listTripPlacesByTrip, tripID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListTripPlacesByTripRow
+	for rows.Next() {
+		var i ListTripPlacesByTripRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.PlaceType,
+			&i.Address,
+			&i.Provider,
+			&i.GooglePlaceID,
+			&i.Latitude,
+			&i.Longitude,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTripsByParticipantUser = `-- name: ListTripsByParticipantUser :many
 SELECT
   t.id::text AS id,

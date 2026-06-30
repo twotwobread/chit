@@ -584,6 +584,58 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /trips/{tripId}/places:
+    get:
+      operationId: listTripPlaces
+      summary: List trip places
+      description: Returns existing trip-level places for an authenticated trip participant. Used by Day lodging selection.
+      tags:
+        - Trips
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Existing trip places.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListTripPlacesResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /trips/{tripId}/days/{tripDayId}/lodging-place:
     put:
       operationId: setDayLodgingPlace
@@ -689,6 +741,69 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Trip or trip day not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /trips/{tripId}/days/{tripDayId}/lodging-place/manual:
+    post:
+      operationId: createManualDayLodgingPlace
+      summary: Create a manual lodging place and set Day lodging
+      description: Creates a manual lodging TripPlace for the trip and stores it as the selected Day lodging target. Does not create a Day schedule item.
+      tags:
+        - Trips
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: tripDayId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateManualDayLodgingPlaceRequest'
+      responses:
+        '201':
+          description: Manual lodging place created and set as Day lodging.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SetDayLodgingPlaceResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip/day not found.
           content:
             application/json:
               schema:
@@ -2835,6 +2950,33 @@ components:
           type: integer
           format: int64
           minimum: 0
+    ListTripPlacesResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - places
+      properties:
+        places:
+          type: array
+          items:
+            $ref: '#/components/schemas/TripPlaceSummary'
+    CreateManualDayLodgingPlaceRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - address
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+          example: 호텔 니코 오사카
+        address:
+          type: string
+          minLength: 1
+          maxLength: 300
+          example: 1 Chome-3-3 Nishi-Shinsaibashi, Chuo Ward, Osaka
     SetDayLodgingPlaceRequest:
       type: object
       additionalProperties: false

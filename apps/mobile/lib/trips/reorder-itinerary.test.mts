@@ -394,6 +394,7 @@ describe('reorder itinerary helpers', () => {
         status: 'success',
         dayLabel: 'Day 1',
         formattedDate: '2026.07.10',
+        lodgingPlace: null,
         items: [
           {
             id: 'item-3',

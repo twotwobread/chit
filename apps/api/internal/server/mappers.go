@@ -218,7 +218,22 @@ func getDayScheduleResponseToOpenAPI(result trip.GetDayScheduleItemsResult) open
 	}
 }
 
+func listTripPlacesResponseToOpenAPI(result trip.ListTripPlacesResult) openapi.ListTripPlacesResponse {
+	places := make([]openapi.TripPlaceSummary, 0, len(result.Places))
+	for _, place := range result.Places {
+		places = append(places, tripPlaceSummaryToOpenAPI(place))
+	}
+	return openapi.ListTripPlacesResponse{Places: places}
+}
+
 func setDayLodgingPlaceResponseToOpenAPI(result trip.SetDayLodgingPlaceResult) openapi.SetDayLodgingPlaceResponse {
+	return openapi.SetDayLodgingPlaceResponse{
+		Day:          tripDayToOpenAPI(result.Day),
+		LodgingPlace: tripPlaceSummaryToOpenAPI(result.LodgingPlace),
+	}
+}
+
+func createManualDayLodgingPlaceResponseToOpenAPI(result trip.CreateManualDayLodgingPlaceResult) openapi.SetDayLodgingPlaceResponse {
 	return openapi.SetDayLodgingPlaceResponse{
 		Day:          tripDayToOpenAPI(result.Day),
 		LodgingPlace: tripPlaceSummaryToOpenAPI(result.LodgingPlace),

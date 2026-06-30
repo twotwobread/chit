@@ -201,6 +201,26 @@ func (s apiServer) RemoveTripParticipant(w http.ResponseWriter, r *http.Request,
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (s apiServer) ListTripPlaces(w http.ResponseWriter, r *http.Request, tripId string) {
+	if s.auth == nil || s.trips == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "trip places are not configured", nil)
+		return
+	}
+
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	result, err := s.trips.ListTripPlaces(r.Context(), authContext.UserID, tripId)
+	if err != nil {
+		writeTripDetailError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, listTripPlacesResponseToOpenAPI(result))
+}
+
 func (s apiServer) SetDayLodgingPlace(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string) {
 	if s.auth == nil || s.trips == nil {
 		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "day lodging place is not configured", nil)
@@ -226,6 +246,34 @@ func (s apiServer) SetDayLodgingPlace(w http.ResponseWriter, r *http.Request, tr
 	}
 
 	writeJSON(w, http.StatusOK, setDayLodgingPlaceResponseToOpenAPI(result))
+}
+
+func (s apiServer) CreateManualDayLodgingPlace(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string) {
+	if s.auth == nil || s.trips == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "manual day lodging place creation is not configured", nil)
+		return
+	}
+
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	var body openapi.CreateManualDayLodgingPlaceJSONRequestBody
+	if !decodeJSON(w, r, &body) {
+		return
+	}
+
+	result, err := s.trips.CreateManualDayLodgingPlace(r.Context(), authContext.UserID, tripId, tripDayId, trip.CreateManualDayLodgingPlaceInput{
+		Name:    body.Name,
+		Address: body.Address,
+	})
+	if err != nil {
+		writeDayLodgingPlaceError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, createManualDayLodgingPlaceResponseToOpenAPI(result))
 }
 
 func (s apiServer) ClearDayLodgingPlace(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string) {

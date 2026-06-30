@@ -25,6 +25,7 @@ function baseLocalState(
     editStatus: 'idle',
     deleteStatus: 'idle',
     lodgingStatus: 'idle',
+    lodgingPickerStatus: 'idle',
     ...overrides,
   };
 }
@@ -80,6 +81,13 @@ describe('shared itinerary update helpers', () => {
     assert.equal(buildDayItinerarySharedUpdateSignature(sameContentDifferentObject), signature);
 
     const changes: GetDayScheduleItemsResponse[] = [
+      baseResponse({
+        day: {
+          date: '2026-07-10',
+          dayOrder: 1,
+          lodgingPlace: { id: 'place-3', name: '호텔 니코 오사카', placeType: 'lodging', address: 'Nishi' },
+        },
+      }),
       withFirstItem({ itemOrder: 3 }),
       withFirstItem({ version: 8 }),
       withFirstItem({ isLodging: false }),
@@ -129,6 +137,10 @@ describe('shared itinerary update helpers', () => {
       baseLocalState({ deleteStatus: 'deleting' }),
       baseLocalState({ lodgingStatus: 'setting' }),
       baseLocalState({ lodgingStatus: 'clearing' }),
+      baseLocalState({ lodgingPickerStatus: 'loading' }),
+      baseLocalState({ lodgingPickerStatus: 'selecting' }),
+      baseLocalState({ lodgingPickerStatus: 'manual' }),
+      baseLocalState({ lodgingPickerStatus: 'creating' }),
     ];
 
     for (const localState of protectedStates) {
@@ -175,6 +187,10 @@ describe('shared itinerary update helpers', () => {
     assert.equal(isDayItinerarySharedUpdateReloadDisabled(baseLocalState({ deleteStatus: 'deleting' })), true);
     assert.equal(isDayItinerarySharedUpdateReloadDisabled(baseLocalState({ lodgingStatus: 'setting' })), true);
     assert.equal(isDayItinerarySharedUpdateReloadDisabled(baseLocalState({ lodgingStatus: 'clearing' })), true);
+    assert.equal(isDayItinerarySharedUpdateReloadDisabled(baseLocalState({ lodgingPickerStatus: 'selecting' })), false);
+    assert.equal(isDayItinerarySharedUpdateReloadDisabled(baseLocalState({ lodgingPickerStatus: 'manual' })), false);
+    assert.equal(isDayItinerarySharedUpdateReloadDisabled(baseLocalState({ lodgingPickerStatus: 'loading' })), true);
+    assert.equal(isDayItinerarySharedUpdateReloadDisabled(baseLocalState({ lodgingPickerStatus: 'creating' })), true);
   });
 
   it('requests immediate reconcile when pending remote state becomes unprotected', () => {

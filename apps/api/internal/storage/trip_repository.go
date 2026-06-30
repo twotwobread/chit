@@ -564,6 +564,18 @@ func (s *Store) GetTripPlaceSummaryByTripAndPlace(ctx context.Context, tripID st
 	return tripPlaceSummary(row.ID, row.Name, row.PlaceType, row.Address, row.Provider, row.GooglePlaceID, row.Latitude, row.Longitude), true, nil
 }
 
+func (s *Store) ListTripPlaces(ctx context.Context, tripID string) ([]trip.TripPlaceSummary, error) {
+	rows, err := s.queries.ListTripPlacesByTrip(ctx, mustUUID(tripID))
+	if err != nil {
+		return nil, err
+	}
+	places := make([]trip.TripPlaceSummary, 0, len(rows))
+	for _, row := range rows {
+		places = append(places, tripPlaceSummary(row.ID, row.Name, row.PlaceType, row.Address, row.Provider, row.GooglePlaceID, row.Latitude, row.Longitude))
+	}
+	return places, nil
+}
+
 func (s *Store) GetGoogleTripPlaceByGooglePlaceID(ctx context.Context, tripID string, googlePlaceID string) (trip.TripPlaceSummary, bool, error) {
 	row, err := s.queries.GetGoogleTripPlaceByGooglePlaceID(ctx, db.GetGoogleTripPlaceByGooglePlaceIDParams{
 		TripID:        mustUUID(tripID),
@@ -591,6 +603,42 @@ func (s *Store) SetDayLodgingPlace(ctx context.Context, record trip.SetDayLodgin
 		return trip.TripPlaceSummary{}, trip.ErrNotFound
 	}
 	if err != nil {
+		return trip.TripPlaceSummary{}, err
+	}
+	return tripPlaceSummary(row.ID, row.Name, row.PlaceType, row.Address, row.Provider, row.GooglePlaceID, row.Latitude, row.Longitude), nil
+}
+
+func (s *Store) CreateManualDayLodgingPlace(ctx context.Context, record trip.CreateManualDayLodgingPlaceRecord) (trip.TripPlaceSummary, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return trip.TripPlaceSummary{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	qtx := s.queries.WithTx(tx)
+	place, err := qtx.CreateTripPlace(ctx, db.CreateTripPlaceParams{
+		TripID:    mustUUID(record.TripID),
+		Name:      record.Name,
+		Address:   record.Address,
+		PlaceType: "lodging",
+	})
+	if err != nil {
+		return trip.TripPlaceSummary{}, err
+	}
+
+	row, err := qtx.SetDayLodgingPlace(ctx, db.SetDayLodgingPlaceParams{
+		TripID:      mustUUID(record.TripID),
+		TripDayID:   mustUUID(record.TripDayID),
+		TripPlaceID: mustUUID(place.ID),
+	})
+	if isForeignKeyConstraintViolation(err, "trip_days_lodging_trip_place_fk") || err == pgx.ErrNoRows {
+		return trip.TripPlaceSummary{}, trip.ErrNotFound
+	}
+	if err != nil {
+		return trip.TripPlaceSummary{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
 		return trip.TripPlaceSummary{}, err
 	}
 	return tripPlaceSummary(row.ID, row.Name, row.PlaceType, row.Address, row.Provider, row.GooglePlaceID, row.Latitude, row.Longitude), nil

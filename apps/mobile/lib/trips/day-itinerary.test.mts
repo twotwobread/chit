@@ -56,6 +56,7 @@ describe('day itinerary helpers', () => {
       status: 'success',
       dayLabel: 'Day 1',
       formattedDate: '2026.07.10',
+      lodgingPlace: { id: 'place-1', name: '우메다 공중정원', placeType: 'sights', address: 'Umeda' },
       items: [
         {
           id: 'item-1',
@@ -99,6 +100,7 @@ describe('day itinerary helpers', () => {
       status: 'empty',
       dayLabel: 'Day 1',
       formattedDate: '2026.07.10',
+      lodgingPlace: null,
       title: '아직 등록된 장소가 없어요.',
       helper: '장소 추가를 눌러 방문할 장소를 검색해보세요.',
     });

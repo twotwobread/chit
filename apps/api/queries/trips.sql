@@ -265,6 +265,20 @@ FROM trip_places
 WHERE trip_id = sqlc.arg(trip_id)::uuid
   AND id = sqlc.arg(trip_place_id)::uuid;
 
+-- name: ListTripPlacesByTrip :many
+SELECT
+  id::text AS id,
+  name,
+  place_type,
+  address,
+  provider,
+  google_place_id,
+  latitude,
+  longitude
+FROM trip_places
+WHERE trip_id = sqlc.arg(trip_id)::uuid
+ORDER BY created_at ASC, id ASC;
+
 -- name: GetGoogleTripPlaceByGooglePlaceID :one
 SELECT
   id::text AS id,

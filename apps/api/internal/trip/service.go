@@ -728,6 +728,39 @@ func normalizeManualExpenseSplits(manualSplits []ManualExpenseSplitInput, amount
 	return normalized, nil
 }
 
+func (s *Service) ListTripPlaces(ctx context.Context, userID string, tripID string) (ListTripPlacesResult, error) {
+	if strings.TrimSpace(userID) == "" {
+		return ListTripPlacesResult{}, ErrUnauthorized
+	}
+
+	tripID = strings.TrimSpace(tripID)
+	if !isUUID(tripID) {
+		return ListTripPlacesResult{}, ErrValidation
+	}
+
+	_, ok, err := s.repo.GetTripByID(ctx, tripID)
+	if err != nil {
+		return ListTripPlacesResult{}, err
+	}
+	if !ok {
+		return ListTripPlacesResult{}, ErrNotFound
+	}
+
+	isParticipant, err := s.repo.IsTripParticipant(ctx, tripID, userID)
+	if err != nil {
+		return ListTripPlacesResult{}, err
+	}
+	if !isParticipant {
+		return ListTripPlacesResult{}, ErrForbidden
+	}
+
+	places, err := s.repo.ListTripPlaces(ctx, tripID)
+	if err != nil {
+		return ListTripPlacesResult{}, err
+	}
+	return ListTripPlacesResult{Places: places}, nil
+}
+
 func (s *Service) SetDayLodgingPlace(ctx context.Context, userID string, tripID string, tripDayID string, input SetDayLodgingPlaceInput) (SetDayLodgingPlaceResult, error) {
 	tripPlaceID := strings.TrimSpace(input.TripPlaceID)
 	if !isUUID(tripPlaceID) {
@@ -749,6 +782,29 @@ func (s *Service) SetDayLodgingPlace(ctx context.Context, userID string, tripID 
 	}
 	day.LodgingPlace = &lodgingPlace
 	return SetDayLodgingPlaceResult{Day: day, LodgingPlace: lodgingPlace}, nil
+}
+
+func (s *Service) CreateManualDayLodgingPlace(ctx context.Context, userID string, tripID string, tripDayID string, input CreateManualDayLodgingPlaceInput) (CreateManualDayLodgingPlaceResult, error) {
+	day, err := s.activeTripDay(ctx, userID, tripID, tripDayID)
+	if err != nil {
+		return CreateManualDayLodgingPlaceResult{}, err
+	}
+
+	name := strings.TrimSpace(input.Name)
+	if len([]rune(name)) < 1 || len([]rune(name)) > 120 {
+		return CreateManualDayLodgingPlaceResult{}, ErrValidation
+	}
+	address := strings.TrimSpace(input.Address)
+	if len([]rune(address)) < 1 || len([]rune(address)) > 300 {
+		return CreateManualDayLodgingPlaceResult{}, ErrValidation
+	}
+
+	lodgingPlace, err := s.repo.CreateManualDayLodgingPlace(ctx, CreateManualDayLodgingPlaceRecord{TripID: strings.TrimSpace(tripID), TripDayID: strings.TrimSpace(tripDayID), Name: name, Address: address})
+	if err != nil {
+		return CreateManualDayLodgingPlaceResult{}, err
+	}
+	day.LodgingPlace = &lodgingPlace
+	return CreateManualDayLodgingPlaceResult{Day: day, LodgingPlace: lodgingPlace}, nil
 }
 
 func (s *Service) ClearDayLodgingPlace(ctx context.Context, userID string, tripID string, tripDayID string) error {

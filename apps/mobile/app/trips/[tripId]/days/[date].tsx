@@ -75,17 +75,27 @@ import { buildDayItineraryAddPlaceSearchRoute } from '../../../../lib/trips/day-
 import { tripItineraryPath } from '../../../../lib/trips/routes';
 import {
   clearDayLodgingPlace,
+  createManualDayLodgingPlace,
   deleteScheduleItem,
   getTripDayItinerary,
   listDayExpenses,
+  listTripPlaces,
   reorderScheduleItems,
   setDayLodgingPlace,
   updateScheduleItem,
 } from '../../../../lib/trips/client';
 import {
+  buildDayLodgingPanel,
+  buildDayLodgingPlaceOptions,
   buildDayLodgingRowViewModel,
+  buildManualDayLodgingPlaceSubmitState,
   buildSetDayLodgingPlaceRequest,
+  dayLodgingCopy,
   dayLodgingMutationFailureState,
+  validateManualDayLodgingPlaceForm,
+  type DayLodgingManualFormErrors,
+  type DayLodgingManualFormValues,
+  type DayLodgingPlaceOptionViewModel,
   type DayLodgingSubmittingState,
 } from '../../../../lib/trips/lodging-place';
 import {
@@ -146,6 +156,12 @@ type LodgingState =
   | { status: 'setting' | 'clearing'; itemId: string }
   | { status: 'error'; error: { title: string; helper: string } };
 
+type LodgingPlacePickerState =
+  | { status: 'idle' }
+  | { status: 'loading' }
+  | { status: 'selecting'; options: DayLodgingPlaceOptionViewModel[] }
+  | { status: 'manual' | 'creating'; values: DayLodgingManualFormValues; errors: DayLodgingManualFormErrors };
+
 type DayItineraryContentFocusTarget = DayItineraryDeleteFocusTarget | { kind: 'deleteTrigger'; itemId: string };
 
 type DayItineraryContentFocusRequest = {
@@ -191,6 +207,7 @@ export default function TripDayItineraryScreen() {
   const [deleteState, setDeleteState] = useState<DeleteState>({ status: 'idle' });
   const [reorderState, setReorderState] = useState<ReorderState>({ status: 'idle' });
   const [lodgingState, setLodgingState] = useState<LodgingState>({ status: 'idle' });
+  const [lodgingPickerState, setLodgingPickerState] = useState<LodgingPlacePickerState>({ status: 'idle' });
   const [reorderFeedback, setReorderFeedback] = useState<string | null>(null);
   const [mapActionFeedback, setMapActionFeedback] = useState<DayItineraryMapActionFeedback | null>(null);
   const [contentFocusRequest, setContentFocusRequest] = useState<DayItineraryContentFocusRequest | null>(null);
@@ -208,6 +225,7 @@ export default function TripDayItineraryScreen() {
   const deleteStateRef = useRef<DeleteState>({ status: 'idle' });
   const reorderStateRef = useRef<ReorderState>({ status: 'idle' });
   const lodgingStateRef = useRef<LodgingState>({ status: 'idle' });
+  const lodgingPickerStateRef = useRef<LodgingPlacePickerState>({ status: 'idle' });
   const sharedUpdateStateRef = useRef<DayItinerarySharedUpdateState>({
     baselineSignature: null,
     pendingSignature: null,
@@ -233,6 +251,7 @@ export default function TripDayItineraryScreen() {
       editStatus: editStateRef.current.status,
       deleteStatus: deleteStateRef.current.status,
       lodgingStatus: lodgingStateRef.current.status,
+      lodgingPickerStatus: lodgingPickerStateRef.current.status,
     }),
     [],
   );
@@ -312,6 +331,10 @@ export default function TripDayItineraryScreen() {
   useEffect(() => {
     lodgingStateRef.current = lodgingState;
   }, [lodgingState]);
+
+  useEffect(() => {
+    lodgingPickerStateRef.current = lodgingPickerState;
+  }, [lodgingPickerState]);
 
   const updateScrollOffset = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
     scrollMetricsRef.current.offsetY = event.nativeEvent.contentOffset.y;
@@ -539,6 +562,7 @@ export default function TripDayItineraryScreen() {
     deleteState.status,
     getSharedUpdateLocalState,
     isAppActive,
+    lodgingPickerState.status,
     lodgingState.status,
     refetchSharedItinerary,
     reorderState.status,
@@ -600,6 +624,7 @@ export default function TripDayItineraryScreen() {
     setDeleteState({ status: 'idle' });
     setReorderState({ status: 'idle' });
     setLodgingState({ status: 'idle' });
+    setLodgingPickerState({ status: 'idle' });
     setReorderFeedback(null);
     setMapActionFeedback(null);
     setContentFocusRequest(null);
@@ -900,6 +925,152 @@ export default function TripDayItineraryScreen() {
     }
   };
 
+  const submitClearCurrentLodging = async () => {
+    if (!tripId || !date || lodgingState.status === 'setting' || lodgingState.status === 'clearing') {
+      return;
+    }
+
+    discardReorder();
+    setLodgingState({
+      status: 'clearing',
+      itemId: state.status === 'success' ? (state.viewModel.lodgingPlace?.id ?? 'current') : 'current',
+    });
+    try {
+      await clearDayLodgingPlace(tripId, date);
+      setLodgingState({ status: 'idle' });
+      setLodgingPickerState({ status: 'idle' });
+      await load();
+    } catch (error) {
+      if (
+        error instanceof MobileAuthError &&
+        (error.code === 'UNAUTHORIZED' || error.code === 'INVALID_REFRESH_TOKEN')
+      ) {
+        setState({ status: 'auth' });
+        return;
+      }
+      if (error instanceof ApiError) {
+        if (error.status === 401) {
+          setState({ status: 'auth' });
+          return;
+        }
+        if (error.status === 403 || error.status === 404) {
+          setLodgingState({ status: 'idle' });
+          await load();
+          return;
+        }
+      }
+      setLodgingState({ status: 'error', error: dayLodgingMutationFailureState() });
+    }
+  };
+
+  const openLodgingPlaceSelection = async () => {
+    if (!tripId) {
+      return;
+    }
+
+    discardReorder();
+    setLodgingPickerState({ status: 'loading' });
+    try {
+      const places = await listTripPlaces(tripId);
+      const currentPlaceId = state.status === 'success' ? state.viewModel.lodgingPlace?.id : null;
+      setLodgingPickerState({ status: 'selecting', options: buildDayLodgingPlaceOptions(places, currentPlaceId) });
+    } catch (error) {
+      if (
+        error instanceof MobileAuthError &&
+        (error.code === 'UNAUTHORIZED' || error.code === 'INVALID_REFRESH_TOKEN')
+      ) {
+        setState({ status: 'auth' });
+        return;
+      }
+      if (error instanceof ApiError && error.status === 401) {
+        setState({ status: 'auth' });
+        return;
+      }
+      setLodgingState({ status: 'error', error: dayLodgingMutationFailureState() });
+      setLodgingPickerState({ status: 'idle' });
+    }
+  };
+
+  const submitSelectLodgingPlace = async (option: DayLodgingPlaceOptionViewModel) => {
+    if (!tripId || !date || lodgingState.status === 'setting' || lodgingState.status === 'clearing') {
+      return;
+    }
+
+    setLodgingState({ status: 'setting', itemId: option.id });
+    try {
+      await setDayLodgingPlace(tripId, date, buildSetDayLodgingPlaceRequest(option.id));
+      setLodgingState({ status: 'idle' });
+      setLodgingPickerState({ status: 'idle' });
+      await load();
+    } catch (error) {
+      if (
+        error instanceof MobileAuthError &&
+        (error.code === 'UNAUTHORIZED' || error.code === 'INVALID_REFRESH_TOKEN')
+      ) {
+        setState({ status: 'auth' });
+        return;
+      }
+      if (error instanceof ApiError) {
+        if (error.status === 401) {
+          setState({ status: 'auth' });
+          return;
+        }
+        if (error.status === 403 || error.status === 404) {
+          setLodgingState({ status: 'idle' });
+          await load();
+          return;
+        }
+      }
+      setLodgingState({ status: 'error', error: dayLodgingMutationFailureState() });
+    }
+  };
+
+  const openManualLodgingForm = () => {
+    discardReorder();
+    setLodgingPickerState({ status: 'manual', values: { name: '', address: '' }, errors: {} });
+  };
+
+  const submitManualLodging = async () => {
+    if (!tripId || !date || lodgingPickerState.status !== 'manual') {
+      return;
+    }
+    const validation = validateManualDayLodgingPlaceForm(lodgingPickerState.values);
+    if (!validation.ok) {
+      setLodgingPickerState({ ...lodgingPickerState, errors: validation.errors });
+      return;
+    }
+
+    const submittingState = { status: 'creating' as const, values: lodgingPickerState.values, errors: {} };
+    setLodgingPickerState(submittingState);
+    try {
+      await createManualDayLodgingPlace(tripId, date, validation.request);
+      setLodgingState({ status: 'idle' });
+      setLodgingPickerState({ status: 'idle' });
+      await load();
+    } catch (error) {
+      if (
+        error instanceof MobileAuthError &&
+        (error.code === 'UNAUTHORIZED' || error.code === 'INVALID_REFRESH_TOKEN')
+      ) {
+        setState({ status: 'auth' });
+        return;
+      }
+      if (error instanceof ApiError) {
+        if (error.status === 401) {
+          setState({ status: 'auth' });
+          return;
+        }
+        if (error.status === 403 || error.status === 404) {
+          setLodgingPickerState({ status: 'idle' });
+          await load();
+          return;
+        }
+      }
+      const failure = dayLodgingMutationFailureState();
+      setLodgingPickerState({ ...submittingState, status: 'manual', errors: { form: failure.title } });
+    }
+  };
+
   const openPlaceMap = async (item: DayItineraryRowViewModel) => {
     discardReorder();
     const actions = buildDayItineraryMapRowActions(item);
@@ -980,6 +1151,7 @@ export default function TripDayItineraryScreen() {
     editStatus: editState.status,
     deleteStatus: deleteState.status,
     lodgingStatus: lodgingState.status,
+    lodgingPickerStatus: lodgingPickerState.status,
   };
   const sharedUpdateBanner = buildDayItinerarySharedUpdateBanner(sharedUpdateState);
   const sharedUpdateReloadDisabled = isDayItinerarySharedUpdateReloadDisabled(sharedUpdateLocalState);
@@ -1026,14 +1198,28 @@ export default function TripDayItineraryScreen() {
               onEditPlace={beginEdit}
               onEnterReorderMode={() => beginReorder(state.viewModel)}
               onExitReorderMode={cancelReorder}
+              lodgingPickerState={lodgingPickerState}
               lodgingState={lodgingState}
+              onCancelLodgingPicker={() => setLodgingPickerState({ status: 'idle' })}
+              onClearCurrentLodging={() => void submitClearCurrentLodging()}
               onClearLodging={(item) => void submitClearLodging(item)}
+              onCreateManualLodging={() => void submitManualLodging()}
               onMoveReorderItem={moveReorderItem}
               onOpenMap={(item) => void openPlaceMap(item)}
               onReorderDragActiveChange={setReorderDragActive}
               onReorderDragMove={requestReorderAutoScroll}
+              onOpenLodgingPlaceSelection={() => void openLodgingPlaceSelection()}
+              onOpenManualLodgingForm={openManualLodgingForm}
               onSaveReorder={() => void submitReorder()}
+              onSelectLodgingPlace={(option) => void submitSelectLodgingPlace(option)}
               onSetLodging={(item) => void submitSetLodging(item)}
+              onUpdateManualLodgingValues={(values) =>
+                setLodgingPickerState((current) =>
+                  current.status === 'manual' || current.status === 'creating'
+                    ? { ...current, values, errors: {} }
+                    : current,
+                )
+              }
               mapActionFeedback={mapActionFeedback}
               onReloadSharedUpdate={requestSharedUpdateReload}
               reorderFeedback={reorderFeedback}
@@ -1101,21 +1287,29 @@ export default function TripDayItineraryScreen() {
 function DayItineraryContent({
   focusRequest,
   getReorderScrollOffsetY,
+  lodgingPickerState,
   lodgingState,
   onFocusRequestHandled,
   onAddPlace,
+  onCancelLodgingPicker,
+  onClearCurrentLodging,
   onClearLodging,
   onCopyAddress,
+  onCreateManualLodging,
   onDeletePlace,
   onEditPlace,
   onEnterReorderMode,
   onExitReorderMode,
   onMoveReorderItem,
+  onOpenLodgingPlaceSelection,
+  onOpenManualLodgingForm,
   onOpenMap,
   onReorderDragActiveChange,
   onReorderDragMove,
   onSaveReorder,
+  onSelectLodgingPlace,
   onSetLodging,
+  onUpdateManualLodgingValues,
   mapActionFeedback,
   onReloadSharedUpdate,
   reorderFeedback,
@@ -1126,21 +1320,29 @@ function DayItineraryContent({
 }: {
   focusRequest: DayItineraryContentFocusRequest | null;
   getReorderScrollOffsetY: () => number;
+  lodgingPickerState: LodgingPlacePickerState;
   lodgingState: LodgingState;
   onFocusRequestHandled: () => void;
   onAddPlace: () => void;
+  onCancelLodgingPicker: () => void;
+  onClearCurrentLodging: () => void;
   onClearLodging: (item: DayItineraryRowViewModel) => void;
   onCopyAddress: (item: DayItineraryRowViewModel) => void;
+  onCreateManualLodging: () => void;
   onDeletePlace: (item: DayItineraryRowViewModel, originFocusTarget?: number | null) => void;
   onEditPlace: (item: DayItineraryRowViewModel) => void;
   onEnterReorderMode: () => void;
   onExitReorderMode: () => void;
   onMoveReorderItem: (fromIndex: number, toIndex: number) => void;
+  onOpenLodgingPlaceSelection: () => void;
+  onOpenManualLodgingForm: () => void;
   onOpenMap: (item: DayItineraryRowViewModel) => void;
   onReorderDragActiveChange: (isActive: boolean) => void;
   onReorderDragMove: (pointerY: number) => void;
   onSaveReorder: () => void;
+  onSelectLodgingPlace: (option: DayLodgingPlaceOptionViewModel) => void;
   onSetLodging: (item: DayItineraryRowViewModel) => void;
+  onUpdateManualLodgingValues: (values: DayLodgingManualFormValues) => void;
   mapActionFeedback: DayItineraryMapActionFeedback | null;
   onReloadSharedUpdate: () => void;
   reorderFeedback: string | null;
@@ -1206,6 +1408,19 @@ function DayItineraryContent({
         </Text>
         <Text style={styles.dayDate}>{viewModel.formattedDate}</Text>
       </View>
+
+      <DayLodgingPanel
+        lodgingState={lodgingState}
+        onCancelPicker={onCancelLodgingPicker}
+        onClear={onClearCurrentLodging}
+        onCreateManual={onCreateManualLodging}
+        onOpenManual={onOpenManualLodgingForm}
+        onOpenSelection={onOpenLodgingPlaceSelection}
+        onSelectPlace={onSelectLodgingPlace}
+        onUpdateManualValues={onUpdateManualLodgingValues}
+        pickerState={lodgingPickerState}
+        viewModel={buildDayLodgingPanel(viewModel.lodgingPlace)}
+      />
 
       {viewModel.status === 'empty' ? (
         <View
@@ -1463,6 +1678,154 @@ function DayExpensesSection({
               />
             </Pressable>
           ))}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function DayLodgingPanel({
+  lodgingState,
+  onCancelPicker,
+  onClear,
+  onCreateManual,
+  onOpenManual,
+  onOpenSelection,
+  onSelectPlace,
+  onUpdateManualValues,
+  pickerState,
+  viewModel,
+}: {
+  lodgingState: LodgingState;
+  pickerState: LodgingPlacePickerState;
+  viewModel: ReturnType<typeof buildDayLodgingPanel>;
+  onCancelPicker: () => void;
+  onClear: () => void;
+  onCreateManual: () => void;
+  onOpenManual: () => void;
+  onOpenSelection: () => void;
+  onSelectPlace: (option: DayLodgingPlaceOptionViewModel) => void;
+  onUpdateManualValues: (values: DayLodgingManualFormValues) => void;
+}) {
+  const isMutating = lodgingState.status === 'setting' || lodgingState.status === 'clearing';
+  const isCreating = pickerState.status === 'creating';
+  const manualSubmit = buildManualDayLodgingPlaceSubmitState(isCreating);
+
+  return (
+    <View style={styles.lodgingBox}>
+      <View style={styles.placeTitleRow}>
+        <Text style={styles.placeName}>{viewModel.label}</Text>
+        {viewModel.canClear ? <Badge label={dayLodgingCopy.badge} tone="primary" /> : null}
+      </View>
+      {viewModel.placeName ? <Text style={styles.lodgingPlaceName}>{viewModel.placeName}</Text> : null}
+      {viewModel.address ? <Text style={styles.address}>{viewModel.address}</Text> : null}
+      {viewModel.helper ? <Text style={styles.message}>{viewModel.helper}</Text> : null}
+
+      <View style={styles.rowActionGroup}>
+        <Pressable
+          accessibilityRole="button"
+          disabled={isMutating}
+          onPress={onOpenSelection}
+          style={styles.rowActionButton}
+        >
+          <Text style={styles.rowActionText}>{dayLodgingCopy.selectExistingAction}</Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          disabled={isMutating}
+          onPress={onOpenManual}
+          style={styles.rowActionButton}
+        >
+          <Text style={styles.rowActionText}>{dayLodgingCopy.manualRegisterAction}</Text>
+        </Pressable>
+        {viewModel.canClear ? (
+          <Pressable
+            accessibilityRole="button"
+            disabled={isMutating}
+            onPress={onClear}
+            style={[styles.rowDangerActionButton, isMutating ? styles.rowActionButtonDisabled : null]}
+          >
+            <Text style={styles.rowDangerActionText}>
+              {lodgingState.status === 'clearing' ? dayLodgingCopy.clearing : dayLodgingCopy.clearAction}
+            </Text>
+          </Pressable>
+        ) : null}
+      </View>
+
+      {pickerState.status === 'loading' ? <Text style={styles.message}>{dayLodgingCopy.loadingPlaces}</Text> : null}
+
+      {pickerState.status === 'selecting' ? (
+        <View style={styles.lodgingPickerBox}>
+          {pickerState.options.length === 0 ? <Text style={styles.message}>{dayLodgingCopy.emptyPlaces}</Text> : null}
+          {pickerState.options.map((option) => (
+            <Pressable
+              accessibilityRole="button"
+              disabled={isMutating || option.selected}
+              key={option.id}
+              onPress={() => onSelectPlace(option)}
+              style={[styles.lodgingOption, option.selected ? styles.lodgingOptionSelected : null]}
+            >
+              <View style={styles.placeTitleRow}>
+                <Text style={styles.placeName}>{option.name}</Text>
+                {option.selected ? <Badge label="선택됨" tone="primary" /> : null}
+              </View>
+              <Text style={styles.address}>{option.address}</Text>
+            </Pressable>
+          ))}
+          <Pressable accessibilityRole="button" onPress={onCancelPicker} style={styles.secondaryButton}>
+            <Text style={styles.secondaryButtonText}>닫기</Text>
+          </Pressable>
+        </View>
+      ) : null}
+
+      {pickerState.status === 'manual' || pickerState.status === 'creating' ? (
+        <View style={styles.lodgingPickerBox}>
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>숙소명</Text>
+            <TextInput
+              editable={!isCreating}
+              onChangeText={(name) => onUpdateManualValues({ ...pickerState.values, name })}
+              placeholder="예: 호텔 니코 오사카"
+              placeholderTextColor={theme.color.textFaint}
+              style={styles.input}
+              value={pickerState.values.name}
+            />
+            {pickerState.errors.name ? <Text style={styles.fieldError}>{pickerState.errors.name}</Text> : null}
+          </View>
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>주소</Text>
+            <TextInput
+              editable={!isCreating}
+              multiline
+              onChangeText={(address) => onUpdateManualValues({ ...pickerState.values, address })}
+              placeholder="예: Nishi-Shinsaibashi"
+              placeholderTextColor={theme.color.textFaint}
+              style={[styles.input, styles.addressInput]}
+              textAlignVertical="top"
+              value={pickerState.values.address}
+            />
+            {pickerState.errors.address ? <Text style={styles.fieldError}>{pickerState.errors.address}</Text> : null}
+            {pickerState.errors.form ? <Text style={styles.fieldError}>{pickerState.errors.form}</Text> : null}
+          </View>
+          <View style={styles.rowActionGroup}>
+            <Pressable
+              accessibilityRole="button"
+              disabled={manualSubmit.disabled}
+              onPress={onCreateManual}
+              style={[styles.button, manualSubmit.disabled ? styles.buttonDisabled : null]}
+            >
+              {isCreating ? <ActivityIndicator color={theme.color.onPrimary} /> : null}
+              <Text style={styles.buttonText}>{manualSubmit.label}</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              disabled={isCreating}
+              onPress={onCancelPicker}
+              style={styles.secondaryButton}
+            >
+              <Text style={styles.secondaryButtonText}>취소</Text>
+            </Pressable>
+          </View>
         </View>
       ) : null}
     </View>
@@ -1904,6 +2267,35 @@ const styles = StyleSheet.create({
   },
   placeList: {
     gap: theme.space[3],
+  },
+  lodgingBox: {
+    backgroundColor: theme.color.surfaceSunken,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    gap: theme.space[3],
+    padding: theme.space[4],
+  },
+  lodgingPlaceName: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.subhead,
+    fontWeight: theme.font.weight.bold,
+  },
+  lodgingPickerBox: {
+    gap: theme.space[3],
+  },
+  lodgingOption: {
+    backgroundColor: theme.color.surface,
+    borderColor: theme.color.borderDefault,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    gap: theme.space[2],
+    padding: theme.space[3],
+  },
+  lodgingOptionSelected: {
+    borderColor: theme.color.primary,
+    backgroundColor: theme.color.primarySoft,
   },
   placeRow: {
     alignItems: 'flex-start',

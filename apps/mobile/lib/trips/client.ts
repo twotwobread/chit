@@ -2,6 +2,7 @@ import {
   AuthService,
   TripsService,
   type AcceptTripInviteResponse,
+  type CreateManualDayLodgingPlaceRequest,
   type CreateManualScheduleItemRequest,
   type CreateManualScheduleItemResponse,
   type CreateQuickExpenseRequest,
@@ -17,6 +18,7 @@ import {
   type GetTripSettlementResponse,
   type ListDayExpensesResponse,
   type ListTripParticipantsResponse,
+  type ListTripPlacesResponse,
   type ListTripsResponse,
   type MarkScheduleItemArrivedResponse,
   type MarkScheduleItemSkippedResponse,
@@ -49,6 +51,11 @@ export async function getTripDetail(tripId: string): Promise<GetTripDetailRespon
 export async function listTripParticipants(tripId: string): Promise<ListTripParticipantsResponse> {
   await getMeWithRefresh();
   return TripsService.listTripParticipants(tripId);
+}
+
+export async function listTripPlaces(tripId: string): Promise<ListTripPlacesResponse> {
+  await getMeWithRefresh();
+  return TripsService.listTripPlaces(tripId);
 }
 
 export async function getTripSettlement(tripId: string): Promise<GetTripSettlementResponse> {
@@ -126,6 +133,15 @@ export async function setDayLodgingPlace(
 ): Promise<SetDayLodgingPlaceResponse> {
   await getMeWithRefresh();
   return TripsService.setDayLodgingPlace(tripId, date, request);
+}
+
+export async function createManualDayLodgingPlace(
+  tripId: string,
+  date: string,
+  request: CreateManualDayLodgingPlaceRequest,
+): Promise<SetDayLodgingPlaceResponse> {
+  await getMeWithRefresh();
+  return TripsService.createManualDayLodgingPlace(tripId, date, request);
 }
 
 export async function clearDayLodgingPlace(tripId: string, date: string): Promise<void> {
