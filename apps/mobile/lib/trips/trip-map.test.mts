@@ -3,7 +3,12 @@ import test from 'node:test';
 
 import type { ScheduleItem, TripDay } from '@i-um/api-contract';
 
-import { buildRouteMapPlaces, buildTripMapDayChips, resolveTripMapSelectedDay } from './trip-map';
+import {
+  buildRouteMapPlaces,
+  buildTripMapDayChips,
+  resolveMapRouteSheetState,
+  resolveTripMapSelectedDay,
+} from './trip-map';
 
 function day(overrides: Partial<TripDay>): TripDay {
   return {
@@ -57,6 +62,13 @@ test('resolves selected map day from preferred id, current calendar day, then fi
   assert.equal(resolveTripMapSelectedDay({ days, preferredDayId: 'missing', today: '2026-07-11' })?.id, 'day-2');
   assert.equal(resolveTripMapSelectedDay({ days, preferredDayId: null, today: '2026-07-12' })?.id, 'day-1');
   assert.equal(resolveTripMapSelectedDay({ days: [], preferredDayId: null, today: '2026-07-12' }), null);
+});
+
+test('resolves map route sheet state from vertical gestures', () => {
+  assert.equal(resolveMapRouteSheetState('collapsed', -20), 'expanded');
+  assert.equal(resolveMapRouteSheetState('expanded', 20), 'collapsed');
+  assert.equal(resolveMapRouteSheetState('collapsed', -6), 'collapsed');
+  assert.equal(resolveMapRouteSheetState('expanded', 6), 'expanded');
 });
 
 test('builds route map places from valid routable items while preserving duplicates and statuses', () => {

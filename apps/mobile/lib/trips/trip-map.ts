@@ -39,6 +39,18 @@ export function resolveTripMapSelectedDay({
   return orderedDays.find((day) => day.date === today) ?? orderedDays[0];
 }
 
+export type MapRouteSheetState = 'collapsed' | 'expanded';
+
+export function resolveMapRouteSheetState(current: MapRouteSheetState, gestureDy: number): MapRouteSheetState {
+  if (gestureDy < -12) {
+    return 'expanded';
+  }
+  if (gestureDy > 12) {
+    return 'collapsed';
+  }
+  return current;
+}
+
 export function buildRouteMapPlaces(items: ScheduleItem[]): RouteMapPlace[] {
   return items
     .slice()
