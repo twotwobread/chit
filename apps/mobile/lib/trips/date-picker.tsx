@@ -43,6 +43,7 @@ export function TripDateFieldButton({
 }
 
 export function TripDatePicker({
+  anchorDate,
   helperText,
   label,
   minDate,
@@ -54,6 +55,7 @@ export function TripDatePicker({
   yearOptionCount,
   yearOptionRadius = defaultYearOptionRadius,
 }: {
+  anchorDate?: string;
   helperText: string;
   label: string;
   minDate?: string;
@@ -77,15 +79,7 @@ export function TripDatePicker({
       ? Array.from({ length: yearOptionCount }, (_, index) => minYear + index)
       : Array.from({ length: yearOptionRadius * 2 + 1 }, (_, index) => selectedYear - yearOptionRadius + index);
   const canGoPrevious = minDate ? month > monthStringFromDate(dateFromString(minDate)) : true;
-  const markedDates = selectedDate
-    ? {
-        [selectedDate]: {
-          selected: true,
-          selectedColor: theme.color.primary,
-          selectedTextColor: theme.color.onPrimary,
-        },
-      }
-    : undefined;
+  const markedDates = buildMarkedDates({ anchorDate, selectedDate });
 
   const changeMonth = (nextMonth: string) => {
     onMonthChange(minDate ? normalizeMonth(nextMonth, minDate) : nextMonth);
@@ -221,6 +215,28 @@ export function TripDatePicker({
       </Pressable>
     </View>
   );
+}
+
+function buildMarkedDates({ anchorDate, selectedDate }: { anchorDate?: string; selectedDate: string }) {
+  const dates: Record<string, { selected: boolean; selectedColor: string; selectedTextColor: string }> = {};
+
+  if (anchorDate) {
+    dates[anchorDate] = {
+      selected: true,
+      selectedColor: theme.color.primarySoft,
+      selectedTextColor: theme.color.primary,
+    };
+  }
+
+  if (selectedDate) {
+    dates[selectedDate] = {
+      selected: true,
+      selectedColor: theme.color.primary,
+      selectedTextColor: theme.color.onPrimary,
+    };
+  }
+
+  return Object.keys(dates).length > 0 ? dates : undefined;
 }
 
 const styles = StyleSheet.create({
