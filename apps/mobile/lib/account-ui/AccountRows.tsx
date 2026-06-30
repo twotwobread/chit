@@ -95,7 +95,7 @@ export function StatRow({ stats }: StatRowProps) {
 
 export function SettingsList({ children, title }: SettingsListProps) {
   return (
-    <View>
+    <View style={styles.settingsList}>
       {title ? <Text style={styles.groupLabel}>{title}</Text> : null}
       <View style={styles.group}>{children}</View>
     </View>
@@ -165,6 +165,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.xl,
     borderWidth: 1,
     overflow: 'hidden',
+    width: '100%',
     ...theme.shadow.sm,
   },
   groupLabel: {
@@ -251,6 +252,7 @@ const styles = StyleSheet.create({
   rowLabel: {
     color: theme.color.textStrong,
     flex: 1,
+    flexShrink: 1,
     fontFamily: theme.font.family.semibold,
     fontSize: theme.font.size.body,
     fontWeight: theme.font.weight.semibold,
@@ -260,11 +262,17 @@ const styles = StyleSheet.create({
   },
   rowValue: {
     color: theme.color.textMuted,
+    flexShrink: 1,
     fontFamily: theme.font.family.regular,
     fontSize: theme.font.size.caption,
+    textAlign: 'right',
   },
   rowValueDisabled: {
     color: theme.color.textFaint,
+  },
+  settingsList: {
+    maxWidth: theme.layout.cardMaxW,
+    width: '100%',
   },
   statLabel: {
     color: theme.color.textMuted,

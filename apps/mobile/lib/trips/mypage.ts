@@ -95,14 +95,15 @@ export function buildMyTripsSuccessViewModel(
   trips: TripListItem[],
   today = localDateString(),
 ): MyTripsSuccessViewModel {
-  const sections = groupTripsByStatus(trips, today).map((section) => ({
+  const groupedSections = groupTripsByStatus(trips, today).map((section) => ({
     ...section,
     trips: section.trips.map(toTripCardViewModel),
   }));
+  const currentTrip = groupedSections.find((section) => section.status === 'ongoing')?.trips[0] ?? null;
 
   return {
-    currentTrip: sections.find((section) => section.status === 'ongoing')?.trips[0] ?? null,
-    sections,
+    currentTrip,
+    sections: groupedSections.filter((section) => section.status !== 'ongoing'),
   };
 }
 
