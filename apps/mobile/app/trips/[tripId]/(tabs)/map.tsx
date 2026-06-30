@@ -1,11 +1,21 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { Linking, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, PanResponder, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 
 import { ApiError } from '@i-um/api-contract';
 
 import { MobileAuthError } from '../../../../lib/auth/client';
+import { searchGooglePlaces } from '../../../../lib/places/client';
+import {
+  buildGooglePlaceExplorationDetail,
+  buildGooglePlaceSearchInputState,
+  errorGooglePlaceSearchState,
+  googlePlaceSearchLoadingState,
+  successGooglePlaceSearchState,
+  type GooglePlaceSearchRowViewModel,
+  type GooglePlaceSearchViewState,
+} from '../../../../lib/places/google-search';
 import { ListRow, PlacePin, PlaceTag, PrimaryButton, SecondaryButton, theme } from '../../../../lib/design';
 import { DayChips } from '../../../../lib/trip-ui/DayChips';
 import { RouteMap } from '../../../../lib/trip-ui/RouteMap';
@@ -182,6 +192,11 @@ function MapContent({
   onSelectDay: (dayId: string) => void;
 }) {
   const [sheetState, setSheetState] = useState<MapRouteSheetState>('collapsed');
+  const [placeSearchQuery, setPlaceSearchQuery] = useState('');
+  const [placeSearchState, setPlaceSearchState] = useState<GooglePlaceSearchViewState>(() =>
+    buildGooglePlaceSearchInputState(''),
+  );
+  const [selectedSearchResult, setSelectedSearchResult] = useState<GooglePlaceSearchRowViewModel | null>(null);
   const panResponder = useMemo(
     () =>
       PanResponder.create({
@@ -193,6 +208,30 @@ function MapContent({
     [],
   );
   const expanded = sheetState === 'expanded';
+  const isPlaceSearchLoading = placeSearchState.status === 'loading';
+
+  const updatePlaceSearchQuery = (value: string) => {
+    setPlaceSearchQuery(value);
+    setPlaceSearchState(buildGooglePlaceSearchInputState(value));
+    setSelectedSearchResult(null);
+  };
+
+  const runPlaceSearch = async () => {
+    const inputState = buildGooglePlaceSearchInputState(placeSearchQuery);
+    if (inputState.status === 'minQuery' || inputState.status === 'initial') {
+      setPlaceSearchState(inputState);
+      return;
+    }
+
+    setPlaceSearchState(googlePlaceSearchLoadingState());
+    setSelectedSearchResult(null);
+    try {
+      const response = await searchGooglePlaces(tripId, selectedDayId, placeSearchQuery);
+      setPlaceSearchState(successGooglePlaceSearchState(response.results));
+    } catch (error) {
+      setPlaceSearchState(errorGooglePlaceSearchState(error instanceof ApiError ? error.status : undefined));
+    }
+  };
 
   return (
     <>
@@ -221,21 +260,33 @@ function MapContent({
             </Text>
           </Pressable>
           {expanded ? (
-            viewModel.status === 'empty' ? (
-              <TripStateCard
-                helper="선택한 Day에 장소를 추가하면 지도에서 바로 열 수 있어요."
-                primaryAction={{ label: '일정 보기', onPress: () => router.push(tripItineraryPath(tripId)) }}
-                title={`${viewModel.dayLabel}에 등록된 장소가 없어요.`}
+            <>
+              <PlaceSearchPanel
+                isLoading={isPlaceSearchLoading}
+                onOpenMap={openMap}
+                onSearch={() => void runPlaceSearch()}
+                onSelectResult={setSelectedSearchResult}
+                onUpdateQuery={updatePlaceSearchQuery}
+                query={placeSearchQuery}
+                selectedResult={selectedSearchResult}
+                state={placeSearchState}
               />
-            ) : (
-              <SelectedDayList
-                copyAddress={copyAddress}
-                items={viewModel.items}
-                openMap={openMap}
-                summary={`${viewModel.formattedDate} · 일정 ${viewModel.items.length}개 · 지도 ${mapPlaces.length}곳`}
-                title={`${viewModel.dayLabel} 지도 동선`}
-              />
-            )
+              {viewModel.status === 'empty' ? (
+                <TripStateCard
+                  helper="선택한 Day에 장소를 추가하면 지도에서 바로 열 수 있어요."
+                  primaryAction={{ label: '일정 보기', onPress: () => router.push(tripItineraryPath(tripId)) }}
+                  title={`${viewModel.dayLabel}에 등록된 장소가 없어요.`}
+                />
+              ) : (
+                <SelectedDayList
+                  copyAddress={copyAddress}
+                  items={viewModel.items}
+                  openMap={openMap}
+                  summary={`${viewModel.formattedDate} · 일정 ${viewModel.items.length}개 · 지도 ${mapPlaces.length}곳`}
+                  title={`${viewModel.dayLabel} 지도 동선`}
+                />
+              )}
+            </>
           ) : null}
         </View>
       </View>
@@ -243,6 +294,103 @@ function MapContent({
         <TripStateCard helper={feedback.kind === 'error' ? undefined : feedback.message} title={feedback.message} />
       ) : null}
     </>
+  );
+}
+
+function PlaceSearchPanel({
+  isLoading,
+  onOpenMap,
+  onSearch,
+  onSelectResult,
+  onUpdateQuery,
+  query,
+  selectedResult,
+  state,
+}: {
+  isLoading: boolean;
+  onOpenMap: (url: string) => void;
+  onSearch: () => void;
+  onSelectResult: (result: GooglePlaceSearchRowViewModel) => void;
+  onUpdateQuery: (value: string) => void;
+  query: string;
+  selectedResult: GooglePlaceSearchRowViewModel | null;
+  state: GooglePlaceSearchViewState;
+}) {
+  const detail = selectedResult ? buildGooglePlaceExplorationDetail(selectedResult) : null;
+
+  return (
+    <TripListCard>
+      <View style={styles.searchSection}>
+        <View style={styles.summary}>
+          <Text style={styles.summaryTitle}>장소 검색</Text>
+          <Text style={styles.summaryHelper}>도착한 여행지 근처 식당, 카페, 명소를 검색해 보세요.</Text>
+        </View>
+        <View style={styles.searchRow}>
+          <TextInput
+            autoCapitalize="none"
+            editable={!isLoading}
+            onChangeText={onUpdateQuery}
+            onSubmitEditing={onSearch}
+            placeholder="예: 맛집, 카페, 장소명"
+            placeholderTextColor={theme.color.textFaint}
+            returnKeyType="search"
+            style={styles.searchInput}
+            value={query}
+          />
+          <Pressable
+            accessibilityRole="button"
+            disabled={isLoading}
+            onPress={onSearch}
+            style={[styles.searchButton, isLoading ? styles.searchButtonDisabled : null]}
+          >
+            {isLoading ? <ActivityIndicator color={theme.color.onPrimary} /> : null}
+            <Text style={styles.searchButtonText}>검색</Text>
+          </Pressable>
+        </View>
+        {'message' in state && state.message ? <Text style={styles.summaryHelper}>{state.message}</Text> : null}
+        {'title' in state ? (
+          <View style={styles.searchNotice}>
+            <Text style={styles.searchNoticeTitle}>{state.title}</Text>
+            <Text style={styles.summaryHelper}>{state.helper}</Text>
+          </View>
+        ) : null}
+        {state.status === 'success' ? (
+          <View style={styles.searchResultList}>
+            {state.results.map((result) => (
+              <Pressable
+                accessibilityRole="button"
+                key={result.id}
+                onPress={() => onSelectResult(result)}
+                style={[
+                  styles.searchResultCard,
+                  selectedResult?.id === result.id ? styles.searchResultCardSelected : null,
+                ]}
+              >
+                <Text style={styles.optionTitle}>{result.placeName}</Text>
+                <Text style={styles.placeType}>{result.typeHint}</Text>
+                <Text style={styles.address}>{result.address}</Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
+        {detail ? (
+          <View style={styles.placeDetailCard}>
+            <Text style={styles.optionTitle}>{detail.placeName}</Text>
+            <Text style={styles.address}>{detail.address}</Text>
+            <Text style={styles.searchNoticeTitle}>{detail.photoReviewTitle}</Text>
+            <Text style={styles.summaryHelper}>{detail.photoReviewHelper}</Text>
+            <SecondaryButton
+              label={detail.mapSearchLabel}
+              onPress={() =>
+                onOpenMap(
+                  buildDayItineraryMapRowActions({ address: detail.address, placeName: detail.placeName }).map.url,
+                )
+              }
+            />
+          </View>
+        ) : null}
+      </View>
+    </TripListCard>
   );
 }
 
@@ -350,6 +498,26 @@ const styles = StyleSheet.create({
     fontFamily: theme.font.family.regular,
     fontSize: theme.font.size.caption,
   },
+  optionTitle: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.subhead,
+    fontWeight: theme.font.weight.bold,
+  },
+  placeDetailCard: {
+    backgroundColor: theme.color.surfaceSunken,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    gap: theme.space[3],
+    padding: theme.space[4],
+  },
+  placeType: {
+    color: theme.color.primary,
+    fontFamily: theme.font.family.semibold,
+    fontSize: theme.font.size.caption,
+    fontWeight: theme.font.weight.semibold,
+  },
   map: {
     width: '100%',
   },
@@ -392,6 +560,71 @@ const styles = StyleSheet.create({
   },
   rowSubtitle: {
     gap: theme.space[2],
+  },
+  searchButton: {
+    alignItems: 'center',
+    backgroundColor: theme.color.primary,
+    borderRadius: theme.radius.md,
+    flexDirection: 'row',
+    gap: theme.space[2],
+    justifyContent: 'center',
+    minHeight: theme.layout.controlH,
+    paddingHorizontal: theme.space[4],
+  },
+  searchButtonDisabled: {
+    opacity: 0.55,
+  },
+  searchButtonText: {
+    color: theme.color.onPrimary,
+    fontFamily: theme.font.family.bold,
+    fontWeight: theme.font.weight.bold,
+  },
+  searchInput: {
+    backgroundColor: theme.color.surfaceSunken,
+    borderColor: theme.color.borderDefault,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    color: theme.color.textStrong,
+    flex: 1,
+    fontFamily: theme.font.family.regular,
+    minHeight: theme.layout.controlH,
+    paddingHorizontal: theme.space[4],
+  },
+  searchNotice: {
+    backgroundColor: theme.color.surfaceSunken,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    gap: theme.space[2],
+    padding: theme.space[4],
+  },
+  searchNoticeTitle: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.label,
+    fontWeight: theme.font.weight.bold,
+  },
+  searchResultCard: {
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    gap: theme.space[2],
+    padding: theme.space[4],
+  },
+  searchResultCardSelected: {
+    backgroundColor: theme.color.primarySoft,
+    borderColor: theme.color.primary,
+  },
+  searchResultList: {
+    gap: theme.space[3],
+  },
+  searchRow: {
+    flexDirection: 'row',
+    gap: theme.space[3],
+  },
+  searchSection: {
+    gap: theme.space[4],
+    paddingBottom: theme.space[4],
   },
   sheetHandle: {
     alignSelf: 'center',

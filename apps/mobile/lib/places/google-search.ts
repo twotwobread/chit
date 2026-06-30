@@ -18,6 +18,12 @@ export type GooglePlaceSearchRowViewModel = {
   typeHint: string;
 };
 
+export type GooglePlaceExplorationDetailViewModel = GooglePlaceSearchRowViewModel & {
+  photoReviewTitle: string;
+  photoReviewHelper: string;
+  mapSearchLabel: string;
+};
+
 export type GooglePlaceSearchViewState =
   | { status: 'initial'; message: string; results: [] }
   | { status: 'minQuery'; message: string; results: [] }
@@ -119,6 +125,18 @@ export function successGooglePlaceSearchState(results: GooglePlaceSearchResult[]
       address: result.formattedAddress,
       typeHint: getGooglePlaceTypeHint(result.primaryType),
     })),
+  };
+}
+
+export function buildGooglePlaceExplorationDetail(
+  result: GooglePlaceSearchRowViewModel,
+): GooglePlaceExplorationDetailViewModel {
+  return {
+    ...result,
+    photoReviewTitle: '사진 · 리뷰',
+    photoReviewHelper:
+      '현재 지도 검색 API 응답에는 사진과 리뷰가 포함되지 않아요. Google Maps에서 자세히 확인해 주세요.',
+    mapSearchLabel: 'Google Maps에서 보기',
   };
 }
 
