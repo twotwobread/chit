@@ -84,6 +84,23 @@ const (
 	Send    MySettlementDirection = "send"
 )
 
+// Defines values for NonPlaceScheduleItemCategory.
+const (
+	Memo      NonPlaceScheduleItemCategory = "memo"
+	Reminder  NonPlaceScheduleItemCategory = "reminder"
+	Rest      NonPlaceScheduleItemCategory = "rest"
+	Transport NonPlaceScheduleItemCategory = "transport"
+)
+
+// Defines values for NonPlaceTransportMode.
+const (
+	Bus    NonPlaceTransportMode = "bus"
+	Ferry  NonPlaceTransportMode = "ferry"
+	Flight NonPlaceTransportMode = "flight"
+	Other  NonPlaceTransportMode = "other"
+	Train  NonPlaceTransportMode = "train"
+)
+
 // Defines values for ReadinessCheckStatus.
 const (
 	ReadinessCheckStatusOk ReadinessCheckStatus = "ok"
@@ -102,6 +119,12 @@ const (
 // Defines values for RoutePreviewResponseMode.
 const (
 	Transit RoutePreviewResponseMode = "transit"
+)
+
+// Defines values for ScheduleItemType.
+const (
+	NonPlace ScheduleItemType = "non_place"
+	Place    ScheduleItemType = "place"
 )
 
 // Defines values for SettlementParticipantStatus.
@@ -232,6 +255,29 @@ type CreateManualScheduleItemRequest struct {
 
 // CreateManualScheduleItemResponse defines model for CreateManualScheduleItemResponse.
 type CreateManualScheduleItemResponse struct {
+	Day          TripDay      `json:"day"`
+	ScheduleItem ScheduleItem `json:"scheduleItem"`
+}
+
+// CreateNonPlaceScheduleItemRequest defines model for CreateNonPlaceScheduleItemRequest.
+type CreateNonPlaceScheduleItemRequest struct {
+	BookingReference *string                      `json:"bookingReference,omitempty"`
+	Category         NonPlaceScheduleItemCategory `json:"category"`
+	DestinationText  *string                      `json:"destinationText,omitempty"`
+	EndTime          *string                      `json:"endTime,omitempty"`
+	GateText         *string                      `json:"gateText,omitempty"`
+	Link             *string                      `json:"link,omitempty"`
+	Memo             *string                      `json:"memo,omitempty"`
+	OriginText       *string                      `json:"originText,omitempty"`
+	ReferenceNumber  *string                      `json:"referenceNumber,omitempty"`
+	StartTime        *string                      `json:"startTime,omitempty"`
+	TerminalText     *string                      `json:"terminalText,omitempty"`
+	Title            string                       `json:"title"`
+	TransportMode    *NonPlaceTransportMode       `json:"transportMode,omitempty"`
+}
+
+// CreateNonPlaceScheduleItemResponse defines model for CreateNonPlaceScheduleItemResponse.
+type CreateNonPlaceScheduleItemResponse struct {
 	Day          TripDay      `json:"day"`
 	ScheduleItem ScheduleItem `json:"scheduleItem"`
 }
@@ -541,6 +587,27 @@ type MySettlementTripSummary struct {
 	TripName          string                        `json:"tripName"`
 }
 
+// NonPlaceScheduleItemCategory defines model for NonPlaceScheduleItemCategory.
+type NonPlaceScheduleItemCategory string
+
+// NonPlaceScheduleItemDetails defines model for NonPlaceScheduleItemDetails.
+type NonPlaceScheduleItemDetails struct {
+	BookingReference *string                      `json:"bookingReference"`
+	Category         NonPlaceScheduleItemCategory `json:"category"`
+	DestinationText  *string                      `json:"destinationText"`
+	GateText         *string                      `json:"gateText"`
+	Link             *string                      `json:"link"`
+	Memo             *string                      `json:"memo"`
+	OriginText       *string                      `json:"originText"`
+	ReferenceNumber  *string                      `json:"referenceNumber"`
+	TerminalText     *string                      `json:"terminalText"`
+	Title            string                       `json:"title"`
+	TransportMode    *NonPlaceTransportMode       `json:"transportMode"`
+}
+
+// NonPlaceTransportMode defines model for NonPlaceTransportMode.
+type NonPlaceTransportMode string
+
 // OAuthCredential Provider credential. Apple uses identityToken/authorizationCode/nonce. Kakao uses accessToken. dev* fields are accepted only when server dev OAuth is enabled.
 type OAuthCredential struct {
 	AccessToken       *string `json:"accessToken,omitempty"`
@@ -680,11 +747,13 @@ type ScheduleItem struct {
 	ArrivedAt *time.Time `json:"arrivedAt"`
 
 	// EndTime Optional local end time in HH:mm. Must be later than startTime when present.
-	EndTime   *string          `json:"endTime"`
-	Id        string           `json:"id"`
-	IsLodging bool             `json:"isLodging"`
-	ItemOrder int              `json:"itemOrder"`
-	Place     TripPlaceSummary `json:"place"`
+	EndTime   *string                      `json:"endTime"`
+	Id        string                       `json:"id"`
+	IsLodging bool                         `json:"isLodging"`
+	ItemOrder int                          `json:"itemOrder"`
+	ItemType  ScheduleItemType             `json:"itemType"`
+	NonPlace  *NonPlaceScheduleItemDetails `json:"nonPlace"`
+	Place     *TripPlaceSummary            `json:"place"`
 
 	// SkippedAt Server-generated skip timestamp for this schedule item instance. Null means the item is not currently skipped.
 	SkippedAt *time.Time `json:"skippedAt"`
@@ -693,6 +762,9 @@ type ScheduleItem struct {
 	StartTime *string `json:"startTime"`
 	Version   int     `json:"version"`
 }
+
+// ScheduleItemType defines model for ScheduleItemType.
+type ScheduleItemType string
 
 // SearchGooglePlacesResponse defines model for SearchGooglePlacesResponse.
 type SearchGooglePlacesResponse struct {
@@ -879,13 +951,42 @@ type UpdateMeRequest struct {
 type UpdateScheduleItemRequest struct {
 	Address *string `json:"address,omitempty"`
 
+	// BookingReference Transport booking reference. Empty string clears the field.
+	BookingReference *string                       `json:"bookingReference,omitempty"`
+	Category         *NonPlaceScheduleItemCategory `json:"category,omitempty"`
+
+	// DestinationText Transport destination text. Empty string clears the field.
+	DestinationText *string `json:"destinationText,omitempty"`
+
 	// EndTime Optional local end time in HH:mm. Empty string clears end time; absent leaves unchanged.
-	EndTime   *string        `json:"endTime,omitempty"`
-	Name      *string        `json:"name,omitempty"`
-	PlaceType *TripPlaceType `json:"placeType,omitempty"`
+	EndTime *string `json:"endTime,omitempty"`
+
+	// GateText Transport gate text. Empty string clears the field.
+	GateText *string `json:"gateText,omitempty"`
+
+	// Link Non-place link. Empty string clears the link.
+	Link *string `json:"link,omitempty"`
+
+	// Memo Non-place memo. Empty string clears the memo.
+	Memo *string `json:"memo,omitempty"`
+	Name *string `json:"name,omitempty"`
+
+	// OriginText Transport origin text. Empty string clears the field.
+	OriginText *string        `json:"originText,omitempty"`
+	PlaceType  *TripPlaceType `json:"placeType,omitempty"`
+
+	// ReferenceNumber Transport reference number. Empty string clears the field.
+	ReferenceNumber *string `json:"referenceNumber,omitempty"`
 
 	// StartTime Optional local start time in HH:mm. Empty string clears start and end time; absent leaves unchanged.
 	StartTime *string `json:"startTime,omitempty"`
+
+	// TerminalText Transport terminal text. Empty string clears the field.
+	TerminalText *string `json:"terminalText,omitempty"`
+
+	// Title Non-place item title. Empty string is invalid because title is required.
+	Title         *string                `json:"title,omitempty"`
+	TransportMode *NonPlaceTransportMode `json:"transportMode,omitempty"`
 }
 
 // UpdateScheduleItemResponse defines model for UpdateScheduleItemResponse.
@@ -953,6 +1054,9 @@ type CreateGooglePlaceScheduleItemJSONRequestBody = CreateGooglePlaceScheduleIte
 
 // CreateManualScheduleItemJSONRequestBody defines body for CreateManualScheduleItem for application/json ContentType.
 type CreateManualScheduleItemJSONRequestBody = CreateManualScheduleItemRequest
+
+// CreateNonPlaceScheduleItemJSONRequestBody defines body for CreateNonPlaceScheduleItem for application/json ContentType.
+type CreateNonPlaceScheduleItemJSONRequestBody = CreateNonPlaceScheduleItemRequest
 
 // ReorderScheduleItemsJSONRequestBody defines body for ReorderScheduleItems for application/json ContentType.
 type ReorderScheduleItemsJSONRequestBody = ReorderScheduleItemsRequest
@@ -1052,6 +1156,9 @@ type ServerInterface interface {
 	// Add a manual place to a trip day schedule
 	// (POST /trips/{tripId}/days/{tripDayId}/schedule-items/manual)
 	CreateManualScheduleItem(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string)
+	// Add a non-place item to a trip day schedule
+	// (POST /trips/{tripId}/days/{tripDayId}/schedule-items/non-place)
+	CreateNonPlaceScheduleItem(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string)
 	// Reorder a trip day schedule
 	// (PATCH /trips/{tripId}/days/{tripDayId}/schedule-items/order)
 	ReorderScheduleItems(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string)
@@ -1265,6 +1372,12 @@ func (_ Unimplemented) GetDayScheduleItems(w http.ResponseWriter, r *http.Reques
 // Add a manual place to a trip day schedule
 // (POST /trips/{tripId}/days/{tripDayId}/schedule-items/manual)
 func (_ Unimplemented) CreateManualScheduleItem(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Add a non-place item to a trip day schedule
+// (POST /trips/{tripId}/days/{tripDayId}/schedule-items/non-place)
+func (_ Unimplemented) CreateNonPlaceScheduleItem(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -2242,6 +2355,46 @@ func (siw *ServerInterfaceWrapper) CreateManualScheduleItem(w http.ResponseWrite
 	handler.ServeHTTP(w, r)
 }
 
+// CreateNonPlaceScheduleItem operation middleware
+func (siw *ServerInterfaceWrapper) CreateNonPlaceScheduleItem(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "tripDayId" -------------
+	var tripDayId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripDayId", chi.URLParam(r, "tripDayId"), &tripDayId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripDayId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateNonPlaceScheduleItem(w, r, tripId, tripDayId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ReorderScheduleItems operation middleware
 func (siw *ServerInterfaceWrapper) ReorderScheduleItems(w http.ResponseWriter, r *http.Request) {
 
@@ -2939,6 +3092,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/trips/{tripId}/days/{tripDayId}/schedule-items/manual", wrapper.CreateManualScheduleItem)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/trips/{tripId}/days/{tripDayId}/schedule-items/non-place", wrapper.CreateNonPlaceScheduleItem)
 	})
 	r.Group(func(r chi.Router) {
 		r.Patch(options.BaseURL+"/trips/{tripId}/days/{tripDayId}/schedule-items/order", wrapper.ReorderScheduleItems)

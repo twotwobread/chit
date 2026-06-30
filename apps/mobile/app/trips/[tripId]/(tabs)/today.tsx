@@ -481,12 +481,17 @@ function TodayReadyContent({
           lodgingHelper={viewModel.lodgingNavigationAction.helper ?? undefined}
           lodgingLabel={viewModel.lodgingNavigationAction.label}
           onArrive={() => onAction(viewModel.arrivalAction)}
+          navigationAvailable={Boolean(viewModel.nextPlace.navigationAction.label)}
           onLodging={() => {
             if (viewModel.lodgingNavigationAction.action) {
               onAction(viewModel.lodgingNavigationAction.action);
             }
           }}
-          onNavigate={() => onAction(viewModel.nextPlace.navigationAction)}
+          onNavigate={() => {
+            if (viewModel.nextPlace.navigationAction.label) {
+              onAction(viewModel.nextPlace.navigationAction);
+            }
+          }}
           onSkip={() => onAction(viewModel.skipAction)}
           onTravelMode={onTravelMode}
           place={{
@@ -499,7 +504,11 @@ function TodayReadyContent({
           skipDisabled={pendingItemId === viewModel.skipAction.itemId}
           routeChip={routeChip}
           skipLabel={pendingItemId === viewModel.skipAction.itemId ? '처리 중...' : viewModel.skipAction.label}
-          travelMode={travelModeDisplayLabel(viewModel.nextPlace.navigationAction.travelMode)}
+          travelMode={
+            viewModel.nextPlace.navigationAction.label
+              ? travelModeDisplayLabel(viewModel.nextPlace.navigationAction.travelMode)
+              : ''
+          }
           travelOptions={travelModeDisplayOptions}
         />
       ) : null}

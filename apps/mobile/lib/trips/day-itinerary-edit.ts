@@ -139,6 +139,15 @@ export function buildDayItineraryDeleteSubmitState(isDeleting: boolean): { disab
 export function buildDayItineraryDeleteConfirmation(
   item: DayItineraryRowViewModel,
 ): DayItineraryDeleteConfirmationViewModel {
+  if (item.itemType === 'non_place') {
+    return {
+      title: '이 일정을 삭제할까요?',
+      helper: '이 Day 일정에서만 삭제돼요.',
+      itemLabel: `${item.orderLabel}번째 일정 · ${item.placeName}`,
+      contextLabel: [item.placeTypeLabel, item.nonPlaceDetailLabel].filter(Boolean).join(' · '),
+    };
+  }
+
   return {
     title: '이 장소를 삭제할까요?',
     helper: '이 Day 일정에서만 삭제돼요.',

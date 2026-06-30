@@ -644,8 +644,20 @@ SELECT
   si.end_time,
   si.arrived_at,
   si.skipped_at,
+  si.item_kind,
+  si.non_place_category,
+  si.non_place_title,
+  si.non_place_memo,
+  si.non_place_link,
+  si.transport_mode,
+  si.transport_reference_number,
+  si.transport_booking_reference,
+  si.transport_origin_text,
+  si.transport_destination_text,
+  si.transport_terminal_text,
+  si.transport_gate_text,
   COALESCE(td.lodging_trip_place_id = si.trip_place_id, false) AS is_lodging,
-  tp.id::text AS trip_place_id,
+  COALESCE(tp.id::text, '')::text AS trip_place_id,
   tp.name AS place_name,
   tp.place_type,
   tp.address,
@@ -658,7 +670,7 @@ JOIN trip_days td
   ON td.id = si.trip_day_id
  AND td.trip_id = si.trip_id
  AND td.deleted_at IS NULL
-JOIN trip_places tp
+LEFT JOIN trip_places tp
   ON tp.id = si.trip_place_id
  AND tp.trip_id = si.trip_id
 WHERE si.trip_id = $1::uuid
@@ -674,22 +686,34 @@ type GetScheduleItemByTripDayAndIDParams struct {
 }
 
 type GetScheduleItemByTripDayAndIDRow struct {
-	ID            string
-	ItemOrder     int32
-	Version       int32
-	StartTime     pgtype.Time
-	EndTime       pgtype.Time
-	ArrivedAt     pgtype.Timestamptz
-	SkippedAt     pgtype.Timestamptz
-	IsLodging     interface{}
-	TripPlaceID   string
-	PlaceName     string
-	PlaceType     string
-	Address       string
-	Provider      string
-	GooglePlaceID pgtype.Text
-	Latitude      pgtype.Float8
-	Longitude     pgtype.Float8
+	ID                        string
+	ItemOrder                 int32
+	Version                   int32
+	StartTime                 pgtype.Time
+	EndTime                   pgtype.Time
+	ArrivedAt                 pgtype.Timestamptz
+	SkippedAt                 pgtype.Timestamptz
+	ItemKind                  string
+	NonPlaceCategory          pgtype.Text
+	NonPlaceTitle             pgtype.Text
+	NonPlaceMemo              pgtype.Text
+	NonPlaceLink              pgtype.Text
+	TransportMode             pgtype.Text
+	TransportReferenceNumber  pgtype.Text
+	TransportBookingReference pgtype.Text
+	TransportOriginText       pgtype.Text
+	TransportDestinationText  pgtype.Text
+	TransportTerminalText     pgtype.Text
+	TransportGateText         pgtype.Text
+	IsLodging                 interface{}
+	TripPlaceID               string
+	PlaceName                 pgtype.Text
+	PlaceType                 pgtype.Text
+	Address                   pgtype.Text
+	Provider                  pgtype.Text
+	GooglePlaceID             pgtype.Text
+	Latitude                  pgtype.Float8
+	Longitude                 pgtype.Float8
 }
 
 func (q *Queries) GetScheduleItemByTripDayAndID(ctx context.Context, arg GetScheduleItemByTripDayAndIDParams) (GetScheduleItemByTripDayAndIDRow, error) {
@@ -703,6 +727,18 @@ func (q *Queries) GetScheduleItemByTripDayAndID(ctx context.Context, arg GetSche
 		&i.EndTime,
 		&i.ArrivedAt,
 		&i.SkippedAt,
+		&i.ItemKind,
+		&i.NonPlaceCategory,
+		&i.NonPlaceTitle,
+		&i.NonPlaceMemo,
+		&i.NonPlaceLink,
+		&i.TransportMode,
+		&i.TransportReferenceNumber,
+		&i.TransportBookingReference,
+		&i.TransportOriginText,
+		&i.TransportDestinationText,
+		&i.TransportTerminalText,
+		&i.TransportGateText,
 		&i.IsLodging,
 		&i.TripPlaceID,
 		&i.PlaceName,
@@ -953,8 +989,20 @@ SELECT
   si.end_time,
   si.arrived_at,
   si.skipped_at,
+  si.item_kind,
+  si.non_place_category,
+  si.non_place_title,
+  si.non_place_memo,
+  si.non_place_link,
+  si.transport_mode,
+  si.transport_reference_number,
+  si.transport_booking_reference,
+  si.transport_origin_text,
+  si.transport_destination_text,
+  si.transport_terminal_text,
+  si.transport_gate_text,
   COALESCE(td.lodging_trip_place_id = si.trip_place_id, false) AS is_lodging,
-  tp.id::text AS trip_place_id,
+  COALESCE(tp.id::text, '')::text AS trip_place_id,
   tp.name AS place_name,
   tp.place_type,
   tp.address,
@@ -967,7 +1015,7 @@ JOIN trip_days td
   ON td.id = si.trip_day_id
  AND td.trip_id = si.trip_id
  AND td.deleted_at IS NULL
-JOIN trip_places tp
+LEFT JOIN trip_places tp
   ON tp.id = si.trip_place_id
  AND tp.trip_id = si.trip_id
 WHERE si.trip_id = $1::uuid
@@ -982,22 +1030,34 @@ type ListScheduleItemsByTripDayParams struct {
 }
 
 type ListScheduleItemsByTripDayRow struct {
-	ID            string
-	ItemOrder     int32
-	Version       int32
-	StartTime     pgtype.Time
-	EndTime       pgtype.Time
-	ArrivedAt     pgtype.Timestamptz
-	SkippedAt     pgtype.Timestamptz
-	IsLodging     interface{}
-	TripPlaceID   string
-	PlaceName     string
-	PlaceType     string
-	Address       string
-	Provider      string
-	GooglePlaceID pgtype.Text
-	Latitude      pgtype.Float8
-	Longitude     pgtype.Float8
+	ID                        string
+	ItemOrder                 int32
+	Version                   int32
+	StartTime                 pgtype.Time
+	EndTime                   pgtype.Time
+	ArrivedAt                 pgtype.Timestamptz
+	SkippedAt                 pgtype.Timestamptz
+	ItemKind                  string
+	NonPlaceCategory          pgtype.Text
+	NonPlaceTitle             pgtype.Text
+	NonPlaceMemo              pgtype.Text
+	NonPlaceLink              pgtype.Text
+	TransportMode             pgtype.Text
+	TransportReferenceNumber  pgtype.Text
+	TransportBookingReference pgtype.Text
+	TransportOriginText       pgtype.Text
+	TransportDestinationText  pgtype.Text
+	TransportTerminalText     pgtype.Text
+	TransportGateText         pgtype.Text
+	IsLodging                 interface{}
+	TripPlaceID               string
+	PlaceName                 pgtype.Text
+	PlaceType                 pgtype.Text
+	Address                   pgtype.Text
+	Provider                  pgtype.Text
+	GooglePlaceID             pgtype.Text
+	Latitude                  pgtype.Float8
+	Longitude                 pgtype.Float8
 }
 
 func (q *Queries) ListScheduleItemsByTripDay(ctx context.Context, arg ListScheduleItemsByTripDayParams) ([]ListScheduleItemsByTripDayRow, error) {
@@ -1017,6 +1077,18 @@ func (q *Queries) ListScheduleItemsByTripDay(ctx context.Context, arg ListSchedu
 			&i.EndTime,
 			&i.ArrivedAt,
 			&i.SkippedAt,
+			&i.ItemKind,
+			&i.NonPlaceCategory,
+			&i.NonPlaceTitle,
+			&i.NonPlaceMemo,
+			&i.NonPlaceLink,
+			&i.TransportMode,
+			&i.TransportReferenceNumber,
+			&i.TransportBookingReference,
+			&i.TransportOriginText,
+			&i.TransportDestinationText,
+			&i.TransportTerminalText,
+			&i.TransportGateText,
 			&i.IsLodging,
 			&i.TripPlaceID,
 			&i.PlaceName,
@@ -1318,7 +1390,7 @@ WITH target AS (
     tp.address AS place_address,
     tp.place_type
   FROM schedule_items si
-  JOIN trip_places tp
+  LEFT JOIN trip_places tp
     ON tp.id = si.trip_place_id
    AND tp.trip_id = si.trip_id
   WHERE si.trip_id = $1::uuid
@@ -1337,6 +1409,7 @@ WITH target AS (
     AND e.trip_day_id = target.trip_day_id
     AND e.schedule_item_id = target.id
     AND e.anchor_type = 'schedule_item'
+    AND target.trip_place_id IS NOT NULL
   RETURNING e.id
 ), deleted_item AS (
   UPDATE schedule_items si
@@ -1346,7 +1419,7 @@ WITH target AS (
   WHERE si.trip_id = target.trip_id
     AND si.trip_day_id = target.trip_day_id
     AND si.id = target.id
-  RETURNING target.trip_place_id::text AS trip_place_id
+  RETURNING COALESCE(target.trip_place_id::text, '') AS trip_place_id
 )
 SELECT trip_place_id
 FROM deleted_item
@@ -1358,9 +1431,9 @@ type SoftDeleteScheduleItemByTripDayAndIDParams struct {
 	ScheduleItemID pgtype.UUID
 }
 
-func (q *Queries) SoftDeleteScheduleItemByTripDayAndID(ctx context.Context, arg SoftDeleteScheduleItemByTripDayAndIDParams) (string, error) {
+func (q *Queries) SoftDeleteScheduleItemByTripDayAndID(ctx context.Context, arg SoftDeleteScheduleItemByTripDayAndIDParams) (interface{}, error) {
 	row := q.db.QueryRow(ctx, softDeleteScheduleItemByTripDayAndID, arg.TripID, arg.TripDayID, arg.ScheduleItemID)
-	var trip_place_id string
+	var trip_place_id interface{}
 	err := row.Scan(&trip_place_id)
 	return trip_place_id, err
 }
@@ -1447,6 +1520,7 @@ WITH target AS (
   WHERE si.trip_id = $1::uuid
     AND si.trip_day_id = $2::uuid
     AND si.id = $3::uuid
+    AND si.item_kind = 'place'
     AND si.deleted_at IS NULL
 ), updated_item AS (
   UPDATE schedule_items si

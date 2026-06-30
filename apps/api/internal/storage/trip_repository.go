@@ -1091,6 +1091,7 @@ func (s *Store) CreateManualScheduleItem(ctx context.Context, record trip.Create
 		ID:        item.ID,
 		ItemOrder: int(item.ItemOrder),
 		Version:   int(item.Version),
+		ItemType:  trip.ScheduleItemTypePlace,
 		ArrivedAt: timePtrFromTimestamptz(item.ArrivedAt),
 		SkippedAt: timePtrFromTimestamptz(item.SkippedAt),
 		Place:     tripPlaceSummary(place.ID, place.Name, place.PlaceType, place.Address, place.Provider, place.GooglePlaceID, place.Latitude, place.Longitude),
@@ -1144,6 +1145,7 @@ func (s *Store) AppendGooglePlaceScheduleItem(ctx context.Context, record place.
 		ID:        item.ID,
 		ItemOrder: int(item.ItemOrder),
 		Version:   int(item.Version),
+		ItemType:  trip.ScheduleItemTypePlace,
 		ArrivedAt: timePtrFromTimestamptz(item.ArrivedAt),
 		SkippedAt: timePtrFromTimestamptz(item.SkippedAt),
 		Place:     tripPlaceSummary(placeRow.ID, placeRow.Name, placeRow.PlaceType, placeRow.Address, placeRow.Provider, placeRow.GooglePlaceID, placeRow.Latitude, placeRow.Longitude),
@@ -1201,6 +1203,7 @@ func (s *Store) CreateGooglePlaceScheduleItem(ctx context.Context, record place.
 		ID:        item.ID,
 		ItemOrder: int(item.ItemOrder),
 		Version:   int(item.Version),
+		ItemType:  trip.ScheduleItemTypePlace,
 		ArrivedAt: timePtrFromTimestamptz(item.ArrivedAt),
 		SkippedAt: timePtrFromTimestamptz(item.SkippedAt),
 		Place:     tripPlaceSummary(placeRow.ID, placeRow.Name, placeRow.PlaceType, placeRow.Address, placeRow.Provider, placeRow.GooglePlaceID, placeRow.Latitude, placeRow.Longitude),
@@ -1279,6 +1282,110 @@ func createScheduleItemAtEnd(ctx context.Context, tx pgx.Tx, tripID string, trip
 	return item, nil
 }
 
+func (s *Store) CreateNonPlaceScheduleItem(ctx context.Context, record trip.CreateNonPlaceScheduleItemRecord) (trip.ScheduleItem, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return trip.ScheduleItem{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	if err := lockSameDayScheduleOrdering(ctx, tx, record.TripID, record.TripDayID); err != nil {
+		return trip.ScheduleItem{}, err
+	}
+	current, err := loadOrderedScheduleRowsForUpdate(ctx, tx, record.TripID, record.TripDayID)
+	if err != nil {
+		return trip.ScheduleItem{}, err
+	}
+	if needsRebalance, err := orderedScheduleRanksNeedRebalance(current); err != nil {
+		return trip.ScheduleItem{}, err
+	} else if needsRebalance {
+		current, err = rebalanceScheduleRanks(ctx, tx, record.TripID, record.TripDayID, current)
+		if err != nil {
+			return trip.ScheduleItem{}, err
+		}
+	}
+	nextRank, err := nextAppendScheduleRank(current)
+	if errors.Is(err, errRebalanceScheduleRanks) {
+		current, err = rebalanceScheduleRanks(ctx, tx, record.TripID, record.TripDayID, current)
+		if err != nil {
+			return trip.ScheduleItem{}, err
+		}
+		nextRank, err = nextAppendScheduleRank(current)
+	}
+	if errors.Is(err, errRebalanceScheduleRanks) {
+		return trip.ScheduleItem{}, trip.ErrConflict
+	}
+	if err != nil {
+		return trip.ScheduleItem{}, err
+	}
+
+	var itemID string
+	err = tx.QueryRow(ctx, `
+		INSERT INTO schedule_items (
+			trip_id,
+			trip_day_id,
+			item_kind,
+			non_place_category,
+			non_place_title,
+			non_place_memo,
+			non_place_link,
+			transport_mode,
+			transport_reference_number,
+			transport_booking_reference,
+			transport_origin_text,
+			transport_destination_text,
+			transport_terminal_text,
+			transport_gate_text,
+			start_time,
+			end_time,
+			item_order,
+			rank
+		) VALUES (
+			$1::uuid,
+			$2::uuid,
+			'non_place',
+			$3,
+			$4,
+			$5,
+			$6,
+			$7,
+			$8,
+			$9,
+			$10,
+			$11,
+			$12,
+			$13,
+			$14::time,
+			$15::time,
+			(
+				SELECT COALESCE(MAX(item_order), 0) + 1
+				FROM schedule_items
+				WHERE trip_day_id = $2::uuid
+				  AND deleted_at IS NULL
+			),
+			$16
+		)
+		RETURNING id::text
+	`, mustUUID(record.TripID), mustUUID(record.TripDayID), record.Details.Category, record.Details.Title, textPtrToSQL(record.Details.Memo), textPtrToSQL(record.Details.Link), textPtrToSQL(record.Details.TransportMode), textPtrToSQL(record.Details.ReferenceNumber), textPtrToSQL(record.Details.BookingReference), textPtrToSQL(record.Details.OriginText), textPtrToSQL(record.Details.DestinationText), textPtrToSQL(record.Details.TerminalText), textPtrToSQL(record.Details.GateText), timeTextPtrToSQL(record.StartTime), timeTextPtrToSQL(record.EndTime), nextRank).Scan(&itemID)
+	if err != nil {
+		if isUniqueConstraintViolation(err, "schedule_items_active_day_order_unique") || isUniqueConstraintViolation(err, "schedule_items_active_day_rank_unique") {
+			return trip.ScheduleItem{}, trip.ErrConflict
+		}
+		return trip.ScheduleItem{}, err
+	}
+
+	qtx := s.queries.WithTx(tx)
+	row, err := qtx.GetScheduleItemByTripDayAndID(ctx, db.GetScheduleItemByTripDayAndIDParams{TripID: mustUUID(record.TripID), TripDayID: mustUUID(record.TripDayID), ScheduleItemID: mustUUID(itemID)})
+	if err != nil {
+		return trip.ScheduleItem{}, err
+	}
+	item := scheduleItemFromGetRow(row)
+	if err := tx.Commit(ctx); err != nil {
+		return trip.ScheduleItem{}, err
+	}
+	return item, nil
+}
+
 func (s *Store) GetScheduleItemByTripDayAndID(ctx context.Context, tripID string, tripDayID string, itemID string) (trip.ScheduleItem, bool, error) {
 	row, err := s.queries.GetScheduleItemByTripDayAndID(ctx, db.GetScheduleItemByTripDayAndIDParams{
 		TripID:         mustUUID(tripID),
@@ -1291,17 +1398,7 @@ func (s *Store) GetScheduleItemByTripDayAndID(ctx context.Context, tripID string
 	if err != nil {
 		return trip.ScheduleItem{}, false, err
 	}
-	return trip.ScheduleItem{
-		ID:        row.ID,
-		ItemOrder: int(row.ItemOrder),
-		Version:   int(row.Version),
-		IsLodging: boolFromSQL(row.IsLodging),
-		StartTime: timeTextPtrFromSQL(row.StartTime),
-		EndTime:   timeTextPtrFromSQL(row.EndTime),
-		ArrivedAt: timePtrFromTimestamptz(row.ArrivedAt),
-		SkippedAt: timePtrFromTimestamptz(row.SkippedAt),
-		Place:     tripPlaceSummary(row.TripPlaceID, row.PlaceName, row.PlaceType, row.Address, row.Provider, row.GooglePlaceID, row.Latitude, row.Longitude),
-	}, true, nil
+	return scheduleItemFromGetRow(row), true, nil
 }
 
 func (s *Store) ReorderScheduleItems(ctx context.Context, record trip.ReorderScheduleItemsRecord) ([]trip.ScheduleItem, error) {
@@ -1541,6 +1638,7 @@ func (s *Store) UpdateScheduleItemPlace(ctx context.Context, record trip.UpdateS
 		ID:        row.ID,
 		ItemOrder: int(row.ItemOrder),
 		Version:   int(row.Version),
+		ItemType:  trip.ScheduleItemTypePlace,
 		IsLodging: boolFromSQL(row.IsLodging),
 		StartTime: timeTextPtrFromSQL(row.StartTime),
 		EndTime:   timeTextPtrFromSQL(row.EndTime),
@@ -1548,6 +1646,55 @@ func (s *Store) UpdateScheduleItemPlace(ctx context.Context, record trip.UpdateS
 		SkippedAt: timePtrFromTimestamptz(row.SkippedAt),
 		Place:     tripPlaceSummary(row.TripPlaceID, row.PlaceName, row.PlaceType, row.Address, row.Provider, row.GooglePlaceID, row.Latitude, row.Longitude),
 	}, nil
+}
+
+func (s *Store) UpdateNonPlaceScheduleItem(ctx context.Context, record trip.UpdateNonPlaceScheduleItemRecord) (trip.ScheduleItem, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return trip.ScheduleItem{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	commandTag, err := tx.Exec(ctx, `
+		UPDATE schedule_items
+		SET
+			start_time = $4::time,
+			end_time = $5::time,
+			non_place_category = $6,
+			non_place_title = $7,
+			non_place_memo = $8,
+			non_place_link = $9,
+			transport_mode = $10,
+			transport_reference_number = $11,
+			transport_booking_reference = $12,
+			transport_origin_text = $13,
+			transport_destination_text = $14,
+			transport_terminal_text = $15,
+			transport_gate_text = $16,
+			updated_at = now()
+		WHERE trip_id = $1::uuid
+		  AND trip_day_id = $2::uuid
+		  AND id = $3::uuid
+		  AND item_kind = 'non_place'
+		  AND deleted_at IS NULL
+	`, mustUUID(record.TripID), mustUUID(record.TripDayID), mustUUID(record.ItemID), timeTextPtrToSQL(record.StartTime), timeTextPtrToSQL(record.EndTime), record.Details.Category, record.Details.Title, textPtrToSQL(record.Details.Memo), textPtrToSQL(record.Details.Link), textPtrToSQL(record.Details.TransportMode), textPtrToSQL(record.Details.ReferenceNumber), textPtrToSQL(record.Details.BookingReference), textPtrToSQL(record.Details.OriginText), textPtrToSQL(record.Details.DestinationText), textPtrToSQL(record.Details.TerminalText), textPtrToSQL(record.Details.GateText))
+	if err != nil {
+		return trip.ScheduleItem{}, err
+	}
+	if commandTag.RowsAffected() != 1 {
+		return trip.ScheduleItem{}, trip.ErrNotFound
+	}
+
+	qtx := s.queries.WithTx(tx)
+	row, err := qtx.GetScheduleItemByTripDayAndID(ctx, db.GetScheduleItemByTripDayAndIDParams{TripID: mustUUID(record.TripID), TripDayID: mustUUID(record.TripDayID), ScheduleItemID: mustUUID(record.ItemID)})
+	if err != nil {
+		return trip.ScheduleItem{}, err
+	}
+	item := scheduleItemFromGetRow(row)
+	if err := tx.Commit(ctx); err != nil {
+		return trip.ScheduleItem{}, err
+	}
+	return item, nil
 }
 
 func (s *Store) DeleteScheduleItem(ctx context.Context, tripID string, tripDayID string, itemID string) (bool, error) {
@@ -2012,19 +2159,45 @@ func firstPendingExecutionScheduleItem(items []executionScheduleRow) int {
 func mapScheduleItems(rows []db.ListScheduleItemsByTripDayRow) []trip.ScheduleItem {
 	items := make([]trip.ScheduleItem, 0, len(rows))
 	for index, row := range rows {
-		items = append(items, trip.ScheduleItem{
+		item := trip.ScheduleItem{
 			ID:        row.ID,
 			ItemOrder: index + 1,
 			Version:   int(row.Version),
+			ItemType:  row.ItemKind,
 			IsLodging: boolFromSQL(row.IsLodging),
 			StartTime: timeTextPtrFromSQL(row.StartTime),
 			EndTime:   timeTextPtrFromSQL(row.EndTime),
 			ArrivedAt: timePtrFromTimestamptz(row.ArrivedAt),
 			SkippedAt: timePtrFromTimestamptz(row.SkippedAt),
-			Place:     tripPlaceSummary(row.TripPlaceID, row.PlaceName, row.PlaceType, row.Address, row.Provider, row.GooglePlaceID, row.Latitude, row.Longitude),
-		})
+			Place:     tripPlaceSummaryFromNullable(row.TripPlaceID, row.PlaceName, row.PlaceType, row.Address, row.Provider, row.GooglePlaceID, row.Latitude, row.Longitude),
+			NonPlace:  nonPlaceScheduleItemDetails(row.ItemKind, row.NonPlaceCategory, row.NonPlaceTitle, row.NonPlaceMemo, row.NonPlaceLink, row.TransportMode, row.TransportReferenceNumber, row.TransportBookingReference, row.TransportOriginText, row.TransportDestinationText, row.TransportTerminalText, row.TransportGateText),
+		}
+		if item.ItemType == "" {
+			item.ItemType = trip.ScheduleItemTypePlace
+		}
+		items = append(items, item)
 	}
 	return items
+}
+
+func scheduleItemFromGetRow(row db.GetScheduleItemByTripDayAndIDRow) trip.ScheduleItem {
+	item := trip.ScheduleItem{
+		ID:        row.ID,
+		ItemOrder: int(row.ItemOrder),
+		Version:   int(row.Version),
+		ItemType:  row.ItemKind,
+		IsLodging: boolFromSQL(row.IsLodging),
+		StartTime: timeTextPtrFromSQL(row.StartTime),
+		EndTime:   timeTextPtrFromSQL(row.EndTime),
+		ArrivedAt: timePtrFromTimestamptz(row.ArrivedAt),
+		SkippedAt: timePtrFromTimestamptz(row.SkippedAt),
+		Place:     tripPlaceSummaryFromNullable(row.TripPlaceID, row.PlaceName, row.PlaceType, row.Address, row.Provider, row.GooglePlaceID, row.Latitude, row.Longitude),
+		NonPlace:  nonPlaceScheduleItemDetails(row.ItemKind, row.NonPlaceCategory, row.NonPlaceTitle, row.NonPlaceMemo, row.NonPlaceLink, row.TransportMode, row.TransportReferenceNumber, row.TransportBookingReference, row.TransportOriginText, row.TransportDestinationText, row.TransportTerminalText, row.TransportGateText),
+	}
+	if item.ItemType == "" {
+		item.ItemType = trip.ScheduleItemTypePlace
+	}
+	return item
 }
 
 func lodgingPlaceFromActiveTripDay(id string, name pgtype.Text, placeType pgtype.Text, address pgtype.Text, provider pgtype.Text, googlePlaceID pgtype.Text, latitude pgtype.Float8, longitude pgtype.Float8) *trip.TripPlaceSummary {
@@ -2042,6 +2215,32 @@ func tripPlaceSummary(id string, name string, placeType string, address string, 
 		PlaceType:     placeType,
 		Address:       address,
 		RoutablePlace: routablePlace(provider, googlePlaceID, latitude, longitude),
+	}
+}
+
+func tripPlaceSummaryFromNullable(id string, name pgtype.Text, placeType pgtype.Text, address pgtype.Text, provider pgtype.Text, googlePlaceID pgtype.Text, latitude pgtype.Float8, longitude pgtype.Float8) trip.TripPlaceSummary {
+	if id == "" || !name.Valid || !placeType.Valid || !address.Valid || !provider.Valid {
+		return trip.TripPlaceSummary{}
+	}
+	return tripPlaceSummary(id, name.String, placeType.String, address.String, provider.String, googlePlaceID, latitude, longitude)
+}
+
+func nonPlaceScheduleItemDetails(itemKind string, category pgtype.Text, title pgtype.Text, memo pgtype.Text, link pgtype.Text, transportMode pgtype.Text, referenceNumber pgtype.Text, bookingReference pgtype.Text, originText pgtype.Text, destinationText pgtype.Text, terminalText pgtype.Text, gateText pgtype.Text) *trip.NonPlaceScheduleItemDetails {
+	if itemKind != trip.ScheduleItemTypeNonPlace || !category.Valid || !title.Valid {
+		return nil
+	}
+	return &trip.NonPlaceScheduleItemDetails{
+		Category:         category.String,
+		Title:            title.String,
+		Memo:             textPtrFromSQL(memo),
+		Link:             textPtrFromSQL(link),
+		TransportMode:    textPtrFromSQL(transportMode),
+		ReferenceNumber:  textPtrFromSQL(referenceNumber),
+		BookingReference: textPtrFromSQL(bookingReference),
+		OriginText:       textPtrFromSQL(originText),
+		DestinationText:  textPtrFromSQL(destinationText),
+		TerminalText:     textPtrFromSQL(terminalText),
+		GateText:         textPtrFromSQL(gateText),
 	}
 }
 
@@ -2088,6 +2287,21 @@ func timeTextPtrFromSQL(value pgtype.Time) *string {
 	minutes := totalMinutes % 60
 	text := fmt.Sprintf("%02d:%02d", hours, minutes)
 	return &text
+}
+
+func textPtrFromSQL(value pgtype.Text) *string {
+	if !value.Valid {
+		return nil
+	}
+	text := value.String
+	return &text
+}
+
+func textPtrToSQL(value *string) pgtype.Text {
+	if value == nil {
+		return pgtype.Text{}
+	}
+	return pgtype.Text{String: *value, Valid: true}
 }
 
 func timeTextPtrToSQL(value *string) pgtype.Time {

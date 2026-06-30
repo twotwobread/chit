@@ -77,20 +77,32 @@ type ExpenseSplit struct {
 }
 
 type ScheduleItem struct {
-	ID          pgtype.UUID
-	TripID      pgtype.UUID
-	TripDayID   pgtype.UUID
-	TripPlaceID pgtype.UUID
-	ItemOrder   int32
-	Rank        string
-	Version     int32
-	StartTime   pgtype.Time
-	EndTime     pgtype.Time
-	ArrivedAt   pgtype.Timestamptz
-	SkippedAt   pgtype.Timestamptz
-	DeletedAt   pgtype.Timestamptz
-	CreatedAt   pgtype.Timestamptz
-	UpdatedAt   pgtype.Timestamptz
+	ID                        pgtype.UUID
+	TripID                    pgtype.UUID
+	TripDayID                 pgtype.UUID
+	TripPlaceID               pgtype.UUID
+	ItemOrder                 int32
+	Rank                      string
+	Version                   int32
+	StartTime                 pgtype.Time
+	EndTime                   pgtype.Time
+	ArrivedAt                 pgtype.Timestamptz
+	SkippedAt                 pgtype.Timestamptz
+	ItemKind                  string
+	NonPlaceCategory          pgtype.Text
+	NonPlaceTitle             pgtype.Text
+	NonPlaceMemo              pgtype.Text
+	NonPlaceLink              pgtype.Text
+	TransportMode             pgtype.Text
+	TransportReferenceNumber  pgtype.Text
+	TransportBookingReference pgtype.Text
+	TransportOriginText       pgtype.Text
+	TransportDestinationText  pgtype.Text
+	TransportTerminalText     pgtype.Text
+	TransportGateText         pgtype.Text
+	DeletedAt                 pgtype.Timestamptz
+	CreatedAt                 pgtype.Timestamptz
+	UpdatedAt                 pgtype.Timestamptz
 }
 
 type Trip struct {
