@@ -276,8 +276,8 @@ func (s *Store) DeleteTripByID(ctx context.Context, tripID string) (bool, error)
 
 func (s *Store) DeleteTripMemberParticipant(ctx context.Context, tripID string, participantID string) (bool, error) {
 	_, err := s.queries.DeleteTripMemberParticipant(ctx, db.DeleteTripMemberParticipantParams{
-		Column1: mustUUID(tripID),
-		Column2: mustUUID(participantID),
+		TripID:        mustUUID(tripID),
+		ParticipantID: mustUUID(participantID),
 	})
 	if err == pgx.ErrNoRows {
 		return false, nil

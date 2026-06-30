@@ -445,18 +445,45 @@ func (q *Queries) DeleteTripByID(ctx context.Context, dollar_1 pgtype.UUID) (str
 }
 
 const deleteTripMemberParticipant = `-- name: DeleteTripMemberParticipant :one
-DELETE FROM trip_participants
-WHERE trip_id = $1::uuid
-  AND id = $2::uuid
-  AND role = 'member'
-RETURNING
-  id::text,
-  user_id::text
+WITH target AS (
+  SELECT
+    id,
+    user_id,
+    display_name
+  FROM trip_participants
+  WHERE trip_id = $1::uuid
+    AND id = $2::uuid
+    AND role = 'member'
+), refreshed_expense_payers AS (
+  UPDATE expenses e
+  SET payer_display_name = target.display_name,
+      updated_at = now()
+  FROM target
+  WHERE e.trip_id = $1::uuid
+    AND e.payer_participant_id = target.id
+  RETURNING e.id
+), refreshed_expense_splits AS (
+  UPDATE expense_splits es
+  SET participant_display_name = target.display_name
+  FROM target, expenses e
+  WHERE e.id = es.expense_id
+    AND e.trip_id = $1::uuid
+    AND es.participant_id = target.id
+  RETURNING es.id
+), deleted_participant AS (
+  DELETE FROM trip_participants tp
+  USING target
+  WHERE tp.id = target.id
+  RETURNING tp.id::text AS id,
+            tp.user_id::text AS user_id
+)
+SELECT id, user_id
+FROM deleted_participant
 `
 
 type DeleteTripMemberParticipantParams struct {
-	Column1 pgtype.UUID
-	Column2 pgtype.UUID
+	TripID        pgtype.UUID
+	ParticipantID pgtype.UUID
 }
 
 type DeleteTripMemberParticipantRow struct {
@@ -465,7 +492,7 @@ type DeleteTripMemberParticipantRow struct {
 }
 
 func (q *Queries) DeleteTripMemberParticipant(ctx context.Context, arg DeleteTripMemberParticipantParams) (DeleteTripMemberParticipantRow, error) {
-	row := q.db.QueryRow(ctx, deleteTripMemberParticipant, arg.Column1, arg.Column2)
+	row := q.db.QueryRow(ctx, deleteTripMemberParticipant, arg.TripID, arg.ParticipantID)
 	var i DeleteTripMemberParticipantRow
 	err := row.Scan(&i.ID, &i.UserID)
 	return i, err
