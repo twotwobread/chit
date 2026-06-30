@@ -96,13 +96,40 @@ ORDER BY
   id ASC;
 
 -- name: DeleteTripMemberParticipant :one
-DELETE FROM trip_participants
-WHERE trip_id = $1::uuid
-  AND id = $2::uuid
-  AND role = 'member'
-RETURNING
-  id::text,
-  user_id::text;
+WITH target AS (
+  SELECT
+    id,
+    user_id,
+    display_name
+  FROM trip_participants
+  WHERE trip_id = sqlc.arg(trip_id)::uuid
+    AND id = sqlc.arg(participant_id)::uuid
+    AND role = 'member'
+), refreshed_expense_payers AS (
+  UPDATE expenses e
+  SET payer_display_name = target.display_name,
+      updated_at = now()
+  FROM target
+  WHERE e.trip_id = sqlc.arg(trip_id)::uuid
+    AND e.payer_participant_id = target.id
+  RETURNING e.id
+), refreshed_expense_splits AS (
+  UPDATE expense_splits es
+  SET participant_display_name = target.display_name
+  FROM target, expenses e
+  WHERE e.id = es.expense_id
+    AND e.trip_id = sqlc.arg(trip_id)::uuid
+    AND es.participant_id = target.id
+  RETURNING es.id
+), deleted_participant AS (
+  DELETE FROM trip_participants tp
+  USING target
+  WHERE tp.id = target.id
+  RETURNING tp.id::text AS id,
+            tp.user_id::text AS user_id
+)
+SELECT id, user_id
+FROM deleted_participant;
 
 -- name: ListTripsByParticipantUser :many
 SELECT

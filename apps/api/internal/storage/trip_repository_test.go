@@ -2785,6 +2785,91 @@ func TestDeleteTripMemberParticipantDeletesOnlyTargetMember(t *testing.T) {
 	}
 }
 
+func TestDeleteTripMemberParticipantRefreshesExpenseParticipantFallbacks(t *testing.T) {
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("DATABASE_URL is required for storage integration test")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	store, err := Open(ctx, databaseURL)
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer store.Close()
+
+	ownerUserID := insertTripRepositoryTestUser(t, ctx, store, "F168 Owner")
+	targetUserID := insertTripRepositoryTestUser(t, ctx, store, "F168 Target")
+	otherUserID := insertTripRepositoryTestUser(t, ctx, store, "F168 Other")
+	t.Cleanup(func() {
+		_, _ = store.pool.Exec(context.Background(), `DELETE FROM users WHERE id = ANY($1::uuid[])`, []string{ownerUserID, targetUserID, otherUserID})
+	})
+
+	tripID := insertTripRepositoryTestTrip(t, ctx, store, "F168 참여자 fallback 여행", ownerUserID)
+	t.Cleanup(func() { _, _ = store.pool.Exec(context.Background(), `DELETE FROM trips WHERE id = $1::uuid`, tripID) })
+
+	ownerParticipantID := insertTripRepositoryTestParticipant(t, ctx, store, tripID, ownerUserID, trip.RoleOwner, "주최자")
+	targetParticipantID := insertTripRepositoryTestParticipant(t, ctx, store, tripID, targetUserID, trip.RoleMember, "민수")
+	otherParticipantID := insertTripRepositoryTestParticipant(t, ctx, store, tripID, otherUserID, trip.RoleMember, "지영")
+	tripDayID := tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-11")
+
+	var expenseID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO expenses (trip_id, trip_day_id, anchor_type, expense_date, amount_minor, currency, split_policy, payer_participant_id, payer_display_name, created_by)
+		VALUES ($1::uuid, $2::uuid, 'trip_day', '2026-07-11', 1200, 'JPY', 'manual', $3::uuid, '민수', $4::uuid)
+		RETURNING id::text
+	`, tripID, tripDayID, targetParticipantID, ownerUserID).Scan(&expenseID); err != nil {
+		t.Fatalf("insert expense: %v", err)
+	}
+	if _, err := store.pool.Exec(ctx, `
+		INSERT INTO expense_splits (expense_id, participant_id, participant_display_name, amount_minor, split_order)
+		VALUES
+		  ($1::uuid, $2::uuid, '민수', 700, 1),
+		  ($1::uuid, $3::uuid, '지영', 500, 2)
+	`, expenseID, targetParticipantID, otherParticipantID); err != nil {
+		t.Fatalf("insert expense splits: %v", err)
+	}
+
+	if _, err := store.pool.Exec(ctx, `UPDATE trip_participants SET display_name = '김민수' WHERE id = $1::uuid`, targetParticipantID); err != nil {
+		t.Fatalf("rename target participant: %v", err)
+	}
+
+	deleted, err := store.DeleteTripMemberParticipant(ctx, tripID, targetParticipantID)
+	if err != nil {
+		t.Fatalf("delete trip member participant: %v", err)
+	}
+	if !deleted {
+		t.Fatal("expected target member participant to be deleted")
+	}
+
+	expenses, err := store.ListDayExpensesByTripDay(ctx, tripID, tripDayID)
+	if err != nil {
+		t.Fatalf("list day expenses: %v", err)
+	}
+	if len(expenses) != 1 {
+		t.Fatalf("expected one expense, got %#v", expenses)
+	}
+	listed := expenses[0]
+	if listed.Payer.ParticipantID != nil || listed.Payer.DisplayName != "김민수" || listed.Payer.Source != trip.ExpenseDisplaySourceFallback {
+		t.Fatalf("expected removed payer to use latest fallback display, got %#v", listed.Payer)
+	}
+	if len(listed.Splits) != 2 {
+		t.Fatalf("expected two splits, got %#v", listed.Splits)
+	}
+	if listed.Splits[0].Participant.ParticipantID != nil || listed.Splits[0].Participant.DisplayName != "김민수" || listed.Splits[0].Participant.Source != trip.ExpenseDisplaySourceFallback {
+		t.Fatalf("expected removed split participant to use latest fallback display, got %#v", listed.Splits[0].Participant)
+	}
+	if listed.Splits[1].Participant.ParticipantID == nil || *listed.Splits[1].Participant.ParticipantID != otherParticipantID || listed.Splits[1].Participant.DisplayName != "지영" || listed.Splits[1].Participant.Source != trip.ExpenseDisplaySourceLive {
+		t.Fatalf("expected unaffected split participant to stay live, got %#v", listed.Splits[1].Participant)
+	}
+
+	assertTripRepositoryParticipantCount(t, ctx, store, tripID, ownerParticipantID, 1)
+	assertTripRepositoryParticipantCount(t, ctx, store, tripID, otherParticipantID, 1)
+	assertTripRepositoryParticipantCount(t, ctx, store, tripID, targetParticipantID, 0)
+}
+
 func TestListTripParticipantsOrdersOwnerFirstThenJoinedAt(t *testing.T) {
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
