@@ -148,13 +148,13 @@ export default function GooglePlaceSearchScreen() {
     return (
       <ScrollView contentContainerStyle={styles.scrollContent} style={styles.scroll}>
         <View style={styles.header}>
-          <Text style={styles.screenTitle}>장소 추가</Text>
+          <Text style={styles.screenTitle}>일정 추가</Text>
         </View>
         <View style={styles.card}>
           <Text style={styles.errorTitle}>{title}</Text>
           <Text style={styles.message}>{helper}</Text>
           <Pressable accessibilityRole="button" onPress={returnToDay} style={styles.button}>
-            <Text style={styles.buttonText}>Day 일정으로</Text>
+            <Text style={styles.buttonText}>일정으로</Text>
           </Pressable>
         </View>
       </ScrollView>
@@ -164,8 +164,8 @@ export default function GooglePlaceSearchScreen() {
   return (
     <ScrollView contentContainerStyle={styles.scrollContent} style={styles.scroll}>
       <View style={styles.header}>
-        <Text style={styles.screenTitle}>장소 추가</Text>
-        <Text style={styles.screenHelper}>이 Day에 추가할 장소를 검색해 보세요.</Text>
+        <Text style={styles.screenTitle}>일정 추가</Text>
+        <Text style={styles.screenHelper}>이 일정에 연결할 장소를 검색해 보세요.</Text>
       </View>
 
       <View style={styles.card}>
@@ -278,7 +278,7 @@ export default function GooglePlaceSearchScreen() {
       ) : null}
 
       <Pressable accessibilityRole="button" disabled={isBusy} onPress={returnToDay} style={styles.backLink}>
-        <Text style={styles.backLinkText}>Day 일정으로</Text>
+        <Text style={styles.backLinkText}>일정으로</Text>
       </Pressable>
     </ScrollView>
   );

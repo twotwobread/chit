@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { router, useFocusEffect, useLocalSearchParams, type Href } from 'expo-router';
 
 import { ApiError } from '@i-um/api-contract';
 
@@ -16,11 +16,14 @@ import {
   buildDayItineraryViewModel,
 } from '../../../../lib/trips/day-itinerary';
 import {
-  ITINERARY_TAB_DETAIL_CTA_LABEL,
+  ITINERARY_TAB_ADD_CTA_LABEL,
+  ITINERARY_TAB_ADD_NON_PLACE_CTA_LABEL,
   ITINERARY_TAB_EMPTY_HELPER,
   ITINERARY_TAB_EMPTY_TITLE,
+  ITINERARY_TAB_REORDER_CTA_LABEL,
   buildItineraryTimelineItems,
 } from '../../../../lib/trips/itinerary-tab';
+import { buildDayItineraryAddPlaceSearchRoute } from '../../../../lib/trips/day-itinerary-add-place-navigation';
 import { tripDetailPath } from '../../../../lib/trips/routes';
 import { localDateString } from '../../../../lib/trips/status';
 import { buildTripMapDayChips, resolveTripMapSelectedDay } from '../../../../lib/trips/trip-map';
@@ -140,7 +143,11 @@ function ItineraryContent({
   onSelectDay: (dayId: string) => void;
 }) {
   const detailRoute = buildDayItineraryRoute(tripId, selectedDayId);
+  const addPlaceRoute = buildDayItineraryAddPlaceSearchRoute(tripId, selectedDayId);
+  const nonPlaceRoute = `${detailRoute}?action=nonPlace` as Href;
+  const reorderRoute = `${detailRoute}?action=reorder` as Href;
   const timelineItems = buildItineraryTimelineItems(viewModel);
+  const canReorder = viewModel.status === 'success' && viewModel.items.length >= 2;
 
   return (
     <>
@@ -149,17 +156,33 @@ function ItineraryContent({
         <Text style={styles.summaryTitle}>{viewModel.dayLabel} 일정</Text>
         <Text style={styles.summaryHelper}>{viewModel.formattedDate}</Text>
       </View>
+      <View style={styles.actionWrap}>
+        <PrimaryButton label={ITINERARY_TAB_ADD_CTA_LABEL} onPress={() => router.push(addPlaceRoute)} />
+        <View style={styles.secondaryActionRow}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push(nonPlaceRoute)}
+            style={styles.secondaryActionButton}
+          >
+            <Text style={styles.secondaryActionText}>{ITINERARY_TAB_ADD_NON_PLACE_CTA_LABEL}</Text>
+          </Pressable>
+          {canReorder ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.push(reorderRoute)}
+              style={styles.secondaryActionButton}
+            >
+              <Text style={styles.secondaryActionText}>{ITINERARY_TAB_REORDER_CTA_LABEL}</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      </View>
       {timelineItems.length > 0 ? (
         <View style={styles.timelineWrap}>
-          <ItineraryTimeline items={timelineItems} onPressItem={() => router.push(detailRoute)} />
-          <PrimaryButton label={ITINERARY_TAB_DETAIL_CTA_LABEL} onPress={() => router.push(detailRoute)} />
+          <ItineraryTimeline items={timelineItems} />
         </View>
       ) : (
-        <TripStateCard
-          helper={ITINERARY_TAB_EMPTY_HELPER}
-          primaryAction={{ label: ITINERARY_TAB_DETAIL_CTA_LABEL, onPress: () => router.push(detailRoute) }}
-          title={ITINERARY_TAB_EMPTY_TITLE}
-        />
+        <TripStateCard helper={ITINERARY_TAB_EMPTY_HELPER} title={ITINERARY_TAB_EMPTY_TITLE} />
       )}
     </>
   );
@@ -191,6 +214,33 @@ function itineraryFailureState(error: unknown): ItineraryState {
 }
 
 const styles = StyleSheet.create({
+  actionWrap: {
+    gap: theme.space[3],
+    maxWidth: theme.layout.cardMaxW,
+    width: '100%',
+  },
+  secondaryActionButton: {
+    alignItems: 'center',
+    borderColor: theme.color.primary,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: theme.layout.controlH,
+    paddingHorizontal: theme.space[3],
+    paddingVertical: theme.space[3],
+  },
+  secondaryActionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.space[3],
+  },
+  secondaryActionText: {
+    color: theme.color.primary,
+    fontFamily: theme.font.family.bold,
+    fontWeight: theme.font.weight.bold,
+    textAlign: 'center',
+  },
   summaryHelper: {
     color: theme.color.textMuted,
     fontFamily: theme.font.family.regular,

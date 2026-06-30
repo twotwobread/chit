@@ -89,8 +89,8 @@ export function buildDayItineraryViewModel(response: GetDayScheduleItemsResponse
       dayLabel,
       formattedDate,
       lodgingPlace: response.day.lodgingPlace,
-      title: '아직 등록된 장소가 없어요.',
-      helper: '장소 추가를 눌러 방문할 장소를 검색해보세요.',
+      title: '아직 등록된 일정이 없어요.',
+      helper: '일정 추가를 눌러 방문할 장소나 장소 없는 일정을 등록해보세요.',
     };
   }
 

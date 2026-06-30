@@ -24,8 +24,8 @@ describe('reorder itinerary helpers', () => {
       status: 'empty',
       dayLabel: 'Day 1',
       formattedDate: '2026.07.10',
-      title: '아직 등록된 장소가 없어요.',
-      helper: '장소 추가를 눌러 첫 장소를 등록해보세요.',
+      title: '아직 등록된 일정이 없어요.',
+      helper: '일정 추가를 눌러 방문할 장소나 장소 없는 일정을 등록해보세요.',
     };
     const singlePlaceViewModel: DayItineraryViewModel = {
       status: 'success',
@@ -90,7 +90,7 @@ describe('reorder itinerary helpers', () => {
           placeType: 'sights',
           placeTypeLabel: '관광지',
           address: 'Umeda',
-          dragHandleLabel: '드래그',
+          dragHandleLabel: '순서 변경',
         },
         {
           id: 'item-2',
@@ -100,7 +100,7 @@ describe('reorder itinerary helpers', () => {
           placeType: 'food',
           placeTypeLabel: '식당',
           address: 'Dotonbori',
-          dragHandleLabel: '드래그',
+          dragHandleLabel: '순서 변경',
         },
       ],
       items: [
@@ -112,7 +112,7 @@ describe('reorder itinerary helpers', () => {
           placeType: 'sights',
           placeTypeLabel: '관광지',
           address: 'Umeda',
-          dragHandleLabel: '드래그',
+          dragHandleLabel: '순서 변경',
         },
         {
           id: 'item-2',
@@ -122,7 +122,7 @@ describe('reorder itinerary helpers', () => {
           placeType: 'food',
           placeTypeLabel: '식당',
           address: 'Dotonbori',
-          dragHandleLabel: '드래그',
+          dragHandleLabel: '순서 변경',
         },
       ],
     });

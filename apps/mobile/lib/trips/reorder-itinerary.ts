@@ -5,7 +5,7 @@ import { buildDayItineraryViewModel, type DayItineraryRowViewModel, type DayItin
 export type DayItineraryReorderActionViewModel = { status: 'hidden' } | { status: 'enabled'; label: '순서 변경' };
 
 export type DayItineraryReorderRowViewModel = DayItineraryRowViewModel & {
-  dragHandleLabel: '드래그';
+  dragHandleLabel: '순서 변경';
 };
 
 export type DayItineraryReorderDraftViewModel = {
@@ -43,7 +43,7 @@ function buildDraftRows(items: DayItineraryRowViewModel[]): DayItineraryReorderR
   return items.map((item, index) => ({
     ...item,
     orderLabel: String(index + 1),
-    dragHandleLabel: '드래그',
+    dragHandleLabel: '순서 변경',
   }));
 }
 

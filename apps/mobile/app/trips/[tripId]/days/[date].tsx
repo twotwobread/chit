@@ -20,7 +20,7 @@ import {
   type NativeSyntheticEvent,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
-import { router, useFocusEffect, useLocalSearchParams, type Href } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 
 import {
   ApiError,
@@ -30,7 +30,7 @@ import {
 } from '@i-um/api-contract';
 
 import { MobileAuthError } from '../../../../lib/auth/client';
-import { Badge, ListRow, PlacePin, PlaceTag, theme } from '../../../../lib/design';
+import { Badge, PlacePin, PlaceTag, theme } from '../../../../lib/design';
 import {
   buildDayItineraryPlaceAccessibilityLabel,
   buildDayItineraryViewModel,
@@ -95,7 +95,6 @@ import {
   createNonPlaceScheduleItem,
   deleteScheduleItem,
   getTripDayItinerary,
-  listDayExpenses,
   listTripPlaces,
   reorderScheduleItems,
   setDayLodgingPlace,
@@ -116,12 +115,6 @@ import {
   type DayLodgingSubmittingState,
 } from '../../../../lib/trips/lodging-place';
 import {
-  buildDayExpensesViewModel,
-  dayExpensesFailureState,
-  type DayExpensesFailureViewModel,
-  type DayExpensesViewModel,
-} from '../../../../lib/trips/day-expenses';
-import {
   DAY_ITINERARY_SHARED_UPDATE_POLL_INTERVAL_MS,
   DAY_ITINERARY_SHARED_UPDATE_RELOAD_CONFIRMATION,
   buildDayItinerarySharedUpdateBanner,
@@ -139,11 +132,6 @@ type DayItineraryState =
   | { status: 'auth' }
   | { status: 'notFound'; title: string; helper: string }
   | { status: 'error'; title: string; helper: string };
-
-type DayExpenseState =
-  | { status: 'loading' }
-  | { status: 'success'; viewModel: DayExpensesViewModel }
-  | { status: 'error'; error: DayExpensesFailureViewModel };
 
 type EditState =
   | { status: 'idle' }
@@ -231,14 +219,19 @@ function focusAccessibilityNode(node: AccessibilityFocusable): boolean {
 }
 
 export default function TripDayItineraryScreen() {
-  const { tripId: tripIdParam, date: dateParam } = useLocalSearchParams<{
+  const {
+    tripId: tripIdParam,
+    date: dateParam,
+    action: actionParam,
+  } = useLocalSearchParams<{
     tripId?: string | string[];
     date?: string | string[];
+    action?: string | string[];
   }>();
   const tripId = Array.isArray(tripIdParam) ? tripIdParam[0] : tripIdParam;
   const date = Array.isArray(dateParam) ? dateParam[0] : dateParam;
+  const initialAction = Array.isArray(actionParam) ? actionParam[0] : actionParam;
   const [state, setState] = useState<DayItineraryState>({ status: 'loading' });
-  const [expenseState, setExpenseState] = useState<DayExpenseState>({ status: 'loading' });
   const [editState, setEditState] = useState<EditState>({ status: 'idle' });
   const [nonPlaceEditorState, setNonPlaceEditorState] = useState<NonPlaceEditorState>({ status: 'idle' });
   const [deleteState, setDeleteState] = useState<DeleteState>({ status: 'idle' });
@@ -277,6 +270,7 @@ export default function TripDayItineraryScreen() {
   const latestHandledItineraryRequestRef = useRef(0);
   const deleteOriginFocusTargetRef = useRef<number | null>(null);
   const focusRequestIdRef = useRef(0);
+  const handledInitialActionRef = useRef<string | null>(null);
 
   const updateSharedUpdateState = useCallback((nextState: DayItinerarySharedUpdateState) => {
     sharedUpdateStateRef.current = nextState;
@@ -340,19 +334,6 @@ export default function TripDayItineraryScreen() {
       const failure = dayItineraryFailureState();
       setState({ status: 'error', title: failure.title, helper: failure.helper });
     }
-  }, []);
-
-  const handleExpensesFetchError = useCallback((error: unknown) => {
-    if (error instanceof MobileAuthError && (error.code === 'UNAUTHORIZED' || error.code === 'INVALID_REFRESH_TOKEN')) {
-      setState({ status: 'auth' });
-      return;
-    }
-    if (error instanceof ApiError && error.status === 401) {
-      setState({ status: 'auth' });
-      return;
-    }
-
-    setExpenseState({ status: 'error', error: dayExpensesFailureState() });
   }, []);
 
   useEffect(() => {
@@ -452,41 +433,20 @@ export default function TripDayItineraryScreen() {
     [applyReorderAutoScroll, startReorderAutoScroll],
   );
 
-  const loadExpenses = useCallback(async () => {
-    if (!tripId || !date) {
-      return;
-    }
-
-    setExpenseState({ status: 'loading' });
-    try {
-      const response = await listDayExpenses(tripId, date);
-      setExpenseState({
-        status: 'success',
-        viewModel: buildDayExpensesViewModel({ expenses: response.expenses, tripId, date }),
-      });
-    } catch (error) {
-      handleExpensesFetchError(error);
-    }
-  }, [date, handleExpensesFetchError, tripId]);
-
   const load = useCallback(async () => {
     if (!tripId || !date) {
       const notFound = dayItineraryFailureState(404);
       updateSharedUpdateState({ baselineSignature: null, pendingSignature: null });
       setState({ status: 'notFound', title: notFound.title, helper: notFound.helper });
-      setExpenseState({ status: 'loading' });
       return;
     }
 
     const requestSequence = nextItineraryRequestSequence();
     setMapActionFeedback(null);
     setState({ status: 'loading' });
-    setExpenseState({ status: 'loading' });
     try {
       const response = await getTripDayItinerary(tripId, date);
-      if (applyItineraryResponse(response, requestSequence)) {
-        await loadExpenses();
-      }
+      applyItineraryResponse(response, requestSequence);
     } catch (error) {
       if (requestSequence < latestHandledItineraryRequestRef.current) {
         return;
@@ -498,7 +458,6 @@ export default function TripDayItineraryScreen() {
     applyItineraryResponse,
     date,
     handleItineraryFetchError,
-    loadExpenses,
     nextItineraryRequestSequence,
     tripId,
     updateSharedUpdateState,
@@ -758,6 +717,25 @@ export default function TripDayItineraryScreen() {
     setMapActionFeedback(null);
     setReorderState({ status: 'editing', draft });
   };
+
+  useEffect(() => {
+    if (!initialAction || handledInitialActionRef.current === initialAction || state.status !== 'success') {
+      return;
+    }
+
+    if (initialAction === 'nonPlace') {
+      handledInitialActionRef.current = initialAction;
+      beginCreateNonPlace();
+      return;
+    }
+
+    if (initialAction === 'reorder') {
+      handledInitialActionRef.current = initialAction;
+      beginReorder(state.viewModel);
+    }
+    // The entry functions intentionally use latest local state setters and are recreated per render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialAction, state]);
 
   const cancelReorder = () => {
     discardReorder();
@@ -1312,7 +1290,7 @@ export default function TripDayItineraryScreen() {
         style={styles.scroll}
       >
         <View style={styles.header}>
-          <Text style={styles.screenTitle}>Day 일정</Text>
+          <Text style={styles.screenTitle}>일정</Text>
         </View>
 
         {state.status === 'loading' ? (
@@ -1368,11 +1346,6 @@ export default function TripDayItineraryScreen() {
               sharedUpdateBanner={sharedUpdateBanner}
               sharedUpdateReloadDisabled={sharedUpdateReloadDisabled}
               viewModel={state.viewModel}
-            />
-            <DayExpensesSection
-              onOpenCreate={(route) => router.push(route)}
-              onRetry={() => void loadExpenses()}
-              state={expenseState}
             />
             {nonPlaceEditorState.status === 'editing' || nonPlaceEditorState.status === 'saving' ? (
               <NonPlaceScheduleItemPanel
@@ -1767,84 +1740,11 @@ function DayItineraryContent({
               <Text style={styles.secondaryButtonText}>장소 없는 일정 추가</Text>
             </Pressable>
             <Pressable accessibilityRole="button" onPress={onAddPlace} style={styles.button}>
-              <Text style={styles.buttonText}>장소 추가</Text>
+              <Text style={styles.buttonText}>일정 추가</Text>
             </Pressable>
           </>
         )}
       </View>
-    </View>
-  );
-}
-
-function DayExpensesSection({
-  onOpenCreate,
-  onRetry,
-  state,
-}: {
-  onOpenCreate: (route: Href) => void;
-  onRetry: () => void;
-  state: DayExpenseState;
-}) {
-  const emptyViewModel = state.status === 'success' && state.viewModel.status === 'empty' ? state.viewModel : null;
-  const successViewModel = state.status === 'success' && state.viewModel.status === 'success' ? state.viewModel : null;
-
-  return (
-    <View style={[styles.card, styles.sectionCard]}>
-      <Text accessibilityRole="header" style={styles.sectionTitle}>
-        지출
-      </Text>
-
-      {state.status === 'loading' ? (
-        <View style={styles.expenseStatusBox}>
-          <ActivityIndicator color={theme.color.primary} />
-          <Text style={styles.message}>지출을 불러오는 중...</Text>
-        </View>
-      ) : null}
-
-      {state.status === 'error' ? (
-        <View style={styles.errorBox}>
-          <Text style={styles.expenseErrorTitle}>{state.error.title}</Text>
-          <Text style={styles.message}>{state.error.helper}</Text>
-          <Pressable accessibilityRole="button" onPress={onRetry} style={styles.secondaryButton}>
-            <Text style={styles.secondaryButtonText}>{state.error.actionLabel}</Text>
-          </Pressable>
-        </View>
-      ) : null}
-
-      {emptyViewModel ? (
-        <View style={styles.emptyBox}>
-          <Text style={styles.emptyTitle}>{emptyViewModel.emptyTitle}</Text>
-          <Text style={styles.message}>{emptyViewModel.helper}</Text>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => onOpenCreate(emptyViewModel.actionRoute)}
-            style={styles.button}
-          >
-            <Text style={styles.buttonText}>{emptyViewModel.actionLabel}</Text>
-          </Pressable>
-        </View>
-      ) : null}
-
-      {successViewModel ? (
-        <View style={styles.expenseList}>
-          {successViewModel.rows.map((row) => (
-            <Pressable
-              key={row.id}
-              accessibilityLabel={row.accessibilityLabel}
-              accessibilityRole="button"
-              onPress={() => router.push(row.editRoute)}
-              style={styles.expenseRow}
-            >
-              <ListRow
-                first
-                subtitle={row.detailLine}
-                title={<Text style={styles.expensePlaceName}>{row.placeName}</Text>}
-                trailing={<Text style={styles.expenseAmount}>{row.amountLabel}</Text>}
-              />
-            </Pressable>
-          ))}
-        </View>
-      ) : null}
     </View>
   );
 }
@@ -2107,12 +2007,14 @@ function ReorderPlaceList({
         </View>
         <View
           accessibilityHint="핸들을 잡고 위아래로 끌어서 순서를 바꿔요."
-          accessibilityLabel={`${item.placeName} 드래그 핸들`}
+          accessibilityLabel={`${item.placeName} ${item.dragHandleLabel} 핸들`}
           accessibilityRole="button"
           style={[styles.dragHandle, isActive ? styles.dragHandleActive : null]}
           {...responder.panHandlers}
         >
-          <Text style={styles.dragHandleText}>{item.dragHandleLabel}</Text>
+          <View style={styles.dragHandleBar} />
+          <View style={styles.dragHandleBar} />
+          <View style={styles.dragHandleBar} />
         </View>
       </View>
     );
@@ -2844,11 +2746,13 @@ const styles = StyleSheet.create({
   },
   dragHandle: {
     alignItems: 'center',
+    alignSelf: 'stretch',
+    backgroundColor: theme.color.surface,
     borderColor: theme.color.borderDefault,
     borderRadius: theme.radius.sm,
     borderWidth: 1,
+    gap: 3,
     justifyContent: 'center',
-    minHeight: theme.layout.controlHSm,
     minWidth: theme.layout.controlHSm,
     paddingHorizontal: theme.space[3],
     paddingVertical: theme.space[2],
@@ -2856,11 +2760,11 @@ const styles = StyleSheet.create({
   dragHandleActive: {
     borderColor: theme.color.primary,
   },
-  dragHandleText: {
-    color: theme.color.textMuted,
-    fontFamily: theme.font.family.semibold,
-    fontSize: theme.font.size.caption,
-    fontWeight: theme.font.weight.semibold,
+  dragHandleBar: {
+    backgroundColor: theme.color.textMuted,
+    borderRadius: theme.radius.pill,
+    height: 2,
+    width: 18,
   },
   emptyBox: {
     backgroundColor: theme.color.surfaceSunken,
