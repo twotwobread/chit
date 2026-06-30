@@ -21,6 +21,7 @@ export type DayItinerarySharedUpdateLocalState = {
   editStatus: 'idle' | 'editing' | 'saving';
   deleteStatus: 'idle' | 'confirming' | 'deleting';
   lodgingStatus: 'idle' | 'setting' | 'clearing' | 'error';
+  lodgingPickerStatus: 'idle' | 'loading' | 'selecting' | 'manual' | 'creating';
 };
 
 export type DayItinerarySharedUpdateState = {
@@ -40,6 +41,9 @@ export function buildDayItinerarySharedUpdateSignature(response: GetDayScheduleI
     day: {
       date: response.day.date,
       dayOrder: response.day.dayOrder,
+      lodgingPlaceId: response.day.lodgingPlace?.id ?? null,
+      lodgingPlaceName: response.day.lodgingPlace?.name ?? null,
+      lodgingPlaceAddress: response.day.lodgingPlace?.address ?? null,
     },
     items: [...getScheduleItems(response)]
       .sort((left, right) => {
@@ -81,7 +85,8 @@ export function isDayItinerarySharedUpdateProtected(localState: DayItineraryShar
     localState.deleteStatus === 'confirming' ||
     localState.deleteStatus === 'deleting' ||
     localState.lodgingStatus === 'setting' ||
-    localState.lodgingStatus === 'clearing'
+    localState.lodgingStatus === 'clearing' ||
+    localState.lodgingPickerStatus !== 'idle'
   );
 }
 
@@ -91,7 +96,9 @@ export function isDayItinerarySharedUpdateReloadDisabled(localState: DayItinerar
     localState.editStatus === 'saving' ||
     localState.deleteStatus === 'deleting' ||
     localState.lodgingStatus === 'setting' ||
-    localState.lodgingStatus === 'clearing'
+    localState.lodgingStatus === 'clearing' ||
+    localState.lodgingPickerStatus === 'loading' ||
+    localState.lodgingPickerStatus === 'creating'
   );
 }
 

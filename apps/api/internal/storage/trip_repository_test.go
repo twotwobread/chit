@@ -854,6 +854,42 @@ func TestDayLodgingPlacePersistenceAndScheduleMapping(t *testing.T) {
 	if found {
 		t.Fatal("expected day lodging place to be cleared")
 	}
+
+	places, err := store.ListTripPlaces(ctx, tripID)
+	if err != nil {
+		t.Fatalf("list trip places: %v", err)
+	}
+	if len(places) != 2 || places[0].ID != lodgingPlaceID || places[1].ID != foodPlaceID {
+		t.Fatalf("expected trip places in created order, got %#v", places)
+	}
+
+	manual, err := store.CreateManualDayLodgingPlace(ctx, trip.CreateManualDayLodgingPlaceRecord{TripID: tripID, TripDayID: tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-12"), Name: "호텔 몬토레", Address: "Osaka Station"})
+	if err != nil {
+		t.Fatalf("create manual day lodging place: %v", err)
+	}
+	if manual.Name != "호텔 몬토레" || manual.Address != "Osaka Station" || manual.PlaceType != "lodging" {
+		t.Fatalf("unexpected manual lodging place: %#v", manual)
+	}
+	manualLodging, found, err := store.GetDayLodgingPlaceByTripAndDate(ctx, tripID, "2026-07-12")
+	if err != nil {
+		t.Fatalf("get manual day lodging place: %v", err)
+	}
+	if !found || manualLodging.ID != manual.ID {
+		t.Fatalf("expected manual place to be selected as day lodging, found=%v place=%#v", found, manualLodging)
+	}
+	var manualScheduleItemCount int
+	if err := store.pool.QueryRow(ctx, `
+		SELECT count(*)::int
+		FROM schedule_items
+		WHERE trip_id = $1::uuid
+		  AND trip_day_id = $2::uuid
+		  AND trip_place_id = $3::uuid
+	`, tripID, tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-12"), manual.ID).Scan(&manualScheduleItemCount); err != nil {
+		t.Fatalf("count manual lodging schedule items: %v", err)
+	}
+	if manualScheduleItemCount != 0 {
+		t.Fatalf("expected manual lodging registration not to create schedule items, got %d", manualScheduleItemCount)
+	}
 }
 
 func TestDayLodgingPlaceEnforcesSameTripAndCascadesOnPlaceDelete(t *testing.T) {

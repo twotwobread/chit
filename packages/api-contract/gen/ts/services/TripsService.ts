@@ -3,6 +3,7 @@
 /* tslint:disable */
 /* eslint-disable */
 import type { AcceptTripInviteResponse } from '../models/AcceptTripInviteResponse';
+import type { CreateManualDayLodgingPlaceRequest } from '../models/CreateManualDayLodgingPlaceRequest';
 import type { CreateManualScheduleItemRequest } from '../models/CreateManualScheduleItemRequest';
 import type { CreateManualScheduleItemResponse } from '../models/CreateManualScheduleItemResponse';
 import type { CreateQuickExpenseRequest } from '../models/CreateQuickExpenseRequest';
@@ -17,6 +18,7 @@ import type { GetTripDetailResponse } from '../models/GetTripDetailResponse';
 import type { GetTripSettlementResponse } from '../models/GetTripSettlementResponse';
 import type { ListDayExpensesResponse } from '../models/ListDayExpensesResponse';
 import type { ListTripParticipantsResponse } from '../models/ListTripParticipantsResponse';
+import type { ListTripPlacesResponse } from '../models/ListTripPlacesResponse';
 import type { ListTripsResponse } from '../models/ListTripsResponse';
 import type { MarkScheduleItemArrivedResponse } from '../models/MarkScheduleItemArrivedResponse';
 import type { MarkScheduleItemSkippedResponse } from '../models/MarkScheduleItemSkippedResponse';
@@ -284,6 +286,31 @@ export class TripsService {
         });
     }
     /**
+     * List trip places
+     * Returns existing trip-level places for an authenticated trip participant. Used by Day lodging selection.
+     * @param tripId
+     * @returns ListTripPlacesResponse Existing trip places.
+     * @throws ApiError
+     */
+    public static listTripPlaces(
+        tripId: string,
+    ): CancelablePromise<ListTripPlacesResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/trips/{tripId}/places',
+            path: {
+                'tripId': tripId,
+            },
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                403: `Forbidden.`,
+                404: `Trip not found.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
      * Set a trip day lodging place
      * Stores or replaces the selected Day lodging target for an authenticated trip participant.
      * @param tripId
@@ -339,6 +366,38 @@ export class TripsService {
                 401: `Unauthorized.`,
                 403: `Forbidden.`,
                 404: `Trip or trip day not found.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
+     * Create a manual lodging place and set Day lodging
+     * Creates a manual lodging TripPlace for the trip and stores it as the selected Day lodging target. Does not create a Day schedule item.
+     * @param tripId
+     * @param tripDayId
+     * @param requestBody
+     * @returns SetDayLodgingPlaceResponse Manual lodging place created and set as Day lodging.
+     * @throws ApiError
+     */
+    public static createManualDayLodgingPlace(
+        tripId: string,
+        tripDayId: string,
+        requestBody: CreateManualDayLodgingPlaceRequest,
+    ): CancelablePromise<SetDayLodgingPlaceResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/trips/{tripId}/days/{tripDayId}/lodging-place/manual',
+            path: {
+                'tripId': tripId,
+                'tripDayId': tripDayId,
+            },
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                403: `Forbidden.`,
+                404: `Trip/day not found.`,
                 500: `Unexpected server error.`,
             },
         });

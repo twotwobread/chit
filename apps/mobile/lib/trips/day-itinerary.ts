@@ -1,6 +1,6 @@
 import type { Href } from 'expo-router';
 
-import type { GetDayScheduleItemsResponse, ScheduleItem, TripPlaceType } from '@i-um/api-contract';
+import type { GetDayScheduleItemsResponse, ScheduleItem, TripPlaceSummary, TripPlaceType } from '@i-um/api-contract';
 
 import { theme } from '../design/theme';
 import { formatTripDayDate } from './days';
@@ -25,12 +25,14 @@ export type DayItineraryViewModel =
       status: 'success';
       dayLabel: string;
       formattedDate: string;
+      lodgingPlace: TripPlaceSummary | null;
       items: DayItineraryRowViewModel[];
     }
   | {
       status: 'empty';
       dayLabel: string;
       formattedDate: string;
+      lodgingPlace: TripPlaceSummary | null;
       title: string;
       helper: string;
     };
@@ -65,6 +67,7 @@ export function buildDayItineraryViewModel(response: GetDayScheduleItemsResponse
       status: 'empty',
       dayLabel,
       formattedDate,
+      lodgingPlace: response.day.lodgingPlace,
       title: '아직 등록된 장소가 없어요.',
       helper: '장소 추가를 눌러 방문할 장소를 검색해보세요.',
     };
@@ -74,6 +77,7 @@ export function buildDayItineraryViewModel(response: GetDayScheduleItemsResponse
     status: 'success',
     dayLabel,
     formattedDate,
+    lodgingPlace: response.day.lodgingPlace,
     items: [...scheduleItems]
       .sort((left, right) => left.itemOrder - right.itemOrder)
       .map((item) => ({

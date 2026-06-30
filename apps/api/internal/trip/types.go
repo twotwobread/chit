@@ -53,6 +53,11 @@ type SetDayLodgingPlaceInput struct {
 	TripPlaceID string
 }
 
+type CreateManualDayLodgingPlaceInput struct {
+	Name    string
+	Address string
+}
+
 type CreateQuickExpenseInput struct {
 	ScheduleItemID     string
 	AmountMinor        int64
@@ -163,6 +168,13 @@ type SetDayLodgingPlaceRecord struct {
 	TripID      string
 	TripDayID   string
 	TripPlaceID string
+}
+
+type CreateManualDayLodgingPlaceRecord struct {
+	TripID    string
+	TripDayID string
+	Name      string
+	Address   string
 }
 
 type CreateQuickExpenseRecord struct {
@@ -327,6 +339,15 @@ type GetDayScheduleItemsResult struct {
 }
 
 type SetDayLodgingPlaceResult struct {
+	Day          TripDay
+	LodgingPlace TripPlaceSummary
+}
+
+type ListTripPlacesResult struct {
+	Places []TripPlaceSummary
+}
+
+type CreateManualDayLodgingPlaceResult struct {
 	Day          TripDay
 	LodgingPlace TripPlaceSummary
 }
@@ -590,7 +611,9 @@ type Repository interface {
 	ListActiveTripDaysByTrip(ctx context.Context, tripID string) ([]TripDay, error)
 	GetActiveTripDayByTripAndID(ctx context.Context, tripID string, tripDayID string) (TripDay, bool, error)
 	GetTripPlaceSummaryByTripAndPlace(ctx context.Context, tripID string, tripPlaceID string) (TripPlaceSummary, bool, error)
+	ListTripPlaces(ctx context.Context, tripID string) ([]TripPlaceSummary, error)
 	SetDayLodgingPlace(ctx context.Context, record SetDayLodgingPlaceRecord) (TripPlaceSummary, error)
+	CreateManualDayLodgingPlace(ctx context.Context, record CreateManualDayLodgingPlaceRecord) (TripPlaceSummary, error)
 	DeleteDayLodgingPlace(ctx context.Context, tripID string, tripDayID string) error
 	ListScheduleItemsByTripDay(ctx context.Context, tripID string, tripDayID string) ([]ScheduleItem, error)
 	ListDayExpensesByTripDay(ctx context.Context, tripID string, tripDayID string) ([]DayExpenseListItem, error)

@@ -54,8 +54,13 @@ type fakeRepository struct {
 	dayLodgingLookupDate     string
 	tripPlaceSummary         TripPlaceSummary
 	tripPlaceFound           bool
+	tripPlaces               []TripPlaceSummary
 	tripPlaceLookupTripID    string
 	tripPlaceLookupID        string
+	listTripPlacesTripID     string
+	manualDayLodgingRecord   CreateManualDayLodgingPlaceRecord
+	manualDayLodgingCalled   bool
+	manualDayLodgingPlace    TripPlaceSummary
 	setDayLodgingRecord      SetDayLodgingPlaceRecord
 	setDayLodgingCalled      bool
 	setDayLodgingPlace       TripPlaceSummary
@@ -314,6 +319,11 @@ func (r *fakeRepository) GetTripPlaceSummaryByTripAndPlace(_ context.Context, tr
 	return r.tripPlaceSummary, r.tripPlaceFound, nil
 }
 
+func (r *fakeRepository) ListTripPlaces(_ context.Context, tripID string) ([]TripPlaceSummary, error) {
+	r.listTripPlacesTripID = tripID
+	return append([]TripPlaceSummary(nil), r.tripPlaces...), nil
+}
+
 func (r *fakeRepository) SetDayLodgingPlace(_ context.Context, record SetDayLodgingPlaceRecord) (TripPlaceSummary, error) {
 	r.setDayLodgingRecord = record
 	r.setDayLodgingCalled = true
@@ -324,6 +334,15 @@ func (r *fakeRepository) SetDayLodgingPlace(_ context.Context, record SetDayLodg
 		return r.setDayLodgingPlace, nil
 	}
 	return r.tripPlaceSummary, nil
+}
+
+func (r *fakeRepository) CreateManualDayLodgingPlace(_ context.Context, record CreateManualDayLodgingPlaceRecord) (TripPlaceSummary, error) {
+	r.manualDayLodgingRecord = record
+	r.manualDayLodgingCalled = true
+	if r.manualDayLodgingPlace.ID != "" {
+		return r.manualDayLodgingPlace, nil
+	}
+	return TripPlaceSummary{ID: testUUID(8801), Name: record.Name, Address: record.Address, PlaceType: "lodging"}, nil
 }
 
 func (r *fakeRepository) DeleteDayLodgingPlace(_ context.Context, tripID string, date string) error {
@@ -1804,6 +1823,76 @@ func TestAllocateEqualExpenseSplitsAllowsZeroMinorUnitShares(t *testing.T) {
 	}
 	if splits[0].AmountMinor != 1 || splits[1].AmountMinor != 0 {
 		t.Fatalf("expected one minor unit assigned by order, got %#v", splits)
+	}
+}
+
+func TestServiceListTripPlaces(t *testing.T) {
+	places := []TripPlaceSummary{
+		{ID: testUUID(8001), Name: "호텔 니코 오사카", PlaceType: "lodging", Address: "Nishi-Shinsaibashi"},
+		{ID: testUUID(8002), Name: "도톤보리", PlaceType: "sights", Address: "Dotonbori"},
+	}
+	repo := &fakeRepository{trip: Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"}, tripFound: true, isParticipant: true, tripPlaces: places}
+	service := newTestService(repo)
+
+	result, err := service.ListTripPlaces(context.Background(), "user-1", testTripID)
+	if err != nil {
+		t.Fatalf("ListTripPlaces returned error: %v", err)
+	}
+	if repo.listTripPlacesTripID != testTripID {
+		t.Fatalf("expected list trip places lookup by trip, got %q", repo.listTripPlacesTripID)
+	}
+	if len(result.Places) != 2 || result.Places[0].Name != "호텔 니코 오사카" || result.Places[1].Name != "도톤보리" {
+		t.Fatalf("expected existing trip places in repository order, got %#v", result.Places)
+	}
+}
+
+func TestServiceCreateManualDayLodgingPlace(t *testing.T) {
+	repo := &fakeRepository{
+		trip:                  Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"},
+		tripFound:             true,
+		isParticipant:         true,
+		manualDayLodgingPlace: TripPlaceSummary{ID: testUUID(8801), Name: "호텔 니코 오사카", PlaceType: "lodging", Address: "Nishi-Shinsaibashi"},
+	}
+	service := newTestService(repo)
+
+	result, err := service.CreateManualDayLodgingPlace(context.Background(), "user-1", testTripID, "2026-07-11", CreateManualDayLodgingPlaceInput{
+		Name:    " 호텔 니코 오사카 ",
+		Address: " Nishi-Shinsaibashi ",
+	})
+	if err != nil {
+		t.Fatalf("CreateManualDayLodgingPlace returned error: %v", err)
+	}
+	if !repo.manualDayLodgingCalled || repo.manualDayLodgingRecord.TripID != testTripID || repo.manualDayLodgingRecord.TripDayID != "2026-07-11" || repo.manualDayLodgingRecord.Name != "호텔 니코 오사카" || repo.manualDayLodgingRecord.Address != "Nishi-Shinsaibashi" {
+		t.Fatalf("expected normalized manual lodging record, got called=%v record=%#v", repo.manualDayLodgingCalled, repo.manualDayLodgingRecord)
+	}
+	if result.Day.LodgingPlace == nil || result.Day.LodgingPlace.ID != testUUID(8801) || result.LodgingPlace.PlaceType != "lodging" {
+		t.Fatalf("expected created lodging place set on day, got %#v", result)
+	}
+}
+
+func TestServiceCreateManualDayLodgingPlaceValidation(t *testing.T) {
+	tests := []struct {
+		name  string
+		input CreateManualDayLodgingPlaceInput
+	}{
+		{name: "blank name", input: CreateManualDayLodgingPlaceInput{Name: " ", Address: "Nishi"}},
+		{name: "too long name", input: CreateManualDayLodgingPlaceInput{Name: strings.Repeat("가", 121), Address: "Nishi"}},
+		{name: "blank address", input: CreateManualDayLodgingPlaceInput{Name: "호텔", Address: " "}},
+		{name: "too long address", input: CreateManualDayLodgingPlaceInput{Name: "호텔", Address: strings.Repeat("가", 301)}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := &fakeRepository{trip: Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"}, tripFound: true, isParticipant: true}
+			service := newTestService(repo)
+			_, err := service.CreateManualDayLodgingPlace(context.Background(), "user-1", testTripID, "2026-07-11", tt.input)
+			if !errors.Is(err, ErrValidation) {
+				t.Fatalf("expected ErrValidation, got %v", err)
+			}
+			if repo.manualDayLodgingCalled {
+				t.Fatal("expected invalid input not to call repository")
+			}
+		})
 	}
 }
 

@@ -4,10 +4,14 @@ import { describe, it } from 'node:test';
 import type { TripDay } from '@i-um/api-contract';
 
 import {
+  buildDayLodgingPanel,
+  buildDayLodgingPlaceOptions,
   buildDayLodgingRowViewModel,
+  buildManualDayLodgingPlaceSubmitState,
   buildSetDayLodgingPlaceRequest,
   buildTripDayLodgingSummary,
   dayLodgingMutationFailureState,
+  validateManualDayLodgingPlaceForm,
 } from './lodging-place';
 
 describe('day lodging place helpers', () => {
@@ -52,6 +56,61 @@ describe('day lodging place helpers', () => {
         action: { kind: 'clear', label: '숙소 해제 중...', disabled: true, isSubmitting: true },
       },
     );
+  });
+
+  it('builds the Day lodging panel for empty and selected lodging states', () => {
+    assert.deepEqual(buildDayLodgingPanel(null), {
+      label: '숙소',
+      placeName: null,
+      address: null,
+      helper: '이 Day에 지정된 숙소가 없어요.',
+      canClear: false,
+    });
+
+    assert.deepEqual(
+      buildDayLodgingPanel({ id: 'place-1', name: '호텔 니코 오사카', address: 'Nishi', placeType: 'lodging' }),
+      {
+        label: '숙소',
+        placeName: '호텔 니코 오사카',
+        address: 'Nishi',
+        helper: null,
+        canClear: true,
+      },
+    );
+  });
+
+  it('builds existing trip place lodging options and marks the current selection', () => {
+    assert.deepEqual(
+      buildDayLodgingPlaceOptions(
+        {
+          places: [
+            { id: 'place-1', name: '호텔 니코 오사카', address: 'Nishi', placeType: 'lodging', routablePlace: null },
+            { id: 'place-2', name: '도톤보리', address: 'Dotonbori', placeType: 'sights', routablePlace: null },
+          ],
+        },
+        'place-2',
+      ),
+      [
+        { id: 'place-1', name: '호텔 니코 오사카', address: 'Nishi', placeType: 'lodging', selected: false },
+        { id: 'place-2', name: '도톤보리', address: 'Dotonbori', placeType: 'sights', selected: true },
+      ],
+    );
+  });
+
+  it('validates and trims manual lodging registration form values', () => {
+    assert.deepEqual(validateManualDayLodgingPlaceForm({ name: ' 호텔 ', address: ' Nishi ' }), {
+      ok: true,
+      request: { name: '호텔', address: 'Nishi' },
+    });
+    assert.deepEqual(validateManualDayLodgingPlaceForm({ name: ' ', address: '가'.repeat(301) }), {
+      ok: false,
+      errors: { name: '숙소명을 입력해주세요.', address: '주소는 300자 이하로 입력해주세요.' },
+    });
+  });
+
+  it('builds manual lodging submit states', () => {
+    assert.deepEqual(buildManualDayLodgingPlaceSubmitState(false), { disabled: false, label: '숙소 등록' });
+    assert.deepEqual(buildManualDayLodgingPlaceSubmitState(true), { disabled: true, label: '숙소 등록 중...' });
   });
 
   it('builds generated set request shape from a trip place id', () => {
