@@ -4,6 +4,7 @@ import test from 'node:test';
 import type { GetTripSettlementResponse } from '@i-um/api-contract';
 
 import {
+  buildSettlementRequestMessage,
   buildSettlementTransferViewModel,
   computeSettlementBalances,
   getAuthoritativeSettlementCurrencySummaries,
@@ -333,9 +334,10 @@ test('keeps balance summaries visible when there are no suggested transfers', ()
   assert.equal(viewModel.totalTransferCount, 0);
   assert.equal(viewModel.sections.length, 0);
   assert.equal(viewModel.balanceSections.length, 1);
+  assert.equal(viewModel.summaryTitle, '정산 현황');
   assert.deepEqual(viewModel.noTransferNotice, {
     helper: '모든 지출이 이미 맞춰졌거나 아직 정산할 지출이 없어요.',
-    primaryAction: { label: '오늘 일정 보기', route: '/trips/trip-1/days/day-1' },
+    primaryAction: null,
     title: '보낼 정산이 없어요.',
   });
 });
@@ -357,10 +359,39 @@ test('builds no-transfer state with optional today route action', () => {
     buildSettlementTransferViewModel({ settlement: emptySettlement, todayRoute: '/trips/trip-1/days/2026-07-10' }),
     {
       helper: '모든 지출이 이미 맞춰졌거나 아직 정산할 지출이 없어요.',
-      primaryAction: { label: '오늘 일정 보기', route: '/trips/trip-1/days/2026-07-10' },
+      primaryAction: null,
       status: 'empty',
       title: '보낼 정산이 없어요.',
     },
+  );
+});
+
+test('builds settlement request message from suggested transfers', () => {
+  const viewModel = buildSettlementTransferViewModel({
+    settlement: {
+      tripId: 'trip-1',
+      defaultCurrency: 'KRW',
+      currencySummaries: [
+        {
+          currency: 'KRW',
+          totalPaidMinor: 50000,
+          totalShareMinor: 50000,
+          balances: [],
+          suggestedTransfers: [
+            {
+              fromParticipant: { participantId: 'c', displayName: '유나', participantStatus: 'current' as const },
+              toParticipant: { participantId: 'a', displayName: '민수', participantStatus: 'current' as const },
+              amountMinor: 18500,
+            },
+          ],
+        },
+      ],
+    },
+  });
+
+  assert.equal(
+    buildSettlementRequestMessage(viewModel, '오사카 여행'),
+    '[i-um] 오사카 여행 정산 요청\n유나님 → 민수님 18,500원\n확인 후 송금 부탁드려요.',
   );
 });
 
