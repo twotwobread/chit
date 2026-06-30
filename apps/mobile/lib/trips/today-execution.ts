@@ -11,7 +11,13 @@ import type {
   TripPlaceType,
 } from '@i-um/api-contract';
 
-import { buildDayItineraryRoute, getPlaceTypeLabel, getScheduleItems } from './day-itinerary';
+import {
+  buildDayItineraryRoute,
+  buildNonPlaceDetailLabel,
+  getNonPlaceCategoryLabel,
+  getPlaceTypeLabel,
+  getScheduleItems,
+} from './day-itinerary';
 import { formatTripDayDate } from './days';
 import { tripDetailPath } from './mypage';
 import { buildQuickExpenseRoute } from './quick-expense';
@@ -306,24 +312,44 @@ export function buildTodayExecutionViewModel({
     };
   }
 
+  const placeBackedNext = nextItem.place;
+  const nonPlaceDetails = nextItem.nonPlace;
+  const nonPlaceDetailLabel = buildNonPlaceDetailLabel(nextItem);
+
   return {
     status: 'success',
     ...common,
-    nextPlace: {
-      itemId: nextItem.id,
-      order: nextItem.itemOrder,
-      orderLabel: String(nextItem.itemOrder),
-      placeName: nextItem.place.name,
-      placeType: nextItem.place.placeType,
-      placeTypeLabel: getPlaceTypeLabel(nextItem.place.placeType),
-      address: nextItem.place.address,
-      routablePlace: nextItem.place.routablePlace ?? null,
-      navigationAction: navigateAction('길찾기', nextItem.place.name, nextItem.place.address, travelMode),
-      travelModeSelector: buildTravelModeSelectorViewModel(travelMode),
-    },
+    nextPlace: placeBackedNext
+      ? {
+          itemId: nextItem.id,
+          order: nextItem.itemOrder,
+          orderLabel: String(nextItem.itemOrder),
+          placeName: placeBackedNext.name,
+          placeType: placeBackedNext.placeType,
+          placeTypeLabel: getPlaceTypeLabel(placeBackedNext.placeType),
+          address: placeBackedNext.address,
+          routablePlace: placeBackedNext.routablePlace ?? null,
+          navigationAction: navigateAction('길찾기', placeBackedNext.name, placeBackedNext.address, travelMode),
+          travelModeSelector: buildTravelModeSelectorViewModel(travelMode),
+        }
+      : {
+          itemId: nextItem.id,
+          order: nextItem.itemOrder,
+          orderLabel: String(nextItem.itemOrder),
+          placeName: nonPlaceDetails?.title ?? '장소 없는 일정',
+          placeType: 'etc' as const,
+          placeTypeLabel: nonPlaceDetails ? getNonPlaceCategoryLabel(nonPlaceDetails.category) : '일정',
+          address: nonPlaceDetailLabel ?? '세부 정보 없음',
+          routablePlace: null,
+          navigationAction: navigateAction('', '', '', travelMode),
+          travelModeSelector: buildTravelModeSelectorViewModel(travelMode),
+        },
     skippedSection: skippedItems.length > 0 ? buildSkippedSection(skippedItems, selectedTrip.id, currentDay.id) : null,
-    arrivalAction: arriveAction(selectedTrip.id, currentDay.id, nextItem.id),
-    quickExpenseAction: routeAction('지출 등록', buildQuickExpenseRoute(selectedTrip.id, currentDay.id, nextItem.id)),
+    arrivalAction: arriveAction(selectedTrip.id, currentDay.id, nextItem.id, placeBackedNext ? undefined : '완료'),
+    quickExpenseAction: routeAction(
+      '지출 등록',
+      buildQuickExpenseRoute(selectedTrip.id, currentDay.id, placeBackedNext ? nextItem.id : undefined),
+    ),
     skipAction: skipAction(selectedTrip.id, currentDay.id, nextItem.id),
   };
 }
@@ -393,9 +419,13 @@ function buildSkippedSection(items: ScheduleItem[], tripId: string, date: string
     items: items.map((item) => ({
       itemId: item.id,
       orderLabel: String(item.itemOrder),
-      placeName: item.place.name,
-      placeTypeLabel: getPlaceTypeLabel(item.place.placeType),
-      address: item.place.address,
+      placeName: item.place?.name ?? item.nonPlace?.title ?? '장소 없는 일정',
+      placeTypeLabel: item.place
+        ? getPlaceTypeLabel(item.place.placeType)
+        : item.nonPlace
+          ? getNonPlaceCategoryLabel(item.nonPlace.category)
+          : '일정',
+      address: item.place?.address ?? '',
       restoreAction: restoreAction(tripId, date, item.id),
     })),
   };
@@ -420,8 +450,8 @@ function retryAction(): TodayRetryAction {
   return { kind: 'retry', label: '다시 시도' };
 }
 
-function arriveAction(tripId: string, date: string, itemId: string): TodayArriveAction {
-  return { kind: 'arrive', label: '도착했어요', tripId, date, itemId };
+function arriveAction(tripId: string, date: string, itemId: string, label = '도착했어요'): TodayArriveAction {
+  return { kind: 'arrive', label, tripId, date, itemId };
 }
 
 function skipAction(tripId: string, date: string, itemId: string): TodaySkipAction {

@@ -9,6 +9,20 @@ import (
 const (
 	RoleOwner  = "owner"
 	RoleMember = "member"
+
+	ScheduleItemTypePlace    = "place"
+	ScheduleItemTypeNonPlace = "non_place"
+
+	NonPlaceCategoryTransport = "transport"
+	NonPlaceCategoryRest      = "rest"
+	NonPlaceCategoryMemo      = "memo"
+	NonPlaceCategoryReminder  = "reminder"
+
+	TransportModeFlight = "flight"
+	TransportModeTrain  = "train"
+	TransportModeBus    = "bus"
+	TransportModeFerry  = "ferry"
+	TransportModeOther  = "other"
 )
 
 var (
@@ -47,6 +61,22 @@ type CreateManualScheduleItemInput struct {
 	Name      string
 	Address   string
 	PlaceType string
+}
+
+type CreateNonPlaceScheduleItemInput struct {
+	Category         string
+	Title            string
+	StartTime        *string
+	EndTime          *string
+	Memo             *string
+	Link             *string
+	TransportMode    *string
+	ReferenceNumber  *string
+	BookingReference *string
+	OriginText       *string
+	DestinationText  *string
+	TerminalText     *string
+	GateText         *string
 }
 
 type SetDayLodgingPlaceInput struct {
@@ -88,6 +118,18 @@ type UpdateScheduleItemInput struct {
 	PlaceType *string
 	StartTime *string
 	EndTime   *string
+
+	Category         *string
+	Title            *string
+	Memo             *string
+	Link             *string
+	TransportMode    *string
+	ReferenceNumber  *string
+	BookingReference *string
+	OriginText       *string
+	DestinationText  *string
+	TerminalText     *string
+	GateText         *string
 }
 
 type ReorderDayScheduleMoveInput struct {
@@ -122,6 +164,14 @@ type CreateManualScheduleItemRecord struct {
 	PlaceType string
 }
 
+type CreateNonPlaceScheduleItemRecord struct {
+	TripID    string
+	TripDayID string
+	Details   NonPlaceScheduleItemDetails
+	StartTime *string
+	EndTime   *string
+}
+
 type UpdateScheduleItemRecord struct {
 	TripID    string
 	TripDayID string
@@ -129,6 +179,15 @@ type UpdateScheduleItemRecord struct {
 	Name      string
 	Address   string
 	PlaceType string
+	StartTime *string
+	EndTime   *string
+}
+
+type UpdateNonPlaceScheduleItemRecord struct {
+	TripID    string
+	TripDayID string
+	ItemID    string
+	Details   NonPlaceScheduleItemDetails
 	StartTime *string
 	EndTime   *string
 }
@@ -321,16 +380,32 @@ type TripPlaceSummary struct {
 	RoutablePlace *RoutablePlace
 }
 
+type NonPlaceScheduleItemDetails struct {
+	Category         string
+	Title            string
+	Memo             *string
+	Link             *string
+	TransportMode    *string
+	ReferenceNumber  *string
+	BookingReference *string
+	OriginText       *string
+	DestinationText  *string
+	TerminalText     *string
+	GateText         *string
+}
+
 type ScheduleItem struct {
 	ID        string
 	ItemOrder int
 	Version   int
+	ItemType  string
 	IsLodging bool
 	StartTime *string
 	EndTime   *string
 	ArrivedAt *time.Time
 	SkippedAt *time.Time
 	Place     TripPlaceSummary
+	NonPlace  *NonPlaceScheduleItemDetails
 }
 
 type GetDayScheduleItemsResult struct {
@@ -353,6 +428,11 @@ type CreateManualDayLodgingPlaceResult struct {
 }
 
 type CreateManualScheduleItemResult struct {
+	Day  TripDay
+	Item ScheduleItem
+}
+
+type CreateNonPlaceScheduleItemResult struct {
 	Day  TripDay
 	Item ScheduleItem
 }
@@ -623,11 +703,13 @@ type Repository interface {
 	DeleteExpenseByTripDayAndID(ctx context.Context, tripID string, tripDayID string, expenseID string) (bool, error)
 	CreateQuickExpense(ctx context.Context, record CreateQuickExpenseRecord) (CreateQuickExpenseResult, error)
 	CreateManualScheduleItem(ctx context.Context, record CreateManualScheduleItemRecord) (ScheduleItem, error)
+	CreateNonPlaceScheduleItem(ctx context.Context, record CreateNonPlaceScheduleItemRecord) (ScheduleItem, error)
 	GetScheduleItemByTripDayAndID(ctx context.Context, tripID string, tripDayID string, itemID string) (ScheduleItem, bool, error)
 	ReorderScheduleItems(ctx context.Context, record ReorderScheduleItemsRecord) ([]ScheduleItem, error)
 	MarkScheduleItemArrived(ctx context.Context, record MarkScheduleItemArrivedRecord) (MarkScheduleItemArrivedMutationResult, error)
 	MarkScheduleItemSkipped(ctx context.Context, record MarkScheduleItemSkippedRecord) (MarkScheduleItemSkippedMutationResult, error)
 	RestoreScheduleItem(ctx context.Context, record RestoreScheduleItemRecord) (RestoreScheduleItemMutationResult, error)
 	UpdateScheduleItemPlace(ctx context.Context, record UpdateScheduleItemRecord) (ScheduleItem, error)
+	UpdateNonPlaceScheduleItem(ctx context.Context, record UpdateNonPlaceScheduleItemRecord) (ScheduleItem, error)
 	DeleteScheduleItem(ctx context.Context, tripID string, tripDayID string, itemID string) (bool, error)
 }

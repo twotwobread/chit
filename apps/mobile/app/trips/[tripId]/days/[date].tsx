@@ -22,7 +22,12 @@ import {
 import * as Clipboard from 'expo-clipboard';
 import { router, useFocusEffect, useLocalSearchParams, type Href } from 'expo-router';
 
-import { ApiError, type TripPlaceType } from '@i-um/api-contract';
+import {
+  ApiError,
+  type CreateNonPlaceScheduleItemRequest,
+  type NonPlaceTransportMode,
+  type TripPlaceType,
+} from '@i-um/api-contract';
 
 import { MobileAuthError } from '../../../../lib/auth/client';
 import { Badge, ListRow, PlacePin, PlaceTag, theme } from '../../../../lib/design';
@@ -71,11 +76,23 @@ import {
   type DayItineraryEditFormValues,
 } from '../../../../lib/trips/day-itinerary-edit';
 import { manualPlaceTypeOptions } from '../../../../lib/trips/manual-place';
+import {
+  buildNonPlaceScheduleItemEditForm,
+  buildNonPlaceScheduleItemSubmitState,
+  emptyNonPlaceScheduleItemForm,
+  nonPlaceCategoryOptions,
+  nonPlaceTransportModeOptions,
+  validateCreateNonPlaceScheduleItemForm,
+  validateUpdateNonPlaceScheduleItemForm,
+  type NonPlaceScheduleItemFormErrors,
+  type NonPlaceScheduleItemFormValues,
+} from '../../../../lib/trips/non-place-schedule-item';
 import { buildDayItineraryAddPlaceSearchRoute } from '../../../../lib/trips/day-itinerary-add-place-navigation';
 import { tripItineraryPath } from '../../../../lib/trips/routes';
 import {
   clearDayLodgingPlace,
   createManualDayLodgingPlace,
+  createNonPlaceScheduleItem,
   deleteScheduleItem,
   getTripDayItinerary,
   listDayExpenses,
@@ -136,6 +153,25 @@ type EditState =
       original: DayItineraryEditFormValues;
       values: DayItineraryEditFormValues;
       errors: DayItineraryEditFormErrors;
+      error?: { title: string; helper: string };
+    };
+
+type NonPlaceEditorState =
+  | { status: 'idle' }
+  | {
+      status: 'editing' | 'saving';
+      mode: 'create';
+      values: NonPlaceScheduleItemFormValues;
+      errors: NonPlaceScheduleItemFormErrors;
+      error?: { title: string; helper: string };
+    }
+  | {
+      status: 'editing' | 'saving';
+      mode: 'edit';
+      item: DayItineraryRowViewModel;
+      original: NonPlaceScheduleItemFormValues;
+      values: NonPlaceScheduleItemFormValues;
+      errors: NonPlaceScheduleItemFormErrors;
       error?: { title: string; helper: string };
     };
 
@@ -204,6 +240,7 @@ export default function TripDayItineraryScreen() {
   const [state, setState] = useState<DayItineraryState>({ status: 'loading' });
   const [expenseState, setExpenseState] = useState<DayExpenseState>({ status: 'loading' });
   const [editState, setEditState] = useState<EditState>({ status: 'idle' });
+  const [nonPlaceEditorState, setNonPlaceEditorState] = useState<NonPlaceEditorState>({ status: 'idle' });
   const [deleteState, setDeleteState] = useState<DeleteState>({ status: 'idle' });
   const [reorderState, setReorderState] = useState<ReorderState>({ status: 'idle' });
   const [lodgingState, setLodgingState] = useState<LodgingState>({ status: 'idle' });
@@ -222,6 +259,7 @@ export default function TripDayItineraryScreen() {
   const reorderDragPointerYRef = useRef<number | null>(null);
   const reorderAutoScrollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const editStateRef = useRef<EditState>({ status: 'idle' });
+  const nonPlaceEditorStateRef = useRef<NonPlaceEditorState>({ status: 'idle' });
   const deleteStateRef = useRef<DeleteState>({ status: 'idle' });
   const reorderStateRef = useRef<ReorderState>({ status: 'idle' });
   const lodgingStateRef = useRef<LodgingState>({ status: 'idle' });
@@ -248,6 +286,7 @@ export default function TripDayItineraryScreen() {
   const getSharedUpdateLocalState = useCallback(
     (): DayItinerarySharedUpdateLocalState => ({
       reorderStatus: reorderStateRef.current.status,
+      createStatus: nonPlaceEditorStateRef.current.status,
       editStatus: editStateRef.current.status,
       deleteStatus: deleteStateRef.current.status,
       lodgingStatus: lodgingStateRef.current.status,
@@ -319,6 +358,10 @@ export default function TripDayItineraryScreen() {
   useEffect(() => {
     editStateRef.current = editState;
   }, [editState]);
+
+  useEffect(() => {
+    nonPlaceEditorStateRef.current = nonPlaceEditorState;
+  }, [nonPlaceEditorState]);
 
   useEffect(() => {
     deleteStateRef.current = deleteState;
@@ -558,6 +601,7 @@ export default function TripDayItineraryScreen() {
     void refetchSharedItinerary();
   }, [
     date,
+    nonPlaceEditorState.status,
     editState.status,
     deleteState.status,
     getSharedUpdateLocalState,
@@ -621,6 +665,7 @@ export default function TripDayItineraryScreen() {
   const discardDayScreenLocalState = useCallback(() => {
     setReorderDragActive(false);
     setEditState({ status: 'idle' });
+    setNonPlaceEditorState({ status: 'idle' });
     setDeleteState({ status: 'idle' });
     setReorderState({ status: 'idle' });
     setLodgingState({ status: 'idle' });
@@ -669,13 +714,32 @@ export default function TripDayItineraryScreen() {
     router.replace('/');
   };
 
+  const beginCreateNonPlace = () => {
+    discardReorder();
+    deleteOriginFocusTargetRef.current = null;
+    setEditState({ status: 'idle' });
+    setDeleteState({ status: 'idle' });
+    setLodgingState({ status: 'idle' });
+    setMapActionFeedback(null);
+    setNonPlaceEditorState({ status: 'editing', mode: 'create', values: emptyNonPlaceScheduleItemForm(), errors: {} });
+  };
+
   const beginEdit = (item: DayItineraryRowViewModel) => {
     discardReorder();
-    const values = buildDayItineraryEditForm(item);
     deleteOriginFocusTargetRef.current = null;
     setDeleteState({ status: 'idle' });
     setLodgingState({ status: 'idle' });
     setMapActionFeedback(null);
+
+    if (item.itemType === 'non_place') {
+      const values = buildNonPlaceScheduleItemEditForm(item);
+      setEditState({ status: 'idle' });
+      setNonPlaceEditorState({ status: 'editing', mode: 'edit', item, original: values, values, errors: {} });
+      return;
+    }
+
+    const values = buildDayItineraryEditForm(item);
+    setNonPlaceEditorState({ status: 'idle' });
     setEditState({ status: 'editing', item, original: values, values, errors: {} });
   };
 
@@ -687,6 +751,7 @@ export default function TripDayItineraryScreen() {
 
     setReorderFeedback(null);
     setEditState({ status: 'idle' });
+    setNonPlaceEditorState({ status: 'idle' });
     deleteOriginFocusTargetRef.current = null;
     setDeleteState({ status: 'idle' });
     setLodgingState({ status: 'idle' });
@@ -719,6 +784,79 @@ export default function TripDayItineraryScreen() {
       }
       return { ...current, values, errors: {}, error: undefined };
     });
+  };
+
+  const updateNonPlaceEditorValues = (values: NonPlaceScheduleItemFormValues) => {
+    setNonPlaceEditorState((current) => {
+      if (current.status !== 'editing' && current.status !== 'saving') {
+        return current;
+      }
+      return { ...current, values, errors: {}, error: undefined };
+    });
+  };
+
+  const submitNonPlaceEditor = async () => {
+    if (
+      !tripId ||
+      !date ||
+      (nonPlaceEditorState.status !== 'editing' && nonPlaceEditorState.status !== 'saving') ||
+      nonPlaceEditorState.status === 'saving'
+    ) {
+      return;
+    }
+
+    const validation =
+      nonPlaceEditorState.mode === 'create'
+        ? validateCreateNonPlaceScheduleItemForm(nonPlaceEditorState.values)
+        : validateUpdateNonPlaceScheduleItemForm(nonPlaceEditorState.original, nonPlaceEditorState.values);
+    if (!validation.ok) {
+      setNonPlaceEditorState({ ...nonPlaceEditorState, errors: validation.errors, error: undefined });
+      return;
+    }
+
+    const submittingState: NonPlaceEditorState = {
+      ...nonPlaceEditorState,
+      status: 'saving',
+      errors: {},
+      error: undefined,
+    };
+    setNonPlaceEditorState(submittingState);
+    try {
+      if (nonPlaceEditorState.mode === 'create') {
+        await createNonPlaceScheduleItem(tripId, date, validation.request as CreateNonPlaceScheduleItemRequest);
+      } else {
+        await updateScheduleItem(tripId, date, nonPlaceEditorState.item.id, validation.request);
+      }
+      setNonPlaceEditorState({ status: 'idle' });
+      await load();
+    } catch (error) {
+      if (
+        error instanceof MobileAuthError &&
+        (error.code === 'UNAUTHORIZED' || error.code === 'INVALID_REFRESH_TOKEN')
+      ) {
+        setState({ status: 'auth' });
+        return;
+      }
+      if (error instanceof ApiError) {
+        if (error.status === 401) {
+          setState({ status: 'auth' });
+          return;
+        }
+        if (error.status === 403 || error.status === 404) {
+          setNonPlaceEditorState({ status: 'idle' });
+          await load();
+          return;
+        }
+      }
+      setNonPlaceEditorState({
+        ...submittingState,
+        status: 'editing',
+        error: {
+          title: nonPlaceEditorState.mode === 'create' ? '일정을 추가할 수 없어요.' : '일정 정보를 저장할 수 없어요.',
+          helper: '잠시 후 다시 시도해주세요.',
+        },
+      });
+    }
   };
 
   const submitEdit = async () => {
@@ -771,6 +909,7 @@ export default function TripDayItineraryScreen() {
     discardReorder();
     deleteOriginFocusTargetRef.current = typeof originFocusTarget === 'number' ? originFocusTarget : null;
     setEditState({ status: 'idle' });
+    setNonPlaceEditorState({ status: 'idle' });
     setLodgingState({ status: 'idle' });
     setMapActionFeedback(null);
     setDeleteState({ status: 'confirming', item });
@@ -1148,6 +1287,7 @@ export default function TripDayItineraryScreen() {
 
   const sharedUpdateLocalState: DayItinerarySharedUpdateLocalState = {
     reorderStatus: reorderState.status,
+    createStatus: nonPlaceEditorState.status,
     editStatus: editState.status,
     deleteStatus: deleteState.status,
     lodgingStatus: lodgingState.status,
@@ -1193,6 +1333,7 @@ export default function TripDayItineraryScreen() {
                   router.push(buildDayItineraryAddPlaceSearchRoute(tripId, date));
                 }
               }}
+              onAddNonPlace={beginCreateNonPlace}
               onCopyAddress={(item) => void copyPlaceAddress(item)}
               onDeletePlace={beginDelete}
               onEditPlace={beginEdit}
@@ -1233,6 +1374,14 @@ export default function TripDayItineraryScreen() {
               onRetry={() => void loadExpenses()}
               state={expenseState}
             />
+            {nonPlaceEditorState.status === 'editing' || nonPlaceEditorState.status === 'saving' ? (
+              <NonPlaceScheduleItemPanel
+                editorState={nonPlaceEditorState}
+                onCancel={() => setNonPlaceEditorState({ status: 'idle' })}
+                onSubmit={() => void submitNonPlaceEditor()}
+                onUpdateValues={updateNonPlaceEditorValues}
+              />
+            ) : null}
             {editState.status === 'editing' || editState.status === 'saving' ? (
               <EditPlacePanel
                 editState={editState}
@@ -1291,6 +1440,7 @@ function DayItineraryContent({
   lodgingState,
   onFocusRequestHandled,
   onAddPlace,
+  onAddNonPlace,
   onCancelLodgingPicker,
   onClearCurrentLodging,
   onClearLodging,
@@ -1324,6 +1474,7 @@ function DayItineraryContent({
   lodgingState: LodgingState;
   onFocusRequestHandled: () => void;
   onAddPlace: () => void;
+  onAddNonPlace: () => void;
   onCancelLodgingPicker: () => void;
   onClearCurrentLodging: () => void;
   onClearLodging: (item: DayItineraryRowViewModel) => void;
@@ -1463,46 +1614,57 @@ function DayItineraryContent({
                       >
                         {item.placeName}
                       </Text>
-                      <PlaceTag type={item.placeType} />
-                      {lodging.badgeLabel ? <Badge label={lodging.badgeLabel} tone="primary" /> : null}
+                      {item.itemType === 'non_place' ? (
+                        <Badge label={item.placeTypeLabel} tone="primary" />
+                      ) : (
+                        <PlaceTag type={item.placeType} />
+                      )}
+                      {item.statusLabel ? <Badge label={item.statusLabel} tone="neutral" /> : null}
+                      {lodging.badgeLabel && item.itemType !== 'non_place' ? (
+                        <Badge label={lodging.badgeLabel} tone="primary" />
+                      ) : null}
                     </View>
                     {item.timeLabel ? <Text style={styles.timeLabel}>{item.timeLabel}</Text> : null}
-                    <Text style={styles.address}>{item.address}</Text>
+                    {item.address ? <Text style={styles.address}>{item.address}</Text> : null}
                     <View style={styles.rowActionGroup}>
-                      <Pressable
-                        accessibilityLabel={mapActions.map.accessibilityLabel}
-                        accessibilityRole="button"
-                        onPress={() => onOpenMap(item)}
-                        style={styles.rowActionButton}
-                      >
-                        <Text style={styles.rowActionText}>{mapActions.map.label}</Text>
-                      </Pressable>
-                      <Pressable
-                        accessibilityHint={mapActions.copy.disabled ? mapActions.copy.disabledHelper : undefined}
-                        accessibilityLabel={mapActions.copy.accessibilityLabel}
-                        accessibilityRole="button"
-                        accessibilityState={{ disabled: mapActions.copy.disabled }}
-                        disabled={mapActions.copy.disabled}
-                        onPress={() => onCopyAddress(item)}
-                        style={[
-                          styles.rowActionButton,
-                          mapActions.copy.disabled ? styles.rowActionButtonDisabled : null,
-                        ]}
-                      >
-                        <Text style={styles.rowActionText}>{mapActions.copy.label}</Text>
-                      </Pressable>
-                      <Pressable
-                        accessibilityRole="button"
-                        disabled={lodging.action.disabled}
-                        onPress={() => (lodging.action.kind === 'set' ? onSetLodging(item) : onClearLodging(item))}
-                        style={[
-                          styles.rowActionButton,
-                          lodging.action.disabled ? styles.rowActionButtonDisabled : null,
-                        ]}
-                      >
-                        {lodging.action.isSubmitting ? <ActivityIndicator color={theme.color.primary} /> : null}
-                        <Text style={styles.rowActionText}>{lodging.action.label}</Text>
-                      </Pressable>
+                      {item.itemType !== 'non_place' ? (
+                        <>
+                          <Pressable
+                            accessibilityLabel={mapActions.map.accessibilityLabel}
+                            accessibilityRole="button"
+                            onPress={() => onOpenMap(item)}
+                            style={styles.rowActionButton}
+                          >
+                            <Text style={styles.rowActionText}>{mapActions.map.label}</Text>
+                          </Pressable>
+                          <Pressable
+                            accessibilityHint={mapActions.copy.disabled ? mapActions.copy.disabledHelper : undefined}
+                            accessibilityLabel={mapActions.copy.accessibilityLabel}
+                            accessibilityRole="button"
+                            accessibilityState={{ disabled: mapActions.copy.disabled }}
+                            disabled={mapActions.copy.disabled}
+                            onPress={() => onCopyAddress(item)}
+                            style={[
+                              styles.rowActionButton,
+                              mapActions.copy.disabled ? styles.rowActionButtonDisabled : null,
+                            ]}
+                          >
+                            <Text style={styles.rowActionText}>{mapActions.copy.label}</Text>
+                          </Pressable>
+                          <Pressable
+                            accessibilityRole="button"
+                            disabled={lodging.action.disabled}
+                            onPress={() => (lodging.action.kind === 'set' ? onSetLodging(item) : onClearLodging(item))}
+                            style={[
+                              styles.rowActionButton,
+                              lodging.action.disabled ? styles.rowActionButtonDisabled : null,
+                            ]}
+                          >
+                            {lodging.action.isSubmitting ? <ActivityIndicator color={theme.color.primary} /> : null}
+                            <Text style={styles.rowActionText}>{lodging.action.label}</Text>
+                          </Pressable>
+                        </>
+                      ) : null}
                       <Pressable
                         accessibilityRole="button"
                         onPress={() => onEditPlace(item)}
@@ -1601,6 +1763,9 @@ function DayItineraryContent({
                 <Text style={styles.secondaryButtonText}>{reorderAction.label}</Text>
               </Pressable>
             ) : null}
+            <Pressable accessibilityRole="button" onPress={onAddNonPlace} style={styles.secondaryButton}>
+              <Text style={styles.secondaryButtonText}>장소 없는 일정 추가</Text>
+            </Pressable>
             <Pressable accessibilityRole="button" onPress={onAddPlace} style={styles.button}>
               <Text style={styles.buttonText}>장소 추가</Text>
             </Pressable>
@@ -1930,10 +2095,15 @@ function ReorderPlaceList({
         <View style={styles.placeContent}>
           <View style={styles.placeTitleRow}>
             <Text style={styles.placeName}>{item.placeName}</Text>
-            <PlaceTag type={item.placeType} />
+            {item.itemType === 'non_place' ? (
+              <Badge label={item.placeTypeLabel} tone="primary" />
+            ) : (
+              <PlaceTag type={item.placeType} />
+            )}
+            {item.statusLabel ? <Badge label={item.statusLabel} tone="neutral" /> : null}
           </View>
           {item.timeLabel ? <Text style={styles.timeLabel}>{item.timeLabel}</Text> : null}
-          <Text style={styles.address}>{item.address}</Text>
+          {item.address ? <Text style={styles.address}>{item.address}</Text> : null}
         </View>
         <View
           accessibilityHint="핸들을 잡고 위아래로 끌어서 순서를 바꿔요."
@@ -1947,6 +2117,264 @@ function ReorderPlaceList({
       </View>
     );
   });
+}
+
+function NonPlaceScheduleItemPanel({
+  editorState,
+  onCancel,
+  onSubmit,
+  onUpdateValues,
+}: {
+  editorState: Extract<NonPlaceEditorState, { status: 'editing' | 'saving' }>;
+  onCancel: () => void;
+  onSubmit: () => void;
+  onUpdateValues: (values: NonPlaceScheduleItemFormValues) => void;
+}) {
+  const isSaving = editorState.status === 'saving';
+  const submitView = buildNonPlaceScheduleItemSubmitState(isSaving, editorState.mode);
+  const update = (patch: Partial<NonPlaceScheduleItemFormValues>) =>
+    onUpdateValues({ ...editorState.values, ...patch });
+
+  return (
+    <View style={styles.card}>
+      <Text style={styles.panelTitle}>
+        {editorState.mode === 'create' ? '장소 없는 일정 추가' : '장소 없는 일정 수정'}
+      </Text>
+      <View style={styles.fieldGroup}>
+        <Text style={styles.label}>분류</Text>
+        <View style={styles.chipList}>
+          {nonPlaceCategoryOptions.map((option) => {
+            const selected = editorState.values.category === option.value;
+            return (
+              <Pressable
+                accessibilityRole="button"
+                disabled={isSaving}
+                key={option.value}
+                onPress={() => update({ category: option.value })}
+                style={[styles.chip, selected ? styles.chipSelected : null]}
+              >
+                <Text style={[styles.chipText, selected ? styles.chipTextSelected : null]}>{option.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
+      <View style={styles.fieldGroup}>
+        <Text style={styles.label}>제목</Text>
+        <TextInput
+          editable={!isSaving}
+          onChangeText={(title) => update({ title })}
+          placeholder="예: 체크아웃, 공항 이동"
+          placeholderTextColor={theme.color.textFaint}
+          style={styles.input}
+          value={editorState.values.title}
+        />
+        {editorState.errors.title ? <Text style={styles.fieldError}>{editorState.errors.title}</Text> : null}
+      </View>
+
+      <View style={styles.fieldGroup}>
+        <Text style={styles.label}>시간</Text>
+        <View style={styles.timeFieldRow}>
+          <View style={styles.timeField}>
+            <TextInput
+              accessibilityLabel="시작 시간"
+              editable={!isSaving}
+              keyboardType="numbers-and-punctuation"
+              onChangeText={(startTime) => update({ startTime })}
+              placeholder="시작 HH:mm"
+              placeholderTextColor={theme.color.textFaint}
+              style={styles.input}
+              value={editorState.values.startTime}
+            />
+            {editorState.errors.startTime ? (
+              <Text style={styles.fieldError}>{editorState.errors.startTime}</Text>
+            ) : null}
+          </View>
+          <View style={styles.timeField}>
+            <TextInput
+              accessibilityLabel="종료 시간"
+              editable={!isSaving}
+              keyboardType="numbers-and-punctuation"
+              onChangeText={(endTime) => update({ endTime })}
+              placeholder="종료 HH:mm"
+              placeholderTextColor={theme.color.textFaint}
+              style={styles.input}
+              value={editorState.values.endTime}
+            />
+            {editorState.errors.endTime ? <Text style={styles.fieldError}>{editorState.errors.endTime}</Text> : null}
+          </View>
+        </View>
+        <Text style={styles.fieldHelper}>비워두면 순서만 있는 일정으로 저장돼요.</Text>
+      </View>
+
+      <View style={styles.fieldGroup}>
+        <Text style={styles.label}>메모</Text>
+        <TextInput
+          editable={!isSaving}
+          multiline
+          onChangeText={(memo) => update({ memo })}
+          placeholder="선택 입력"
+          placeholderTextColor={theme.color.textFaint}
+          style={[styles.input, styles.addressInput]}
+          textAlignVertical="top"
+          value={editorState.values.memo}
+        />
+        {editorState.errors.memo ? <Text style={styles.fieldError}>{editorState.errors.memo}</Text> : null}
+      </View>
+
+      <View style={styles.fieldGroup}>
+        <Text style={styles.label}>링크</Text>
+        <TextInput
+          autoCapitalize="none"
+          editable={!isSaving}
+          keyboardType="url"
+          onChangeText={(link) => update({ link })}
+          placeholder="https://..."
+          placeholderTextColor={theme.color.textFaint}
+          style={styles.input}
+          value={editorState.values.link}
+        />
+        {editorState.errors.link ? <Text style={styles.fieldError}>{editorState.errors.link}</Text> : null}
+      </View>
+
+      {editorState.values.category === 'transport' ? (
+        <>
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>이동 수단</Text>
+            <View style={styles.chipList}>
+              {nonPlaceTransportModeOptions.map((option) => {
+                const selected = editorState.values.transportMode === option.value;
+                return (
+                  <Pressable
+                    accessibilityRole="button"
+                    disabled={isSaving}
+                    key={option.value}
+                    onPress={() => update({ transportMode: option.value as NonPlaceTransportMode })}
+                    style={[styles.chip, selected ? styles.chipSelected : null]}
+                  >
+                    <Text style={[styles.chipText, selected ? styles.chipTextSelected : null]}>{option.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            {editorState.errors.transportMode ? (
+              <Text style={styles.fieldError}>{editorState.errors.transportMode}</Text>
+            ) : null}
+          </View>
+
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>출발/도착</Text>
+            <View style={styles.timeFieldRow}>
+              <View style={styles.timeField}>
+                <TextInput
+                  editable={!isSaving}
+                  onChangeText={(originText) => update({ originText })}
+                  placeholder="출발지"
+                  placeholderTextColor={theme.color.textFaint}
+                  style={styles.input}
+                  value={editorState.values.originText}
+                />
+                {editorState.errors.originText ? (
+                  <Text style={styles.fieldError}>{editorState.errors.originText}</Text>
+                ) : null}
+              </View>
+              <View style={styles.timeField}>
+                <TextInput
+                  editable={!isSaving}
+                  onChangeText={(destinationText) => update({ destinationText })}
+                  placeholder="도착지"
+                  placeholderTextColor={theme.color.textFaint}
+                  style={styles.input}
+                  value={editorState.values.destinationText}
+                />
+                {editorState.errors.destinationText ? (
+                  <Text style={styles.fieldError}>{editorState.errors.destinationText}</Text>
+                ) : null}
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>예약/탑승 정보</Text>
+            <TextInput
+              editable={!isSaving}
+              onChangeText={(referenceNumber) => update({ referenceNumber })}
+              placeholder="편명/열차번호"
+              placeholderTextColor={theme.color.textFaint}
+              style={styles.input}
+              value={editorState.values.referenceNumber}
+            />
+            {editorState.errors.referenceNumber ? (
+              <Text style={styles.fieldError}>{editorState.errors.referenceNumber}</Text>
+            ) : null}
+            <TextInput
+              editable={!isSaving}
+              onChangeText={(bookingReference) => update({ bookingReference })}
+              placeholder="예약번호"
+              placeholderTextColor={theme.color.textFaint}
+              style={styles.input}
+              value={editorState.values.bookingReference}
+            />
+            {editorState.errors.bookingReference ? (
+              <Text style={styles.fieldError}>{editorState.errors.bookingReference}</Text>
+            ) : null}
+            <View style={styles.timeFieldRow}>
+              <View style={styles.timeField}>
+                <TextInput
+                  editable={!isSaving}
+                  onChangeText={(terminalText) => update({ terminalText })}
+                  placeholder="터미널"
+                  placeholderTextColor={theme.color.textFaint}
+                  style={styles.input}
+                  value={editorState.values.terminalText}
+                />
+                {editorState.errors.terminalText ? (
+                  <Text style={styles.fieldError}>{editorState.errors.terminalText}</Text>
+                ) : null}
+              </View>
+              <View style={styles.timeField}>
+                <TextInput
+                  editable={!isSaving}
+                  onChangeText={(gateText) => update({ gateText })}
+                  placeholder="게이트"
+                  placeholderTextColor={theme.color.textFaint}
+                  style={styles.input}
+                  value={editorState.values.gateText}
+                />
+                {editorState.errors.gateText ? (
+                  <Text style={styles.fieldError}>{editorState.errors.gateText}</Text>
+                ) : null}
+              </View>
+            </View>
+          </View>
+        </>
+      ) : null}
+
+      {editorState.errors.form ? <Text style={styles.fieldError}>{editorState.errors.form}</Text> : null}
+      {editorState.error ? (
+        <View style={styles.errorBox}>
+          <Text style={styles.errorTitle}>{editorState.error.title}</Text>
+          <Text style={styles.message}>{editorState.error.helper}</Text>
+        </View>
+      ) : null}
+
+      <View style={styles.actionGroup}>
+        <Pressable
+          accessibilityRole="button"
+          disabled={submitView.disabled}
+          onPress={onSubmit}
+          style={[styles.button, submitView.disabled ? styles.buttonDisabled : null]}
+        >
+          {isSaving ? <ActivityIndicator color={theme.color.onPrimary} /> : null}
+          <Text style={styles.buttonText}>{submitView.label}</Text>
+        </Pressable>
+        <Pressable accessibilityRole="button" disabled={isSaving} onPress={onCancel} style={styles.secondaryButton}>
+          <Text style={styles.secondaryButtonText}>취소</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
 }
 
 function EditPlacePanel({

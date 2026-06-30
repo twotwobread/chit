@@ -1916,6 +1916,98 @@ func TestReorderScheduleItemsRollsBackWhenRebalanceRewriteFails(t *testing.T) {
 	}
 }
 
+func TestCreateNonPlaceScheduleItemPersistsDetailsAndSupportsStatusUpdate(t *testing.T) {
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("DATABASE_URL is required for storage integration test")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	store, err := Open(ctx, databaseURL)
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer store.Close()
+
+	var userID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO users (display_name)
+		VALUES ('장소 없는 일정 테스트')
+		RETURNING id::text
+	`).Scan(&userID); err != nil {
+		t.Fatalf("insert user: %v", err)
+	}
+	defer func() { _, _ = store.pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1::uuid`, userID) }()
+
+	var tripID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO trips (name, start_date, end_date, default_currency, created_by)
+		VALUES ('장소 없는 일정 테스트 여행', '2026-07-10', '2026-07-13', 'JPY', $1::uuid)
+		RETURNING id::text
+	`, userID).Scan(&tripID); err != nil {
+		t.Fatalf("insert trip: %v", err)
+	}
+	dayID := tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-11")
+
+	startTime := "08:00"
+	endTime := "09:30"
+	created, err := store.CreateNonPlaceScheduleItem(ctx, trip.CreateNonPlaceScheduleItemRecord{
+		TripID:    tripID,
+		TripDayID: dayID,
+		StartTime: &startTime,
+		EndTime:   &endTime,
+		Details: trip.NonPlaceScheduleItemDetails{
+			Category:        trip.NonPlaceCategoryTransport,
+			Title:           "공항 이동",
+			TransportMode:   stringPtr(trip.TransportModeBus),
+			ReferenceNumber: stringPtr("BUS-12"),
+			OriginText:      stringPtr("난바"),
+			DestinationText: stringPtr("간사이공항"),
+		},
+	})
+	if err != nil {
+		t.Fatalf("create non-place item: %v", err)
+	}
+	if created.ItemType != trip.ScheduleItemTypeNonPlace || created.Place.ID != "" || created.NonPlace == nil || created.NonPlace.Title != "공항 이동" || created.StartTime == nil || *created.StartTime != "08:00" || created.EndTime == nil || *created.EndTime != "09:30" {
+		t.Fatalf("unexpected created non-place item: %#v", created)
+	}
+
+	items, err := store.ListScheduleItemsByTripDay(ctx, tripID, dayID)
+	if err != nil {
+		t.Fatalf("list schedule items: %v", err)
+	}
+	if len(items) != 1 || items[0].ID != created.ID || items[0].ItemType != trip.ScheduleItemTypeNonPlace || items[0].NonPlace == nil || items[0].NonPlace.ReferenceNumber == nil || *items[0].NonPlace.ReferenceNumber != "BUS-12" {
+		t.Fatalf("expected listed non-place item details, got %#v", items)
+	}
+
+	updated, err := store.UpdateNonPlaceScheduleItem(ctx, trip.UpdateNonPlaceScheduleItemRecord{
+		TripID:    tripID,
+		TripDayID: dayID,
+		ItemID:    created.ID,
+		Details: trip.NonPlaceScheduleItemDetails{
+			Category: trip.NonPlaceCategoryMemo,
+			Title:    "공항 이동 메모",
+			Memo:     stringPtr("버스 취소"),
+		},
+	})
+	if err != nil {
+		t.Fatalf("update non-place item: %v", err)
+	}
+	if updated.NonPlace == nil || updated.NonPlace.Category != trip.NonPlaceCategoryMemo || updated.NonPlace.Memo == nil || *updated.NonPlace.Memo != "버스 취소" || updated.NonPlace.TransportMode != nil || updated.StartTime != nil || updated.EndTime != nil {
+		t.Fatalf("expected updated memo details with cleared transport/time fields, got %#v", updated)
+	}
+
+	arrived, err := store.MarkScheduleItemArrived(ctx, trip.MarkScheduleItemArrivedRecord{TripID: tripID, TripDayID: dayID, ItemID: created.ID})
+	if err != nil {
+		t.Fatalf("mark non-place arrived: %v", err)
+	}
+	if arrived.Item.ArrivedAt == nil || arrived.Item.ItemType != trip.ScheduleItemTypeNonPlace {
+		t.Fatalf("expected non-place item to participate in status transition, got %#v", arrived.Item)
+	}
+}
+
 func TestCreateManualScheduleItemRebalancesBeforeAppendWhenRankWouldExceedWidth(t *testing.T) {
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {

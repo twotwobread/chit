@@ -1,6 +1,13 @@
 import type { Href } from 'expo-router';
 
-import type { GetDayScheduleItemsResponse, ScheduleItem, TripPlaceSummary, TripPlaceType } from '@i-um/api-contract';
+import type {
+  GetDayScheduleItemsResponse,
+  NonPlaceScheduleItemCategory,
+  NonPlaceTransportMode,
+  ScheduleItem,
+  TripPlaceSummary,
+  TripPlaceType,
+} from '@i-um/api-contract';
 
 import { theme } from '../design/theme';
 import { formatTripDayDate } from './days';
@@ -10,14 +17,28 @@ export type DayItineraryRowViewModel = {
   version: number;
   orderLabel: string;
   isLodging?: boolean;
+  statusLabel?: string;
   startTime?: string | null;
   endTime?: string | null;
   timeLabel?: string;
+  itemType?: 'place' | 'non_place';
   placeId?: string;
   placeName: string;
   placeType: TripPlaceType;
   placeTypeLabel: string;
   address: string;
+  nonPlaceCategory?: NonPlaceScheduleItemCategory;
+  nonPlaceCategoryLabel?: string;
+  nonPlaceDetailLabel?: string;
+  nonPlaceMemo?: string;
+  nonPlaceLink?: string;
+  transportMode?: NonPlaceTransportMode;
+  referenceNumber?: string;
+  bookingReference?: string;
+  originText?: string;
+  destinationText?: string;
+  terminalText?: string;
+  gateText?: string;
 };
 
 export type DayItineraryViewModel =
@@ -80,20 +101,7 @@ export function buildDayItineraryViewModel(response: GetDayScheduleItemsResponse
     lodgingPlace: response.day.lodgingPlace,
     items: [...scheduleItems]
       .sort((left, right) => left.itemOrder - right.itemOrder)
-      .map((item) => ({
-        id: item.id,
-        version: item.version,
-        orderLabel: String(item.itemOrder),
-        isLodging: item.isLodging,
-        startTime: item.startTime,
-        endTime: item.endTime,
-        timeLabel: formatScheduleItemTimeLabel(item.startTime, item.endTime),
-        placeId: item.place.id,
-        placeName: item.place.name,
-        placeType: item.place.placeType,
-        placeTypeLabel: getPlaceTypeLabel(item.place.placeType),
-        address: item.place.address,
-      })),
+      .map(scheduleItemToDayItineraryRow),
   };
 }
 
@@ -103,7 +111,142 @@ export function getScheduleItems(response: GetDayScheduleItemsResponse): Schedul
 
 export function buildDayItineraryPlaceAccessibilityLabel(item: DayItineraryRowViewModel): string {
   const timeText = item.timeLabel ? `${item.timeLabel}. ` : '';
+  if (item.itemType === 'non_place') {
+    const detail = item.nonPlaceDetailLabel ? `. ${item.nonPlaceDetailLabel}` : '';
+    return `${item.orderLabel}번째 일정 ${timeText}${item.placeName}. ${item.placeTypeLabel}${detail}`;
+  }
   return `${item.orderLabel}번째 장소 ${timeText}${item.placeName}. ${item.placeTypeLabel}. ${item.address}`;
+}
+
+export function getNonPlaceCategoryLabel(category: NonPlaceScheduleItemCategory): string {
+  switch (category) {
+    case 'transport':
+      return '이동';
+    case 'rest':
+      return '휴식';
+    case 'memo':
+      return '메모';
+    case 'reminder':
+      return '알림';
+  }
+}
+
+export function getTransportModeLabel(mode: NonPlaceTransportMode): string {
+  switch (mode) {
+    case 'flight':
+      return '비행기';
+    case 'train':
+      return '기차';
+    case 'bus':
+      return '버스';
+    case 'ferry':
+      return '페리';
+    case 'other':
+      return '기타';
+  }
+}
+
+export function buildNonPlaceDetailLabel(item: ScheduleItem): string | undefined {
+  const details = item.nonPlace;
+  if (!details) {
+    return undefined;
+  }
+  if (details.category === 'transport') {
+    const parts: string[] = [];
+    if (details.transportMode) {
+      parts.push(getTransportModeLabel(details.transportMode));
+    }
+    const route = [details.originText, details.destinationText].filter(Boolean).join(' → ');
+    if (route) {
+      parts.push(route);
+    }
+    const meta = [details.referenceNumber, details.terminalText, details.gateText].filter(Boolean).join(' · ');
+    if (meta) {
+      parts.push(meta);
+    }
+    return parts.length > 0 ? parts.join(' · ') : undefined;
+  }
+  return details.memo ?? undefined;
+}
+
+function buildScheduleItemStatusLabel(item: ScheduleItem): string | undefined {
+  if (item.arrivedAt) {
+    return '완료';
+  }
+  if (item.skippedAt) {
+    return '건너뜀';
+  }
+  return undefined;
+}
+
+function scheduleItemToDayItineraryRow(item: ScheduleItem): DayItineraryRowViewModel {
+  if (item.itemType === 'non_place' && item.nonPlace) {
+    const categoryLabel = getNonPlaceCategoryLabel(item.nonPlace.category);
+    const statusLabel = buildScheduleItemStatusLabel(item);
+    return {
+      id: item.id,
+      version: item.version,
+      orderLabel: String(item.itemOrder),
+      itemType: 'non_place',
+      isLodging: false,
+      ...(statusLabel ? { statusLabel } : {}),
+      startTime: item.startTime,
+      endTime: item.endTime,
+      timeLabel: formatScheduleItemTimeLabel(item.startTime, item.endTime),
+      placeName: item.nonPlace.title,
+      placeType: 'etc',
+      placeTypeLabel: categoryLabel,
+      address: buildNonPlaceDetailLabel(item) ?? '',
+      nonPlaceCategory: item.nonPlace.category,
+      nonPlaceCategoryLabel: categoryLabel,
+      nonPlaceDetailLabel: buildNonPlaceDetailLabel(item),
+      ...(item.nonPlace.memo ? { nonPlaceMemo: item.nonPlace.memo } : {}),
+      ...(item.nonPlace.link ? { nonPlaceLink: item.nonPlace.link } : {}),
+      ...(item.nonPlace.transportMode ? { transportMode: item.nonPlace.transportMode } : {}),
+      ...(item.nonPlace.referenceNumber ? { referenceNumber: item.nonPlace.referenceNumber } : {}),
+      ...(item.nonPlace.bookingReference ? { bookingReference: item.nonPlace.bookingReference } : {}),
+      ...(item.nonPlace.originText ? { originText: item.nonPlace.originText } : {}),
+      ...(item.nonPlace.destinationText ? { destinationText: item.nonPlace.destinationText } : {}),
+      ...(item.nonPlace.terminalText ? { terminalText: item.nonPlace.terminalText } : {}),
+      ...(item.nonPlace.gateText ? { gateText: item.nonPlace.gateText } : {}),
+    };
+  }
+
+  if (!item.place) {
+    const statusLabel = buildScheduleItemStatusLabel(item);
+    return {
+      id: item.id,
+      version: item.version,
+      orderLabel: String(item.itemOrder),
+      itemType: 'non_place',
+      isLodging: false,
+      ...(statusLabel ? { statusLabel } : {}),
+      startTime: item.startTime,
+      endTime: item.endTime,
+      timeLabel: formatScheduleItemTimeLabel(item.startTime, item.endTime),
+      placeName: '장소 없는 일정',
+      placeType: 'etc',
+      placeTypeLabel: '일정',
+      address: '',
+    };
+  }
+
+  const statusLabel = buildScheduleItemStatusLabel(item);
+  return {
+    id: item.id,
+    version: item.version,
+    orderLabel: String(item.itemOrder),
+    isLodging: item.isLodging,
+    ...(statusLabel ? { statusLabel } : {}),
+    startTime: item.startTime,
+    endTime: item.endTime,
+    timeLabel: formatScheduleItemTimeLabel(item.startTime, item.endTime),
+    placeId: item.place.id,
+    placeName: item.place.name,
+    placeType: item.place.placeType,
+    placeTypeLabel: getPlaceTypeLabel(item.place.placeType),
+    address: item.place.address,
+  };
 }
 
 export function formatScheduleItemTimeLabel(startTime?: string | null, endTime?: string | null): string | undefined {

@@ -18,6 +18,7 @@ export const DAY_ITINERARY_SHARED_UPDATE_RELOAD_CONFIRMATION = {
 
 export type DayItinerarySharedUpdateLocalState = {
   reorderStatus: 'idle' | 'editing' | 'saving';
+  createStatus: 'idle' | 'editing' | 'saving';
   editStatus: 'idle' | 'editing' | 'saving';
   deleteStatus: 'idle' | 'confirming' | 'deleting';
   lodgingStatus: 'idle' | 'setting' | 'clearing' | 'error';
@@ -59,10 +60,22 @@ export function buildDayItinerarySharedUpdateSignature(response: GetDayScheduleI
         isLodging: item.isLodging,
         startTime: item.startTime,
         endTime: item.endTime,
-        placeId: item.place.id,
-        placeName: item.place.name,
-        placeType: item.place.placeType,
-        address: item.place.address,
+        itemType: item.itemType,
+        placeId: item.place?.id ?? null,
+        placeName: item.place?.name ?? null,
+        placeType: item.place?.placeType ?? null,
+        address: item.place?.address ?? null,
+        nonPlaceCategory: item.nonPlace?.category ?? null,
+        nonPlaceTitle: item.nonPlace?.title ?? null,
+        nonPlaceMemo: item.nonPlace?.memo ?? null,
+        nonPlaceLink: item.nonPlace?.link ?? null,
+        transportMode: item.nonPlace?.transportMode ?? null,
+        referenceNumber: item.nonPlace?.referenceNumber ?? null,
+        bookingReference: item.nonPlace?.bookingReference ?? null,
+        originText: item.nonPlace?.originText ?? null,
+        destinationText: item.nonPlace?.destinationText ?? null,
+        terminalText: item.nonPlace?.terminalText ?? null,
+        gateText: item.nonPlace?.gateText ?? null,
       })),
   });
 }
@@ -80,6 +93,8 @@ export function isDayItinerarySharedUpdateProtected(localState: DayItineraryShar
   return (
     localState.reorderStatus === 'editing' ||
     localState.reorderStatus === 'saving' ||
+    localState.createStatus === 'editing' ||
+    localState.createStatus === 'saving' ||
     localState.editStatus === 'editing' ||
     localState.editStatus === 'saving' ||
     localState.deleteStatus === 'confirming' ||
@@ -93,6 +108,7 @@ export function isDayItinerarySharedUpdateProtected(localState: DayItineraryShar
 export function isDayItinerarySharedUpdateReloadDisabled(localState: DayItinerarySharedUpdateLocalState): boolean {
   return (
     localState.reorderStatus === 'saving' ||
+    localState.createStatus === 'saving' ||
     localState.editStatus === 'saving' ||
     localState.deleteStatus === 'deleting' ||
     localState.lodgingStatus === 'setting' ||

@@ -229,6 +229,14 @@ function noPlaceOption(selectedItemId: string | null): ExpenseEditPlaceOption {
 }
 
 function placeOption(item: ScheduleItem, selectedItemId: string | null): ExpenseEditPlaceOption {
+  if (!item.place) {
+    return {
+      itemId: item.id,
+      label: '장소 없는 일정',
+      detail: '장소 연결 없이 일정에만 연결돼요.',
+      selected: item.id === selectedItemId,
+    };
+  }
   return {
     itemId: item.id,
     label: item.place.name,
@@ -238,7 +246,7 @@ function placeOption(item: ScheduleItem, selectedItemId: string | null): Expense
 }
 
 function orderedItems(items: ScheduleItem[]): ScheduleItem[] {
-  return [...items].sort((left, right) => left.itemOrder - right.itemOrder);
+  return [...items].filter((item) => item.place !== null).sort((left, right) => left.itemOrder - right.itemOrder);
 }
 
 function currencyLabel(currency: SupportedCurrency): string {

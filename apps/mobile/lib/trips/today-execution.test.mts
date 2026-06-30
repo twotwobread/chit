@@ -363,6 +363,73 @@ test('maps the first ordered itinerary item to the next place without exposing s
   assert.equal(JSON.stringify(viewModel).includes('오사카성'), false);
 });
 
+test('keeps a current non-place item as the Today target without navigation or inferred quick-expense item', () => {
+  const viewModel = buildTodayExecutionViewModel({
+    selectedTrip: trip({ id: 'trip-current' }),
+    tripDetail: tripDetail(),
+    itinerary: itinerary({
+      items: [
+        item({
+          id: 'item-transport',
+          itemType: 'non_place',
+          itemOrder: 1,
+          place: null,
+          nonPlace: {
+            category: 'transport',
+            title: '공항 이동',
+            memo: null,
+            link: null,
+            transportMode: 'bus',
+            referenceNumber: 'BUS-12',
+            bookingReference: null,
+            originText: '난바',
+            destinationText: '간사이공항',
+            terminalText: null,
+            gateText: null,
+          },
+        } as ScheduleItem),
+        item({ id: 'item-place-later', itemOrder: 2 }),
+        item({
+          id: 'item-skipped-rest',
+          itemType: 'non_place',
+          itemOrder: 3,
+          place: null,
+          skippedAt: '2026-07-10T09:00:00Z',
+          nonPlace: {
+            category: 'rest',
+            title: '휴식',
+            memo: '카페에서 쉬기',
+            link: null,
+            transportMode: null,
+            referenceNumber: null,
+            bookingReference: null,
+            originText: null,
+            destinationText: null,
+            terminalText: null,
+            gateText: null,
+          },
+        } as ScheduleItem),
+      ],
+    }),
+    today: '2026-07-10',
+    ongoingTripCount: 1,
+  });
+
+  assert.equal(viewModel.status, 'success');
+  if (viewModel.status !== 'success') {
+    return;
+  }
+  assert.equal(viewModel.nextPlace.itemId, 'item-transport');
+  assert.equal(viewModel.nextPlace.placeName, '공항 이동');
+  assert.equal(viewModel.nextPlace.placeTypeLabel, '이동');
+  assert.equal(viewModel.nextPlace.address, '버스 · 난바 → 간사이공항 · BUS-12');
+  assert.equal(viewModel.nextPlace.navigationAction.label, '');
+  assert.equal(viewModel.arrivalAction.label, '완료');
+  assert.equal(viewModel.quickExpenseAction.route, '/trips/trip-current/days/2026-07-10/expenses/quick');
+  assert.equal(viewModel.skippedSection?.items[0]?.placeName, '휴식');
+  assert.equal(viewModel.skippedSection?.items[0]?.placeTypeLabel, '휴식');
+});
+
 test('threads the selected travel mode into Today navigation and selector state', () => {
   const viewModel = buildTodayExecutionViewModel({
     selectedTrip: trip({ id: 'trip-current' }),

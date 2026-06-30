@@ -2,11 +2,14 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
+import type { NonPlaceScheduleItemDetails } from './NonPlaceScheduleItemDetails';
+import type { ScheduleItemType } from './ScheduleItemType';
 import type { TripPlaceSummary } from './TripPlaceSummary';
 export type ScheduleItem = {
     id: string;
     itemOrder: number;
     version: number;
+    itemType: ScheduleItemType;
     isLodging: boolean;
     /**
      * Optional local start time in HH:mm. Null means order-only/untimed.
@@ -24,5 +27,6 @@ export type ScheduleItem = {
      * Server-generated skip timestamp for this schedule item instance. Null means the item is not currently skipped.
      */
     skippedAt: string | null;
-    place: TripPlaceSummary;
+    place: TripPlaceSummary | null;
+    nonPlace: NonPlaceScheduleItemDetails | null;
 };

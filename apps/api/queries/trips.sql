@@ -436,8 +436,20 @@ SELECT
   si.end_time,
   si.arrived_at,
   si.skipped_at,
+  si.item_kind,
+  si.non_place_category,
+  si.non_place_title,
+  si.non_place_memo,
+  si.non_place_link,
+  si.transport_mode,
+  si.transport_reference_number,
+  si.transport_booking_reference,
+  si.transport_origin_text,
+  si.transport_destination_text,
+  si.transport_terminal_text,
+  si.transport_gate_text,
   COALESCE(td.lodging_trip_place_id = si.trip_place_id, false) AS is_lodging,
-  tp.id::text AS trip_place_id,
+  COALESCE(tp.id::text, '')::text AS trip_place_id,
   tp.name AS place_name,
   tp.place_type,
   tp.address,
@@ -450,7 +462,7 @@ JOIN trip_days td
   ON td.id = si.trip_day_id
  AND td.trip_id = si.trip_id
  AND td.deleted_at IS NULL
-JOIN trip_places tp
+LEFT JOIN trip_places tp
   ON tp.id = si.trip_place_id
  AND tp.trip_id = si.trip_id
 WHERE si.trip_id = sqlc.arg(trip_id)::uuid
@@ -467,8 +479,20 @@ SELECT
   si.end_time,
   si.arrived_at,
   si.skipped_at,
+  si.item_kind,
+  si.non_place_category,
+  si.non_place_title,
+  si.non_place_memo,
+  si.non_place_link,
+  si.transport_mode,
+  si.transport_reference_number,
+  si.transport_booking_reference,
+  si.transport_origin_text,
+  si.transport_destination_text,
+  si.transport_terminal_text,
+  si.transport_gate_text,
   COALESCE(td.lodging_trip_place_id = si.trip_place_id, false) AS is_lodging,
-  tp.id::text AS trip_place_id,
+  COALESCE(tp.id::text, '')::text AS trip_place_id,
   tp.name AS place_name,
   tp.place_type,
   tp.address,
@@ -481,7 +505,7 @@ JOIN trip_days td
   ON td.id = si.trip_day_id
  AND td.trip_id = si.trip_id
  AND td.deleted_at IS NULL
-JOIN trip_places tp
+LEFT JOIN trip_places tp
   ON tp.id = si.trip_place_id
  AND tp.trip_id = si.trip_id
 WHERE si.trip_id = sqlc.arg(trip_id)::uuid
@@ -510,6 +534,7 @@ WITH target AS (
   WHERE si.trip_id = sqlc.arg(trip_id)::uuid
     AND si.trip_day_id = sqlc.arg(trip_day_id)::uuid
     AND si.id = sqlc.arg(schedule_item_id)::uuid
+    AND si.item_kind = 'place'
     AND si.deleted_at IS NULL
 ), updated_item AS (
   UPDATE schedule_items si
@@ -585,7 +610,7 @@ WITH target AS (
     tp.address AS place_address,
     tp.place_type
   FROM schedule_items si
-  JOIN trip_places tp
+  LEFT JOIN trip_places tp
     ON tp.id = si.trip_place_id
    AND tp.trip_id = si.trip_id
   WHERE si.trip_id = sqlc.arg(trip_id)::uuid
@@ -604,6 +629,7 @@ WITH target AS (
     AND e.trip_day_id = target.trip_day_id
     AND e.schedule_item_id = target.id
     AND e.anchor_type = 'schedule_item'
+    AND target.trip_place_id IS NOT NULL
   RETURNING e.id
 ), deleted_item AS (
   UPDATE schedule_items si
@@ -613,7 +639,7 @@ WITH target AS (
   WHERE si.trip_id = target.trip_id
     AND si.trip_day_id = target.trip_day_id
     AND si.id = target.id
-  RETURNING target.trip_place_id::text AS trip_place_id
+  RETURNING COALESCE(target.trip_place_id::text, '') AS trip_place_id
 )
 SELECT trip_place_id
 FROM deleted_item;

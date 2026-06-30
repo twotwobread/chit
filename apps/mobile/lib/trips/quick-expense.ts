@@ -476,6 +476,16 @@ export function quickExpenseFailureMessage(status?: number): string {
 }
 
 function toItemOption(item: ScheduleItem, selectedItemId: string | null): QuickExpenseItemOption {
+  if (!item.place) {
+    return {
+      itemId: item.id,
+      orderLabel: String(item.itemOrder),
+      placeName: '장소 없는 일정',
+      placeTypeLabel: '일정',
+      address: '',
+      selected: item.id === selectedItemId,
+    };
+  }
   return {
     itemId: item.id,
     orderLabel: String(item.itemOrder),
@@ -487,7 +497,7 @@ function toItemOption(item: ScheduleItem, selectedItemId: string | null): QuickE
 }
 
 function orderedItems(items: ScheduleItem[]): ScheduleItem[] {
-  return [...items].sort((left, right) => left.itemOrder - right.itemOrder);
+  return [...items].filter((item) => item.place !== null).sort((left, right) => left.itemOrder - right.itemOrder);
 }
 
 function parseManualSplitAmountInput(

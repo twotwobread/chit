@@ -44,17 +44,17 @@ export function buildRouteMapPlaces(items: ScheduleItem[]): RouteMapPlace[] {
     .slice()
     .sort((left, right) => left.itemOrder - right.itemOrder)
     .filter((item) => {
-      const coordinates = item.place.routablePlace;
+      const coordinates = item.place?.routablePlace;
       return coordinates && Number.isFinite(coordinates.latitude) && Number.isFinite(coordinates.longitude);
     })
     .map((item) => ({
       id: item.id,
-      latitude: item.place.routablePlace?.latitude,
-      longitude: item.place.routablePlace?.longitude,
-      name: item.place.name,
+      latitude: item.place?.routablePlace?.latitude,
+      longitude: item.place?.routablePlace?.longitude,
+      name: item.place?.name ?? '장소 없는 일정',
       order: item.itemOrder,
       status: mapScheduleItemStatus(item),
-      type: item.place.placeType,
+      type: item.place?.placeType ?? 'etc',
     }));
 }
 

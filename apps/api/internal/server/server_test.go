@@ -2154,6 +2154,86 @@ func TestCreateManualScheduleItemRequiresAuth(t *testing.T) {
 	}
 }
 
+func TestCreateNonPlaceScheduleItemHandler(t *testing.T) {
+	backend := newFakeAuthBackend()
+	accessToken := loginTestUser(t, backend)
+	tripID := createTestTrip(t, backend, accessToken)
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/days/2026-07-11/schedule-items/non-place", bytes.NewReader([]byte(`{
+		"category":"transport",
+		"title":"공항 이동",
+		"startTime":"08:00",
+		"endTime":"09:30",
+		"transportMode":"bus",
+		"referenceNumber":"BUS-12",
+		"originText":"난바",
+		"destinationText":"간사이공항"
+	}`)))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", "Bearer "+accessToken)
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusCreated, recorder.Code, recorder.Body.String())
+	}
+	var body struct {
+		ScheduleItem struct {
+			ID       string          `json:"id"`
+			ItemType string          `json:"itemType"`
+			Place    json.RawMessage `json:"place"`
+			NonPlace struct {
+				Category        string `json:"category"`
+				Title           string `json:"title"`
+				TransportMode   string `json:"transportMode"`
+				ReferenceNumber string `json:"referenceNumber"`
+				OriginText      string `json:"originText"`
+				DestinationText string `json:"destinationText"`
+			} `json:"nonPlace"`
+			StartTime string `json:"startTime"`
+			EndTime   string `json:"endTime"`
+		} `json:"scheduleItem"`
+	}
+	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.ScheduleItem.ID == "" || body.ScheduleItem.ItemType != "non_place" || string(body.ScheduleItem.Place) != "null" || body.ScheduleItem.NonPlace.Category != "transport" || body.ScheduleItem.NonPlace.Title != "공항 이동" || body.ScheduleItem.NonPlace.TransportMode != "bus" || body.ScheduleItem.NonPlace.ReferenceNumber != "BUS-12" || body.ScheduleItem.NonPlace.OriginText != "난바" || body.ScheduleItem.NonPlace.DestinationText != "간사이공항" || body.ScheduleItem.StartTime != "08:00" || body.ScheduleItem.EndTime != "09:30" {
+		t.Fatalf("unexpected response body: %#v place=%s", body, string(body.ScheduleItem.Place))
+	}
+}
+
+func TestCreateNonPlaceScheduleItemValidation(t *testing.T) {
+	backend := newFakeAuthBackend()
+	accessToken := loginTestUser(t, backend)
+	tripID := createTestTrip(t, backend, accessToken)
+
+	tests := []struct {
+		name string
+		body string
+	}{
+		{name: "blank title", body: `{"category":"memo","title":" "}`},
+		{name: "transport missing mode", body: `{"category":"transport","title":"공항 이동"}`},
+		{name: "non transport rejects transport fields", body: `{"category":"memo","title":"메모","transportMode":"bus"}`},
+		{name: "unknown field", body: `{"category":"memo","title":"메모","placeId":"x"}`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			request := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/days/2026-07-11/schedule-items/non-place", bytes.NewReader([]byte(tt.body)))
+			request.Header.Set("Content-Type", "application/json")
+			request.Header.Set("Authorization", "Bearer "+accessToken)
+
+			NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+			if recorder.Code != http.StatusBadRequest {
+				t.Fatalf("expected status %d, got %d with body %s", http.StatusBadRequest, recorder.Code, recorder.Body.String())
+			}
+		})
+	}
+}
+
 func TestListDayExpensesHandler(t *testing.T) {
 	backend := newFakeAuthBackend()
 	ownerToken := loginTestUser(t, backend)
@@ -5047,11 +5127,28 @@ func (b *fakeAuthBackend) CreateManualScheduleItem(_ context.Context, record tri
 		ID:        testUUID(5000 + b.nextScheduleItem),
 		ItemOrder: len(b.dayScheduleItems[key]) + 1,
 		Version:   1,
+		ItemType:  tripdomain.ScheduleItemTypePlace,
 		Place:     place,
 	}
 	b.tripPlaces[record.TripID+":"+place.ID] = place
 	b.dayScheduleItems[key] = append(b.dayScheduleItems[key], item)
 	b.markDayScheduleLodging(record.TripID, record.TripDayID)
+	return item, nil
+}
+
+func (b *fakeAuthBackend) CreateNonPlaceScheduleItem(_ context.Context, record tripdomain.CreateNonPlaceScheduleItemRecord) (tripdomain.ScheduleItem, error) {
+	b.nextScheduleItem++
+	key := record.TripID + ":" + record.TripDayID
+	item := tripdomain.ScheduleItem{
+		ID:        testUUID(5000 + b.nextScheduleItem),
+		ItemOrder: len(b.dayScheduleItems[key]) + 1,
+		Version:   1,
+		ItemType:  tripdomain.ScheduleItemTypeNonPlace,
+		StartTime: record.StartTime,
+		EndTime:   record.EndTime,
+		NonPlace:  &record.Details,
+	}
+	b.dayScheduleItems[key] = append(b.dayScheduleItems[key], item)
 	return item, nil
 }
 
@@ -5073,6 +5170,7 @@ func (b *fakeAuthBackend) AppendGooglePlaceScheduleItem(_ context.Context, recor
 		ID:        testUUID(5000 + b.nextScheduleItem),
 		ItemOrder: len(b.dayScheduleItems[key]) + 1,
 		Version:   1,
+		ItemType:  tripdomain.ScheduleItemTypePlace,
 		Place:     place,
 	}
 	b.dayScheduleItems[key] = append(b.dayScheduleItems[key], item)
@@ -5276,6 +5374,22 @@ func (b *fakeAuthBackend) UpdateScheduleItemPlace(_ context.Context, record trip
 		b.dayScheduleItems[key] = items
 	}
 	return updated, nil
+}
+
+func (b *fakeAuthBackend) UpdateNonPlaceScheduleItem(_ context.Context, record tripdomain.UpdateNonPlaceScheduleItemRecord) (tripdomain.ScheduleItem, error) {
+	key := record.TripID + ":" + record.TripDayID
+	items := b.dayScheduleItems[key]
+	for index, item := range items {
+		if item.ID == record.ItemID && item.ItemType == tripdomain.ScheduleItemTypeNonPlace {
+			item.StartTime = record.StartTime
+			item.EndTime = record.EndTime
+			item.NonPlace = &record.Details
+			items[index] = item
+			b.dayScheduleItems[key] = items
+			return item, nil
+		}
+	}
+	return tripdomain.ScheduleItem{}, tripdomain.ErrNotFound
 }
 
 func (b *fakeAuthBackend) DeleteScheduleItem(_ context.Context, tripID string, date string, itemID string) (bool, error) {

@@ -90,6 +90,80 @@ describe('day itinerary helpers', () => {
     });
   });
 
+  it('formats non-place rows with category and compact transport details', () => {
+    const response: GetDayScheduleItemsResponse = {
+      day: { date: '2026-07-10', dayOrder: 1, lodgingPlace: null },
+      items: [
+        {
+          id: 'item-transport',
+          itemOrder: 1,
+          version: 4,
+          itemType: 'non_place',
+          isLodging: false,
+          startTime: '08:00',
+          endTime: '09:30',
+          arrivedAt: null,
+          skippedAt: null,
+          place: null,
+          nonPlace: {
+            category: 'transport',
+            title: '공항 이동',
+            memo: null,
+            link: null,
+            transportMode: 'bus',
+            referenceNumber: 'BUS-12',
+            bookingReference: null,
+            originText: '난바',
+            destinationText: '간사이공항',
+            terminalText: 'T1',
+            gateText: '4',
+          },
+        },
+      ],
+    };
+
+    const viewModel = buildDayItineraryViewModel(response);
+
+    assert.deepEqual(viewModel, {
+      status: 'success',
+      dayLabel: 'Day 1',
+      formattedDate: '2026.07.10',
+      lodgingPlace: null,
+      items: [
+        {
+          id: 'item-transport',
+          version: 4,
+          orderLabel: '1',
+          itemType: 'non_place',
+          isLodging: false,
+          startTime: '08:00',
+          endTime: '09:30',
+          timeLabel: '08:00–09:30',
+          placeName: '공항 이동',
+          placeType: 'etc',
+          placeTypeLabel: '이동',
+          address: '버스 · 난바 → 간사이공항 · BUS-12 · T1 · 4',
+          nonPlaceCategory: 'transport',
+          nonPlaceCategoryLabel: '이동',
+          nonPlaceDetailLabel: '버스 · 난바 → 간사이공항 · BUS-12 · T1 · 4',
+          transportMode: 'bus',
+          referenceNumber: 'BUS-12',
+          originText: '난바',
+          destinationText: '간사이공항',
+          terminalText: 'T1',
+          gateText: '4',
+        },
+      ],
+    });
+    if (viewModel.status !== 'success') {
+      assert.fail('expected success view model');
+    }
+    assert.equal(
+      buildDayItineraryPlaceAccessibilityLabel(viewModel.items[0]),
+      '1번째 일정 08:00–09:30. 공항 이동. 이동. 버스 · 난바 → 간사이공항 · BUS-12 · T1 · 4',
+    );
+  });
+
   it('returns empty state for an in-range day with no items', () => {
     const response: GetDayScheduleItemsResponse = {
       day: { date: '2026-07-10', dayOrder: 1, lodgingPlace: null },
