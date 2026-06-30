@@ -47,7 +47,10 @@ import {
   buildTodayRoutePreviewHeroChip,
   routePreviewEligibility,
   todayRoutePreviewHeroChipFallbackCopy,
+  todayRoutePreviewPermissionNeededState,
   todayRoutePreviewSuccessState,
+  todayRoutePreviewUnavailableState,
+  todayRoutePreviewUnsupportedState,
 } from '../../../../lib/trips/today-route-preview';
 import {
   applyTravelModeToTodayViewModel,
@@ -175,7 +178,7 @@ export default function TripTodayTabScreen() {
       routablePlace: successViewModel.nextPlace.routablePlace,
     };
     if (routePreviewEligibility(destination) === 'unsupported' || !destination.routablePlace) {
-      setRouteChip(todayRoutePreviewHeroChipFallbackCopy);
+      setRouteChip(buildTodayRoutePreviewHeroChip(todayRoutePreviewUnsupportedState()));
       return;
     }
 
@@ -184,6 +187,9 @@ export default function TripTodayTabScreen() {
       try {
         const permission = await Location.requestForegroundPermissionsAsync();
         if (permission.status !== Location.PermissionStatus.GRANTED) {
+          if (!cancelled) {
+            setRouteChip(buildTodayRoutePreviewHeroChip(todayRoutePreviewPermissionNeededState()));
+          }
           return;
         }
         const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
@@ -201,7 +207,7 @@ export default function TripTodayTabScreen() {
         }
       } catch {
         if (!cancelled) {
-          setRouteChip(todayRoutePreviewHeroChipFallbackCopy);
+          setRouteChip(buildTodayRoutePreviewHeroChip(todayRoutePreviewUnavailableState()));
         }
       }
     };

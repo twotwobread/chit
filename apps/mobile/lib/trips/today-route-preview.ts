@@ -90,6 +90,9 @@ export function todayRoutePreviewSuccessState(response: RoutePreviewResponse): T
 }
 
 export function buildTodayRoutePreviewHeroChip(state: TodayRoutePreviewState): string {
+  if (state.status === 'permissionNeeded' || state.status === 'unsupported' || state.status === 'unavailable') {
+    return state.title;
+  }
   if (state.status !== 'success') {
     return todayRoutePreviewHeroChipFallbackCopy;
   }
