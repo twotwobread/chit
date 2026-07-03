@@ -1,0 +1,11 @@
+id: lint
+type: command
+severity: blocking
+command: pnpm lint
+applies_to:
+  contracts:
+    - implementation.execute
+    - evaluation.checklist
+    - pr.create
+evidence:
+  write_to: artifacts/checks/lint.log

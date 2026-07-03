@@ -20,10 +20,10 @@ Ouroboros clarification/interview/seed generation.
 
 Run the Ouroboros clarification loop until ambiguity is low enough to produce an implementation-ready Seed/spec, or stop and ask for human product decisions.
 
-Provider-private outputs such as transcripts, sessions, and seeds may be referenced in the canonical spec, but downstream phases must consume `.harness/runs/<run-id>/feature.spec.yaml`.
+Provider-private outputs such as transcripts, sessions, and seeds may be referenced in the canonical spec, but downstream phases must consume `.harness/runs/<run-id>/artifacts/feature.spec.md`.
 
 ## Output requirements
 
-- Write `feature.spec.yaml`.
+- Write `feature.spec.md`.
 - Record interview/session/seed identifiers in `provider.evidence`.
 - Record unresolved ambiguity in `open_questions` instead of guessing.

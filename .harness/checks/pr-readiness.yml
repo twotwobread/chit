@@ -1,0 +1,9 @@
+id: pr-readiness
+type: human
+severity: blocking
+applies_to:
+  contracts:
+    - pr.create
+    - pr.lifecycle
+evidence:
+  write_to: artifacts/checks/pr-readiness.md

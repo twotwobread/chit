@@ -1,0 +1,127 @@
+id: default
+version: 1
+
+classification_axes:
+  type: [feature, bugfix, refactor, docs, deploy, investigation]
+  route:
+    - pending
+    - ready_for_implementation
+    - ready_for_lightweight_investigation
+    - needs_clarification
+    - needs_investigation
+    - needs_product_direction
+    - blocked
+  size: [unknown, small, normal, large, epic]
+  ambiguity: [unknown, low, medium, high]
+  risk: [unknown, low, medium, high, critical]
+  testability: [unknown, low, medium, high]
+  architecture_impact: [unknown, local, cross-module, cross-service]
+  domain_sensitivity: [none, auth, privacy, billing, audit-log, security, data-migration]
+  product_direction_unclear: [true, false]
+  implementation_requires_exploration: [true, false]
+  user_approved_skip_spec_review: [true, false]
+
+routing:
+  principles:
+    - Triage does not finalize size when the request is too vague.
+    - Labels are evidence, not authority.
+    - Missing scope routes to clarification, not implementation.
+    - Clear expected behavior with unknown cause routes to technical investigation.
+    - Unresolved product/domain/UX decisions block implementation.
+  routes:
+    ready_for_lightweight_investigation:
+      when: "type == 'bugfix' and ambiguity in ['low', 'medium'] and risk in ['low', 'medium'] and product_direction_unclear == false"
+      next_phase: investigation.localize
+    ready_for_implementation:
+      when: "ambiguity == 'low' and risk in ['low', 'medium'] and product_direction_unclear == false"
+      next_phase: implementation.execute
+    needs_clarification:
+      when: "ambiguity == 'high' or size == 'unknown' or testability == 'unknown'"
+      next_phase: spec.author
+    needs_product_direction:
+      when: "product_direction_unclear == true"
+      next_phase: spec.author
+
+tiers:
+  lightweight:
+    when: "size == 'small' and risk == 'low' and ambiguity == 'low' and product_direction_unclear == false"
+    description: Minimal run for clear, local, low-risk work.
+    required_artifacts:
+      - run.yaml
+      - artifacts/user-request.md
+      - artifacts/classification.yaml
+      - artifacts/ledger.md
+      - artifacts/verification.md
+    checks:
+      - adapter-sync
+  normal:
+    when: "size == 'normal' and risk in ['low', 'medium'] and ambiguity in ['low', 'medium'] and product_direction_unclear == false"
+    description: Micro-spec plus plan/evaluation for regular feature or bugfix work.
+    required_artifacts:
+      - run.yaml
+      - provider-selection.yaml
+      - artifacts/user-request.md
+      - artifacts/classification.yaml
+      - artifacts/feature.spec.md
+      - artifacts/implementation-plan.md
+      - artifacts/evaluation-report.md
+      - artifacts/ledger.md
+    checks:
+      - adapter-sync
+      - lint
+  strict:
+    when: "size in ['large', 'epic'] or risk in ['high', 'critical'] or ambiguity == 'high' or product_direction_unclear == true"
+    description: Full review path for broad, risky, ambiguous, or product-direction-sensitive work.
+    required_artifacts:
+      - run.yaml
+      - events.ndjson
+      - provider-selection.yaml
+      - artifacts/user-request.md
+      - artifacts/classification.yaml
+      - artifacts/feature.spec.md
+      - artifacts/spec-review.md
+      - artifacts/implementation-plan.md
+      - artifacts/evaluation-report.md
+      - artifacts/ledger.md
+      - artifacts/checks/
+      - private/
+    checks:
+      - adapter-sync
+      - lint
+      - verify-generated
+
+provider_policies:
+  spec-authoring-policy:
+    default: micro-spec-author
+    rules:
+      - when: "product_direction_unclear == true"
+        provider: product-direction-review
+        reason: Product/design/QA direction needs broader framing before implementation.
+      - when: "size in ['large', 'epic'] or risk in ['high', 'critical'] or ambiguity in ['medium', 'high']"
+        provider: ouroboros-spec-author
+        reason: Large, risky, or ambiguous work needs the full clarification/seed loop.
+      - when: "risk == 'low' and ambiguity == 'low' and testability in ['medium', 'high'] and architecture_impact == 'local'"
+        provider: micro-spec-author
+        reason: Small clear work should stay lightweight.
+
+  implementation-policy:
+    default: default-implementation
+    rules:
+      - when: "testability in ['medium', 'high'] and ambiguity == 'low' and risk in ['low', 'medium']"
+        provider: superpowers-tdd
+        reason: Clear, testable work benefits from a test-first implementation loop.
+      - when: "implementation_requires_exploration == true or ambiguity in ['medium', 'high']"
+        provider: default-implementation
+        reason: Exploratory implementation should resolve unknowns before forcing a rigid test target.
+
+rulepack_selection:
+  default: .harness/policies/rulepacks/feature-start.yml
+  docs-cleanup: .harness/policies/rulepacks/docs-cleanup.yml
+  pr-lifecycle: .harness/policies/rulepacks/pr-lifecycle.yml
+  staging-deploy: .harness/policies/rulepacks/staging-deploy.yml
+
+approvals:
+  spec.review:
+    required_when: "risk in ['high', 'critical'] or ambiguity == 'high' or product_direction_unclear == true"
+  pr.create:
+    required_when: "risk in ['low', 'medium', 'high', 'critical']"

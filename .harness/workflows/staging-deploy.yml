@@ -1,14 +1,14 @@
 name: staging-deploy
 version: 1
 
-rulepack: ".harness/rulepacks/staging-deploy.yml"
+policy: ".harness/policies/default.yml"
+rulepack: ".harness/policies/rulepacks/staging-deploy.yml"
 
 phases:
   staging.deploy:
     contract: ".harness/contracts/staging-deploy.contract.md"
     provider: "staging-deploy-provider"
 
-gates:
+checks:
   before_output:
-    - require_no_secret_values: true
-    - require_log_summary_only: true
+    - secret-log-safety

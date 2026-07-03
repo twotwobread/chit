@@ -1,0 +1,10 @@
+id: api-test
+type: command
+severity: blocking
+command: pnpm --filter @i-um/api test
+applies_to:
+  contracts:
+    - implementation.execute
+    - evaluation.checklist
+evidence:
+  write_to: artifacts/checks/api-test.log

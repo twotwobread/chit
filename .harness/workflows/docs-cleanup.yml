@@ -1,14 +1,15 @@
 name: docs-cleanup
 version: 1
 
-rulepack: ".harness/rulepacks/docs-cleanup.yml"
+policy: ".harness/policies/default.yml"
+rulepack: ".harness/policies/rulepacks/docs-cleanup.yml"
 
 phases:
   docs.cleanup:
     contract: ".harness/contracts/docs-cleanup.contract.md"
     provider: "docs-cleanup-provider"
 
-gates:
+checks:
   before_complete:
-    - require_stale_reference_search: true
-    - require_generated_adapters_synced_when_touched: true
+    - stale-reference-search
+    - adapter-sync

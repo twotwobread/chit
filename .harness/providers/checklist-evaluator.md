@@ -16,8 +16,8 @@ Evaluate the git diff against the canonical spec, acceptance criteria, applicabl
 - API/DB/mobile source-of-truth rules followed when touched.
 - Secret/log safety preserved.
 - Generated artifacts updated with source changes.
-- PR readiness gates satisfied.
+- PR readiness checks satisfied.
 
 ## Output
 
-Write `.harness/runs/<run-id>/evaluation-report.md` with `Passed`, `Failed`, or `Blocked`.
+Write `.harness/runs/<run-id>/artifacts/evaluation-report.md` with `Passed`, `Failed`, or `Blocked`.

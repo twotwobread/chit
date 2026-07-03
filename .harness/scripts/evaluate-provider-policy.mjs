@@ -13,11 +13,11 @@ function usage() {
   node .harness/scripts/evaluate-provider-policy.mjs \\
     --workflow .harness/workflows/feature-start.yml \\
     --policy spec-authoring-policy \\
-    --classification .harness/runs/<run-id>/classification.yaml
+    --classification .harness/runs/<run-id>/artifacts/classification.yaml
 
 Options:
   --workflow <path>        Workflow YAML path
-  --policy <name>          Provider policy name in workflow.provider_policies
+  --policy <name>          Provider policy name in the workflow's external/default policy
   --classification <path>  Classification/context YAML path
   --json                   Emit JSON instead of YAML
 `);
@@ -27,9 +27,7 @@ function parseArgs(argv) {
   const args = { json: false };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
-    if (arg === '--') {
-      continue;
-    }
+    if (arg === '--') continue;
     if (arg === '--json') {
       args.json = true;
       continue;
@@ -71,14 +69,16 @@ try {
   }
 
   const workflow = await readYaml(args.workflow);
+  const externalPolicy = workflow.policy ? await readYaml(workflow.policy) : {};
   const context = await readYaml(args.classification);
-  const policy = workflow?.provider_policies?.[args.policy];
+  const providerPolicies = externalPolicy.provider_policies ?? workflow.provider_policies ?? {};
+  const policy = providerPolicies[args.policy];
 
   if (!policy) {
     throw new Error(`Provider policy not found: ${args.policy}`);
   }
 
-  const axes = workflow.classification_axes ?? {};
+  const axes = externalPolicy.classification_axes ?? workflow.classification_axes ?? {};
   const expressionErrors = [];
   for (const [index, rule] of (policy.rules ?? []).entries()) {
     const result = validateExpression(rule.when, axes);
@@ -93,7 +93,8 @@ try {
   const selection = selectProvider(policy, context);
   const output = {
     workflow: workflow.name ?? args.workflow,
-    policy: args.policy,
+    policy_file: workflow.policy ?? null,
+    provider_policy: args.policy,
     classification: args.classification,
     selected_provider: selection.selected_provider,
     provider_doc: providerDocPath(selection.selected_provider),

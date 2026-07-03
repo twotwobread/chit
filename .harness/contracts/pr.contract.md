@@ -2,18 +2,18 @@
 
 ## Purpose
 
-Create or update a reviewable PR only after required gates pass.
+Create or update a reviewable PR only after required checks pass.
 
 ## Inputs
 
 - Git diff and commit stack.
-- `.harness/runs/<run-id>/feature.spec.yaml` when feature work exists.
-- `.harness/runs/<run-id>/evaluation-report.md`.
+- `.harness/runs/<run-id>/artifacts/feature.spec.md` when feature work exists.
+- `.harness/runs/<run-id>/artifacts/evaluation-report.md`.
 - PR template when present.
 
 ## Output
 
-- PR URL recorded in `.harness/runs/<run-id>/ledger.md`.
+- PR URL recorded in `.harness/runs/<run-id>/artifacts/ledger.md`.
 
 ## Done conditions
 

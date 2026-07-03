@@ -1,0 +1,8 @@
+id: pr-merge-readiness
+type: human
+severity: blocking
+applies_to:
+  contracts:
+    - pr.lifecycle
+evidence:
+  write_to: artifacts/checks/pr-merge-readiness.md

@@ -8,7 +8,7 @@ Deploy, smoke-test, or roll back the i-um staging API or Expo internal builds sa
 
 - User deploy/build/smoke/rollback request.
 - `.harness/skills/staging-deploy/SKILL.md` runbook.
-- `.harness/rulepacks/staging-deploy.yml`.
+- `.harness/policies/rulepacks/staging-deploy.yml`.
 
 ## Outputs
 

@@ -69,7 +69,7 @@ Use the Superpowers TDD loop:
 6. Refactor only when needed for the current change.
 7. Record command results and remaining gaps.
 
-Superpowers may structure the implementation loop, but the source of truth remains `feature.spec.yaml` and `implementation-plan.md`.
+Superpowers may structure the implementation loop, but the source of truth remains `feature.spec.md` and `implementation-plan.md`.
 
 ## Do not use when
 

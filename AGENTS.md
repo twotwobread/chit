@@ -1,8 +1,8 @@
 # Agent Kernel
 
-This repository uses `.harness` as the source of truth for agent workflows, contracts, providers, rules, gates, and canonical skills.
+This repository uses `.harness` as the source of truth for agent workflows, contracts, policies, providers, checks, rules, run artifacts, and canonical skills.
 
-`.pi`, `.claude`, and `.agents` are runtime adapters/install surfaces. If an adapter conflicts with `.harness`, follow `.harness`.
+`.pi`, `.claude`, and `.agents` are runtime adapter/install surfaces. If an adapter conflicts with `.harness`, follow `.harness`.
 
 ## Project map
 
@@ -13,9 +13,9 @@ i-um/
 │   └── api/                 # Go API server
 ├── packages/api-contract/   # OpenAPI contract + generated TS client
 ├── docs/
-│   ├── features/            # feature specs
+│   ├── features/            # promoted feature specs/review artifacts
 │   └── decisions/           # decision history; not default implementation context
-├── .harness/                # agent-agnostic workflows/rules/providers/contracts
+├── .harness/                # provider-neutral workflow kernel
 ├── .pi/                     # Pi adapter
 ├── .claude/                 # Claude adapter
 └── .agents/                 # common agent adapter
@@ -24,12 +24,14 @@ i-um/
 ## Always follow
 
 - Keep default context small; read task-specific rules only when needed.
-- Use `.harness/workflows` for workflow definitions and provider policy.
+- Read `.harness/manifest.yaml` and the relevant workflow before non-trivial process work.
+- Use `.harness/workflows` for phase order.
 - Use `.harness/contracts` for phase input/output/done conditions.
-- Use `.harness/providers` for tool-specific behavior.
-- Use `.harness/rules` and `.harness/rulepacks` for agent rules.
+- Use `.harness/policies` for route, tier, provider, rulepack, check, and approval selection.
+- Use `.harness/rules` for canonical agent/project rule bodies.
+- Use `.harness/checks` for executable verification descriptors.
 - Do not edit generated adapter skill/rule copies directly; edit `.harness/skills` or `.harness/rules` and run `pnpm harness:sync`.
-- Blocking gates must pass before PR creation unless the user explicitly accepts the risk.
+- Blocking checks must pass before PR creation unless the user explicitly accepts the risk.
 
 ## Source of truth
 
@@ -50,11 +52,13 @@ i-um/
 - Docs/rules cleanup: use the current agent's `i-um-docs-cleanup` adapter, generated from `.harness/skills/docs-cleanup/SKILL.md`.
 - Staging/internal deploy: use the current agent's `i-um-staging-deploy` adapter, generated from `.harness/skills/staging-deploy/SKILL.md`.
 
-## Provider policy summary
+## Run policy summary
 
-- Small, clear, local, testable work: micro spec plus Superpowers-style TDD implementation when appropriate.
-- Large, ambiguous, high-risk work: Ouroboros-backed clarification/seed loop and stricter spec review before implementation.
-- Product-direction uncertainty: product-direction-review provider may be selected before finalizing the canonical spec.
+- Runs start as a pending envelope; triage decides whether to clarify, investigate, implement, or block.
+- Tier selection happens after enough scope evidence exists.
+- Lightweight work keeps artifacts minimal.
+- Normal work adds spec/plan/evaluation artifacts.
+- Strict work adds explicit review, check evidence, and private provider state when needed.
 
 ## Completion
 

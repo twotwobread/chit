@@ -10,4 +10,4 @@ Convert the canonical spec and review findings into a concise implementation pla
 
 ## Output
 
-Write `.harness/runs/<run-id>/implementation-plan.md`.
+Write `.harness/runs/<run-id>/artifacts/implementation-plan.md`.

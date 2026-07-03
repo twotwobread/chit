@@ -9,7 +9,7 @@ Create, update, inspect, merge, or clean up an existing PR/worktree without reop
 - Worktree/branch and PR/issue identifier when provided.
 - Git diff and commit stack.
 - PR template when creating/updating a PR body.
-- `.harness/rulepacks/pr-lifecycle.yml`.
+- `.harness/policies/rulepacks/pr-lifecycle.yml`.
 
 ## Outputs
 

@@ -13,9 +13,9 @@
 
 ## Behavior
 
-Draft a concise canonical `feature.spec.yaml`. Keep it small, but include acceptance criteria, out-of-scope items, and a test plan.
+Draft a concise canonical `feature.spec.md`. Keep it small, but include acceptance criteria, out-of-scope items, and a test plan.
 
-For small testable work, this provider may use Superpowers-style TDD framing to express acceptance criteria and first tests, but it must still output the canonical spec artifact. Downstream implementation should read only `feature.spec.yaml`, not provider notes.
+For small testable work, this provider may use Superpowers-style TDD framing to express acceptance criteria and first tests, but it must still output the canonical spec artifact. Downstream implementation should read only `feature.spec.md`, not provider notes.
 
 ## Do not use when
 

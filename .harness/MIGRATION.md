@@ -45,7 +45,7 @@ Status: done.
 
 Status: done.
 
-- Added workflows, contracts, providers, schemas, rules, rulepacks, gates, skills, scripts, and runs directories.
+- Added workflows, contracts, providers, policies, checks, artifacts, rules, skills, scripts, and runs directories.
 
 ### Phase 3: Move canonical rules
 
@@ -95,10 +95,10 @@ Status: done.
 
 Status: done.
 
-- Added `.harness/rulepacks/feature-start.yml`.
-- Added `.harness/rulepacks/docs-cleanup.yml`.
-- Added `.harness/rulepacks/pr-lifecycle.yml`.
-- Added `.harness/rulepacks/staging-deploy.yml`.
+- Added `.harness/policies/rulepacks/feature-start.yml`.
+- Added `.harness/policies/rulepacks/docs-cleanup.yml`.
+- Added `.harness/policies/rulepacks/pr-lifecycle.yml`.
+- Added `.harness/policies/rulepacks/staging-deploy.yml`.
 
 ### Phase 9: Adapter cleanup
 

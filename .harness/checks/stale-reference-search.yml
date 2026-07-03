@@ -1,0 +1,9 @@
+id: stale-reference-search
+type: command
+severity: blocking
+command: "bash -lc '! rg -n \\\"\\.harness/rulepacks|\\.harness/schemas|feature\\.spec\\.yaml\\\" .harness AGENTS.md package.json --glob \\\"!.harness/checks/stale-reference-search.yml\\\"'"
+applies_to:
+  contracts:
+    - docs.cleanup
+evidence:
+  write_to: artifacts/checks/stale-reference-search.log
