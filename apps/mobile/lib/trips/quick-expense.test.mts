@@ -23,6 +23,7 @@ import {
   inferCurrentQuickExpenseItem,
   parseAmountMinor,
   parseQuickExpenseRoute,
+  resolveQuickExpenseReturnPath,
   toggleQuickExpenseSplitParticipant,
 } from './quick-expense.ts';
 
@@ -513,11 +514,38 @@ test('builds manual split summary without mutating entered amounts when total ch
   ]);
 });
 
-test('builds route with optional inferred item id', () => {
+test('builds route with optional inferred item id and return intent', () => {
   assert.equal(buildQuickExpenseRoute('trip-a', '2026-07-10'), '/trips/trip-a/days/2026-07-10/expenses/quick');
   assert.equal(
     buildQuickExpenseRoute('trip-a', '2026-07-10', 'item-a'),
     '/trips/trip-a/days/2026-07-10/expenses/quick?itemId=item-a',
+  );
+  assert.equal(
+    buildQuickExpenseRoute('trip-a', '2026-07-10', null, 'settle'),
+    '/trips/trip-a/days/2026-07-10/expenses/quick?returnTo=settle',
+  );
+  assert.equal(
+    buildQuickExpenseRoute('trip-a', '2026-07-10', 'item a', 'settle'),
+    '/trips/trip-a/days/2026-07-10/expenses/quick?itemId=item%20a&returnTo=settle',
+  );
+});
+
+test('resolves quick expense completion return destinations', () => {
+  assert.equal(
+    resolveQuickExpenseReturnPath({ tripId: 'trip-a', date: '2026-07-10', returnTo: 'settle' }),
+    '/trips/trip-a/settle',
+  );
+  assert.equal(
+    resolveQuickExpenseReturnPath({ tripId: 'trip-a', date: '2026-07-10', returnTo: ['settle'] }),
+    '/trips/trip-a/settle',
+  );
+  assert.equal(
+    resolveQuickExpenseReturnPath({ tripId: 'trip-a', date: '2026-07-10' }),
+    '/trips/trip-a/itinerary?dayId=2026-07-10',
+  );
+  assert.equal(
+    resolveQuickExpenseReturnPath({ tripId: 'trip-a', date: '2026-07-10', returnTo: 'today' }),
+    '/trips/trip-a/itinerary?dayId=2026-07-10',
   );
 });
 
@@ -531,6 +559,11 @@ test('parses quick expense routes for overlay interception', () => {
     tripId: 'trip-a',
     date: '2026-07-10',
     itemId: 'item a',
+  });
+  assert.deepEqual(parseQuickExpenseRoute('/trips/trip-a/days/2026-07-10/expenses/quick?returnTo=settle'), {
+    tripId: 'trip-a',
+    date: '2026-07-10',
+    itemId: null,
   });
   assert.equal(parseQuickExpenseRoute('/trips/trip-a/days/2026-07-10'), null);
 });

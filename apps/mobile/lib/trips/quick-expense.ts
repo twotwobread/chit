@@ -16,6 +16,7 @@ import {
   getScheduleItems,
 } from './day-itinerary';
 import { formatTripDayDate } from './days';
+import { tripItineraryDayPath, tripSettlePath } from './routes';
 
 export type QuickExpenseFormErrors = {
   amount?: string;
@@ -93,15 +94,45 @@ export type QuickExpenseViewModel = {
 
 const zeroDecimalCurrencies = new Set<SupportedCurrency>(['KRW', 'JPY']);
 
+export type QuickExpenseReturnTo = 'settle';
+
+export type QuickExpenseReturnParam = string | string[] | undefined;
+
 export type QuickExpenseRouteTarget = {
   tripId: string;
   date: string;
   itemId: string | null;
 };
 
-export function buildQuickExpenseRoute(tripId: string, tripDayId: string, itemId?: string | null): Href {
+export function buildQuickExpenseRoute(
+  tripId: string,
+  tripDayId: string,
+  itemId?: string | null,
+  returnTo?: QuickExpenseReturnTo | null,
+): Href {
   const base = `/trips/${tripId}/days/${tripDayId}/expenses/quick`;
-  return (itemId ? `${base}?itemId=${encodeURIComponent(itemId)}` : base) as Href;
+  const params = [
+    itemId ? `itemId=${encodeURIComponent(itemId)}` : null,
+    returnTo ? `returnTo=${encodeURIComponent(returnTo)}` : null,
+  ].filter((param): param is string => param !== null);
+
+  return (params.length > 0 ? `${base}?${params.join('&')}` : base) as Href;
+}
+
+export function resolveQuickExpenseReturnPath({
+  tripId,
+  date,
+  returnTo,
+}: {
+  tripId: string;
+  date: string;
+  returnTo?: QuickExpenseReturnParam;
+}): Href {
+  const returnValue = Array.isArray(returnTo) ? returnTo[0] : returnTo;
+  if (returnValue === 'settle') {
+    return tripSettlePath(tripId);
+  }
+  return tripItineraryDayPath(tripId, date);
 }
 
 export function parseQuickExpenseRoute(route: Href): QuickExpenseRouteTarget | null {

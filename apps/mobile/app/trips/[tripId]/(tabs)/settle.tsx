@@ -7,8 +7,8 @@ import { PrimaryButton, SecondaryButton, theme } from '../../../../lib/design';
 import { TransferRow } from '../../../../lib/trip-ui/TransferRow';
 import { TripListCard, TripScreen, TripScreenHeader, TripStateCard } from '../../../../lib/trip-ui/TripScreenScaffold';
 import { getTripDetail, getTripSettlement } from '../../../../lib/trips/client';
-import { buildQuickExpenseRoute } from '../../../../lib/trips/quick-expense';
 import {
+  buildSettlementExpenseEntryRoute,
   buildSettlementRequestMessage,
   buildSettlementTransferViewModel,
   settlementTransferFailureState,
@@ -42,7 +42,7 @@ export default function TripSettleTabScreen() {
     try {
       const [detail, settlement] = await Promise.all([getTripDetail(tripId), getTripSettlement(tripId)]);
       const currentDay = findTripCalendarDay(detail.days, localDateString());
-      const expenseEntryRoute = currentDay ? buildQuickExpenseRoute(tripId, currentDay.id) : null;
+      const expenseEntryRoute = currentDay ? buildSettlementExpenseEntryRoute(tripId, currentDay.id) : null;
 
       setState({
         status: 'settlement',
