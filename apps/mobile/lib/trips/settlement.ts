@@ -1,12 +1,18 @@
+import type { Href } from 'expo-router';
+
 import type {
   GetTripSettlementResponse,
   SettlementCurrencySummary as ApiSettlementCurrencySummary,
   SupportedCurrency,
 } from '@i-um/api-contract';
 
-import { formatMoney } from './quick-expense';
+import { buildQuickExpenseRoute, formatMoney } from './quick-expense';
 
 export type AuthoritativeTripSettlement = GetTripSettlementResponse;
+
+export function buildSettlementExpenseEntryRoute(tripId: string, tripDayId: string): Href {
+  return buildQuickExpenseRoute(tripId, tripDayId, null, 'settle');
+}
 
 export type SettlementTransferRowViewModel = {
   fromName: string;

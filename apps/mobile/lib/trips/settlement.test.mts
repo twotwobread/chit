@@ -4,6 +4,7 @@ import test from 'node:test';
 import type { GetTripSettlementResponse } from '@i-um/api-contract';
 
 import {
+  buildSettlementExpenseEntryRoute,
   buildSettlementRequestMessage,
   buildSettlementTransferViewModel,
   computeSettlementBalances,
@@ -17,6 +18,13 @@ const participants = [
   { id: 'b', name: '지영' },
   { id: 'c', name: '유나' },
 ];
+
+test('builds settlement expense entry route with settlement return intent', () => {
+  assert.equal(
+    buildSettlementExpenseEntryRoute('trip-a', '2026-07-10'),
+    '/trips/trip-a/days/2026-07-10/expenses/quick?returnTo=settle',
+  );
+});
 
 test('uses authoritative settlement summaries returned by the API', () => {
   const settlement = {

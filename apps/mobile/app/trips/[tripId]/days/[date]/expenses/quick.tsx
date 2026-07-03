@@ -20,7 +20,6 @@ import {
   updateExpense,
 } from '../../../../../../lib/trips/client';
 import { getScheduleItems } from '../../../../../../lib/trips/day-itinerary';
-import { tripItineraryDayPath } from '../../../../../../lib/trips/routes';
 import {
   buildCreateQuickExpenseRequest,
   buildDefaultSplitParticipantIds,
@@ -30,6 +29,7 @@ import {
   buildSavedEqualSplitSummary,
   formatMoney,
   quickExpenseFailureMessage,
+  resolveQuickExpenseReturnPath,
   type QuickExpenseFormErrors,
   type QuickExpenseManualSplitInput,
   type QuickExpenseSplitPolicy,
@@ -58,7 +58,13 @@ export default function QuickExpenseScreen() {
     tripId: tripIdParam,
     date: dateParam,
     itemId: itemIdParam,
-  } = useLocalSearchParams<{ tripId?: string | string[]; date?: string | string[]; itemId?: string | string[] }>();
+    returnTo: returnToParam,
+  } = useLocalSearchParams<{
+    tripId?: string | string[];
+    date?: string | string[];
+    itemId?: string | string[];
+    returnTo?: string | string[];
+  }>();
   const tripId = Array.isArray(tripIdParam) ? tripIdParam[0] : tripIdParam;
   const date = Array.isArray(dateParam) ? dateParam[0] : dateParam;
   const routeItemId = Array.isArray(itemIdParam) ? itemIdParam[0] : itemIdParam;
@@ -267,7 +273,7 @@ export default function QuickExpenseScreen() {
       router.replace('/');
       return;
     }
-    router.replace(tripItineraryDayPath(tripId, date));
+    router.replace(resolveQuickExpenseReturnPath({ tripId, date, returnTo: returnToParam }));
   };
 
   return (
