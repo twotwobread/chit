@@ -1,0 +1,12 @@
+id: adapter-sync
+type: command
+severity: blocking
+command: pnpm harness:validate
+applies_to:
+  contracts:
+    - docs.cleanup
+    - pr.lifecycle
+    - staging.deploy
+    - evaluation.checklist
+evidence:
+  write_to: artifacts/checks/adapter-sync.log

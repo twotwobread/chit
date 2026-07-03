@@ -8,7 +8,7 @@ Clean up docs, rules, skills, or agent-facing context while keeping default cont
 
 - User request.
 - Target docs/rules/skills/references.
-- `.harness/rulepacks/docs-cleanup.yml`.
+- `.harness/policies/rulepacks/docs-cleanup.yml`.
 
 ## Outputs
 

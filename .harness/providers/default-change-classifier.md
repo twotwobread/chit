@@ -14,4 +14,4 @@ Use the user request, linked issue/spec, and narrow repository facts to classify
 
 ## Output
 
-Write `.harness/runs/<run-id>/classification.yaml` with all provider-policy inputs populated.
+Write `.harness/runs/<run-id>/artifacts/classification.yaml` with all provider-policy inputs populated.

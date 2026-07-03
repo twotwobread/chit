@@ -1,0 +1,10 @@
+id: mobile-typecheck
+type: command
+severity: blocking
+command: pnpm --filter @i-um/mobile typecheck
+applies_to:
+  contracts:
+    - implementation.execute
+    - evaluation.checklist
+evidence:
+  write_to: artifacts/checks/mobile-typecheck.log

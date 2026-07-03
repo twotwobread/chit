@@ -6,15 +6,15 @@ Evaluate the final diff against the canonical spec, project rules, and verificat
 
 ## Inputs
 
-- `.harness/runs/<run-id>/classification.yaml`.
-- `.harness/runs/<run-id>/feature.spec.yaml`.
+- `.harness/runs/<run-id>/artifacts/classification.yaml`.
+- `.harness/runs/<run-id>/artifacts/feature.spec.md`.
 - Git diff/stat.
 - Test and verification command results.
 - Applicable phase/risk rules.
 
 ## Output
 
-`.harness/runs/<run-id>/evaluation-report.md`
+`.harness/runs/<run-id>/artifacts/evaluation-report.md`
 
 Required sections:
 

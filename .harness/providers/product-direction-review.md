@@ -16,6 +16,6 @@ No single tool is assumed. Use human clarification, PM/design/QA review, Ourobor
 
 ## Behavior
 
-Clarify product/design/QA options first, then convert the chosen direction into canonical `feature.spec.yaml`.
+Clarify product/design/QA options first, then convert the chosen direction into canonical `feature.spec.md`.
 
 Do not let downstream phases depend on provider-private notes; record only stable decisions and evidence in the canonical spec and ledger.

@@ -1,0 +1,41 @@
+harness_version: 0.2
+schema_version: 1
+
+source_of_truth: .harness
+
+default_workflow: feature-start
+default_policy: .harness/policies/default.yml
+
+commands:
+  validate: pnpm harness:validate
+  sync: pnpm harness:sync
+  sync_check: pnpm harness:validate
+  select_provider: pnpm harness:evaluate-provider
+
+runtime:
+  runs_dir: .harness/runs
+  runs_gitignored: true
+  initial_tier: pending
+  canonical_artifacts_dir: artifacts
+  private_state_dir: private
+
+principles:
+  - Runs start as a minimal pending envelope.
+  - Intake triage decides whether to clarify, investigate, implement, or block.
+  - Tier selection happens only after enough scope evidence exists.
+  - Lightweight runs record only the artifacts needed for safe completion.
+  - Strict runs add review, check evidence, provider-private state, and richer logs.
+
+generated_surfaces:
+  - name: pi-skills
+    path: .pi/skills
+    source: .harness/skills
+  - name: claude-skills
+    path: .claude/skills
+    source: .harness/skills
+  - name: agents-skills
+    path: .agents/skills
+    source: .harness/skills
+  - name: pi-rules
+    path: .pi/rules
+    source: .harness/rules

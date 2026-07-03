@@ -42,4 +42,4 @@ Stop and ask, or recommend `i-um-feature-spec-plan`, if:
 
 ## Verification
 
-Run the smallest command set that covers changed behavior, then broader gates when needed. Record commands and results in the completion report.
+Run the smallest command set that covers changed behavior, then broader checks when needed. Record commands and results in the completion report.

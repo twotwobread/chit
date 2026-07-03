@@ -6,13 +6,13 @@ Turn the canonical spec into an execution plan without binding downstream phases
 
 ## Inputs
 
-- `.harness/runs/<run-id>/feature.spec.yaml`.
-- `.harness/runs/<run-id>/spec-review.md` when required by workflow tier.
+- `.harness/runs/<run-id>/artifacts/feature.spec.md`.
+- `.harness/runs/<run-id>/artifacts/spec-review.md` when required by workflow tier.
 - Relevant source-of-truth files for API, DB, mobile, or tests.
 
 ## Output
 
-`.harness/runs/<run-id>/implementation-plan.md`
+`.harness/runs/<run-id>/artifacts/implementation-plan.md`
 
 Required sections:
 

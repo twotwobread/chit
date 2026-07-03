@@ -17,9 +17,9 @@ pnpm harness:sync
 
 # i-um Feature Start
 
-Use this skill when the user asks to implement, fix, debug, resolve an issue, or start feature work. Use `.harness/workflows/feature-start.yml` as the workflow source of truth.
+Use this skill when the user asks to implement, fix, debug, resolve an issue, or start feature work. Use `.harness/workflows/feature-start.yml` as the workflow source of truth and `.harness/policies/default.yml` for route, tier, provider, rulepack, check, and approval decisions.
 
-Do not hard-code Ouroboros, Superpowers, product review, or checklist behavior in this skill. Select providers through the workflow provider policies and record the decision in the run ledger.
+Do not hard-code Ouroboros, Superpowers, product review, or checklist behavior in this skill. Policies select providers; runs record the decision.
 
 ## Required input
 
@@ -34,12 +34,13 @@ If missing, ask before implementation.
 ## Minimal reads
 
 1. `.harness/workflows/feature-start.yml`.
-2. `.harness/rulepacks/feature-start.yml`.
-3. Relevant phase contract before running each phase.
-4. Provider doc selected by workflow policy.
-5. Target issue/spec or narrow source files needed by the current phase.
+2. `.harness/policies/default.yml`.
+3. `.harness/policies/rulepacks/feature-start.yml`.
+4. Relevant phase contract before running each phase.
+5. Provider doc selected by policy.
+6. Target issue/spec or narrow source files needed by the current phase.
 
-Do not read broad docs by default. Read only the rules selected by the rulepack for the current phase/risk.
+Do not read broad docs by default. Read only rules selected by the rulepack for the current phase/risk.
 
 ## Procedure
 
@@ -49,34 +50,45 @@ Do not read broad docs by default. Read only the rules selected by the rulepack 
    - `git rev-parse --show-toplevel`
    - Do not overwrite unrelated user changes.
 
-2. Create or select run context
+2. Create or select a run envelope
    - Choose a stable `<run-id>`.
-   - Create `.harness/runs/<run-id>/` when artifacts will be written.
-   - Start `.harness/runs/<run-id>/ledger.md` with the request and initial assumptions.
+   - Start with `tier: pending` and `route: pending`; do not choose `lightweight`, `normal`, or `strict` before triage.
+   - Minimum run shape:
+     - `.harness/runs/<run-id>/run.yaml`
+     - `.harness/runs/<run-id>/artifacts/user-request.md`
+     - `.harness/runs/<run-id>/artifacts/ledger.md`
 
-3. Run `change.classify`
+3. Run intake triage through `change.classify`
    - Follow `.harness/contracts/change-classify.contract.md`.
-   - Classify size, ambiguity, risk, testability, architecture impact, domain sensitivity, product uncertainty, and exploration need.
-   - Write `classification.yaml`.
+   - Inspect only the request, linked issue/spec, relevant error/log, and narrow code/contract snippets needed to route the work.
+   - Decide the next route: `ready_for_lightweight_investigation`, `ready_for_implementation`, `needs_clarification`, `needs_investigation`, `needs_product_direction`, or `blocked`.
+   - If scope cannot be judged safely, ask focused clarification questions or block; do not invent scope.
+   - Write `.harness/runs/<run-id>/artifacts/classification.yaml`.
 
-4. Select workflow tier and providers
-   - Use `.harness/workflows/feature-start.yml` provider policies.
-   - Small/clear/local/testable work: expect `micro-spec-author` for spec and often `superpowers-tdd` for implementation.
-   - Large/ambiguous/high-risk work: expect `ouroboros-spec-author` and the full review loop before implementation.
-   - Product-direction uncertainty: consider `product-direction-review` before finalizing the canonical spec.
-   - Record selected providers and reasons in `ledger.md`.
+4. Select tier and providers only after enough evidence exists
+   - Use `.harness/policies/default.yml`.
+   - `lightweight`: clear, local, low-risk work; keep artifacts minimal.
+   - `normal`: ordinary feature/bugfix work needing micro spec, plan, and evaluation.
+   - `strict`: broad, risky, ambiguous, product-direction-sensitive, or high-coordination work.
+   - If the route is still `needs_clarification` or `blocked`, keep `tier: pending`.
+   - Record selected tier/provider reasons in `run.yaml`, `provider-selection.yaml` when materialized, and/or `artifacts/ledger.md`.
 
-5. Run phases in order
-   - `spec.author`: require `feature.spec.yaml`.
-   - `spec.review`: require explicit verdict unless the workflow tier and user approval allow a small-path skip.
-   - `implementation.plan`: require `implementation-plan.md`.
+5. Materialize only tier-required artifacts
+   - Lightweight runs usually need `classification.yaml`, `ledger.md`, and `verification.md`.
+   - Normal runs add `feature.spec.md`, `implementation-plan.md`, and `evaluation-report.md`.
+   - Strict runs add `spec-review.md`, `events.ndjson`, `artifacts/checks/*`, and `private/*` when provider-private state is needed.
+
+6. Run phases in order for the selected route/tier
+   - `spec.author`: require `artifacts/feature.spec.md` when the policy/tier requires a spec.
+   - `spec.review`: require explicit verdict for strict/high-risk work or when policy approval requires it.
+   - `implementation.plan`: require `artifacts/implementation-plan.md` for normal/strict work.
    - `implementation.execute`: implement only from canonical artifacts.
-   - `evaluation.checklist`: require `evaluation-report.md`.
-   - `pr.create` and `review.request`: only after required gates pass or accepted risk is explicit.
+   - `evaluation.checklist`: require `artifacts/evaluation-report.md` for normal/strict work; lightweight may use `artifacts/verification.md`.
+   - `pr.create` and `review.request`: only after blocking checks pass or accepted risk is explicit.
 
-6. Respect contract boundaries
-   - Downstream phases read canonical artifacts, not provider-private transcripts, seeds, prompts, or notes.
-   - If implementation reveals new product/domain ambiguity, pause and re-run classification/provider selection.
+7. Re-triage when new facts appear
+   - If investigation reveals API/DB/auth/privacy/product-direction impact, pause and update classification/tier before implementation continues.
+   - Do not silently upgrade scope; explain the evidence and ask when product/domain decisions are needed.
 
-7. Complete
-   - Report changed behavior, workflow tier, selected providers, verification commands/results, manual smoke/deploy status, and gaps/risks.
+8. Complete
+   - Report route, tier, selected providers/checks, changed behavior, verification commands/results, manual smoke/deploy status, and gaps/risks.

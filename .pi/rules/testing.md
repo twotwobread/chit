@@ -32,7 +32,7 @@ pnpm --filter @i-um/mobile typecheck
 pnpm verify
 ```
 
-Run only commands relevant to the change first; use broader gates before completion when appropriate.
+Run only commands relevant to the change first; use broader checks before completion when appropriate.
 
 ## Long output
 

@@ -1,0 +1,36 @@
+schema_version: classification.v1
+required:
+  - schema_version
+  - type
+  - route
+  - size
+  - ambiguity
+  - risk
+  - testability
+  - architecture_impact
+  - domain_sensitivity
+  - product_direction_unclear
+  - implementation_requires_exploration
+  - ready_for_implementation
+  - likely_tier
+  - next_phase
+  - knowns
+  - unknowns
+  - blocking_questions
+  - risk_signals
+  - rationale
+fields:
+  route:
+    enum:
+      - pending
+      - ready_for_lightweight_investigation
+      - ready_for_implementation
+      - needs_clarification
+      - needs_investigation
+      - needs_product_direction
+      - blocked
+  likely_tier:
+    enum: [pending, lightweight, normal, strict]
+notes:
+  - Triage may leave size/risk/testability as unknown when evidence is insufficient.
+  - Unknowns should be recorded as unknowns rather than guessed.

@@ -12,8 +12,13 @@ const requiredDirs = [
   '.harness/workflows',
   '.harness/contracts',
   '.harness/providers',
+  '.harness/policies',
+  '.harness/policies/rulepacks',
+  '.harness/checks',
+  '.harness/artifacts',
+  '.harness/artifacts/schemas',
+  '.harness/artifacts/templates',
   '.harness/rules',
-  '.harness/rulepacks',
   '.harness/skills',
   '.harness/scripts',
 ];
@@ -49,6 +54,7 @@ const expectedGeneratedAdapters = [
 ];
 
 const errors = [];
+const pendingPathChecks = [];
 
 async function exists(relPath) {
   try {
@@ -114,6 +120,15 @@ function requireObject(owner, obj, key) {
   return obj[key];
 }
 
+function requireStringArray(owner, obj, key) {
+  if (obj?.[key] === undefined) return undefined;
+  if (!Array.isArray(obj[key]) || obj[key].some((item) => typeof item !== 'string' || item.trim() === '')) {
+    errors.push(`${owner}.${key} must be a sequence of non-empty strings when present`);
+    return undefined;
+  }
+  return obj[key];
+}
+
 function validateHarnessPath(owner, relPath, options = {}) {
   if (typeof relPath !== 'string' || !relPath.startsWith('.harness/')) {
     errors.push(`${owner} must reference a .harness path, got: ${String(relPath)}`);
@@ -156,27 +171,97 @@ function validatePolicyExpression(owner, expression, axes) {
   }
 }
 
-function validateGateExpressions(owner, value, axes) {
+function validateWhenExpressions(owner, value, axes) {
   if (Array.isArray(value)) {
-    for (const [index, item] of value.entries()) validateGateExpressions(`${owner}[${index}]`, item, axes);
+    for (const [index, item] of value.entries()) validateWhenExpressions(`${owner}[${index}]`, item, axes);
     return;
   }
   if (!isObject(value)) return;
 
   for (const [key, child] of Object.entries(value)) {
-    if (key === 'except_when') {
-      validatePolicyExpression(`${owner}.except_when`, child, axes);
+    if (['when', 'except_when', 'required_when'].includes(key)) {
+      validatePolicyExpression(`${owner}.${key}`, child, axes);
     } else {
-      validateGateExpressions(`${owner}.${key}`, child, axes);
+      validateWhenExpressions(`${owner}.${key}`, child, axes);
     }
   }
 }
 
-function validateWorkflow(relPath, workflow) {
+function validateProviderPolicies(owner, providerPolicies, axes) {
+  for (const [policyName, policy] of Object.entries(providerPolicies)) {
+    const policyOwner = `${owner}.provider_policies.${policyName}`;
+    if (!isObject(policy)) {
+      errors.push(`${policyOwner} must be a mapping`);
+      continue;
+    }
+
+    validateProviderRef(`${policyOwner}.default`, policy.default);
+    if (policy.rules !== undefined && !Array.isArray(policy.rules)) {
+      errors.push(`${policyOwner}.rules must be a sequence when present`);
+    }
+    for (const [index, rule] of (policy.rules ?? []).entries()) {
+      const ruleOwner = `${policyOwner}.rules[${index}]`;
+      if (!isObject(rule)) {
+        errors.push(`${ruleOwner} must be a mapping`);
+        continue;
+      }
+      const when = requireString(ruleOwner, rule, 'when');
+      if (when) validatePolicyExpression(`${ruleOwner}.when`, when, axes);
+      validateProviderRef(ruleOwner, rule.provider);
+    }
+  }
+}
+
+function validatePolicyFile(relPath, policy) {
+  const owner = relPath;
+  requireString(owner, policy, 'id');
+  if (typeof policy.version !== 'number') {
+    errors.push(`${owner} must define numeric field: version`);
+  }
+
+  const axes = requireObject(owner, policy, 'classification_axes');
+  const providerPolicies = isObject(policy.provider_policies) ? policy.provider_policies : {};
+  validateProviderPolicies(owner, providerPolicies, axes);
+  validateWhenExpressions(`${owner}.routing`, policy.routing, axes);
+  validateWhenExpressions(`${owner}.tiers`, policy.tiers, axes);
+  validateWhenExpressions(`${owner}.approvals`, policy.approvals, axes);
+
+  if (isObject(policy.tiers)) {
+    for (const [tierName, tier] of Object.entries(policy.tiers)) {
+      if (!isObject(tier)) continue;
+      for (const check of tier.checks ?? []) {
+        if (typeof check !== 'string' || check.trim() === '') {
+          errors.push(`${owner}.tiers.${tierName}.checks must contain non-empty check ids`);
+          continue;
+        }
+        pendingPathChecks.push([`${owner}.tiers.${tierName}.checks.${check}`, `.harness/checks/${check}.yml`]);
+      }
+    }
+  }
+
+  if (isObject(policy.rulepack_selection)) {
+    for (const [key, rulepackPath] of Object.entries(policy.rulepack_selection)) {
+      validateHarnessPath(`${owner}.rulepack_selection.${key}`, rulepackPath);
+    }
+  }
+
+  for (const [index, ref] of collectHarnessPaths(policy).entries()) {
+    pendingPathChecks.push([`${owner} embedded .harness ref[${index}]`, ref]);
+  }
+}
+
+function validateWorkflow(relPath, workflow, policiesByPath) {
   const owner = relPath;
   requireString(owner, workflow, 'name');
   if (typeof workflow.version !== 'number') {
     errors.push(`${owner} must define numeric field: version`);
+  }
+
+  const policyPath = typeof workflow.policy === 'string' ? workflow.policy : undefined;
+  const externalPolicy = policyPath ? policiesByPath.get(policyPath) : undefined;
+  if (policyPath) {
+    validateHarnessPath(`${owner}.policy`, policyPath);
+    if (!externalPolicy) errors.push(`${owner}.policy references missing policy: ${policyPath}`);
   }
 
   const rulepack = requireString(owner, workflow, 'rulepack');
@@ -193,8 +278,16 @@ function validateWorkflow(relPath, workflow) {
   }
 
   const phases = requireObject(owner, workflow, 'phases');
-  const classificationAxes = isObject(workflow.classification_axes) ? workflow.classification_axes : {};
-  const providerPolicies = isObject(workflow.provider_policies) ? workflow.provider_policies : {};
+  const classificationAxes = isObject(workflow.classification_axes)
+    ? workflow.classification_axes
+    : isObject(externalPolicy?.classification_axes)
+      ? externalPolicy.classification_axes
+      : {};
+  const providerPolicies = isObject(workflow.provider_policies)
+    ? workflow.provider_policies
+    : isObject(externalPolicy?.provider_policies)
+      ? externalPolicy.provider_policies
+      : {};
 
   for (const [phaseName, phase] of Object.entries(phases)) {
     const phaseOwner = `${owner}.phases.${phaseName}`;
@@ -217,49 +310,28 @@ function validateWorkflow(relPath, workflow) {
     }
   }
 
-  for (const [policyName, policy] of Object.entries(providerPolicies)) {
-    const policyOwner = `${owner}.provider_policies.${policyName}`;
-    if (!isObject(policy)) {
-      errors.push(`${policyOwner} must be a mapping`);
-      continue;
-    }
-
-    validateProviderRef(`${policyOwner}.default`, policy.default);
-    if (policy.rules !== undefined && !Array.isArray(policy.rules)) {
-      errors.push(`${policyOwner}.rules must be a sequence when present`);
-    }
-    for (const [index, rule] of (policy.rules ?? []).entries()) {
-      const ruleOwner = `${policyOwner}.rules[${index}]`;
-      if (!isObject(rule)) {
-        errors.push(`${ruleOwner} must be a mapping`);
-        continue;
-      }
-      const when = requireString(ruleOwner, rule, 'when');
-      if (when) validatePolicyExpression(`${ruleOwner}.when`, when, classificationAxes);
-      validateProviderRef(ruleOwner, rule.provider);
-    }
+  if (workflow.provider_policies !== undefined) {
+    validateProviderPolicies(owner, workflow.provider_policies, classificationAxes);
   }
 
-  const workflowTierNames = isObject(workflow.workflow_tiers) ? Object.keys(workflow.workflow_tiers) : [];
-
-  if (isObject(workflow.workflow_tiers)) {
-    for (const [tierName, tier] of Object.entries(workflow.workflow_tiers)) {
-      const tierOwner = `${owner}.workflow_tiers.${tierName}`;
-      if (!isObject(tier)) {
-        errors.push(`${tierOwner} must be a mapping`);
-        continue;
+  if (workflow.checks !== undefined) {
+    if (!isObject(workflow.checks)) {
+      errors.push(`${owner}.checks must be a mapping when present`);
+    } else {
+      for (const [stageName, checkIds] of Object.entries(workflow.checks)) {
+        if (!Array.isArray(checkIds)) {
+          errors.push(`${owner}.checks.${stageName} must be a sequence of check ids`);
+          continue;
+        }
+        for (const checkId of checkIds) {
+          if (typeof checkId !== 'string' || checkId.trim() === '') {
+            errors.push(`${owner}.checks.${stageName} must contain non-empty check ids`);
+            continue;
+          }
+          pendingPathChecks.push([`${owner}.checks.${stageName}.${checkId}`, `.harness/checks/${checkId}.yml`]);
+        }
       }
-      const when = requireString(tierOwner, tier, 'when');
-      if (when) validatePolicyExpression(`${tierOwner}.when`, when, classificationAxes);
     }
-  }
-
-  if (workflow.gates !== undefined) {
-    validateGateExpressions(`${owner}.gates`, workflow.gates, {
-      ...classificationAxes,
-      workflow_tier: workflowTierNames,
-      user_approved_skip_spec_review: [true, false],
-    });
   }
 
   for (const [index, ref] of collectHarnessPaths(workflow).entries()) {
@@ -278,15 +350,6 @@ function validateRulepack(relPath, rulepack) {
   for (const [index, ref] of collectHarnessPaths(rulepack).entries()) {
     validateHarnessPath(`${owner} rule ref[${index}]`, ref);
   }
-}
-
-function requireStringArray(owner, obj, key) {
-  if (obj?.[key] === undefined) return undefined;
-  if (!Array.isArray(obj[key]) || obj[key].some((item) => typeof item !== 'string' || item.trim() === '')) {
-    errors.push(`${owner}.${key} must be a sequence of non-empty strings when present`);
-    return undefined;
-  }
-  return obj[key];
 }
 
 function validateSchemaFile(relPath, schema) {
@@ -315,12 +378,46 @@ function validateSchemaFile(relPath, schema) {
   }
 }
 
-const pendingPathChecks = [];
+function validateCheckFile(relPath, check) {
+  const owner = relPath;
+  requireString(owner, check, 'id');
+  const type = requireString(owner, check, 'type');
+  const severity = requireString(owner, check, 'severity');
+  if (type && !['command', 'schema_validation', 'human', 'model_judge', 'adapter_sync'].includes(type)) {
+    errors.push(`${owner}.type must be one of command, schema_validation, human, model_judge, adapter_sync`);
+  }
+  if (severity && !['blocking', 'warning', 'advisory'].includes(severity)) {
+    errors.push(`${owner}.severity must be one of blocking, warning, advisory`);
+  }
+  if (type === 'command') requireString(owner, check, 'command');
+
+  if (isObject(check.applies_to)) {
+    requireStringArray(`${owner}.applies_to`, check.applies_to, 'contracts');
+  }
+  if (isObject(check.evidence)) {
+    requireString(owner, check.evidence, 'write_to');
+  }
+}
 
 for (const dir of requiredDirs) {
   if (!(await exists(dir))) {
     errors.push(`missing required directory: ${dir}`);
   }
+}
+
+const policiesByPath = new Map();
+const policyDir = path.join(repoRoot, '.harness/policies');
+let policyFiles = [];
+try {
+  policyFiles = (await readdir(policyDir)).filter((name) => name.endsWith('.yml') || name.endsWith('.yaml'));
+} catch {
+  policyFiles = [];
+}
+for (const file of policyFiles) {
+  const rel = `.harness/policies/${file}`;
+  const policy = await readYaml(rel);
+  validatePolicyFile(rel, policy);
+  policiesByPath.set(rel, policy);
 }
 
 const workflowsDir = path.join(repoRoot, '.harness/workflows');
@@ -330,36 +427,45 @@ try {
 } catch {
   workflowFiles = [];
 }
-
 for (const file of workflowFiles) {
   const rel = `.harness/workflows/${file}`;
-  validateWorkflow(rel, await readYaml(rel));
+  validateWorkflow(rel, await readYaml(rel), policiesByPath);
 }
 
-const rulepackDir = path.join(repoRoot, '.harness/rulepacks');
+const rulepackDir = path.join(repoRoot, '.harness/policies/rulepacks');
 let rulepackFiles = [];
 try {
   rulepackFiles = (await readdir(rulepackDir)).filter((name) => name.endsWith('.yml') || name.endsWith('.yaml'));
 } catch {
   rulepackFiles = [];
 }
-
 for (const file of rulepackFiles) {
-  const rel = `.harness/rulepacks/${file}`;
+  const rel = `.harness/policies/rulepacks/${file}`;
   validateRulepack(rel, await readYaml(rel));
 }
 
-const schemasDir = path.join(repoRoot, '.harness/schemas');
+const schemasDir = path.join(repoRoot, '.harness/artifacts/schemas');
 let schemaFiles = [];
 try {
   schemaFiles = (await readdir(schemasDir)).filter((name) => name.endsWith('.yml') || name.endsWith('.yaml'));
 } catch {
   schemaFiles = [];
 }
-
 for (const file of schemaFiles) {
-  const rel = `.harness/schemas/${file}`;
+  const rel = `.harness/artifacts/schemas/${file}`;
   validateSchemaFile(rel, await readYaml(rel));
+}
+
+const checksDir = path.join(repoRoot, '.harness/checks');
+let checkFiles = [];
+try {
+  checkFiles = (await readdir(checksDir)).filter((name) => name.endsWith('.yml') || name.endsWith('.yaml'));
+} catch {
+  checkFiles = [];
+}
+for (const file of checkFiles) {
+  const rel = `.harness/checks/${file}`;
+  validateCheckFile(rel, await readYaml(rel));
 }
 
 for (const [owner, relPath] of pendingPathChecks) {

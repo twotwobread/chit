@@ -6,8 +6,8 @@
 
 ## Behavior
 
-Review `feature.spec.yaml` against the spec-review contract, applicable rulepack entries, and classification risk. For high-risk/high-ambiguity work, require stricter evidence and explicit approval before implementation.
+Review `feature.spec.md` against the spec-review contract, applicable rulepack entries, and classification risk. For high-risk/high-ambiguity work, require stricter evidence and explicit approval before implementation.
 
 ## Output
 
-Write `.harness/runs/<run-id>/spec-review.md` with an explicit verdict.
+Write `.harness/runs/<run-id>/artifacts/spec-review.md` with an explicit verdict.

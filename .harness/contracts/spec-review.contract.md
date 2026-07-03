@@ -6,13 +6,13 @@ Verify that the canonical spec is safe to implement.
 
 ## Inputs
 
-- `.harness/runs/<run-id>/classification.yaml`.
-- `.harness/runs/<run-id>/feature.spec.yaml`.
+- `.harness/runs/<run-id>/artifacts/classification.yaml`.
+- `.harness/runs/<run-id>/artifacts/feature.spec.md`.
 - Applicable phase and risk rules.
 
 ## Output
 
-`.harness/runs/<run-id>/spec-review.md`
+`.harness/runs/<run-id>/artifacts/spec-review.md`
 
 Required sections:
 

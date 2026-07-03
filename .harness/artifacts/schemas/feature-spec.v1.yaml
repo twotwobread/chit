@@ -19,4 +19,4 @@ fields:
     required: [name, evidence]
 notes:
   - This is a lightweight schema draft for agent-readable canonical artifacts.
-  - Add executable validation in .harness/gates/check-spec when needed.
+  - Add executable validation in .harness/checks/spec-schema-valid when needed.

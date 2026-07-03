@@ -1,0 +1,15 @@
+run_id: <run-id>
+workflow: feature-start
+policy: .harness/policies/default.yml
+status: in_progress
+current_phase: intake.triage
+route: pending
+tier: pending
+artifacts:
+  user_request: artifacts/user-request.md
+  classification: artifacts/classification.yaml
+  ledger: artifacts/ledger.md
+  verification: artifacts/verification.md
+tier_history:
+  - tier: pending
+    reason: Run envelope created before scope classification.

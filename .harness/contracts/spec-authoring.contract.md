@@ -7,13 +7,13 @@ Create the canonical implementation-ready feature spec for the current run.
 ## Inputs
 
 - User request and linked issue/spec when present.
-- `.harness/runs/<run-id>/classification.yaml`.
+- `.harness/runs/<run-id>/artifacts/classification.yaml`.
 - Applicable rulepack entries for `spec.author`.
 - Existing source-of-truth files only when needed to verify facts.
 
 ## Output
 
-`.harness/runs/<run-id>/feature.spec.yaml`
+`.harness/runs/<run-id>/artifacts/feature.spec.md`
 
 Minimum fields:
 
@@ -40,7 +40,7 @@ provider:
 
 ## Done conditions
 
-- Downstream phases can implement from `feature.spec.yaml` without reading provider-private state.
+- Downstream phases can implement from `feature.spec.md` without reading provider-private state.
 - Product/domain/UX unknowns remain in `open_questions`; they are not converted into guesses.
 - High-risk or high-ambiguity specs record the clarification/seed source used by the provider.
 - Small specs may be concise, but must still include acceptance criteria and test plan.

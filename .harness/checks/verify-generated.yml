@@ -1,0 +1,10 @@
+id: verify-generated
+type: command
+severity: blocking
+command: pnpm verify:generated
+applies_to:
+  contracts:
+    - implementation.execute
+    - evaluation.checklist
+evidence:
+  write_to: artifacts/checks/verify-generated.log
