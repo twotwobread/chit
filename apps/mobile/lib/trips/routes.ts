@@ -37,6 +37,10 @@ export function tripItineraryPath(tripId: string): `/trips/${string}/itinerary` 
   return `/trips/${tripId}/itinerary`;
 }
 
+export function tripItineraryDayPath(tripId: string, tripDayId: string): `/trips/${string}/itinerary?dayId=${string}` {
+  return `/trips/${tripId}/itinerary?dayId=${tripDayId}`;
+}
+
 export function tripSettlePath(tripId: string): `/trips/${string}/settle` {
   return `/trips/${tripId}/settle`;
 }
@@ -88,7 +92,7 @@ export function tripFallbackPath(input: TripRouteFallbackInput): Href {
     case 'dayPlaceSearch':
     case 'dayPlaceNew':
     case 'dayQuickExpense':
-      return `/trips/${input.tripId}/days/${input.tripDayId}` as Href;
+      return tripItineraryDayPath(input.tripId, input.tripDayId);
     default: {
       const exhaustive: never = input;
       throw new Error(`Unsupported trip route fallback input: ${JSON.stringify(exhaustive)}`);
@@ -126,7 +130,7 @@ export function tripFallbackPathForPathname(pathname: string, tripId: string): H
     if (suffix === 'expenses/quick') {
       return tripFallbackPath({ kind: 'dayQuickExpense', tripId, tripDayId });
     }
-    return tripFallbackPath({ kind: 'day', tripId });
+    return tripItineraryDayPath(tripId, tripDayId);
   }
 
   if (isTripRootTabPath(normalizedPathname, tripId)) {

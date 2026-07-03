@@ -1,29 +1,13 @@
 import { useCallback, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { router, useFocusEffect, useLocalSearchParams, type Href } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 
-import { ApiError } from '@i-um/api-contract';
+import { ApiError, type TripDay } from '@i-um/api-contract';
 
 import { MobileAuthError } from '../../../../lib/auth/client';
-import { PrimaryButton, theme } from '../../../../lib/design';
 import { DayChips } from '../../../../lib/trip-ui/DayChips';
-import { ItineraryTimeline } from '../../../../lib/trip-ui/ItineraryTimeline';
+import { DayItineraryEditor } from '../../../../lib/trip-ui/DayItineraryEditor';
 import { TripScreen, TripScreenHeader, TripStateCard } from '../../../../lib/trip-ui/TripScreenScaffold';
-import { getTripDayItinerary, getTripDetail } from '../../../../lib/trips/client';
-import {
-  type DayItineraryViewModel,
-  buildDayItineraryRoute,
-  buildDayItineraryViewModel,
-} from '../../../../lib/trips/day-itinerary';
-import {
-  ITINERARY_TAB_ADD_CTA_LABEL,
-  ITINERARY_TAB_ADD_NON_PLACE_CTA_LABEL,
-  ITINERARY_TAB_EMPTY_HELPER,
-  ITINERARY_TAB_EMPTY_TITLE,
-  ITINERARY_TAB_REORDER_CTA_LABEL,
-  buildItineraryTimelineItems,
-} from '../../../../lib/trips/itinerary-tab';
-import { buildDayItineraryAddPlaceSearchRoute } from '../../../../lib/trips/day-itinerary-add-place-navigation';
+import { getTripDetail } from '../../../../lib/trips/client';
 import { tripDetailPath } from '../../../../lib/trips/routes';
 import { localDateString } from '../../../../lib/trips/status';
 import { buildTripMapDayChips, resolveTripMapSelectedDay } from '../../../../lib/trips/trip-map';
@@ -33,8 +17,7 @@ type ItineraryState =
   | {
       status: 'success';
       dayChips: ReturnType<typeof buildTripMapDayChips>;
-      selectedDayId: string;
-      viewModel: DayItineraryViewModel;
+      selectedDay: TripDay;
     }
   | { status: 'emptyDays'; tripId: string }
   | { status: 'auth' }
@@ -42,13 +25,17 @@ type ItineraryState =
   | { status: 'error' };
 
 export default function TripItineraryTabScreen() {
-  const { tripId: tripIdParam } = useLocalSearchParams<{ tripId?: string | string[] }>();
+  const { tripId: tripIdParam, dayId: dayIdParam } = useLocalSearchParams<{
+    tripId?: string | string[];
+    dayId?: string | string[];
+  }>();
   const tripId = Array.isArray(tripIdParam) ? tripIdParam[0] : tripIdParam;
+  const routeDayId = Array.isArray(dayIdParam) ? dayIdParam[0] : dayIdParam;
   const selectedDayIdRef = useRef<string | null>(null);
   const [state, setState] = useState<ItineraryState>({ status: 'loading' });
 
   const load = useCallback(
-    async (preferredDayId: string | null = selectedDayIdRef.current) => {
+    async (preferredDayId: string | null = routeDayId ?? selectedDayIdRef.current) => {
       if (!tripId) {
         setState({ status: 'notFound' });
         return;
@@ -69,30 +56,53 @@ export default function TripItineraryTabScreen() {
           return;
         }
 
-        const itinerary = await getTripDayItinerary(tripId, selectedDay.id);
         selectedDayIdRef.current = selectedDay.id;
         setState({
           status: 'success',
           dayChips: buildTripMapDayChips(detail.days),
-          selectedDayId: selectedDay.id,
-          viewModel: buildDayItineraryViewModel(itinerary),
+          selectedDay,
         });
       } catch (error) {
         setState(itineraryFailureState(error));
       }
     },
-    [tripId],
+    [routeDayId, tripId],
   );
 
   useFocusEffect(
     useCallback(() => {
-      void load();
-    }, [load]),
+      void load(routeDayId ?? selectedDayIdRef.current);
+    }, [load, routeDayId]),
   );
+
+  const selectDay = (dayId: string) => {
+    selectedDayIdRef.current = dayId;
+    if (tripId) {
+      router.setParams({ dayId });
+    }
+    void load(dayId);
+  };
+
+  if (state.status === 'success') {
+    return (
+      <DayItineraryEditor
+        date={state.selectedDay.id}
+        headerContent={
+          <>
+            <TripScreenHeader helper="Day별 일정을 선택해 추가·수정·삭제·순서 변경을 한곳에서 처리해요." title="일정" />
+            <DayChips days={state.dayChips} selectedDayId={state.selectedDay.id} onSelectDay={selectDay} />
+          </>
+        }
+        key={state.selectedDay.id}
+        showHeader={false}
+        tripId={tripId ?? ''}
+      />
+    );
+  }
 
   return (
     <TripScreen>
-      <TripScreenHeader helper="Day별 일정을 선택해 순서대로 확인해요." title="일정" />
+      <TripScreenHeader helper="Day별 일정을 선택해 추가·수정·삭제·순서 변경을 한곳에서 처리해요." title="일정" />
 
       {state.status === 'loading' ? <TripStateCard loading title="일정을 불러오는 중..." /> : null}
       {state.status === 'auth' ? (
@@ -116,75 +126,7 @@ export default function TripItineraryTabScreen() {
         />
       ) : null}
       {state.status === 'emptyDays' ? <EmptyDaysState tripId={state.tripId} /> : null}
-      {state.status === 'success' ? (
-        <ItineraryContent
-          onSelectDay={(dayId) => void load(dayId)}
-          selectedDayId={state.selectedDayId}
-          dayChips={state.dayChips}
-          tripId={tripId ?? ''}
-          viewModel={state.viewModel}
-        />
-      ) : null}
     </TripScreen>
-  );
-}
-
-function ItineraryContent({
-  dayChips,
-  onSelectDay,
-  selectedDayId,
-  tripId,
-  viewModel,
-}: {
-  dayChips: ReturnType<typeof buildTripMapDayChips>;
-  selectedDayId: string;
-  viewModel: DayItineraryViewModel;
-  tripId: string;
-  onSelectDay: (dayId: string) => void;
-}) {
-  const detailRoute = buildDayItineraryRoute(tripId, selectedDayId);
-  const addPlaceRoute = buildDayItineraryAddPlaceSearchRoute(tripId, selectedDayId);
-  const nonPlaceRoute = `${detailRoute}?action=nonPlace` as Href;
-  const reorderRoute = `${detailRoute}?action=reorder` as Href;
-  const timelineItems = buildItineraryTimelineItems(viewModel);
-  const canReorder = viewModel.status === 'success' && viewModel.items.length >= 2;
-
-  return (
-    <>
-      <DayChips days={dayChips} selectedDayId={selectedDayId} onSelectDay={onSelectDay} />
-      <View style={styles.summaryWrap}>
-        <Text style={styles.summaryTitle}>{viewModel.dayLabel} 일정</Text>
-        <Text style={styles.summaryHelper}>{viewModel.formattedDate}</Text>
-      </View>
-      <View style={styles.actionWrap}>
-        <PrimaryButton label={ITINERARY_TAB_ADD_CTA_LABEL} onPress={() => router.push(addPlaceRoute)} />
-        <View style={styles.secondaryActionRow}>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => router.push(nonPlaceRoute)}
-            style={styles.secondaryActionButton}
-          >
-            <Text style={styles.secondaryActionText}>{ITINERARY_TAB_ADD_NON_PLACE_CTA_LABEL}</Text>
-          </Pressable>
-          {canReorder ? (
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => router.push(reorderRoute)}
-              style={styles.secondaryActionButton}
-            >
-              <Text style={styles.secondaryActionText}>{ITINERARY_TAB_REORDER_CTA_LABEL}</Text>
-            </Pressable>
-          ) : null}
-        </View>
-      </View>
-      {timelineItems.length > 0 ? (
-        <View style={styles.timelineWrap}>
-          <ItineraryTimeline items={timelineItems} />
-        </View>
-      ) : (
-        <TripStateCard helper={ITINERARY_TAB_EMPTY_HELPER} title={ITINERARY_TAB_EMPTY_TITLE} />
-      )}
-    </>
   );
 }
 
@@ -212,54 +154,3 @@ function itineraryFailureState(error: unknown): ItineraryState {
   }
   return { status: 'error' };
 }
-
-const styles = StyleSheet.create({
-  actionWrap: {
-    gap: theme.space[3],
-    maxWidth: theme.layout.cardMaxW,
-    width: '100%',
-  },
-  secondaryActionButton: {
-    alignItems: 'center',
-    borderColor: theme.color.primary,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    flex: 1,
-    justifyContent: 'center',
-    minHeight: theme.layout.controlH,
-    paddingHorizontal: theme.space[3],
-    paddingVertical: theme.space[3],
-  },
-  secondaryActionRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: theme.space[3],
-  },
-  secondaryActionText: {
-    color: theme.color.primary,
-    fontFamily: theme.font.family.bold,
-    fontWeight: theme.font.weight.bold,
-    textAlign: 'center',
-  },
-  summaryHelper: {
-    color: theme.color.textMuted,
-    fontFamily: theme.font.family.regular,
-    fontSize: theme.font.size.caption,
-  },
-  summaryTitle: {
-    color: theme.color.textStrong,
-    fontFamily: theme.font.family.bold,
-    fontSize: theme.font.size.subhead,
-    fontWeight: theme.font.weight.bold,
-  },
-  summaryWrap: {
-    gap: theme.space[1],
-    maxWidth: theme.layout.cardMaxW,
-    width: '100%',
-  },
-  timelineWrap: {
-    gap: theme.space[4],
-    maxWidth: theme.layout.cardMaxW,
-    width: '100%',
-  },
-});

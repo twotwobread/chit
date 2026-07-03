@@ -1,5 +1,3 @@
-import type { Href } from 'expo-router';
-
 import type {
   GetDayScheduleItemsResponse,
   NonPlaceScheduleItemCategory,
@@ -69,10 +67,6 @@ export type DayItineraryFailureViewModel =
       title: string;
       helper: string;
     };
-
-export function buildDayItineraryRoute(tripId: string, tripDayId: string): Href {
-  return `/trips/${tripId}/days/${tripDayId}` as Href;
-}
 
 export function getPlaceTypeLabel(placeType: TripPlaceType): string {
   return theme.placeType[placeType].label;

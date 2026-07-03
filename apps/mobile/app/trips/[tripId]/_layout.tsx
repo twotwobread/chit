@@ -342,7 +342,6 @@ export default function TripLayout() {
             <Stack.Screen name="detail" />
             <Stack.Screen name="edit" />
             <Stack.Screen name="participants" />
-            <Stack.Screen name="days/[date]" />
             <Stack.Screen name="days/[date]/place-search" />
             <Stack.Screen name="days/[date]/places/new" />
             <Stack.Screen name="days/[date]/expenses/quick" />

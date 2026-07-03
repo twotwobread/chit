@@ -19,7 +19,8 @@ import {
   listTripParticipants,
   updateExpense,
 } from '../../../../../../lib/trips/client';
-import { buildDayItineraryRoute, getScheduleItems } from '../../../../../../lib/trips/day-itinerary';
+import { getScheduleItems } from '../../../../../../lib/trips/day-itinerary';
+import { tripItineraryDayPath } from '../../../../../../lib/trips/routes';
 import {
   buildCreateQuickExpenseRequest,
   buildDefaultSplitParticipantIds,
@@ -266,7 +267,7 @@ export default function QuickExpenseScreen() {
       router.replace('/');
       return;
     }
-    router.replace(buildDayItineraryRoute(tripId, date));
+    router.replace(tripItineraryDayPath(tripId, date));
   };
 
   return (

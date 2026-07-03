@@ -2,8 +2,8 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 
 import { theme } from '../../../../../../lib/design';
-import { buildDayItineraryRoute } from '../../../../../../lib/trips/day-itinerary';
 import { buildGooglePlaceSearchRoute } from '../../../../../../lib/places/google-search';
+import { tripItineraryDayPath } from '../../../../../../lib/trips/routes';
 
 export default function NewManualPlaceScreen() {
   const { tripId: tripIdParam, date: dateParam } = useLocalSearchParams<{
@@ -23,7 +23,7 @@ export default function NewManualPlaceScreen() {
 
   const backToDay = () => {
     if (tripId && date) {
-      router.replace(buildDayItineraryRoute(tripId, date));
+      router.replace(tripItineraryDayPath(tripId, date));
       return;
     }
     router.replace('/');

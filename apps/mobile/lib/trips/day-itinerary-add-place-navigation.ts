@@ -2,7 +2,7 @@ import type { Href } from 'expo-router';
 
 import { buildGooglePlaceSearchRoute } from '../places/google-search';
 
-import { buildDayItineraryRoute } from './day-itinerary';
+import { tripItineraryDayPath } from './routes';
 
 export type DayItineraryAddPlaceReturnParam = string | string[] | undefined;
 
@@ -11,7 +11,7 @@ export type DayItineraryAddPlaceReturnNavigation =
   | { kind: 'replaceWithDay'; href: Href };
 
 const dayItineraryAddPlaceReturnParamName = 'returnTo';
-const dayItineraryAddPlaceReturnToDayValue = 'day-detail';
+const dayItineraryAddPlaceReturnToDayValue = 'itinerary-tab';
 
 export function buildDayItineraryAddPlaceSearchRoute(tripId: string, date: string): Href {
   const searchRoute = buildGooglePlaceSearchRoute(tripId, date);
@@ -33,7 +33,7 @@ export function resolveDayItineraryAddPlaceReturnNavigation({
   date: string;
   returnTo?: DayItineraryAddPlaceReturnParam;
 }): DayItineraryAddPlaceReturnNavigation {
-  const href = buildDayItineraryRoute(tripId, date);
+  const href = tripItineraryDayPath(tripId, date);
   if (isDayItineraryAddPlaceReturnToDay(returnTo)) {
     return { kind: 'dismissToDay', href };
   }
