@@ -10,7 +10,7 @@ import {
   ITINERARY_TAB_REORDER_CTA_LABEL,
 } from './itinerary-tab';
 
-test('buildItineraryTimelineItems maps selected day rows to order-only timeline items', () => {
+test('buildItineraryTimelineItems maps selected day rows to timeline presentation items', () => {
   assert.deepEqual(
     buildItineraryTimelineItems({
       status: 'success',
@@ -22,6 +22,7 @@ test('buildItineraryTimelineItems maps selected day rows to order-only timeline 
           version: 1,
           orderLabel: '1',
           isLodging: true,
+          statusLabel: '완료',
           placeId: 'place-1',
           placeName: '우메다 공중정원',
           placeType: 'sights',
@@ -36,6 +37,7 @@ test('buildItineraryTimelineItems maps selected day rows to order-only timeline 
           version: 1,
           orderLabel: '2',
           isLodging: false,
+          statusLabel: '건너뜀',
           placeId: 'place-2',
           placeName: '도톤보리',
           placeType: 'food',
@@ -55,7 +57,7 @@ test('buildItineraryTimelineItems maps selected day rows to order-only timeline 
         area: 'Umeda',
         startTime: '09:30',
         endTime: '11:00',
-        status: 'todo',
+        status: 'done',
         isLodging: true,
       },
       {
@@ -66,7 +68,7 @@ test('buildItineraryTimelineItems maps selected day rows to order-only timeline 
         area: '식당',
         startTime: null,
         endTime: null,
-        status: 'todo',
+        status: 'skipped',
         isLodging: false,
       },
     ],

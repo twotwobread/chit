@@ -31,6 +31,7 @@ import {
 
 import { MobileAuthError } from '../auth/client';
 import { Badge, PlacePin, PlaceTag, theme } from '../design';
+import { ItineraryTimeline, type ItineraryTimelineItem } from './ItineraryTimeline';
 import {
   buildDayItineraryPlaceAccessibilityLabel,
   buildDayItineraryViewModel,
@@ -88,6 +89,11 @@ import {
   type NonPlaceScheduleItemFormValues,
 } from '../trips/non-place-schedule-item';
 import { buildDayItineraryAddPlaceSearchRoute } from '../trips/day-itinerary-add-place-navigation';
+import {
+  ITINERARY_TAB_EMPTY_HELPER,
+  ITINERARY_TAB_EMPTY_TITLE,
+  buildItineraryTimelineItems,
+} from '../trips/itinerary-tab';
 import { tripItineraryDayPath, tripItineraryPath } from '../trips/routes';
 import {
   clearDayLodgingPlace,
@@ -1496,15 +1502,29 @@ function DayItineraryContent({
       : lodgingState.status === 'clearing'
         ? { kind: 'clear', itemId: lodgingState.itemId }
         : null;
-  const dayHeadingRef = useRef<Text>(null);
   const emptyStateRef = useRef<View>(null);
   const rowRefs = useRef<Record<string, Text | null>>({});
   const deleteTriggerRefs = useRef<Record<string, View | null>>({});
+  const timelineItems = buildItineraryTimelineItems(viewModel);
+  const itineraryItemsById = new Map(
+    viewModel.status === 'success' ? viewModel.items.map((item) => [item.id, item] as const) : [],
+  );
 
   useEffect(() => {
     if (!focusRequest) {
       return;
     }
+
+    const focusFallback = () => {
+      if (viewModel.status === 'success') {
+        for (const item of viewModel.items) {
+          if (focusAccessibilityNode(rowRefs.current[item.id])) {
+            return;
+          }
+        }
+      }
+      focusAccessibilityNode(emptyStateRef.current);
+    };
 
     if (focusRequest.target.kind === 'deleteTrigger') {
       if (!focusAccessibilityNode(deleteTriggerRefs.current[focusRequest.target.itemId])) {
@@ -1516,7 +1536,7 @@ function DayItineraryContent({
 
     if (focusRequest.target.kind === 'placeRow') {
       if (!focusAccessibilityNode(rowRefs.current[focusRequest.target.itemId])) {
-        focusAccessibilityNode(dayHeadingRef.current);
+        focusFallback();
       }
       onFocusRequestHandled();
       return;
@@ -1524,25 +1544,79 @@ function DayItineraryContent({
 
     if (focusRequest.target.kind === 'emptyState') {
       if (!focusAccessibilityNode(emptyStateRef.current)) {
-        focusAccessibilityNode(dayHeadingRef.current);
+        focusFallback();
       }
       onFocusRequestHandled();
       return;
     }
 
-    focusAccessibilityNode(dayHeadingRef.current);
+    focusFallback();
     onFocusRequestHandled();
-  }, [focusRequest, onFocusRequestHandled]);
+  }, [focusRequest, onFocusRequestHandled, viewModel]);
+
+  const renderTimelineActions = (timelineItem: ItineraryTimelineItem) => {
+    const item = itineraryItemsById.get(timelineItem.id);
+    if (!item) {
+      return null;
+    }
+
+    const lodging = buildDayLodgingRowViewModel(item, lodgingSubmittingState);
+    const mapActions = buildDayItineraryMapRowActions(item);
+
+    return (
+      <View style={styles.rowActionGroup}>
+        {item.itemType !== 'non_place' ? (
+          <>
+            <Pressable
+              accessibilityLabel={mapActions.map.accessibilityLabel}
+              accessibilityRole="button"
+              onPress={() => onOpenMap(item)}
+              style={styles.rowActionButton}
+            >
+              <Text style={styles.rowActionText}>{mapActions.map.label}</Text>
+            </Pressable>
+            <Pressable
+              accessibilityHint={mapActions.copy.disabled ? mapActions.copy.disabledHelper : undefined}
+              accessibilityLabel={mapActions.copy.accessibilityLabel}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: mapActions.copy.disabled }}
+              disabled={mapActions.copy.disabled}
+              onPress={() => onCopyAddress(item)}
+              style={[styles.rowActionButton, mapActions.copy.disabled ? styles.rowActionButtonDisabled : null]}
+            >
+              <Text style={styles.rowActionText}>{mapActions.copy.label}</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              disabled={lodging.action.disabled}
+              onPress={() => (lodging.action.kind === 'set' ? onSetLodging(item) : onClearLodging(item))}
+              style={[styles.rowActionButton, lodging.action.disabled ? styles.rowActionButtonDisabled : null]}
+            >
+              {lodging.action.isSubmitting ? <ActivityIndicator color={theme.color.primary} /> : null}
+              <Text style={styles.rowActionText}>{lodging.action.label}</Text>
+            </Pressable>
+          </>
+        ) : null}
+        <Pressable accessibilityRole="button" onPress={() => onEditPlace(item)} style={styles.rowActionButton}>
+          <Text style={styles.rowActionText}>수정</Text>
+        </Pressable>
+        <Pressable
+          ref={(node) => {
+            deleteTriggerRefs.current[item.id] = node;
+          }}
+          accessibilityLabel={`${item.placeName} 삭제`}
+          accessibilityRole="button"
+          onPress={() => onDeletePlace(item, findNodeHandle(deleteTriggerRefs.current[item.id]))}
+          style={styles.rowDangerActionButton}
+        >
+          <Text style={styles.rowDangerActionText}>삭제</Text>
+        </Pressable>
+      </View>
+    );
+  };
 
   return (
     <View style={styles.card}>
-      <View style={styles.dayHeader}>
-        <Text ref={dayHeadingRef} accessibilityRole="header" style={styles.dayLabel}>
-          {viewModel.dayLabel}
-        </Text>
-        <Text style={styles.dayDate}>{viewModel.formattedDate}</Text>
-      </View>
-
       <DayLodgingPanel
         lodgingState={lodgingState}
         onCancelPicker={onCancelLodgingPicker}
@@ -1560,11 +1634,13 @@ function DayItineraryContent({
         <View
           ref={emptyStateRef}
           accessible
-          accessibilityLabel={`${viewModel.title}. ${viewModel.helper}`}
-          style={styles.emptyBox}
+          accessibilityLabel={`${ITINERARY_TAB_EMPTY_TITLE}. ${ITINERARY_TAB_EMPTY_HELPER}`}
         >
-          <Text style={styles.emptyTitle}>{viewModel.title}</Text>
-          <Text style={styles.message}>{viewModel.helper}</Text>
+          <ItineraryTimeline
+            emptyHelper={ITINERARY_TAB_EMPTY_HELPER}
+            emptyTitle={ITINERARY_TAB_EMPTY_TITLE}
+            items={timelineItems}
+          />
         </View>
       ) : null}
 
@@ -1580,97 +1656,17 @@ function DayItineraryContent({
               onMoveItem={onMoveReorderItem}
             />
           ) : (
-            viewModel.items.map((item) => {
-              const lodging = buildDayLodgingRowViewModel(item, lodgingSubmittingState);
-              const mapActions = buildDayItineraryMapRowActions(item);
-              return (
-                <View key={item.id} style={styles.placeRow}>
-                  <PlacePin order={item.orderLabel} type={item.placeType} />
-                  <View style={styles.placeContent}>
-                    <View style={styles.placeTitleRow}>
-                      <Text
-                        ref={(node) => {
-                          rowRefs.current[item.id] = node;
-                        }}
-                        accessibilityLabel={buildDayItineraryPlaceAccessibilityLabel(item)}
-                        style={styles.placeName}
-                      >
-                        {item.placeName}
-                      </Text>
-                      {item.itemType === 'non_place' ? (
-                        <Badge label={item.placeTypeLabel} tone="primary" />
-                      ) : (
-                        <PlaceTag type={item.placeType} />
-                      )}
-                      {item.statusLabel ? <Badge label={item.statusLabel} tone="neutral" /> : null}
-                      {lodging.badgeLabel && item.itemType !== 'non_place' ? (
-                        <Badge label={lodging.badgeLabel} tone="primary" />
-                      ) : null}
-                    </View>
-                    {item.timeLabel ? <Text style={styles.timeLabel}>{item.timeLabel}</Text> : null}
-                    {item.address ? <Text style={styles.address}>{item.address}</Text> : null}
-                    <View style={styles.rowActionGroup}>
-                      {item.itemType !== 'non_place' ? (
-                        <>
-                          <Pressable
-                            accessibilityLabel={mapActions.map.accessibilityLabel}
-                            accessibilityRole="button"
-                            onPress={() => onOpenMap(item)}
-                            style={styles.rowActionButton}
-                          >
-                            <Text style={styles.rowActionText}>{mapActions.map.label}</Text>
-                          </Pressable>
-                          <Pressable
-                            accessibilityHint={mapActions.copy.disabled ? mapActions.copy.disabledHelper : undefined}
-                            accessibilityLabel={mapActions.copy.accessibilityLabel}
-                            accessibilityRole="button"
-                            accessibilityState={{ disabled: mapActions.copy.disabled }}
-                            disabled={mapActions.copy.disabled}
-                            onPress={() => onCopyAddress(item)}
-                            style={[
-                              styles.rowActionButton,
-                              mapActions.copy.disabled ? styles.rowActionButtonDisabled : null,
-                            ]}
-                          >
-                            <Text style={styles.rowActionText}>{mapActions.copy.label}</Text>
-                          </Pressable>
-                          <Pressable
-                            accessibilityRole="button"
-                            disabled={lodging.action.disabled}
-                            onPress={() => (lodging.action.kind === 'set' ? onSetLodging(item) : onClearLodging(item))}
-                            style={[
-                              styles.rowActionButton,
-                              lodging.action.disabled ? styles.rowActionButtonDisabled : null,
-                            ]}
-                          >
-                            {lodging.action.isSubmitting ? <ActivityIndicator color={theme.color.primary} /> : null}
-                            <Text style={styles.rowActionText}>{lodging.action.label}</Text>
-                          </Pressable>
-                        </>
-                      ) : null}
-                      <Pressable
-                        accessibilityRole="button"
-                        onPress={() => onEditPlace(item)}
-                        style={styles.rowActionButton}
-                      >
-                        <Text style={styles.rowActionText}>수정</Text>
-                      </Pressable>
-                      <Pressable
-                        ref={(node) => {
-                          deleteTriggerRefs.current[item.id] = node;
-                        }}
-                        accessibilityLabel={`${item.placeName} 삭제`}
-                        accessibilityRole="button"
-                        onPress={() => onDeletePlace(item, findNodeHandle(deleteTriggerRefs.current[item.id]))}
-                        style={styles.rowDangerActionButton}
-                      >
-                        <Text style={styles.rowDangerActionText}>삭제</Text>
-                      </Pressable>
-                    </View>
-                  </View>
-                </View>
-              );
-            })
+            <ItineraryTimeline
+              getItemAccessibilityLabel={(timelineItem) => {
+                const item = itineraryItemsById.get(timelineItem.id);
+                return item ? buildDayItineraryPlaceAccessibilityLabel(item) : timelineItem.name;
+              }}
+              items={timelineItems}
+              onItemNameRef={(timelineItem, node) => {
+                rowRefs.current[timelineItem.id] = node;
+              }}
+              renderActions={renderTimelineActions}
+            />
           )}
         </View>
       ) : null}

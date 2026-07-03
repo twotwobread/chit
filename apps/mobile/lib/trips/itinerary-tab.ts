@@ -20,7 +20,18 @@ export function buildItineraryTimelineItems(viewModel: DayItineraryViewModel): I
     area: item.address || item.placeTypeLabel,
     startTime: item.startTime,
     endTime: item.endTime,
-    status: 'todo',
+    status: dayItineraryStatusToTimelineStatus(item.statusLabel),
     isLodging: item.isLodging,
   }));
+}
+
+function dayItineraryStatusToTimelineStatus(statusLabel?: string): ItineraryTimelineItem['status'] {
+  switch (statusLabel) {
+    case '완료':
+      return 'done';
+    case '건너뜀':
+      return 'skipped';
+    default:
+      return 'todo';
+  }
 }
