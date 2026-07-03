@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Clock } from 'lucide-react-native';
 
@@ -17,14 +18,20 @@ export type ItineraryTimelineProps = {
   emptyHelper?: string;
   onPressItem?: (item: ItineraryTimelineItem) => void;
   onPressTime?: (item: ItineraryTimelineItem) => void;
+  getItemAccessibilityLabel?: (item: ItineraryTimelineItem) => string;
+  onItemNameRef?: (item: ItineraryTimelineItem, node: Text | null) => void;
+  renderActions?: (item: ItineraryTimelineItem) => ReactNode;
 };
 
 export function ItineraryTimeline({
   emptyHelper = 'Day를 선택하거나 장소를 추가하면 일정이 여기에 보여요.',
   emptyTitle = '아직 등록된 일정이 없어요',
+  getItemAccessibilityLabel,
   items,
+  onItemNameRef,
   onPressItem,
   onPressTime,
+  renderActions,
 }: ItineraryTimelineProps) {
   if (items.length === 0) {
     return (
@@ -40,9 +47,25 @@ export function ItineraryTimeline({
     <View style={styles.wrap}>
       {buildItinerarySegments(items).map((segment) =>
         segment.kind === 'anchor' ? (
-          <AnchorRow item={segment.item} key={segment.item.id} onPressItem={onPressItem} onPressTime={onPressTime} />
+          <AnchorRow
+            getItemAccessibilityLabel={getItemAccessibilityLabel}
+            item={segment.item}
+            key={segment.item.id}
+            onItemNameRef={onItemNameRef}
+            onPressItem={onPressItem}
+            onPressTime={onPressTime}
+            renderActions={renderActions}
+          />
         ) : (
-          <UntimedSegment items={segment.items} key={segment.id} onPressItem={onPressItem} onPressTime={onPressTime} />
+          <UntimedSegment
+            getItemAccessibilityLabel={getItemAccessibilityLabel}
+            items={segment.items}
+            key={segment.id}
+            onItemNameRef={onItemNameRef}
+            onPressItem={onPressItem}
+            onPressTime={onPressTime}
+            renderActions={renderActions}
+          />
         ),
       )}
     </View>
@@ -50,13 +73,19 @@ export function ItineraryTimeline({
 }
 
 function AnchorRow({
+  getItemAccessibilityLabel,
   item,
+  onItemNameRef,
   onPressItem,
   onPressTime,
+  renderActions,
 }: {
   item: ItineraryTimelineItem;
   onPressItem?: (item: ItineraryTimelineItem) => void;
   onPressTime?: (item: ItineraryTimelineItem) => void;
+  getItemAccessibilityLabel?: (item: ItineraryTimelineItem) => string;
+  onItemNameRef?: (item: ItineraryTimelineItem, node: Text | null) => void;
+  renderActions?: (item: ItineraryTimelineItem) => ReactNode;
 }) {
   const duration = itineraryDurationLabel(item.startTime ?? '', item.endTime);
   const done = item.status === 'done' || item.status === 'skipped';
@@ -75,20 +104,33 @@ function AnchorRow({
           {item.note ? <Badge label={item.note} tone="amber" /> : null}
           {onPressTime ? <TimeButton item={item} onPressTime={onPressTime} /> : null}
         </View>
-        <TimelineCard done={done} item={item} onPressItem={onPressItem} />
+        <TimelineCard
+          done={done}
+          getItemAccessibilityLabel={getItemAccessibilityLabel}
+          item={item}
+          onItemNameRef={onItemNameRef}
+          onPressItem={onPressItem}
+          renderActions={renderActions}
+        />
       </View>
     </View>
   );
 }
 
 function UntimedSegment({
+  getItemAccessibilityLabel,
   items,
+  onItemNameRef,
   onPressItem,
   onPressTime,
+  renderActions,
 }: {
   items: ItineraryTimelineItem[];
   onPressItem?: (item: ItineraryTimelineItem) => void;
   onPressTime?: (item: ItineraryTimelineItem) => void;
+  getItemAccessibilityLabel?: (item: ItineraryTimelineItem) => string;
+  onItemNameRef?: (item: ItineraryTimelineItem, node: Text | null) => void;
+  renderActions?: (item: ItineraryTimelineItem) => ReactNode;
 }) {
   return (
     <View style={styles.row}>
@@ -105,7 +147,16 @@ function UntimedSegment({
             const done = item.status === 'done' || item.status === 'skipped';
             return (
               <View key={item.id} style={index === 0 ? null : styles.untimedItemGap}>
-                <TimelineCard compact done={done} item={item} onPressItem={onPressItem} onPressTime={onPressTime} />
+                <TimelineCard
+                  compact
+                  done={done}
+                  getItemAccessibilityLabel={getItemAccessibilityLabel}
+                  item={item}
+                  onItemNameRef={onItemNameRef}
+                  onPressItem={onPressItem}
+                  onPressTime={onPressTime}
+                  renderActions={renderActions}
+                />
               </View>
             );
           })}
@@ -118,23 +169,40 @@ function UntimedSegment({
 function TimelineCard({
   compact = false,
   done,
+  getItemAccessibilityLabel,
   item,
+  onItemNameRef,
   onPressItem,
   onPressTime,
+  renderActions,
 }: {
   compact?: boolean;
   done: boolean;
   item: ItineraryTimelineItem;
   onPressItem?: (item: ItineraryTimelineItem) => void;
   onPressTime?: (item: ItineraryTimelineItem) => void;
+  getItemAccessibilityLabel?: (item: ItineraryTimelineItem) => string;
+  onItemNameRef?: (item: ItineraryTimelineItem, node: Text | null) => void;
+  renderActions?: (item: ItineraryTimelineItem) => ReactNode;
 }) {
+  const actions = renderActions?.(item);
+  const accessibilityLabel = getItemAccessibilityLabel?.(item);
+
   const content = (
     <>
       <PlacePin faded={done} order={item.order} size={compact ? 30 : 32} type={item.type} />
       <View style={styles.cardBody}>
         <View style={styles.nameRow}>
-          <Text style={[styles.name, done ? styles.nameDone : null]}>{item.name}</Text>
+          <Text
+            accessibilityLabel={accessibilityLabel}
+            ref={(node) => onItemNameRef?.(item, node)}
+            style={[styles.name, done ? styles.nameDone : null]}
+          >
+            {item.name}
+          </Text>
           {item.status === 'next' ? <Badge label="다음" solid tone="primary" /> : null}
+          {item.status === 'done' ? <Badge label="완료" tone="neutral" /> : null}
+          {item.status === 'skipped' ? <Badge label="건너뜀" tone="neutral" /> : null}
           {item.isLodging ? <Badge label="숙소" tone="neutral" /> : null}
         </View>
         <View style={styles.metaRow}>
@@ -143,6 +211,7 @@ function TimelineCard({
           {item.addedBy ? <Text style={styles.meta}>· {item.addedBy} 추가</Text> : null}
         </View>
         {item.legLabel ? <Text style={styles.leg}>{item.legLabel}</Text> : null}
+        {actions ? <View style={styles.cardActions}>{actions}</View> : null}
       </View>
       {compact && onPressTime ? <TimeButton item={item} onPressTime={onPressTime} /> : null}
     </>
@@ -204,6 +273,9 @@ const styles = StyleSheet.create({
   cardBody: {
     flex: 1,
     gap: theme.space[2],
+  },
+  cardActions: {
+    marginTop: theme.space[1],
   },
   cardCompact: {
     marginTop: 0,
