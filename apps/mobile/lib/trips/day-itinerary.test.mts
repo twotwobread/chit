@@ -5,20 +5,12 @@ import type { GetDayScheduleItemsResponse } from '@i-um/api-contract';
 
 import {
   buildDayItineraryPlaceAccessibilityLabel,
-  buildDayItineraryRoute,
   buildDayItineraryViewModel,
   dayItineraryFailureState,
   getPlaceTypeLabel,
 } from './day-itinerary';
 
 describe('day itinerary helpers', () => {
-  it('builds the day itinerary route from trip id and date', () => {
-    assert.equal(
-      buildDayItineraryRoute('00000000-0000-0000-0000-000000000001', '2026-07-10'),
-      '/trips/00000000-0000-0000-0000-000000000001/days/2026-07-10',
-    );
-  });
-
   it('formats day header and ordered rows from the generated response type', () => {
     const response: GetDayScheduleItemsResponse = {
       day: {

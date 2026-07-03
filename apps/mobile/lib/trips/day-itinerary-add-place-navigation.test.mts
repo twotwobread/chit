@@ -9,40 +9,41 @@ import {
 
 const tripId = '00000000-0000-0000-0000-000000000001';
 const date = '2026-07-10';
-const dayRoute = `/trips/${tripId}/days/${date}`;
+const itineraryDayRoute = `/trips/${tripId}/itinerary?dayId=${date}`;
 
 describe('day itinerary add-place navigation helpers', () => {
-  it('marks Google place search routes launched from Day detail', () => {
+  it('marks Google place search routes launched from the itinerary tab', () => {
     assert.equal(
       buildDayItineraryAddPlaceSearchRoute(tripId, date),
-      `/trips/${tripId}/days/${date}/place-search?returnTo=day-detail`,
+      `/trips/${tripId}/days/${date}/place-search?returnTo=itinerary-tab`,
     );
 
-    assert.equal(isDayItineraryAddPlaceReturnToDay('day-detail'), true);
-    assert.equal(isDayItineraryAddPlaceReturnToDay(['day-detail']), true);
+    assert.equal(isDayItineraryAddPlaceReturnToDay('itinerary-tab'), true);
+    assert.equal(isDayItineraryAddPlaceReturnToDay(['itinerary-tab']), true);
+    assert.equal(isDayItineraryAddPlaceReturnToDay('day-detail'), false);
     assert.equal(isDayItineraryAddPlaceReturnToDay('trip-detail'), false);
     assert.equal(isDayItineraryAddPlaceReturnToDay(undefined), false);
   });
 
-  it('dismisses back to the existing Day detail entry when search was launched from Day detail', () => {
-    assert.deepEqual(resolveDayItineraryAddPlaceReturnNavigation({ tripId, date, returnTo: 'day-detail' }), {
+  it('dismisses back to the existing itinerary tab entry when search was launched from itinerary', () => {
+    assert.deepEqual(resolveDayItineraryAddPlaceReturnNavigation({ tripId, date, returnTo: 'itinerary-tab' }), {
       kind: 'dismissToDay',
-      href: dayRoute,
+      href: itineraryDayRoute,
     });
   });
 
-  it('falls back to replacing with a single Day detail route when return intent is missing', () => {
+  it('falls back to replacing with the itinerary tab selected day route when return intent is missing', () => {
     assert.deepEqual(resolveDayItineraryAddPlaceReturnNavigation({ tripId, date }), {
       kind: 'replaceWithDay',
-      href: dayRoute,
+      href: itineraryDayRoute,
     });
   });
 
   it('uses the same existing-entry return strategy for repeated add-place successes', () => {
-    const firstReturn = resolveDayItineraryAddPlaceReturnNavigation({ tripId, date, returnTo: ['day-detail'] });
-    const secondReturn = resolveDayItineraryAddPlaceReturnNavigation({ tripId, date, returnTo: ['day-detail'] });
+    const firstReturn = resolveDayItineraryAddPlaceReturnNavigation({ tripId, date, returnTo: ['itinerary-tab'] });
+    const secondReturn = resolveDayItineraryAddPlaceReturnNavigation({ tripId, date, returnTo: ['itinerary-tab'] });
 
-    assert.deepEqual(firstReturn, { kind: 'dismissToDay', href: dayRoute });
+    assert.deepEqual(firstReturn, { kind: 'dismissToDay', href: itineraryDayRoute });
     assert.deepEqual(secondReturn, firstReturn);
   });
 });

@@ -7,6 +7,7 @@ import {
   tripDetailPath,
   tripFallbackPath,
   tripFallbackPathForPathname,
+  tripItineraryDayPath,
   tripItineraryPath,
   tripMapPath,
   tripParticipantsPath,
@@ -21,6 +22,7 @@ test('builds canonical trip tab and hidden detail paths', () => {
   assert.equal(tripTodayPath('trip-a'), '/trips/trip-a/today');
   assert.equal(tripMapPath('trip-a'), '/trips/trip-a/map');
   assert.equal(tripItineraryPath('trip-a'), '/trips/trip-a/itinerary');
+  assert.equal(tripItineraryDayPath('trip-a', 'day-1'), '/trips/trip-a/itinerary?dayId=day-1');
   assert.equal(tripSettlePath('trip-a'), '/trips/trip-a/settle');
   assert.equal(tripDetailPath('trip-a'), '/trips/trip-a/detail');
   assert.equal(tripParticipantsPath('trip-a'), '/trips/trip-a/participants');
@@ -50,15 +52,15 @@ test('encodes no-history fallback matrix for trip shell routes', () => {
   assert.equal(tripFallbackPath({ kind: 'day', tripId: 'trip-a' }), '/trips/trip-a/itinerary');
   assert.equal(
     tripFallbackPath({ kind: 'dayPlaceSearch', tripId: 'trip-a', tripDayId: 'day-1' }),
-    '/trips/trip-a/days/day-1',
+    '/trips/trip-a/itinerary?dayId=day-1',
   );
   assert.equal(
     tripFallbackPath({ kind: 'dayPlaceNew', tripId: 'trip-a', tripDayId: 'day-1' }),
-    '/trips/trip-a/days/day-1',
+    '/trips/trip-a/itinerary?dayId=day-1',
   );
   assert.equal(
     tripFallbackPath({ kind: 'dayQuickExpense', tripId: 'trip-a', tripDayId: 'day-1' }),
-    '/trips/trip-a/days/day-1',
+    '/trips/trip-a/itinerary?dayId=day-1',
   );
 });
 
@@ -67,18 +69,21 @@ test('derives fallback from concrete trip pathnames', () => {
   assert.equal(tripFallbackPathForPathname('/trips/trip-a/detail', 'trip-a'), '/');
   assert.equal(tripFallbackPathForPathname('/trips/trip-a/edit', 'trip-a'), '/trips/trip-a/detail');
   assert.equal(tripFallbackPathForPathname('/trips/trip-a/participants', 'trip-a'), '/trips/trip-a/detail');
-  assert.equal(tripFallbackPathForPathname('/trips/trip-a/days/day-1', 'trip-a'), '/trips/trip-a/itinerary');
+  assert.equal(
+    tripFallbackPathForPathname('/trips/trip-a/days/day-1', 'trip-a'),
+    '/trips/trip-a/itinerary?dayId=day-1',
+  );
   assert.equal(
     tripFallbackPathForPathname('/trips/trip-a/days/day-1/place-search', 'trip-a'),
-    '/trips/trip-a/days/day-1',
+    '/trips/trip-a/itinerary?dayId=day-1',
   );
   assert.equal(
     tripFallbackPathForPathname('/trips/trip-a/days/day-1/places/new', 'trip-a'),
-    '/trips/trip-a/days/day-1',
+    '/trips/trip-a/itinerary?dayId=day-1',
   );
   assert.equal(
     tripFallbackPathForPathname('/trips/trip-a/days/day-1/expenses/quick', 'trip-a'),
-    '/trips/trip-a/days/day-1',
+    '/trips/trip-a/itinerary?dayId=day-1',
   );
 });
 

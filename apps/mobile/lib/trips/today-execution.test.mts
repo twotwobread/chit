@@ -182,7 +182,7 @@ test('builds an empty-itinerary Today state with current day context and day iti
     formattedDate: '2026.07.10',
     title: '오늘 일정에 아직 장소가 없어요.',
     helper: '오늘 일정 화면에서 첫 장소를 추가해보세요.',
-    primaryAction: { kind: 'route', label: '오늘 일정 열기', route: '/trips/trip-current/days/2026-07-10' },
+    primaryAction: { kind: 'route', label: '오늘 일정 열기', route: '/trips/trip-current/itinerary?dayId=2026-07-10' },
     lodgingNavigationAction: disabledLodgingNavigationAction,
     multipleOngoingTripNotice: {
       message: '다른 진행 중인 여행은 내 여행에서 볼 수 있어요.',
@@ -353,7 +353,7 @@ test('maps the first ordered itinerary item to the next place without exposing s
       date: '2026-07-10',
       itemId: 'item-next',
     },
-    primaryAction: { kind: 'route', label: '오늘 일정 보기', route: '/trips/trip-current/days/2026-07-10' },
+    primaryAction: { kind: 'route', label: '오늘 일정 보기', route: '/trips/trip-current/itinerary?dayId=2026-07-10' },
     lodgingNavigationAction: disabledLodgingNavigationAction,
     multipleOngoingTripNotice: null,
   });
@@ -570,7 +570,7 @@ test('builds a completed Today state when every itinerary item is arrived', () =
       label: '지출 등록',
       route: '/trips/trip-current/days/2026-07-10/expenses/quick',
     },
-    primaryAction: { kind: 'route', label: '오늘 일정 보기', route: '/trips/trip-current/days/2026-07-10' },
+    primaryAction: { kind: 'route', label: '오늘 일정 보기', route: '/trips/trip-current/itinerary?dayId=2026-07-10' },
     lodgingNavigationAction: disabledLodgingNavigationAction,
     multipleOngoingTripNotice: null,
   });
@@ -642,7 +642,7 @@ test('builds a recover-needed state when all non-arrived items are skipped', () 
         },
       ],
     },
-    primaryAction: { kind: 'route', label: '오늘 일정 보기', route: '/trips/trip-current/days/2026-07-10' },
+    primaryAction: { kind: 'route', label: '오늘 일정 보기', route: '/trips/trip-current/itinerary?dayId=2026-07-10' },
     lodgingNavigationAction: disabledLodgingNavigationAction,
     multipleOngoingTripNotice: null,
   });
@@ -666,7 +666,7 @@ test('does not expose a remaining section when only the next place exists', () =
   assert.deepEqual(viewModel.primaryAction, {
     kind: 'route',
     label: '오늘 일정 보기',
-    route: '/trips/trip-current/days/2026-07-10',
+    route: '/trips/trip-current/itinerary?dayId=2026-07-10',
   });
 });
 

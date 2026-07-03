@@ -12,7 +12,6 @@ import type {
 } from '@i-um/api-contract';
 
 import {
-  buildDayItineraryRoute,
   buildNonPlaceDetailLabel,
   getNonPlaceCategoryLabel,
   getPlaceTypeLabel,
@@ -20,6 +19,7 @@ import {
 } from './day-itinerary';
 import { formatTripDayDate } from './days';
 import { tripDetailPath } from './mypage';
+import { tripItineraryDayPath } from './routes';
 import { buildQuickExpenseRoute } from './quick-expense';
 import { groupTripsByStatus } from './status';
 import {
@@ -267,7 +267,7 @@ export function buildTodayExecutionViewModel({
     return buildTodayUnavailableViewModel(selectedTrip.id);
   }
 
-  const dayRoute = buildDayItineraryRoute(selectedTrip.id, currentDay.id);
+  const dayRoute = tripItineraryDayPath(selectedTrip.id, currentDay.id);
   const orderedItems = orderedItineraryItems(getScheduleItems(itinerary));
   const lodgingSourceDay = itinerary.day.date === currentDay.date ? itinerary.day : currentDay;
   const common = {

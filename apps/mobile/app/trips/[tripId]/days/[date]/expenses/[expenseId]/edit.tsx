@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { router, useFocusEffect, useLocalSearchParams, type Href } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 
 import {
   ApiError,
@@ -36,8 +36,7 @@ import {
   type QuickExpenseManualSplitInput,
   type QuickExpenseSplitPolicy,
 } from '../../../../../../../lib/trips/quick-expense';
-
-const dayRoute = (tripId: string, date: string): Href => `/trips/${tripId}/days/${date}` as Href;
+import { tripItineraryDayPath } from '../../../../../../../lib/trips/routes';
 
 type ExpenseEditState =
   | { status: 'loading' }
@@ -169,7 +168,7 @@ export default function ExpenseEditScreen() {
     setFormMessage(null);
     try {
       await updateExpense(tripId, date, expenseId, validation.request);
-      router.replace(dayRoute(tripId, date));
+      router.replace(tripItineraryDayPath(tripId, date));
     } catch (error) {
       if (await handleAuthError(error)) {
         return;
@@ -203,7 +202,7 @@ export default function ExpenseEditScreen() {
     setFormMessage(null);
     try {
       await deleteExpense(tripId, date, expenseId);
-      router.replace(dayRoute(tripId, date));
+      router.replace(tripItineraryDayPath(tripId, date));
     } catch (error) {
       if (await handleAuthError(error)) {
         return;
