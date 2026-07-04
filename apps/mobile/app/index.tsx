@@ -9,7 +9,7 @@ import { clearStoredSession, readStoredSession } from '../lib/auth/session';
 import { Card, PrimaryButton, SecondaryButton, theme } from '../lib/design';
 import { ActiveTripCard, PastTripRow, UpcomingTripRow } from '../lib/home-ui/TripCards';
 import { BottomMenu } from '../lib/navigation/BottomMenu';
-import { listMyTrips } from '../lib/trips/client';
+import { listMyTrips } from '../lib/trips/trip-api';
 import {
   buildHomeRootViewModel,
   type HomeCurrentTripViewModel,

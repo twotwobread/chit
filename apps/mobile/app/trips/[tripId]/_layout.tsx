@@ -18,7 +18,7 @@ import {
   listMyTrips,
   listTripParticipants,
   removeTripParticipant,
-} from '../../../lib/trips/client';
+} from '../../../lib/trips/trip-api';
 import { markExplicitHomeIntent } from '../../../lib/trips/home-intent';
 import {
   buildFallbackShareContent,

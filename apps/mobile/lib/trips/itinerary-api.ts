@@ -1,113 +1,29 @@
 import {
-  AuthService,
   TripsService,
-  type AcceptTripInviteResponse,
   type CreateManualDayLodgingPlaceRequest,
   type CreateManualScheduleItemRequest,
   type CreateManualScheduleItemResponse,
   type CreateNonPlaceScheduleItemRequest,
   type CreateNonPlaceScheduleItemResponse,
-  type CreateQuickExpenseRequest,
-  type CreateQuickExpenseResponse,
   type CreateRoutePreviewRequest,
-  type CreateTripInviteResponse,
-  type CreateTripRequest,
-  type CreateTripResponse,
   type GetDayScheduleItemsResponse,
-  type GetExpenseResponse,
-  type GetMySettlementSummaryResponse,
-  type GetTripDetailResponse,
-  type GetTripSettlementResponse,
-  type ListDayExpensesResponse,
-  type ListTripParticipantsResponse,
-  type ListTripPlacesResponse,
-  type ListTripsResponse,
   type MarkScheduleItemArrivedResponse,
   type MarkScheduleItemSkippedResponse,
   type ReorderScheduleItemsRequest,
   type ReorderScheduleItemsResponse,
+  type RestoreScheduleItemResponse,
   type RoutePreviewResponse,
   type SetDayLodgingPlaceRequest,
   type SetDayLodgingPlaceResponse,
-  type RestoreScheduleItemResponse,
-  type UpdateExpenseRequest,
-  type UpdateExpenseResponse,
   type UpdateScheduleItemRequest,
   type UpdateScheduleItemResponse,
-  type UpdateTripRequest,
-  type UpdateTripResponse,
 } from '@i-um/api-contract';
 
 import { getMeWithRefresh } from '../auth/client';
 
-export async function createTrip(request: CreateTripRequest): Promise<CreateTripResponse> {
-  await getMeWithRefresh();
-  return TripsService.createTrip(request);
-}
-
-export async function getTripDetail(tripId: string): Promise<GetTripDetailResponse> {
-  await getMeWithRefresh();
-  return TripsService.getTripDetail(tripId);
-}
-
-export async function listTripParticipants(tripId: string): Promise<ListTripParticipantsResponse> {
-  await getMeWithRefresh();
-  return TripsService.listTripParticipants(tripId);
-}
-
-export async function listTripPlaces(tripId: string): Promise<ListTripPlacesResponse> {
-  await getMeWithRefresh();
-  return TripsService.listTripPlaces(tripId);
-}
-
-export async function getTripSettlement(tripId: string): Promise<GetTripSettlementResponse> {
-  await getMeWithRefresh();
-  return TripsService.getTripSettlement(tripId);
-}
-
-export async function removeTripParticipant(tripId: string, participantId: string): Promise<void> {
-  await getMeWithRefresh();
-  return TripsService.removeTripParticipant(tripId, participantId);
-}
-
-export async function createTripInvite(tripId: string): Promise<CreateTripInviteResponse> {
-  await getMeWithRefresh();
-  return TripsService.createTripInvite(tripId);
-}
-
-export async function acceptTripInvite(token: string): Promise<AcceptTripInviteResponse> {
-  await getMeWithRefresh();
-  return TripsService.acceptTripInvite(token);
-}
-
 export async function getTripDayItinerary(tripId: string, tripDayId: string): Promise<GetDayScheduleItemsResponse> {
   await getMeWithRefresh();
   return TripsService.getDayScheduleItems(tripId, tripDayId);
-}
-
-export async function listDayExpenses(tripId: string, tripDayId: string): Promise<ListDayExpensesResponse> {
-  await getMeWithRefresh();
-  return TripsService.listDayExpenses(tripId, tripDayId);
-}
-
-export async function getDayExpense(tripId: string, tripDayId: string, expenseId: string): Promise<GetExpenseResponse> {
-  await getMeWithRefresh();
-  return TripsService.getDayExpense(tripId, tripDayId, expenseId);
-}
-
-export async function updateExpense(
-  tripId: string,
-  tripDayId: string,
-  expenseId: string,
-  request: UpdateExpenseRequest,
-): Promise<UpdateExpenseResponse> {
-  await getMeWithRefresh();
-  return TripsService.updateExpense(tripId, tripDayId, expenseId, request);
-}
-
-export async function deleteExpense(tripId: string, tripDayId: string, expenseId: string): Promise<void> {
-  await getMeWithRefresh();
-  return TripsService.deleteExpense(tripId, tripDayId, expenseId);
 }
 
 export async function createManualScheduleItem(
@@ -126,15 +42,6 @@ export async function createNonPlaceScheduleItem(
 ): Promise<CreateNonPlaceScheduleItemResponse> {
   await getMeWithRefresh();
   return TripsService.createNonPlaceScheduleItem(tripId, date, request);
-}
-
-export async function createQuickExpense(
-  tripId: string,
-  date: string,
-  request: CreateQuickExpenseRequest,
-): Promise<CreateQuickExpenseResponse> {
-  await getMeWithRefresh();
-  return TripsService.createQuickExpense(tripId, date, request);
 }
 
 export async function setDayLodgingPlace(
@@ -219,24 +126,4 @@ export async function updateScheduleItem(
 export async function deleteScheduleItem(tripId: string, date: string, itemId: string): Promise<void> {
   await getMeWithRefresh();
   return TripsService.deleteScheduleItem(tripId, date, itemId);
-}
-
-export async function updateTrip(tripId: string, request: UpdateTripRequest): Promise<UpdateTripResponse> {
-  await getMeWithRefresh();
-  return TripsService.updateTrip(tripId, request);
-}
-
-export async function deleteTrip(tripId: string): Promise<void> {
-  await getMeWithRefresh();
-  return TripsService.deleteTrip(tripId);
-}
-
-export async function listMyTrips(): Promise<ListTripsResponse> {
-  await getMeWithRefresh();
-  return TripsService.listTrips();
-}
-
-export async function getMySettlementSummary(): Promise<GetMySettlementSummaryResponse> {
-  await getMeWithRefresh();
-  return AuthService.getMySettlementSummary();
 }
