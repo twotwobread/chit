@@ -26,6 +26,7 @@ Passed | Failed | Blocked
 
 ## Spec coverage
 ## Test evidence
+## Bugfix scenario coverage
 ## Rule/gate evidence
 ## Regression gaps
 ## Manual smoke / deploy
@@ -35,5 +36,6 @@ Passed | Failed | Blocked
 ## Done conditions
 
 - Verdict is explicit.
+- For bugfixes, `Bugfix scenario coverage` maps the reported Given/When/Then to automated coverage or an explicit regression gap.
 - Failures or blocked items prevent PR creation unless the user explicitly accepts the risk.
 - Verification commands are summarized without long logs or secrets.

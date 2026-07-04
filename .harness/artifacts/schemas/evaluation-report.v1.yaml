@@ -3,6 +3,7 @@ required_sections:
   - Verdict
   - Spec coverage
   - Test evidence
+  - Bugfix scenario coverage
   - Rule/gate evidence
   - Regression gaps
   - Manual smoke / deploy

@@ -63,6 +63,9 @@ Use the Superpowers TDD loop:
 
 1. Load/activate the Superpowers TDD skill when the runtime supports it.
 2. Map acceptance criteria to one or more tests.
+   - For bugfixes, derive the first failing test from the reported reproduction path, not from an unverified implementation hypothesis.
+   - Write the test as Given/When/Then in notes, comments, or the run ledger before coding when the test name alone is not explicit.
+   - If the UI/E2E path is impractical, test the closest lower-level seam that still represents the reported trigger and expected observable behavior.
 3. Write or update the failing test first when practical.
 4. Verify the test fails for the expected reason.
 5. Implement the smallest behavior to pass.

@@ -13,6 +13,7 @@ Evaluate the git diff against the canonical spec, acceptance criteria, applicabl
 - Spec scope covered.
 - Out-of-scope items not implemented.
 - Tests or explicit regression gaps recorded.
+- For bugfixes, reported Given/When/Then scenario coverage is recorded with automated coverage or an explicit gap.
 - API/DB/mobile source-of-truth rules followed when touched.
 - Secret/log safety preserved.
 - Generated artifacts updated with source changes.

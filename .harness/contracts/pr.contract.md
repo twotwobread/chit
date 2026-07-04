@@ -18,5 +18,6 @@ Create or update a reviewable PR only after required checks pass.
 ## Done conditions
 
 - PR title/body summarize scope and verification.
+- For bugfixes, the PR body includes a User Scenario Verification summary or explicitly states why it is not applicable.
 - Known gaps and risks are explicit.
 - Blocking evaluation failures are resolved or user-accepted.
