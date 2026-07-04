@@ -1,0 +1,14 @@
+id: worktree-isolation
+type: command
+severity: blocking
+command: node .harness/scripts/check-worktree-isolation.mjs --repo-root .
+applies_to:
+  contracts:
+    - workspace.prepare
+    - spec.author
+    - implementation.plan
+    - implementation.execute
+    - evaluation.checklist
+    - pr.create
+evidence:
+  write_to: artifacts/checks/worktree-isolation.log

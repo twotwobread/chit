@@ -4,6 +4,7 @@ version: 1
 always:
   - .harness/rules/core/agent-operating-rules.md
   - .harness/rules/core/git-safety.md
+  - .harness/rules/core/worktree.md
   - .harness/rules/code/architecture.md
   - .harness/rules/code/testing.md
 
@@ -44,9 +45,6 @@ by_change_area:
 
   code_quality:
     - .harness/rules/code/code-quality.md
-
-  worktree:
-    - .harness/rules/core/worktree.md
 
   completion:
     - .harness/rules/core/completion-report.md
