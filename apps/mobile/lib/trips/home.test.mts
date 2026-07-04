@@ -20,27 +20,27 @@ function trip(overrides: Partial<TripListItem>): TripListItem {
   };
 }
 
-test('ordinary root entry blocks on root loading without BottomMenu', () => {
+test('ordinary root entry shows Home-first loading copy without BottomMenu before session is known', () => {
   assert.deepEqual(buildHomeRootViewModel({ status: 'loading' }), {
     status: 'loading',
     surface: 'root',
-    title: '여행을 확인하는 중...',
-    helper: '진행 중인 여행이 있는지 확인하고 있어요.',
+    title: '내 여행을 불러오는 중...',
+    helper: '여행 목록을 확인하고 있어요.',
     showBottomMenu: false,
   });
 });
 
-test('ordinary root entry shows retry-only root error before redirect decision', () => {
+test('ordinary root entry shows retry-only Home-first trip list error', () => {
   assert.deepEqual(buildHomeRootViewModel({ status: 'tripListError' }), {
     status: 'rootError',
-    title: '여행을 확인할 수 없어요.',
-    helper: '진행 중인 여행 여부를 확인하지 못했어요. 다시 시도해주세요.',
+    title: '내 여행을 불러올 수 없어요.',
+    helper: '잠시 후 다시 시도해주세요.',
     retryLabel: '다시 시도',
     showBottomMenu: false,
   });
 });
 
-test('ordinary root entry redirects to the current trip today route', () => {
+test('ordinary root entry renders Home and pins the current trip instead of redirecting', () => {
   const viewModel = buildHomeRootViewModel({
     status: 'ready',
     today: '2026-06-22',
@@ -50,11 +50,17 @@ test('ordinary root entry redirects to the current trip today route', () => {
     ],
   });
 
-  assert.deepEqual(viewModel, {
-    status: 'redirect',
-    href: '/trips/ongoing/today',
-    showBottomMenu: false,
-  });
+  assert.equal(viewModel.status, 'home');
+  if (viewModel.status !== 'home') {
+    return;
+  }
+  assert.equal(viewModel.showBottomMenu, true);
+  assert.equal(viewModel.home.currentTrip?.id, 'ongoing');
+  assert.equal(viewModel.home.currentTrip?.resumePath, '/trips/ongoing/today');
+  assert.deepEqual(
+    viewModel.home.sections.map((section) => [section.status, section.trips.map((item) => item.id)]),
+    [['upcoming', ['upcoming']]],
+  );
 });
 
 test('ordinary root entry renders Home when no trip is ongoing', () => {
@@ -82,7 +88,7 @@ test('ordinary root entry renders Home when no trip is ongoing', () => {
   );
 });
 
-test('explicit Home intent bypasses current-trip redirect for the Home visit', () => {
+test('explicit Home intent renders the current-trip Home visit with resume action', () => {
   const viewModel = buildHomeRootViewModel({
     explicitHomeIntent: true,
     status: 'ready',

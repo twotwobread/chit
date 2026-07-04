@@ -54,11 +54,6 @@ export type HomeRootViewModel =
       showBottomMenu: boolean;
     }
   | {
-      status: 'redirect';
-      href: Href;
-      showBottomMenu: false;
-    }
-  | {
       status: 'home';
       home: HomeViewModel;
       showBottomMenu: true;
@@ -79,8 +74,8 @@ export function buildHomeRootViewModel(input: HomeRootInput): HomeRootViewModel 
       : {
           status: 'loading',
           surface: 'root',
-          title: '여행을 확인하는 중...',
-          helper: '진행 중인 여행이 있는지 확인하고 있어요.',
+          title: '내 여행을 불러오는 중...',
+          helper: '여행 목록을 확인하고 있어요.',
           showBottomMenu: false,
         };
   }
@@ -106,22 +101,14 @@ export function buildHomeRootViewModel(input: HomeRootInput): HomeRootViewModel 
         }
       : {
           status: 'rootError',
-          title: '여행을 확인할 수 없어요.',
-          helper: '진행 중인 여행 여부를 확인하지 못했어요. 다시 시도해주세요.',
+          title: '내 여행을 불러올 수 없어요.',
+          helper: '잠시 후 다시 시도해주세요.',
           retryLabel: '다시 시도',
           showBottomMenu: false,
         };
   }
 
   const today = input.today ?? localDateString();
-  const currentTrip = selectCurrentTrip(input.trips, today);
-  if (currentTrip && !explicitHomeIntent) {
-    return {
-      status: 'redirect',
-      href: tripTodayPath(currentTrip.id),
-      showBottomMenu: false,
-    };
-  }
 
   return {
     status: 'home',

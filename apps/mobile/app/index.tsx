@@ -50,10 +50,6 @@ export default function HomeScreen() {
 
       const response = await listMyTrips();
       const nextState = buildHomeRootViewModel({ explicitHomeIntent, status: 'ready', trips: response.trips });
-      if (nextState.status === 'redirect') {
-        router.replace(nextState.href);
-        return;
-      }
       setState(nextState);
     } catch (error) {
       if (await handleAuthError(error)) {
@@ -131,12 +127,7 @@ function HomeScreenContent({ onRetry, state }: { onRetry: () => void; state: Hom
     );
   }
 
-  return (
-    <Card>
-      <ActivityIndicator color={theme.color.primary} />
-      <Text style={styles.message}>여행으로 이동하는 중...</Text>
-    </Card>
-  );
+  return null;
 }
 
 function HomeHeader() {

@@ -5,7 +5,8 @@
 - GitHub Issue: #163
 - Status: Implementation Complete (Manual Smoke Pending)
 - Created: 2026-06-28
-- Updated: 2026-06-28
+- Updated: 2026-07-04
+- Superseded behavior: Issue #221 changes ordinary root `/` entry to render Home instead of auto-redirecting to an ongoing trip Today page.
 
 ## Source
 
@@ -15,6 +16,10 @@
 - Local handoff package: `refactor/README.md`, `refactor/MAPPING.md` sections 2-4, `refactor/PROMPT.md` task 6
 - Current mobile sources: `apps/mobile/app/index.tsx`, `apps/mobile/app/mypage.tsx`, `apps/mobile/app/trips/[tripId]/_layout.tsx`, `apps/mobile/app/trips/[tripId]/(tabs)/today.tsx`, `apps/mobile/lib/navigation/BottomMenu.tsx`, `apps/mobile/lib/trips/status.ts`, `apps/mobile/lib/trips/mypage.ts`, `apps/mobile/lib/trips/routes.ts`
 - Notes: #162 already owns the trip shell and canonical `/trips/{tripId}/today`. #163 owns changing `/` from Today execution into slim Home plus active-trip root redirect.
+
+## Supersession Note
+
+As of issue #221, the active-trip redirect portion of this #163 spec is no longer current behavior. Ordinary root `/` entry renders the Home management surface even when an ongoing trip exists; the ongoing trip remains available through the pinned Home resume CTA and explicit `/trips/{id}/today` routes. The rest of this document records the original #163 implementation context and remains useful only where it does not conflict with #221.
 
 ## Goal
 
