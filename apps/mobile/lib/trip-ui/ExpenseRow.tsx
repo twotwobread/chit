@@ -15,6 +15,7 @@ export type ExpenseCategory = keyof typeof CATEGORY;
 
 export type ExpenseRowProps = {
   title: string;
+  accessibilityLabel?: string;
   category?: ExpenseCategory;
   payerLabel: string;
   splitLabel?: string;
@@ -26,6 +27,7 @@ export type ExpenseRowProps = {
 };
 
 export function ExpenseRow({
+  accessibilityLabel,
   amount,
   category = 'etc',
   currency = 'JPY',
@@ -51,6 +53,7 @@ export function ExpenseRow({
   if (onPress) {
     return (
       <Pressable
+        accessibilityLabel={accessibilityLabel}
         accessibilityRole="button"
         onPress={onPress}
         style={({ pressed }) => [styles.row, first ? null : styles.divider, pressed ? styles.pressed : null]}

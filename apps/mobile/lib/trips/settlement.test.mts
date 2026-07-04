@@ -1,15 +1,17 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import type { GetTripSettlementResponse, TripDay } from '@i-um/api-contract';
+import type { DayExpenseListItem, GetTripSettlementResponse, TripDay } from '@i-um/api-contract';
 
 import {
   buildSettlementExpenseEntryRoute,
   buildSettlementExpenseEntryRouteForDays,
+  buildSettlementExpenseHistoryViewModel,
   buildSettlementRequestMessage,
   buildSettlementTransferViewModel,
   computeSettlementBalances,
   getAuthoritativeSettlementCurrencySummaries,
+  settlementExpenseHistoryFailureState,
   settlementTransferFailureState,
   suggestSettlementTransfers,
 } from './settlement';
@@ -29,6 +31,42 @@ const participants = [
   { id: 'b', name: '지영' },
   { id: 'c', name: '유나' },
 ];
+
+function participant(displayName: string, participantId: string | null = 'participant-a') {
+  return { participantId, displayName, source: participantId ? 'live' : 'fallback' } as const;
+}
+
+function tripDay(overrides: Partial<TripDay> = {}): TripDay {
+  return {
+    id: 'day-a',
+    date: '2026-07-10',
+    dayOrder: 1,
+    lodgingPlace: null,
+    ...overrides,
+  };
+}
+
+function dayExpense(overrides: Partial<DayExpenseListItem> = {}): DayExpenseListItem {
+  return {
+    id: 'expense-a',
+    anchorType: 'schedule_item',
+    tripDayId: 'day-a',
+    scheduleItemId: 'item-a',
+    expenseDate: '2026-07-10',
+    displayTitle: '도톤보리',
+    place: { tripPlaceId: 'place-a', name: '도톤보리', address: 'Dotonbori', placeType: 'food', source: 'live' },
+    amountMinor: 1200,
+    currency: 'JPY',
+    payer: participant('민수', 'payer-a'),
+    splitPolicy: 'equal',
+    splits: [
+      { splitOrder: 1, participant: participant('민수', 'payer-a'), amountMinor: 600 },
+      { splitOrder: 2, participant: participant('지영', 'participant-b'), amountMinor: 600 },
+    ],
+    createdAt: '2026-07-10T12:00:00Z',
+    ...overrides,
+  };
+}
 
 test('builds settlement expense entry route with settlement return intent', () => {
   assert.equal(
@@ -52,6 +90,134 @@ test('builds settlement expense entry route from today or the first trip day', (
     '/trips/trip-a/days/day-1/expenses/quick?returnTo=settle',
   );
   assert.equal(buildSettlementExpenseEntryRouteForDays('trip-a', [], '2026-07-20'), null);
+});
+
+test('builds day-tabbed settlement expense history with selected-day editable rows', () => {
+  const viewModel = buildSettlementExpenseHistoryViewModel({
+    tripId: 'trip-a',
+    selectedDayId: 'day-3',
+    today: '2026-07-10',
+    days: [
+      {
+        day: tripDay({ id: 'day-1', date: '2026-07-10', dayOrder: 1 }),
+        expenses: [dayExpense({ id: 'expense-new', tripDayId: 'day-1', amountMinor: 2000 })],
+      },
+      {
+        day: tripDay({ id: 'day-2', date: '2026-07-11', dayOrder: 2 }),
+        expenses: [],
+      },
+      {
+        day: tripDay({ id: 'day-3', date: '2026-07-12', dayOrder: 3 }),
+        expenses: [
+          dayExpense({
+            id: 'expense-krw',
+            tripDayId: 'day-3',
+            expenseDate: '2026-07-12',
+            currency: 'KRW',
+            amountMinor: 18500,
+            displayTitle: '한식당',
+            payer: participant('유나', 'payer-c'),
+            splits: [{ splitOrder: 1, participant: participant('유나', 'payer-c'), amountMinor: 18500 }],
+          }),
+        ],
+      },
+    ],
+  });
+
+  assert.equal(viewModel.status, 'success');
+  if (viewModel.status !== 'success') {
+    return;
+  }
+  assert.equal(viewModel.title, '지출 내역');
+  assert.equal(viewModel.helper, '총 2건의 지출을 확인하고 수정할 수 있어요.');
+  assert.equal(viewModel.selectedDayId, 'day-3');
+  assert.deepEqual(viewModel.dayChips, [
+    { id: 'day-1', label: 'Day 1', dateLabel: '2026.07.10', statusLabel: '1건' },
+    { id: 'day-2', label: 'Day 2', dateLabel: '2026.07.11', statusLabel: '지출 없음' },
+    { id: 'day-3', label: 'Day 3', dateLabel: '2026.07.12', statusLabel: '1건' },
+  ]);
+  assert.deepEqual(
+    [
+      viewModel.selectedSection.dayId,
+      viewModel.selectedSection.title,
+      viewModel.selectedSection.helper,
+      viewModel.selectedSection.expenseCount,
+    ],
+    ['day-3', 'Day 3', '2026.07.12 · 1건', 1],
+  );
+  assert.deepEqual(
+    viewModel.selectedSection.rows.map((row) => [row.id, row.amountLabel, row.editRoute]),
+    [['expense-krw', '18,500원', '/trips/trip-a/days/day-3/expenses/expense-krw/edit']],
+  );
+});
+
+test('defaults settlement expense history selection to today then first expense day then first day', () => {
+  const todayViewModel = buildSettlementExpenseHistoryViewModel({
+    tripId: 'trip-a',
+    today: '2026-07-11',
+    days: [
+      { day: tripDay({ id: 'day-1', date: '2026-07-10', dayOrder: 1 }), expenses: [dayExpense()] },
+      { day: tripDay({ id: 'day-2', date: '2026-07-11', dayOrder: 2 }), expenses: [] },
+    ],
+  });
+  assert.equal(todayViewModel.status, 'success');
+  if (todayViewModel.status !== 'success') {
+    return;
+  }
+  assert.equal(todayViewModel.selectedDayId, 'day-2');
+  assert.equal(todayViewModel.selectedSection.emptyTitle, '이 Day에 등록된 지출이 없어요.');
+
+  const firstExpenseViewModel = buildSettlementExpenseHistoryViewModel({
+    tripId: 'trip-a',
+    today: '2026-07-12',
+    days: [
+      { day: tripDay({ id: 'day-1', date: '2026-07-10', dayOrder: 1 }), expenses: [] },
+      { day: tripDay({ id: 'day-2', date: '2026-07-11', dayOrder: 2 }), expenses: [dayExpense()] },
+    ],
+  });
+  assert.equal(firstExpenseViewModel.status, 'success');
+  if (firstExpenseViewModel.status !== 'success') {
+    return;
+  }
+  assert.equal(firstExpenseViewModel.selectedDayId, 'day-2');
+
+  const firstDayViewModel = buildSettlementExpenseHistoryViewModel({
+    tripId: 'trip-a',
+    today: '2026-07-12',
+    days: [
+      { day: tripDay({ id: 'day-1', date: '2026-07-10', dayOrder: 1 }), expenses: [] },
+      { day: tripDay({ id: 'day-2', date: '2026-07-11', dayOrder: 2 }), expenses: [] },
+    ],
+  });
+  assert.equal(firstDayViewModel.status, 'success');
+  if (firstDayViewModel.status !== 'success') {
+    return;
+  }
+  assert.equal(firstDayViewModel.selectedDayId, 'day-1');
+  assert.equal(firstDayViewModel.helper, '지출을 등록하면 사람별 요약과 정산 정보에 바로 반영돼요.');
+});
+
+test('builds empty settlement expense history when the trip has no days', () => {
+  assert.deepEqual(
+    buildSettlementExpenseHistoryViewModel({
+      tripId: 'trip-a',
+      days: [],
+    }),
+    {
+      status: 'empty',
+      title: '지출 내역',
+      emptyTitle: '여행 일정이 없어요.',
+      helper: '여행 일정을 만든 뒤 지출을 등록할 수 있어요.',
+    },
+  );
+});
+
+test('builds retryable settlement expense history failure state', () => {
+  assert.deepEqual(settlementExpenseHistoryFailureState(), {
+    title: '지출 내역을 불러올 수 없어요.',
+    helper: '정산 정보는 그대로 볼 수 있어요. 잠시 후 다시 시도해주세요.',
+    actionLabel: '지출 다시 불러오기',
+  });
 });
 
 test('uses authoritative settlement summaries returned by the API', () => {
