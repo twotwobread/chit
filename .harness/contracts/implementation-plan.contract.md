@@ -32,3 +32,7 @@ Required sections:
 - Plan traces back to acceptance criteria.
 - API changes start from OpenAPI; DB changes start from migrations.
 - Testable changes identify the first failing test or explicit regression gap.
+- For bugfixes, the first failing test is derived from the reported reproduction path:
+  - Given `<reported input/state>`
+  - When `<reported user action or system trigger>`
+  - Then `<expected observable behavior>`

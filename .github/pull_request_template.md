@@ -20,6 +20,21 @@ If this PR closes an issue, keep the closing keyword at the bottom, e.g. `Fixes 
 
 - `<command or manual check>`: pass/fail
 
+## User Scenario Verification
+
+| Given | When | Then | Verification |
+|---|---|---|---|
+|  |  |  |  |
+
+Automated coverage:
+-
+
+Manual smoke:
+-
+
+Gaps/Risks:
+-
+
 ## Deployment
 
 - Staging/Internal build:

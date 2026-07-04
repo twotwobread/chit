@@ -1,0 +1,11 @@
+id: bugfix-scenario-coverage
+type: command
+severity: blocking
+command: node .harness/scripts/check-bugfix-scenario-coverage.mjs --run-dir .harness/runs/{run_id}
+applies_to:
+  contracts:
+    - implementation.execute
+    - evaluation.checklist
+    - pr.create
+evidence:
+  write_to: artifacts/checks/bugfix-scenario-coverage.log

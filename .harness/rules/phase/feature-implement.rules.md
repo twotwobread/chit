@@ -42,4 +42,4 @@ Stop and ask, or recommend `i-um-feature-spec-plan`, if:
 
 ## Verification
 
-Run the smallest command set that covers changed behavior, then broader checks when needed. Record commands and results in the completion report.
+Run the smallest command set that covers changed behavior, then broader checks when needed. For bugfixes, include the minimum scenario regression test or an explicit regression gap from `.harness/rules/code/testing.md`. Record commands and results in the completion report.

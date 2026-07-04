@@ -54,6 +54,7 @@ tiers:
       - artifacts/verification.md
     checks:
       - adapter-sync
+      - bugfix-scenario-coverage
   normal:
     when: "size == 'normal' and risk in ['low', 'medium'] and ambiguity in ['low', 'medium'] and product_direction_unclear == false"
     description: Micro-spec plus plan/evaluation for regular feature or bugfix work.
@@ -68,6 +69,7 @@ tiers:
       - artifacts/ledger.md
     checks:
       - adapter-sync
+      - bugfix-scenario-coverage
       - lint
   strict:
     when: "size in ['large', 'epic'] or risk in ['high', 'critical'] or ambiguity == 'high' or product_direction_unclear == true"
@@ -87,6 +89,7 @@ tiers:
       - private/
     checks:
       - adapter-sync
+      - bugfix-scenario-coverage
       - lint
       - verify-generated
 
