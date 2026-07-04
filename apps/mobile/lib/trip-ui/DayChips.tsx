@@ -14,9 +14,16 @@ export type DayChipsProps = {
   selectedDayId: string | null;
   onSelectDay: (dayId: string) => void;
   emptyLabel?: string;
+  edgePadding?: number;
 };
 
-export function DayChips({ days, emptyLabel = '선택할 Day가 없어요', onSelectDay, selectedDayId }: DayChipsProps) {
+export function DayChips({
+  days,
+  edgePadding = theme.layout.gutter,
+  emptyLabel = '선택할 Day가 없어요',
+  onSelectDay,
+  selectedDayId,
+}: DayChipsProps) {
   if (days.length === 0) {
     return (
       <View style={styles.emptyWrap}>
@@ -26,7 +33,11 @@ export function DayChips({ days, emptyLabel = '선택할 Day가 없어요', onSe
   }
 
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={[styles.row, { paddingHorizontal: edgePadding }]}
+    >
       {days.map((day) => {
         const selected = day.id === selectedDayId;
         return (
@@ -108,7 +119,6 @@ const styles = StyleSheet.create({
   },
   row: {
     gap: theme.space[3],
-    paddingHorizontal: theme.layout.gutter,
     paddingVertical: theme.space[2],
   },
   status: {

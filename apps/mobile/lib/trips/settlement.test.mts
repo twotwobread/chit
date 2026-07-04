@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import type { GetTripSettlementResponse } from '@i-um/api-contract';
+import type { GetTripSettlementResponse, TripDay } from '@i-um/api-contract';
 
 import {
   buildSettlementExpenseEntryRoute,
+  buildSettlementExpenseEntryRouteForDays,
   buildSettlementRequestMessage,
   buildSettlementTransferViewModel,
   computeSettlementBalances,
@@ -12,6 +13,16 @@ import {
   settlementTransferFailureState,
   suggestSettlementTransfers,
 } from './settlement';
+
+function day(overrides: Partial<TripDay>): TripDay {
+  return {
+    id: 'day-1',
+    date: '2026-07-10',
+    dayOrder: 1,
+    lodgingPlace: null,
+    ...overrides,
+  };
+}
 
 const participants = [
   { id: 'a', name: '민수' },
@@ -24,6 +35,23 @@ test('builds settlement expense entry route with settlement return intent', () =
     buildSettlementExpenseEntryRoute('trip-a', '2026-07-10'),
     '/trips/trip-a/days/2026-07-10/expenses/quick?returnTo=settle',
   );
+});
+
+test('builds settlement expense entry route from today or the first trip day', () => {
+  const days = [
+    day({ id: 'day-2', date: '2026-07-11', dayOrder: 2 }),
+    day({ id: 'day-1', date: '2026-07-10', dayOrder: 1 }),
+  ];
+
+  assert.equal(
+    buildSettlementExpenseEntryRouteForDays('trip-a', days, '2026-07-11'),
+    '/trips/trip-a/days/day-2/expenses/quick?returnTo=settle',
+  );
+  assert.equal(
+    buildSettlementExpenseEntryRouteForDays('trip-a', days, '2026-07-20'),
+    '/trips/trip-a/days/day-1/expenses/quick?returnTo=settle',
+  );
+  assert.equal(buildSettlementExpenseEntryRouteForDays('trip-a', [], '2026-07-20'), null);
 });
 
 test('uses authoritative settlement summaries returned by the API', () => {

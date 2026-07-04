@@ -35,6 +35,7 @@ import {
   buildSavedEqualSplitSummary,
   parseQuickExpenseRoute,
   quickExpenseFailureMessage,
+  resolveInitialQuickExpenseItemId,
   type QuickExpenseRouteTarget,
 } from '../trips/quick-expense';
 import {
@@ -214,8 +215,7 @@ export function useTripTodayController() {
         getTripDayItinerary(target.tripId, target.date),
         listTripParticipants(target.tripId),
       ]);
-      const validItemId =
-        target.itemId && itinerary.scheduleItems.some((item) => item.id === target.itemId) ? target.itemId : null;
+      const selectedItemId = resolveInitialQuickExpenseItemId(itinerary.scheduleItems, target.itemId);
       const participants = participantsResponse.participants;
       setQuickExpenseState({
         status: 'ready',
@@ -224,7 +224,7 @@ export function useTripTodayController() {
         currency: tripDetail.trip.defaultCurrency,
         itinerary,
         participants,
-        selectedItemId: validItemId,
+        selectedItemId,
         payerParticipantId: participants.length === 1 ? participants[0].participantId : null,
         selectedSplitParticipantIds: buildDefaultSplitParticipantIds(participants),
         errorMessage: null,

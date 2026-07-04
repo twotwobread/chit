@@ -10,7 +10,7 @@ import { getTripSettlement } from '../../../../lib/trips/settlement-api';
 import { beginStaleWhileRevalidate, resolveStaleWhileRevalidateFailure } from '../../../../lib/trips/stale-refresh';
 import { getTripDetail } from '../../../../lib/trips/trip-api';
 import {
-  buildSettlementExpenseEntryRoute,
+  buildSettlementExpenseEntryRouteForDays,
   buildSettlementRequestMessage,
   buildSettlementTransferViewModel,
   settlementTransferFailureState,
@@ -20,7 +20,6 @@ import {
   type SettlementTransferViewModel,
 } from '../../../../lib/trips/settlement';
 import { localDateString } from '../../../../lib/trips/status';
-import { findTripCalendarDay } from '../../../../lib/trips/trip-tabs';
 
 type TripSettleState =
   | { status: 'loading' }
@@ -43,8 +42,7 @@ export default function TripSettleTabScreen() {
     setState((current) => beginStaleWhileRevalidate(current, { status: 'loading' }, ['settlement']));
     try {
       const [detail, settlement] = await Promise.all([getTripDetail(tripId), getTripSettlement(tripId)]);
-      const currentDay = findTripCalendarDay(detail.days, localDateString());
-      const expenseEntryRoute = currentDay ? buildSettlementExpenseEntryRoute(tripId, currentDay.id) : null;
+      const expenseEntryRoute = buildSettlementExpenseEntryRouteForDays(tripId, detail.days, localDateString());
 
       setState({
         status: 'settlement',

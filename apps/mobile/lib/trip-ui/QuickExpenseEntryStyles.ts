@@ -188,10 +188,50 @@ export const styles = StyleSheet.create({
     gap: theme.space[2],
     padding: theme.space[4],
   },
+  scheduleSelectorAction: {
+    color: theme.color.primary,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.label,
+    fontWeight: theme.font.weight.bold,
+  },
+  scheduleSelectorButton: {
+    alignItems: 'center',
+    backgroundColor: theme.color.surfaceSunken,
+    borderColor: theme.color.borderDefault,
+    borderRadius: theme.radius.md,
+    borderWidth: 1.5,
+    flexDirection: 'row',
+    gap: theme.space[3],
+    minHeight: theme.layout.controlHLg,
+    padding: theme.space[4],
+  },
+  scheduleSelectorButtonEmpty: {
+    backgroundColor: theme.color.surface,
+  },
+  scheduleSelectorMenu: {
+    gap: theme.space[3],
+  },
+  scheduleSelectorTextColumn: {
+    flex: 1,
+    gap: theme.space[1],
+  },
   placeMetaRow: {
     alignItems: 'center',
     flexDirection: 'row',
     gap: theme.space[3],
+  },
+  dayBadge: {
+    backgroundColor: theme.color.surface,
+    borderColor: theme.color.borderDefault,
+    borderRadius: theme.radius.pill,
+    borderWidth: 1,
+    color: theme.color.textBody,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.caption,
+    fontWeight: theme.font.weight.bold,
+    overflow: 'hidden',
+    paddingHorizontal: theme.space[3],
+    paddingVertical: theme.space[1],
   },
   orderBadge: {
     backgroundColor: theme.color.primary,
@@ -275,5 +315,8 @@ export const styles = StyleSheet.create({
     color: theme.color.primary,
     fontFamily: theme.font.family.bold,
     fontWeight: theme.font.weight.bold,
+  },
+  pressed: {
+    opacity: 0.72,
   },
 });

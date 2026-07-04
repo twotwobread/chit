@@ -4,6 +4,7 @@ import type {
   GetTripSettlementResponse,
   SettlementCurrencySummary as ApiSettlementCurrencySummary,
   SupportedCurrency,
+  TripDay,
 } from '@i-um/api-contract';
 
 import { buildQuickExpenseRoute, formatMoney } from './quick-expense';
@@ -12,6 +13,12 @@ export type AuthoritativeTripSettlement = GetTripSettlementResponse;
 
 export function buildSettlementExpenseEntryRoute(tripId: string, tripDayId: string): Href {
   return buildQuickExpenseRoute(tripId, tripDayId, null, 'settle');
+}
+
+export function buildSettlementExpenseEntryRouteForDays(tripId: string, days: TripDay[], today: string): Href | null {
+  const orderedDays = [...days].sort((left, right) => left.dayOrder - right.dayOrder);
+  const entryDay = orderedDays.find((day) => day.date === today) ?? orderedDays[0] ?? null;
+  return entryDay ? buildSettlementExpenseEntryRoute(tripId, entryDay.id) : null;
 }
 
 export type SettlementTransferRowViewModel = {
