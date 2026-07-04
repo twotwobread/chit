@@ -5,6 +5,7 @@ import { type GetTripDetailResponse, type TripParticipantListItem } from '@i-um/
 
 import { isApiStatus, isMobileAuthSessionError } from '../auth/errors';
 import { getStoredSession } from '../auth/session';
+import { beginStaleWhileRevalidate, resolveStaleWhileRevalidateFailure } from '../trips/stale-refresh';
 import { getTripDetail, listTripParticipants } from '../trips/trip-api';
 
 export type TripDetailState =
@@ -31,7 +32,7 @@ export function useTripDetailController() {
       return;
     }
 
-    setState({ status: 'loading' });
+    setState((current) => beginStaleWhileRevalidate(current, { status: 'loading' }, ['success']));
     try {
       const [detail, participantsResult, session] = await Promise.all([
         getTripDetail(tripId),
@@ -49,7 +50,13 @@ export function useTripDetailController() {
         currentUserId: session?.user.id,
       });
     } catch (error) {
-      setState(tripDetailFailureState(error));
+      const failureState = tripDetailFailureState(error);
+      setState((current) =>
+        resolveStaleWhileRevalidateFailure(current, failureState, {
+          shouldKeepStale: (state) => state.status === 'error',
+          staleStatuses: ['success'],
+        }),
+      );
     }
   }, [tripId]);
 

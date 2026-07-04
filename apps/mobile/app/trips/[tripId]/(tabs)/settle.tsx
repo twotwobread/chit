@@ -7,6 +7,7 @@ import { PrimaryButton, SecondaryButton, theme } from '../../../../lib/design';
 import { TransferRow } from '../../../../lib/trip-ui/TransferRow';
 import { TripListCard, TripScreen, TripScreenHeader, TripStateCard } from '../../../../lib/trip-ui/TripScreenScaffold';
 import { getTripSettlement } from '../../../../lib/trips/settlement-api';
+import { beginStaleWhileRevalidate, resolveStaleWhileRevalidateFailure } from '../../../../lib/trips/stale-refresh';
 import { getTripDetail } from '../../../../lib/trips/trip-api';
 import {
   buildSettlementExpenseEntryRoute,
@@ -39,7 +40,7 @@ export default function TripSettleTabScreen() {
       return;
     }
 
-    setState({ status: 'loading' });
+    setState((current) => beginStaleWhileRevalidate(current, { status: 'loading' }, ['settlement']));
     try {
       const [detail, settlement] = await Promise.all([getTripDetail(tripId), getTripSettlement(tripId)]);
       const currentDay = findTripCalendarDay(detail.days, localDateString());
@@ -52,7 +53,13 @@ export default function TripSettleTabScreen() {
         viewModel: buildSettlementTransferViewModel({ settlement }),
       });
     } catch (error) {
-      setState(settleFailureState(error));
+      const failureState = settleFailureState(error);
+      setState((current) =>
+        resolveStaleWhileRevalidateFailure(current, failureState, {
+          shouldKeepStale: (state) => state.status === 'error',
+          staleStatuses: ['settlement'],
+        }),
+      );
     }
   }, [tripId]);
 

@@ -10,6 +10,7 @@ import { isMobileAuthSessionError } from '../auth/errors';
 import { createLogoutFlow, type LogoutFlow } from '../auth/logout-flow';
 import { clearStoredSession, readStoredSession } from '../auth/session';
 import { getMySettlementSummary } from '../trips/settlement-api';
+import { beginStaleWhileRevalidate, resolveStaleWhileRevalidateFailure } from '../trips/stale-refresh';
 import { listMyTrips } from '../trips/trip-api';
 
 export type MyPageState =
@@ -57,7 +58,7 @@ export function useMyPageController() {
   }, []);
 
   const loadTrips = useCallback(async () => {
-    setTripState({ status: 'loading' });
+    setTripState((current) => beginStaleWhileRevalidate(current, { status: 'loading' }, ['ready']));
 
     try {
       const response = await listMyTrips();
@@ -66,12 +67,18 @@ export function useMyPageController() {
       if (await handleAuthError(error)) {
         return;
       }
-      setTripState({ status: 'error' });
+      const failureState: TripListState = { status: 'error' };
+      setTripState((current) =>
+        resolveStaleWhileRevalidateFailure(current, failureState, {
+          shouldKeepStale: (state) => state.status === 'error',
+          staleStatuses: ['ready'],
+        }),
+      );
     }
   }, [handleAuthError]);
 
   const loadSettlementSummary = useCallback(async () => {
-    setSettlementSummaryState({ status: 'loading' });
+    setSettlementSummaryState((current) => beginStaleWhileRevalidate(current, { status: 'loading' }, ['ready']));
 
     try {
       const response = await getMySettlementSummary();
@@ -80,14 +87,20 @@ export function useMyPageController() {
       if (await handleAuthError(error)) {
         return;
       }
-      setSettlementSummaryState({ status: 'error' });
+      const failureState: SettlementSummaryState = { status: 'error' };
+      setSettlementSummaryState((current) =>
+        resolveStaleWhileRevalidateFailure(current, failureState, {
+          shouldKeepStale: (state) => state.status === 'error',
+          staleStatuses: ['ready'],
+        }),
+      );
     }
   }, [handleAuthError]);
 
   const load = useCallback(async () => {
-    setState({ status: 'loading' });
-    setTripState({ status: 'loading' });
-    setSettlementSummaryState({ status: 'loading' });
+    setState((current) => beginStaleWhileRevalidate(current, { status: 'loading' }, ['ready']));
+    setTripState((current) => beginStaleWhileRevalidate(current, { status: 'loading' }, ['ready']));
+    setSettlementSummaryState((current) => beginStaleWhileRevalidate(current, { status: 'loading' }, ['ready']));
     updateLegalLinkState(initialLegalLinkOpenState);
 
     try {
@@ -109,7 +122,13 @@ export function useMyPageController() {
       if (await handleAuthError(error)) {
         return;
       }
-      setState({ status: 'error' });
+      const failureState: MyPageState = { status: 'error' };
+      setState((current) =>
+        resolveStaleWhileRevalidateFailure(current, failureState, {
+          shouldKeepStale: (state) => state.status === 'error',
+          staleStatuses: ['ready'],
+        }),
+      );
     }
   }, [handleAuthError, loadSettlementSummary, loadTrips, updateLegalLinkState]);
 
