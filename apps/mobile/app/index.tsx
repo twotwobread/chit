@@ -11,6 +11,8 @@ import { ActiveTripCard, PastTripRow, UpcomingTripRow } from '../lib/home-ui/Tri
 import { BottomMenu } from '../lib/navigation/BottomMenu';
 import { listMyTrips } from '../lib/trips/trip-api';
 import {
+  buildHomeRootRefreshFailureViewModel,
+  buildHomeRootRefreshStartViewModel,
   buildHomeRootViewModel,
   type HomeCurrentTripViewModel,
   type HomeRootViewModel,
@@ -33,7 +35,7 @@ export default function HomeScreen() {
 
   const load = useCallback(async () => {
     const explicitHomeIntent = resolveExplicitHomeIntent();
-    setState(buildHomeRootViewModel({ explicitHomeIntent, status: 'loading' }));
+    setState((current) => buildHomeRootRefreshStartViewModel(current, explicitHomeIntent));
 
     try {
       const stored = await readStoredSession();
@@ -50,10 +52,6 @@ export default function HomeScreen() {
 
       const response = await listMyTrips();
       const nextState = buildHomeRootViewModel({ explicitHomeIntent, status: 'ready', trips: response.trips });
-      if (nextState.status === 'redirect') {
-        router.replace(nextState.href);
-        return;
-      }
       setState(nextState);
     } catch (error) {
       if (await handleAuthError(error)) {
@@ -61,7 +59,7 @@ export default function HomeScreen() {
         setState(buildHomeRootViewModel({ message: '다시 로그인해주세요.', status: 'needsLogin' }));
         return;
       }
-      setState(buildHomeRootViewModel({ explicitHomeIntent, status: 'tripListError' }));
+      setState((current) => buildHomeRootRefreshFailureViewModel(current, explicitHomeIntent));
     }
   }, [resolveExplicitHomeIntent]);
 
@@ -131,12 +129,7 @@ function HomeScreenContent({ onRetry, state }: { onRetry: () => void; state: Hom
     );
   }
 
-  return (
-    <Card>
-      <ActivityIndicator color={theme.color.primary} />
-      <Text style={styles.message}>여행으로 이동하는 중...</Text>
-    </Card>
-  );
+  return null;
 }
 
 function HomeHeader() {
