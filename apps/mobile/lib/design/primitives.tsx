@@ -280,6 +280,7 @@ export function ListRow({
 
 export function SegmentedControl({
   dark = false,
+  disabledOptions = [],
   onChange,
   options,
   value,
@@ -288,21 +289,25 @@ export function SegmentedControl({
   value: string;
   onChange: (value: string) => void;
   dark?: boolean;
+  disabledOptions?: string[];
 }) {
   return (
     <View style={[styles.segment, dark ? styles.segmentDark : null]}>
       {options.map((option) => {
         const active = option === value;
+        const disabled = disabledOptions.includes(option);
 
         return (
           <Pressable
             accessibilityRole="tab"
-            accessibilityState={{ selected: active }}
+            accessibilityState={{ disabled, selected: active }}
+            disabled={disabled}
             key={option}
             onPress={() => onChange(option)}
             style={[
               styles.segmentItem,
               active ? (dark ? styles.segmentItemActiveDark : styles.segmentItemActive) : null,
+              disabled ? styles.segmentItemDisabled : null,
             ]}
           >
             <Text
@@ -310,6 +315,7 @@ export function SegmentedControl({
                 styles.segmentText,
                 dark ? styles.segmentTextDark : null,
                 active ? (dark ? styles.segmentTextActiveDark : styles.segmentTextActive) : null,
+                disabled ? styles.segmentTextDisabled : null,
               ]}
             >
               {option}
@@ -487,6 +493,9 @@ const styles = StyleSheet.create({
   segmentItemActiveDark: {
     backgroundColor: theme.color.surface,
   },
+  segmentItemDisabled: {
+    opacity: 0.45,
+  },
   segmentText: {
     color: theme.color.textMuted,
     fontFamily: theme.font.family.bold,
@@ -501,5 +510,8 @@ const styles = StyleSheet.create({
   },
   segmentTextDark: {
     color: theme.color.green[100],
+  },
+  segmentTextDisabled: {
+    color: theme.color.textFaint,
   },
 });
