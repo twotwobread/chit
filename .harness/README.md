@@ -39,8 +39,10 @@ Run     -> stateful workflow execution envelope
 .harness/artifacts/templates reusable run/artifact templates
 .harness/rules               canonical project/agent rule bodies
 .harness/skills              canonical skill sources
-.harness/scripts             adapter sync, validation, and provider policy helpers
+.harness/scripts             adapter sync, validation, provider policy, and run summary helpers
 .harness/runs                workflow run artifacts; ignored except .gitkeep
+.harness/history             tracked sanitized run summaries for harness analysis
+.harness/evals               tracked curated regression cases derived from history
 ```
 
 ## Run lifecycle
@@ -62,6 +64,22 @@ request/issue + narrow repo evidence -> route decision -> enough evidence? -> ti
 ```
 
 If scope is unclear, route to clarification or block. If expected behavior is clear but cause is unknown, route to local technical investigation. Only after enough evidence exists should policy select a tier.
+
+## Run history and evals
+
+Raw run directories under `.harness/runs/` are operational scratch state and remain gitignored. They may include local notes, provider-private files, event streams, or check artifacts that should not be committed as-is.
+
+For harness improvement, record compact sanitized summaries in `.harness/history/runs.ndjson`:
+
+```bash
+pnpm harness:record-run -- --run-id <run-id>
+```
+
+Use `--dry-run` to print the summary without appending. The recorder whitelists canonical fields from `run.yaml`, `artifacts/classification.yaml`, and `provider-selection.yaml`; it does not copy `private/`, full user requests, long logs, or check output bodies.
+
+When a run captures reusable judgment about routing, tiering, provider selection, or policy quality, promote it manually into a curated `.harness/evals/cases/<case-id>.yaml` case. History answers "what happened?"; eval cases answer "what should happen next time?".
+
+Before deleting a feature worktree, record or dry-run the active run summary so route/tier/provider evidence survives cleanup.
 
 ## Tier depth
 
