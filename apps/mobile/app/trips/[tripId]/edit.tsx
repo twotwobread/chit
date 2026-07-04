@@ -7,7 +7,7 @@ import { ApiError } from '@i-um/api-contract';
 import { MobileAuthError } from '../../../lib/auth/client';
 import { getStoredSession } from '../../../lib/auth/session';
 import { Card, PrimaryButton, SecondaryButton, theme } from '../../../lib/design';
-import { getTripDetail, updateTrip } from '../../../lib/trips/client';
+import { getTripDetail, updateTrip } from '../../../lib/trips/trip-api';
 import { dateFromString, monthStringFromDate, todayString } from '../../../lib/trips/date';
 import { tripDetailPath } from '../../../lib/trips/routes';
 import { TripDateFieldButton, TripDatePicker, TripFormField } from '../../../lib/trips/date-picker';

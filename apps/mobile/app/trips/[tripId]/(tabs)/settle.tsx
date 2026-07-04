@@ -6,7 +6,8 @@ import type { Href } from 'expo-router';
 import { PrimaryButton, SecondaryButton, theme } from '../../../../lib/design';
 import { TransferRow } from '../../../../lib/trip-ui/TransferRow';
 import { TripListCard, TripScreen, TripScreenHeader, TripStateCard } from '../../../../lib/trip-ui/TripScreenScaffold';
-import { getTripDetail, getTripSettlement } from '../../../../lib/trips/client';
+import { getTripSettlement } from '../../../../lib/trips/settlement-api';
+import { getTripDetail } from '../../../../lib/trips/trip-api';
 import {
   buildSettlementExpenseEntryRoute,
   buildSettlementRequestMessage,

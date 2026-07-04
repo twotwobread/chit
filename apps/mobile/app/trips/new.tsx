@@ -6,7 +6,7 @@ import type { CreateTripResponse, SupportedCurrency } from '@i-um/api-contract';
 
 import { MobileAuthError } from '../../lib/auth/client';
 import { Card, PrimaryButton, SecondaryButton, theme } from '../../lib/design';
-import { createTrip } from '../../lib/trips/client';
+import { createTrip } from '../../lib/trips/trip-api';
 import { dateFromString, isValidDate, monthStringFromDate, todayString } from '../../lib/trips/date';
 import { TripDateFieldButton, TripDatePicker, TripFormField } from '../../lib/trips/date-picker';
 import { tripDetailPath } from '../../lib/trips/routes';

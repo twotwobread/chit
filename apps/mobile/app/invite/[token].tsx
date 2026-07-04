@@ -7,7 +7,7 @@ import { ApiError } from '@i-um/api-contract';
 import { MobileAuthError } from '../../lib/auth/client';
 import { clearStoredSession, readStoredSession } from '../../lib/auth/session';
 import { Card, PrimaryButton, SecondaryButton, theme } from '../../lib/design';
-import { acceptTripInvite } from '../../lib/trips/client';
+import { acceptTripInvite } from '../../lib/trips/trip-api';
 import {
   buildInviteInvalidViewModel,
   buildInviteLoginRequiredViewModel,

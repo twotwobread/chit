@@ -7,7 +7,7 @@ import { MobileAuthError } from '../../../../lib/auth/client';
 import { DayChips } from '../../../../lib/trip-ui/DayChips';
 import { DayItineraryEditor } from '../../../../lib/trip-ui/DayItineraryEditor';
 import { TripScreen, TripScreenHeader, TripStateCard } from '../../../../lib/trip-ui/TripScreenScaffold';
-import { getTripDetail } from '../../../../lib/trips/client';
+import { getTripDetail } from '../../../../lib/trips/trip-api';
 import { tripDetailPath } from '../../../../lib/trips/routes';
 import { localDateString } from '../../../../lib/trips/status';
 import { buildTripMapDayChips, resolveTripMapSelectedDay } from '../../../../lib/trips/trip-map';
