@@ -2,6 +2,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { SegmentedControl, theme } from '../design';
+import {
+  quickExpenseDirectSplitUnavailableMessage,
+  resolveQuickExpenseSheetInitialSplitMode,
+  selectQuickExpenseSheetSplitMode,
+  type QuickExpenseSplitPolicy,
+} from '../trips/quick-expense';
 
 export type QuickExpenseItemOption = {
   id: string;
@@ -19,6 +25,7 @@ export type QuickExpenseDraft = {
   amountInput: string;
   itemId: string | null;
   payerParticipantId: string | null;
+  splitMode: QuickExpenseSplitPolicy;
   splitParticipantIds: string[];
   memoInput: string;
 };
@@ -46,7 +53,11 @@ export type QuickExpenseFormProps = {
 
 type QuickExpenseErrors = Partial<Record<'amount' | 'item' | 'payer' | 'participants', string>>;
 
-const SPLIT_OPTIONS = ['1/N 분할', '직접 분할'];
+const SPLIT_OPTION_LABELS: Record<QuickExpenseSplitPolicy, string> = {
+  equal: '1/N 분할',
+  manual: '직접 분할',
+};
+const SPLIT_OPTIONS = [SPLIT_OPTION_LABELS.equal, SPLIT_OPTION_LABELS.manual];
 
 export function QuickExpenseForm({
   currency = 'JPY',
@@ -66,17 +77,23 @@ export function QuickExpenseForm({
     ? (initialDraft?.payerParticipantId ?? null)
     : (participantOptions[0]?.id ?? null);
   const defaultSplitIds = initialDraft?.splitParticipantIds ?? participantOptions.map((participant) => participant.id);
+  const directSplitUnavailableMessage = quickExpenseDirectSplitUnavailableMessage(participantOptions.length);
+  const defaultSplitMode = resolveQuickExpenseSheetInitialSplitMode({
+    requestedSplitMode: initialDraft?.splitMode,
+    participantCount: participantOptions.length,
+    selectedParticipantCount: defaultSplitIds.length,
+  });
   const [draft, setDraft] = useState<QuickExpenseDraft>({
     amountInput: initialDraft?.amountInput ?? '',
     itemId: defaultItemId,
     payerParticipantId: defaultPayerId,
+    splitMode: defaultSplitMode,
     splitParticipantIds: defaultSplitIds,
     memoInput: initialDraft?.memoInput ?? '',
   });
   const [errors, setErrors] = useState<QuickExpenseErrors>({});
   const [itemSelectorExpanded, setItemSelectorExpanded] = useState(false);
-  const splitMode =
-    draft.splitParticipantIds.length === participantOptions.length ? SPLIT_OPTIONS[0] : SPLIT_OPTIONS[1];
+  const splitMode = draft.splitMode;
   const selectedItem = useMemo(
     () => itemOptions.find((item) => item.id === draft.itemId) ?? null,
     [draft.itemId, itemOptions],
@@ -96,12 +113,21 @@ export function QuickExpenseForm({
   };
 
   const toggleSplitParticipant = (participantId: string) => {
-    setDraft((current) => ({
-      ...current,
-      splitParticipantIds: current.splitParticipantIds.includes(participantId)
+    setDraft((current) => {
+      const nextSplitParticipantIds = current.splitParticipantIds.includes(participantId)
         ? current.splitParticipantIds.filter((id) => id !== participantId)
-        : [...current.splitParticipantIds, participantId],
-    }));
+        : [...current.splitParticipantIds, participantId];
+      const shouldUseManualMode =
+        directSplitUnavailableMessage === null &&
+        (current.splitMode === 'manual' || nextSplitParticipantIds.length !== participantOptions.length);
+
+      return {
+        ...current,
+        splitMode: shouldUseManualMode ? 'manual' : 'equal',
+        splitParticipantIds: nextSplitParticipantIds,
+      };
+    });
+    setErrors((current) => ({ ...current, participants: undefined }));
   };
 
   const save = () => {
@@ -217,14 +243,27 @@ export function QuickExpenseForm({
 
       <Text style={styles.label}>분할</Text>
       <SegmentedControl
+        disabledOptions={directSplitUnavailableMessage ? [SPLIT_OPTION_LABELS.manual] : []}
         onChange={(value) => {
-          if (value === SPLIT_OPTIONS[0]) {
-            updateDraft({ splitParticipantIds: participantOptions.map((participant) => participant.id) });
+          const nextSplitMode = value === SPLIT_OPTION_LABELS.equal ? 'equal' : 'manual';
+          const selection = selectQuickExpenseSheetSplitMode({
+            currentSplitMode: draft.splitMode,
+            nextSplitMode,
+            participantIds: participantOptions.map((participant) => participant.id),
+            selectedSplitParticipantIds: draft.splitParticipantIds,
+          });
+          if (!selection.ok) {
+            setErrors((current) => ({ ...current, participants: selection.message }));
+            return;
           }
+
+          updateDraft({ splitMode: selection.splitMode, splitParticipantIds: selection.splitParticipantIds });
+          setErrors((current) => ({ ...current, participants: undefined }));
         }}
         options={SPLIT_OPTIONS}
-        value={splitMode}
+        value={SPLIT_OPTION_LABELS[splitMode]}
       />
+      {directSplitUnavailableMessage ? <Text style={styles.helperText}>{directSplitUnavailableMessage}</Text> : null}
       <View style={styles.optionList}>
         {participantOptions.map((participant) => (
           <ParticipantChip

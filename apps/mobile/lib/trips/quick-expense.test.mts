@@ -29,6 +29,8 @@ import {
   resolveQuickExpenseItemDayId,
   parseQuickExpenseRoute,
   resolveQuickExpenseReturnPath,
+  resolveQuickExpenseSheetInitialSplitMode,
+  selectQuickExpenseSheetSplitMode,
   toggleQuickExpenseSplitParticipant,
 } from './quick-expense.ts';
 
@@ -443,6 +445,65 @@ test('builds split participant selection state and previews only selected partic
     [['participant-friend', '1,000엔']],
   );
   assert.equal(viewModel.splitParticipantError, null);
+});
+
+test('initializes Today-sheet direct split from a saved participant subset only when direct split is available', () => {
+  assert.equal(
+    resolveQuickExpenseSheetInitialSplitMode({
+      requestedSplitMode: undefined,
+      participantCount: 2,
+      selectedParticipantCount: 1,
+    }),
+    'manual',
+  );
+  assert.equal(
+    resolveQuickExpenseSheetInitialSplitMode({
+      requestedSplitMode: undefined,
+      participantCount: 2,
+      selectedParticipantCount: 2,
+    }),
+    'equal',
+  );
+  assert.equal(
+    resolveQuickExpenseSheetInitialSplitMode({
+      requestedSplitMode: 'manual',
+      participantCount: 1,
+      selectedParticipantCount: 1,
+    }),
+    'equal',
+  );
+});
+
+test('selects Today-sheet direct split without requiring participant deselection', () => {
+  const result = selectQuickExpenseSheetSplitMode({
+    currentSplitMode: 'equal',
+    nextSplitMode: 'manual',
+    participantIds: ['participant-payer', 'participant-friend'],
+    selectedSplitParticipantIds: ['participant-payer', 'participant-friend'],
+  });
+
+  assert.deepEqual(result, {
+    ok: true,
+    splitMode: 'manual',
+    splitParticipantIds: ['participant-payer', 'participant-friend'],
+    message: null,
+  });
+});
+
+test('keeps Today-sheet direct split unavailable for a one-person split target and returns a reason', () => {
+  const result = selectQuickExpenseSheetSplitMode({
+    currentSplitMode: 'equal',
+    nextSplitMode: 'manual',
+    participantIds: ['participant-payer'],
+    selectedSplitParticipantIds: ['participant-payer'],
+  });
+
+  assert.deepEqual(result, {
+    ok: false,
+    splitMode: 'equal',
+    splitParticipantIds: ['participant-payer'],
+    message: '분할 대상자가 1명이라 직접 분할을 선택할 수 없어요.',
+  });
 });
 
 test('hides split preview for invalid amount and reports missing participants for valid amount', () => {

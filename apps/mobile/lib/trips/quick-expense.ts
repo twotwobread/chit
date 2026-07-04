@@ -215,6 +215,64 @@ export function toggleQuickExpenseSplitParticipant(selectedParticipantIds: strin
     : [...selectedParticipantIds, participantId];
 }
 
+export function quickExpenseDirectSplitUnavailableMessage(participantCount: number): string | null {
+  if (participantCount === 0) {
+    return '참여자 정보를 불러오지 못해 직접 분할을 선택할 수 없어요.';
+  }
+  if (participantCount === 1) {
+    return '분할 대상자가 1명이라 직접 분할을 선택할 수 없어요.';
+  }
+  return null;
+}
+
+export function resolveQuickExpenseSheetInitialSplitMode({
+  requestedSplitMode,
+  participantCount,
+  selectedParticipantCount,
+}: {
+  requestedSplitMode?: QuickExpenseSplitPolicy;
+  participantCount: number;
+  selectedParticipantCount: number;
+}): QuickExpenseSplitPolicy {
+  if (quickExpenseDirectSplitUnavailableMessage(participantCount)) {
+    return 'equal';
+  }
+  if (requestedSplitMode === 'manual' || selectedParticipantCount !== participantCount) {
+    return 'manual';
+  }
+  return 'equal';
+}
+
+export function selectQuickExpenseSheetSplitMode({
+  currentSplitMode,
+  nextSplitMode,
+  participantIds,
+  selectedSplitParticipantIds,
+}: {
+  currentSplitMode: QuickExpenseSplitPolicy;
+  nextSplitMode: QuickExpenseSplitPolicy;
+  participantIds: string[];
+  selectedSplitParticipantIds: string[];
+}):
+  | { ok: true; splitMode: QuickExpenseSplitPolicy; splitParticipantIds: string[]; message: null }
+  | { ok: false; splitMode: QuickExpenseSplitPolicy; splitParticipantIds: string[]; message: string } {
+  if (nextSplitMode === 'equal') {
+    return { ok: true, splitMode: 'equal', splitParticipantIds: participantIds, message: null };
+  }
+
+  const unavailableMessage = quickExpenseDirectSplitUnavailableMessage(participantIds.length);
+  if (unavailableMessage) {
+    return {
+      ok: false,
+      splitMode: currentSplitMode,
+      splitParticipantIds: selectedSplitParticipantIds,
+      message: unavailableMessage,
+    };
+  }
+
+  return { ok: true, splitMode: 'manual', splitParticipantIds: selectedSplitParticipantIds, message: null };
+}
+
 export function buildQuickExpenseViewModel({
   amountInput,
   currency,
