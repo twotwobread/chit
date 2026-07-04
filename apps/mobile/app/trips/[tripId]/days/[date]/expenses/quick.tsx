@@ -21,6 +21,7 @@ export default function QuickExpenseScreen() {
     selectItem,
     selectPayer,
     selectSplitPolicy,
+    selectTripDay,
     selectedItemId,
     selectedSplitParticipantIds,
     setMemoInput,
@@ -60,6 +61,7 @@ export default function QuickExpenseScreen() {
           onSelectItem={selectItem}
           onSelectPayer={selectPayer}
           onSelectSplitPolicy={selectSplitPolicy}
+          onSelectTripDay={selectTripDay}
           onSubmit={() => void submit()}
           onToggleSplitParticipant={toggleSplitParticipant}
           onUpdateAmount={updateAmountInput}

@@ -5,6 +5,7 @@ import type {
   ScheduleItem,
   ExpenseSplit,
   GetDayScheduleItemsResponse,
+  TripDay,
   TripParticipantListItem,
 } from '@i-um/api-contract';
 
@@ -22,6 +23,9 @@ import {
   formatMoney,
   inferCurrentQuickExpenseItem,
   parseAmountMinor,
+  resolveInitialQuickExpenseItemId,
+  resolveInitialQuickExpenseItemIdFromItineraries,
+  resolveQuickExpenseItemDayId,
   parseQuickExpenseRoute,
   resolveQuickExpenseReturnPath,
   toggleQuickExpenseSplitParticipant,
@@ -46,9 +50,9 @@ function item(overrides: Partial<ScheduleItem>): ScheduleItem {
   };
 }
 
-function itinerary(items: ScheduleItem[]): GetDayScheduleItemsResponse {
+function itinerary(items: ScheduleItem[], dayOverrides: Partial<TripDay> = {}): GetDayScheduleItemsResponse {
   return {
-    day: { date: '2026-07-10', dayOrder: 1, lodgingPlace: null },
+    day: { id: 'day-1', date: '2026-07-10', dayOrder: 1, lodgingPlace: null, ...dayOverrides },
     items,
   };
 }
@@ -90,6 +94,33 @@ test('infers the first pending itinerary item by item order', () => {
   assert.equal(current?.id, 'item-next');
 });
 
+test('resolves initial quick expense item from a valid preferred item before inferring current item', () => {
+  const resolved = resolveInitialQuickExpenseItemId(
+    [item({ id: 'item-current', itemOrder: 1 }), item({ id: 'item-preferred', itemOrder: 2 })],
+    'item-preferred',
+  );
+
+  assert.equal(resolved, 'item-preferred');
+});
+
+test('falls back to the first pending item when no valid preferred item exists', () => {
+  const resolved = resolveInitialQuickExpenseItemId([
+    item({ id: 'item-done', itemOrder: 1, arrivedAt: '2026-07-10T00:30:00Z' }),
+    item({ id: 'item-current', itemOrder: 2 }),
+  ]);
+
+  assert.equal(resolved, 'item-current');
+});
+
+test('does not default quick expense to a skipped schedule item', () => {
+  const resolved = resolveInitialQuickExpenseItemId([
+    item({ id: 'item-skipped', itemOrder: 1, skippedAt: '2026-07-10T00:30:00Z' } as Partial<ScheduleItem>),
+    item({ id: 'item-current', itemOrder: 2 }),
+  ]);
+
+  assert.equal(resolved, 'item-current');
+});
+
 test('requires explicit chooser when no pending item is inferred', () => {
   const current = inferCurrentQuickExpenseItem([item({ id: 'item-done', arrivedAt: '2026-07-10T00:30:00Z' })]);
   assert.equal(current, null);
@@ -105,6 +136,84 @@ test('requires explicit chooser when no pending item is inferred', () => {
   assert.equal(viewModel.showItemSelector, true);
   assert.equal(viewModel.helper, '현재 일정을 확정할 수 없어 오늘 일정에서 연결할 일정을 선택해주세요.');
   assert.equal(viewModel.itemOptions.length, 1);
+});
+
+test('resolves initial all-day quick expense item by day order before item order', () => {
+  const resolved = resolveInitialQuickExpenseItemIdFromItineraries([
+    itinerary([item({ id: 'item-day-2-first', itemOrder: 1 })], { id: 'day-2', date: '2026-07-11', dayOrder: 2 }),
+    itinerary([item({ id: 'item-day-1-second', itemOrder: 2 })], { id: 'day-1', date: '2026-07-10', dayOrder: 1 }),
+  ]);
+
+  assert.equal(resolved, 'item-day-1-second');
+});
+
+test('resolves the trip day for a selected quick expense item across multiple days', () => {
+  const itineraries = [
+    itinerary([item({ id: 'item-a' })], { id: 'day-1', dayOrder: 1 }),
+    itinerary([item({ id: 'item-b' })], { id: 'day-2', date: '2026-07-11', dayOrder: 2 }),
+  ];
+
+  assert.equal(resolveQuickExpenseItemDayId(itineraries, 'item-b'), 'day-2');
+  assert.equal(resolveQuickExpenseItemDayId(itineraries, 'missing'), null);
+});
+
+test('builds settlement day tabs and filters schedule options to the selected day', () => {
+  const viewModel = buildQuickExpenseViewModel({
+    currency: 'JPY',
+    itinerary: itinerary([item({ id: 'item-a', itemOrder: 1 })], { id: 'day-1', dayOrder: 1 }),
+    itineraries: [
+      itinerary([item({ id: 'item-a', itemOrder: 1 })], { id: 'day-1', dayOrder: 1 }),
+      itinerary(
+        [
+          item({
+            id: 'item-b',
+            itemOrder: 2,
+            place: { id: 'place-b', name: '오사카성', placeType: 'sights', address: 'Osakajo' },
+          }),
+        ],
+        { id: 'day-2', date: '2026-07-11', dayOrder: 2 },
+      ),
+    ],
+    participants: [participant({ participantId: 'participant-a' })],
+    selectedItemId: 'item-b',
+    selectedTripDayId: 'day-2',
+    shouldChooseItem: false,
+  });
+
+  assert.equal(viewModel.dayLabel, '전체 일정');
+  assert.equal(viewModel.selectedTripDayId, 'day-2');
+  assert.deepEqual(
+    viewModel.dayOptions.map((option) => [option.tripDayId, option.dayLabel, option.itemCount, option.selected]),
+    [
+      ['day-1', 'Day 1', 1, false],
+      ['day-2', 'Day 2', 1, true],
+    ],
+  );
+  assert.deepEqual(
+    viewModel.itemOptions.map((option) => [option.itemId, option.tripDayId, option.dayLabel, option.orderLabel]),
+    [['item-b', 'day-2', 'Day 2', '2']],
+  );
+  assert.equal(viewModel.selectedItem?.tripDayId, 'day-2');
+});
+
+test('derives the selected settlement day from the selected schedule item', () => {
+  const viewModel = buildQuickExpenseViewModel({
+    currency: 'JPY',
+    itinerary: itinerary([item({ id: 'item-a', itemOrder: 1 })], { id: 'day-1', dayOrder: 1 }),
+    itineraries: [
+      itinerary([item({ id: 'item-a', itemOrder: 1 })], { id: 'day-1', dayOrder: 1 }),
+      itinerary([item({ id: 'item-b', itemOrder: 1 })], { id: 'day-2', date: '2026-07-11', dayOrder: 2 }),
+    ],
+    participants: [participant({ participantId: 'participant-a' })],
+    selectedItemId: 'item-b',
+    shouldChooseItem: false,
+  });
+
+  assert.equal(viewModel.selectedTripDayId, 'day-2');
+  assert.deepEqual(
+    viewModel.itemOptions.map((option) => option.itemId),
+    ['item-b'],
+  );
 });
 
 test('builds schedule item options with time labels and marks selected item', () => {

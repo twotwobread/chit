@@ -363,7 +363,7 @@ test('maps the first ordered itinerary item to the next place without exposing s
   assert.equal(JSON.stringify(viewModel).includes('오사카성'), false);
 });
 
-test('keeps a current non-place item as the Today target without navigation or inferred quick-expense item', () => {
+test('keeps a current non-place item as the Today target and quick-expense default item', () => {
   const viewModel = buildTodayExecutionViewModel({
     selectedTrip: trip({ id: 'trip-current' }),
     tripDetail: tripDetail(),
@@ -425,7 +425,10 @@ test('keeps a current non-place item as the Today target without navigation or i
   assert.equal(viewModel.nextPlace.address, '버스 · 난바 → 간사이공항 · BUS-12');
   assert.equal(viewModel.nextPlace.navigationAction.label, '');
   assert.equal(viewModel.arrivalAction.label, '완료');
-  assert.equal(viewModel.quickExpenseAction.route, '/trips/trip-current/days/2026-07-10/expenses/quick');
+  assert.equal(
+    viewModel.quickExpenseAction.route,
+    '/trips/trip-current/days/2026-07-10/expenses/quick?itemId=item-transport',
+  );
   assert.equal(viewModel.skippedSection?.items[0]?.placeName, '휴식');
   assert.equal(viewModel.skippedSection?.items[0]?.placeTypeLabel, '휴식');
 });

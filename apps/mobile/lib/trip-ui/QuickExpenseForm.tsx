@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { Chip, SegmentedControl, theme } from '../design';
+import { SegmentedControl, theme } from '../design';
 
 export type QuickExpenseItemOption = {
   id: string;
@@ -71,6 +71,7 @@ export function QuickExpenseForm({
     splitParticipantIds: defaultSplitIds,
   });
   const [errors, setErrors] = useState<QuickExpenseErrors>({});
+  const [itemSelectorExpanded, setItemSelectorExpanded] = useState(false);
   const splitMode =
     draft.splitParticipantIds.length === participantOptions.length ? SPLIT_OPTIONS[0] : SPLIT_OPTIONS[1];
   const selectedItem = useMemo(
@@ -84,6 +85,11 @@ export function QuickExpenseForm({
 
   const updateDraft = (patch: Partial<QuickExpenseDraft>) => {
     setDraft((current) => ({ ...current, ...patch }));
+  };
+
+  const selectItem = (itemId: string) => {
+    updateDraft({ itemId });
+    setItemSelectorExpanded(false);
   };
 
   const toggleSplitParticipant = (participantId: string) => {
@@ -145,19 +151,51 @@ export function QuickExpenseForm({
       {itemOptions.length === 0 ? (
         <Text style={styles.helperText}>연결할 일정이 없어요.</Text>
       ) : (
-        <View style={styles.optionList}>
-          {itemOptions.map((item) => (
-            <Chip
-              key={item.id}
-              label={item.helper ? `${item.label} · ${item.helper}` : item.label}
-              onPress={() => updateDraft({ itemId: item.id })}
-              selected={item.id === draft.itemId}
-            />
-          ))}
+        <View style={styles.selectorWrap}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ expanded: itemSelectorExpanded }}
+            onPress={() => setItemSelectorExpanded((expanded) => !expanded)}
+            style={({ pressed }) => [styles.selectorButton, pressed ? styles.pressed : null]}
+          >
+            <View style={styles.selectorTextColumn}>
+              <Text style={styles.selectorTitle}>{selectedItem?.label ?? '일정을 선택해주세요.'}</Text>
+              {selectedItem?.helper ? (
+                <Text numberOfLines={1} style={styles.selectorHelper}>
+                  {selectedItem.helper}
+                </Text>
+              ) : null}
+            </View>
+            <Text style={styles.selectorAction}>{itemSelectorExpanded ? '닫기' : '변경'}</Text>
+          </Pressable>
+          {itemSelectorExpanded ? (
+            <View style={styles.selectorMenu}>
+              {itemOptions.map((item) => {
+                const selected = item.id === draft.itemId;
+                return (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    key={item.id}
+                    onPress={() => selectItem(item.id)}
+                    style={({ pressed }) => [
+                      styles.selectorOption,
+                      selected ? styles.selectorOptionSelected : null,
+                      pressed ? styles.pressed : null,
+                    ]}
+                  >
+                    <Text style={[styles.selectorOptionTitle, selected ? styles.selectorOptionTitleSelected : null]}>
+                      {item.label}
+                    </Text>
+                    {item.helper ? <Text style={styles.selectorHelper}>{item.helper}</Text> : null}
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
         </View>
       )}
       {errors.item ? <Text style={styles.errorText}>{errors.item}</Text> : null}
-      {selectedItem?.helper ? <Text style={styles.helperText}>{selectedItem.helper}</Text> : null}
 
       <Text style={styles.label}>결제자</Text>
       <View style={styles.optionList}>
@@ -341,6 +379,75 @@ const styles = StyleSheet.create({
   optionList: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    gap: theme.space[2],
+  },
+  selectorAction: {
+    color: theme.color.primary,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.label,
+    fontWeight: theme.font.weight.bold,
+  },
+  selectorButton: {
+    alignItems: 'center',
+    backgroundColor: theme.color.surface,
+    borderColor: theme.color.borderDefault,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1.5,
+    flexDirection: 'row',
+    gap: theme.space[3],
+    minHeight: theme.layout.controlHLg,
+    paddingHorizontal: theme.space[4],
+    paddingVertical: theme.space[3],
+  },
+  selectorHelper: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.caption,
+    lineHeight: theme.font.size.caption * theme.font.leading.normal,
+  },
+  selectorMenu: {
+    backgroundColor: theme.color.surfaceSunken,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    gap: theme.space[2],
+    padding: theme.space[2],
+  },
+  selectorOption: {
+    backgroundColor: theme.color.surface,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    gap: theme.space[1],
+    paddingHorizontal: theme.space[4],
+    paddingVertical: theme.space[3],
+  },
+  selectorOptionSelected: {
+    backgroundColor: theme.color.primarySoft,
+    borderColor: theme.color.primary,
+  },
+  selectorOptionTitle: {
+    color: theme.color.textBody,
+    fontFamily: theme.font.family.semibold,
+    fontSize: theme.font.size.label,
+    fontWeight: theme.font.weight.semibold,
+  },
+  selectorOptionTitleSelected: {
+    color: theme.color.primary,
+    fontFamily: theme.font.family.bold,
+    fontWeight: theme.font.weight.bold,
+  },
+  selectorTextColumn: {
+    flex: 1,
+    gap: theme.space[1],
+  },
+  selectorTitle: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.subhead,
+    fontWeight: theme.font.weight.bold,
+  },
+  selectorWrap: {
     gap: theme.space[2],
   },
   participantChip: {

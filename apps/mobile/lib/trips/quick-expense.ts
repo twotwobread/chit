@@ -43,11 +43,22 @@ export type QuickExpenseManualSplitSummary = {
 
 export type QuickExpenseItemOption = {
   itemId: string;
+  tripDayId: string;
+  dayLabel: string;
+  formattedDate: string;
   orderLabel: string;
   placeName: string;
   placeTypeLabel: string;
   address: string;
   timeLabel: string | null;
+  selected: boolean;
+};
+
+export type QuickExpenseDayOption = {
+  tripDayId: string;
+  dayLabel: string;
+  formattedDate: string;
+  itemCount: number;
   selected: boolean;
 };
 
@@ -81,6 +92,8 @@ export type QuickExpenseViewModel = {
   currency: SupportedCurrency;
   currencyLabel: string;
   selectedItem: QuickExpenseItemOption | null;
+  selectedTripDayId: string | null;
+  dayOptions: QuickExpenseDayOption[];
   itemOptions: QuickExpenseItemOption[];
   payerOptions: QuickExpensePayerOption[];
   splitParticipantOptions: QuickExpenseSplitParticipantOption[];
@@ -155,7 +168,36 @@ export function parseQuickExpenseRoute(route: Href): QuickExpenseRouteTarget | n
 }
 
 export function inferCurrentQuickExpenseItem(items: ScheduleItem[]): ScheduleItem | null {
-  return orderedItems(items).find((item) => item.arrivedAt === null) ?? null;
+  return orderedItems(items).find((item) => item.arrivedAt === null && !item.skippedAt) ?? null;
+}
+
+export function resolveInitialQuickExpenseItemId(
+  items: ScheduleItem[],
+  preferredItemId?: string | null,
+): string | null {
+  return resolveInitialQuickExpenseItemIdFromOrderedItems(orderedItems(items), preferredItemId);
+}
+
+export function resolveInitialQuickExpenseItemIdFromItineraries(
+  itineraries: GetDayScheduleItemsResponse[],
+  preferredItemId?: string | null,
+): string | null {
+  const orderedItemsByDay = orderedItineraries(itineraries).flatMap((itinerary) =>
+    orderedItems(getScheduleItems(itinerary)),
+  );
+  return resolveInitialQuickExpenseItemIdFromOrderedItems(orderedItemsByDay, preferredItemId);
+}
+
+export function resolveQuickExpenseItemDayId(
+  itineraries: GetDayScheduleItemsResponse[],
+  itemId: string | null,
+): string | null {
+  if (!itemId) {
+    return null;
+  }
+  return (
+    itineraries.find((itinerary) => getScheduleItems(itinerary).some((item) => item.id === itemId))?.day.id ?? null
+  );
 }
 
 export function hasQuickExpenseEntry(items: ScheduleItem[]): boolean {
@@ -176,22 +218,47 @@ export function buildQuickExpenseViewModel({
   amountInput,
   currency,
   itinerary,
+  itineraries,
   participants,
   selectedItemId,
   selectedSplitParticipantIds,
+  selectedTripDayId,
   shouldChooseItem,
 }: {
   amountInput?: string;
   currency: SupportedCurrency;
   itinerary: GetDayScheduleItemsResponse;
+  itineraries?: GetDayScheduleItemsResponse[];
   participants: TripParticipantListItem[];
   selectedItemId: string | null;
   selectedSplitParticipantIds?: string[];
+  selectedTripDayId?: string | null;
   shouldChooseItem: boolean;
 }): QuickExpenseViewModel {
-  const itemOptions = orderedItems(getScheduleItems(itinerary)).map((item) => toItemOption(item, selectedItemId));
+  const itineraryList = itineraries && itineraries.length > 0 ? orderedItineraries(itineraries) : [itinerary];
+  const allItemOptions = itineraryList.flatMap((optionItinerary) =>
+    orderedItems(getScheduleItems(optionItinerary)).map((item) => toItemOption(item, optionItinerary, selectedItemId)),
+  );
+  const isAllDayMode = itineraryList.length > 1;
+  const selectedItemFromAllDays = allItemOptions.find((item) => item.selected) ?? null;
+  const activeTripDayId = isAllDayMode
+    ? (selectedTripDayId ?? selectedItemFromAllDays?.tripDayId ?? itineraryList[0]?.day.id ?? null)
+    : itinerary.day.id;
+  const itemOptions = isAllDayMode
+    ? allItemOptions.filter((option) => option.tripDayId === activeTripDayId)
+    : allItemOptions;
   const selectedItem = itemOptions.find((item) => item.selected) ?? null;
+  const dayOptions = isAllDayMode
+    ? itineraryList.map((optionItinerary) => ({
+        tripDayId: optionItinerary.day.id,
+        dayLabel: `Day ${optionItinerary.day.dayOrder}`,
+        formattedDate: formatTripDayDate(optionItinerary.day.date),
+        itemCount: getScheduleItems(optionItinerary).length,
+        selected: optionItinerary.day.id === activeTripDayId,
+      }))
+    : [];
   const showItemSelector = itemOptions.length > 0;
+  const hasAnyItemOptions = allItemOptions.length > 0;
   const selectedParticipantSet = new Set(selectedSplitParticipantIds ?? buildDefaultSplitParticipantIds(participants));
   const selectedParticipants = participants.filter((participant) =>
     selectedParticipantSet.has(participant.participantId),
@@ -206,11 +273,13 @@ export function buildQuickExpenseViewModel({
       })
     : [];
   return {
-    dayLabel: `Day ${itinerary.day.dayOrder}`,
-    formattedDate: formatTripDayDate(itinerary.day.date),
+    dayLabel: isAllDayMode ? '전체 일정' : `Day ${itinerary.day.dayOrder}`,
+    formattedDate: isAllDayMode ? itineraryDateRangeLabel(itineraryList) : formatTripDayDate(itinerary.day.date),
     currency,
     currencyLabel: currencyLabel(currency),
     selectedItem,
+    selectedTripDayId: activeTripDayId,
+    dayOptions,
     itemOptions,
     payerOptions: participants.map((participant) => ({
       participantId: participant.participantId,
@@ -230,9 +299,18 @@ export function buildQuickExpenseViewModel({
     showItemSelector,
     helper:
       shouldChooseItem && itemOptions.length > 0
-        ? '현재 일정을 확정할 수 없어 오늘 일정에서 연결할 일정을 선택해주세요.'
+        ? isAllDayMode
+          ? '정산에 연결할 일정을 선택해주세요.'
+          : '현재 일정을 확정할 수 없어 오늘 일정에서 연결할 일정을 선택해주세요.'
         : null,
-    emptyMessage: itemOptions.length === 0 ? '오늘 일정에 등록된 일정이 없어 지출을 저장할 수 없어요.' : null,
+    emptyMessage:
+      itemOptions.length === 0
+        ? isAllDayMode
+          ? hasAnyItemOptions
+            ? '선택한 Day에 등록된 일정이 없어 다른 Day를 선택해주세요.'
+            : '여행 일정에 등록된 일정이 없어 지출을 저장할 수 없어요.'
+          : '오늘 일정에 등록된 일정이 없어 지출을 저장할 수 없어요.'
+        : null,
   };
 }
 
@@ -512,10 +590,20 @@ export function quickExpenseFailureMessage(status?: number): string {
   return '지출을 저장할 수 없어요. 잠시 후 다시 시도해주세요.';
 }
 
-function toItemOption(item: ScheduleItem, selectedItemId: string | null): QuickExpenseItemOption {
+function toItemOption(
+  item: ScheduleItem,
+  itinerary: GetDayScheduleItemsResponse,
+  selectedItemId: string | null,
+): QuickExpenseItemOption {
+  const dayFields = {
+    tripDayId: itinerary.day.id,
+    dayLabel: `Day ${itinerary.day.dayOrder}`,
+    formattedDate: formatTripDayDate(itinerary.day.date),
+  };
   if (!item.place) {
     return {
       itemId: item.id,
+      ...dayFields,
       orderLabel: String(item.itemOrder),
       placeName: item.nonPlace?.title ?? '장소 없는 일정',
       placeTypeLabel: item.nonPlace ? getNonPlaceCategoryLabel(item.nonPlace.category) : '일정',
@@ -526,6 +614,7 @@ function toItemOption(item: ScheduleItem, selectedItemId: string | null): QuickE
   }
   return {
     itemId: item.id,
+    ...dayFields,
     orderLabel: String(item.itemOrder),
     placeName: item.place.name,
     placeTypeLabel: getPlaceTypeLabel(item.place.placeType),
@@ -533,6 +622,30 @@ function toItemOption(item: ScheduleItem, selectedItemId: string | null): QuickE
     timeLabel: formatScheduleItemTimeLabel(item.startTime, item.endTime) ?? null,
     selected: item.id === selectedItemId,
   };
+}
+
+function resolveInitialQuickExpenseItemIdFromOrderedItems(
+  orderedItemsByContext: ScheduleItem[],
+  preferredItemId?: string | null,
+): string | null {
+  if (preferredItemId && orderedItemsByContext.some((item) => item.id === preferredItemId)) {
+    return preferredItemId;
+  }
+  return orderedItemsByContext.find((item) => item.arrivedAt === null && !item.skippedAt)?.id ?? null;
+}
+
+function orderedItineraries(itineraries: GetDayScheduleItemsResponse[]): GetDayScheduleItemsResponse[] {
+  return [...itineraries].sort((left, right) => left.day.dayOrder - right.day.dayOrder);
+}
+
+function itineraryDateRangeLabel(itineraries: GetDayScheduleItemsResponse[]): string {
+  const ordered = orderedItineraries(itineraries);
+  const first = ordered[0];
+  const last = ordered[ordered.length - 1];
+  if (!first || !last || first.day.date === last.day.date) {
+    return first ? formatTripDayDate(first.day.date) : '';
+  }
+  return `${formatTripDayDate(first.day.date)}–${formatTripDayDate(last.day.date)}`;
 }
 
 function orderedItems(items: ScheduleItem[]): ScheduleItem[] {

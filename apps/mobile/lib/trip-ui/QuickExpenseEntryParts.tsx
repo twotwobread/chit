@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 
 import { type SupportedCurrency } from '@i-um/api-contract';
@@ -13,6 +14,7 @@ import {
   type QuickExpenseSplitPolicy,
   type QuickExpenseViewModel,
 } from '../trips/quick-expense';
+import { DayChips } from './DayChips';
 import { styles } from './QuickExpenseEntryStyles';
 
 export function QuickExpenseForm({
@@ -23,6 +25,7 @@ export function QuickExpenseForm({
   onSelectItem,
   onSelectPayer,
   onSelectSplitPolicy,
+  onSelectTripDay,
   onSubmit,
   onToggleSplitParticipant,
   onUpdateAmount,
@@ -48,6 +51,7 @@ export function QuickExpenseForm({
     policy: QuickExpenseSplitPolicy,
     previewRows: QuickExpenseViewModel['splitPreviewRows'],
   ) => void;
+  onSelectTripDay: (tripDayId: string) => void;
   onSubmit: () => void;
   onToggleSplitParticipant: (participantId: string) => void;
   onUpdateAmount: (value: string) => void;
@@ -80,6 +84,20 @@ export function QuickExpenseForm({
     ...option,
     selected: option.participantId === payerParticipantId,
   }));
+  const [itemSelectorExpanded, setItemSelectorExpanded] = useState(false);
+  const selectItem = (itemId: string) => {
+    onSelectItem(itemId);
+    setItemSelectorExpanded(false);
+  };
+  const showDayContext = viewModel.dayLabel === '전체 일정';
+  const showDayTabs = viewModel.dayOptions.length > 1;
+  const selectedItemTitle = viewModel.selectedItem
+    ? `${showDayContext ? `${viewModel.selectedItem.dayLabel} · ` : ''}${viewModel.selectedItem.placeName}`
+    : '일정을 선택해주세요.';
+  const selectTripDay = (tripDayId: string) => {
+    onSelectTripDay(tripDayId);
+    setItemSelectorExpanded(false);
+  };
 
   return (
     <Card>
@@ -98,40 +116,78 @@ export function QuickExpenseForm({
 
       {viewModel.helper ? <Text style={styles.helper}>{viewModel.helper}</Text> : null}
 
-      {viewModel.showItemSelector && viewModel.itemOptions.length > 0 ? (
+      {showDayTabs ? (
         <View style={styles.fieldGroup}>
-          <Text style={styles.label}>연결할 일정</Text>
-          <View style={styles.optionList}>
-            {viewModel.itemOptions.map((option) => (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityState={{ selected: option.itemId === selectedItemId }}
-                key={option.itemId}
-                onPress={() => onSelectItem(option.itemId)}
-                style={[styles.optionCard, option.itemId === selectedItemId ? styles.optionCardSelected : null]}
-              >
-                <View style={styles.placeMetaRow}>
-                  <Text style={styles.orderBadge}>{option.orderLabel}</Text>
-                  <Text style={styles.placeType}>{option.placeTypeLabel}</Text>
-                </View>
-                <Text style={styles.optionTitle}>{option.placeName}</Text>
-                {option.timeLabel ? <Text style={styles.timeLabel}>{option.timeLabel}</Text> : null}
-                {option.address ? <Text style={styles.address}>{option.address}</Text> : null}
-              </Pressable>
-            ))}
-          </View>
-          {errors.item ? <Text style={styles.errorMessage}>{errors.item}</Text> : null}
+          <Text style={styles.label}>Day 선택</Text>
+          <DayChips
+            days={viewModel.dayOptions.map((option) => ({
+              id: option.tripDayId,
+              label: option.dayLabel,
+              statusLabel: `일정 ${option.itemCount}개`,
+            }))}
+            edgePadding={0}
+            onSelectDay={selectTripDay}
+            selectedDayId={viewModel.selectedTripDayId}
+          />
         </View>
       ) : null}
 
-      {viewModel.selectedItem ? (
-        <View style={styles.selectedPlaceBox}>
-          <Text style={styles.label}>선택된 일정</Text>
-          <Text style={styles.optionTitle}>{viewModel.selectedItem.placeName}</Text>
-          {viewModel.selectedItem.timeLabel ? (
-            <Text style={styles.timeLabel}>{viewModel.selectedItem.timeLabel}</Text>
+      {viewModel.showItemSelector && viewModel.itemOptions.length > 0 ? (
+        <View style={styles.fieldGroup}>
+          <Text style={styles.label}>연결할 일정</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ expanded: itemSelectorExpanded }}
+            onPress={() => setItemSelectorExpanded((expanded) => !expanded)}
+            style={({ pressed }) => [
+              styles.scheduleSelectorButton,
+              viewModel.selectedItem ? null : styles.scheduleSelectorButtonEmpty,
+              pressed ? styles.pressed : null,
+            ]}
+          >
+            <View style={styles.scheduleSelectorTextColumn}>
+              <Text style={styles.optionTitle}>{selectedItemTitle}</Text>
+              {viewModel.selectedItem?.timeLabel ? (
+                <Text style={styles.timeLabel}>{viewModel.selectedItem.timeLabel}</Text>
+              ) : null}
+              {viewModel.selectedItem?.address ? (
+                <Text numberOfLines={1} style={styles.address}>
+                  {viewModel.selectedItem.address}
+                </Text>
+              ) : null}
+            </View>
+            <Text style={styles.scheduleSelectorAction}>{itemSelectorExpanded ? '닫기' : '변경'}</Text>
+          </Pressable>
+          {itemSelectorExpanded ? (
+            <View style={styles.scheduleSelectorMenu}>
+              {viewModel.itemOptions.map((option) => {
+                const selected = option.itemId === selectedItemId;
+                return (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    key={option.itemId}
+                    onPress={() => selectItem(option.itemId)}
+                    style={({ pressed }) => [
+                      styles.optionCard,
+                      selected ? styles.optionCardSelected : null,
+                      pressed ? styles.pressed : null,
+                    ]}
+                  >
+                    <View style={styles.placeMetaRow}>
+                      {showDayContext && !showDayTabs ? <Text style={styles.dayBadge}>{option.dayLabel}</Text> : null}
+                      <Text style={styles.orderBadge}>{option.orderLabel}</Text>
+                      <Text style={styles.placeType}>{option.placeTypeLabel}</Text>
+                    </View>
+                    <Text style={styles.optionTitle}>{option.placeName}</Text>
+                    {option.timeLabel ? <Text style={styles.timeLabel}>{option.timeLabel}</Text> : null}
+                    {option.address ? <Text style={styles.address}>{option.address}</Text> : null}
+                  </Pressable>
+                );
+              })}
+            </View>
           ) : null}
-          {viewModel.selectedItem.address ? <Text style={styles.address}>{viewModel.selectedItem.address}</Text> : null}
+          {errors.item ? <Text style={styles.errorMessage}>{errors.item}</Text> : null}
         </View>
       ) : null}
 

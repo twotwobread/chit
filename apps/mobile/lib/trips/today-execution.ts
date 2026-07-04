@@ -346,10 +346,7 @@ export function buildTodayExecutionViewModel({
         },
     skippedSection: skippedItems.length > 0 ? buildSkippedSection(skippedItems, selectedTrip.id, currentDay.id) : null,
     arrivalAction: arriveAction(selectedTrip.id, currentDay.id, nextItem.id, placeBackedNext ? undefined : '완료'),
-    quickExpenseAction: routeAction(
-      '지출 등록',
-      buildQuickExpenseRoute(selectedTrip.id, currentDay.id, placeBackedNext ? nextItem.id : undefined),
-    ),
+    quickExpenseAction: routeAction('지출 등록', buildQuickExpenseRoute(selectedTrip.id, currentDay.id, nextItem.id)),
     skipAction: skipAction(selectedTrip.id, currentDay.id, nextItem.id),
   };
 }
