@@ -1,0 +1,31 @@
+schema_version: eval-case.v1
+id: <case-id>
+title: <short-title>
+source_run:
+  run_id: <run-id>
+  history_recorded_at: <iso8601>
+  issue: null
+  pr: null
+input:
+  request_summary: <sanitized request summary>
+  relevant_context: []
+  policy_file: .harness/policies/default.yml
+  policy_sha256: <sha256>
+expected:
+  type: feature
+  route: ready_for_implementation
+  likely_tier: normal
+  provider_selection:
+    spec.author: micro-spec-author
+    implementation.execute: superpowers-tdd
+  rationale: <why this is the expected harness behavior>
+judgment:
+  classification_quality: unknown
+  tier_quality: unknown
+  provider_quality: unknown
+  outcome_quality: unknown
+  notes: []
+provenance:
+  curated_by: <human-or-agent>
+  curated_at: <iso8601>
+  source_summary: .harness/history/runs.ndjson

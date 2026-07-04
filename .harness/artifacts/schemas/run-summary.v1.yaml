@@ -1,0 +1,57 @@
+schema_version: run-summary.v1
+purpose: Sanitized tracked summary of one harness workflow run for policy/workflow analysis.
+required:
+  - schema_version
+  - run_id
+  - recorded_at
+  - workflow
+  - policy
+  - status
+  - current_phase
+  - route
+  - final_tier
+  - tier_history
+  - classification
+  - provider_selection
+  - outcome
+  - review
+  - sources
+fields:
+  schema_version:
+    const: run-summary.v1
+  run_id:
+    description: Stable run id under .harness/runs.
+  recorded_at:
+    description: ISO timestamp when the summary was recorded.
+  workflow:
+    required: [name]
+  policy:
+    required: [path, id, version, sha256]
+    notes:
+      - sha256 is computed from the policy file contents at recording time.
+  status:
+    description: Run status from run.yaml.
+  current_phase:
+    description: Current or final phase from run.yaml.
+  route:
+    description: Route from run.yaml or classification.
+  final_tier:
+    description: Tier from run.yaml after classification/tier selection.
+  tier_history:
+    description: Sanitized tier transitions and reasons.
+  classification:
+    description: Whitelisted classification fields from artifacts/classification.yaml.
+  provider_selection:
+    description: Whitelisted provider selections by phase from provider-selection.yaml.
+  outcome:
+    enum_hint: [unknown, in_progress, merged, closed, abandoned, blocked, reverted]
+  review:
+    fields:
+      human_override: boolean
+      quality_notes: []
+      followups: []
+  sources:
+    description: Source file paths and explicitly excluded raw/private paths.
+privacy_notes:
+  - Do not include provider-private state, full user transcripts, long logs, check output bodies, or secrets.
+  - Generate summaries by whitelisting fields; do not recursively copy run directories.

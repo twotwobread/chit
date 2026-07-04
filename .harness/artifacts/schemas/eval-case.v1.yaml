@@ -1,0 +1,52 @@
+schema_version: eval-case.v1
+purpose: Manually curated harness regression case derived from run history.
+required:
+  - schema_version
+  - id
+  - title
+  - source_run
+  - input
+  - expected
+  - judgment
+  - provenance
+fields:
+  schema_version:
+    const: eval-case.v1
+  id:
+    description: Stable case identifier.
+  title:
+    description: Short human-readable title.
+  source_run:
+    fields:
+      run_id: string
+      history_recorded_at: string
+      issue: string|null
+      pr: string|null
+  input:
+    fields:
+      request_summary: string
+      relevant_context: []
+      policy_file: string
+      policy_sha256: string
+  expected:
+    fields:
+      type: string
+      route: string
+      likely_tier: string
+      provider_selection: {}
+      rationale: string
+  judgment:
+    fields:
+      classification_quality: good|bad|mixed|unknown
+      tier_quality: appropriate|too_heavy|too_light|unknown
+      provider_quality: appropriate|wrong|unknown
+      outcome_quality: success|failed|blocked|unknown
+      notes: []
+  provenance:
+    fields:
+      curated_by: string
+      curated_at: string
+      source_summary: string
+privacy_notes:
+  - Eval cases contain human-curated summaries, not raw transcripts.
+  - Redact secrets, personal data, long logs, and provider-private notes before committing.

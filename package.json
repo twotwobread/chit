@@ -15,6 +15,7 @@
     "harness:sync": "node .harness/scripts/sync-adapters.mjs",
     "harness:validate": "node .harness/scripts/validate-harness.mjs",
     "harness:evaluate-provider": "node .harness/scripts/evaluate-provider-policy.mjs",
+    "harness:record-run": "node .harness/scripts/record-run-summary.mjs",
     "lint": "pnpm --filter @i-um/api lint && pnpm --filter @i-um/mobile lint",
     "format": "pnpm --filter @i-um/api format && pnpm --filter @i-um/mobile format",
     "format:check": "pnpm --filter @i-um/api format:check && pnpm --filter @i-um/mobile format:check",
