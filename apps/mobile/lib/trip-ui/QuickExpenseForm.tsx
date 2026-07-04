@@ -139,7 +139,6 @@ export function QuickExpenseForm({
     <View style={styles.wrap}>
       <Text style={styles.label}>금액</Text>
       <View style={styles.amountField}>
-        <Text style={styles.currencyLabel}>{currencyLabel(currency)}</Text>
         <TextInput
           keyboardType="decimal-pad"
           onChangeText={(amountInput) => updateDraft({ amountInput })}
@@ -148,6 +147,7 @@ export function QuickExpenseForm({
           style={styles.amountInput}
           value={draft.amountInput}
         />
+        <Text style={styles.currencyLabel}>{currencyLabel(currency)}</Text>
       </View>
       {errors.amount ? <Text style={styles.errorText}>{errors.amount}</Text> : null}
 

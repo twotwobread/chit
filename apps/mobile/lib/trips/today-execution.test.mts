@@ -336,7 +336,7 @@ test('maps the first ordered itinerary item to the next place without exposing s
     skippedSection: null,
     arrivalAction: {
       kind: 'arrive',
-      label: '도착했어요',
+      label: '도착완료',
       tripId: 'trip-current',
       date: '2026-07-10',
       itemId: 'item-next',
@@ -510,7 +510,7 @@ test('selects the first pending itinerary item without exposing later pending pl
   assert.deepEqual(viewModel.nextPlace.travelModeSelector, buildTravelModeSelectorViewModel('transit'));
   assert.deepEqual(viewModel.arrivalAction, {
     kind: 'arrive',
-    label: '도착했어요',
+    label: '도착완료',
     tripId: 'trip-current',
     date: '2026-07-10',
     itemId: 'item-next',
