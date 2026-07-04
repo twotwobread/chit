@@ -3,7 +3,12 @@ import test from 'node:test';
 
 import type { TripListItem } from '@i-um/api-contract';
 
-import { buildHomeRootViewModel, buildHomeViewModel } from './home.ts';
+import {
+  buildHomeRootRefreshFailureViewModel,
+  buildHomeRootRefreshStartViewModel,
+  buildHomeRootViewModel,
+  buildHomeViewModel,
+} from './home.ts';
 
 function trip(overrides: Partial<TripListItem>): TripListItem {
   return {
@@ -111,6 +116,42 @@ test('explicit Home loading and error states are Home management states', () => 
   const errorViewModel = buildHomeRootViewModel({ explicitHomeIntent: true, status: 'tripListError' });
   assert.equal(errorViewModel.status, 'homeError');
   assert.equal(errorViewModel.showBottomMenu, true);
+});
+
+test('Home focus refresh keeps the current Home view instead of showing blocking loading', () => {
+  const current = buildHomeRootViewModel({
+    status: 'ready',
+    today: '2026-06-22',
+    trips: [trip({ id: 'ongoing', startDate: '2026-06-20', endDate: '2026-06-22' })],
+  });
+
+  const refreshState = buildHomeRootRefreshStartViewModel(current, false);
+
+  assert.equal(refreshState.status, 'home');
+  assert.deepEqual(refreshState, current);
+});
+
+test('Home focus refresh failure keeps stale Home content when there is already data', () => {
+  const current = buildHomeRootViewModel({
+    status: 'ready',
+    today: '2026-06-22',
+    trips: [trip({ id: 'ongoing', startDate: '2026-06-20', endDate: '2026-06-22' })],
+  });
+
+  const failureState = buildHomeRootRefreshFailureViewModel(current, false);
+
+  assert.equal(failureState.status, 'home');
+  assert.deepEqual(failureState, current);
+});
+
+test('Home focus refresh uses blocking loading and error when there is no stale Home data', () => {
+  const current = buildHomeRootViewModel({ status: 'loading' });
+
+  const refreshState = buildHomeRootRefreshStartViewModel(current, false);
+  const failureState = buildHomeRootRefreshFailureViewModel(current, false);
+
+  assert.equal(refreshState.status, 'loading');
+  assert.equal(failureState.status, 'rootError');
 });
 
 test('Home pins the selected current trip and deduplicates it from grouped sections', () => {

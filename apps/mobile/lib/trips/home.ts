@@ -59,6 +59,28 @@ export type HomeRootViewModel =
       showBottomMenu: true;
     };
 
+export function buildHomeRootRefreshStartViewModel(
+  current: HomeRootViewModel,
+  explicitHomeIntent: boolean,
+): HomeRootViewModel {
+  if (current.status === 'home') {
+    return current;
+  }
+
+  return buildHomeRootViewModel({ explicitHomeIntent, status: 'loading' });
+}
+
+export function buildHomeRootRefreshFailureViewModel(
+  current: HomeRootViewModel,
+  explicitHomeIntent: boolean,
+): HomeRootViewModel {
+  if (current.status === 'home') {
+    return current;
+  }
+
+  return buildHomeRootViewModel({ explicitHomeIntent, status: 'tripListError' });
+}
+
 export function buildHomeRootViewModel(input: HomeRootInput): HomeRootViewModel {
   const explicitHomeIntent = input.status === 'needsLogin' ? false : input.explicitHomeIntent === true;
 
