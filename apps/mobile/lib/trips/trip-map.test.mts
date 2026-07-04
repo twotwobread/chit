@@ -4,6 +4,7 @@ import test from 'node:test';
 import type { ScheduleItem, TripDay } from '@i-um/api-contract';
 
 import {
+  buildMapRouteSheetExpandedLayout,
   buildRouteMapPlaces,
   buildTripMapDayChips,
   resolveMapRouteSheetState,
@@ -69,6 +70,13 @@ test('resolves map route sheet state from vertical gestures', () => {
   assert.equal(resolveMapRouteSheetState('expanded', 20), 'collapsed');
   assert.equal(resolveMapRouteSheetState('collapsed', -6), 'collapsed');
   assert.equal(resolveMapRouteSheetState('expanded', 6), 'expanded');
+});
+
+test('expanded map route sheet grows with search results instead of clipping them', () => {
+  const layout = buildMapRouteSheetExpandedLayout();
+
+  assert.equal(layout.position, 'relative');
+  assert.equal('maxHeight' in layout, false);
 });
 
 test('builds route map places from valid routable items while preserving duplicates and statuses', () => {

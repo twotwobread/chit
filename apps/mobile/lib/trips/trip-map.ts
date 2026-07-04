@@ -41,6 +41,14 @@ export function resolveTripMapSelectedDay({
 
 export type MapRouteSheetState = 'collapsed' | 'expanded';
 
+export type MapRouteSheetExpandedLayout = {
+  position: 'relative';
+};
+
+export function buildMapRouteSheetExpandedLayout(): MapRouteSheetExpandedLayout {
+  return { position: 'relative' };
+}
+
 export function resolveMapRouteSheetState(current: MapRouteSheetState, gestureDy: number): MapRouteSheetState {
   if (gestureDy < -12) {
     return 'expanded';

@@ -1,6 +1,7 @@
 import { StyleSheet } from 'react-native';
 
 import { theme } from '../design';
+import { buildMapRouteSheetExpandedLayout } from '../trips/trip-map';
 
 export const styles = StyleSheet.create({
   actionColumn: {
@@ -64,10 +65,7 @@ export const styles = StyleSheet.create({
   routeSheetCollapsed: {
     maxHeight: 104,
   },
-  routeSheetExpanded: {
-    maxHeight: '78%',
-    position: 'relative',
-  },
+  routeSheetExpanded: buildMapRouteSheetExpandedLayout(),
   rowButton: {
     minHeight: 34,
     paddingHorizontal: theme.space[3],
