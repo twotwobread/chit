@@ -447,7 +447,7 @@ function retryAction(): TodayRetryAction {
   return { kind: 'retry', label: '다시 시도' };
 }
 
-function arriveAction(tripId: string, date: string, itemId: string, label = '도착했어요'): TodayArriveAction {
+function arriveAction(tripId: string, date: string, itemId: string, label = '도착완료'): TodayArriveAction {
   return { kind: 'arrive', label, tripId, date, itemId };
 }
 
