@@ -6,6 +6,7 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { isApiStatus, isMobileAuthSessionError } from '../auth/errors';
 import type { RouteMapPlace } from './RouteMap';
 import { getTripDayItinerary } from '../trips/itinerary-api';
+import { beginStaleWhileRevalidate, resolveStaleWhileRevalidateFailure } from '../trips/stale-refresh';
 import { getTripDetail } from '../trips/trip-api';
 import { buildDayItineraryViewModel, getScheduleItems, type DayItineraryViewModel } from '../trips/day-itinerary';
 import {
@@ -46,7 +47,7 @@ export function useTripMapController() {
       }
 
       setFeedback(null);
-      setState({ status: 'loading' });
+      setState((current) => beginStaleWhileRevalidate(current, { status: 'loading' }, ['success', 'unavailable']));
       try {
         const detail = await getTripDetail(tripId);
         const selectedDay = resolveTripMapSelectedDay({
@@ -70,7 +71,13 @@ export function useTripMapController() {
           mapPlaces: buildRouteMapPlaces(getScheduleItems(itinerary)),
         });
       } catch (error) {
-        setState(mapFailureState(error));
+        const failureState = mapFailureState(error);
+        setState((current) =>
+          resolveStaleWhileRevalidateFailure(current, failureState, {
+            shouldKeepStale: (state) => state.status === 'error',
+            staleStatuses: ['success', 'unavailable'],
+          }),
+        );
       }
     },
     [tripId],
