@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { Card, ListRow, PrimaryButton, SecondaryButton, theme } from '../../../../lib/design';
 import { BottomSheet } from '../../../../lib/trip-ui/BottomSheet';
 import { NextPlaceHeroCard } from '../../../../lib/trip-ui/NextPlaceHeroCard';
-import { QuickExpenseForm } from '../../../../lib/trip-ui/QuickExpenseForm';
+import { QuickExpenseForm, type QuickExpenseSubmitPayload } from '../../../../lib/trip-ui/QuickExpenseForm';
 import { TodaySpendCard } from '../../../../lib/trip-ui/TodaySpendCard';
 import { TripScreen, TripScreenHeader, TripStateCard } from '../../../../lib/trip-ui/TripScreenScaffold';
 import { type QuickExpenseOverlayState, useTripTodayController } from '../../../../lib/trip-ui/useTripTodayController';
@@ -208,12 +208,7 @@ function QuickExpenseOverlaySheet({
   state: QuickExpenseOverlayState;
   onClose: () => void;
   onRetry: (target: QuickExpenseRouteTarget) => void;
-  onSubmit: (payload: {
-    amount: number;
-    itemId: string;
-    payerParticipantId: string;
-    splitParticipantIds: string[];
-  }) => void;
+  onSubmit: (payload: QuickExpenseSubmitPayload) => void;
 }) {
   const isReady = state.status === 'ready' || state.status === 'saving';
   const viewModel = isReady

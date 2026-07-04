@@ -2,6 +2,7 @@ import type { Href } from 'expo-router';
 
 import type {
   CreateQuickExpenseRequest,
+  UpdateExpenseRequest,
   ScheduleItem,
   ExpenseSplit,
   GetDayScheduleItemsResponse,
@@ -498,6 +499,29 @@ export function buildQuickExpenseManualSplitSummary({
     canSubmit: true,
     validationMessage: null,
     requestSplits,
+  };
+}
+
+export function buildQuickExpenseMemoUpdateRequest({
+  createRequest,
+  memoInput,
+}: {
+  createRequest: CreateQuickExpenseRequest;
+  memoInput: string;
+}): UpdateExpenseRequest | null {
+  const memo = memoInput.trim();
+  if (memo === '') {
+    return null;
+  }
+
+  return {
+    amountMinor: createRequest.amountMinor,
+    payerParticipantId: createRequest.payerParticipantId,
+    splitPolicy: createRequest.splitPolicy,
+    ...(createRequest.participantIds ? { participantIds: createRequest.participantIds } : {}),
+    ...(createRequest.splits ? { splits: createRequest.splits } : {}),
+    memo,
+    scheduleItemId: createRequest.scheduleItemId,
   };
 }
 
