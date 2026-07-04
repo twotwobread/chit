@@ -7,6 +7,7 @@ import {
   buildGooglePlaceExplorationDetail,
   buildGooglePlaceSearchInputState,
   buildGooglePlaceSearchRoute,
+  buildGooglePlaceSearchSubmitBlockState,
   canSearchGooglePlaces,
   confirmingDuplicateGooglePlaceState,
   duplicateDayPlaceConfirmationMessage,
@@ -43,6 +44,20 @@ describe('google place search helpers', () => {
       message: '두 글자 이상 입력해 주세요.',
       results: [],
     });
+  });
+
+  it('blocks search submission only for blank or too-short queries', () => {
+    assert.deepEqual(buildGooglePlaceSearchSubmitBlockState(''), {
+      status: 'initial',
+      message: '장소 이름을 검색해 보세요.',
+      results: [],
+    });
+    assert.deepEqual(buildGooglePlaceSearchSubmitBlockState('도'), {
+      status: 'minQuery',
+      message: '두 글자 이상 입력해 주세요.',
+      results: [],
+    });
+    assert.equal(buildGooglePlaceSearchSubmitBlockState('도톤보리'), null);
   });
 
   it('maps loading, empty, error, and not-found states', () => {

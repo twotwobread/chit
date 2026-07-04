@@ -8,6 +8,7 @@ import { searchGooglePlaces } from '../places/client';
 import {
   buildGooglePlaceExplorationDetail,
   buildGooglePlaceSearchInputState,
+  buildGooglePlaceSearchSubmitBlockState,
   errorGooglePlaceSearchState,
   googlePlaceSearchLoadingState,
   successGooglePlaceSearchState,
@@ -72,9 +73,9 @@ export function MapContent({
   };
 
   const runPlaceSearch = async () => {
-    const inputState = buildGooglePlaceSearchInputState(placeSearchQuery);
-    if (inputState.status === 'minQuery' || inputState.status === 'initial') {
-      setPlaceSearchState(inputState);
+    const blockState = buildGooglePlaceSearchSubmitBlockState(placeSearchQuery);
+    if (blockState) {
+      setPlaceSearchState(blockState);
       return;
     }
 

@@ -77,6 +77,13 @@ export function buildGooglePlaceSearchInputState(query: string): GooglePlaceSear
   return { status: 'initial', message: '', results: [] };
 }
 
+export function buildGooglePlaceSearchSubmitBlockState(query: string): GooglePlaceSearchViewState | null {
+  if (canSearchGooglePlaces(query)) {
+    return null;
+  }
+  return buildGooglePlaceSearchInputState(query);
+}
+
 export function googlePlaceSearchLoadingState(): GooglePlaceSearchViewState {
   return { status: 'loading', message: '장소를 검색하는 중...', results: [] };
 }
