@@ -16,6 +16,7 @@ import {
   buildCreateQuickExpenseRequest,
   buildDefaultSplitParticipantIds,
   buildQuickExpenseManualSplitInputsFromRows,
+  buildQuickExpenseMemoUpdateRequest,
   buildQuickExpenseViewModel,
   buildSavedEqualSplitSummary,
   quickExpenseFailureMessage,
@@ -250,17 +251,9 @@ export function useQuickExpenseController() {
     try {
       const expenseTripDayId = resolveQuickExpenseItemDayId(state.itineraries, selectedItemId) ?? date;
       const response = await createQuickExpense(tripId, expenseTripDayId, validation.request);
-      const memo = memoInput.trim();
-      if (memo) {
-        await updateExpense(tripId, expenseTripDayId, response.expense.id, {
-          amountMinor: validation.request.amountMinor,
-          payerParticipantId: validation.request.payerParticipantId,
-          splitPolicy: validation.request.splitPolicy,
-          ...(validation.request.participantIds ? { participantIds: validation.request.participantIds } : {}),
-          ...(validation.request.splits ? { splits: validation.request.splits } : {}),
-          memo,
-          scheduleItemId: validation.request.scheduleItemId,
-        });
+      const memoUpdateRequest = buildQuickExpenseMemoUpdateRequest({ createRequest: validation.request, memoInput });
+      if (memoUpdateRequest) {
+        await updateExpense(tripId, expenseTripDayId, response.expense.id, memoUpdateRequest);
       }
       setSavedSummary(
         buildSavedEqualSplitSummary({

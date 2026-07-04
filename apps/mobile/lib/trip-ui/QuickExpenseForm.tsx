@@ -20,6 +20,7 @@ export type QuickExpenseDraft = {
   itemId: string | null;
   payerParticipantId: string | null;
   splitParticipantIds: string[];
+  memoInput: string;
 };
 
 export type QuickExpenseSubmitPayload = {
@@ -28,6 +29,7 @@ export type QuickExpenseSubmitPayload = {
   itemId: string;
   payerParticipantId: string;
   splitParticipantIds: string[];
+  memoInput: string;
 };
 
 export type QuickExpenseFormProps = {
@@ -69,6 +71,7 @@ export function QuickExpenseForm({
     itemId: defaultItemId,
     payerParticipantId: defaultPayerId,
     splitParticipantIds: defaultSplitIds,
+    memoInput: initialDraft?.memoInput ?? '',
   });
   const [errors, setErrors] = useState<QuickExpenseErrors>({});
   const [itemSelectorExpanded, setItemSelectorExpanded] = useState(false);
@@ -128,6 +131,7 @@ export function QuickExpenseForm({
       itemId: draft.itemId,
       payerParticipantId: draft.payerParticipantId,
       splitParticipantIds: draft.splitParticipantIds,
+      memoInput: draft.memoInput,
     });
   };
 
@@ -233,6 +237,17 @@ export function QuickExpenseForm({
         ))}
       </View>
       {errors.participants ? <Text style={styles.errorText}>{errors.participants}</Text> : null}
+
+      <Text style={styles.label}>메모</Text>
+      <TextInput
+        multiline
+        onChangeText={(memoInput) => updateDraft({ memoInput })}
+        placeholder="선택 입력"
+        placeholderTextColor={theme.color.textFaint}
+        style={[styles.memoInput, styles.textArea]}
+        textAlignVertical="top"
+        value={draft.memoInput}
+      />
       {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
 
       <View style={styles.actionRow}>
@@ -376,6 +391,16 @@ const styles = StyleSheet.create({
     marginBottom: theme.space[3],
     marginTop: theme.space[5],
   },
+  memoInput: {
+    borderColor: theme.color.borderDefault,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.body,
+    paddingHorizontal: theme.space[4],
+    paddingVertical: theme.space[3],
+  },
   optionList: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -506,6 +531,9 @@ const styles = StyleSheet.create({
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.subhead,
     fontWeight: theme.font.weight.bold,
+  },
+  textArea: {
+    minHeight: 88,
   },
   wrap: {
     paddingBottom: theme.space[3],

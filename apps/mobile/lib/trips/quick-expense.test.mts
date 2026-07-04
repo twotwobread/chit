@@ -14,6 +14,7 @@ import equalSplitCases from '../../../../packages/api-contract/fixtures/equal-sp
 import {
   buildCreateQuickExpenseRequest,
   buildDefaultEqualSplitPreview,
+  buildQuickExpenseMemoUpdateRequest,
   buildQuickExpenseManualSplitInputsFromRows,
   buildQuickExpenseManualSplitSummary,
   buildDefaultSplitParticipantIds,
@@ -538,6 +539,36 @@ test('builds create quick expense request and validation errors', () => {
       },
     },
   );
+});
+
+test('builds memo update request after quick expense creation and skips blank memo', () => {
+  const createValidation = buildCreateQuickExpenseRequest({
+    amountInput: '18,500',
+    currency: 'KRW',
+    scheduleItemId: 'item-a',
+    splitPolicy: 'equal',
+    participantIds: ['participant-b'],
+    manualSplitInputs: [],
+    payerParticipantId: 'participant-a',
+  });
+
+  assert.equal(createValidation.ok, true);
+  if (!createValidation.ok) {
+    return;
+  }
+
+  assert.deepEqual(
+    buildQuickExpenseMemoUpdateRequest({ createRequest: createValidation.request, memoInput: '  저녁 회식  ' }),
+    {
+      amountMinor: 18500,
+      payerParticipantId: 'participant-a',
+      splitPolicy: 'equal',
+      participantIds: ['participant-b'],
+      memo: '저녁 회식',
+      scheduleItemId: 'item-a',
+    },
+  );
+  assert.equal(buildQuickExpenseMemoUpdateRequest({ createRequest: createValidation.request, memoInput: '   ' }), null);
 });
 
 test('builds manual quick expense request only when split sum matches total', () => {

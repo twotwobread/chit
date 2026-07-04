@@ -18,7 +18,7 @@ import {
   isApiStatus,
   isMobileAuthSessionError,
 } from '../auth/errors';
-import { createQuickExpense, listDayExpenses } from '../trips/expense-api';
+import { createQuickExpense, listDayExpenses, updateExpense } from '../trips/expense-api';
 import {
   createRoutePreview,
   getTripDayItinerary,
@@ -32,6 +32,7 @@ import { buildTodaySpendSummaryViewModel, type TodaySpendSummaryViewModel } from
 import {
   buildCreateQuickExpenseRequest,
   buildDefaultSplitParticipantIds,
+  buildQuickExpenseMemoUpdateRequest,
   buildSavedEqualSplitSummary,
   parseQuickExpenseRoute,
   quickExpenseFailureMessage,
@@ -251,11 +252,13 @@ export function useTripTodayController() {
     async ({
       amount,
       itemId,
+      memoInput,
       payerParticipantId,
       splitParticipantIds,
     }: {
       amount: number;
       itemId: string;
+      memoInput: string;
       payerParticipantId: string;
       splitParticipantIds: string[];
     }) => {
@@ -288,6 +291,18 @@ export function useTripTodayController() {
           quickExpenseState.target.date,
           validation.request,
         );
+        const memoUpdateRequest = buildQuickExpenseMemoUpdateRequest({
+          createRequest: validation.request,
+          memoInput,
+        });
+        if (memoUpdateRequest) {
+          await updateExpense(
+            quickExpenseState.target.tripId,
+            quickExpenseState.target.date,
+            response.expense.id,
+            memoUpdateRequest,
+          );
+        }
         const summary = buildSavedEqualSplitSummary({
           amountMinor: response.expense.amountMinor,
           currency: response.expense.currency,
