@@ -18,6 +18,10 @@ artifacts:
   verification: ".harness/runs/{run_id}/artifacts/verification.md"
 
 phases:
+  workspace.prepare:
+    contract: ".harness/contracts/workspace-prepare.contract.md"
+    provider: "worktree-isolation"
+
   change.classify:
     contract: ".harness/contracts/change-classify.contract.md"
     provider: "default-change-classifier"

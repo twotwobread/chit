@@ -17,6 +17,7 @@
     "harness:evaluate-provider": "node .harness/scripts/evaluate-provider-policy.mjs",
     "harness:record-run": "node .harness/scripts/record-run-summary.mjs",
     "harness:check-bugfix-scenario": "node .harness/scripts/check-bugfix-scenario-coverage.mjs",
+    "harness:check-worktree-isolation": "node .harness/scripts/check-worktree-isolation.mjs --repo-root .",
     "lint": "pnpm --filter @i-um/api lint && pnpm --filter @i-um/mobile lint",
     "format": "pnpm --filter @i-um/api format && pnpm --filter @i-um/mobile format",
     "format:check": "pnpm --filter @i-um/api format:check && pnpm --filter @i-um/mobile format:check",

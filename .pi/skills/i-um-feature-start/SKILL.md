@@ -50,7 +50,15 @@ Do not read broad docs by default. Read only rules selected by the rulepack for 
    - `git rev-parse --show-toplevel`
    - Do not overwrite unrelated user changes.
 
-2. Create or select a run envelope
+2. Prepare isolated workspace
+   - Feature, issue, bugfix, and feature-spec work must run in a `.worktrees/*` workspace before writing run artifacts, specs, plans, implementation files, or PR changes.
+   - If already in a linked worktree under `.worktrees/*`, continue there.
+   - If at the repository root on `develop`, create or select the worktree with `.pi/bin/worktree-create`; do not call `git worktree add` directly.
+   - If the repository root has working-tree changes, stop and ask before moving or overwriting anything.
+   - After entering the selected worktree, re-run `git status --short`, `git branch --show-current`, and `git rev-parse --show-toplevel`.
+   - Keep the repository root on `develop` for sync/management only.
+
+3. Create or select a run envelope
    - Choose a stable `<run-id>`.
    - Start with `tier: pending` and `route: pending`; do not choose `lightweight`, `normal`, or `strict` before triage.
    - Minimum run shape:
@@ -58,14 +66,14 @@ Do not read broad docs by default. Read only rules selected by the rulepack for 
      - `.harness/runs/<run-id>/artifacts/user-request.md`
      - `.harness/runs/<run-id>/artifacts/ledger.md`
 
-3. Run intake triage through `change.classify`
+4. Run intake triage through `change.classify`
    - Follow `.harness/contracts/change-classify.contract.md`.
    - Inspect only the request, linked issue/spec, relevant error/log, and narrow code/contract snippets needed to route the work.
    - Decide the next route: `ready_for_lightweight_investigation`, `ready_for_implementation`, `needs_clarification`, `needs_investigation`, `needs_product_direction`, or `blocked`.
    - If scope cannot be judged safely, ask focused clarification questions or block; do not invent scope.
    - Write `.harness/runs/<run-id>/artifacts/classification.yaml`.
 
-4. Select tier and providers only after enough evidence exists
+5. Select tier and providers only after enough evidence exists
    - Use `.harness/policies/default.yml`.
    - `lightweight`: clear, local, low-risk work; keep artifacts minimal.
    - `normal`: ordinary feature/bugfix work needing micro spec, plan, and evaluation.
@@ -73,12 +81,12 @@ Do not read broad docs by default. Read only rules selected by the rulepack for 
    - If the route is still `needs_clarification` or `blocked`, keep `tier: pending`.
    - Record selected tier/provider reasons in `run.yaml`, `provider-selection.yaml` when materialized, and/or `artifacts/ledger.md`.
 
-5. Materialize only tier-required artifacts
+6. Materialize only tier-required artifacts
    - Lightweight runs usually need `classification.yaml`, `ledger.md`, and `verification.md`.
    - Normal runs add `feature.spec.md`, `implementation-plan.md`, and `evaluation-report.md`.
    - Strict runs add `spec-review.md`, `events.ndjson`, `artifacts/checks/*`, and `private/*` when provider-private state is needed.
 
-6. Run phases in order for the selected route/tier
+7. Run phases in order for the selected route/tier
    - `spec.author`: require `artifacts/feature.spec.md` when the policy/tier requires a spec.
    - `spec.review`: require explicit verdict for strict/high-risk work or when policy approval requires it.
    - `implementation.plan`: require `artifacts/implementation-plan.md` for normal/strict work.
@@ -86,9 +94,9 @@ Do not read broad docs by default. Read only rules selected by the rulepack for 
    - `evaluation.checklist`: require `artifacts/evaluation-report.md` for normal/strict work; lightweight may use `artifacts/verification.md`.
    - `pr.create` and `review.request`: only after blocking checks pass or accepted risk is explicit.
 
-7. Re-triage when new facts appear
+8. Re-triage when new facts appear
    - If investigation reveals API/DB/auth/privacy/product-direction impact, pause and update classification/tier before implementation continues.
    - Do not silently upgrade scope; explain the evidence and ask when product/domain decisions are needed.
 
-8. Complete
+9. Complete
    - Report route, tier, selected providers/checks, changed behavior, verification commands/results, manual smoke/deploy status, and gaps/risks.
