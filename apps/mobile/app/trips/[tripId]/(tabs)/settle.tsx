@@ -4,26 +4,43 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import type { Href } from 'expo-router';
 
 import { PrimaryButton, SecondaryButton, theme } from '../../../../lib/design';
+import { DayChips } from '../../../../lib/trip-ui/DayChips';
+import { ExpenseRow } from '../../../../lib/trip-ui/ExpenseRow';
 import { TransferRow } from '../../../../lib/trip-ui/TransferRow';
 import { TripListCard, TripScreen, TripScreenHeader, TripStateCard } from '../../../../lib/trip-ui/TripScreenScaffold';
+import { listDayExpenses } from '../../../../lib/trips/expense-api';
 import { getTripSettlement } from '../../../../lib/trips/settlement-api';
 import { beginStaleWhileRevalidate, resolveStaleWhileRevalidateFailure } from '../../../../lib/trips/stale-refresh';
 import { getTripDetail } from '../../../../lib/trips/trip-api';
 import {
   buildSettlementExpenseEntryRouteForDays,
+  buildSettlementExpenseHistoryViewModel,
   buildSettlementRequestMessage,
   buildSettlementTransferViewModel,
+  settlementExpenseHistoryFailureState,
   settlementTransferFailureState,
   type SettlementBalanceDirection,
+  type SettlementExpenseHistoryDayInput,
+  type SettlementExpenseHistoryFailureViewModel,
   type SettlementNoTransferNoticeViewModel,
   type SettlementTransferFailureViewModel,
   type SettlementTransferViewModel,
 } from '../../../../lib/trips/settlement';
 import { localDateString } from '../../../../lib/trips/status';
 
+type SettlementExpenseHistoryState =
+  | { status: 'ready'; days: SettlementExpenseHistoryDayInput[] }
+  | { status: 'error'; error: SettlementExpenseHistoryFailureViewModel };
+
 type TripSettleState =
   | { status: 'loading' }
-  | { status: 'settlement'; expenseEntryRoute: Href | null; tripName: string; viewModel: SettlementTransferViewModel }
+  | {
+      status: 'settlement';
+      expenseEntryRoute: Href | null;
+      expenseHistory: SettlementExpenseHistoryState;
+      tripName: string;
+      viewModel: SettlementTransferViewModel;
+    }
   | { status: 'auth' }
   | { status: 'notFound' }
   | { status: 'error'; error: Extract<SettlementTransferFailureViewModel, { status: 'error' }> };
@@ -31,6 +48,7 @@ type TripSettleState =
 export default function TripSettleTabScreen() {
   const { tripId: tripIdParam } = useLocalSearchParams<{ tripId?: string | string[] }>();
   const tripId = Array.isArray(tripIdParam) ? tripIdParam[0] : tripIdParam;
+  const [selectedExpenseDayId, setSelectedExpenseDayId] = useState<string | null>(null);
   const [state, setState] = useState<TripSettleState>({ status: 'loading' });
 
   const load = useCallback(async () => {
@@ -43,10 +61,27 @@ export default function TripSettleTabScreen() {
     try {
       const [detail, settlement] = await Promise.all([getTripDetail(tripId), getTripSettlement(tripId)]);
       const expenseEntryRoute = buildSettlementExpenseEntryRouteForDays(tripId, detail.days, localDateString());
+      let expenseHistory: SettlementExpenseHistoryState;
+
+      try {
+        const days = await Promise.all(
+          detail.days.map(async (day) => ({
+            day,
+            expenses: (await listDayExpenses(tripId, day.id)).expenses,
+          })),
+        );
+        expenseHistory = {
+          status: 'ready',
+          days,
+        };
+      } catch {
+        expenseHistory = { status: 'error', error: settlementExpenseHistoryFailureState() };
+      }
 
       setState({
         status: 'settlement',
         expenseEntryRoute,
+        expenseHistory,
         tripName: detail.trip.name.trim() || '여행',
         viewModel: buildSettlementTransferViewModel({ settlement }),
       });
@@ -95,6 +130,12 @@ export default function TripSettleTabScreen() {
       {state.status === 'settlement' ? (
         <SettlementContent
           expenseEntryRoute={state.expenseEntryRoute}
+          expenseHistory={state.expenseHistory}
+          onRetryExpenseHistory={() => void load()}
+          onSelectExpenseDay={setSelectedExpenseDayId}
+          selectedExpenseDayId={selectedExpenseDayId}
+          today={localDateString()}
+          tripId={tripId ?? ''}
           tripName={state.tripName}
           viewModel={state.viewModel}
         />
@@ -105,10 +146,22 @@ export default function TripSettleTabScreen() {
 
 function SettlementContent({
   expenseEntryRoute,
+  expenseHistory,
+  onRetryExpenseHistory,
+  onSelectExpenseDay,
+  selectedExpenseDayId,
+  today,
+  tripId,
   tripName,
   viewModel,
 }: {
   expenseEntryRoute: Href | null;
+  expenseHistory: SettlementExpenseHistoryState;
+  onRetryExpenseHistory: () => void;
+  onSelectExpenseDay: (dayId: string) => void;
+  selectedExpenseDayId: string | null;
+  today: string;
+  tripId: string;
   tripName: string;
   viewModel: SettlementTransferViewModel;
 }) {
@@ -119,6 +172,14 @@ function SettlementContent({
         {expenseEntryRoute ? (
           <PrimaryButton label="지출 등록하기" onPress={() => router.push(expenseEntryRoute)} />
         ) : null}
+        <ExpenseHistoryContent
+          expenseHistory={expenseHistory}
+          onRetry={onRetryExpenseHistory}
+          onSelectDay={onSelectExpenseDay}
+          selectedDayId={selectedExpenseDayId}
+          today={today}
+          tripId={tripId}
+        />
       </View>
     );
   }
@@ -135,6 +196,15 @@ function SettlementContent({
       {expenseEntryRoute ? (
         <PrimaryButton label="지출 등록하기" onPress={() => router.push(expenseEntryRoute)} />
       ) : null}
+
+      <ExpenseHistoryContent
+        expenseHistory={expenseHistory}
+        onRetry={onRetryExpenseHistory}
+        onSelectDay={onSelectExpenseDay}
+        selectedDayId={selectedExpenseDayId}
+        today={today}
+        tripId={tripId}
+      />
 
       {viewModel.balanceSections.map((section) => (
         <TripListCard key={`balance-${section.currency}`}>
@@ -188,6 +258,85 @@ function SettlementContent({
 
       <SettlementRequestButton tripName={tripName} viewModel={viewModel} />
     </View>
+  );
+}
+
+function ExpenseHistoryContent({
+  expenseHistory,
+  onRetry,
+  onSelectDay,
+  selectedDayId,
+  today,
+  tripId,
+}: {
+  expenseHistory: SettlementExpenseHistoryState;
+  onRetry: () => void;
+  onSelectDay: (dayId: string) => void;
+  selectedDayId: string | null;
+  today: string;
+  tripId: string;
+}) {
+  if (expenseHistory.status === 'error') {
+    return (
+      <TripStateCard
+        helper={expenseHistory.error.helper}
+        primaryAction={{ label: expenseHistory.error.actionLabel, onPress: onRetry }}
+        title={expenseHistory.error.title}
+      />
+    );
+  }
+
+  const viewModel = buildSettlementExpenseHistoryViewModel({
+    days: expenseHistory.days,
+    selectedDayId,
+    today,
+    tripId,
+  });
+  if (viewModel.status === 'empty') {
+    return <TripStateCard helper={viewModel.helper} title={viewModel.emptyTitle} />;
+  }
+
+  const section = viewModel.selectedSection;
+
+  return (
+    <TripListCard>
+      <View style={styles.expenseHistoryHeader}>
+        <Text style={styles.sectionTitle}>{viewModel.title}</Text>
+        <Text style={styles.sectionHelper}>{viewModel.helper}</Text>
+      </View>
+      <View style={styles.expenseDayChips}>
+        <DayChips days={viewModel.dayChips} selectedDayId={viewModel.selectedDayId} onSelectDay={onSelectDay} />
+      </View>
+      <View style={styles.expenseDaySection}>
+        <View style={styles.expenseDayHeader}>
+          <Text style={styles.expenseDayTitle}>{section.title}</Text>
+          <Text style={styles.sectionHelper}>{section.helper}</Text>
+        </View>
+        {section.rows.length === 0 ? (
+          <View style={styles.expenseDayEmpty}>
+            <Text style={styles.expenseDayEmptyTitle}>{section.emptyTitle}</Text>
+            {section.emptyHelper ? <Text style={styles.sectionHelper}>{section.emptyHelper}</Text> : null}
+          </View>
+        ) : (
+          <View style={styles.expenseRowList}>
+            {section.rows.map((row, index) => (
+              <ExpenseRow
+                accessibilityLabel={row.accessibilityLabel}
+                amount={row.amountMinor}
+                category={row.category}
+                currency={row.currency}
+                first={index === 0}
+                key={row.id}
+                onPress={() => router.push(row.editRoute)}
+                payerLabel={row.payerLabel}
+                splitLabel={row.splitLabel}
+                title={row.placeName}
+              />
+            ))}
+          </View>
+        )}
+      </View>
+    </TripListCard>
   );
 }
 
@@ -350,6 +499,45 @@ const styles = StyleSheet.create({
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.subhead,
     fontWeight: theme.font.weight.bold,
+  },
+  expenseDayChips: {
+    marginHorizontal: -theme.space[5],
+  },
+  expenseDayEmpty: {
+    gap: theme.space[1],
+    paddingHorizontal: theme.space[1],
+    paddingVertical: theme.space[4],
+  },
+  expenseDayEmptyTitle: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.semibold,
+    fontSize: theme.font.size.body,
+    fontWeight: theme.font.weight.semibold,
+  },
+  expenseDayHeader: {
+    gap: theme.space[1],
+    paddingHorizontal: theme.space[1],
+    paddingTop: theme.space[4],
+  },
+  expenseDaySection: {
+    borderTopColor: theme.color.borderSubtle,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    gap: theme.space[2],
+    paddingBottom: theme.space[2],
+  },
+  expenseDayTitle: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.semibold,
+    fontSize: theme.font.size.body,
+    fontWeight: theme.font.weight.semibold,
+  },
+  expenseHistoryHeader: {
+    gap: theme.space[1],
+    paddingHorizontal: theme.space[1],
+    paddingVertical: theme.space[4],
+  },
+  expenseRowList: {
+    gap: 0,
   },
   sectionHeader: {
     gap: theme.space[1],

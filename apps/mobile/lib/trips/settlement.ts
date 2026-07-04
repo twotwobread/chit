@@ -1,12 +1,17 @@
 import type { Href } from 'expo-router';
 
 import type {
+  DayExpenseListItem,
   GetTripSettlementResponse,
   SettlementCurrencySummary as ApiSettlementCurrencySummary,
   SupportedCurrency,
   TripDay,
 } from '@i-um/api-contract';
 
+import type { DayChip } from '../trip-ui/DayChips';
+
+import { type DayExpenseRowViewModel, buildDayExpensesViewModel } from './day-expenses';
+import { formatTripDayDate } from './days';
 import { buildQuickExpenseRoute, formatMoney } from './quick-expense';
 
 export type AuthoritativeTripSettlement = GetTripSettlementResponse;
@@ -19,6 +24,138 @@ export function buildSettlementExpenseEntryRouteForDays(tripId: string, days: Tr
   const orderedDays = [...days].sort((left, right) => left.dayOrder - right.dayOrder);
   const entryDay = orderedDays.find((day) => day.date === today) ?? orderedDays[0] ?? null;
   return entryDay ? buildSettlementExpenseEntryRoute(tripId, entryDay.id) : null;
+}
+
+export type SettlementExpenseHistoryDayInput = {
+  day: TripDay;
+  expenses: DayExpenseListItem[];
+};
+
+export type SettlementExpenseHistoryDaySectionViewModel = {
+  dayId: string;
+  title: string;
+  helper: string;
+  expenseCount: number;
+  rows: DayExpenseRowViewModel[];
+  emptyTitle: string | null;
+  emptyHelper: string | null;
+};
+
+export type SettlementExpenseHistoryViewModel =
+  | {
+      status: 'success';
+      title: string;
+      helper: string;
+      totalExpenseCount: number;
+      dayChips: DayChip[];
+      selectedDayId: string;
+      selectedSection: SettlementExpenseHistoryDaySectionViewModel;
+    }
+  | {
+      status: 'empty';
+      title: string;
+      emptyTitle: string;
+      helper: string;
+    };
+
+export type SettlementExpenseHistoryFailureViewModel = {
+  title: string;
+  helper: string;
+  actionLabel: string;
+};
+
+export function buildSettlementExpenseHistoryViewModel({
+  days,
+  selectedDayId,
+  today,
+  tripId,
+}: {
+  tripId: string;
+  days: SettlementExpenseHistoryDayInput[];
+  selectedDayId?: string | null;
+  today?: string | null;
+}): SettlementExpenseHistoryViewModel {
+  const sections = days.map((dayInput): SettlementExpenseHistoryDaySectionViewModel => {
+    const dayExpenses = buildDayExpensesViewModel({
+      date: dayInput.day.id,
+      expenses: dayInput.expenses,
+      tripId,
+    });
+    const rows = dayExpenses.status === 'success' ? dayExpenses.rows : [];
+    const expenseCount = rows.length;
+
+    return {
+      dayId: dayInput.day.id,
+      title: `Day ${dayInput.day.dayOrder}`,
+      helper: `${formatTripDayDate(dayInput.day.date)} · ${expenseCount > 0 ? `${expenseCount}건` : '지출 없음'}`,
+      expenseCount,
+      rows,
+      emptyTitle: expenseCount === 0 ? '이 Day에 등록된 지출이 없어요.' : null,
+      emptyHelper: expenseCount === 0 ? '다른 Day를 선택하거나 지출을 등록해 주세요.' : null,
+    };
+  });
+
+  if (sections.length === 0) {
+    return {
+      status: 'empty',
+      title: '지출 내역',
+      emptyTitle: '여행 일정이 없어요.',
+      helper: '여행 일정을 만든 뒤 지출을 등록할 수 있어요.',
+    };
+  }
+
+  const totalExpenseCount = sections.reduce((total, section) => total + section.expenseCount, 0);
+  const selectedSection = resolveSelectedExpenseHistorySection({ days, sections, selectedDayId, today });
+
+  return {
+    status: 'success',
+    title: '지출 내역',
+    helper:
+      totalExpenseCount > 0
+        ? `총 ${totalExpenseCount}건의 지출을 확인하고 수정할 수 있어요.`
+        : '지출을 등록하면 사람별 요약과 정산 정보에 바로 반영돼요.',
+    totalExpenseCount,
+    dayChips: sections.map((section, index) => ({
+      id: section.dayId,
+      label: section.title,
+      dateLabel: formatTripDayDate(days[index].day.date),
+      statusLabel: section.expenseCount > 0 ? `${section.expenseCount}건` : '지출 없음',
+    })),
+    selectedDayId: selectedSection.dayId,
+    selectedSection,
+  };
+}
+
+function resolveSelectedExpenseHistorySection({
+  days,
+  sections,
+  selectedDayId,
+  today,
+}: {
+  days: SettlementExpenseHistoryDayInput[];
+  sections: SettlementExpenseHistoryDaySectionViewModel[];
+  selectedDayId?: string | null;
+  today?: string | null;
+}): SettlementExpenseHistoryDaySectionViewModel {
+  const selected = selectedDayId ? sections.find((section) => section.dayId === selectedDayId) : null;
+  if (selected) {
+    return selected;
+  }
+
+  const todayIndex = today ? days.findIndex((dayInput) => dayInput.day.date === today) : -1;
+  if (todayIndex >= 0) {
+    return sections[todayIndex];
+  }
+
+  return sections.find((section) => section.expenseCount > 0) ?? sections[0];
+}
+
+export function settlementExpenseHistoryFailureState(): SettlementExpenseHistoryFailureViewModel {
+  return {
+    title: '지출 내역을 불러올 수 없어요.',
+    helper: '정산 정보는 그대로 볼 수 있어요. 잠시 후 다시 시도해주세요.',
+    actionLabel: '지출 다시 불러오기',
+  };
 }
 
 export type SettlementTransferRowViewModel = {
