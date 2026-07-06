@@ -2581,8 +2581,8 @@ func TestCreateQuickExpenseLinksRepeatedPlaceByScheduleItemOccurrence(t *testing
 		return createdScheduleItem{ID: response.Item.ID, PlaceID: response.Item.Place.ID}
 	}
 
-	first := createGoogleItem(`{"googlePlaceId":"google-lodging-repeat","duplicateConfirmed":false}`)
-	second := createGoogleItem(`{"googlePlaceId":"google-lodging-repeat","duplicateConfirmed":true}`)
+	first := createGoogleItem(`{"googlePlaceId":"google-lodging-repeat","duplicateConfirmed":false,"title":"숙소 방문"}`)
+	second := createGoogleItem(`{"googlePlaceId":"google-lodging-repeat","duplicateConfirmed":true,"title":"숙소 재방문"}`)
 	if first.ID == second.ID || first.PlaceID != second.PlaceID {
 		t.Fatalf("expected two schedule item occurrences for one trip place, got first=%#v second=%#v", first, second)
 	}
@@ -3540,7 +3540,7 @@ func TestCreateGooglePlaceScheduleItemHandler(t *testing.T) {
 	}}
 
 	recorder := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/days/2026-07-11/places/google/schedule-items", bytes.NewReader([]byte(`{"googlePlaceId":"google-1","duplicateConfirmed":false}`)))
+	request := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/days/2026-07-11/places/google/schedule-items", bytes.NewReader([]byte(`{"googlePlaceId":"google-1","duplicateConfirmed":false,"title":"오전 산책","startTime":"09:30","endTime":"11:00","memo":"강가 산책하기"}`)))
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Authorization", "Bearer "+accessToken)
 
@@ -3559,13 +3559,19 @@ func TestCreateGooglePlaceScheduleItemHandler(t *testing.T) {
 			DayOrder int    `json:"dayOrder"`
 		} `json:"day"`
 		Item struct {
-			ItemOrder int `json:"itemOrder"`
+			ItemOrder int     `json:"itemOrder"`
+			StartTime *string `json:"startTime"`
+			EndTime   *string `json:"endTime"`
 			Place     struct {
 				ID        string `json:"id"`
 				Name      string `json:"name"`
 				PlaceType string `json:"placeType"`
 				Address   string `json:"address"`
 			} `json:"place"`
+			PlaceSchedule struct {
+				Title string  `json:"title"`
+				Memo  *string `json:"memo"`
+			} `json:"placeSchedule"`
 		} `json:"scheduleItem"`
 	}
 	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
@@ -3574,13 +3580,16 @@ func TestCreateGooglePlaceScheduleItemHandler(t *testing.T) {
 	if body.Day.Date != "2026-07-11" || body.Day.DayOrder != 2 || body.Item.ItemOrder != 1 || body.Item.Place.Name != "도톤보리" || body.Item.Place.PlaceType != "sights" {
 		t.Fatalf("unexpected response %#v", body)
 	}
+	if body.Item.PlaceSchedule.Title != "오전 산책" || body.Item.PlaceSchedule.Memo == nil || *body.Item.PlaceSchedule.Memo != "강가 산책하기" || body.Item.StartTime == nil || *body.Item.StartTime != "09:30" || body.Item.EndTime == nil || *body.Item.EndTime != "11:00" {
+		t.Fatalf("expected schedule details in response, got %#v", body.Item)
+	}
 	if len(backend.dayScheduleItems[tripID+":2026-07-11"]) != 1 {
 		t.Fatalf("expected created schedule item, got %#v", backend.dayScheduleItems)
 	}
 
 	provider.detailsCalled = false
 	recorder = httptest.NewRecorder()
-	request = httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/days/2026-07-12/places/google/schedule-items", bytes.NewReader([]byte(`{"googlePlaceId":"google-1","duplicateConfirmed":false}`)))
+	request = httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/days/2026-07-12/places/google/schedule-items", bytes.NewReader([]byte(`{"googlePlaceId":"google-1","duplicateConfirmed":false,"title":"저녁 산책"}`)))
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Authorization", "Bearer "+accessToken)
 
@@ -3620,11 +3629,11 @@ func TestCreateGooglePlaceScheduleItemDuplicateConfirmation(t *testing.T) {
 		return recorder
 	}
 
-	if recorder := create(`{"googlePlaceId":"google-dup","duplicateConfirmed":false}`); recorder.Code != http.StatusCreated {
+	if recorder := create(`{"googlePlaceId":"google-dup","duplicateConfirmed":false,"title":"첫 방문"}`); recorder.Code != http.StatusCreated {
 		t.Fatalf("expected first create status %d, got %d with body %s", http.StatusCreated, recorder.Code, recorder.Body.String())
 	}
 
-	recorder := create(`{"googlePlaceId":"google-dup","duplicateConfirmed":false}`)
+	recorder := create(`{"googlePlaceId":"google-dup","duplicateConfirmed":false,"title":"다시 방문","memo":"야경 보기"}`)
 	if recorder.Code != http.StatusConflict {
 		t.Fatalf("expected duplicate status %d, got %d with body %s", http.StatusConflict, recorder.Code, recorder.Body.String())
 	}
@@ -3641,7 +3650,7 @@ func TestCreateGooglePlaceScheduleItemDuplicateConfirmation(t *testing.T) {
 		t.Fatalf("unexpected duplicate error %#v", errorBody)
 	}
 
-	if recorder := create(`{"googlePlaceId":"google-dup","duplicateConfirmed":true}`); recorder.Code != http.StatusCreated {
+	if recorder := create(`{"googlePlaceId":"google-dup","duplicateConfirmed":true,"title":"다시 방문","memo":"야경 보기"}`); recorder.Code != http.StatusCreated {
 		t.Fatalf("expected confirmed duplicate status %d, got %d with body %s", http.StatusCreated, recorder.Code, recorder.Body.String())
 	}
 	if len(backend.dayScheduleItems[tripID+":2026-07-11"]) != 2 {
@@ -3666,10 +3675,10 @@ func TestCreateGooglePlaceScheduleItemValidationAuthAndProviderErrors(t *testing
 		{name: "requires auth", path: "/trips/" + tripID + "/days/2026-07-10/places/google/schedule-items", token: "", body: `{"googlePlaceId":"google-1","duplicateConfirmed":false}`, provider: &fakePlaceProvider{}, expectCode: http.StatusUnauthorized, expectErr: "UNAUTHORIZED"},
 		{name: "invalid trip id", path: "/trips/not-a-uuid/days/2026-07-10/places/google/schedule-items", token: accessToken, body: `{"googlePlaceId":"google-1","duplicateConfirmed":false}`, provider: &fakePlaceProvider{}, expectCode: http.StatusBadRequest, expectErr: "VALIDATION_ERROR"},
 		{name: "blank google place id", path: "/trips/" + tripID + "/days/2026-07-10/places/google/schedule-items", token: accessToken, body: `{"googlePlaceId":" ","duplicateConfirmed":false}`, provider: &fakePlaceProvider{}, expectCode: http.StatusBadRequest, expectErr: "VALIDATION_ERROR"},
-		{name: "out of range", path: "/trips/" + tripID + "/days/2026-07-14/places/google/schedule-items", token: accessToken, body: `{"googlePlaceId":"google-1","duplicateConfirmed":false}`, provider: &fakePlaceProvider{}, expectCode: http.StatusNotFound, expectErr: "NOT_FOUND"},
-		{name: "forbidden", path: "/trips/" + tripID + "/days/2026-07-10/places/google/schedule-items", token: nonParticipantToken, body: `{"googlePlaceId":"google-1","duplicateConfirmed":false}`, provider: &fakePlaceProvider{}, expectCode: http.StatusForbidden, expectErr: "FORBIDDEN"},
-		{name: "provider unavailable", path: "/trips/" + tripID + "/days/2026-07-10/places/google/schedule-items", token: accessToken, body: `{"googlePlaceId":"google-1","duplicateConfirmed":false}`, provider: &fakePlaceProvider{detailsErr: placedomain.ErrProviderUnavailable}, expectCode: http.StatusBadGateway, expectErr: "PLACE_PROVIDER_UNAVAILABLE"},
-		{name: "provider rate limited", path: "/trips/" + tripID + "/days/2026-07-10/places/google/schedule-items", token: accessToken, body: `{"googlePlaceId":"google-1","duplicateConfirmed":false}`, provider: &fakePlaceProvider{detailsErr: placedomain.ErrProviderRateLimited}, expectCode: http.StatusTooManyRequests, expectErr: "PLACE_PROVIDER_RATE_LIMITED"},
+		{name: "out of range", path: "/trips/" + tripID + "/days/2026-07-14/places/google/schedule-items", token: accessToken, body: `{"googlePlaceId":"google-1","duplicateConfirmed":false,"title":"도톤보리"}`, provider: &fakePlaceProvider{}, expectCode: http.StatusNotFound, expectErr: "NOT_FOUND"},
+		{name: "forbidden", path: "/trips/" + tripID + "/days/2026-07-10/places/google/schedule-items", token: nonParticipantToken, body: `{"googlePlaceId":"google-1","duplicateConfirmed":false,"title":"도톤보리"}`, provider: &fakePlaceProvider{}, expectCode: http.StatusForbidden, expectErr: "FORBIDDEN"},
+		{name: "provider unavailable", path: "/trips/" + tripID + "/days/2026-07-10/places/google/schedule-items", token: accessToken, body: `{"googlePlaceId":"google-1","duplicateConfirmed":false,"title":"도톤보리"}`, provider: &fakePlaceProvider{detailsErr: placedomain.ErrProviderUnavailable}, expectCode: http.StatusBadGateway, expectErr: "PLACE_PROVIDER_UNAVAILABLE"},
+		{name: "provider rate limited", path: "/trips/" + tripID + "/days/2026-07-10/places/google/schedule-items", token: accessToken, body: `{"googlePlaceId":"google-1","duplicateConfirmed":false,"title":"도톤보리"}`, provider: &fakePlaceProvider{detailsErr: placedomain.ErrProviderRateLimited}, expectCode: http.StatusTooManyRequests, expectErr: "PLACE_PROVIDER_RATE_LIMITED"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -5124,11 +5133,12 @@ func (b *fakeAuthBackend) CreateManualScheduleItem(_ context.Context, record tri
 		Address:   record.Address,
 	}
 	item := tripdomain.ScheduleItem{
-		ID:        testUUID(5000 + b.nextScheduleItem),
-		ItemOrder: len(b.dayScheduleItems[key]) + 1,
-		Version:   1,
-		ItemType:  tripdomain.ScheduleItemTypePlace,
-		Place:     place,
+		ID:            testUUID(5000 + b.nextScheduleItem),
+		ItemOrder:     len(b.dayScheduleItems[key]) + 1,
+		Version:       1,
+		ItemType:      tripdomain.ScheduleItemTypePlace,
+		Place:         place,
+		PlaceSchedule: &tripdomain.PlaceScheduleItemDetails{Title: record.Name},
 	}
 	b.tripPlaces[record.TripID+":"+place.ID] = place
 	b.dayScheduleItems[key] = append(b.dayScheduleItems[key], item)
@@ -5167,11 +5177,14 @@ func (b *fakeAuthBackend) AppendGooglePlaceScheduleItem(_ context.Context, recor
 	}
 	b.nextScheduleItem++
 	item := tripdomain.ScheduleItem{
-		ID:        testUUID(5000 + b.nextScheduleItem),
-		ItemOrder: len(b.dayScheduleItems[key]) + 1,
-		Version:   1,
-		ItemType:  tripdomain.ScheduleItemTypePlace,
-		Place:     place,
+		ID:            testUUID(5000 + b.nextScheduleItem),
+		ItemOrder:     len(b.dayScheduleItems[key]) + 1,
+		Version:       1,
+		ItemType:      tripdomain.ScheduleItemTypePlace,
+		StartTime:     record.StartTime,
+		EndTime:       record.EndTime,
+		Place:         place,
+		PlaceSchedule: &tripdomain.PlaceScheduleItemDetails{Title: record.Title, Memo: record.Memo},
 	}
 	b.dayScheduleItems[key] = append(b.dayScheduleItems[key], item)
 	b.markDayScheduleLodging(record.TripID, record.TripDayID)
@@ -5185,6 +5198,10 @@ func (b *fakeAuthBackend) CreateGooglePlaceScheduleItem(ctx context.Context, rec
 			TripDayID:          record.TripDayID,
 			TripPlaceID:        placeID,
 			DuplicateConfirmed: record.DuplicateConfirmed,
+			Title:              record.Title,
+			StartTime:          record.StartTime,
+			EndTime:            record.EndTime,
+			Memo:               record.Memo,
 		})
 	}
 
@@ -5208,6 +5225,10 @@ func (b *fakeAuthBackend) CreateGooglePlaceScheduleItem(ctx context.Context, rec
 		TripDayID:          record.TripDayID,
 		TripPlaceID:        place.ID,
 		DuplicateConfirmed: record.DuplicateConfirmed,
+		Title:              record.Title,
+		StartTime:          record.StartTime,
+		EndTime:            record.EndTime,
+		Memo:               record.Memo,
 	})
 }
 

@@ -68,6 +68,7 @@ export type { NonPlaceTransportMode } from './models/NonPlaceTransportMode';
 export type { OAuthCredential } from './models/OAuthCredential';
 export type { OAuthLinkRequest } from './models/OAuthLinkRequest';
 export type { OAuthLoginRequest } from './models/OAuthLoginRequest';
+export type { PlaceScheduleItemDetails } from './models/PlaceScheduleItemDetails';
 export type { ReadinessCheck } from './models/ReadinessCheck';
 export type { ReadinessChecks } from './models/ReadinessChecks';
 export type { ReadinessResponse } from './models/ReadinessResponse';

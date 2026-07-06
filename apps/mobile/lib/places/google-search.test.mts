@@ -74,10 +74,22 @@ describe('google place search helpers', () => {
   it('builds add request and add states', () => {
     const result = { id: 'google-1', placeName: '도톤보리', address: 'Osaka', typeHint: '관광지' };
 
-    assert.deepEqual(buildCreateGooglePlaceScheduleItemRequest(' google-1 ', false), {
-      googlePlaceId: 'google-1',
-      duplicateConfirmed: false,
-    });
+    assert.deepEqual(
+      buildCreateGooglePlaceScheduleItemRequest({
+        googlePlaceId: ' google-1 ',
+        duplicateConfirmed: false,
+        title: '  도톤보리 산책  ',
+        startTime: ' 09:30 ',
+        memo: '  강가 산책하기  ',
+      }),
+      {
+        googlePlaceId: 'google-1',
+        duplicateConfirmed: false,
+        title: '도톤보리 산책',
+        startTime: '09:30',
+        memo: '강가 산책하기',
+      },
+    );
     assert.deepEqual(idleGooglePlaceAddState(), { status: 'idle' });
     assert.deepEqual(addingGooglePlaceState('google-1'), { status: 'adding', googlePlaceId: 'google-1' });
     assert.deepEqual(confirmingDuplicateGooglePlaceState(result), {

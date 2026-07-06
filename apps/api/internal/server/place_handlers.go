@@ -54,6 +54,10 @@ func (s apiServer) CreateGooglePlaceScheduleItem(w http.ResponseWriter, r *http.
 	result, err := s.places.CreateGooglePlaceScheduleItem(r.Context(), authContext.UserID, tripId, tripDayId, place.CreateGooglePlaceScheduleItemInput{
 		GooglePlaceID:      body.GooglePlaceId,
 		DuplicateConfirmed: body.DuplicateConfirmed,
+		Title:              body.Title,
+		StartTime:          body.StartTime,
+		EndTime:            body.EndTime,
+		Memo:               body.Memo,
 	})
 	if err != nil {
 		if errors.Is(err, place.ErrDuplicateDayPlaceConfirmationNeeded) {

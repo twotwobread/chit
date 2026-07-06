@@ -470,18 +470,26 @@ func dayScheduleItemToOpenAPI(item trip.ScheduleItem) openapi.ScheduleItem {
 		place = &mappedPlace
 	}
 	return openapi.ScheduleItem{
-		Id:        item.ID,
-		ItemOrder: item.ItemOrder,
-		Version:   item.Version,
-		ItemType:  itemType,
-		IsLodging: item.IsLodging,
-		StartTime: item.StartTime,
-		EndTime:   item.EndTime,
-		ArrivedAt: optionalTimeToOpenAPI(item.ArrivedAt),
-		SkippedAt: optionalTimeToOpenAPI(item.SkippedAt),
-		Place:     place,
-		NonPlace:  nonPlaceScheduleItemDetailsToOpenAPI(item.NonPlace),
+		Id:            item.ID,
+		ItemOrder:     item.ItemOrder,
+		Version:       item.Version,
+		ItemType:      itemType,
+		IsLodging:     item.IsLodging,
+		StartTime:     item.StartTime,
+		EndTime:       item.EndTime,
+		ArrivedAt:     optionalTimeToOpenAPI(item.ArrivedAt),
+		SkippedAt:     optionalTimeToOpenAPI(item.SkippedAt),
+		Place:         place,
+		PlaceSchedule: placeScheduleItemDetailsToOpenAPI(item.PlaceSchedule),
+		NonPlace:      nonPlaceScheduleItemDetailsToOpenAPI(item.NonPlace),
 	}
+}
+
+func placeScheduleItemDetailsToOpenAPI(details *trip.PlaceScheduleItemDetails) *openapi.PlaceScheduleItemDetails {
+	if details == nil {
+		return nil
+	}
+	return &openapi.PlaceScheduleItemDetails{Title: details.Title, Memo: details.Memo}
 }
 
 func nonPlaceScheduleItemDetailsToOpenAPI(details *trip.NonPlaceScheduleItemDetails) *openapi.NonPlaceScheduleItemDetails {
