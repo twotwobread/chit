@@ -82,6 +82,37 @@ describe('day itinerary helpers', () => {
     });
   });
 
+  it('uses place schedule title as the primary label while keeping place context', () => {
+    const response: GetDayScheduleItemsResponse = {
+      day: { date: '2026-07-10', dayOrder: 1, lodgingPlace: null },
+      scheduleItems: [
+        {
+          id: 'item-1',
+          itemOrder: 1,
+          version: 1,
+          itemType: 'place',
+          isLodging: false,
+          startTime: null,
+          endTime: null,
+          arrivedAt: null,
+          skippedAt: null,
+          place: { id: 'place-1', name: '도톤보리', placeType: 'sights', address: 'Osaka' },
+          placeSchedule: { title: '야경 산책', memo: '강가 걷기' },
+          nonPlace: null,
+        },
+      ],
+    };
+
+    const viewModel = buildDayItineraryViewModel(response);
+    assert.equal(viewModel.status, 'success');
+    if (viewModel.status !== 'success') {
+      return;
+    }
+    assert.equal(viewModel.items[0].placeName, '야경 산책');
+    assert.equal(viewModel.items[0].address, 'Osaka');
+    assert.equal(buildDayItineraryPlaceAccessibilityLabel(viewModel.items[0]), '1번째 장소 야경 산책. 관광지. Osaka');
+  });
+
   it('formats non-place rows with category and compact transport details', () => {
     const response: GetDayScheduleItemsResponse = {
       day: { date: '2026-07-10', dayOrder: 1, lodgingPlace: null },

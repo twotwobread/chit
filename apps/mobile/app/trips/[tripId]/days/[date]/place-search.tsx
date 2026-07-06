@@ -9,7 +9,14 @@ import { theme } from '../../../../../lib/design';
 import { resolveDayItineraryAddPlaceReturnNavigation } from '../../../../../lib/trips/day-itinerary-add-place-navigation';
 import { createGooglePlaceScheduleItem, searchGooglePlaces } from '../../../../../lib/places/client';
 import {
+  applySelectedPlaceToPlaceScheduleForm,
+  buildPlaceScheduleDetailRoute,
+  parsePlaceScheduleDetailParams,
+  selectedPlaceFromGoogleSearchResult,
+} from '../../../../../lib/places/place-schedule-detail';
+import {
   addingGooglePlaceState,
+  buildCreateGooglePlaceScheduleItemRequest,
   buildGooglePlaceSearchInputState,
   canSearchGooglePlaces,
   confirmingDuplicateGooglePlaceState,
@@ -30,19 +37,40 @@ export default function GooglePlaceSearchScreen() {
     tripId: tripIdParam,
     date: dateParam,
     returnTo: returnToParam,
+    mode: modeParam,
+    title: titleParam,
+    titleTouched: titleTouchedParam,
+    startTime: startTimeParam,
+    endTime: endTimeParam,
+    memo: memoParam,
+    googlePlaceId: googlePlaceIdParam,
+    placeName: placeNameParam,
+    address: addressParam,
+    typeHint: typeHintParam,
   } = useLocalSearchParams<{
     tripId?: string | string[];
     date?: string | string[];
     returnTo?: string | string[];
+    mode?: string | string[];
+    title?: string | string[];
+    titleTouched?: string | string[];
+    startTime?: string | string[];
+    endTime?: string | string[];
+    memo?: string | string[];
+    googlePlaceId?: string | string[];
+    placeName?: string | string[];
+    address?: string | string[];
+    typeHint?: string | string[];
   }>();
   const tripId = Array.isArray(tripIdParam) ? tripIdParam[0] : tripIdParam;
   const date = Array.isArray(dateParam) ? dateParam[0] : dateParam;
   const [query, setQuery] = useState('');
   const [state, setState] = useState<GooglePlaceSearchViewState>(buildGooglePlaceSearchInputState(''));
   const [addState, setAddState] = useState<GooglePlaceAddViewState>(idleGooglePlaceAddState());
+  const isSelectorMode = (Array.isArray(modeParam) ? modeParam[0] : modeParam) === 'select';
   const isLoading = state.status === 'loading';
   const isAdding = addState.status === 'adding';
-  const isBusy = isLoading || isAdding;
+  const isBusy = isLoading || (!isSelectorMode && isAdding);
 
   const returnToDay = () => {
     if (!tripId || !date) {
@@ -106,14 +134,49 @@ export default function GooglePlaceSearchScreen() {
     }
   };
 
+  const returnSelectedPlace = (result: GooglePlaceSearchRowViewModel) => {
+    if (!tripId || !date) {
+      return;
+    }
+    const currentValues = parsePlaceScheduleDetailParams({
+      title: titleParam,
+      titleTouched: titleTouchedParam,
+      startTime: startTimeParam,
+      endTime: endTimeParam,
+      memo: memoParam,
+      googlePlaceId: googlePlaceIdParam,
+      placeName: placeNameParam,
+      address: addressParam,
+      typeHint: typeHintParam,
+    });
+    const nextValues = applySelectedPlaceToPlaceScheduleForm(
+      currentValues,
+      selectedPlaceFromGoogleSearchResult(result),
+    );
+    router.replace(buildPlaceScheduleDetailRoute(tripId, date, nextValues));
+  };
+
   const submitAdd = async (result: GooglePlaceSearchRowViewModel, duplicateConfirmed: boolean) => {
     if (isBusy || !tripId || !date) {
       return;
     }
 
+    if (isSelectorMode) {
+      returnSelectedPlace(result);
+      return;
+    }
+
     setAddState(addingGooglePlaceState(result.id));
     try {
-      await createGooglePlaceScheduleItem(tripId, date, result.id, duplicateConfirmed);
+      await createGooglePlaceScheduleItem(
+        tripId,
+        date,
+        buildCreateGooglePlaceScheduleItemRequest({
+          googlePlaceId: result.id,
+          duplicateConfirmed,
+          title: result.placeName,
+        }),
+      );
       returnToDay();
     } catch (error) {
       if (
@@ -164,8 +227,10 @@ export default function GooglePlaceSearchScreen() {
   return (
     <ScrollView contentContainerStyle={styles.scrollContent} style={styles.scroll}>
       <View style={styles.header}>
-        <Text style={styles.screenTitle}>일정 추가</Text>
-        <Text style={styles.screenHelper}>이 일정에 연결할 장소를 검색해 보세요.</Text>
+        <Text style={styles.screenTitle}>장소 검색</Text>
+        <Text style={styles.screenHelper}>
+          {isSelectorMode ? '일정에 연결할 장소를 선택해 주세요.' : '이 일정에 연결할 장소를 검색해 보세요.'}
+        </Text>
       </View>
 
       <View style={styles.card}>
@@ -269,7 +334,9 @@ export default function GooglePlaceSearchScreen() {
                   style={[styles.secondaryButton, isBusy ? styles.secondaryButtonDisabled : null]}
                 >
                   {isAddingThisResult ? <ActivityIndicator color={theme.color.primary} /> : null}
-                  <Text style={styles.secondaryButtonText}>{isAddingThisResult ? '추가 중...' : '추가'}</Text>
+                  <Text style={styles.secondaryButtonText}>
+                    {isAddingThisResult ? '추가 중...' : isSelectorMode ? '선택' : '추가'}
+                  </Text>
                 </Pressable>
               </View>
             );

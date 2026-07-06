@@ -97,11 +97,32 @@ export function errorGooglePlaceAddState(): GooglePlaceAddViewState {
   return { status: 'error', message: googlePlaceAddFailureMessage };
 }
 
-export function buildCreateGooglePlaceScheduleItemRequest(
-  googlePlaceId: string,
-  duplicateConfirmed: boolean,
-): CreateGooglePlaceScheduleItemRequest {
-  return { googlePlaceId: googlePlaceId.trim(), duplicateConfirmed };
+export function buildCreateGooglePlaceScheduleItemRequest({
+  googlePlaceId,
+  duplicateConfirmed,
+  title,
+  startTime,
+  endTime,
+  memo,
+}: CreateGooglePlaceScheduleItemRequest): CreateGooglePlaceScheduleItemRequest {
+  const request: CreateGooglePlaceScheduleItemRequest = {
+    googlePlaceId: googlePlaceId.trim(),
+    duplicateConfirmed,
+    title: title.trim(),
+  };
+  const normalizedStartTime = startTime?.trim();
+  const normalizedEndTime = endTime?.trim();
+  const normalizedMemo = memo?.trim();
+  if (normalizedStartTime) {
+    request.startTime = normalizedStartTime;
+  }
+  if (normalizedEndTime) {
+    request.endTime = normalizedEndTime;
+  }
+  if (normalizedMemo) {
+    request.memo = normalizedMemo;
+  }
+  return request;
 }
 
 export function isDuplicateDayPlaceConfirmationError(errorBody: unknown): boolean {

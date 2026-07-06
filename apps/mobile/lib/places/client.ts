@@ -1,15 +1,12 @@
 import {
   PlacesService,
+  type CreateGooglePlaceScheduleItemRequest,
   type CreateGooglePlaceScheduleItemResponse,
   type SearchGooglePlacesResponse,
 } from '@i-um/api-contract';
 
 import { getMeWithRefresh } from '../auth/client';
-import {
-  buildCreateGooglePlaceScheduleItemRequest,
-  googlePlaceSearchDefaultLimit,
-  normalizeGooglePlaceSearchQuery,
-} from './google-search';
+import { googlePlaceSearchDefaultLimit, normalizeGooglePlaceSearchQuery } from './google-search';
 
 export async function searchGooglePlaces(
   tripId: string,
@@ -24,13 +21,8 @@ export async function searchGooglePlaces(
 export async function createGooglePlaceScheduleItem(
   tripId: string,
   tripDayId: string,
-  googlePlaceId: string,
-  duplicateConfirmed: boolean,
+  request: CreateGooglePlaceScheduleItemRequest,
 ): Promise<CreateGooglePlaceScheduleItemResponse> {
   await getMeWithRefresh();
-  return PlacesService.createGooglePlaceScheduleItem(
-    tripId,
-    tripDayId,
-    buildCreateGooglePlaceScheduleItemRequest(googlePlaceId, duplicateConfirmed),
-  );
+  return PlacesService.createGooglePlaceScheduleItem(tripId, tripDayId, request);
 }

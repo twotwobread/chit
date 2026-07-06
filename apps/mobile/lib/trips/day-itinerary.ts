@@ -226,6 +226,7 @@ function scheduleItemToDayItineraryRow(item: ScheduleItem): DayItineraryRowViewM
   }
 
   const statusLabel = buildScheduleItemStatusLabel(item);
+  const placeScheduleTitle = item.placeSchedule?.title?.trim();
   return {
     id: item.id,
     version: item.version,
@@ -236,7 +237,7 @@ function scheduleItemToDayItineraryRow(item: ScheduleItem): DayItineraryRowViewM
     endTime: item.endTime,
     timeLabel: formatScheduleItemTimeLabel(item.startTime, item.endTime),
     placeId: item.place.id,
-    placeName: item.place.name,
+    placeName: placeScheduleTitle || item.place.name,
     placeType: item.place.placeType,
     placeTypeLabel: getPlaceTypeLabel(item.place.placeType),
     address: item.place.address,

@@ -25,7 +25,7 @@ import { createDayItineraryReorderActions } from './day-itinerary-editor-reorder
 import { useDayItineraryMapActions } from './useDayItineraryMapActions';
 import { useDayItineraryReorderAutoScroll } from './useDayItineraryReorderAutoScroll';
 import { buildDayItineraryViewModel, dayItineraryFailureState } from '../trips/day-itinerary';
-import { buildDayItineraryAddPlaceSearchRoute } from '../trips/day-itinerary-add-place-navigation';
+import { buildPlaceScheduleDetailRoute } from '../places/place-schedule-detail';
 import { tripItineraryDayPath, tripItineraryPath } from '../trips/routes';
 import { getTripDayItinerary } from '../trips/itinerary-api';
 import {
@@ -567,7 +567,7 @@ export function useDayItineraryEditorController({
 
   const addPlace = () => {
     if (tripId && date) {
-      router.push(buildDayItineraryAddPlaceSearchRoute(tripId, date));
+      router.push(buildPlaceScheduleDetailRoute(tripId, date));
     }
   };
 
