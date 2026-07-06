@@ -230,8 +230,20 @@ type AuthUser struct {
 // CreateGooglePlaceScheduleItemRequest defines model for CreateGooglePlaceScheduleItemRequest.
 type CreateGooglePlaceScheduleItemRequest struct {
 	// DuplicateConfirmed Set true only after the user confirms adding the same Google place to the same Day again.
-	DuplicateConfirmed bool   `json:"duplicateConfirmed"`
-	GooglePlaceId      string `json:"googlePlaceId"`
+	DuplicateConfirmed bool `json:"duplicateConfirmed"`
+
+	// EndTime Optional local end time in HH:mm. Requires startTime and must be later than startTime.
+	EndTime       *string `json:"endTime,omitempty"`
+	GooglePlaceId string  `json:"googlePlaceId"`
+
+	// Memo Optional place-backed schedule memo. Empty strings are normalized to null by the server.
+	Memo *string `json:"memo,omitempty"`
+
+	// StartTime Optional local start time in HH:mm. Omit or send empty string to save as untimed/order-only.
+	StartTime *string `json:"startTime,omitempty"`
+
+	// Title Required schedule title. Defaults from the selected place name on mobile but is stored separately from the place snapshot.
+	Title string `json:"title"`
 }
 
 // CreateGooglePlaceScheduleItemResponse defines model for CreateGooglePlaceScheduleItemResponse.
@@ -636,6 +648,15 @@ type OAuthLoginRequest struct {
 	Provider   AuthProvider    `json:"provider"`
 }
 
+// PlaceScheduleItemDetails defines model for PlaceScheduleItemDetails.
+type PlaceScheduleItemDetails struct {
+	// Memo Optional memo for the place-backed schedule item.
+	Memo *string `json:"memo"`
+
+	// Title User-editable schedule title for a place-backed item. The linked place snapshot remains read-only.
+	Title string `json:"title"`
+}
+
 // ReadinessCheck defines model for ReadinessCheck.
 type ReadinessCheck struct {
 	Status ReadinessCheckStatus `json:"status"`
@@ -747,13 +768,14 @@ type ScheduleItem struct {
 	ArrivedAt *time.Time `json:"arrivedAt"`
 
 	// EndTime Optional local end time in HH:mm. Must be later than startTime when present.
-	EndTime   *string                      `json:"endTime"`
-	Id        string                       `json:"id"`
-	IsLodging bool                         `json:"isLodging"`
-	ItemOrder int                          `json:"itemOrder"`
-	ItemType  ScheduleItemType             `json:"itemType"`
-	NonPlace  *NonPlaceScheduleItemDetails `json:"nonPlace"`
-	Place     *TripPlaceSummary            `json:"place"`
+	EndTime       *string                      `json:"endTime"`
+	Id            string                       `json:"id"`
+	IsLodging     bool                         `json:"isLodging"`
+	ItemOrder     int                          `json:"itemOrder"`
+	ItemType      ScheduleItemType             `json:"itemType"`
+	NonPlace      *NonPlaceScheduleItemDetails `json:"nonPlace"`
+	Place         *TripPlaceSummary            `json:"place"`
+	PlaceSchedule *PlaceScheduleItemDetails    `json:"placeSchedule"`
 
 	// SkippedAt Server-generated skip timestamp for this schedule item instance. Null means the item is not currently skipped.
 	SkippedAt *time.Time `json:"skippedAt"`

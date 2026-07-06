@@ -1075,7 +1075,7 @@ func (s *Store) CreateManualScheduleItem(ctx context.Context, record trip.Create
 		return trip.ScheduleItem{}, err
 	}
 
-	item, err := createScheduleItemAtEnd(ctx, tx, record.TripID, record.TripDayID, place.ID)
+	item, err := createScheduleItemAtEnd(ctx, tx, record.TripID, record.TripDayID, place.ID, record.Name, nil, nil, nil)
 	if err != nil {
 		if errors.Is(err, trip.ErrConflict) || isUniqueConstraintViolation(err, "schedule_items_active_day_order_unique") || isUniqueConstraintViolation(err, "schedule_items_active_day_rank_unique") {
 			return trip.ScheduleItem{}, trip.ErrConflict
@@ -1088,13 +1088,16 @@ func (s *Store) CreateManualScheduleItem(ctx context.Context, record trip.Create
 	}
 
 	return trip.ScheduleItem{
-		ID:        item.ID,
-		ItemOrder: int(item.ItemOrder),
-		Version:   int(item.Version),
-		ItemType:  trip.ScheduleItemTypePlace,
-		ArrivedAt: timePtrFromTimestamptz(item.ArrivedAt),
-		SkippedAt: timePtrFromTimestamptz(item.SkippedAt),
-		Place:     tripPlaceSummary(place.ID, place.Name, place.PlaceType, place.Address, place.Provider, place.GooglePlaceID, place.Latitude, place.Longitude),
+		ID:            item.ID,
+		ItemOrder:     int(item.ItemOrder),
+		Version:       int(item.Version),
+		ItemType:      trip.ScheduleItemTypePlace,
+		StartTime:     timeTextPtrFromSQL(item.StartTime),
+		EndTime:       timeTextPtrFromSQL(item.EndTime),
+		ArrivedAt:     timePtrFromTimestamptz(item.ArrivedAt),
+		SkippedAt:     timePtrFromTimestamptz(item.SkippedAt),
+		Place:         tripPlaceSummary(place.ID, place.Name, place.PlaceType, place.Address, place.Provider, place.GooglePlaceID, place.Latitude, place.Longitude),
+		PlaceSchedule: placeScheduleItemDetails(trip.ScheduleItemTypePlace, item.PlaceTitle, item.PlaceMemo, place.Name),
 	}, nil
 }
 
@@ -1129,7 +1132,7 @@ func (s *Store) AppendGooglePlaceScheduleItem(ctx context.Context, record place.
 		return trip.ScheduleItem{}, place.DuplicateDayPlaceConfirmationError{TripPlaceID: record.TripPlaceID}
 	}
 
-	item, err := createScheduleItemAtEnd(ctx, tx, record.TripID, record.TripDayID, record.TripPlaceID)
+	item, err := createScheduleItemAtEnd(ctx, tx, record.TripID, record.TripDayID, record.TripPlaceID, record.Title, record.Memo, record.StartTime, record.EndTime)
 	if err != nil {
 		if errors.Is(err, trip.ErrConflict) || isUniqueConstraintViolation(err, "schedule_items_active_day_order_unique") || isUniqueConstraintViolation(err, "schedule_items_active_day_rank_unique") {
 			return trip.ScheduleItem{}, place.ErrConflict
@@ -1142,13 +1145,16 @@ func (s *Store) AppendGooglePlaceScheduleItem(ctx context.Context, record place.
 	}
 
 	return trip.ScheduleItem{
-		ID:        item.ID,
-		ItemOrder: int(item.ItemOrder),
-		Version:   int(item.Version),
-		ItemType:  trip.ScheduleItemTypePlace,
-		ArrivedAt: timePtrFromTimestamptz(item.ArrivedAt),
-		SkippedAt: timePtrFromTimestamptz(item.SkippedAt),
-		Place:     tripPlaceSummary(placeRow.ID, placeRow.Name, placeRow.PlaceType, placeRow.Address, placeRow.Provider, placeRow.GooglePlaceID, placeRow.Latitude, placeRow.Longitude),
+		ID:            item.ID,
+		ItemOrder:     int(item.ItemOrder),
+		Version:       int(item.Version),
+		ItemType:      trip.ScheduleItemTypePlace,
+		StartTime:     timeTextPtrFromSQL(item.StartTime),
+		EndTime:       timeTextPtrFromSQL(item.EndTime),
+		ArrivedAt:     timePtrFromTimestamptz(item.ArrivedAt),
+		SkippedAt:     timePtrFromTimestamptz(item.SkippedAt),
+		Place:         tripPlaceSummary(placeRow.ID, placeRow.Name, placeRow.PlaceType, placeRow.Address, placeRow.Provider, placeRow.GooglePlaceID, placeRow.Latitude, placeRow.Longitude),
+		PlaceSchedule: placeScheduleItemDetails(trip.ScheduleItemTypePlace, item.PlaceTitle, item.PlaceMemo, placeRow.Name),
 	}, nil
 }
 
@@ -1187,7 +1193,7 @@ func (s *Store) CreateGooglePlaceScheduleItem(ctx context.Context, record place.
 		return trip.ScheduleItem{}, place.DuplicateDayPlaceConfirmationError{TripPlaceID: placeRow.ID}
 	}
 
-	item, err := createScheduleItemAtEnd(ctx, tx, record.TripID, record.TripDayID, placeRow.ID)
+	item, err := createScheduleItemAtEnd(ctx, tx, record.TripID, record.TripDayID, placeRow.ID, record.Title, record.Memo, record.StartTime, record.EndTime)
 	if err != nil {
 		if errors.Is(err, trip.ErrConflict) || isUniqueConstraintViolation(err, "schedule_items_active_day_order_unique") || isUniqueConstraintViolation(err, "schedule_items_active_day_rank_unique") {
 			return trip.ScheduleItem{}, place.ErrConflict
@@ -1200,25 +1206,32 @@ func (s *Store) CreateGooglePlaceScheduleItem(ctx context.Context, record place.
 	}
 
 	return trip.ScheduleItem{
-		ID:        item.ID,
-		ItemOrder: int(item.ItemOrder),
-		Version:   int(item.Version),
-		ItemType:  trip.ScheduleItemTypePlace,
-		ArrivedAt: timePtrFromTimestamptz(item.ArrivedAt),
-		SkippedAt: timePtrFromTimestamptz(item.SkippedAt),
-		Place:     tripPlaceSummary(placeRow.ID, placeRow.Name, placeRow.PlaceType, placeRow.Address, placeRow.Provider, placeRow.GooglePlaceID, placeRow.Latitude, placeRow.Longitude),
+		ID:            item.ID,
+		ItemOrder:     int(item.ItemOrder),
+		Version:       int(item.Version),
+		ItemType:      trip.ScheduleItemTypePlace,
+		StartTime:     timeTextPtrFromSQL(item.StartTime),
+		EndTime:       timeTextPtrFromSQL(item.EndTime),
+		ArrivedAt:     timePtrFromTimestamptz(item.ArrivedAt),
+		SkippedAt:     timePtrFromTimestamptz(item.SkippedAt),
+		Place:         tripPlaceSummary(placeRow.ID, placeRow.Name, placeRow.PlaceType, placeRow.Address, placeRow.Provider, placeRow.GooglePlaceID, placeRow.Latitude, placeRow.Longitude),
+		PlaceSchedule: placeScheduleItemDetails(trip.ScheduleItemTypePlace, item.PlaceTitle, item.PlaceMemo, placeRow.Name),
 	}, nil
 }
 
 type appendedScheduleItemRow struct {
-	ID        string
-	ItemOrder int
-	Version   int
-	ArrivedAt pgtype.Timestamptz
-	SkippedAt pgtype.Timestamptz
+	ID         string
+	ItemOrder  int
+	Version    int
+	StartTime  pgtype.Time
+	EndTime    pgtype.Time
+	PlaceTitle pgtype.Text
+	PlaceMemo  pgtype.Text
+	ArrivedAt  pgtype.Timestamptz
+	SkippedAt  pgtype.Timestamptz
 }
 
-func createScheduleItemAtEnd(ctx context.Context, tx pgx.Tx, tripID string, tripDayID string, placeID string) (appendedScheduleItemRow, error) {
+func createScheduleItemAtEnd(ctx context.Context, tx pgx.Tx, tripID string, tripDayID string, placeID string, title string, memo *string, startTime *string, endTime *string) (appendedScheduleItemRow, error) {
 	if err := lockSameDayScheduleOrdering(ctx, tx, tripID, tripDayID); err != nil {
 		return appendedScheduleItemRow{}, err
 	}
@@ -1257,22 +1270,30 @@ func createScheduleItemAtEnd(ctx context.Context, tx pgx.Tx, tripID string, trip
 			trip_id,
 			trip_day_id,
 			trip_place_id,
+			place_title,
+			place_memo,
+			start_time,
+			end_time,
 			item_order,
 			rank
 		) VALUES (
 			$1::uuid,
 			$2::uuid,
 			$3::uuid,
+			$4,
+			$5,
+			$6::time,
+			$7::time,
 			(
 				SELECT COALESCE(MAX(item_order), 0) + 1
 				FROM schedule_items
 				WHERE trip_day_id = $2::uuid
 				  AND deleted_at IS NULL
 			),
-			$4
+			$8
 		)
-		RETURNING id::text, item_order, version, arrived_at, skipped_at
-	`, mustUUID(tripID), mustUUID(tripDayID), mustUUID(placeID), nextRank).Scan(&item.ID, &item.ItemOrder, &item.Version, &item.ArrivedAt, &item.SkippedAt)
+		RETURNING id::text, item_order, version, start_time, end_time, place_title, place_memo, arrived_at, skipped_at
+	`, mustUUID(tripID), mustUUID(tripDayID), mustUUID(placeID), title, textPtrToSQL(memo), timeTextPtrToSQL(startTime), timeTextPtrToSQL(endTime), nextRank).Scan(&item.ID, &item.ItemOrder, &item.Version, &item.StartTime, &item.EndTime, &item.PlaceTitle, &item.PlaceMemo, &item.ArrivedAt, &item.SkippedAt)
 	if err != nil {
 		if isUniqueConstraintViolation(err, "schedule_items_active_day_order_unique") || isUniqueConstraintViolation(err, "schedule_items_active_day_rank_unique") {
 			return appendedScheduleItemRow{}, trip.ErrConflict
@@ -1635,16 +1656,17 @@ func (s *Store) UpdateScheduleItemPlace(ctx context.Context, record trip.UpdateS
 		return trip.ScheduleItem{}, err
 	}
 	return trip.ScheduleItem{
-		ID:        row.ID,
-		ItemOrder: int(row.ItemOrder),
-		Version:   int(row.Version),
-		ItemType:  trip.ScheduleItemTypePlace,
-		IsLodging: boolFromSQL(row.IsLodging),
-		StartTime: timeTextPtrFromSQL(row.StartTime),
-		EndTime:   timeTextPtrFromSQL(row.EndTime),
-		ArrivedAt: timePtrFromTimestamptz(row.ArrivedAt),
-		SkippedAt: timePtrFromTimestamptz(row.SkippedAt),
-		Place:     tripPlaceSummary(row.TripPlaceID, row.PlaceName, row.PlaceType, row.Address, row.Provider, row.GooglePlaceID, row.Latitude, row.Longitude),
+		ID:            row.ID,
+		ItemOrder:     int(row.ItemOrder),
+		Version:       int(row.Version),
+		ItemType:      trip.ScheduleItemTypePlace,
+		IsLodging:     boolFromSQL(row.IsLodging),
+		StartTime:     timeTextPtrFromSQL(row.StartTime),
+		EndTime:       timeTextPtrFromSQL(row.EndTime),
+		ArrivedAt:     timePtrFromTimestamptz(row.ArrivedAt),
+		SkippedAt:     timePtrFromTimestamptz(row.SkippedAt),
+		Place:         tripPlaceSummary(row.TripPlaceID, row.PlaceName, row.PlaceType, row.Address, row.Provider, row.GooglePlaceID, row.Latitude, row.Longitude),
+		PlaceSchedule: placeScheduleItemDetails(trip.ScheduleItemTypePlace, row.PlaceTitle, row.PlaceMemo, row.PlaceName),
 	}, nil
 }
 
@@ -2160,17 +2182,18 @@ func mapScheduleItems(rows []db.ListScheduleItemsByTripDayRow) []trip.ScheduleIt
 	items := make([]trip.ScheduleItem, 0, len(rows))
 	for index, row := range rows {
 		item := trip.ScheduleItem{
-			ID:        row.ID,
-			ItemOrder: index + 1,
-			Version:   int(row.Version),
-			ItemType:  row.ItemKind,
-			IsLodging: boolFromSQL(row.IsLodging),
-			StartTime: timeTextPtrFromSQL(row.StartTime),
-			EndTime:   timeTextPtrFromSQL(row.EndTime),
-			ArrivedAt: timePtrFromTimestamptz(row.ArrivedAt),
-			SkippedAt: timePtrFromTimestamptz(row.SkippedAt),
-			Place:     tripPlaceSummaryFromNullable(row.TripPlaceID, row.PlaceName, row.PlaceType, row.Address, row.Provider, row.GooglePlaceID, row.Latitude, row.Longitude),
-			NonPlace:  nonPlaceScheduleItemDetails(row.ItemKind, row.NonPlaceCategory, row.NonPlaceTitle, row.NonPlaceMemo, row.NonPlaceLink, row.TransportMode, row.TransportReferenceNumber, row.TransportBookingReference, row.TransportOriginText, row.TransportDestinationText, row.TransportTerminalText, row.TransportGateText),
+			ID:            row.ID,
+			ItemOrder:     index + 1,
+			Version:       int(row.Version),
+			ItemType:      row.ItemKind,
+			IsLodging:     boolFromSQL(row.IsLodging),
+			StartTime:     timeTextPtrFromSQL(row.StartTime),
+			EndTime:       timeTextPtrFromSQL(row.EndTime),
+			ArrivedAt:     timePtrFromTimestamptz(row.ArrivedAt),
+			SkippedAt:     timePtrFromTimestamptz(row.SkippedAt),
+			Place:         tripPlaceSummaryFromNullable(row.TripPlaceID, row.PlaceName, row.PlaceType, row.Address, row.Provider, row.GooglePlaceID, row.Latitude, row.Longitude),
+			PlaceSchedule: placeScheduleItemDetails(row.ItemKind, row.PlaceTitle, row.PlaceMemo, row.PlaceName.String),
+			NonPlace:      nonPlaceScheduleItemDetails(row.ItemKind, row.NonPlaceCategory, row.NonPlaceTitle, row.NonPlaceMemo, row.NonPlaceLink, row.TransportMode, row.TransportReferenceNumber, row.TransportBookingReference, row.TransportOriginText, row.TransportDestinationText, row.TransportTerminalText, row.TransportGateText),
 		}
 		if item.ItemType == "" {
 			item.ItemType = trip.ScheduleItemTypePlace
@@ -2182,17 +2205,18 @@ func mapScheduleItems(rows []db.ListScheduleItemsByTripDayRow) []trip.ScheduleIt
 
 func scheduleItemFromGetRow(row db.GetScheduleItemByTripDayAndIDRow) trip.ScheduleItem {
 	item := trip.ScheduleItem{
-		ID:        row.ID,
-		ItemOrder: int(row.ItemOrder),
-		Version:   int(row.Version),
-		ItemType:  row.ItemKind,
-		IsLodging: boolFromSQL(row.IsLodging),
-		StartTime: timeTextPtrFromSQL(row.StartTime),
-		EndTime:   timeTextPtrFromSQL(row.EndTime),
-		ArrivedAt: timePtrFromTimestamptz(row.ArrivedAt),
-		SkippedAt: timePtrFromTimestamptz(row.SkippedAt),
-		Place:     tripPlaceSummaryFromNullable(row.TripPlaceID, row.PlaceName, row.PlaceType, row.Address, row.Provider, row.GooglePlaceID, row.Latitude, row.Longitude),
-		NonPlace:  nonPlaceScheduleItemDetails(row.ItemKind, row.NonPlaceCategory, row.NonPlaceTitle, row.NonPlaceMemo, row.NonPlaceLink, row.TransportMode, row.TransportReferenceNumber, row.TransportBookingReference, row.TransportOriginText, row.TransportDestinationText, row.TransportTerminalText, row.TransportGateText),
+		ID:            row.ID,
+		ItemOrder:     int(row.ItemOrder),
+		Version:       int(row.Version),
+		ItemType:      row.ItemKind,
+		IsLodging:     boolFromSQL(row.IsLodging),
+		StartTime:     timeTextPtrFromSQL(row.StartTime),
+		EndTime:       timeTextPtrFromSQL(row.EndTime),
+		ArrivedAt:     timePtrFromTimestamptz(row.ArrivedAt),
+		SkippedAt:     timePtrFromTimestamptz(row.SkippedAt),
+		Place:         tripPlaceSummaryFromNullable(row.TripPlaceID, row.PlaceName, row.PlaceType, row.Address, row.Provider, row.GooglePlaceID, row.Latitude, row.Longitude),
+		PlaceSchedule: placeScheduleItemDetails(row.ItemKind, row.PlaceTitle, row.PlaceMemo, row.PlaceName.String),
+		NonPlace:      nonPlaceScheduleItemDetails(row.ItemKind, row.NonPlaceCategory, row.NonPlaceTitle, row.NonPlaceMemo, row.NonPlaceLink, row.TransportMode, row.TransportReferenceNumber, row.TransportBookingReference, row.TransportOriginText, row.TransportDestinationText, row.TransportTerminalText, row.TransportGateText),
 	}
 	if item.ItemType == "" {
 		item.ItemType = trip.ScheduleItemTypePlace
@@ -2223,6 +2247,20 @@ func tripPlaceSummaryFromNullable(id string, name pgtype.Text, placeType pgtype.
 		return trip.TripPlaceSummary{}
 	}
 	return tripPlaceSummary(id, name.String, placeType.String, address.String, provider.String, googlePlaceID, latitude, longitude)
+}
+
+func placeScheduleItemDetails(itemKind string, title pgtype.Text, memo pgtype.Text, fallbackTitle string) *trip.PlaceScheduleItemDetails {
+	if itemKind != trip.ScheduleItemTypePlace {
+		return nil
+	}
+	resolvedTitle := fallbackTitle
+	if title.Valid && title.String != "" {
+		resolvedTitle = title.String
+	}
+	if resolvedTitle == "" {
+		return nil
+	}
+	return &trip.PlaceScheduleItemDetails{Title: resolvedTitle, Memo: textPtrFromSQL(memo)}
 }
 
 func nonPlaceScheduleItemDetails(itemKind string, category pgtype.Text, title pgtype.Text, memo pgtype.Text, link pgtype.Text, transportMode pgtype.Text, referenceNumber pgtype.Text, bookingReference pgtype.Text, originText pgtype.Text, destinationText pgtype.Text, terminalText pgtype.Text, gateText pgtype.Text) *trip.NonPlaceScheduleItemDetails {

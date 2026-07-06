@@ -123,7 +123,10 @@ func TestServiceCreateGooglePlaceScheduleItemCreatesSnapshotAndItem(t *testing.T
 	}}
 	service := NewService(repo, provider)
 
-	result, err := service.CreateGooglePlaceScheduleItem(context.Background(), "user-1", testTripID, "2026-07-11", CreateGooglePlaceScheduleItemInput{GooglePlaceID: " google-1 "})
+	startTime := "09:30"
+	endTime := "11:00"
+	memo := "강가 산책하기"
+	result, err := service.CreateGooglePlaceScheduleItem(context.Background(), "user-1", testTripID, "2026-07-11", CreateGooglePlaceScheduleItemInput{GooglePlaceID: " google-1 ", Title: "  오전 산책  ", StartTime: &startTime, EndTime: &endTime, Memo: &memo})
 	if err != nil {
 		t.Fatalf("CreateGooglePlaceScheduleItem returned error: %v", err)
 	}
@@ -136,6 +139,12 @@ func TestServiceCreateGooglePlaceScheduleItemCreatesSnapshotAndItem(t *testing.T
 	}
 	if repo.createdGoogleRecord.Latitude != 34.6687 || repo.createdGoogleRecord.Longitude != 135.5013 || len(repo.createdGoogleRecord.GoogleTypes) != 2 {
 		t.Fatalf("expected provider metadata in record, got %#v", repo.createdGoogleRecord)
+	}
+	if repo.createdGoogleRecord.Title != "오전 산책" || repo.createdGoogleRecord.StartTime == nil || *repo.createdGoogleRecord.StartTime != "09:30" || repo.createdGoogleRecord.EndTime == nil || *repo.createdGoogleRecord.EndTime != "11:00" || repo.createdGoogleRecord.Memo == nil || *repo.createdGoogleRecord.Memo != "강가 산책하기" {
+		t.Fatalf("expected schedule details in record, got %#v", repo.createdGoogleRecord)
+	}
+	if result.Item.PlaceSchedule == nil || result.Item.PlaceSchedule.Title != "오전 산책" || result.Item.PlaceSchedule.Memo == nil || *result.Item.PlaceSchedule.Memo != "강가 산책하기" || result.Item.StartTime == nil || *result.Item.StartTime != "09:30" || result.Item.EndTime == nil || *result.Item.EndTime != "11:00" {
+		t.Fatalf("expected schedule details in result, got %#v", result.Item)
 	}
 	if result.Day.DayOrder != 2 || result.Item.Place.Name != "도톤보리" || result.Item.ItemOrder != 1 {
 		t.Fatalf("unexpected result %#v", result)
@@ -153,7 +162,7 @@ func TestServiceCreateGooglePlaceScheduleItemReusesExistingTripPlaceWithoutProvi
 	provider := &fakeProvider{}
 	service := NewService(repo, provider)
 
-	result, err := service.CreateGooglePlaceScheduleItem(context.Background(), "user-1", testTripID, "2026-07-11", CreateGooglePlaceScheduleItemInput{GooglePlaceID: "google-1"})
+	result, err := service.CreateGooglePlaceScheduleItem(context.Background(), "user-1", testTripID, "2026-07-11", CreateGooglePlaceScheduleItemInput{GooglePlaceID: "google-1", Title: "저녁 산책"})
 	if err != nil {
 		t.Fatalf("CreateGooglePlaceScheduleItem returned error: %v", err)
 	}
@@ -161,8 +170,8 @@ func TestServiceCreateGooglePlaceScheduleItemReusesExistingTripPlaceWithoutProvi
 	if provider.detailsCalled {
 		t.Fatal("expected existing Google-backed place to be reused without provider details call")
 	}
-	if repo.appendedGoogleRecord.TripPlaceID != "place-1" {
-		t.Fatalf("expected append to existing place, got %#v", repo.appendedGoogleRecord)
+	if repo.appendedGoogleRecord.TripPlaceID != "place-1" || repo.appendedGoogleRecord.Title != "저녁 산책" {
+		t.Fatalf("expected append to existing place with schedule details, got %#v", repo.appendedGoogleRecord)
 	}
 	if result.Item.Place.ID != "place-1" {
 		t.Fatalf("expected item to use existing place, got %#v", result.Item)
@@ -180,13 +189,13 @@ func TestServiceCreateGooglePlaceScheduleItemDuplicateConfirmation(t *testing.T)
 	}
 	service := NewService(repo, &fakeProvider{})
 
-	_, err := service.CreateGooglePlaceScheduleItem(context.Background(), "user-1", testTripID, "2026-07-11", CreateGooglePlaceScheduleItemInput{GooglePlaceID: "google-1"})
+	_, err := service.CreateGooglePlaceScheduleItem(context.Background(), "user-1", testTripID, "2026-07-11", CreateGooglePlaceScheduleItemInput{GooglePlaceID: "google-1", Title: "중복 장소"})
 	if !errors.Is(err, ErrDuplicateDayPlaceConfirmationNeeded) {
 		t.Fatalf("expected duplicate confirmation error, got %v", err)
 	}
 
 	repo.appendErr = nil
-	_, err = service.CreateGooglePlaceScheduleItem(context.Background(), "user-1", testTripID, "2026-07-11", CreateGooglePlaceScheduleItemInput{GooglePlaceID: "google-1", DuplicateConfirmed: true})
+	_, err = service.CreateGooglePlaceScheduleItem(context.Background(), "user-1", testTripID, "2026-07-11", CreateGooglePlaceScheduleItemInput{GooglePlaceID: "google-1", Title: "중복 장소", DuplicateConfirmed: true})
 	if err != nil {
 		t.Fatalf("expected confirmed duplicate to append, got %v", err)
 	}
@@ -206,9 +215,39 @@ func TestServiceCreateGooglePlaceScheduleItemValidationAndProviderData(t *testin
 
 	provider := &fakeProvider{details: GooglePlaceDetails{GooglePlaceID: "google-1", DisplayName: "도톤보리", FormattedAddress: "Osaka", Latitude: 0, Longitude: 181, PrimaryType: "cafe", Types: []string{"cafe"}}}
 	service = NewService(validRepo, provider)
-	_, err = service.CreateGooglePlaceScheduleItem(context.Background(), "user-1", testTripID, "2026-07-10", CreateGooglePlaceScheduleItemInput{GooglePlaceID: "google-1"})
+	_, err = service.CreateGooglePlaceScheduleItem(context.Background(), "user-1", testTripID, "2026-07-10", CreateGooglePlaceScheduleItemInput{GooglePlaceID: "google-1", Title: "도톤보리"})
 	if !errors.Is(err, ErrProviderUnavailable) {
 		t.Fatalf("expected invalid provider data to be unavailable, got %v", err)
+	}
+}
+
+func TestServiceCreateGooglePlaceScheduleItemValidatesScheduleDetails(t *testing.T) {
+	repo := &fakeRepository{trip: trip.Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"}, tripFound: true, isParticipant: true}
+	service := NewService(repo, &fakeProvider{})
+	endTime := "11:00"
+	badStart := "9:00"
+	startAfterEnd := "12:00"
+	memoTooLong := strings.Repeat("가", 1001)
+
+	tests := []struct {
+		name  string
+		input CreateGooglePlaceScheduleItemInput
+	}{
+		{name: "blank title", input: CreateGooglePlaceScheduleItemInput{GooglePlaceID: "google-1", Title: "   "}},
+		{name: "too long title", input: CreateGooglePlaceScheduleItemInput{GooglePlaceID: "google-1", Title: strings.Repeat("가", 121)}},
+		{name: "bad start time", input: CreateGooglePlaceScheduleItemInput{GooglePlaceID: "google-1", Title: "도톤보리", StartTime: &badStart}},
+		{name: "end without start", input: CreateGooglePlaceScheduleItemInput{GooglePlaceID: "google-1", Title: "도톤보리", EndTime: &endTime}},
+		{name: "end before start", input: CreateGooglePlaceScheduleItemInput{GooglePlaceID: "google-1", Title: "도톤보리", StartTime: &startAfterEnd, EndTime: &endTime}},
+		{name: "too long memo", input: CreateGooglePlaceScheduleItemInput{GooglePlaceID: "google-1", Title: "도톤보리", Memo: &memoTooLong}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := service.CreateGooglePlaceScheduleItem(context.Background(), "user-1", testTripID, "2026-07-10", tt.input)
+			if !errors.Is(err, ErrValidation) {
+				t.Fatalf("expected validation error, got %v", err)
+			}
+		})
 	}
 }
 
@@ -267,7 +306,7 @@ func (r *fakeRepository) AppendGooglePlaceScheduleItem(_ context.Context, record
 	if placeSummary.ID == "" {
 		placeSummary = trip.TripPlaceSummary{ID: record.TripPlaceID, Name: "도톤보리", PlaceType: "sights", Address: "Osaka"}
 	}
-	return trip.ScheduleItem{ID: "item-1", ItemOrder: 1, Version: 1, Place: placeSummary}, nil
+	return trip.ScheduleItem{ID: "item-1", ItemOrder: 1, Version: 1, StartTime: record.StartTime, EndTime: record.EndTime, Place: placeSummary, PlaceSchedule: &trip.PlaceScheduleItemDetails{Title: record.Title, Memo: record.Memo}}, nil
 }
 
 func (r *fakeRepository) CreateGooglePlaceScheduleItem(_ context.Context, record CreateGooglePlaceScheduleItemRecord) (trip.ScheduleItem, error) {
@@ -276,9 +315,12 @@ func (r *fakeRepository) CreateGooglePlaceScheduleItem(_ context.Context, record
 		return trip.ScheduleItem{}, r.appendErr
 	}
 	return trip.ScheduleItem{
-		ID:        "item-1",
-		ItemOrder: 1,
-		Version:   1,
+		ID:            "item-1",
+		ItemOrder:     1,
+		Version:       1,
+		StartTime:     record.StartTime,
+		EndTime:       record.EndTime,
+		PlaceSchedule: &trip.PlaceScheduleItemDetails{Title: record.Title, Memo: record.Memo},
 		Place: trip.TripPlaceSummary{
 			ID:        "place-1",
 			Name:      record.Name,

@@ -61,6 +61,10 @@ type SearchInput struct {
 type CreateGooglePlaceScheduleItemInput struct {
 	GooglePlaceID      string
 	DuplicateConfirmed bool
+	Title              string
+	StartTime          *string
+	EndTime            *string
+	Memo               *string
 }
 
 type SearchResult struct {
@@ -85,6 +89,10 @@ type AppendGooglePlaceScheduleItemRecord struct {
 	TripDayID          string
 	TripPlaceID        string
 	DuplicateConfirmed bool
+	Title              string
+	StartTime          *string
+	EndTime            *string
+	Memo               *string
 }
 
 type CreateGooglePlaceScheduleItemRecord struct {
@@ -99,6 +107,10 @@ type CreateGooglePlaceScheduleItemRecord struct {
 	GooglePrimaryType  string
 	GoogleTypes        []string
 	DuplicateConfirmed bool
+	Title              string
+	StartTime          *string
+	EndTime            *string
+	Memo               *string
 }
 
 type CreateGooglePlaceScheduleItemResult struct {

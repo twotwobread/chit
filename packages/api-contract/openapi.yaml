@@ -2645,6 +2645,24 @@ components:
         - bus
         - ferry
         - other
+    PlaceScheduleItemDetails:
+      type: object
+      additionalProperties: false
+      required:
+        - title
+        - memo
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 120
+          description: User-editable schedule title for a place-backed item. The linked place snapshot remains read-only.
+          example: 도톤보리 산책
+        memo:
+          type: string
+          nullable: true
+          maxLength: 1000
+          description: Optional memo for the place-backed schedule item.
     NonPlaceScheduleItemDetails:
       type: object
       additionalProperties: false
@@ -2724,6 +2742,7 @@ components:
         - arrivedAt
         - skippedAt
         - place
+        - placeSchedule
         - nonPlace
       properties:
         id:
@@ -2763,6 +2782,10 @@ components:
         place:
           allOf:
             - $ref: '#/components/schemas/TripPlaceSummary'
+          nullable: true
+        placeSchedule:
+          allOf:
+            - $ref: '#/components/schemas/PlaceScheduleItemDetails'
           nullable: true
         nonPlace:
           allOf:
@@ -3359,6 +3382,7 @@ components:
       required:
         - googlePlaceId
         - duplicateConfirmed
+        - title
       properties:
         googlePlaceId:
           type: string
@@ -3369,6 +3393,26 @@ components:
           type: boolean
           description: Set true only after the user confirms adding the same Google place to the same Day again.
           example: false
+        title:
+          type: string
+          minLength: 1
+          maxLength: 120
+          description: Required schedule title. Defaults from the selected place name on mobile but is stored separately from the place snapshot.
+          example: 도톤보리 산책
+        startTime:
+          type: string
+          pattern: '^([01]\\d|2[0-3]):[0-5]\\d$'
+          description: Optional local start time in HH:mm. Omit or send empty string to save as untimed/order-only.
+          example: '09:30'
+        endTime:
+          type: string
+          pattern: '^([01]\\d|2[0-3]):[0-5]\\d$'
+          description: Optional local end time in HH:mm. Requires startTime and must be later than startTime.
+          example: '11:00'
+        memo:
+          type: string
+          maxLength: 1000
+          description: Optional place-backed schedule memo. Empty strings are normalized to null by the server.
     CreateGooglePlaceScheduleItemResponse:
       type: object
       required:

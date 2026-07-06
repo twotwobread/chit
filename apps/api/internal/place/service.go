@@ -17,6 +17,8 @@ const (
 	maxGooglePlaceIDLen = 255
 	maxNameLen          = 120
 	maxAddressLen       = 240
+	maxTitleLen         = 120
+	maxMemoLen          = 1000
 )
 
 type Service struct {
@@ -95,6 +97,10 @@ func (s *Service) CreateGooglePlaceScheduleItem(ctx context.Context, userID stri
 	if len([]rune(googlePlaceID)) < 1 || len([]rune(googlePlaceID)) > maxGooglePlaceIDLen {
 		return CreateGooglePlaceScheduleItemResult{}, ErrValidation
 	}
+	title, startTime, endTime, memo, err := normalizePlaceScheduleDetails(input)
+	if err != nil {
+		return CreateGooglePlaceScheduleItemResult{}, err
+	}
 
 	day, err := s.validateTripDayParticipant(ctx, userID, tripID, tripDayID)
 	if err != nil {
@@ -110,6 +116,10 @@ func (s *Service) CreateGooglePlaceScheduleItem(ctx context.Context, userID stri
 			TripDayID:          tripDayID,
 			TripPlaceID:        existingPlace.ID,
 			DuplicateConfirmed: input.DuplicateConfirmed,
+			Title:              title,
+			StartTime:          startTime,
+			EndTime:            endTime,
+			Memo:               memo,
 		})
 		if err != nil {
 			return CreateGooglePlaceScheduleItemResult{}, err
@@ -138,6 +148,10 @@ func (s *Service) CreateGooglePlaceScheduleItem(ctx context.Context, userID stri
 			GooglePrimaryType:  snapshot.PrimaryType,
 			GoogleTypes:        snapshot.Types,
 			DuplicateConfirmed: input.DuplicateConfirmed,
+			Title:              title,
+			StartTime:          startTime,
+			EndTime:            endTime,
+			Memo:               memo,
 		})
 		if err != nil {
 			return CreateGooglePlaceScheduleItemResult{}, err
@@ -145,6 +159,63 @@ func (s *Service) CreateGooglePlaceScheduleItem(ctx context.Context, userID stri
 	}
 
 	return CreateGooglePlaceScheduleItemResult{Day: day, Item: item}, nil
+}
+
+func normalizePlaceScheduleDetails(input CreateGooglePlaceScheduleItemInput) (string, *string, *string, *string, error) {
+	title := strings.TrimSpace(input.Title)
+	if len([]rune(title)) < 1 || len([]rune(title)) > maxTitleLen {
+		return "", nil, nil, nil, ErrValidation
+	}
+	startTime, err := normalizeOptionalScheduleTime(input.StartTime)
+	if err != nil {
+		return "", nil, nil, nil, err
+	}
+	endTime, err := normalizeOptionalScheduleTime(input.EndTime)
+	if err != nil {
+		return "", nil, nil, nil, err
+	}
+	if endTime != nil && startTime == nil {
+		return "", nil, nil, nil, ErrValidation
+	}
+	if startTime != nil && endTime != nil && *endTime <= *startTime {
+		return "", nil, nil, nil, ErrValidation
+	}
+	memo, err := normalizeOptionalMemo(input.Memo)
+	if err != nil {
+		return "", nil, nil, nil, err
+	}
+	return title, startTime, endTime, memo, nil
+}
+
+func normalizeOptionalScheduleTime(value *string) (*string, error) {
+	if value == nil {
+		return nil, nil
+	}
+	trimmed := strings.TrimSpace(*value)
+	if trimmed == "" {
+		return nil, nil
+	}
+	if len(trimmed) != 5 || trimmed[2] != ':' {
+		return nil, ErrValidation
+	}
+	if _, err := time.Parse("15:04", trimmed); err != nil {
+		return nil, ErrValidation
+	}
+	return &trimmed, nil
+}
+
+func normalizeOptionalMemo(value *string) (*string, error) {
+	if value == nil {
+		return nil, nil
+	}
+	trimmed := strings.TrimSpace(*value)
+	if trimmed == "" {
+		return nil, nil
+	}
+	if len([]rune(trimmed)) > maxMemoLen {
+		return nil, ErrValidation
+	}
+	return &trimmed, nil
 }
 
 func (s *Service) validateTripDayParticipant(ctx context.Context, userID string, tripID string, tripDayID string) (trip.TripDay, error) {

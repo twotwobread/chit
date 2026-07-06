@@ -394,18 +394,24 @@ type NonPlaceScheduleItemDetails struct {
 	GateText         *string
 }
 
+type PlaceScheduleItemDetails struct {
+	Title string
+	Memo  *string
+}
+
 type ScheduleItem struct {
-	ID        string
-	ItemOrder int
-	Version   int
-	ItemType  string
-	IsLodging bool
-	StartTime *string
-	EndTime   *string
-	ArrivedAt *time.Time
-	SkippedAt *time.Time
-	Place     TripPlaceSummary
-	NonPlace  *NonPlaceScheduleItemDetails
+	ID            string
+	ItemOrder     int
+	Version       int
+	ItemType      string
+	IsLodging     bool
+	StartTime     *string
+	EndTime       *string
+	ArrivedAt     *time.Time
+	SkippedAt     *time.Time
+	Place         TripPlaceSummary
+	PlaceSchedule *PlaceScheduleItemDetails
+	NonPlace      *NonPlaceScheduleItemDetails
 }
 
 type GetDayScheduleItemsResult struct {

@@ -3,6 +3,7 @@
 /* tslint:disable */
 /* eslint-disable */
 import type { NonPlaceScheduleItemDetails } from './NonPlaceScheduleItemDetails';
+import type { PlaceScheduleItemDetails } from './PlaceScheduleItemDetails';
 import type { ScheduleItemType } from './ScheduleItemType';
 import type { TripPlaceSummary } from './TripPlaceSummary';
 export type ScheduleItem = {
@@ -28,5 +29,6 @@ export type ScheduleItem = {
      */
     skippedAt: string | null;
     place: TripPlaceSummary | null;
+    placeSchedule: PlaceScheduleItemDetails | null;
     nonPlace: NonPlaceScheduleItemDetails | null;
 };

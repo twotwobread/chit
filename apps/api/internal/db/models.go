@@ -86,6 +86,8 @@ type ScheduleItem struct {
 	Version                   int32
 	StartTime                 pgtype.Time
 	EndTime                   pgtype.Time
+	PlaceTitle                pgtype.Text
+	PlaceMemo                 pgtype.Text
 	ArrivedAt                 pgtype.Timestamptz
 	SkippedAt                 pgtype.Timestamptz
 	ItemKind                  string

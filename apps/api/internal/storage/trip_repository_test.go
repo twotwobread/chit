@@ -89,11 +89,11 @@ func TestListScheduleItemsByTripDayFiltersSortsAndJoinsPlaces(t *testing.T) {
 		      updated_at = now()
 		  RETURNING id, date
 		)
-		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, item_order, rank, version)
+		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, place_title, item_order, rank, version)
 		VALUES
-		  ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $3::uuid, 2, '0000000000000002048', 2),
-		  ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, 1, '0000000000000001024', 5),
-		  ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-12'), $4::uuid, 1, '0000000000000001024', 1)
+		  ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $3::uuid, '장소 일정', 2, '0000000000000002048', 2),
+		  ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, '장소 일정', 1, '0000000000000001024', 5),
+		  ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-12'), $4::uuid, '장소 일정', 1, '0000000000000001024', 1)
 	`, tripID, firstPlaceID, secondPlaceID, otherDatePlaceID); err != nil {
 		t.Fatalf("insert schedule items: %v", err)
 	}
@@ -278,8 +278,8 @@ func TestExpenseDisplayUsesLiveRowsThenFallback(t *testing.T) {
 
 	var scheduleItemID string
 	if err := store.pool.QueryRow(ctx, `
-		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, item_order, rank, version)
-		VALUES ($1::uuid, $2::uuid, $3::uuid, 1, '0000000000000001024', 1)
+		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, place_title, item_order, rank, version)
+		VALUES ($1::uuid, $2::uuid, $3::uuid, '장소 일정', 1, '0000000000000001024', 1)
 		RETURNING id::text
 	`, tripID, tripDayID, placeID).Scan(&scheduleItemID); err != nil {
 		t.Fatalf("insert schedule item: %v", err)
@@ -424,8 +424,8 @@ func TestMarkScheduleItemArrivedFirstPendingIdempotentAndDuplicatePlaceIndepende
 		      updated_at = now()
 		  RETURNING id, date
 		)
-		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, item_order, rank, version)
-		VALUES ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, 1, '0000000000000001024', 1)
+		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, place_title, item_order, rank, version)
+		VALUES ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, '장소 일정', 1, '0000000000000001024', 1)
 		RETURNING id::text
 	`, tripID, sharedPlaceID).Scan(&firstItemID); err != nil {
 		t.Fatalf("insert first schedule item: %v", err)
@@ -448,8 +448,8 @@ func TestMarkScheduleItemArrivedFirstPendingIdempotentAndDuplicatePlaceIndepende
 		      updated_at = now()
 		  RETURNING id, date
 		)
-		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, item_order, rank, version)
-		VALUES ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, 2, '0000000000000002048', 1)
+		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, place_title, item_order, rank, version)
+		VALUES ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, '장소 일정', 2, '0000000000000002048', 1)
 		RETURNING id::text
 	`, tripID, sharedPlaceID).Scan(&secondItemID); err != nil {
 		t.Fatalf("insert second schedule item: %v", err)
@@ -472,8 +472,8 @@ func TestMarkScheduleItemArrivedFirstPendingIdempotentAndDuplicatePlaceIndepende
 		      updated_at = now()
 		  RETURNING id, date
 		)
-		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, item_order, rank, version)
-		VALUES ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, 3, '0000000000000003072', 1)
+		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, place_title, item_order, rank, version)
+		VALUES ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, '장소 일정', 3, '0000000000000003072', 1)
 	`, tripID, thirdPlaceID); err != nil {
 		t.Fatalf("insert third schedule item: %v", err)
 	}
@@ -590,8 +590,8 @@ func TestMarkScheduleItemSkippedRestoreAndDuplicatePlaceIndependent(t *testing.T
 		      updated_at = now()
 		  RETURNING id, date
 		)
-		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, item_order, rank, version)
-		VALUES ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, 1, '0000000000000001024', 1)
+		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, place_title, item_order, rank, version)
+		VALUES ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, '장소 일정', 1, '0000000000000001024', 1)
 		RETURNING id::text
 	`, tripID, sharedPlaceID).Scan(&firstItemID); err != nil {
 		t.Fatalf("insert first schedule item: %v", err)
@@ -614,8 +614,8 @@ func TestMarkScheduleItemSkippedRestoreAndDuplicatePlaceIndependent(t *testing.T
 		      updated_at = now()
 		  RETURNING id, date
 		)
-		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, item_order, rank, version)
-		VALUES ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, 2, '0000000000000002048', 1)
+		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, place_title, item_order, rank, version)
+		VALUES ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, '장소 일정', 2, '0000000000000002048', 1)
 		RETURNING id::text
 	`, tripID, sharedPlaceID).Scan(&secondItemID); err != nil {
 		t.Fatalf("insert second schedule item: %v", err)
@@ -638,8 +638,8 @@ func TestMarkScheduleItemSkippedRestoreAndDuplicatePlaceIndependent(t *testing.T
 		      updated_at = now()
 		  RETURNING id, date
 		)
-		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, item_order, rank, version)
-		VALUES ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, 3, '0000000000000003072', 1)
+		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, place_title, item_order, rank, version)
+		VALUES ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, '장소 일정', 3, '0000000000000003072', 1)
 	`, tripID, thirdPlaceID); err != nil {
 		t.Fatalf("insert third schedule item: %v", err)
 	}
@@ -795,11 +795,11 @@ func TestDayLodgingPlacePersistenceAndScheduleMapping(t *testing.T) {
 		      updated_at = now()
 		  RETURNING id, date
 		)
-		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, item_order, rank, version)
+		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, place_title, item_order, rank, version)
 		VALUES
-		  ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, 1, '0000000000000001024', 1),
-		  ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, 2, '0000000000000002048', 1),
-		  ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $3::uuid, 3, '0000000000000003072', 1)
+		  ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, '장소 일정', 1, '0000000000000001024', 1),
+		  ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, '장소 일정', 2, '0000000000000002048', 1),
+		  ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $3::uuid, '장소 일정', 3, '0000000000000003072', 1)
 	`, tripID, lodgingPlaceID, foodPlaceID); err != nil {
 		t.Fatalf("insert schedule items: %v", err)
 	}
@@ -1133,6 +1133,9 @@ func TestCreateGooglePlaceScheduleItemReusesTripPlaceAndHandlesDuplicateConfirma
 		t.Fatalf("insert trip: %v", err)
 	}
 
+	startTime := "09:30"
+	endTime := "11:00"
+	memo := "강가 산책하기"
 	record := place.CreateGooglePlaceScheduleItemRecord{
 		TripID:            tripID,
 		TripDayID:         tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-11"),
@@ -1144,6 +1147,10 @@ func TestCreateGooglePlaceScheduleItemReusesTripPlaceAndHandlesDuplicateConfirma
 		Longitude:         135.5013,
 		GooglePrimaryType: "tourist_attraction",
 		GoogleTypes:       []string{"tourist_attraction", "point_of_interest"},
+		Title:             "오전 산책",
+		StartTime:         &startTime,
+		EndTime:           &endTime,
+		Memo:              &memo,
 	}
 	first, err := store.CreateGooglePlaceScheduleItem(ctx, record)
 	if err != nil {
@@ -1151,6 +1158,9 @@ func TestCreateGooglePlaceScheduleItemReusesTripPlaceAndHandlesDuplicateConfirma
 	}
 	if first.ItemOrder != 1 || first.Place.Name != "도톤보리" || first.Place.PlaceType != "sights" {
 		t.Fatalf("unexpected first item: %#v", first)
+	}
+	if first.PlaceSchedule == nil || first.PlaceSchedule.Title != "오전 산책" || first.PlaceSchedule.Memo == nil || *first.PlaceSchedule.Memo != "강가 산책하기" || first.StartTime == nil || *first.StartTime != "09:30" || first.EndTime == nil || *first.EndTime != "11:00" {
+		t.Fatalf("expected first item details, got %#v", first)
 	}
 	if first.Place.RoutablePlace == nil || first.Place.RoutablePlace.GooglePlaceID != "google-place-1" || first.Place.RoutablePlace.Latitude != 34.6687 || first.Place.RoutablePlace.Longitude != 135.5013 {
 		t.Fatalf("expected routable place metadata, got %#v", first.Place.RoutablePlace)
@@ -1162,12 +1172,19 @@ func TestCreateGooglePlaceScheduleItemReusesTripPlaceAndHandlesDuplicateConfirma
 	}
 
 	record.DuplicateConfirmed = true
+	record.Title = "야경 다시 보기"
+	record.Memo = nil
+	record.StartTime = nil
+	record.EndTime = nil
 	second, err := store.CreateGooglePlaceScheduleItem(ctx, record)
 	if err != nil {
 		t.Fatalf("create confirmed duplicate google item: %v", err)
 	}
 	if second.ItemOrder != 2 || second.Place.ID != first.Place.ID {
 		t.Fatalf("expected duplicate to append with reused place, got first=%#v second=%#v", first, second)
+	}
+	if second.PlaceSchedule == nil || second.PlaceSchedule.Title != "야경 다시 보기" || second.PlaceSchedule.Memo != nil || second.StartTime != nil || second.EndTime != nil {
+		t.Fatalf("expected confirmed duplicate to preserve its own untimed details, got %#v", second)
 	}
 
 	var placeCount int
@@ -1254,8 +1271,8 @@ func TestReorderScheduleItemsAppliesMovesSequentiallyAndReturnsLatestOrder(t *te
 		      updated_at = now()
 		  RETURNING id, date
 		)
-		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, item_order, rank, version)
-			VALUES ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, $3, lpad($4::int::text, 19, '0'), 1)
+		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, place_title, item_order, rank, version)
+			VALUES ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, '장소 일정', $3, lpad($4::int::text, 19, '0'), 1)
 			RETURNING id::text
 		`, tripID, placeID, index+1, rank).Scan(&itemID); err != nil {
 			t.Fatalf("insert schedule item %d: %v", index, err)
@@ -1405,8 +1422,8 @@ func TestReorderScheduleItemsRejectsStaleMovedItemVersionWithoutChangingData(t *
 		      updated_at = now()
 		  RETURNING id, date
 		)
-		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, item_order, rank, version)
-			VALUES ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, $3, $4, $5)
+		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, place_title, item_order, rank, version)
+			VALUES ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, '장소 일정', $3, $4, $5)
 			RETURNING id::text
 		`, tripID, placeID, index+1, ranks[index], versions[index]).Scan(&itemID); err != nil {
 			t.Fatalf("insert schedule item %d: %v", index, err)
@@ -1545,8 +1562,8 @@ func TestReorderScheduleItemsRollsBackEarlierMovesWhenLaterMoveFails(t *testing.
 		      updated_at = now()
 		  RETURNING id, date
 		)
-		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, item_order, rank, version)
-			VALUES ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, $3, $4, 1)
+		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, place_title, item_order, rank, version)
+			VALUES ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, '장소 일정', $3, $4, 1)
 			RETURNING id::text
 		`, tripID, placeID, index+1, rank).Scan(&itemID); err != nil {
 			t.Fatalf("insert schedule item %d: %v", index, err)
@@ -2115,8 +2132,8 @@ func TestUpdateScheduleItemPlaceUpdatesSharedPlaceSnapshot(t *testing.T) {
 		      updated_at = now()
 		  RETURNING id, date
 		)
-		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, item_order, rank)
-		VALUES ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, 1, '0000000000000001024')
+		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, place_title, item_order, rank)
+		VALUES ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, '장소 일정', 1, '0000000000000001024')
 		RETURNING id::text
 	`, tripID, placeID).Scan(&firstItemID); err != nil {
 		t.Fatalf("insert first schedule item: %v", err)
@@ -2139,8 +2156,8 @@ func TestUpdateScheduleItemPlaceUpdatesSharedPlaceSnapshot(t *testing.T) {
 		      updated_at = now()
 		  RETURNING id, date
 		)
-		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, item_order, rank)
-		VALUES ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-12'), $2::uuid, 1, '0000000000000001024')
+		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, place_title, item_order, rank)
+		VALUES ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-12'), $2::uuid, '장소 일정', 1, '0000000000000001024')
 	`, tripID, placeID); err != nil {
 		t.Fatalf("insert second schedule item: %v", err)
 	}
@@ -2250,8 +2267,8 @@ func TestDeleteScheduleItemRemovesSelectedItemAndCleansOrphanPlace(t *testing.T)
 		      updated_at = now()
 		  RETURNING id, date
 		)
-		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, item_order, rank)
-		VALUES ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, 1, '0000000000000001024')
+		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, place_title, item_order, rank)
+		VALUES ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, '장소 일정', 1, '0000000000000001024')
 		RETURNING id::text
 	`, tripID, sharedPlaceID).Scan(&firstSharedItemID); err != nil {
 		t.Fatalf("insert first shared item: %v", err)
@@ -2274,8 +2291,8 @@ func TestDeleteScheduleItemRemovesSelectedItemAndCleansOrphanPlace(t *testing.T)
 		      updated_at = now()
 		  RETURNING id, date
 		)
-		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, item_order, rank)
-		VALUES ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-12'), $2::uuid, 1, '0000000000000001024')
+		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, place_title, item_order, rank)
+		VALUES ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-12'), $2::uuid, '장소 일정', 1, '0000000000000001024')
 	`, tripID, sharedPlaceID); err != nil {
 		t.Fatalf("insert second shared item: %v", err)
 	}
@@ -2322,8 +2339,8 @@ func TestDeleteScheduleItemRemovesSelectedItemAndCleansOrphanPlace(t *testing.T)
 		      updated_at = now()
 		  RETURNING id, date
 		)
-		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, item_order, rank)
-		VALUES ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, 2, '0000000000000002048')
+		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, place_title, item_order, rank)
+		VALUES ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, '장소 일정', 2, '0000000000000002048')
 		RETURNING id::text
 	`, tripID, lodgingOnlyPlaceID).Scan(&lodgingOnlyItemID); err != nil {
 		t.Fatalf("insert lodging-only item: %v", err)
@@ -2380,8 +2397,8 @@ func TestDeleteScheduleItemRemovesSelectedItemAndCleansOrphanPlace(t *testing.T)
 		      updated_at = now()
 		  RETURNING id, date
 		)
-		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, item_order, rank)
-		VALUES ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, 3, '0000000000000003072')
+		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, place_title, item_order, rank)
+		VALUES ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, '장소 일정', 3, '0000000000000003072')
 		RETURNING id::text
 	`, tripID, orphanPlaceID).Scan(&orphanItemID); err != nil {
 		t.Fatalf("insert orphan item: %v", err)
@@ -3112,8 +3129,8 @@ func createRankedDayScheduleFixture(t *testing.T, ctx context.Context, store *St
 
 		var itemID string
 		if err := store.pool.QueryRow(ctx, `
-			INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, item_order, rank, version)
-			VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6)
+			INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, place_title, item_order, rank, version)
+			VALUES ($1::uuid, $2::uuid, $3::uuid, '장소 일정', $4, $5, $6)
 			RETURNING id::text
 		`, tripID, tripDayID, placeID, index+1, rank, versions[index]).Scan(&itemID); err != nil {
 			t.Fatalf("insert schedule item %d: %v", index, err)
@@ -3214,8 +3231,8 @@ func createReorderDayScheduleFixture(t *testing.T, ctx context.Context, store *S
 		      updated_at = now()
 		  RETURNING id, date
 		)
-		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, item_order, rank, version)
-			VALUES ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, $3, $4, 1)
+		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, place_title, item_order, rank, version)
+			VALUES ($1::uuid, (SELECT id FROM ensured_trip_days WHERE date = '2026-07-11'), $2::uuid, '장소 일정', $3, $4, 1)
 			RETURNING id::text
 		`, tripID, placeID, index+1, ranks[index]).Scan(&itemID); err != nil {
 			t.Fatalf("insert schedule item %d: %v", index, err)
