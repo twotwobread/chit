@@ -442,7 +442,6 @@ export function useDayItineraryEditorController({
   };
 
   const {
-    beginCreateNonPlace,
     beginEdit,
     cancelEdit,
     cancelNonPlaceEditor,
@@ -485,12 +484,6 @@ export function useDayItineraryEditorController({
 
   useEffect(() => {
     if (!initialAction || handledInitialActionRef.current === initialAction || state.status !== 'success') {
-      return;
-    }
-
-    if (initialAction === 'nonPlace') {
-      handledInitialActionRef.current = initialAction;
-      beginCreateNonPlace();
       return;
     }
 
@@ -625,7 +618,6 @@ export function useDayItineraryEditorController({
     updateScrollContentSize,
     updateScrollLayout,
     updateScrollOffset,
-    beginCreateNonPlace,
     beginDelete,
     beginEdit,
     beginReorder,

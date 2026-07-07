@@ -47,6 +47,15 @@ export default function GooglePlaceSearchScreen() {
     placeName: placeNameParam,
     address: addressParam,
     typeHint: typeHintParam,
+    nonPlaceCategory: nonPlaceCategoryParam,
+    nonPlaceLink: nonPlaceLinkParam,
+    nonPlaceTransportMode: nonPlaceTransportModeParam,
+    nonPlaceReferenceNumber: nonPlaceReferenceNumberParam,
+    nonPlaceBookingReference: nonPlaceBookingReferenceParam,
+    nonPlaceOriginText: nonPlaceOriginTextParam,
+    nonPlaceDestinationText: nonPlaceDestinationTextParam,
+    nonPlaceTerminalText: nonPlaceTerminalTextParam,
+    nonPlaceGateText: nonPlaceGateTextParam,
   } = useLocalSearchParams<{
     tripId?: string | string[];
     date?: string | string[];
@@ -61,6 +70,15 @@ export default function GooglePlaceSearchScreen() {
     placeName?: string | string[];
     address?: string | string[];
     typeHint?: string | string[];
+    nonPlaceCategory?: string | string[];
+    nonPlaceLink?: string | string[];
+    nonPlaceTransportMode?: string | string[];
+    nonPlaceReferenceNumber?: string | string[];
+    nonPlaceBookingReference?: string | string[];
+    nonPlaceOriginText?: string | string[];
+    nonPlaceDestinationText?: string | string[];
+    nonPlaceTerminalText?: string | string[];
+    nonPlaceGateText?: string | string[];
   }>();
   const tripId = Array.isArray(tripIdParam) ? tripIdParam[0] : tripIdParam;
   const date = Array.isArray(dateParam) ? dateParam[0] : dateParam;
@@ -148,6 +166,15 @@ export default function GooglePlaceSearchScreen() {
       placeName: placeNameParam,
       address: addressParam,
       typeHint: typeHintParam,
+      nonPlaceCategory: nonPlaceCategoryParam,
+      nonPlaceLink: nonPlaceLinkParam,
+      nonPlaceTransportMode: nonPlaceTransportModeParam,
+      nonPlaceReferenceNumber: nonPlaceReferenceNumberParam,
+      nonPlaceBookingReference: nonPlaceBookingReferenceParam,
+      nonPlaceOriginText: nonPlaceOriginTextParam,
+      nonPlaceDestinationText: nonPlaceDestinationTextParam,
+      nonPlaceTerminalText: nonPlaceTerminalTextParam,
+      nonPlaceGateText: nonPlaceGateTextParam,
     });
     const nextValues = applySelectedPlaceToPlaceScheduleForm(
       currentValues,

@@ -4,7 +4,6 @@ import test from 'node:test';
 import {
   buildItineraryTimelineItems,
   ITINERARY_TAB_ADD_CTA_LABEL,
-  ITINERARY_TAB_ADD_NON_PLACE_CTA_LABEL,
   ITINERARY_TAB_EMPTY_HELPER,
   ITINERARY_TAB_EMPTY_TITLE,
   ITINERARY_TAB_REORDER_CTA_LABEL,
@@ -77,9 +76,8 @@ test('buildItineraryTimelineItems maps selected day rows to timeline presentatio
 
 test('itinerary tab empty and detail CTA copy is stable', () => {
   assert.equal(ITINERARY_TAB_EMPTY_TITLE, '이 Day에 등록된 일정이 없어요.');
-  assert.equal(ITINERARY_TAB_EMPTY_HELPER, '일정 추가를 눌러 방문할 장소나 장소 없는 일정을 등록해 주세요.');
+  assert.equal(ITINERARY_TAB_EMPTY_HELPER, '일정 추가에서 장소를 검색하거나 장소 없이 일정을 등록해 주세요.');
   assert.equal(ITINERARY_TAB_ADD_CTA_LABEL, '일정 추가');
-  assert.equal(ITINERARY_TAB_ADD_NON_PLACE_CTA_LABEL, '장소 없는 일정 추가');
   assert.equal(ITINERARY_TAB_REORDER_CTA_LABEL, '순서 변경');
   assert.deepEqual(
     buildItineraryTimelineItems({

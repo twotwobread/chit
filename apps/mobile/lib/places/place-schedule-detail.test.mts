@@ -7,12 +7,16 @@ import {
   buildPlaceScheduleDetailRoute,
   buildPlaceScheduleDetailSubmitState,
   buildScheduleTimeText,
+  clearSelectedPlaceFromPlaceScheduleForm,
   defaultEndScheduleTimeFromStart,
   defaultScheduleTimeFromDate,
   emptyPlaceScheduleDetailForm,
   hasRequiredPlaceScheduleDetailFields,
+  hasRequiredUnifiedScheduleDetailFields,
   parseScheduleTimePickerValue,
   validatePlaceScheduleDetailForm,
+  validateUnifiedScheduleDetailForm,
+  type PlaceScheduleDetailFormValues,
   type PlaceScheduleSelectedPlace,
 } from './place-schedule-detail';
 
@@ -23,7 +27,42 @@ const selectedPlace: PlaceScheduleSelectedPlace = {
   typeHint: '관광지',
 };
 
+const emptyNonPlaceFields = {
+  nonPlaceCategory: 'memo',
+  nonPlaceLink: '',
+  nonPlaceTransportMode: 'other',
+  nonPlaceReferenceNumber: '',
+  nonPlaceBookingReference: '',
+  nonPlaceOriginText: '',
+  nonPlaceDestinationText: '',
+  nonPlaceTerminalText: '',
+  nonPlaceGateText: '',
+} satisfies Pick<
+  PlaceScheduleDetailFormValues,
+  | 'nonPlaceCategory'
+  | 'nonPlaceLink'
+  | 'nonPlaceTransportMode'
+  | 'nonPlaceReferenceNumber'
+  | 'nonPlaceBookingReference'
+  | 'nonPlaceOriginText'
+  | 'nonPlaceDestinationText'
+  | 'nonPlaceTerminalText'
+  | 'nonPlaceGateText'
+>;
+
 describe('place schedule detail helpers', () => {
+  it('defaults to a non-place memo schedule until a place is selected', () => {
+    assert.deepEqual(emptyPlaceScheduleDetailForm(), {
+      title: '',
+      startTime: '',
+      endTime: '',
+      memo: '',
+      titleTouched: false,
+      selectedPlace: null,
+      ...emptyNonPlaceFields,
+    });
+  });
+
   it('defaults the required schedule title from the selected place unless the user edited it', () => {
     assert.deepEqual(applySelectedPlaceToPlaceScheduleForm(emptyPlaceScheduleDetailForm(), selectedPlace), {
       title: '도톤보리',
@@ -32,6 +71,7 @@ describe('place schedule detail helpers', () => {
       memo: '',
       titleTouched: false,
       selectedPlace,
+      ...emptyNonPlaceFields,
     });
 
     assert.deepEqual(
@@ -46,6 +86,34 @@ describe('place schedule detail helpers', () => {
         memo: '',
         titleTouched: true,
         selectedPlace,
+        ...emptyNonPlaceFields,
+      },
+    );
+  });
+
+  it('clears the selected place while preserving common schedule fields', () => {
+    assert.deepEqual(
+      clearSelectedPlaceFromPlaceScheduleForm({
+        ...emptyPlaceScheduleDetailForm(),
+        title: '아침 이동',
+        titleTouched: true,
+        startTime: '09:30',
+        endTime: '10:30',
+        memo: '짐 챙기기',
+        selectedPlace,
+        nonPlaceCategory: 'transport',
+        nonPlaceLink: 'https://example.com/ticket',
+      }),
+      {
+        ...emptyPlaceScheduleDetailForm(),
+        title: '아침 이동',
+        titleTouched: true,
+        startTime: '09:30',
+        endTime: '10:30',
+        memo: '짐 챙기기',
+        selectedPlace: null,
+        nonPlaceCategory: 'transport',
+        nonPlaceLink: 'https://example.com/ticket',
       },
     );
   });
@@ -110,13 +178,70 @@ describe('place schedule detail helpers', () => {
     );
   });
 
-  it('disables submit until required title and selected place exist', () => {
+  it('disables place-only submit until required title and selected place exist', () => {
     const empty = emptyPlaceScheduleDetailForm();
     assert.equal(hasRequiredPlaceScheduleDetailFields(empty), false);
     assert.deepEqual(buildPlaceScheduleDetailSubmitState(false, false), { disabled: true, label: '저장' });
     assert.deepEqual(buildPlaceScheduleDetailSubmitState(true, true), { disabled: true, label: '저장 중...' });
     assert.equal(hasRequiredPlaceScheduleDetailFields({ ...empty, title: '도톤보리 산책', selectedPlace }), true);
     assert.deepEqual(buildPlaceScheduleDetailSubmitState(false, true), { disabled: false, label: '저장' });
+  });
+
+  it('validates unified non-place and place save requests from selected-place state', () => {
+    const empty = emptyPlaceScheduleDetailForm();
+    assert.equal(hasRequiredUnifiedScheduleDetailFields(empty), false);
+    assert.deepEqual(validateUnifiedScheduleDetailForm(empty), {
+      ok: false,
+      errors: { title: '일정 제목을 입력해주세요.' },
+    });
+
+    assert.equal(hasRequiredUnifiedScheduleDetailFields({ ...empty, title: '체크아웃' }), true);
+    assert.deepEqual(
+      validateUnifiedScheduleDetailForm({
+        ...empty,
+        title: '  체크아웃  ',
+        startTime: '09:00',
+        memo: '  프런트에 키 반납  ',
+        nonPlaceCategory: 'reminder',
+      }),
+      {
+        ok: true,
+        kind: 'nonPlace',
+        request: {
+          category: 'reminder',
+          title: '체크아웃',
+          startTime: '09:00',
+          memo: '프런트에 키 반납',
+        },
+      },
+    );
+
+    assert.deepEqual(
+      validateUnifiedScheduleDetailForm({
+        ...empty,
+        title: '공항 이동',
+        nonPlaceCategory: 'transport',
+        nonPlaceTransportMode: '',
+      }),
+      { ok: false, errors: { nonPlaceTransportMode: '이동 수단을 선택해주세요.' } },
+    );
+
+    assert.deepEqual(
+      validateUnifiedScheduleDetailForm({
+        ...empty,
+        title: '도톤보리 산책',
+        selectedPlace,
+      }),
+      {
+        ok: true,
+        kind: 'place',
+        request: {
+          googlePlaceId: 'google-1',
+          duplicateConfirmed: false,
+          title: '도톤보리 산책',
+        },
+      },
+    );
   });
 
   it('builds AM/PM wheel picker values from schedule time text and current time defaults', () => {
