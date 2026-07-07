@@ -69,6 +69,14 @@ export function itineraryDurationLabel(startTime: string, endTime?: string | nul
   return `${minutes}분`;
 }
 
+export function itineraryTimeActionLabel(item: Pick<ItineraryTimelineItem, 'startTime'>): '시간 지정' | '시간 수정' {
+  return item.startTime ? '시간 수정' : '시간 지정';
+}
+
+export function itineraryTimeActionAccessibilityLabel(item: Pick<ItineraryTimelineItem, 'name' | 'startTime'>): string {
+  return `${item.name} ${itineraryTimeActionLabel(item)}`;
+}
+
 function parseTimeToMinutes(value: string): number | null {
   const [hourText, minuteText] = value.split(':');
   const hour = Number(hourText);

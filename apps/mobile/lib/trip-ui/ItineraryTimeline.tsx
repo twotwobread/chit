@@ -6,6 +6,8 @@ import { Badge, PlacePin, PlaceTag, theme } from '../design';
 import {
   buildItinerarySegments,
   itineraryDurationLabel,
+  itineraryTimeActionAccessibilityLabel,
+  itineraryTimeActionLabel,
   type ItineraryTimelineItem,
   type ItineraryTimelineSegment,
 } from './itinerary-segments';
@@ -239,16 +241,18 @@ function TimeButton({
   item: ItineraryTimelineItem;
   onPressTime: (item: ItineraryTimelineItem) => void;
 }) {
+  const label = itineraryTimeActionLabel(item);
+
   return (
     <Pressable
-      accessibilityLabel={`${item.name} 시간 편집`}
+      accessibilityLabel={itineraryTimeActionAccessibilityLabel(item)}
       accessibilityRole="button"
       hitSlop={8}
       onPress={() => onPressTime(item)}
       style={({ pressed }) => [styles.timeButton, pressed ? styles.pressed : null]}
     >
       <Clock color={theme.color.primary} size={13} strokeWidth={2.2} />
-      <Text style={styles.timeButtonText}>시간</Text>
+      <Text style={styles.timeButtonText}>{label}</Text>
     </Pressable>
   );
 }

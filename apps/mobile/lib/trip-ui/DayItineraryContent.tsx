@@ -49,6 +49,7 @@ export function DayItineraryContent({
   onCreateManualLodging,
   onDeletePlace,
   onEditPlace,
+  onEditTime,
   onEnterReorderMode,
   onExitReorderMode,
   onMoveReorderItem,
@@ -83,6 +84,7 @@ export function DayItineraryContent({
   onCreateManualLodging: () => void;
   onDeletePlace: (item: DayItineraryRowViewModel, originFocusTarget?: number | null) => void;
   onEditPlace: (item: DayItineraryRowViewModel) => void;
+  onEditTime: (item: DayItineraryRowViewModel) => void;
   onEnterReorderMode: () => void;
   onExitReorderMode: () => void;
   onMoveReorderItem: (fromIndex: number, toIndex: number) => void;
@@ -166,8 +168,18 @@ export function DayItineraryContent({
     onFocusRequestHandled();
   }, [focusRequest, onFocusRequestHandled, viewModel]);
 
+  const resolveTimelineItem = (timelineItem: ItineraryTimelineItem): DayItineraryRowViewModel | null =>
+    itineraryItemsById.get(timelineItem.id) ?? null;
+
+  const handlePressTimelineTime = (timelineItem: ItineraryTimelineItem) => {
+    const item = resolveTimelineItem(timelineItem);
+    if (item) {
+      onEditTime(item);
+    }
+  };
+
   const renderTimelineActions = (timelineItem: ItineraryTimelineItem) => {
-    const item = itineraryItemsById.get(timelineItem.id);
+    const item = resolveTimelineItem(timelineItem);
     if (!item) {
       return null;
     }
@@ -277,6 +289,7 @@ export function DayItineraryContent({
               onItemNameRef={(timelineItem, node) => {
                 rowRefs.current[timelineItem.id] = node;
               }}
+              onPressTime={handlePressTimelineTime}
               renderActions={renderTimelineActions}
             />
           )}
