@@ -29,7 +29,6 @@ export function DayItineraryEditor({
   const {
     addPlace,
     backToItinerary,
-    beginCreateNonPlace,
     beginDelete,
     beginEdit,
     beginReorder,
@@ -118,7 +117,6 @@ export function DayItineraryEditor({
               getReorderScrollOffsetY={getReorderScrollOffsetY}
               onFocusRequestHandled={clearContentFocusRequest}
               onAddPlace={addPlace}
-              onAddNonPlace={beginCreateNonPlace}
               onCopyAddress={(item) => void copyPlaceAddress(item)}
               onDeletePlace={beginDelete}
               onEditPlace={beginEdit}
