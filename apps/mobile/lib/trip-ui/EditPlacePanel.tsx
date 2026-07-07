@@ -1,12 +1,16 @@
-import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
+import { Pressable, Text, TextInput, View } from 'react-native';
 
 import { type TripPlaceType } from '@i-um/api-contract';
 
-import { theme } from '../design';
+import { Card, PrimaryButton, SecondaryButton, theme } from '../design';
 import { buildDayItineraryEditSubmitState, type DayItineraryEditFormValues } from '../trips/day-itinerary-edit';
 import { manualPlaceTypeOptions } from '../trips/manual-place';
 import { styles } from './DayItineraryEditorStyles';
 import type { EditPlacePanelState } from './DayItineraryEditorTypes';
+import { ScheduleTimeEditor } from './ScheduleTimeEditor';
+
+const editPlaceTimeHelper =
+  '비워두면 순서만 있는 일정으로 유지돼요. 시간을 바꿔도 순서는 자동으로 바뀌지 않아요. 필요하면 순서 변경으로 조정해주세요.';
 
 export function EditPlacePanel({
   editState,
@@ -23,7 +27,7 @@ export function EditPlacePanel({
   const submitView = buildDayItineraryEditSubmitState(isSaving);
 
   return (
-    <View style={styles.card}>
+    <Card>
       <Text style={styles.panelTitle}>장소 수정</Text>
       <View style={styles.fieldGroup}>
         <Text style={styles.label}>장소명</Text>
@@ -53,38 +57,15 @@ export function EditPlacePanel({
         {editState.errors.address ? <Text style={styles.fieldError}>{editState.errors.address}</Text> : null}
       </View>
 
-      <View style={styles.fieldGroup}>
-        <Text style={styles.label}>시간</Text>
-        <View style={styles.timeFieldRow}>
-          <View style={styles.timeField}>
-            <TextInput
-              accessibilityLabel="시작 시간"
-              editable={!isSaving}
-              keyboardType="numbers-and-punctuation"
-              onChangeText={(startTime) => onUpdateValues({ ...editState.values, startTime })}
-              placeholder="시작 HH:mm"
-              placeholderTextColor={theme.color.textFaint}
-              style={styles.input}
-              value={editState.values.startTime}
-            />
-            {editState.errors.startTime ? <Text style={styles.fieldError}>{editState.errors.startTime}</Text> : null}
-          </View>
-          <View style={styles.timeField}>
-            <TextInput
-              accessibilityLabel="종료 시간"
-              editable={!isSaving}
-              keyboardType="numbers-and-punctuation"
-              onChangeText={(endTime) => onUpdateValues({ ...editState.values, endTime })}
-              placeholder="종료 HH:mm"
-              placeholderTextColor={theme.color.textFaint}
-              style={styles.input}
-              value={editState.values.endTime}
-            />
-            {editState.errors.endTime ? <Text style={styles.fieldError}>{editState.errors.endTime}</Text> : null}
-          </View>
-        </View>
-        <Text style={styles.fieldHelper}>비워두면 순서만 있는 일정으로 유지돼요.</Text>
-      </View>
+      <ScheduleTimeEditor
+        disabled={isSaving}
+        emptyHelper="시간을 정하지 않으면 시간 미정 일정으로 유지돼요."
+        endTimeError={editState.errors.endTime}
+        helper={editPlaceTimeHelper}
+        onChange={(patch) => onUpdateValues({ ...editState.values, ...patch })}
+        startTimeError={editState.errors.startTime}
+        values={editState.values}
+      />
 
       <View style={styles.fieldGroup}>
         <Text style={styles.label}>장소 타입</Text>
@@ -116,19 +97,15 @@ export function EditPlacePanel({
       ) : null}
 
       <View style={styles.actionGroup}>
-        <Pressable
-          accessibilityRole="button"
+        <PrimaryButton
           disabled={submitView.disabled}
+          label={submitView.label}
+          loading={isSaving}
+          loadingLabel={submitView.label}
           onPress={onSubmit}
-          style={[styles.button, submitView.disabled ? styles.buttonDisabled : null]}
-        >
-          {isSaving ? <ActivityIndicator color={theme.color.onPrimary} /> : null}
-          <Text style={styles.buttonText}>{submitView.label}</Text>
-        </Pressable>
-        <Pressable accessibilityRole="button" disabled={isSaving} onPress={onCancel} style={styles.secondaryButton}>
-          <Text style={styles.secondaryButtonText}>취소</Text>
-        </Pressable>
+        />
+        <SecondaryButton disabled={isSaving} label="취소" onPress={onCancel} />
       </View>
-    </View>
+    </Card>
   );
 }

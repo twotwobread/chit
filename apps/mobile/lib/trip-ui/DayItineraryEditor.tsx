@@ -122,6 +122,7 @@ export function DayItineraryEditor({
               onCopyAddress={(item) => void copyPlaceAddress(item)}
               onDeletePlace={beginDelete}
               onEditPlace={beginEdit}
+              onEditTime={beginEdit}
               onEnterReorderMode={() => beginReorder(state.viewModel)}
               onExitReorderMode={cancelReorder}
               lodgingPickerState={lodgingPickerState}
