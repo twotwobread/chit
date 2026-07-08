@@ -12,10 +12,10 @@ const date = '2026-07-10';
 const itineraryDayRoute = `/trips/${tripId}/itinerary?dayId=${date}`;
 
 describe('day itinerary add-place navigation helpers', () => {
-  it('marks Google place search routes launched from the itinerary tab', () => {
+  it('starts itinerary add-place from the schedule detail form, not the map search selector', () => {
     assert.equal(
       buildDayItineraryAddPlaceSearchRoute(tripId, date),
-      `/trips/${tripId}/days/${date}/place-search?returnTo=itinerary-tab`,
+      `/trips/${tripId}/days/${date}/places/new?returnTo=itinerary-tab`,
     );
 
     assert.equal(isDayItineraryAddPlaceReturnToDay('itinerary-tab'), true);

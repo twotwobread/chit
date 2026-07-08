@@ -223,7 +223,11 @@ export function PlaceSearchPanel({
               >
                 <Text style={styles.optionTitle}>{result.placeName}</Text>
                 <Text style={styles.placeType}>{result.typeHint}</Text>
-                <Text style={styles.address}>{result.address}</Text>
+                {(result.metadataLabels ?? []).filter((label) => label !== result.typeHint).length > 0 ? (
+                  <Text style={styles.summaryHelper}>
+                    {(result.metadataLabels ?? []).filter((label) => label !== result.typeHint).join(' · ')}
+                  </Text>
+                ) : null}
               </Pressable>
             ))}
           </View>
@@ -231,17 +235,13 @@ export function PlaceSearchPanel({
         {detail ? (
           <View style={styles.placeDetailCard}>
             <Text style={styles.optionTitle}>{detail.placeName}</Text>
-            <Text style={styles.address}>{detail.address}</Text>
-            <Text style={styles.searchNoticeTitle}>{detail.photoReviewTitle}</Text>
-            <Text style={styles.summaryHelper}>{detail.photoReviewHelper}</Text>
-            <SecondaryButton
-              label={detail.mapSearchLabel}
-              onPress={() =>
-                onOpenMap(
-                  buildDayItineraryMapRowActions({ address: detail.address, placeName: detail.placeName }).map.url,
-                )
-              }
-            />
+            <Text style={styles.placeType}>{detail.typeHint}</Text>
+            {(detail.metadataLabels ?? []).filter((label) => label !== detail.typeHint).length > 0 ? (
+              <Text style={styles.summaryHelper}>
+                {(detail.metadataLabels ?? []).filter((label) => label !== detail.typeHint).join(' · ')}
+              </Text>
+            ) : null}
+            <SecondaryButton label={detail.mapSearchLabel} onPress={() => onOpenMap(detail.mapUrl)} />
           </View>
         ) : null}
       </View>
