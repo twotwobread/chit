@@ -9,12 +9,13 @@
     "ios": "expo start --ios",
     "test": "node --import tsx --test lib/trips/*.test.mts lib/places/*.test.mts lib/app-info/*.test.mts lib/auth/*.test.mts",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint --max-warnings=0 \"app/**/*.{ts,tsx}\" \"lib/**/*.{ts,tsx,mts}\" app.config.ts metro.config.js eslint.config.js",
-    "format": "prettier --write \"app/**/*.{ts,tsx}\" \"lib/**/*.{ts,tsx,mts}\" app.config.ts metro.config.js eslint.config.js app.json eas.json package.json tsconfig.json",
-    "format:check": "prettier --check \"app/**/*.{ts,tsx}\" \"lib/**/*.{ts,tsx,mts}\" app.config.ts metro.config.js eslint.config.js app.json eas.json package.json tsconfig.json"
+    "lint": "eslint --max-warnings=0 \"app/**/*.{ts,tsx}\" \"lib/**/*.{ts,tsx,mts}\" app.config.ts babel.config.js metro.config.js eslint.config.js",
+    "format": "prettier --write \"app/**/*.{ts,tsx}\" \"lib/**/*.{ts,tsx,mts}\" app.config.ts babel.config.js metro.config.js eslint.config.js app.json eas.json package.json tsconfig.json",
+    "format:check": "prettier --check \"app/**/*.{ts,tsx}\" \"lib/**/*.{ts,tsx,mts}\" app.config.ts babel.config.js metro.config.js eslint.config.js app.json eas.json package.json tsconfig.json"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
+    "@gorhom/bottom-sheet": "^5.2.14",
     "@i-um/api-contract": "workspace:*",
     "@react-native-seoul/kakao-login": "5.4.2",
     "expo": "54.0.35",
@@ -30,8 +31,10 @@
     "react-dom": "19.1.0",
     "react-native": "0.81.5",
     "react-native-calendars": "^1.1314.0",
+    "react-native-gesture-handler": "~2.28.0",
     "react-native-kakao-share-link": "1.0.12",
     "react-native-maps": "1.20.1",
+    "react-native-reanimated": "~4.1.1",
     "react-native-safe-area-context": "5.6.2",
     "react-native-screens": "~4.16.0",
     "react-native-svg": "15.12.1"

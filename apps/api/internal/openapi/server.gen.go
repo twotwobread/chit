@@ -495,12 +495,46 @@ type GetTripSettlementResponse struct {
 	TripId            string                      `json:"tripId"`
 }
 
+// GooglePlaceDetailsResponse defines model for GooglePlaceDetailsResponse.
+type GooglePlaceDetailsResponse struct {
+	// Description Selected-only provider summary when available.
+	Description   *string `json:"description,omitempty"`
+	GooglePlaceId string  `json:"googlePlaceId"`
+}
+
+// GooglePlacePhotoAttribution defines model for GooglePlacePhotoAttribution.
+type GooglePlacePhotoAttribution struct {
+	DisplayName string  `json:"displayName"`
+	PhotoUri    *string `json:"photoUri,omitempty"`
+	Uri         *string `json:"uri,omitempty"`
+}
+
+// GooglePlaceSearchPhoto defines model for GooglePlaceSearchPhoto.
+type GooglePlaceSearchPhoto struct {
+	AuthorAttributions []GooglePlacePhotoAttribution `json:"authorAttributions"`
+	HeightPx           *int                          `json:"heightPx,omitempty"`
+
+	// Token Short-lived server-issued token for the photo proxy endpoint. Clients must not persist it.
+	Token   string `json:"token"`
+	WidthPx *int   `json:"widthPx,omitempty"`
+}
+
 // GooglePlaceSearchResult defines model for GooglePlaceSearchResult.
 type GooglePlaceSearchResult struct {
-	DisplayName      string `json:"displayName"`
-	FormattedAddress string `json:"formattedAddress"`
-	GooglePlaceId    string `json:"googlePlaceId"`
-	PrimaryType      string `json:"primaryType"`
+	DisplayName      string  `json:"displayName"`
+	FormattedAddress string  `json:"formattedAddress"`
+	GoogleMapsUri    *string `json:"googleMapsUri,omitempty"`
+	GooglePlaceId    string  `json:"googlePlaceId"`
+	Latitude         float64 `json:"latitude"`
+	Longitude        float64 `json:"longitude"`
+
+	// OpenNow Current opening-hours status when returned by Google Places.
+	OpenNow                *bool                   `json:"openNow,omitempty"`
+	Photo                  *GooglePlaceSearchPhoto `json:"photo,omitempty"`
+	PrimaryType            string                  `json:"primaryType"`
+	PrimaryTypeDisplayName *string                 `json:"primaryTypeDisplayName,omitempty"`
+	Rating                 *float64                `json:"rating,omitempty"`
+	UserRatingCount        *int                    `json:"userRatingCount,omitempty"`
 }
 
 // HealthResponse defines model for HealthResponse.
@@ -1035,10 +1069,24 @@ type UpdateTripResponse struct {
 	Trip Trip `json:"trip"`
 }
 
+// GetGooglePlacePhotoParams defines parameters for GetGooglePlacePhoto.
+type GetGooglePlacePhotoParams struct {
+	MaxWidthPx *int `form:"maxWidthPx,omitempty" json:"maxWidthPx,omitempty"`
+}
+
 // SearchGooglePlacesParams defines parameters for SearchGooglePlaces.
 type SearchGooglePlacesParams struct {
 	Query string `form:"query" json:"query"`
 	Limit *int   `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Latitude Map center latitude used as a Google Text Search location bias.
+	Latitude *float64 `form:"latitude,omitempty" json:"latitude,omitempty"`
+
+	// Longitude Map center longitude used as a Google Text Search location bias.
+	Longitude *float64 `form:"longitude,omitempty" json:"longitude,omitempty"`
+
+	// RadiusMeters Search bias radius in meters. Requires latitude and longitude when provided.
+	RadiusMeters *float64 `form:"radiusMeters,omitempty" json:"radiusMeters,omitempty"`
 }
 
 // LinkOAuthProviderJSONRequestBody defines body for LinkOAuthProvider for application/json ContentType.
@@ -1166,12 +1214,18 @@ type ServerInterface interface {
 	// Create a manual lodging place and set Day lodging
 	// (POST /trips/{tripId}/days/{tripDayId}/lodging-place/manual)
 	CreateManualDayLodgingPlace(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string)
+	// Resolve a selected Google Place photo
+	// (GET /trips/{tripId}/days/{tripDayId}/places/google/photos/{photoToken})
+	GetGooglePlacePhoto(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, photoToken string, params GetGooglePlacePhotoParams)
 	// Add a Google Place result to a trip day schedule
 	// (POST /trips/{tripId}/days/{tripDayId}/places/google/schedule-items)
 	CreateGooglePlaceScheduleItem(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string)
 	// Search Google Places for a trip day
 	// (GET /trips/{tripId}/days/{tripDayId}/places/google/search)
 	SearchGooglePlaces(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, params SearchGooglePlacesParams)
+	// Get selected Google Place details
+	// (GET /trips/{tripId}/days/{tripDayId}/places/google/{googlePlaceId}/details)
+	GetGooglePlaceDetails(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, googlePlaceId string)
 	// Get a trip day schedule
 	// (GET /trips/{tripId}/days/{tripDayId}/schedule-items)
 	GetDayScheduleItems(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string)
@@ -1373,6 +1427,12 @@ func (_ Unimplemented) CreateManualDayLodgingPlace(w http.ResponseWriter, r *htt
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// Resolve a selected Google Place photo
+// (GET /trips/{tripId}/days/{tripDayId}/places/google/photos/{photoToken})
+func (_ Unimplemented) GetGooglePlacePhoto(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, photoToken string, params GetGooglePlacePhotoParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // Add a Google Place result to a trip day schedule
 // (POST /trips/{tripId}/days/{tripDayId}/places/google/schedule-items)
 func (_ Unimplemented) CreateGooglePlaceScheduleItem(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string) {
@@ -1382,6 +1442,12 @@ func (_ Unimplemented) CreateGooglePlaceScheduleItem(w http.ResponseWriter, r *h
 // Search Google Places for a trip day
 // (GET /trips/{tripId}/days/{tripDayId}/places/google/search)
 func (_ Unimplemented) SearchGooglePlaces(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, params SearchGooglePlacesParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Get selected Google Place details
+// (GET /trips/{tripId}/days/{tripDayId}/places/google/{googlePlaceId}/details)
+func (_ Unimplemented) GetGooglePlaceDetails(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, googlePlaceId string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -2191,6 +2257,66 @@ func (siw *ServerInterfaceWrapper) CreateManualDayLodgingPlace(w http.ResponseWr
 	handler.ServeHTTP(w, r)
 }
 
+// GetGooglePlacePhoto operation middleware
+func (siw *ServerInterfaceWrapper) GetGooglePlacePhoto(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "tripDayId" -------------
+	var tripDayId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripDayId", chi.URLParam(r, "tripDayId"), &tripDayId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripDayId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "photoToken" -------------
+	var photoToken string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "photoToken", chi.URLParam(r, "photoToken"), &photoToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "photoToken", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetGooglePlacePhotoParams
+
+	// ------------- Optional query parameter "maxWidthPx" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "maxWidthPx", r.URL.Query(), &params.MaxWidthPx)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "maxWidthPx", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetGooglePlacePhoto(w, r, tripId, tripDayId, photoToken, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // CreateGooglePlaceScheduleItem operation middleware
 func (siw *ServerInterfaceWrapper) CreateGooglePlaceScheduleItem(w http.ResponseWriter, r *http.Request) {
 
@@ -2286,8 +2412,81 @@ func (siw *ServerInterfaceWrapper) SearchGooglePlaces(w http.ResponseWriter, r *
 		return
 	}
 
+	// ------------- Optional query parameter "latitude" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "latitude", r.URL.Query(), &params.Latitude)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "latitude", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "longitude" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "longitude", r.URL.Query(), &params.Longitude)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "longitude", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "radiusMeters" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "radiusMeters", r.URL.Query(), &params.RadiusMeters)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "radiusMeters", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.SearchGooglePlaces(w, r, tripId, tripDayId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetGooglePlaceDetails operation middleware
+func (siw *ServerInterfaceWrapper) GetGooglePlaceDetails(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "tripDayId" -------------
+	var tripDayId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripDayId", chi.URLParam(r, "tripDayId"), &tripDayId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripDayId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "googlePlaceId" -------------
+	var googlePlaceId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "googlePlaceId", chi.URLParam(r, "googlePlaceId"), &googlePlaceId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "googlePlaceId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetGooglePlaceDetails(w, r, tripId, tripDayId, googlePlaceId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3104,10 +3303,16 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/trips/{tripId}/days/{tripDayId}/lodging-place/manual", wrapper.CreateManualDayLodgingPlace)
 	})
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/trips/{tripId}/days/{tripDayId}/places/google/photos/{photoToken}", wrapper.GetGooglePlacePhoto)
+	})
+	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/trips/{tripId}/days/{tripDayId}/places/google/schedule-items", wrapper.CreateGooglePlaceScheduleItem)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/trips/{tripId}/days/{tripDayId}/places/google/search", wrapper.SearchGooglePlaces)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/trips/{tripId}/days/{tripDayId}/places/google/{googlePlaceId}/details", wrapper.GetGooglePlaceDetails)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/trips/{tripId}/days/{tripDayId}/schedule-items", wrapper.GetDayScheduleItems)

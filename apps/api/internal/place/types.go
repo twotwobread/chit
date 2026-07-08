@@ -42,20 +42,48 @@ type Repository interface {
 type Provider interface {
 	Search(ctx context.Context, input ProviderSearchInput) ([]SearchResult, error)
 	Details(ctx context.Context, input ProviderDetailsInput) (GooglePlaceDetails, error)
+	Description(ctx context.Context, input ProviderDescriptionInput) (GooglePlaceDescription, error)
+	Photo(ctx context.Context, input ProviderPhotoInput) (GooglePlacePhoto, error)
+}
+
+type SearchLocationBias struct {
+	Latitude     float64
+	Longitude    float64
+	RadiusMeters float64
 }
 
 type ProviderSearchInput struct {
-	Query string
-	Limit int
+	Query        string
+	Limit        int
+	LocationBias *SearchLocationBias
 }
 
 type ProviderDetailsInput struct {
 	GooglePlaceID string
 }
 
+type ProviderDescriptionInput struct {
+	GooglePlaceID string
+}
+
+type ProviderPhotoInput struct {
+	Name       string
+	MaxWidthPx int
+}
+
 type SearchInput struct {
-	Query string
-	Limit int
+	Query        string
+	Limit        int
+	LocationBias *SearchLocationBias
+}
+
+type SelectedDetailsInput struct {
+	GooglePlaceID string
+}
+
+type PhotoInput struct {
+	Token      string
+	MaxWidthPx int
 }
 
 type CreateGooglePlaceScheduleItemInput struct {
@@ -67,11 +95,42 @@ type CreateGooglePlaceScheduleItemInput struct {
 	Memo               *string
 }
 
+type PhotoAttribution struct {
+	DisplayName string
+	URI         string
+	PhotoURI    string
+}
+
+type SearchResultPhoto struct {
+	Name               string
+	Token              string
+	WidthPx            int
+	HeightPx           int
+	AuthorAttributions []PhotoAttribution
+}
+
 type SearchResult struct {
-	GooglePlaceID    string
-	DisplayName      string
-	FormattedAddress string
-	PrimaryType      string
+	GooglePlaceID          string
+	DisplayName            string
+	FormattedAddress       string
+	PrimaryType            string
+	PrimaryTypeDisplayName string
+	Latitude               float64
+	Longitude              float64
+	Rating                 *float64
+	UserRatingCount        *int
+	OpenNow                *bool
+	GoogleMapsURI          string
+	Photo                  *SearchResultPhoto
+}
+
+type GooglePlaceDescription struct {
+	GooglePlaceID string
+	Description   string
+}
+
+type GooglePlacePhoto struct {
+	URI string
 }
 
 type GooglePlaceDetails struct {

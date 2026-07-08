@@ -23,9 +23,18 @@ func (s apiServer) SearchGooglePlaces(w http.ResponseWriter, r *http.Request, tr
 	if params.Limit != nil {
 		limit = *params.Limit
 	}
+	var bias *place.SearchLocationBias
+	if params.Latitude != nil || params.Longitude != nil || params.RadiusMeters != nil {
+		if params.Latitude == nil || params.Longitude == nil || params.RadiusMeters == nil {
+			writePlaceSearchError(w, place.ErrValidation)
+			return
+		}
+		bias = &place.SearchLocationBias{Latitude: *params.Latitude, Longitude: *params.Longitude, RadiusMeters: *params.RadiusMeters}
+	}
 	results, err := s.places.SearchGoogle(r.Context(), authContext.UserID, tripId, tripDayId, place.SearchInput{
-		Query: params.Query,
-		Limit: limit,
+		Query:        params.Query,
+		Limit:        limit,
+		LocationBias: bias,
 	})
 	if err != nil {
 		writePlaceSearchError(w, err)
@@ -33,6 +42,51 @@ func (s apiServer) SearchGooglePlaces(w http.ResponseWriter, r *http.Request, tr
 	}
 
 	writeJSON(w, http.StatusOK, searchGooglePlacesResponseToOpenAPI(results))
+}
+
+func (s apiServer) GetGooglePlaceDetails(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, googlePlaceId string) {
+	if s.auth == nil || s.places == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "place details are not configured", nil)
+		return
+	}
+
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	result, err := s.places.GetGooglePlaceDetails(r.Context(), authContext.UserID, tripId, tripDayId, place.SelectedDetailsInput{GooglePlaceID: googlePlaceId})
+	if err != nil {
+		writePlaceSearchError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, googlePlaceDetailsResponseToOpenAPI(result))
+}
+
+func (s apiServer) GetGooglePlacePhoto(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, photoToken string, params openapi.GetGooglePlacePhotoParams) {
+	if s.auth == nil || s.places == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "place photo proxy is not configured", nil)
+		return
+	}
+
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	maxWidthPx := 320
+	if params.MaxWidthPx != nil {
+		maxWidthPx = *params.MaxWidthPx
+	}
+	photo, err := s.places.GetGooglePlacePhoto(r.Context(), authContext.UserID, tripId, tripDayId, place.PhotoInput{Token: photoToken, MaxWidthPx: maxWidthPx})
+	if err != nil {
+		writePlaceSearchError(w, err)
+		return
+	}
+
+	w.Header().Set("Cache-Control", "no-store")
+	http.Redirect(w, r, photo.URI, http.StatusFound)
 }
 
 func (s apiServer) CreateGooglePlaceScheduleItem(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string) {

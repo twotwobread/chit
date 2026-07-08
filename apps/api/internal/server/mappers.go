@@ -449,14 +449,68 @@ func geoPointToOpenAPI(point route.GeoPoint) openapi.GeoPoint {
 func searchGooglePlacesResponseToOpenAPI(results []place.SearchResult) openapi.SearchGooglePlacesResponse {
 	items := make([]openapi.GooglePlaceSearchResult, 0, len(results))
 	for _, result := range results {
-		items = append(items, openapi.GooglePlaceSearchResult{
+		item := openapi.GooglePlaceSearchResult{
 			GooglePlaceId:    result.GooglePlaceID,
 			DisplayName:      result.DisplayName,
 			FormattedAddress: result.FormattedAddress,
 			PrimaryType:      result.PrimaryType,
-		})
+			Latitude:         result.Latitude,
+			Longitude:        result.Longitude,
+			Rating:           result.Rating,
+			UserRatingCount:  result.UserRatingCount,
+			OpenNow:          result.OpenNow,
+		}
+		if result.PrimaryTypeDisplayName != "" {
+			item.PrimaryTypeDisplayName = &result.PrimaryTypeDisplayName
+		}
+		if result.GoogleMapsURI != "" {
+			item.GoogleMapsUri = &result.GoogleMapsURI
+		}
+		if result.Photo != nil {
+			item.Photo = searchPhotoToOpenAPI(*result.Photo)
+		}
+		items = append(items, item)
 	}
 	return openapi.SearchGooglePlacesResponse{Results: items}
+}
+
+func searchPhotoToOpenAPI(photo place.SearchResultPhoto) *openapi.GooglePlaceSearchPhoto {
+	token := photo.Token
+	if token == "" {
+		token = photo.Name
+	}
+	if token == "" {
+		return nil
+	}
+	mapped := openapi.GooglePlaceSearchPhoto{
+		Token:              token,
+		AuthorAttributions: make([]openapi.GooglePlacePhotoAttribution, 0, len(photo.AuthorAttributions)),
+	}
+	if photo.WidthPx > 0 {
+		mapped.WidthPx = &photo.WidthPx
+	}
+	if photo.HeightPx > 0 {
+		mapped.HeightPx = &photo.HeightPx
+	}
+	for _, attribution := range photo.AuthorAttributions {
+		item := openapi.GooglePlacePhotoAttribution{DisplayName: attribution.DisplayName}
+		if attribution.URI != "" {
+			item.Uri = &attribution.URI
+		}
+		if attribution.PhotoURI != "" {
+			item.PhotoUri = &attribution.PhotoURI
+		}
+		mapped.AuthorAttributions = append(mapped.AuthorAttributions, item)
+	}
+	return &mapped
+}
+
+func googlePlaceDetailsResponseToOpenAPI(result place.GooglePlaceDescription) openapi.GooglePlaceDetailsResponse {
+	mapped := openapi.GooglePlaceDetailsResponse{GooglePlaceId: result.GooglePlaceID}
+	if result.Description != "" {
+		mapped.Description = &result.Description
+	}
+	return mapped
 }
 
 func dayScheduleItemToOpenAPI(item trip.ScheduleItem) openapi.ScheduleItem {

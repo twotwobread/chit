@@ -59,7 +59,7 @@ func NewRouterWithConfig(readiness readinessChecker, config Config) http.Handler
 		if provider == nil {
 			provider = place.NewGoogleProvider(config.GooglePlacesAPIKey)
 		}
-		placeService = place.NewService(repo, provider)
+		placeService = place.NewService(repo, provider, place.WithPhotoTokenSecret(firstNonEmpty(config.GooglePlacesPhotoTokenSecret, config.AuthTokenSecret)))
 	}
 
 	var routeService *route.Service

@@ -3409,6 +3409,161 @@ func TestSearchGooglePlacesHandlerReturnsResults(t *testing.T) {
 	}
 }
 
+func TestSearchGooglePlacesHandlerReturnsMapMetadataAndPhotoToken(t *testing.T) {
+	backend := newFakeAuthBackend()
+	accessToken := loginTestUser(t, backend)
+	tripID := createTestTrip(t, backend, accessToken)
+	rating := 4.5
+	reviewCount := 12304
+	openNow := true
+	provider := &fakePlaceProvider{results: []placedomain.SearchResult{{
+		GooglePlaceID:          "google-1",
+		DisplayName:            "우메다 스카이 빌딩",
+		FormattedAddress:       "Osaka",
+		PrimaryType:            "tourist_attraction",
+		PrimaryTypeDisplayName: "관광명소",
+		Latitude:               34.7053,
+		Longitude:              135.4905,
+		Rating:                 &rating,
+		UserRatingCount:        &reviewCount,
+		OpenNow:                &openNow,
+		GoogleMapsURI:          "https://maps.google.com/?cid=1",
+		Photo: &placedomain.SearchResultPhoto{
+			Name:     "places/google-1/photos/photo-1",
+			WidthPx:  600,
+			HeightPx: 400,
+			AuthorAttributions: []placedomain.PhotoAttribution{{
+				DisplayName: "Google User",
+				URI:         "https://maps.google.com/contrib/1",
+			}},
+		},
+	}}}
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/trips/"+tripID+"/days/2026-07-11/places/google/search?query=%EC%9A%B0%EB%A9%94%EB%8B%A4&latitude=34.7&longitude=135.5&radiusMeters=1200", nil)
+	request.Header.Set("Authorization", "Bearer "+accessToken)
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true, PlaceProvider: provider}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusOK, recorder.Code, recorder.Body.String())
+	}
+	if provider.input.Limit != 10 || provider.input.LocationBias == nil || provider.input.LocationBias.Latitude != 34.7 || provider.input.LocationBias.Longitude != 135.5 || provider.input.LocationBias.RadiusMeters != 1200 {
+		t.Fatalf("expected default limit and location bias, got %#v", provider.input)
+	}
+	var body struct {
+		Results []struct {
+			GooglePlaceID          string   `json:"googlePlaceId"`
+			DisplayName            string   `json:"displayName"`
+			FormattedAddress       string   `json:"formattedAddress"`
+			PrimaryType            string   `json:"primaryType"`
+			PrimaryTypeDisplayName string   `json:"primaryTypeDisplayName"`
+			Latitude               float64  `json:"latitude"`
+			Longitude              float64  `json:"longitude"`
+			Rating                 *float64 `json:"rating"`
+			UserRatingCount        *int     `json:"userRatingCount"`
+			OpenNow                *bool    `json:"openNow"`
+			GoogleMapsURI          string   `json:"googleMapsUri"`
+			Photo                  *struct {
+				Token              string `json:"token"`
+				WidthPx            int    `json:"widthPx"`
+				HeightPx           int    `json:"heightPx"`
+				AuthorAttributions []struct {
+					DisplayName string `json:"displayName"`
+					URI         string `json:"uri"`
+				} `json:"authorAttributions"`
+			} `json:"photo"`
+		} `json:"results"`
+	}
+	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(body.Results) != 1 {
+		t.Fatalf("expected one result, got %#v", body.Results)
+	}
+	result := body.Results[0]
+	if result.PrimaryTypeDisplayName != "관광명소" || result.Latitude != 34.7053 || result.Longitude != 135.4905 || result.Rating == nil || *result.Rating != 4.5 || result.UserRatingCount == nil || *result.UserRatingCount != 12304 || result.OpenNow == nil || !*result.OpenNow || result.GoogleMapsURI == "" {
+		t.Fatalf("expected rich metadata, got %#v", result)
+	}
+	if result.Photo == nil || result.Photo.Token == "" || strings.Contains(result.Photo.Token, "places/") || len(result.Photo.AuthorAttributions) != 1 || result.Photo.AuthorAttributions[0].DisplayName != "Google User" {
+		t.Fatalf("expected signed photo token and attribution, got %#v", result.Photo)
+	}
+}
+
+func TestGooglePlaceDetailsAndPhotoHandlers(t *testing.T) {
+	backend := newFakeAuthBackend()
+	accessToken := loginTestUser(t, backend)
+	tripID := createTestTrip(t, backend, accessToken)
+	provider := &fakePlaceProvider{
+		description: placedomain.GooglePlaceDescription{GooglePlaceID: "google-1", Description: "공중정원 전망대로 유명한 오사카 대표 명소입니다."},
+		photo:       placedomain.GooglePlacePhoto{URI: "https://lh3.googleusercontent.com/photo"},
+		results: []placedomain.SearchResult{{
+			GooglePlaceID:    "google-1",
+			DisplayName:      "우메다 스카이 빌딩",
+			FormattedAddress: "Osaka",
+			PrimaryType:      "tourist_attraction",
+			Latitude:         34.7053,
+			Longitude:        135.4905,
+			Photo:            &placedomain.SearchResultPhoto{Name: "places/google-1/photos/photo-1"},
+		}},
+	}
+	router := NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true, PlaceProvider: provider})
+
+	detailRecorder := httptest.NewRecorder()
+	detailRequest := httptest.NewRequest(http.MethodGet, "/trips/"+tripID+"/days/2026-07-11/places/google/google-1/details", nil)
+	detailRequest.Header.Set("Authorization", "Bearer "+accessToken)
+	router.ServeHTTP(detailRecorder, detailRequest)
+	if detailRecorder.Code != http.StatusOK {
+		t.Fatalf("expected details status %d, got %d with body %s", http.StatusOK, detailRecorder.Code, detailRecorder.Body.String())
+	}
+	if !provider.descriptionCalled || provider.descriptionInput.GooglePlaceID != "google-1" {
+		t.Fatalf("expected selected details provider call, got called=%v input=%#v", provider.descriptionCalled, provider.descriptionInput)
+	}
+	var detailBody struct {
+		GooglePlaceID string `json:"googlePlaceId"`
+		Description   string `json:"description"`
+	}
+	if err := json.NewDecoder(detailRecorder.Body).Decode(&detailBody); err != nil {
+		t.Fatalf("decode details response: %v", err)
+	}
+	if detailBody.Description != "공중정원 전망대로 유명한 오사카 대표 명소입니다." {
+		t.Fatalf("unexpected details body %#v", detailBody)
+	}
+
+	searchRecorder := httptest.NewRecorder()
+	searchRequest := httptest.NewRequest(http.MethodGet, "/trips/"+tripID+"/days/2026-07-11/places/google/search?query=%EC%9A%B0%EB%A9%94%EB%8B%A4", nil)
+	searchRequest.Header.Set("Authorization", "Bearer "+accessToken)
+	router.ServeHTTP(searchRecorder, searchRequest)
+	if searchRecorder.Code != http.StatusOK {
+		t.Fatalf("expected search status %d, got %d with body %s", http.StatusOK, searchRecorder.Code, searchRecorder.Body.String())
+	}
+	var searchBody struct {
+		Results []struct {
+			Photo *struct {
+				Token string `json:"token"`
+			} `json:"photo"`
+		} `json:"results"`
+	}
+	if err := json.NewDecoder(searchRecorder.Body).Decode(&searchBody); err != nil {
+		t.Fatalf("decode search response: %v", err)
+	}
+	photoToken := searchBody.Results[0].Photo.Token
+
+	photoRecorder := httptest.NewRecorder()
+	photoRequest := httptest.NewRequest(http.MethodGet, "/trips/"+tripID+"/days/2026-07-11/places/google/photos/"+photoToken+"?maxWidthPx=240", nil)
+	photoRequest.Header.Set("Authorization", "Bearer "+accessToken)
+	router.ServeHTTP(photoRecorder, photoRequest)
+	if photoRecorder.Code != http.StatusFound {
+		t.Fatalf("expected photo status %d, got %d with body %s", http.StatusFound, photoRecorder.Code, photoRecorder.Body.String())
+	}
+	if provider.photoInput.Name != "places/google-1/photos/photo-1" || provider.photoInput.MaxWidthPx != 240 {
+		t.Fatalf("expected photo provider input to restore raw photo name, got %#v", provider.photoInput)
+	}
+	if photoRecorder.Header().Get("Location") != "https://lh3.googleusercontent.com/photo" || photoRecorder.Header().Get("Cache-Control") != "no-store" {
+		t.Fatalf("expected redirect with no-store headers, got location=%q cache=%q", photoRecorder.Header().Get("Location"), photoRecorder.Header().Get("Cache-Control"))
+	}
+}
+
 func TestSearchGooglePlacesRequiresAuth(t *testing.T) {
 	backend := newFakeAuthBackend()
 	recorder := httptest.NewRecorder()
@@ -3672,9 +3827,9 @@ func TestCreateGooglePlaceScheduleItemValidationAuthAndProviderErrors(t *testing
 		expectCode int
 		expectErr  string
 	}{
-		{name: "requires auth", path: "/trips/" + tripID + "/days/2026-07-10/places/google/schedule-items", token: "", body: `{"googlePlaceId":"google-1","duplicateConfirmed":false}`, provider: &fakePlaceProvider{}, expectCode: http.StatusUnauthorized, expectErr: "UNAUTHORIZED"},
-		{name: "invalid trip id", path: "/trips/not-a-uuid/days/2026-07-10/places/google/schedule-items", token: accessToken, body: `{"googlePlaceId":"google-1","duplicateConfirmed":false}`, provider: &fakePlaceProvider{}, expectCode: http.StatusBadRequest, expectErr: "VALIDATION_ERROR"},
-		{name: "blank google place id", path: "/trips/" + tripID + "/days/2026-07-10/places/google/schedule-items", token: accessToken, body: `{"googlePlaceId":" ","duplicateConfirmed":false}`, provider: &fakePlaceProvider{}, expectCode: http.StatusBadRequest, expectErr: "VALIDATION_ERROR"},
+		{name: "requires auth", path: "/trips/" + tripID + "/days/2026-07-10/places/google/schedule-items", token: "", body: `{"googlePlaceId":"google-1","duplicateConfirmed":false,"title":"도톤보리"}`, provider: &fakePlaceProvider{}, expectCode: http.StatusUnauthorized, expectErr: "UNAUTHORIZED"},
+		{name: "invalid trip id", path: "/trips/not-a-uuid/days/2026-07-10/places/google/schedule-items", token: accessToken, body: `{"googlePlaceId":"google-1","duplicateConfirmed":false,"title":"도톤보리"}`, provider: &fakePlaceProvider{}, expectCode: http.StatusBadRequest, expectErr: "VALIDATION_ERROR"},
+		{name: "blank google place id", path: "/trips/" + tripID + "/days/2026-07-10/places/google/schedule-items", token: accessToken, body: `{"googlePlaceId":" ","duplicateConfirmed":false,"title":"도톤보리"}`, provider: &fakePlaceProvider{}, expectCode: http.StatusBadRequest, expectErr: "VALIDATION_ERROR"},
 		{name: "out of range", path: "/trips/" + tripID + "/days/2026-07-14/places/google/schedule-items", token: accessToken, body: `{"googlePlaceId":"google-1","duplicateConfirmed":false,"title":"도톤보리"}`, provider: &fakePlaceProvider{}, expectCode: http.StatusNotFound, expectErr: "NOT_FOUND"},
 		{name: "forbidden", path: "/trips/" + tripID + "/days/2026-07-10/places/google/schedule-items", token: nonParticipantToken, body: `{"googlePlaceId":"google-1","duplicateConfirmed":false,"title":"도톤보리"}`, provider: &fakePlaceProvider{}, expectCode: http.StatusForbidden, expectErr: "FORBIDDEN"},
 		{name: "provider unavailable", path: "/trips/" + tripID + "/days/2026-07-10/places/google/schedule-items", token: accessToken, body: `{"googlePlaceId":"google-1","duplicateConfirmed":false,"title":"도톤보리"}`, provider: &fakePlaceProvider{detailsErr: placedomain.ErrProviderUnavailable}, expectCode: http.StatusBadGateway, expectErr: "PLACE_PROVIDER_UNAVAILABLE"},
@@ -3723,6 +3878,7 @@ func TestCreateRoutePreviewHandler(t *testing.T) {
 		Latitude:           34.6687,
 		Longitude:          135.5013,
 		DuplicateConfirmed: true,
+		Title:              "도톤보리",
 	})
 	if err != nil {
 		t.Fatalf("create google schedule fixture: %v", err)
@@ -5542,14 +5698,22 @@ func (b *fakeAuthBackend) ListTripsByParticipantUser(_ context.Context, userID s
 }
 
 type fakePlaceProvider struct {
-	called        bool
-	input         placedomain.ProviderSearchInput
-	results       []placedomain.SearchResult
-	err           error
-	detailsCalled bool
-	detailsInput  placedomain.ProviderDetailsInput
-	details       placedomain.GooglePlaceDetails
-	detailsErr    error
+	called            bool
+	input             placedomain.ProviderSearchInput
+	results           []placedomain.SearchResult
+	err               error
+	detailsCalled     bool
+	detailsInput      placedomain.ProviderDetailsInput
+	details           placedomain.GooglePlaceDetails
+	detailsErr        error
+	descriptionCalled bool
+	descriptionInput  placedomain.ProviderDescriptionInput
+	description       placedomain.GooglePlaceDescription
+	descriptionErr    error
+	photoCalled       bool
+	photoInput        placedomain.ProviderPhotoInput
+	photo             placedomain.GooglePlacePhoto
+	photoErr          error
 }
 
 func (p *fakePlaceProvider) Search(_ context.Context, input placedomain.ProviderSearchInput) ([]placedomain.SearchResult, error) {
@@ -5562,6 +5726,18 @@ func (p *fakePlaceProvider) Details(_ context.Context, input placedomain.Provide
 	p.detailsCalled = true
 	p.detailsInput = input
 	return p.details, p.detailsErr
+}
+
+func (p *fakePlaceProvider) Description(_ context.Context, input placedomain.ProviderDescriptionInput) (placedomain.GooglePlaceDescription, error) {
+	p.descriptionCalled = true
+	p.descriptionInput = input
+	return p.description, p.descriptionErr
+}
+
+func (p *fakePlaceProvider) Photo(_ context.Context, input placedomain.ProviderPhotoInput) (placedomain.GooglePlacePhoto, error) {
+	p.photoCalled = true
+	p.photoInput = input
+	return p.photo, p.photoErr
 }
 
 type fakeRouteProvider struct {
