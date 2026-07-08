@@ -36,6 +36,9 @@ crash.*.log
 .harness/runs/*
 !.harness/runs/.gitkeep
 
+# Local brainstorming mockups
+.superpowers/
+
 # Logs
 *.log
 .pi/harness-audit/
