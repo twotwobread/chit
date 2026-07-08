@@ -1852,7 +1852,34 @@ paths:
             type: integer
             minimum: 1
             maximum: 10
-            default: 5
+            default: 10
+        - name: latitude
+          in: query
+          required: false
+          description: Map center latitude used as a Google Text Search location bias.
+          schema:
+            type: number
+            format: double
+            minimum: -90
+            maximum: 90
+        - name: longitude
+          in: query
+          required: false
+          description: Map center longitude used as a Google Text Search location bias.
+          schema:
+            type: number
+            format: double
+            minimum: -180
+            maximum: 180
+        - name: radiusMeters
+          in: query
+          required: false
+          description: Search bias radius in meters. Requires latitude and longitude when provided.
+          schema:
+            type: number
+            format: double
+            minimum: 1
+            maximum: 50000
       responses:
         '200':
           description: Google Places search results.
@@ -1880,6 +1907,158 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Trip or trip day not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Google Places provider rate limited.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Google Places provider unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /trips/{tripId}/days/{tripDayId}/places/google/{googlePlaceId}/details:
+    get:
+      operationId: getGooglePlaceDetails
+      summary: Get selected Google Place details
+      description: Returns selected-only display details for an authenticated trip participant and in-range virtual trip day. Used after a user focuses a search result.
+      tags:
+        - Places
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: tripDayId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: googlePlaceId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Selected Google Place details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GooglePlaceDetailsResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip, trip day, or Google place not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Google Places provider rate limited.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Google Places provider unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /trips/{tripId}/days/{tripDayId}/places/google/photos/{photoToken}:
+    get:
+      operationId: getGooglePlacePhoto
+      summary: Resolve a selected Google Place photo
+      description: Validates a short-lived server-issued Google Place photo token and redirects to the provider photo URI for an authenticated trip participant.
+      tags:
+        - Places
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: tripDayId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: photoToken
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: maxWidthPx
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 640
+            default: 320
+      responses:
+        '302':
+          description: Redirects to a short-lived provider photo URI.
+        '400':
+          description: Validation error or invalid photo token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip, trip day, or photo not found.
           content:
             application/json:
               schema:
@@ -3495,6 +3674,39 @@ components:
       properties:
         scheduleItem:
           $ref: '#/components/schemas/ScheduleItem'
+    GooglePlacePhotoAttribution:
+      type: object
+      required:
+        - displayName
+      properties:
+        displayName:
+          type: string
+          example: Google User
+        uri:
+          type: string
+          format: uri
+        photoUri:
+          type: string
+          format: uri
+    GooglePlaceSearchPhoto:
+      type: object
+      required:
+        - token
+        - authorAttributions
+      properties:
+        token:
+          type: string
+          description: Short-lived server-issued token for the photo proxy endpoint. Clients must not persist it.
+        widthPx:
+          type: integer
+          minimum: 1
+        heightPx:
+          type: integer
+          minimum: 1
+        authorAttributions:
+          type: array
+          items:
+            $ref: '#/components/schemas/GooglePlacePhotoAttribution'
     GooglePlaceSearchResult:
       type: object
       required:
@@ -3502,6 +3714,8 @@ components:
         - displayName
         - formattedAddress
         - primaryType
+        - latitude
+        - longitude
       properties:
         googlePlaceId:
           type: string
@@ -3515,6 +3729,49 @@ components:
         primaryType:
           type: string
           example: tourist_attraction
+        primaryTypeDisplayName:
+          type: string
+          example: 관광명소
+        latitude:
+          type: number
+          format: double
+          minimum: -90
+          maximum: 90
+          example: 34.6687
+        longitude:
+          type: number
+          format: double
+          minimum: -180
+          maximum: 180
+          example: 135.5013
+        rating:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 5
+          example: 4.5
+        userRatingCount:
+          type: integer
+          minimum: 0
+          example: 12304
+        openNow:
+          type: boolean
+          description: Current opening-hours status when returned by Google Places.
+        googleMapsUri:
+          type: string
+          format: uri
+        photo:
+          $ref: '#/components/schemas/GooglePlaceSearchPhoto'
+    GooglePlaceDetailsResponse:
+      type: object
+      required:
+        - googlePlaceId
+      properties:
+        googlePlaceId:
+          type: string
+        description:
+          type: string
+          description: Selected-only provider summary when available.
     SearchGooglePlacesResponse:
       type: object
       required:

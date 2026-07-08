@@ -36,6 +36,48 @@ func TestServiceSearchGoogle(t *testing.T) {
 	}
 }
 
+func TestServiceSearchGoogleSignsRepresentativePhotoTokens(t *testing.T) {
+	repo := &fakeRepository{
+		trip:          trip.Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"},
+		tripFound:     true,
+		isParticipant: true,
+	}
+	provider := &fakeProvider{results: []SearchResult{{
+		GooglePlaceID:    "google-1",
+		DisplayName:      "도톤보리",
+		FormattedAddress: "Osaka",
+		PrimaryType:      "tourist_attraction",
+		Latitude:         34.6687,
+		Longitude:        135.5013,
+		Photo:            &SearchResultPhoto{Name: "places/google-1/photos/photo-1"},
+	}}}
+	service := NewService(repo, provider, WithPhotoTokenSecret("test-photo-secret"))
+
+	results, err := service.SearchGoogle(context.Background(), "user-1", testTripID, "2026-07-11", SearchInput{Query: "도톤보리"})
+	if err != nil {
+		t.Fatalf("SearchGoogle returned error: %v", err)
+	}
+	if results[0].Photo == nil || results[0].Photo.Token == "" {
+		t.Fatalf("expected signed photo token, got %#v", results[0].Photo)
+	}
+	if strings.Contains(results[0].Photo.Token, "places/") {
+		t.Fatalf("expected token not to expose raw Google photo name, got %q", results[0].Photo.Token)
+	}
+
+	photoProvider := &fakeProvider{photo: GooglePlacePhoto{URI: "https://lh3.googleusercontent.com/photo"}}
+	photoService := NewService(repo, photoProvider, WithPhotoTokenSecret("test-photo-secret"))
+	photo, err := photoService.GetGooglePlacePhoto(context.Background(), "user-1", testTripID, "2026-07-11", PhotoInput{Token: results[0].Photo.Token, MaxWidthPx: 320})
+	if err != nil {
+		t.Fatalf("GetGooglePlacePhoto returned error: %v", err)
+	}
+	if photo.URI != "https://lh3.googleusercontent.com/photo" {
+		t.Fatalf("unexpected photo %#v", photo)
+	}
+	if photoProvider.photoInput.Name != "places/google-1/photos/photo-1" || photoProvider.photoInput.MaxWidthPx != 320 {
+		t.Fatalf("expected provider photo input to restore signed photo name, got %#v", photoProvider.photoInput)
+	}
+}
+
 func TestServiceSearchGoogleValidation(t *testing.T) {
 	validRepo := &fakeRepository{trip: trip.Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"}, tripFound: true, isParticipant: true}
 	tests := []struct {
@@ -339,6 +381,10 @@ type fakeProvider struct {
 	detailsInput  ProviderDetailsInput
 	details       GooglePlaceDetails
 	detailsErr    error
+	photoCalled   bool
+	photoInput    ProviderPhotoInput
+	photo         GooglePlacePhoto
+	photoErr      error
 }
 
 func (p *fakeProvider) Search(_ context.Context, input ProviderSearchInput) ([]SearchResult, error) {
@@ -351,4 +397,14 @@ func (p *fakeProvider) Details(_ context.Context, input ProviderDetailsInput) (G
 	p.detailsCalled = true
 	p.detailsInput = input
 	return p.details, p.detailsErr
+}
+
+func (p *fakeProvider) Description(_ context.Context, input ProviderDescriptionInput) (GooglePlaceDescription, error) {
+	return GooglePlaceDescription{GooglePlaceID: input.GooglePlaceID}, nil
+}
+
+func (p *fakeProvider) Photo(_ context.Context, input ProviderPhotoInput) (GooglePlacePhoto, error) {
+	p.photoCalled = true
+	p.photoInput = input
+	return p.photo, p.photoErr
 }

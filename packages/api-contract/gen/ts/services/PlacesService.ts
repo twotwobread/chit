@@ -4,6 +4,7 @@
 /* eslint-disable */
 import type { CreateGooglePlaceScheduleItemRequest } from '../models/CreateGooglePlaceScheduleItemRequest';
 import type { CreateGooglePlaceScheduleItemResponse } from '../models/CreateGooglePlaceScheduleItemResponse';
+import type { GooglePlaceDetailsResponse } from '../models/GooglePlaceDetailsResponse';
 import type { SearchGooglePlacesResponse } from '../models/SearchGooglePlacesResponse';
 import type { CancelablePromise } from '../core/CancelablePromise';
 import { OpenAPI } from '../core/OpenAPI';
@@ -16,6 +17,9 @@ export class PlacesService {
      * @param tripDayId
      * @param query
      * @param limit
+     * @param latitude Map center latitude used as a Google Text Search location bias.
+     * @param longitude Map center longitude used as a Google Text Search location bias.
+     * @param radiusMeters Search bias radius in meters. Requires latitude and longitude when provided.
      * @returns SearchGooglePlacesResponse Google Places search results.
      * @throws ApiError
      */
@@ -23,7 +27,10 @@ export class PlacesService {
         tripId: string,
         tripDayId: string,
         query: string,
-        limit: number = 5,
+        limit: number = 10,
+        latitude?: number,
+        longitude?: number,
+        radiusMeters?: number,
     ): CancelablePromise<SearchGooglePlacesResponse> {
         return __request(OpenAPI, {
             method: 'GET',
@@ -35,12 +42,87 @@ export class PlacesService {
             query: {
                 'query': query,
                 'limit': limit,
+                'latitude': latitude,
+                'longitude': longitude,
+                'radiusMeters': radiusMeters,
             },
             errors: {
                 400: `Validation error.`,
                 401: `Unauthorized.`,
                 403: `Forbidden.`,
                 404: `Trip or trip day not found.`,
+                429: `Google Places provider rate limited.`,
+                500: `Unexpected server error.`,
+                502: `Google Places provider unavailable.`,
+            },
+        });
+    }
+    /**
+     * Get selected Google Place details
+     * Returns selected-only display details for an authenticated trip participant and in-range virtual trip day. Used after a user focuses a search result.
+     * @param tripId
+     * @param tripDayId
+     * @param googlePlaceId
+     * @returns GooglePlaceDetailsResponse Selected Google Place details.
+     * @throws ApiError
+     */
+    public static getGooglePlaceDetails(
+        tripId: string,
+        tripDayId: string,
+        googlePlaceId: string,
+    ): CancelablePromise<GooglePlaceDetailsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/trips/{tripId}/days/{tripDayId}/places/google/{googlePlaceId}/details',
+            path: {
+                'tripId': tripId,
+                'tripDayId': tripDayId,
+                'googlePlaceId': googlePlaceId,
+            },
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                403: `Forbidden.`,
+                404: `Trip, trip day, or Google place not found.`,
+                429: `Google Places provider rate limited.`,
+                500: `Unexpected server error.`,
+                502: `Google Places provider unavailable.`,
+            },
+        });
+    }
+    /**
+     * Resolve a selected Google Place photo
+     * Validates a short-lived server-issued Google Place photo token and redirects to the provider photo URI for an authenticated trip participant.
+     * @param tripId
+     * @param tripDayId
+     * @param photoToken
+     * @param maxWidthPx
+     * @returns void
+     * @throws ApiError
+     */
+    public static getGooglePlacePhoto(
+        tripId: string,
+        tripDayId: string,
+        photoToken: string,
+        maxWidthPx: number = 320,
+    ): CancelablePromise<void> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/trips/{tripId}/days/{tripDayId}/places/google/photos/{photoToken}',
+            path: {
+                'tripId': tripId,
+                'tripDayId': tripDayId,
+                'photoToken': photoToken,
+            },
+            query: {
+                'maxWidthPx': maxWidthPx,
+            },
+            errors: {
+                302: `Redirects to a short-lived provider photo URI.`,
+                400: `Validation error or invalid photo token.`,
+                401: `Unauthorized.`,
+                403: `Forbidden.`,
+                404: `Trip, trip day, or photo not found.`,
                 429: `Google Places provider rate limited.`,
                 500: `Unexpected server error.`,
                 502: `Google Places provider unavailable.`,

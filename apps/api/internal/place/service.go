@@ -2,6 +2,10 @@ package place
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/json"
 	"strings"
 	"time"
 
@@ -11,7 +15,7 @@ import (
 
 const (
 	dateLayout          = "2006-01-02"
-	defaultLimit        = 5
+	defaultLimit        = 10
 	maxLimit            = 10
 	maxQueryLen         = 120
 	maxGooglePlaceIDLen = 255
@@ -22,12 +26,34 @@ const (
 )
 
 type Service struct {
-	repo     Repository
-	provider Provider
+	repo             Repository
+	provider         Provider
+	photoTokenSecret []byte
+	now              func() time.Time
 }
 
-func NewService(repo Repository, provider Provider) *Service {
-	return &Service{repo: repo, provider: provider}
+type Option func(*Service)
+
+func WithPhotoTokenSecret(secret string) Option {
+	return func(s *Service) {
+		trimmed := strings.TrimSpace(secret)
+		if trimmed != "" {
+			s.photoTokenSecret = []byte(trimmed)
+		}
+	}
+}
+
+func NewService(repo Repository, provider Provider, options ...Option) *Service {
+	service := &Service{
+		repo:             repo,
+		provider:         provider,
+		photoTokenSecret: []byte("i-um-place-photo-token-dev-secret"),
+		now:              time.Now,
+	}
+	for _, option := range options {
+		option(service)
+	}
+	return service
 }
 
 func (s *Service) SearchGoogle(ctx context.Context, userID string, tripID string, tripDayID string, input SearchInput) ([]SearchResult, error) {
@@ -62,6 +88,9 @@ func (s *Service) SearchGoogle(ctx context.Context, userID string, tripID string
 	if limit < 1 || limit > maxLimit {
 		return nil, ErrValidation
 	}
+	if input.LocationBias != nil && !validLocationBias(*input.LocationBias) {
+		return nil, ErrValidation
+	}
 
 	if _, err := s.validateTripDayParticipant(ctx, userID, tripID, tripDayID); err != nil {
 		return nil, err
@@ -71,7 +100,77 @@ func (s *Service) SearchGoogle(ctx context.Context, userID string, tripID string
 		return nil, ErrProviderUnavailable
 	}
 
-	return s.provider.Search(ctx, ProviderSearchInput{Query: query, Limit: limit})
+	results, err := s.provider.Search(ctx, ProviderSearchInput{Query: query, Limit: limit, LocationBias: input.LocationBias})
+	if err != nil {
+		return nil, err
+	}
+	for index := range results {
+		if results[index].Photo == nil || strings.TrimSpace(results[index].Photo.Name) == "" {
+			continue
+		}
+		results[index].Photo.Token = s.signPhotoToken(tripID, tripDayID, results[index].Photo.Name)
+	}
+	return results, nil
+}
+
+func (s *Service) GetGooglePlaceDetails(ctx context.Context, userID string, tripID string, tripDayID string, input SelectedDetailsInput) (GooglePlaceDescription, error) {
+	if strings.TrimSpace(userID) == "" {
+		return GooglePlaceDescription{}, ErrUnauthorized
+	}
+	if s == nil || s.repo == nil {
+		return GooglePlaceDescription{}, ErrProviderUnavailable
+	}
+	tripID = strings.TrimSpace(tripID)
+	tripDayID = strings.TrimSpace(tripDayID)
+	if _, err := uuid.Parse(tripID); err != nil {
+		return GooglePlaceDescription{}, ErrValidation
+	}
+	if _, err := uuid.Parse(tripDayID); err != nil {
+		if _, parseErr := time.Parse(dateLayout, tripDayID); parseErr != nil {
+			return GooglePlaceDescription{}, ErrValidation
+		}
+	}
+	googlePlaceID := strings.TrimSpace(input.GooglePlaceID)
+	if len([]rune(googlePlaceID)) < 1 || len([]rune(googlePlaceID)) > maxGooglePlaceIDLen {
+		return GooglePlaceDescription{}, ErrValidation
+	}
+	if _, err := s.validateTripDayParticipant(ctx, userID, tripID, tripDayID); err != nil {
+		return GooglePlaceDescription{}, err
+	}
+	if s.provider == nil {
+		return GooglePlaceDescription{}, ErrProviderUnavailable
+	}
+	return s.provider.Description(ctx, ProviderDescriptionInput{GooglePlaceID: googlePlaceID})
+}
+
+func (s *Service) GetGooglePlacePhoto(ctx context.Context, userID string, tripID string, tripDayID string, input PhotoInput) (GooglePlacePhoto, error) {
+	if strings.TrimSpace(userID) == "" {
+		return GooglePlacePhoto{}, ErrUnauthorized
+	}
+	if s == nil || s.repo == nil {
+		return GooglePlacePhoto{}, ErrProviderUnavailable
+	}
+	tripID = strings.TrimSpace(tripID)
+	tripDayID = strings.TrimSpace(tripDayID)
+	if _, err := uuid.Parse(tripID); err != nil {
+		return GooglePlacePhoto{}, ErrValidation
+	}
+	if _, err := uuid.Parse(tripDayID); err != nil {
+		if _, parseErr := time.Parse(dateLayout, tripDayID); parseErr != nil {
+			return GooglePlacePhoto{}, ErrValidation
+		}
+	}
+	name, err := s.verifyPhotoToken(tripID, tripDayID, input.Token)
+	if err != nil || input.MaxWidthPx < 1 || input.MaxWidthPx > 640 {
+		return GooglePlacePhoto{}, ErrValidation
+	}
+	if _, err := s.validateTripDayParticipant(ctx, userID, tripID, tripDayID); err != nil {
+		return GooglePlacePhoto{}, err
+	}
+	if s.provider == nil {
+		return GooglePlacePhoto{}, ErrProviderUnavailable
+	}
+	return s.provider.Photo(ctx, ProviderPhotoInput{Name: name, MaxWidthPx: input.MaxWidthPx})
 }
 
 func (s *Service) CreateGooglePlaceScheduleItem(ctx context.Context, userID string, tripID string, tripDayID string, input CreateGooglePlaceScheduleItemInput) (CreateGooglePlaceScheduleItemResult, error) {
@@ -307,6 +406,66 @@ func normalizeGoogleTypes(values []string) []string {
 		result = append(result, normalized)
 	}
 	return result
+}
+
+type photoTokenPayload struct {
+	TripID    string `json:"tripId"`
+	TripDayID string `json:"tripDayId"`
+	PhotoName string `json:"photoName"`
+	ExpiresAt int64  `json:"expiresAt"`
+}
+
+func (s *Service) signPhotoToken(tripID string, tripDayID string, photoName string) string {
+	payload := photoTokenPayload{
+		TripID:    tripID,
+		TripDayID: tripDayID,
+		PhotoName: strings.TrimSpace(photoName),
+		ExpiresAt: s.now().Add(15 * time.Minute).Unix(),
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return ""
+	}
+	encodedBody := base64.RawURLEncoding.EncodeToString(body)
+	signature := hmacSignature([]byte(encodedBody), s.photoTokenSecret)
+	return encodedBody + "." + base64.RawURLEncoding.EncodeToString(signature)
+}
+
+func (s *Service) verifyPhotoToken(tripID string, tripDayID string, token string) (string, error) {
+	parts := strings.Split(strings.TrimSpace(token), ".")
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		return "", ErrValidation
+	}
+	actualSignature, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return "", ErrValidation
+	}
+	expectedSignature := hmacSignature([]byte(parts[0]), s.photoTokenSecret)
+	if !hmac.Equal(actualSignature, expectedSignature) {
+		return "", ErrValidation
+	}
+	payloadBytes, err := base64.RawURLEncoding.DecodeString(parts[0])
+	if err != nil {
+		return "", ErrValidation
+	}
+	var payload photoTokenPayload
+	if err := json.Unmarshal(payloadBytes, &payload); err != nil {
+		return "", ErrValidation
+	}
+	if payload.TripID != tripID || payload.TripDayID != tripDayID || strings.TrimSpace(payload.PhotoName) == "" || s.now().Unix() > payload.ExpiresAt {
+		return "", ErrValidation
+	}
+	return payload.PhotoName, nil
+}
+
+func hmacSignature(value []byte, secret []byte) []byte {
+	mac := hmac.New(sha256.New, secret)
+	_, _ = mac.Write(value)
+	return mac.Sum(nil)
+}
+
+func validLocationBias(value SearchLocationBias) bool {
+	return value.Latitude >= -90 && value.Latitude <= 90 && value.Longitude >= -180 && value.Longitude <= 180 && value.RadiusMeters >= 1 && value.RadiusMeters <= 50000
 }
 
 func mapGooglePlaceType(primaryType string, rawTypes []string) string {
