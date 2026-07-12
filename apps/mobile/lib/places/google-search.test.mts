@@ -11,9 +11,13 @@ import {
   buildGooglePlaceDetailsSuccessState,
   buildGooglePlaceCurrentLocationMarkerViewModel,
   buildGooglePlacePhotoImageSource,
+  buildDefaultGooglePlaceDestinationSelection,
+  buildGooglePlaceDestinationChips,
   buildGooglePlacePhotoUrl,
   buildGooglePlaceSearchBiasFromRegion,
+  buildGooglePlaceSearchBiasFromSource,
   buildGooglePlaceSearchInputState,
+  buildGooglePlaceSearchRegionFromDestination,
   buildGooglePlaceSearchResultActionView,
   buildGooglePlaceSearchMarkerPinStyle,
   buildGooglePlaceSearchMarkerViewModels,
@@ -412,6 +416,137 @@ describe('google place search helpers', () => {
       }),
       { latitude: 34.6934, longitude: 135.49, latitudeDelta: 0.03, longitudeDelta: 0.03 },
     );
+  });
+
+  it('builds destination chips and defaults to the first saved trip city', () => {
+    const destinations = [
+      {
+        id: 'destination-osaka',
+        displayName: '오사카',
+        latitude: 34.693725,
+        longitude: 135.502254,
+        radiusMeters: 30000,
+      },
+      {
+        id: 'destination-kyoto',
+        displayName: '교토',
+        latitude: 35.011636,
+        longitude: 135.768029,
+        radiusMeters: 20000,
+      },
+      {
+        id: 'destination-nara',
+        displayName: '나라',
+        latitude: 34.685087,
+        longitude: 135.805,
+        radiusMeters: 16000,
+      },
+    ];
+
+    assert.equal(buildDefaultGooglePlaceDestinationSelection(destinations), 'destination-osaka');
+    assert.deepEqual(buildGooglePlaceDestinationChips(destinations, null), [
+      {
+        id: 'destination-osaka',
+        label: '오사카',
+        selected: true,
+        accessibilityLabel: '오사카 여행 도시 선택됨',
+      },
+      {
+        id: 'destination-kyoto',
+        label: '교토',
+        selected: false,
+        accessibilityLabel: '교토 여행 도시 선택',
+      },
+      {
+        id: 'destination-nara',
+        label: '나라',
+        selected: false,
+        accessibilityLabel: '나라 여행 도시 선택',
+      },
+    ]);
+    assert.deepEqual(
+      buildGooglePlaceDestinationChips(destinations, 'destination-kyoto').map((chip) => [chip.id, chip.selected]),
+      [
+        ['destination-osaka', false],
+        ['destination-kyoto', true],
+        ['destination-nara', false],
+      ],
+    );
+    assert.equal(buildDefaultGooglePlaceDestinationSelection([]), null);
+  });
+
+  it('converts trip destination and map region sources to Google Places bias', () => {
+    const destinations = [
+      {
+        id: 'destination-osaka',
+        displayName: '오사카',
+        latitude: 34.693725,
+        longitude: 135.502254,
+        radiusMeters: 30000,
+      },
+      {
+        id: 'destination-kyoto',
+        displayName: '교토',
+        latitude: 35.011636,
+        longitude: 135.768029,
+        radiusMeters: 20000,
+      },
+    ];
+
+    assert.deepEqual(buildGooglePlaceSearchRegionFromDestination(destinations[0]), {
+      latitude: 34.693725,
+      longitude: 135.502254,
+      latitudeDelta: 0.53899,
+      longitudeDelta: 0.65554,
+    });
+    assert.deepEqual(
+      buildGooglePlaceSearchBiasFromSource(
+        { kind: 'tripDestination', destinationId: 'destination-kyoto' },
+        destinations,
+      ),
+      { latitude: 35.011636, longitude: 135.768029, radiusMeters: 20000 },
+    );
+    assert.deepEqual(
+      buildGooglePlaceSearchBiasFromSource(
+        { kind: 'mapRegion', latitude: 34.7, longitude: 135.5, radiusMeters: 5566 },
+        destinations,
+      ),
+      { latitude: 34.7, longitude: 135.5, radiusMeters: 5566 },
+    );
+    assert.equal(
+      buildGooglePlaceSearchBiasFromSource({ kind: 'tripDestination', destinationId: 'missing' }, destinations),
+      null,
+    );
+  });
+
+  it('keeps map region search and destination chip search as switchable bias sources', () => {
+    const destinations = [
+      {
+        id: 'destination-osaka',
+        displayName: '오사카',
+        latitude: 34.693725,
+        longitude: 135.502254,
+        radiusMeters: 30000,
+      },
+    ];
+    const destinationSource = { kind: 'tripDestination' as const, destinationId: 'destination-osaka' };
+    const mapRegionSource = { kind: 'mapRegion' as const, latitude: 35, longitude: 136, radiusMeters: 12000 };
+
+    assert.deepEqual(buildGooglePlaceSearchBiasFromSource(destinationSource, destinations), {
+      latitude: 34.693725,
+      longitude: 135.502254,
+      radiusMeters: 30000,
+    });
+    assert.deepEqual(buildGooglePlaceSearchBiasFromSource(mapRegionSource, destinations), {
+      latitude: 35,
+      longitude: 136,
+      radiusMeters: 12000,
+    });
+    assert.deepEqual(buildGooglePlaceSearchBiasFromSource(destinationSource, destinations), {
+      latitude: 34.693725,
+      longitude: 135.502254,
+      radiusMeters: 30000,
+    });
   });
 
   it('builds explicit map-region search bias without auto-searching on pan', () => {

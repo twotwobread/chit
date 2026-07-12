@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 
@@ -25,6 +25,7 @@ import {
 } from '../../../../../lib/places/place-schedule-detail';
 import { resolveDayItineraryAddPlaceReturnNavigation } from '../../../../../lib/trips/day-itinerary-add-place-navigation';
 import { buildGoogleDayLodgingPlaceRequest } from '../../../../../lib/trips/lodging-place';
+import { useTripShellState } from '../../../../../lib/trips/trip-shell-context';
 
 export default function GooglePlaceSearchScreen() {
   const {
@@ -62,6 +63,13 @@ export default function GooglePlaceSearchScreen() {
   const isSelectorMode = mode === 'select';
   const isLodgingMode = mode === 'lodging';
   const [addState, setAddState] = useState<GooglePlaceAddViewState>(idleGooglePlaceAddState());
+  const tripShellState = useTripShellState();
+  const tripDestinations = useMemo(() => {
+    if (tripShellState?.status !== 'success' || tripShellState.tripId !== tripId) {
+      return [];
+    }
+    return tripShellState.detail.trip.destinations;
+  }, [tripId, tripShellState]);
 
   const returnToDay = () => {
     if (!tripId || !date) {
@@ -156,6 +164,7 @@ export default function GooglePlaceSearchScreen() {
       notFoundAction={{ label: '일정으로', onPress: returnToDay }}
       onPrimaryAction={(result, duplicateConfirmed) => void submitAdd(result, duplicateConfirmed)}
       onResetActionState={() => setAddState(idleGooglePlaceAddState())}
+      tripDestinations={tripDestinations}
       tripId={tripId}
     />
   );
