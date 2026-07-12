@@ -8,7 +8,7 @@ import type {
 
 import { formatMoney } from './quick-expense';
 import { tripDetailPath, tripSettlePath } from './routes';
-import { groupTripsByStatus, localDateString, type TripStatusSection } from './status';
+import { groupTripsByStatus, localDateString, type TripStatus, type TripStatusSection } from './status';
 
 export type MyTripCardViewModel = TripListItem & {
   dateRangeLabel: string;
@@ -23,9 +23,18 @@ export type MyTripsStatusSectionViewModel = Omit<TripStatusSection, 'trips'> & {
 };
 
 export type MyTripsSuccessViewModel = {
-  currentTrip: MyTripCardViewModel | null;
+  ongoingTripCount: number;
   sections: MyTripsStatusSectionViewModel[];
 };
+
+export type MyTripRowVariant =
+  | {
+      kind: 'upcomingRow';
+      statusLabel?: '진행 중';
+      statusTone: 'amber' | 'success';
+      surfaceTone: 'default' | 'homeHero';
+    }
+  | { kind: 'pastRow' };
 
 export type MySettlementCurrencySummaryViewModel = {
   currency: SupportedCurrency;
@@ -99,12 +108,27 @@ export function buildMyTripsSuccessViewModel(
     ...section,
     trips: section.trips.map(toTripCardViewModel),
   }));
-  const currentTrip = groupedSections.find((section) => section.status === 'ongoing')?.trips[0] ?? null;
+  const ongoingTripCount = groupedSections.find((section) => section.status === 'ongoing')?.trips.length ?? 0;
 
   return {
-    currentTrip,
-    sections: groupedSections.filter((section) => section.status !== 'ongoing'),
+    ongoingTripCount,
+    sections: groupedSections,
   };
+}
+
+export function myTripRowVariant(status: TripStatus): MyTripRowVariant {
+  switch (status) {
+    case 'ongoing':
+      return { kind: 'upcomingRow', statusLabel: undefined, statusTone: 'success', surfaceTone: 'homeHero' };
+    case 'upcoming':
+      return { kind: 'upcomingRow', statusLabel: undefined, statusTone: 'amber', surfaceTone: 'default' };
+    case 'past':
+      return { kind: 'pastRow' };
+    default: {
+      const exhaustive: never = status;
+      throw new Error(`Unsupported trip status: ${exhaustive}`);
+    }
+  }
 }
 
 export function toTripCardViewModel(trip: TripListItem): MyTripCardViewModel {

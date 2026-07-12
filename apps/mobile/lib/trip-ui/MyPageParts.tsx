@@ -10,18 +10,18 @@ import {
   type LegalLinkOpenState,
 } from '../app-info/legal';
 import { SettingRow, StatRow, type AccountProvider } from '../account-ui/AccountRows';
-import { ActiveTripCard, PastTripRow, UpcomingTripRow } from '../home-ui/TripCards';
+import { PastTripRow, UpcomingTripRow } from '../home-ui/TripCards';
 import { theme } from '../design';
 import { type SettlementSummaryState, type TripListState } from './useMyPageController';
 import {
   buildMySettlementSummaryViewModel,
   buildMyTripsSuccessViewModel,
+  myTripRowVariant,
   tripDetailPath,
   type MySettlementSummaryViewModel,
   type MyTripCardViewModel,
   type MyTripsStatusSectionViewModel,
 } from '../trips/mypage';
-import { tripTodayPath } from '../trips/routes';
 import { styles } from './MyPageStyles';
 
 export function AppInfoLegalRows({ state, onOpen }: { state: LegalLinkOpenState; onOpen: (id: LegalLinkId) => void }) {
@@ -156,7 +156,6 @@ export function MySettlementSummaryList({
 export function MyTripsSection({ state, onRetry }: { state: TripListState; onRetry: () => void }) {
   const viewModel =
     state.status === 'ready' && state.trips.length > 0 ? buildMyTripsSuccessViewModel(state.trips) : null;
-  const currentTrip = viewModel?.currentTrip ?? null;
   const groupedTrips = viewModel?.sections ?? [];
 
   return (
@@ -194,10 +193,9 @@ export function MyTripsSection({ state, onRetry }: { state: TripListState; onRet
           <StatRow
             stats={[
               { label: '전체 여행', value: state.trips.length },
-              { label: '그룹', value: groupedTrips.length },
+              { label: '진행 중', value: viewModel.ongoingTripCount },
             ]}
           />
-          {currentTrip ? <MyCurrentTripCard trip={currentTrip} /> : null}
           <TripSections sections={groupedTrips} />
           <Pressable
             accessibilityRole="button"
@@ -209,20 +207,6 @@ export function MyTripsSection({ state, onRetry }: { state: TripListState; onRet
         </>
       ) : null}
     </View>
-  );
-}
-
-export function MyCurrentTripCard({ trip }: { trip: MyTripCardViewModel }) {
-  return (
-    <ActiveTripCard
-      ctaLabel="여행 바로가기"
-      currencyLabel={trip.currencyLabel}
-      dateLabel={trip.dateRangeLabel}
-      dayLabel="현재 진행 중인 여행"
-      metaLabels={trip.metaLabels}
-      name={trip.name}
-      onPress={() => router.push(tripTodayPath(trip.id))}
-    />
   );
 }
 
@@ -257,8 +241,9 @@ export function TripRow({
   trip: MyTripCardViewModel;
 }) {
   const onPress = () => router.push(tripDetailPath(trip.id));
+  const variant = myTripRowVariant(section.status);
 
-  if (section.status === 'past') {
+  if (variant.kind === 'pastRow') {
     return (
       <PastTripRow
         currencyLabel={trip.currencyLabel}
@@ -278,8 +263,9 @@ export function TripRow({
       metaLabels={trip.metaLabels}
       name={trip.name}
       onPress={onPress}
-      statusLabel={section.status === 'ongoing' ? '진행 중' : undefined}
-      statusTone={section.status === 'ongoing' ? 'success' : 'amber'}
+      statusLabel={variant.statusLabel}
+      statusTone={variant.statusTone}
+      surfaceTone={variant.surfaceTone}
     />
   );
 }

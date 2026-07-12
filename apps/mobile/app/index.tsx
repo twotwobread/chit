@@ -1,5 +1,13 @@
 import { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+} from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 
 import { ApiError } from '@i-um/api-contract';
@@ -154,9 +162,75 @@ function HomeContent({ viewModel }: { viewModel: HomeViewModel }) {
 
   return (
     <View style={styles.homeBody}>
-      {viewModel.currentTrip ? <CurrentTripCard trip={viewModel.currentTrip} /> : null}
+      {viewModel.ongoingTrips.length > 0 ? <OngoingTripCarousel trips={viewModel.ongoingTrips} /> : null}
       <TripSections sections={viewModel.sections} />
+      {!viewModel.hasVisibleTrips ? <HomeHistoryOnlyCard /> : null}
       <SecondaryButton label="새 여행 만들기" onPress={() => router.push('/trips/new')} />
+    </View>
+  );
+}
+
+function HomeHistoryOnlyCard() {
+  return (
+    <Card>
+      <Text style={styles.stateTitle}>진행 중이거나 예정된 여행이 없어요.</Text>
+      <Text style={styles.message}>지난 여행은 마이페이지에서 볼 수 있어요.</Text>
+    </Card>
+  );
+}
+
+function OngoingTripCarousel({ trips }: { trips: HomeCurrentTripViewModel[] }) {
+  const [pageIndex, setPageIndex] = useState(0);
+  const [pagerWidth, setPagerWidth] = useState(0);
+  const hasMultipleTrips = trips.length > 1;
+  const safePageIndex = Math.min(pageIndex, trips.length - 1);
+
+  const handleMomentumScrollEnd = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (pagerWidth <= 0) {
+        return;
+      }
+      const nextIndex = Math.round(event.nativeEvent.contentOffset.x / pagerWidth);
+      setPageIndex(Math.max(0, Math.min(nextIndex, trips.length - 1)));
+    },
+    [pagerWidth, trips.length],
+  );
+
+  return (
+    <View style={styles.ongoingCarousel}>
+      <View style={styles.ongoingHeader}>
+        <Text style={styles.tripSectionTitle}>진행 중인 여행{hasMultipleTrips ? ` ${trips.length}개` : ''}</Text>
+        {hasMultipleTrips ? (
+          <Text style={styles.carouselCounter}>
+            {safePageIndex + 1}/{trips.length}
+          </Text>
+        ) : null}
+      </View>
+      <ScrollView
+        horizontal
+        onLayout={(event) => setPagerWidth(event.nativeEvent.layout.width)}
+        onMomentumScrollEnd={handleMomentumScrollEnd}
+        pagingEnabled={hasMultipleTrips}
+        scrollEnabled={hasMultipleTrips}
+        showsHorizontalScrollIndicator={false}
+        style={styles.carouselViewport}
+      >
+        {trips.map((trip) => (
+          <View key={trip.id} style={[styles.carouselPage, pagerWidth > 0 ? { width: pagerWidth } : null]}>
+            <CurrentTripCard trip={trip} />
+          </View>
+        ))}
+      </ScrollView>
+      {hasMultipleTrips ? (
+        <View style={styles.carouselDots}>
+          {trips.map((trip, index) => (
+            <View
+              key={trip.id}
+              style={[styles.carouselDot, index === safePageIndex ? styles.carouselDotActive : null]}
+            />
+          ))}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -252,6 +326,34 @@ const styles = StyleSheet.create({
     gap: theme.space[4],
     padding: theme.space[7],
   },
+  carouselCounter: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.caption,
+    fontWeight: theme.font.weight.bold,
+  },
+  carouselDot: {
+    backgroundColor: theme.color.borderDefault,
+    borderRadius: theme.radius.pill,
+    height: 7,
+    width: 7,
+  },
+  carouselDotActive: {
+    backgroundColor: theme.color.primary,
+    width: 18,
+  },
+  carouselDots: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: theme.space[2],
+    justifyContent: 'center',
+  },
+  carouselPage: {
+    width: '100%',
+  },
+  carouselViewport: {
+    width: '100%',
+  },
   errorTitle: {
     color: theme.color.danger,
     fontFamily: theme.font.family.bold,
@@ -273,6 +375,15 @@ const styles = StyleSheet.create({
     color: theme.color.textBody,
     fontFamily: theme.font.family.regular,
     textAlign: 'center',
+  },
+  ongoingCarousel: {
+    gap: theme.space[3],
+    width: '100%',
+  },
+  ongoingHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
   screen: {
     backgroundColor: theme.color.bg,

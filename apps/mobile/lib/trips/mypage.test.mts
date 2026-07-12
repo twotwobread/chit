@@ -7,6 +7,7 @@ import {
   buildMySettlementSummaryViewModel,
   buildMyTripsSuccessViewModel,
   formatTripDateRange,
+  myTripRowVariant,
   participantCountLabel,
   toTripCardViewModel,
   tripDetailPath,
@@ -91,7 +92,7 @@ test('builds populated MyPage settlement summary rows with per-currency labels i
   ]);
 });
 
-test('omits the current trip shortcut model when no trip is ongoing', () => {
+test('reports zero ongoing trips when no trip is ongoing', () => {
   const viewModel = buildMyTripsSuccessViewModel(
     [
       trip({ id: 'past', startDate: '2026-06-18', endDate: '2026-06-21' }),
@@ -100,14 +101,14 @@ test('omits the current trip shortcut model when no trip is ongoing', () => {
     '2026-06-22',
   );
 
-  assert.equal(viewModel.currentTrip, null);
+  assert.equal(viewModel.ongoingTripCount, 0);
   assert.deepEqual(
     viewModel.sections.map((section) => section.title),
     ['예정된 여행', '지난 여행'],
   );
 });
 
-test('keeps the current trip shortcut without duplicating an ongoing section', () => {
+test('lists a single ongoing trip in the ongoing section', () => {
   const viewModel = buildMyTripsSuccessViewModel(
     [
       trip({ id: 'ongoing', startDate: '2026-06-20', endDate: '2026-06-22' }),
@@ -116,14 +117,17 @@ test('keeps the current trip shortcut without duplicating an ongoing section', (
     '2026-06-22',
   );
 
-  assert.equal(viewModel.currentTrip?.id, 'ongoing');
+  assert.equal(viewModel.ongoingTripCount, 1);
   assert.deepEqual(
-    viewModel.sections.map((section) => section.title),
-    ['예정된 여행'],
+    viewModel.sections.map((section) => [section.title, section.trips.map((item) => item.id)]),
+    [
+      ['진행 중인 여행', ['ongoing']],
+      ['예정된 여행', ['upcoming']],
+    ],
   );
 });
 
-test('uses deterministic primary current trip when multiple trips are ongoing', () => {
+test('lists every ongoing trip in deterministic nearest-end order', () => {
   const viewModel = buildMyTripsSuccessViewModel(
     [
       trip({ id: 'later-start', startDate: '2026-06-21', endDate: '2026-06-23' }),
@@ -133,11 +137,28 @@ test('uses deterministic primary current trip when multiple trips are ongoing', 
     '2026-06-22',
   );
 
-  assert.equal(viewModel.currentTrip?.id, 'earliest-end');
+  assert.equal(viewModel.ongoingTripCount, 3);
+  assert.deepEqual(viewModel.sections[0]?.title, '진행 중인 여행');
   assert.deepEqual(
-    viewModel.sections.flatMap((section) => section.trips.map((item) => item.id)),
-    [],
+    viewModel.sections[0]?.trips.map((item) => item.id),
+    ['earliest-end', 'earlier-start', 'later-start'],
   );
+});
+
+test('maps ongoing MyPage trips to the same row presentation as upcoming with the Home hero green surface', () => {
+  assert.deepEqual(myTripRowVariant('ongoing'), {
+    kind: 'upcomingRow',
+    statusLabel: undefined,
+    statusTone: 'success',
+    surfaceTone: 'homeHero',
+  });
+  assert.deepEqual(myTripRowVariant('upcoming'), {
+    kind: 'upcomingRow',
+    statusLabel: undefined,
+    statusTone: 'amber',
+    surfaceTone: 'default',
+  });
+  assert.deepEqual(myTripRowVariant('past'), { kind: 'pastRow' });
 });
 
 test('formats trip labels for reusable card composition', () => {
@@ -167,12 +188,12 @@ test('adds role and participant count labels to cards in every status section', 
       section.trips.map((item) => [item.id, item.roleLabel, item.participantCountLabel, item.dateRangeLabel]),
     ),
     [
+      [['ongoing', '주최자', '참여자 2명', '2026.06.20 ~ 2026.06.22']],
       [['upcoming', '동행자', '참여자 3명', '2026.06.23 ~ 2026.06.25']],
       [['past', '동행자', '참여자 4명', '2026.06.18 ~ 2026.06.21']],
     ],
   );
-  assert.equal(viewModel.currentTrip?.roleLabel, '주최자');
-  assert.equal(viewModel.currentTrip?.participantCountLabel, '참여자 2명');
+  assert.equal(viewModel.ongoingTripCount, 1);
 });
 
 test('shows an invited member trip with the existing member role label', () => {
