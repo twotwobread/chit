@@ -3,7 +3,7 @@ import type { Href } from 'expo-router';
 import type { TripListItem } from '@i-um/api-contract';
 
 import { toTripCardViewModel, type MyTripCardViewModel } from './mypage';
-import { tripDetailPath, tripTodayPath } from './routes';
+import { tripTodayPath } from './routes';
 import { groupTripsByStatus, localDateString, selectCurrentTrip, type TripStatusSection } from './status';
 
 export type HomeTripCardViewModel = MyTripCardViewModel & {
@@ -159,7 +159,7 @@ export function buildHomeViewModel(trips: TripListItem[], today = localDateStrin
 export function toHomeTripCardViewModel(trip: TripListItem): HomeTripCardViewModel {
   return {
     ...toTripCardViewModel(trip),
-    detailPath: tripDetailPath(trip.id),
+    detailPath: tripTodayPath(trip.id),
   };
 }
 

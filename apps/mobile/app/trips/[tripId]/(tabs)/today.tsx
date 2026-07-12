@@ -16,7 +16,7 @@ import {
   type TodaySkippedPlacesSectionViewModel,
 } from '../../../../lib/trips/today-execution';
 import { type TodaySpendSummaryViewModel } from '../../../../lib/trips/today-spend';
-import { type TripTabUnavailableViewModel } from '../../../../lib/trips/trip-tabs';
+import { type TripTabUnavailableViewModel, type TripTodayStatusLandingViewModel } from '../../../../lib/trips/trip-tabs';
 import { travelModeDisplayLabel, travelModeDisplayOptions } from '../../../../lib/trips/travel-mode';
 
 export default function TripTodayTabScreen() {
@@ -57,6 +57,7 @@ export default function TripTodayTabScreen() {
         />
       ) : null}
       {state.status === 'unavailable' ? <UnavailableState viewModel={state.viewModel} /> : null}
+      {state.status === 'statusLanding' ? <TodayStatusLandingCard viewModel={state.viewModel} /> : null}
       {state.status === 'ready' ? (
         <TodayReadyContent
           actionMessage={actionMessage}
@@ -324,6 +325,37 @@ function UnavailableState({ viewModel }: { viewModel: TripTabUnavailableViewMode
   );
 }
 
+function TodayStatusLandingCard({ viewModel }: { viewModel: TripTodayStatusLandingViewModel }) {
+  const isUpcoming = viewModel.tone === 'amber';
+
+  return (
+    <Card style={[styles.statusLandingCard, isUpcoming ? styles.upcomingCard : styles.pastCard]}>
+      <Text style={[styles.statusLandingEyebrow, isUpcoming ? styles.upcomingText : styles.pastText]}>
+        {viewModel.eyebrow}
+      </Text>
+      <Text style={[styles.statusLandingHero, isUpcoming ? styles.upcomingHero : styles.pastHero]}>
+        {viewModel.heroLabel}
+      </Text>
+      <View style={styles.statusLandingCopy}>
+        <Text style={styles.statusLandingTitle}>{viewModel.title}</Text>
+        <Text style={styles.statusLandingHelper}>{viewModel.helper}</Text>
+      </View>
+      <PrimaryButton
+        label={viewModel.primaryAction.label}
+        onPress={() => router.push(viewModel.primaryAction.route)}
+        style={isUpcoming ? styles.upcomingPrimaryButton : styles.pastPrimaryButton}
+      />
+      {viewModel.secondaryAction ? (
+        <SecondaryButton
+          label={viewModel.secondaryAction.label}
+          onPress={() => router.push(viewModel.secondaryAction!.route)}
+          style={styles.statusLandingSecondaryButton}
+        />
+      ) : null}
+    </Card>
+  );
+}
+
 const styles = StyleSheet.create({
   cardHelper: {
     color: theme.color.textMuted,
@@ -356,6 +388,19 @@ const styles = StyleSheet.create({
     fontSize: theme.font.size.body,
     textAlign: 'center',
   },
+  pastCard: {
+    backgroundColor: theme.color.surfaceSunken,
+    borderColor: theme.color.borderDefault,
+  },
+  pastHero: {
+    color: theme.color.textMuted,
+  },
+  pastPrimaryButton: {
+    backgroundColor: theme.color.ink[700],
+  },
+  pastText: {
+    color: theme.color.textMuted,
+  },
   quickExpenseSheetBody: {
     paddingBottom: theme.space[3],
   },
@@ -381,5 +426,52 @@ const styles = StyleSheet.create({
     gap: 0,
     paddingHorizontal: theme.space[5],
     paddingVertical: theme.space[4],
+  },
+  statusLandingCard: {
+    gap: theme.space[4],
+  },
+  statusLandingCopy: {
+    gap: theme.space[2],
+  },
+  statusLandingEyebrow: {
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.micro,
+    fontWeight: theme.font.weight.bold,
+    letterSpacing: 1,
+  },
+  statusLandingHelper: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.body,
+    lineHeight: theme.font.size.body * theme.font.leading.normal,
+  },
+  statusLandingHero: {
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.display,
+    fontWeight: theme.font.weight.bold,
+    letterSpacing: -0.8,
+  },
+  statusLandingSecondaryButton: {
+    borderColor: theme.color.borderStrong,
+  },
+  statusLandingTitle: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.headline,
+    fontWeight: theme.font.weight.bold,
+    lineHeight: theme.font.size.headline * theme.font.leading.snug,
+  },
+  upcomingCard: {
+    backgroundColor: theme.color.accentSoft,
+    borderColor: theme.color.amber[100],
+  },
+  upcomingHero: {
+    color: theme.color.amber[700],
+  },
+  upcomingPrimaryButton: {
+    backgroundColor: theme.color.amber[600],
+  },
+  upcomingText: {
+    color: theme.color.amber[700],
   },
 });
