@@ -49,11 +49,21 @@ export function RouteMap({
   }
 
   const region = initialRegion ?? fitRegion(validPlaces);
+
+  return (
+    <MapView initialRegion={region} showsMyLocationButton={false} style={[styles.map, style]}>
+      <RouteMapOverlay places={validPlaces} polylines={polylines} />
+    </MapView>
+  );
+}
+
+export function RouteMapOverlay({ places, polylines }: { places: RouteMapPlace[]; polylines?: RouteMapPolyline[] }) {
+  const validPlaces = places.filter(isValidPlace);
   const routeLines =
     polylines == null ? defaultPolylines(validPlaces) : polylines.map(sanitizePolyline).filter(isVisiblePolyline);
 
   return (
-    <MapView initialRegion={region} showsMyLocationButton={false} style={[styles.map, style]}>
+    <>
       {routeLines.map((polyline) => (
         <Polyline
           coordinates={polyline.coordinates}
@@ -73,7 +83,7 @@ export function RouteMap({
           />
         </Marker>
       ))}
-    </MapView>
+    </>
   );
 }
 

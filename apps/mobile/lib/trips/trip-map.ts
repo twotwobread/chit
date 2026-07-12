@@ -4,6 +4,20 @@ import type { DayChip } from '../trip-ui/DayChips';
 import type { RouteMapPlace } from '../trip-ui/RouteMap';
 import { formatTripDayDate } from './days';
 
+export type TripMapSearchLayout = {
+  screenMode: 'fullScreen';
+  dayChipsPlacement: 'mapOverlay';
+  showSheetItineraryList: boolean;
+};
+
+export function buildTripMapSearchLayout(): TripMapSearchLayout {
+  return {
+    dayChipsPlacement: 'mapOverlay',
+    screenMode: 'fullScreen',
+    showSheetItineraryList: false,
+  };
+}
+
 export function buildTripMapDayChips(days: TripDay[]): DayChip[] {
   return days
     .slice()
@@ -39,6 +53,37 @@ export function resolveTripMapSelectedDay({
   return orderedDays.find((day) => day.date === today) ?? orderedDays[0];
 }
 
+export type TripMapInitialRegion = {
+  latitude: number;
+  longitude: number;
+  latitudeDelta: number;
+  longitudeDelta: number;
+};
+
+export function buildTripMapInitialRegion(places: RouteMapPlace[]): TripMapInitialRegion | null {
+  const validPlaces = places.filter(
+    (place): place is RouteMapPlace & { latitude: number; longitude: number } =>
+      Number.isFinite(place.latitude) && Number.isFinite(place.longitude),
+  );
+  if (validPlaces.length === 0) {
+    return null;
+  }
+
+  const latitudes = validPlaces.map((place) => place.latitude);
+  const longitudes = validPlaces.map((place) => place.longitude);
+  const minLatitude = Math.min(...latitudes);
+  const maxLatitude = Math.max(...latitudes);
+  const minLongitude = Math.min(...longitudes);
+  const maxLongitude = Math.max(...longitudes);
+
+  return {
+    latitude: roundCoordinate((minLatitude + maxLatitude) / 2),
+    longitude: roundCoordinate((minLongitude + maxLongitude) / 2),
+    latitudeDelta: roundDelta(Math.max((maxLatitude - minLatitude) * 1.6, 0.01)),
+    longitudeDelta: roundDelta(Math.max((maxLongitude - minLongitude) * 1.6, 0.01)),
+  };
+}
+
 export type MapRouteSheetState = 'collapsed' | 'expanded';
 
 export function resolveMapRouteSheetState(current: MapRouteSheetState, gestureDy: number): MapRouteSheetState {
@@ -68,6 +113,14 @@ export function buildRouteMapPlaces(items: ScheduleItem[]): RouteMapPlace[] {
       status: mapScheduleItemStatus(item),
       type: item.place?.placeType ?? 'etc',
     }));
+}
+
+function roundCoordinate(value: number): number {
+  return Number(value.toFixed(6));
+}
+
+function roundDelta(value: number): number {
+  return Number(value.toFixed(5));
 }
 
 function mapScheduleItemStatus(item: ScheduleItem): RouteMapPlace['status'] {
