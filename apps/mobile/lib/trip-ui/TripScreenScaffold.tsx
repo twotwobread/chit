@@ -1,11 +1,17 @@
 import type { ReactNode } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { Card, PrimaryButton, SecondaryButton, theme } from '../design';
 
-export function TripScreen({ children }: { children: ReactNode }) {
+export function TripScreen({
+  children,
+  contentContainerStyle,
+}: {
+  children: ReactNode;
+  contentContainerStyle?: StyleProp<ViewStyle>;
+}) {
   return (
-    <ScrollView contentContainerStyle={styles.content} style={styles.scroll}>
+    <ScrollView contentContainerStyle={[styles.content, contentContainerStyle]} style={styles.scroll}>
       {children}
     </ScrollView>
   );

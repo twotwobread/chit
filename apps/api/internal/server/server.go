@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/twotwobread/i-um/apps/api/internal/auth"
@@ -14,6 +15,10 @@ import (
 
 type readinessChecker interface {
 	CheckReady(context.Context) (string, error)
+}
+
+type tripTodayProvider interface {
+	TripToday() time.Time
 }
 
 type apiServer struct {
@@ -50,7 +55,11 @@ func NewRouterWithConfig(readiness readinessChecker, config Config) http.Handler
 
 	var tripService *trip.Service
 	if repo, ok := readiness.(trip.Repository); ok {
-		tripService = trip.NewService(repo, trip.WithInviteBaseURL(config.InviteBaseURL))
+		options := []trip.ServiceOption{trip.WithInviteBaseURL(config.InviteBaseURL)}
+		if provider, ok := readiness.(tripTodayProvider); ok {
+			options = append(options, trip.WithToday(provider.TripToday))
+		}
+		tripService = trip.NewService(repo, options...)
 	}
 
 	var placeService *place.Service

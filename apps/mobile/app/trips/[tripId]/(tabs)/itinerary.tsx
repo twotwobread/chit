@@ -6,7 +6,7 @@ import { ApiError, type TripDay } from '@i-um/api-contract';
 import { MobileAuthError } from '../../../../lib/auth/client';
 import { DayChips } from '../../../../lib/trip-ui/DayChips';
 import { DayItineraryEditor } from '../../../../lib/trip-ui/DayItineraryEditor';
-import { TripScreen, TripScreenHeader, TripStateCard } from '../../../../lib/trip-ui/TripScreenScaffold';
+import { TripScreen, TripStateCard } from '../../../../lib/trip-ui/TripScreenScaffold';
 import { getTripDetail } from '../../../../lib/trips/trip-api';
 import { tripDetailPath } from '../../../../lib/trips/routes';
 import { localDateString } from '../../../../lib/trips/status';
@@ -87,12 +87,7 @@ export default function TripItineraryTabScreen() {
     return (
       <DayItineraryEditor
         date={state.selectedDay.id}
-        headerContent={
-          <>
-            <TripScreenHeader helper="Day별 일정을 선택해 추가·수정·삭제·순서 변경을 한곳에서 처리해요." title="일정" />
-            <DayChips days={state.dayChips} selectedDayId={state.selectedDay.id} onSelectDay={selectDay} />
-          </>
-        }
+        headerContent={<DayChips days={state.dayChips} selectedDayId={state.selectedDay.id} onSelectDay={selectDay} />}
         key={state.selectedDay.id}
         showHeader={false}
         tripId={tripId ?? ''}
@@ -102,8 +97,6 @@ export default function TripItineraryTabScreen() {
 
   return (
     <TripScreen>
-      <TripScreenHeader helper="Day별 일정을 선택해 추가·수정·삭제·순서 변경을 한곳에서 처리해요." title="일정" />
-
       {state.status === 'loading' ? <TripStateCard loading title="일정을 불러오는 중..." /> : null}
       {state.status === 'auth' ? (
         <TripStateCard

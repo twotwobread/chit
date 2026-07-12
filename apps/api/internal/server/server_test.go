@@ -4378,6 +4378,10 @@ type fakeAuthBackend struct {
 	nextExpense      int
 }
 
+func (b *fakeAuthBackend) TripToday() time.Time {
+	return time.Date(2026, 6, 21, 12, 0, 0, 0, time.UTC)
+}
+
 func loginTestUser(t *testing.T, backend *fakeAuthBackend) string {
 	t.Helper()
 	return loginTestUserWithSubject(t, backend, "apple-1", "민수")

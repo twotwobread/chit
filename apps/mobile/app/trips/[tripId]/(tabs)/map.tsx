@@ -1,5 +1,5 @@
 import { MapContent, UnavailableState } from '../../../../lib/trip-ui/TripMapScreenParts';
-import { TripScreen, TripScreenHeader, TripStateCard } from '../../../../lib/trip-ui/TripScreenScaffold';
+import { TripScreen, TripStateCard } from '../../../../lib/trip-ui/TripScreenScaffold';
 import { useTripMapController } from '../../../../lib/trip-ui/useTripMapController';
 
 export default function TripMapTabScreen() {
@@ -7,8 +7,6 @@ export default function TripMapTabScreen() {
 
   return (
     <TripScreen>
-      <TripScreenHeader helper="Day별 이동할 장소와 지도 열기 동선을 한곳에서 확인해요." title="지도" />
-
       {state.status === 'loading' ? <TripStateCard loading title="지도 정보를 불러오는 중..." /> : null}
       {state.status === 'auth' ? (
         <TripStateCard primaryAction={{ label: '로그인하기', onPress: goLogin }} title="다시 로그인해주세요." />
