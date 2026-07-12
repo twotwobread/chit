@@ -75,31 +75,35 @@ export function ScheduleTimeEditor({
       </View>
 
       <View style={styles.timeCompactBox}>
-        <View style={styles.timeRangeRow}>
+        <View style={styles.timeSegmentedControl}>
           <Pressable
             accessibilityLabel="시작 시간 수정"
             accessibilityRole="button"
             disabled={disabled}
             onPress={openStartWheel}
-            style={[styles.timePill, activeWheel === 'start' ? styles.timePillActive : null]}
+            style={[styles.timeSegment, activeWheel === 'start' ? styles.timeSegmentActive : null]}
           >
-            <Text style={[styles.timePillLabel, activeWheel === 'start' ? styles.timePillLabelActive : null]}>
+            <Text style={[styles.timeSegmentLabel, activeWheel === 'start' ? styles.timeSegmentLabelActive : null]}>
               시작
             </Text>
-            <Text style={[styles.timePillText, activeWheel === 'start' ? styles.timePillTextActive : null]}>
+            <Text style={[styles.timeSegmentText, activeWheel === 'start' ? styles.timeSegmentTextActive : null]}>
               {summary.startLabel}
             </Text>
           </Pressable>
-          <Text style={styles.timeArrow}>→</Text>
+          <View style={styles.timeBridge}>
+            <Text style={styles.timeArrow}>→</Text>
+          </View>
           <Pressable
             accessibilityLabel="종료 시간 수정"
             accessibilityRole="button"
             disabled={disabled}
             onPress={openEndWheel}
-            style={[styles.timePill, activeWheel === 'end' ? styles.timePillActive : null]}
+            style={[styles.timeSegment, activeWheel === 'end' ? styles.timeSegmentActive : null]}
           >
-            <Text style={[styles.timePillLabel, activeWheel === 'end' ? styles.timePillLabelActive : null]}>종료</Text>
-            <Text style={[styles.timePillText, activeWheel === 'end' ? styles.timePillTextActive : null]}>
+            <Text style={[styles.timeSegmentLabel, activeWheel === 'end' ? styles.timeSegmentLabelActive : null]}>
+              종료
+            </Text>
+            <Text style={[styles.timeSegmentText, activeWheel === 'end' ? styles.timeSegmentTextActive : null]}>
               {summary.endLabel}
             </Text>
           </Pressable>
@@ -162,51 +166,64 @@ const styles = StyleSheet.create({
   timeArrow: {
     color: theme.color.textMuted,
     fontFamily: theme.font.family.bold,
-    fontSize: theme.font.size.body,
+    fontSize: theme.font.size.caption,
     fontWeight: theme.font.weight.bold,
+  },
+  timeBridge: {
+    alignItems: 'center',
+    alignSelf: 'stretch',
+    backgroundColor: theme.color.surface,
+    borderColor: theme.color.borderSubtle,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    justifyContent: 'center',
+    width: theme.space[8],
   },
   timeCompactBox: {
     gap: timeEditorLayout.containerGap,
     padding: timeEditorLayout.containerPadding,
   },
-  timePill: {
+  timeSegment: {
     alignItems: 'center',
     backgroundColor: theme.color.surface,
+    flex: 1,
+    flexDirection: timeEditorLayout.segmentContentDirection,
+    gap: timeEditorLayout.segmentGap,
+    justifyContent: 'center',
+    minHeight: timeEditorLayout.segmentMinHeight,
+    paddingHorizontal: timeEditorLayout.segmentHorizontalPadding,
+    paddingVertical: timeEditorLayout.segmentVerticalPadding,
+  },
+  timeSegmentActive: {
+    backgroundColor: theme.color.primarySoft,
+  },
+  timeSegmentedControl: {
+    alignItems: 'center',
+    backgroundColor: theme.color.surfaceSunken,
     borderColor: theme.color.borderDefault,
     borderRadius: theme.radius.md,
     borderWidth: 1,
-    flexDirection: timeEditorLayout.pillContentDirection,
-    gap: timeEditorLayout.pillGap,
-    minHeight: timeEditorLayout.pillMinHeight,
-    paddingHorizontal: timeEditorLayout.pillHorizontalPadding,
-    paddingVertical: timeEditorLayout.pillVerticalPadding,
+    flexDirection: 'row',
+    minHeight: timeEditorLayout.segmentMinHeight,
+    overflow: 'hidden',
+    width: '100%',
   },
-  timePillActive: {
-    backgroundColor: theme.color.primarySoft,
-    borderColor: theme.color.primary,
-  },
-  timePillLabel: {
+  timeSegmentLabel: {
     color: theme.color.textMuted,
     fontFamily: theme.font.family.semibold,
     fontSize: theme.font.size.micro,
     fontWeight: theme.font.weight.semibold,
   },
-  timePillLabelActive: {
+  timeSegmentLabelActive: {
     color: theme.color.primary,
   },
-  timePillText: {
+  timeSegmentText: {
     color: theme.color.textStrong,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.label,
     fontWeight: theme.font.weight.bold,
   },
-  timePillTextActive: {
+  timeSegmentTextActive: {
     color: theme.color.primary,
-  },
-  timeRangeRow: {
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    flexDirection: 'row',
-    gap: theme.space[2],
   },
 });

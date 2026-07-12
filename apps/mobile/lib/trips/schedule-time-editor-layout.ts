@@ -2,14 +2,14 @@ import { theme } from '../design/theme';
 
 export type ScheduleTimeEditorLayout = {
   containerGap: number;
-  containerHasOuterChrome: boolean;
   containerPadding: number;
-  pillContentDirection: 'row';
-  pillFillAvailableWidth: boolean;
-  pillGap: number;
-  pillHorizontalPadding: number;
-  pillMinHeight: number;
-  pillVerticalPadding: number;
+  segmentContentDirection: 'row';
+  segmentGap: number;
+  segmentHorizontalPadding: number;
+  segmentMinHeight: number;
+  segmentVerticalPadding: number;
+  segmentedControlFillAvailableWidth: boolean;
+  segmentedControlHasOuterChrome: boolean;
   standardContainerPadding: number;
   standardControlHeight: number;
 };
@@ -17,14 +17,14 @@ export type ScheduleTimeEditorLayout = {
 export function buildScheduleTimeEditorLayout(): ScheduleTimeEditorLayout {
   return {
     containerGap: theme.space[2],
-    containerHasOuterChrome: false,
     containerPadding: theme.space[0],
-    pillContentDirection: 'row',
-    pillFillAvailableWidth: false,
-    pillGap: theme.space[2],
-    pillHorizontalPadding: theme.space[3],
-    pillMinHeight: theme.layout.controlHSm,
-    pillVerticalPadding: theme.space[2],
+    segmentContentDirection: 'row',
+    segmentGap: theme.space[2],
+    segmentHorizontalPadding: theme.space[3],
+    segmentMinHeight: theme.layout.controlHSm,
+    segmentVerticalPadding: theme.space[2],
+    segmentedControlFillAvailableWidth: true,
+    segmentedControlHasOuterChrome: true,
     standardContainerPadding: theme.space[3],
     standardControlHeight: theme.layout.controlH,
   };

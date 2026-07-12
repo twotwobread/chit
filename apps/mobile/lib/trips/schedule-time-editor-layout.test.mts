@@ -4,13 +4,13 @@ import { describe, it } from 'node:test';
 import { buildScheduleTimeEditorLayout } from './schedule-time-editor-layout';
 
 describe('schedule time editor layout helpers', () => {
-  it('keeps start and end time controls compact instead of stretching full width', () => {
+  it('uses a full-width segmented capsule while keeping the row shorter than a standard input', () => {
     const layout = buildScheduleTimeEditorLayout();
 
-    assert.equal(layout.containerHasOuterChrome, false);
-    assert.equal(layout.pillFillAvailableWidth, false);
-    assert.equal(layout.pillContentDirection, 'row');
-    assert.ok(layout.pillMinHeight < layout.standardControlHeight);
+    assert.equal(layout.segmentedControlFillAvailableWidth, true);
+    assert.equal(layout.segmentedControlHasOuterChrome, true);
+    assert.equal(layout.segmentContentDirection, 'row');
+    assert.ok(layout.segmentMinHeight < layout.standardControlHeight);
     assert.ok(layout.containerPadding < layout.standardContainerPadding);
   });
 });
