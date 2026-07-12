@@ -7,6 +7,7 @@ import {
   buildRouteMapPlaces,
   buildTripMapDayChips,
   buildTripMapInitialRegion,
+  buildTripMapSearchLayout,
   resolveMapRouteSheetState,
   resolveTripMapSelectedDay,
 } from './trip-map';
@@ -70,6 +71,14 @@ test('resolves map route sheet state from vertical gestures', () => {
   assert.equal(resolveMapRouteSheetState('expanded', 20), 'collapsed');
   assert.equal(resolveMapRouteSheetState('collapsed', -6), 'collapsed');
   assert.equal(resolveMapRouteSheetState('expanded', 6), 'expanded');
+});
+
+test('uses full-screen map search layout with overlay Day chips and no sheet itinerary list', () => {
+  assert.deepEqual(buildTripMapSearchLayout(), {
+    dayChipsPlacement: 'mapOverlay',
+    screenMode: 'fullScreen',
+    showSheetItineraryList: false,
+  });
 });
 
 test('builds an initial region from visible route map places', () => {

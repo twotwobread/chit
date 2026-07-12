@@ -4,6 +4,20 @@ import type { DayChip } from '../trip-ui/DayChips';
 import type { RouteMapPlace } from '../trip-ui/RouteMap';
 import { formatTripDayDate } from './days';
 
+export type TripMapSearchLayout = {
+  screenMode: 'fullScreen';
+  dayChipsPlacement: 'mapOverlay';
+  showSheetItineraryList: boolean;
+};
+
+export function buildTripMapSearchLayout(): TripMapSearchLayout {
+  return {
+    dayChipsPlacement: 'mapOverlay',
+    screenMode: 'fullScreen',
+    showSheetItineraryList: false,
+  };
+}
+
 export function buildTripMapDayChips(days: TripDay[]): DayChip[] {
   return days
     .slice()

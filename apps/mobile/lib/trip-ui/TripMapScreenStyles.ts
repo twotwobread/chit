@@ -51,6 +51,27 @@ export const styles = StyleSheet.create({
     overflow: 'hidden',
     width: '100%',
   },
+  mapFullScreenRoot: {
+    backgroundColor: theme.color.bg,
+    flex: 1,
+  },
+  mapSearchFullScreen: {
+    flex: 1,
+  },
+  dayChipsOverlay: {
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: theme.space[4],
+    zIndex: 4,
+  },
+  mapFeedbackOverlay: {
+    bottom: theme.space[5],
+    left: theme.space[5],
+    position: 'absolute',
+    right: theme.space[5],
+    zIndex: 5,
+  },
   mapSheetWrap: {
     borderColor: theme.color.borderSubtle,
     borderRadius: theme.radius.xl,
