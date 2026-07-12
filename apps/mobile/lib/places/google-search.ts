@@ -6,6 +6,8 @@ import type {
   GooglePlaceSearchResult,
 } from '@i-um/api-contract';
 
+import { theme } from '../design/theme';
+
 export const googlePlaceSearchMinLength = 2;
 export const googlePlaceSearchDefaultLimit = 10;
 export const googlePlacePhotoDefaultWidth = 320;
@@ -64,6 +66,13 @@ export type GooglePlaceSearchMarkerViewModel = {
   selected: boolean;
   iconName: GooglePlaceSearchMarkerIconName;
   emphasis: GooglePlaceSearchMarkerEmphasis;
+};
+
+export type GooglePlaceSearchMarkerPinStyle = {
+  backgroundColor: string;
+  borderColor: string;
+  borderWidth: number;
+  iconColor: string;
 };
 
 export type GooglePlaceSearchMapRegion = {
@@ -531,6 +540,19 @@ export function buildGooglePlaceDetailsErrorState(googlePlaceId: string): Google
     status: 'error',
     googlePlaceId,
     message: '장소 설명을 불러오지 못했어요. Google Maps에서 자세한 정보를 확인해 주세요.',
+  };
+}
+
+export function buildGooglePlaceSearchMarkerPinStyle(
+  category: GooglePlaceSearchMarkerCategory,
+  selected: boolean,
+): GooglePlaceSearchMarkerPinStyle {
+  const categoryColor = theme.placeType[category].color;
+  return {
+    backgroundColor: selected ? theme.color.surface : categoryColor,
+    borderColor: selected ? categoryColor : theme.color.surface,
+    borderWidth: selected ? 4 : 3,
+    iconColor: selected ? categoryColor : theme.color.onPrimary,
   };
 }
 

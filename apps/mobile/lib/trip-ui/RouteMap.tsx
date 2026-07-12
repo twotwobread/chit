@@ -1,7 +1,8 @@
 import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import MapView, { Marker, Polyline, type LatLng, type Region } from 'react-native-maps';
 
-import { PlacePin, theme } from '../design';
+import { theme } from '../design';
+import { buildRouteWaypointMarkerChrome, buildRouteWaypointMarkerStyle } from '../trips/route-map-marker';
 
 export type RouteMapPlace = {
   id: string;
@@ -10,12 +11,14 @@ export type RouteMapPlace = {
   name: string;
   latitude?: number | null;
   longitude?: number | null;
+  markerColor?: string;
   status?: 'done' | 'next' | 'todo' | 'skipped';
 };
 
 export type RouteMapPolyline = {
   id: string;
   coordinates: LatLng[];
+  color?: string;
   tone?: 'done' | 'todo';
 };
 
@@ -69,21 +72,94 @@ export function RouteMapOverlay({ places, polylines }: { places: RouteMapPlace[]
           coordinates={polyline.coordinates}
           key={polyline.id}
           lineDashPattern={polyline.tone === 'todo' ? [3, 7] : undefined}
-          strokeColor={polyline.tone === 'todo' ? theme.color.green[400] : theme.color.green[600]}
+          strokeColor={polyline.color ?? (polyline.tone === 'todo' ? theme.color.green[400] : theme.color.green[600])}
           strokeWidth={polyline.tone === 'todo' ? 3 : 4}
         />
       ))}
       {validPlaces.map((place) => (
-        <Marker coordinate={toLatLng(place)} key={place.id} title={place.name} tracksViewChanges={false}>
-          <PlacePin
-            faded={place.status === 'done' || place.status === 'skipped'}
-            order={place.order}
-            size={place.status === 'next' ? 38 : 32}
-            type={place.type}
-          />
+        <Marker
+          coordinate={toLatLng(place)}
+          key={place.id}
+          title={place.name}
+          tracksViewChanges={false}
+          zIndex={place.status === 'next' ? 3 : 2}
+        >
+          <RouteMarker place={place} />
         </Marker>
       ))}
     </>
+  );
+}
+
+function RouteMarker({ place }: { place: RouteMapPlace }) {
+  if (place.markerColor) {
+    return <RouteWaypointMarker color={place.markerColor} order={place.order} status={place.status} />;
+  }
+
+  return <CategoryRouteMarker place={place} />;
+}
+
+function RouteWaypointMarker({
+  color,
+  order,
+  status,
+}: {
+  color: string;
+  order: number | string;
+  status?: RouteMapPlace['status'];
+}) {
+  const chrome = buildRouteWaypointMarkerChrome(status);
+  const markerStyle = buildRouteWaypointMarkerStyle(color, status);
+  return (
+    <View style={[styles.waypointHalo, { borderColor: chrome.haloBorderColor, borderWidth: chrome.haloBorderWidth }]}>
+      <View
+        style={[
+          styles.waypointBadge,
+          {
+            backgroundColor: markerStyle.badgeBackgroundColor,
+            borderColor: markerStyle.badgeBorderColor,
+            borderWidth: chrome.badgeBorderWidth,
+            height: chrome.badgeHeight,
+            minWidth: chrome.badgeMinWidth,
+            opacity: chrome.badgeOpacity,
+            transform: [{ translateY: chrome.badgeTranslateY }],
+          },
+          chrome.highlighted ? styles.waypointBadgeHighlighted : null,
+        ]}
+      >
+        <Text
+          style={[
+            styles.waypointText,
+            { color: markerStyle.textColor },
+            chrome.highlighted ? styles.waypointTextHighlighted : null,
+          ]}
+        >
+          {order}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+function CategoryRouteMarker({ place }: { place: RouteMapPlace }) {
+  const faded = place.status === 'done' || place.status === 'skipped';
+  const highlighted = place.status === 'next';
+  const size = highlighted ? 38 : 32;
+  return (
+    <View
+      style={[
+        styles.categoryPin,
+        {
+          backgroundColor: theme.placeType[place.type].color,
+          borderRadius: size / 2,
+          height: size,
+          opacity: faded ? 0.5 : 1,
+          width: size,
+        },
+      ]}
+    >
+      <Text style={[styles.categoryPinText, { fontSize: size * 0.46 }]}>{place.order}</Text>
+    </View>
   );
 }
 
@@ -178,5 +254,43 @@ const styles = StyleSheet.create({
   },
   map: {
     minHeight: 220,
+  },
+  categoryPin: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  categoryPinText: {
+    color: theme.color.onPrimary,
+    fontFamily: theme.font.family.bold,
+    fontWeight: theme.font.weight.bold,
+  },
+  waypointBadge: {
+    alignItems: 'center',
+    borderColor: theme.color.surface,
+    borderRadius: theme.radius.sm,
+    borderWidth: 2,
+    height: 30,
+    justifyContent: 'center',
+    minWidth: 34,
+    paddingHorizontal: theme.space[2],
+    ...theme.shadow.sm,
+  },
+  waypointBadgeHighlighted: {
+    ...theme.shadow.md,
+  },
+  waypointHalo: {
+    alignItems: 'center',
+    borderColor: 'transparent',
+    borderRadius: theme.radius.md,
+    justifyContent: 'center',
+  },
+  waypointText: {
+    color: theme.color.onPrimary,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.caption,
+    fontWeight: theme.font.weight.bold,
+  },
+  waypointTextHighlighted: {
+    fontSize: theme.font.size.label,
   },
 });

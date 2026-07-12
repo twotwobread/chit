@@ -70,6 +70,13 @@ export const styles = StyleSheet.create({
     left: theme.space[5],
     position: 'absolute',
     right: theme.space[5],
+    zIndex: 6,
+  },
+  routeNoticeOverlay: {
+    left: theme.space[5],
+    position: 'absolute',
+    right: theme.space[5],
+    top: theme.space[4] + theme.layout.controlHSm + theme.space[7],
     zIndex: 5,
   },
   mapSheetWrap: {

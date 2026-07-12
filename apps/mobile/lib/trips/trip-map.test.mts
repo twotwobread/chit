@@ -1,15 +1,23 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import type { ScheduleItem, TripDay } from '@i-um/api-contract';
+import type { GetDayScheduleItemsResponse, ScheduleItem, TripDay, TripPlaceType } from '@i-um/api-contract';
 
+import { theme } from '../design/theme';
+import { buildRouteWaypointMarkerChrome, buildRouteWaypointMarkerStyle } from './route-map-marker';
 import {
   buildRouteMapPlaces,
   buildTripMapDayChips,
+  buildTripMapDayRoutes,
   buildTripMapInitialRegion,
+  buildTripMapRouteLayerChips,
+  buildTripMapRouteLayerViewModel,
   buildTripMapSearchLayout,
+  emptyTripMapRouteLayerSelection,
   resolveMapRouteSheetState,
   resolveTripMapSelectedDay,
+  toggleTripMapRouteLayer,
+  tripMapRouteLayerChipId,
 } from './trip-map';
 
 function day(overrides: Partial<TripDay>): TripDay {
@@ -41,6 +49,41 @@ function item(overrides: Partial<ScheduleItem>): ScheduleItem {
   };
 }
 
+function routeItem({
+  id,
+  itemOrder,
+  latitude,
+  longitude,
+  name,
+  placeType = 'sights',
+}: {
+  id: string;
+  itemOrder: number;
+  latitude: number;
+  longitude: number;
+  name: string;
+  placeType?: TripPlaceType;
+}): ScheduleItem {
+  return item({
+    id,
+    itemOrder,
+    place: {
+      address: `${name} address`,
+      id: `place-${id}`,
+      name,
+      placeType,
+      routablePlace: { provider: 'google', googlePlaceId: `google-${id}`, latitude, longitude },
+    },
+  });
+}
+
+function itinerary(items: ScheduleItem[], dayOverrides: Partial<TripDay> = {}): GetDayScheduleItemsResponse {
+  return {
+    day: day({ ...dayOverrides }),
+    items,
+  };
+}
+
 test('builds ordered day chips from trip days', () => {
   assert.deepEqual(
     buildTripMapDayChips([
@@ -52,6 +95,226 @@ test('builds ordered day chips from trip days', () => {
       { id: 'day-2', label: 'Day 2', dateLabel: '2026.07.11' },
     ],
   );
+});
+
+test('builds route layer chips with an all toggle and day color dots', () => {
+  const chips = buildTripMapRouteLayerChips([
+    day({ id: 'day-2', dayOrder: 2, date: '2026-07-11' }),
+    day({ id: 'day-1', dayOrder: 1, date: '2026-07-10' }),
+  ]);
+
+  assert.equal(chips[0]?.id, 'all');
+  assert.equal(chips[0]?.label, '전체');
+  assert.equal(chips[0]?.legendColor, undefined);
+  assert.equal(chips[1]?.id, 'day:day-1');
+  assert.equal(chips[1]?.label, 'Day 1');
+  assert.equal(chips[1]?.dateLabel, '2026.07.10');
+  assert.equal(chips[1]?.legendColor, theme.color.green[600]);
+  assert.equal(chips[2]?.id, 'day:day-2');
+  assert.equal(chips[2]?.label, 'Day 2');
+  assert.equal(chips[2]?.dateLabel, '2026.07.11');
+  assert.equal(chips[2]?.legendColor, theme.color.blue[600]);
+});
+
+test('toggles route layer chips as none all or one selected day', () => {
+  assert.deepEqual(emptyTripMapRouteLayerSelection, { kind: 'none' });
+
+  const dayLayer = toggleTripMapRouteLayer(emptyTripMapRouteLayerSelection, 'day:day-1');
+  assert.deepEqual(dayLayer, { dayId: 'day-1', kind: 'day' });
+  assert.equal(tripMapRouteLayerChipId(dayLayer), 'day:day-1');
+  assert.deepEqual(toggleTripMapRouteLayer(dayLayer, 'day:day-1'), { kind: 'none' });
+
+  const allLayer = toggleTripMapRouteLayer(dayLayer, 'all');
+  assert.deepEqual(allLayer, { kind: 'all' });
+  assert.equal(tripMapRouteLayerChipId(allLayer), 'all');
+  assert.deepEqual(toggleTripMapRouteLayer(allLayer, 'all'), { kind: 'none' });
+});
+
+test('builds visible route data for a selected day with one itinerary-order connector', () => {
+  const routes = buildTripMapDayRoutes([
+    itinerary(
+      [
+        routeItem({ id: 'day-1-second', itemOrder: 2, latitude: 34.7, longitude: 135.49, name: '우메다' }),
+        routeItem({ id: 'day-1-first', itemOrder: 1, latitude: 34.6687, longitude: 135.5013, name: '도톤보리' }),
+      ],
+      { id: 'day-1', dayOrder: 1, date: '2026-07-10' },
+    ),
+    itinerary([routeItem({ id: 'day-2-first', itemOrder: 1, latitude: 35.0, longitude: 135.75, name: '교토' })], {
+      id: 'day-2',
+      dayOrder: 2,
+      date: '2026-07-11',
+    }),
+  ]);
+
+  const viewModel = buildTripMapRouteLayerViewModel(routes, { dayId: 'day-1', kind: 'day' });
+
+  assert.deepEqual(
+    viewModel.places.map((place) => [place.id, place.order, place.name]),
+    [
+      ['day-1-first', 1, '도톤보리'],
+      ['day-1-second', 2, '우메다'],
+    ],
+  );
+  assert.deepEqual(viewModel.polylines, [
+    {
+      color: theme.color.green[600],
+      coordinates: [
+        { latitude: 34.6687, longitude: 135.5013 },
+        { latitude: 34.7, longitude: 135.49 },
+      ],
+      id: 'route-day-1',
+    },
+  ]);
+  assert.equal(viewModel.notice, null);
+});
+
+test('decorates day route places with day color and highlights the first active item', () => {
+  const routes = buildTripMapDayRoutes([
+    itinerary(
+      [
+        routeItem({ id: 'arrived', itemOrder: 1, latitude: 34.6687, longitude: 135.5013, name: '도착 완료' }),
+        {
+          ...routeItem({ id: 'skipped', itemOrder: 2, latitude: 34.69, longitude: 135.5, name: '스킵' }),
+          skippedAt: '2026-07-10T01:30:00Z',
+        },
+        routeItem({ id: 'next', itemOrder: 3, latitude: 34.7, longitude: 135.49, name: '다음 장소' }),
+        routeItem({ id: 'todo', itemOrder: 4, latitude: 34.71, longitude: 135.48, name: '예정 장소' }),
+      ].map((candidate) =>
+        candidate.id === 'arrived' ? { ...candidate, arrivedAt: '2026-07-10T00:30:00Z' } : candidate,
+      ),
+      { id: 'day-1', dayOrder: 1, date: '2026-07-10' },
+    ),
+  ]);
+
+  assert.deepEqual(
+    routes[0]?.places.map((place) => [place.id, place.status, place.markerColor]),
+    [
+      ['arrived', 'done', theme.color.green[600]],
+      ['skipped', 'skipped', theme.color.green[600]],
+      ['next', 'next', theme.color.green[600]],
+      ['todo', 'todo', theme.color.green[600]],
+    ],
+  );
+});
+
+test('builds all route layer with independent per-day connectors and no cross-day line', () => {
+  const routes = buildTripMapDayRoutes([
+    itinerary(
+      [
+        routeItem({ id: 'day-1-first', itemOrder: 1, latitude: 34.6687, longitude: 135.5013, name: '도톤보리' }),
+        routeItem({ id: 'day-1-second', itemOrder: 2, latitude: 34.7, longitude: 135.49, name: '우메다' }),
+      ],
+      { id: 'day-1', dayOrder: 1, date: '2026-07-10' },
+    ),
+    itinerary(
+      [
+        routeItem({ id: 'day-2-first', itemOrder: 1, latitude: 35.0, longitude: 135.75, name: '교토역' }),
+        routeItem({ id: 'day-2-second', itemOrder: 2, latitude: 35.0116, longitude: 135.7681, name: '니시키시장' }),
+      ],
+      { id: 'day-2', dayOrder: 2, date: '2026-07-11' },
+    ),
+  ]);
+
+  const viewModel = buildTripMapRouteLayerViewModel(routes, { kind: 'all' });
+
+  assert.deepEqual(
+    viewModel.places.map((place) => place.id),
+    ['day-1-first', 'day-1-second', 'day-2-first', 'day-2-second'],
+  );
+  assert.deepEqual(
+    viewModel.polylines.map((polyline) => [polyline.id, polyline.color, polyline.coordinates]),
+    [
+      [
+        'route-day-1',
+        theme.color.green[600],
+        [
+          { latitude: 34.6687, longitude: 135.5013 },
+          { latitude: 34.7, longitude: 135.49 },
+        ],
+      ],
+      [
+        'route-day-2',
+        theme.color.blue[600],
+        [
+          { latitude: 35.0, longitude: 135.75 },
+          { latitude: 35.0116, longitude: 135.7681 },
+        ],
+      ],
+    ],
+  );
+  assert.equal(viewModel.notice, null);
+});
+
+test('builds an insufficient route notice when the selected layer has fewer than two places', () => {
+  const routes = buildTripMapDayRoutes([
+    itinerary(
+      [routeItem({ id: 'day-1-only', itemOrder: 1, latitude: 34.6687, longitude: 135.5013, name: '도톤보리' })],
+      {
+        id: 'day-1',
+        dayOrder: 1,
+        date: '2026-07-10',
+      },
+    ),
+  ]);
+
+  const viewModel = buildTripMapRouteLayerViewModel(routes, { dayId: 'day-1', kind: 'day' });
+
+  assert.deepEqual(
+    viewModel.places.map((place) => place.id),
+    ['day-1-only'],
+  );
+  assert.deepEqual(viewModel.polylines, []);
+  assert.deepEqual(viewModel.notice, {
+    helper: '장소가 2개 이상이면 일정 순서대로 동선을 연결해요.',
+    title: '연결할 장소가 부족해요',
+  });
+});
+
+test('builds highlighted waypoint marker chrome without an oversized outer halo border', () => {
+  assert.deepEqual(buildRouteWaypointMarkerChrome('next'), {
+    badgeBorderWidth: 3,
+    badgeHeight: 38,
+    badgeMinWidth: 42,
+    badgeOpacity: 1,
+    badgeTranslateY: -6,
+    faded: false,
+    haloBorderColor: 'transparent',
+    haloBorderWidth: 0,
+    highlighted: true,
+  });
+
+  assert.deepEqual(buildRouteWaypointMarkerChrome('done'), {
+    badgeBorderWidth: 2,
+    badgeHeight: 30,
+    badgeMinWidth: 34,
+    badgeOpacity: 0.42,
+    badgeTranslateY: 0,
+    faded: true,
+    haloBorderColor: 'transparent',
+    haloBorderWidth: 0,
+    highlighted: false,
+  });
+  assert.equal(buildRouteWaypointMarkerChrome('skipped').badgeOpacity, 0.42);
+});
+
+test('inverts highlighted waypoint marker colors while keeping done markers day-colored and faded', () => {
+  assert.deepEqual(buildRouteWaypointMarkerStyle(theme.color.green[600], 'next'), {
+    badgeBackgroundColor: theme.color.surface,
+    badgeBorderColor: theme.color.green[600],
+    textColor: theme.color.green[600],
+  });
+
+  assert.deepEqual(buildRouteWaypointMarkerStyle(theme.color.green[600], 'done'), {
+    badgeBackgroundColor: theme.color.green[600],
+    badgeBorderColor: theme.color.surface,
+    textColor: theme.color.onPrimary,
+  });
+
+  assert.deepEqual(buildRouteWaypointMarkerStyle(theme.color.green[600], 'todo'), {
+    badgeBackgroundColor: theme.color.green[600],
+    badgeBorderColor: theme.color.surface,
+    textColor: theme.color.onPrimary,
+  });
 });
 
 test('resolves selected map day from preferred id, current calendar day, then first day', () => {

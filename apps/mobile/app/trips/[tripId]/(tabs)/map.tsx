@@ -3,17 +3,20 @@ import { TripScreen, TripStateCard } from '../../../../lib/trip-ui/TripScreenSca
 import { useTripMapController } from '../../../../lib/trip-ui/useTripMapController';
 
 export default function TripMapTabScreen() {
-  const { feedback, goHome, goLogin, load, state, tripId } = useTripMapController();
+  const { feedback, goHome, goLogin, load, state, toggleRouteLayer, tripId } = useTripMapController();
 
   if (state.status === 'success') {
     return (
       <MapContent
         feedback={feedback}
-        onSelectDay={(dayId) => void load(dayId)}
-        selectedDayId={state.selectedDayId}
-        dayChips={state.dayChips}
-        tripId={tripId ?? ''}
         mapPlaces={state.mapPlaces}
+        onToggleRouteLayer={toggleRouteLayer}
+        routeChips={state.routeChips}
+        routeNotice={state.routeNotice}
+        routePolylines={state.routePolylines}
+        selectedDayId={state.selectedDayId}
+        selectedRouteLayerChipId={state.selectedRouteLayerChipId}
+        tripId={tripId ?? ''}
       />
     );
   }

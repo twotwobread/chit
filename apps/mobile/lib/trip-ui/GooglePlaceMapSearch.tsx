@@ -48,6 +48,7 @@ import {
   buildGooglePlacePhotoImageSource,
   buildGooglePlaceSearchBiasFromRegion,
   buildGooglePlaceSearchInputState,
+  buildGooglePlaceSearchMarkerPinStyle,
   buildGooglePlaceSearchMarkerViewModels,
   buildGooglePlaceSearchResultActionView,
   buildGooglePlaceSearchResultsRegion,
@@ -71,14 +72,13 @@ import {
   type GooglePlaceDetailsViewState,
   type GooglePlaceMapCoordinate,
   type GooglePlaceSearchBias,
-  type GooglePlaceSearchMarkerCategory,
   type GooglePlaceSearchMarkerIconName,
   type GooglePlaceSearchResultActionMode,
   type GooglePlaceSearchRowViewModel,
   type GooglePlaceSearchSheetState,
   type GooglePlaceSearchViewState,
 } from '../places/google-search';
-import { RouteMapOverlay, type RouteMapPlace } from './RouteMap';
+import { RouteMapOverlay, type RouteMapPlace, type RouteMapPolyline } from './RouteMap';
 
 type GooglePlaceSearchBottomSheetHandle = {
   snapToIndex: (index: number) => void;
@@ -119,6 +119,7 @@ export type GooglePlaceMapSearchProps = {
   onPrimaryAction?: (result: GooglePlaceSearchRowViewModel, duplicateConfirmed: boolean) => void;
   onResetActionState?: () => void;
   routePlaces?: RouteMapPlace[];
+  routePolylines?: RouteMapPolyline[];
   sheetTopInset?: number;
   style?: StyleProp<ViewStyle>;
   tripId: string;
@@ -266,6 +267,7 @@ export function GooglePlaceMapSearch({
   onPrimaryAction,
   onResetActionState,
   routePlaces = [],
+  routePolylines,
   sheetTopInset,
   style,
   tripId,
@@ -598,12 +600,16 @@ export function GooglePlaceMapSearch({
         showsMyLocationButton={false}
         style={styles.map}
       >
-        <RouteMapOverlay places={routePlaces} />
+        <RouteMapOverlay places={routePlaces} polylines={routePolylines} />
         {markers.map((marker) => {
           const result = results.find((candidate) => candidate.id === marker.id);
           if (!result) {
             return null;
           }
+          const { iconColor, ...markerPinStyle } = buildGooglePlaceSearchMarkerPinStyle(
+            marker.category,
+            marker.selected,
+          );
           return (
             <Marker
               coordinate={marker.coordinate}
@@ -613,14 +619,8 @@ export function GooglePlaceMapSearch({
               tracksViewChanges
               zIndex={marker.selected ? 4 : 1}
             >
-              <View
-                style={[
-                  styles.markerPin,
-                  { backgroundColor: marker.selected ? theme.color.green[400] : markerCategoryColor(marker.category) },
-                  marker.selected ? styles.markerPinSelected : null,
-                ]}
-              >
-                <MarkerIcon iconName={marker.iconName} selected={marker.selected} />
+              <View style={[styles.markerPin, markerPinStyle, marker.selected ? styles.markerPinSelected : null]}>
+                <MarkerIcon color={iconColor} iconName={marker.iconName} selected={marker.selected} />
               </View>
             </Marker>
           );
@@ -982,28 +982,31 @@ function DuplicateConfirmationCard({
   );
 }
 
-function MarkerIcon({ iconName, selected }: { iconName: GooglePlaceSearchMarkerIconName; selected: boolean }) {
-  const iconColor = theme.color.onPrimary;
+function MarkerIcon({
+  color,
+  iconName,
+  selected,
+}: {
+  color: string;
+  iconName: GooglePlaceSearchMarkerIconName;
+  selected: boolean;
+}) {
   const iconSize = selected ? 22 : 17;
   const strokeWidth = selected ? 2.8 : 2.5;
   switch (iconName) {
     case 'landmark':
-      return <Landmark color={iconColor} size={iconSize} strokeWidth={strokeWidth} />;
+      return <Landmark color={color} size={iconSize} strokeWidth={strokeWidth} />;
     case 'utensils':
-      return <Utensils color={iconColor} size={iconSize} strokeWidth={strokeWidth} />;
+      return <Utensils color={color} size={iconSize} strokeWidth={strokeWidth} />;
     case 'bed':
-      return <BedDouble color={iconColor} size={iconSize} strokeWidth={strokeWidth} />;
+      return <BedDouble color={color} size={iconSize} strokeWidth={strokeWidth} />;
     case 'coffee':
-      return <Coffee color={iconColor} size={iconSize} strokeWidth={strokeWidth} />;
+      return <Coffee color={color} size={iconSize} strokeWidth={strokeWidth} />;
     case 'shopping-bag':
-      return <ShoppingBag color={iconColor} size={iconSize} strokeWidth={strokeWidth} />;
+      return <ShoppingBag color={color} size={iconSize} strokeWidth={strokeWidth} />;
     default:
-      return <MapPin color={iconColor} size={iconSize} strokeWidth={strokeWidth} />;
+      return <MapPin color={color} size={iconSize} strokeWidth={strokeWidth} />;
   }
-}
-
-function markerCategoryColor(category: GooglePlaceSearchMarkerCategory): string {
-  return theme.placeType[category].color;
 }
 
 const styles = StyleSheet.create({
@@ -1345,9 +1348,7 @@ const styles = StyleSheet.create({
     ...theme.shadow.md,
   },
   markerPinSelected: {
-    borderColor: theme.color.surface,
     borderRadius: 23,
-    borderWidth: 4,
     height: 46,
     transform: [{ translateY: -8 }],
     width: 46,
