@@ -36,6 +36,14 @@ func WithInviteBaseURL(value string) ServiceOption {
 	}
 }
 
+func WithToday(today func() time.Time) ServiceOption {
+	return func(s *Service) {
+		if today != nil {
+			s.today = today
+		}
+	}
+}
+
 func NewService(repo Repository, options ...ServiceOption) *Service {
 	service := &Service{
 		repo:                repo,
