@@ -11,6 +11,26 @@ export type DayItinerarySheetCloseAction =
   | { kind: 'close' }
   | { kind: 'promptSave'; target: 'place' | 'nonPlace' };
 
+export type DayItineraryDirtyClosePrompt = {
+  title: string;
+  buttons: (
+    | { label: string; role: 'cancel'; style: 'cancel' }
+    | { label: string; role: 'discard'; style: 'destructive' }
+    | { label: string; role: 'save' }
+  )[];
+};
+
+export function buildDayItineraryDirtyClosePrompt(): DayItineraryDirtyClosePrompt {
+  return {
+    title: '변경 사항을 저장할까요?',
+    buttons: [
+      { label: '취소', role: 'cancel', style: 'cancel' },
+      { label: '저장 안 함', role: 'discard', style: 'destructive' },
+      { label: '저장', role: 'save' },
+    ],
+  };
+}
+
 export function resolveDayItinerarySheetMode(input: {
   selectedDetailItemId: string | null;
   editStatus: DayItinerarySheetStatus;

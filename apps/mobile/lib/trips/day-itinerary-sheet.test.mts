@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import {
+  buildDayItineraryDirtyClosePrompt,
   resolveDayItinerarySheetCloseAction,
   resolveDayItinerarySheetMode,
   shouldDismissDayItinerarySheet,
@@ -62,6 +63,17 @@ describe('day itinerary sheet state helpers', () => {
     assert.equal(shouldDismissDayItinerarySheet({ editStatus: 'idle', nonPlaceEditorStatus: 'saving' }), false);
     assert.equal(shouldDismissDayItinerarySheet({ editStatus: 'editing', nonPlaceEditorStatus: 'idle' }), true);
     assert.equal(shouldDismissDayItinerarySheet({ editStatus: 'idle', nonPlaceEditorStatus: 'idle' }), true);
+  });
+
+  it('offers cancel, discard, and save choices for dirty close prompts', () => {
+    assert.deepEqual(buildDayItineraryDirtyClosePrompt(), {
+      title: '변경 사항을 저장할까요?',
+      buttons: [
+        { label: '취소', role: 'cancel', style: 'cancel' },
+        { label: '저장 안 함', role: 'discard', style: 'destructive' },
+        { label: '저장', role: 'save' },
+      ],
+    });
   });
 
   it('prompts to save when closing a dirty edit sheet and closes clean sheets directly', () => {

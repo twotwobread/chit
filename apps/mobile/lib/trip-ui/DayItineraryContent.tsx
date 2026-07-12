@@ -11,7 +11,11 @@ import {
 import { buildDayItineraryDetailPanel } from '../trips/day-itinerary-detail-panel';
 import { hasDayItineraryEditFormChanges, type DayItineraryEditFormValues } from '../trips/day-itinerary-edit';
 import { type DayItineraryMapActionFeedback } from '../trips/day-itinerary-map-actions';
-import { resolveDayItinerarySheetCloseAction, resolveDayItinerarySheetMode } from '../trips/day-itinerary-sheet';
+import {
+  buildDayItineraryDirtyClosePrompt,
+  resolveDayItinerarySheetCloseAction,
+  resolveDayItinerarySheetMode,
+} from '../trips/day-itinerary-sheet';
 import {
   emptyNonPlaceScheduleItemForm,
   hasNonPlaceScheduleItemFormChanges,
@@ -192,6 +196,16 @@ export function DayItineraryContent({
 
   const closeDetailSheet = () => setSelectedDetailItemId(null);
 
+  const discardActiveSheetChanges = () => {
+    if (editState.status !== 'idle') {
+      onCancelEdit();
+    }
+    if (nonPlaceEditorState.status !== 'idle') {
+      onCancelNonPlaceEditor();
+    }
+    setSelectedDetailItemId(null);
+  };
+
   const closeActiveSheet = () => {
     const closeAction = resolveDayItinerarySheetCloseAction({
       editStatus: editState.status,
@@ -211,19 +225,24 @@ export function DayItineraryContent({
       return;
     }
     if (closeAction.kind === 'promptSave') {
-      Alert.alert('변경 사항을 저장할까요?', undefined, [
-        { text: '취소', style: 'cancel' },
-        { text: '저장', onPress: closeAction.target === 'place' ? onSubmitEdit : onSubmitNonPlaceEditor },
-      ]);
+      const prompt = buildDayItineraryDirtyClosePrompt();
+      const saveAction = closeAction.target === 'place' ? onSubmitEdit : onSubmitNonPlaceEditor;
+      Alert.alert(
+        prompt.title,
+        undefined,
+        prompt.buttons.map((button) => {
+          if (button.role === 'cancel') {
+            return { text: button.label, style: button.style };
+          }
+          if (button.role === 'discard') {
+            return { text: button.label, style: button.style, onPress: discardActiveSheetChanges };
+          }
+          return { text: button.label, onPress: saveAction };
+        }),
+      );
       return;
     }
-    if (editState.status !== 'idle') {
-      onCancelEdit();
-    }
-    if (nonPlaceEditorState.status !== 'idle') {
-      onCancelNonPlaceEditor();
-    }
-    setSelectedDetailItemId(null);
+    discardActiveSheetChanges();
   };
 
   const handlePressTimelineItem = (timelineItem: ItineraryTimelineItem) => {
