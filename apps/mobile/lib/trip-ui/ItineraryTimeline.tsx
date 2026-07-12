@@ -1,8 +1,14 @@
-import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useMemo, useState, type ReactNode } from 'react';
+import { PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Clock } from 'lucide-react-native';
 
 import { Badge, PlacePin, PlaceTag, theme } from '../design';
+import {
+  DAY_ITINERARY_SWIPE_ACTION_WIDTH,
+  resolveDayItinerarySwipeOffset,
+  shouldOpenDayItinerarySwipeAction,
+  shouldStartDayItineraryHorizontalSwipe,
+} from '../trips/day-itinerary-swipe';
 import {
   buildItinerarySegments,
   itineraryDurationLabel,
@@ -23,6 +29,7 @@ export type ItineraryTimelineProps = {
   getItemAccessibilityLabel?: (item: ItineraryTimelineItem) => string;
   onItemNameRef?: (item: ItineraryTimelineItem, node: Text | null) => void;
   renderActions?: (item: ItineraryTimelineItem) => ReactNode;
+  renderSwipeAction?: (item: ItineraryTimelineItem) => ReactNode;
 };
 
 export function ItineraryTimeline({
@@ -34,6 +41,7 @@ export function ItineraryTimeline({
   onPressItem,
   onPressTime,
   renderActions,
+  renderSwipeAction,
 }: ItineraryTimelineProps) {
   if (items.length === 0) {
     return (
@@ -57,6 +65,7 @@ export function ItineraryTimeline({
             onPressItem={onPressItem}
             onPressTime={onPressTime}
             renderActions={renderActions}
+            renderSwipeAction={renderSwipeAction}
           />
         ) : (
           <UntimedSegment
@@ -67,6 +76,7 @@ export function ItineraryTimeline({
             onPressItem={onPressItem}
             onPressTime={onPressTime}
             renderActions={renderActions}
+            renderSwipeAction={renderSwipeAction}
           />
         ),
       )}
@@ -81,6 +91,7 @@ function AnchorRow({
   onPressItem,
   onPressTime,
   renderActions,
+  renderSwipeAction,
 }: {
   item: ItineraryTimelineItem;
   onPressItem?: (item: ItineraryTimelineItem) => void;
@@ -88,6 +99,7 @@ function AnchorRow({
   getItemAccessibilityLabel?: (item: ItineraryTimelineItem) => string;
   onItemNameRef?: (item: ItineraryTimelineItem, node: Text | null) => void;
   renderActions?: (item: ItineraryTimelineItem) => ReactNode;
+  renderSwipeAction?: (item: ItineraryTimelineItem) => ReactNode;
 }) {
   const duration = itineraryDurationLabel(item.startTime ?? '', item.endTime);
   const done = item.status === 'done' || item.status === 'skipped';
@@ -113,6 +125,7 @@ function AnchorRow({
           onItemNameRef={onItemNameRef}
           onPressItem={onPressItem}
           renderActions={renderActions}
+          renderSwipeAction={renderSwipeAction}
         />
       </View>
     </View>
@@ -126,6 +139,7 @@ function UntimedSegment({
   onPressItem,
   onPressTime,
   renderActions,
+  renderSwipeAction,
 }: {
   items: ItineraryTimelineItem[];
   onPressItem?: (item: ItineraryTimelineItem) => void;
@@ -133,6 +147,7 @@ function UntimedSegment({
   getItemAccessibilityLabel?: (item: ItineraryTimelineItem) => string;
   onItemNameRef?: (item: ItineraryTimelineItem, node: Text | null) => void;
   renderActions?: (item: ItineraryTimelineItem) => ReactNode;
+  renderSwipeAction?: (item: ItineraryTimelineItem) => ReactNode;
 }) {
   return (
     <View style={styles.row}>
@@ -158,6 +173,7 @@ function UntimedSegment({
                   onPressItem={onPressItem}
                   onPressTime={onPressTime}
                   renderActions={renderActions}
+                  renderSwipeAction={renderSwipeAction}
                 />
               </View>
             );
@@ -177,6 +193,7 @@ function TimelineCard({
   onPressItem,
   onPressTime,
   renderActions,
+  renderSwipeAction,
 }: {
   compact?: boolean;
   done: boolean;
@@ -186,9 +203,31 @@ function TimelineCard({
   getItemAccessibilityLabel?: (item: ItineraryTimelineItem) => string;
   onItemNameRef?: (item: ItineraryTimelineItem, node: Text | null) => void;
   renderActions?: (item: ItineraryTimelineItem) => ReactNode;
+  renderSwipeAction?: (item: ItineraryTimelineItem) => ReactNode;
 }) {
   const actions = renderActions?.(item);
+  const swipeAction = renderSwipeAction?.(item);
   const accessibilityLabel = getItemAccessibilityLabel?.(item);
+  const [swipeOffset, setSwipeOffset] = useState(0);
+  const hasSwipeAction = Boolean(swipeAction);
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gestureState) =>
+          hasSwipeAction && shouldStartDayItineraryHorizontalSwipe(gestureState),
+        onMoveShouldSetPanResponderCapture: (_, gestureState) =>
+          hasSwipeAction && shouldStartDayItineraryHorizontalSwipe(gestureState),
+        onPanResponderMove: (_, gestureState) => {
+          setSwipeOffset(resolveDayItinerarySwipeOffset(gestureState.dx));
+        },
+        onPanResponderRelease: (_, gestureState) => {
+          setSwipeOffset(shouldOpenDayItinerarySwipeAction(gestureState) ? -DAY_ITINERARY_SWIPE_ACTION_WIDTH : 0);
+        },
+        onPanResponderTerminate: () => setSwipeOffset(0),
+        onShouldBlockNativeResponder: () => false,
+      }),
+    [hasSwipeAction],
+  );
 
   const content = (
     <>
@@ -205,7 +244,7 @@ function TimelineCard({
           {item.status === 'next' ? <Badge label="다음" solid tone="primary" /> : null}
           {item.status === 'done' ? <Badge label="완료" tone="neutral" /> : null}
           {item.status === 'skipped' ? <Badge label="건너뜀" tone="neutral" /> : null}
-          {item.isLodging ? <Badge label="숙소" tone="neutral" /> : null}
+          {item.isLodging ? <Badge label="대표 숙소" tone="neutral" /> : null}
         </View>
         <View style={styles.metaRow}>
           <PlaceTag type={item.type} />
@@ -219,19 +258,43 @@ function TimelineCard({
     </>
   );
 
-  if (onPressItem) {
-    return (
-      <Pressable
-        accessibilityRole="button"
-        onPress={() => onPressItem(item)}
-        style={({ pressed }) => [styles.card, compact ? styles.cardCompact : null, pressed ? styles.pressed : null]}
-      >
-        {content}
-      </Pressable>
-    );
+  const card = onPressItem ? (
+    <Pressable
+      accessibilityRole="button"
+      onPress={() => onPressItem(item)}
+      style={({ pressed }) => [
+        styles.card,
+        compact ? styles.cardCompact : null,
+        swipeOffset ? { transform: [{ translateX: swipeOffset }] } : null,
+        pressed ? styles.pressed : null,
+      ]}
+      {...(hasSwipeAction ? panResponder.panHandlers : {})}
+    >
+      {content}
+    </Pressable>
+  ) : (
+    <View
+      style={[
+        styles.card,
+        compact ? styles.cardCompact : null,
+        swipeOffset ? { transform: [{ translateX: swipeOffset }] } : null,
+      ]}
+      {...(hasSwipeAction ? panResponder.panHandlers : {})}
+    >
+      {content}
+    </View>
+  );
+
+  if (!swipeAction) {
+    return card;
   }
 
-  return <View style={[styles.card, compact ? styles.cardCompact : null]}>{content}</View>;
+  return (
+    <View style={styles.swipeWrap}>
+      <View style={styles.swipeActionSlot}>{swipeAction}</View>
+      {card}
+    </View>
+  );
 }
 
 function TimeButton({
@@ -346,6 +409,18 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.72,
+  },
+  swipeActionSlot: {
+    alignItems: 'stretch',
+    bottom: 0,
+    justifyContent: 'center',
+    position: 'absolute',
+    right: 0,
+    top: theme.space[2],
+    width: DAY_ITINERARY_SWIPE_ACTION_WIDTH,
+  },
+  swipeWrap: {
+    overflow: 'hidden',
   },
   row: {
     flexDirection: 'row',

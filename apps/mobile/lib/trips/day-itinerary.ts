@@ -105,11 +105,8 @@ export function getScheduleItems(response: GetDayScheduleItemsResponse): Schedul
 
 export function buildDayItineraryPlaceAccessibilityLabel(item: DayItineraryRowViewModel): string {
   const timeText = item.timeLabel ? `${item.timeLabel}. ` : '';
-  if (item.itemType === 'non_place') {
-    const detail = item.nonPlaceDetailLabel ? `. ${item.nonPlaceDetailLabel}` : '';
-    return `${item.orderLabel}번째 일정 ${timeText}${item.placeName}. ${item.placeTypeLabel}${detail}`;
-  }
-  return `${item.orderLabel}번째 장소 ${timeText}${item.placeName}. ${item.placeTypeLabel}. ${item.address}`;
+  const rowKind = item.itemType === 'non_place' ? '일정' : '장소';
+  return `${item.orderLabel}번째 ${rowKind} ${timeText}${item.placeName}. ${item.placeTypeLabel}`;
 }
 
 export function getNonPlaceCategoryLabel(category: NonPlaceScheduleItemCategory): string {

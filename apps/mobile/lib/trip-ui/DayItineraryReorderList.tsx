@@ -109,10 +109,10 @@ export function ReorderPlaceList({
             ) : (
               <PlaceTag type={item.placeType} />
             )}
+            {item.isLodging ? <Badge label="대표 숙소" tone="neutral" /> : null}
             {item.statusLabel ? <Badge label={item.statusLabel} tone="neutral" /> : null}
           </View>
           {item.timeLabel ? <Text style={styles.timeLabel}>{item.timeLabel}</Text> : null}
-          {item.address ? <Text style={styles.address}>{item.address}</Text> : null}
         </View>
         <View
           accessibilityHint="핸들을 잡고 위아래로 끌어서 순서를 바꿔요."
