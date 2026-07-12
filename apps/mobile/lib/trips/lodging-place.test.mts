@@ -5,76 +5,81 @@ import type { TripDay } from '@i-um/api-contract';
 
 import {
   buildDayLodgingPanel,
+  buildDayLodgingManagementActionRows,
+  buildDayLodgingManagementActions,
   buildDayLodgingPlaceOptions,
+  buildDayLodgingPlaceOptionsPresentation,
   buildDayLodgingRowViewModel,
-  buildManualDayLodgingPlaceSubmitState,
+  buildGoogleDayLodgingPlaceRequest,
   buildSetDayLodgingPlaceRequest,
   buildTripDayLodgingSummary,
   dayLodgingMutationFailureState,
-  validateManualDayLodgingPlaceForm,
+  runDayLodgingSearchRegisterAction,
 } from './lodging-place';
 
 describe('day lodging place helpers', () => {
-  it('maps non-selected and selected itinerary rows to lodging actions and badge state', () => {
+  it('maps itinerary lodging rows to badge-only management entry state', () => {
     assert.deepEqual(buildDayLodgingRowViewModel({ id: 'item-1', isLodging: false }), {
       isLodging: false,
       badgeLabel: null,
-      action: { kind: 'set', label: '숙소로 지정', disabled: false, isSubmitting: false },
+      opensManagement: false,
     });
 
     assert.deepEqual(buildDayLodgingRowViewModel({ id: 'item-2', isLodging: true }), {
       isLodging: true,
       badgeLabel: '대표 숙소',
-      action: { kind: 'clear', label: '숙소 해제', disabled: false, isSubmitting: false },
+      opensManagement: true,
     });
   });
 
-  it('disables duplicate lodging actions while setting or clearing without optimistic replacement', () => {
-    assert.deepEqual(
-      buildDayLodgingRowViewModel({ id: 'item-1', isLodging: false }, { kind: 'set', itemId: 'item-1' }),
-      {
-        isLodging: false,
-        badgeLabel: null,
-        action: { kind: 'set', label: '숙소로 지정 중...', disabled: true, isSubmitting: true },
-      },
-    );
-
-    assert.deepEqual(
-      buildDayLodgingRowViewModel({ id: 'item-2', isLodging: false }, { kind: 'set', itemId: 'item-1' }),
-      {
-        isLodging: false,
-        badgeLabel: null,
-        action: { kind: 'set', label: '숙소로 지정', disabled: true, isSubmitting: false },
-      },
-    );
-
-    assert.deepEqual(
-      buildDayLodgingRowViewModel({ id: 'item-3', isLodging: true }, { kind: 'clear', itemId: 'item-3' }),
-      {
-        isLodging: true,
-        badgeLabel: '대표 숙소',
-        action: { kind: 'clear', label: '숙소 해제 중...', disabled: true, isSubmitting: true },
-      },
-    );
-  });
-
-  it('builds the Day lodging panel for empty and selected lodging states', () => {
-    assert.deepEqual(buildDayLodgingPanel(null), {
+  it('builds compact Day lodging summary without exposing address', () => {
+    assert.deepEqual(buildDayLodgingPanel(null).summary, {
       label: '숙소',
-      placeName: null,
+      placeName: '숙소 미지정',
+      actionLabel: '지정하기',
       address: null,
-      helper: '이 Day에 지정된 숙소가 없어요.',
-      canClear: false,
     });
 
     assert.deepEqual(
-      buildDayLodgingPanel({ id: 'place-1', name: '호텔 니코 오사카', address: 'Nishi', placeType: 'lodging' }),
+      buildDayLodgingPanel({ id: 'place-1', name: '호텔 니코 오사카', address: 'Nishi', placeType: 'lodging' }).summary,
       {
         label: '숙소',
         placeName: '호텔 니코 오사카',
+        actionLabel: '변경',
+        address: null,
+      },
+    );
+  });
+
+  it('builds management sheet view models for empty and selected lodging states', () => {
+    assert.deepEqual(buildDayLodgingPanel(null).sheet, {
+      title: '숙소 지정',
+      placeName: null,
+      address: null,
+      helper: '현재 여행에 저장된 장소 중 선택하거나 숙소를 직접 등록해 주세요.',
+      canCopyAddress: false,
+      canClear: false,
+      selectExistingAction: '기존 장소에서 선택',
+      manualRegisterAction: '숙소 검색해서 등록',
+      changeAction: null,
+      clearAction: null,
+      copyAddressAction: null,
+    });
+
+    assert.deepEqual(
+      buildDayLodgingPanel({ id: 'place-1', name: '호텔 니코 오사카', address: 'Nishi', placeType: 'lodging' }).sheet,
+      {
+        title: '숙소 관리',
+        placeName: '호텔 니코 오사카',
         address: 'Nishi',
         helper: null,
+        canCopyAddress: true,
         canClear: true,
+        selectExistingAction: '기존 장소에서 선택',
+        manualRegisterAction: '숙소 검색해서 등록',
+        changeAction: '다른 숙소로 변경',
+        clearAction: '숙소 해제',
+        copyAddressAction: '주소 복사',
       },
     );
   });
@@ -97,20 +102,76 @@ describe('day lodging place helpers', () => {
     );
   });
 
-  it('validates and trims manual lodging registration form values', () => {
-    assert.deepEqual(validateManualDayLodgingPlaceForm({ name: ' 호텔 ', address: ' Nishi ' }), {
-      ok: true,
-      request: { name: '호텔', address: 'Nishi' },
+  it('constrains long existing-place option lists to an internal scroll area', () => {
+    assert.deepEqual(buildDayLodgingPlaceOptionsPresentation(Array.from({ length: 4 })), {
+      isScrollable: false,
+      visibleOptionCount: 4,
     });
-    assert.deepEqual(validateManualDayLodgingPlaceForm({ name: ' ', address: '가'.repeat(301) }), {
-      ok: false,
-      errors: { name: '숙소명을 입력해주세요.', address: '주소는 300자 이하로 입력해주세요.' },
+    assert.deepEqual(buildDayLodgingPlaceOptionsPresentation(Array.from({ length: 5 })), {
+      isScrollable: true,
+      visibleOptionCount: 4,
     });
   });
 
-  it('builds manual lodging submit states', () => {
-    assert.deepEqual(buildManualDayLodgingPlaceSubmitState(false), { disabled: false, label: '숙소 등록' });
-    assert.deepEqual(buildManualDayLodgingPlaceSubmitState(true), { disabled: true, label: '숙소 등록 중...' });
+  it('builds Google-backed lodging registration request from a selected map search result', () => {
+    assert.deepEqual(buildGoogleDayLodgingPlaceRequest(' google-hotel-1 '), {
+      googlePlaceId: 'google-hotel-1',
+    });
+  });
+
+  it('orders existing lodging management actions with clear directly below address copy', () => {
+    const sheet = buildDayLodgingPanel({
+      id: 'place-1',
+      name: '호텔 니코 오사카',
+      address: 'Nishi',
+      placeType: 'lodging',
+    }).sheet;
+
+    assert.deepEqual(buildDayLodgingManagementActions(sheet), [
+      { kind: 'copyAddress', label: '주소 복사' },
+      { kind: 'clear', label: '숙소 해제', destructive: true },
+      { kind: 'change', label: '다른 숙소로 변경' },
+      { kind: 'searchRegister', label: '숙소 검색해서 등록' },
+    ]);
+  });
+
+  it('groups compact lodging management actions into horizontal rows', () => {
+    const actions = buildDayLodgingManagementActions(
+      buildDayLodgingPanel({
+        id: 'place-1',
+        name: '호텔 니코 오사카',
+        address: 'Nishi',
+        placeType: 'lodging',
+      }).sheet,
+    );
+
+    assert.deepEqual(buildDayLodgingManagementActionRows(actions), [
+      {
+        id: 'current-place-actions',
+        actions: [
+          { kind: 'copyAddress', label: '주소 복사' },
+          { kind: 'clear', label: '숙소 해제', destructive: true },
+        ],
+      },
+      {
+        id: 'management-actions',
+        actions: [
+          { kind: 'change', label: '다른 숙소로 변경' },
+          { kind: 'searchRegister', label: '숙소 검색해서 등록' },
+        ],
+      },
+    ]);
+  });
+
+  it('closes the lodging sheet before opening map-based lodging search', () => {
+    const events: string[] = [];
+
+    runDayLodgingSearchRegisterAction({
+      closeSheet: () => events.push('close-sheet'),
+      openSearchRegister: () => events.push('open-search-register'),
+    });
+
+    assert.deepEqual(events, ['close-sheet', 'open-search-register']);
   });
 
   it('builds generated set request shape from a trip place id', () => {

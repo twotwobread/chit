@@ -1,14 +1,15 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
+import { router } from 'expo-router';
 
 import type { DayItineraryRowViewModel } from '../trips/day-itinerary';
 import {
   buildDayLodgingPlaceOptions,
   buildSetDayLodgingPlaceRequest,
   dayLodgingMutationFailureState,
-  validateManualDayLodgingPlaceForm,
   type DayLodgingPlaceOptionViewModel,
 } from '../trips/lodging-place';
-import { clearDayLodgingPlace, createManualDayLodgingPlace, setDayLodgingPlace } from '../trips/itinerary-api';
+import { buildDayItineraryLodgingPlaceSearchRoute } from '../trips/day-itinerary-add-place-navigation';
+import { clearDayLodgingPlace, setDayLodgingPlace } from '../trips/itinerary-api';
 import { listTripPlaces } from '../trips/trip-api';
 import {
   type DayItineraryLoad,
@@ -29,7 +30,6 @@ type DayItineraryLodgingActionContext = {
   enterAuthState: () => void;
   handleRecoverableMutationError: DayItineraryMutationFailureHandler;
   load: DayItineraryLoad;
-  lodgingPickerState: LodgingPlacePickerState;
   lodgingState: LodgingState;
   setDeleteState: Dispatch<SetStateAction<DeleteState>>;
   setEditState: Dispatch<SetStateAction<EditState>>;
@@ -47,7 +47,6 @@ export function createDayItineraryLodgingActions({
   enterAuthState,
   handleRecoverableMutationError,
   load,
-  lodgingPickerState,
   lodgingState,
   setDeleteState,
   setEditState,
@@ -185,63 +184,27 @@ export function createDayItineraryLodgingActions({
     }
   };
 
-  const openManualLodgingForm = () => {
+  const openLodgingSearchRegister = () => {
+    if (!tripId || !date) {
+      return;
+    }
+
     discardReorder();
-    setLodgingPickerState({ status: 'manual', values: { name: '', address: '' }, errors: {} });
-  };
-
-  const submitManualLodging = async () => {
-    if (!tripId || !date || lodgingPickerState.status !== 'manual') {
-      return;
-    }
-    const validation = validateManualDayLodgingPlaceForm(lodgingPickerState.values);
-    if (!validation.ok) {
-      setLodgingPickerState({ ...lodgingPickerState, errors: validation.errors });
-      return;
-    }
-
-    const submittingState = { status: 'creating' as const, values: lodgingPickerState.values, errors: {} };
-    setLodgingPickerState(submittingState);
-    try {
-      await createManualDayLodgingPlace(tripId, date, validation.request);
-      setLodgingState({ status: 'idle' });
-      setLodgingPickerState({ status: 'idle' });
-      await load();
-    } catch (error) {
-      if (
-        await handleRecoverableMutationError(error, async () => {
-          setLodgingPickerState({ status: 'idle' });
-          await load();
-        })
-      ) {
-        return;
-      }
-      const failure = dayLodgingMutationFailureState();
-      setLodgingPickerState({ ...submittingState, status: 'manual', errors: { form: failure.title } });
-    }
+    setLodgingPickerState({ status: 'idle' });
+    router.push(buildDayItineraryLodgingPlaceSearchRoute(tripId, date));
   };
 
   const cancelLodgingPicker = () => {
     setLodgingPickerState({ status: 'idle' });
   };
 
-  const updateManualLodgingValues = (
-    values: Extract<LodgingPlacePickerState, { status: 'manual' | 'creating' }>['values'],
-  ) => {
-    setLodgingPickerState((current) =>
-      current.status === 'manual' || current.status === 'creating' ? { ...current, values, errors: {} } : current,
-    );
-  };
-
   return {
     cancelLodgingPicker,
     openLodgingPlaceSelection,
-    openManualLodgingForm,
+    openLodgingSearchRegister,
     submitClearCurrentLodging,
     submitClearLodging,
-    submitManualLodging,
     submitSelectLodgingPlace,
     submitSetLodging,
-    updateManualLodgingValues,
   };
 }

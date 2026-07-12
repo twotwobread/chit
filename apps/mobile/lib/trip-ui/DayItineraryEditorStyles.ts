@@ -126,6 +126,86 @@ export const styles = StyleSheet.create({
     gap: theme.space[3],
     padding: theme.space[4],
   },
+  lodgingSummary: {
+    alignItems: 'center',
+    backgroundColor: theme.color.surfaceSunken,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: theme.space[3],
+    justifyContent: 'space-between',
+    minHeight: theme.layout.tapMin,
+    paddingHorizontal: theme.space[4],
+    paddingVertical: theme.space[3],
+  },
+  lodgingSummaryTextGroup: {
+    alignItems: 'center',
+    flex: 1,
+    flexDirection: 'row',
+    gap: theme.space[3],
+  },
+  lodgingSummaryLabel: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.semibold,
+    fontSize: theme.font.size.caption,
+    fontWeight: theme.font.weight.semibold,
+  },
+  lodgingSummaryName: {
+    color: theme.color.textStrong,
+    flex: 1,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.body,
+    fontWeight: theme.font.weight.bold,
+  },
+  lodgingSummaryAction: {
+    color: theme.color.primary,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.caption,
+    fontWeight: theme.font.weight.bold,
+  },
+  lodgingSheetBody: {
+    gap: theme.space[5],
+    paddingBottom: theme.space[3],
+  },
+  lodgingSheetHeader: {
+    gap: theme.space[2],
+    paddingRight: theme.space[8],
+  },
+  lodgingSheetTitle: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.headline,
+    fontWeight: theme.font.weight.bold,
+  },
+  lodgingCurrentBox: {
+    backgroundColor: theme.color.surfaceSunken,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    gap: theme.space[3],
+    padding: theme.space[4],
+  },
+  lodgingCurrentActionRow: {
+    alignItems: 'stretch',
+    flexDirection: 'row',
+    gap: theme.space[2],
+  },
+  lodgingCurrentActionButton: {
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: theme.layout.controlH,
+  },
+  lodgingSheetActions: {
+    alignItems: 'stretch',
+    flexDirection: 'row',
+    gap: theme.space[2],
+  },
+  lodgingSheetActionButton: {
+    flex: 1,
+    minWidth: 0,
+    paddingHorizontal: theme.space[3],
+  },
   lodgingPlaceName: {
     color: theme.color.textStrong,
     fontFamily: theme.font.family.bold,
@@ -134,6 +214,23 @@ export const styles = StyleSheet.create({
   },
   lodgingPickerBox: {
     gap: theme.space[3],
+  },
+  lodgingOptionListScrollable: {
+    maxHeight: theme.layout.controlHLg * 4 + theme.space[3] * 3,
+  },
+  lodgingOptionListContent: {
+    gap: theme.space[3],
+  },
+  lodgingSearchRow: {
+    alignItems: 'stretch',
+    flexDirection: 'row',
+    gap: theme.space[2],
+  },
+  lodgingSearchInput: {
+    flex: 1,
+  },
+  lodgingSearchButton: {
+    minWidth: theme.layout.controlHLg,
   },
   lodgingOption: {
     backgroundColor: theme.color.surface,
@@ -200,6 +297,7 @@ export const styles = StyleSheet.create({
     borderWidth: 1,
     flexDirection: 'row',
     gap: theme.space[2],
+    justifyContent: 'center',
     paddingHorizontal: theme.space[3],
     paddingVertical: theme.space[2],
   },
@@ -207,9 +305,11 @@ export const styles = StyleSheet.create({
     opacity: 0.6,
   },
   rowDangerActionButton: {
+    alignItems: 'center',
     borderColor: theme.color.danger,
     borderRadius: theme.radius.sm,
     borderWidth: 1,
+    justifyContent: 'center',
     paddingHorizontal: theme.space[3],
     paddingVertical: theme.space[2],
   },

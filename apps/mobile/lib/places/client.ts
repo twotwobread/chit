@@ -1,9 +1,11 @@
 import {
   PlacesService,
+  type CreateGoogleDayLodgingPlaceRequest,
   type CreateGooglePlaceScheduleItemRequest,
   type CreateGooglePlaceScheduleItemResponse,
   type GooglePlaceDetailsResponse,
   type SearchGooglePlacesResponse,
+  type SetDayLodgingPlaceResponse,
 } from '@i-um/api-contract';
 
 import { getMeWithRefresh } from '../auth/client';
@@ -42,6 +44,15 @@ export async function getGooglePlaceDetails(
 ): Promise<GooglePlaceDetailsResponse> {
   await getMeWithRefresh();
   return PlacesService.getGooglePlaceDetails(tripId, tripDayId, googlePlaceId);
+}
+
+export async function createGoogleDayLodgingPlace(
+  tripId: string,
+  tripDayId: string,
+  request: CreateGoogleDayLodgingPlaceRequest,
+): Promise<SetDayLodgingPlaceResponse> {
+  await getMeWithRefresh();
+  return PlacesService.createGoogleDayLodgingPlace(tripId, tripDayId, request);
 }
 
 export async function createGooglePlaceScheduleItem(

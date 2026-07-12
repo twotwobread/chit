@@ -7,7 +7,7 @@ import { ApiError } from '@i-um/api-contract';
 import { MobileAuthError } from '../../../../../lib/auth/client';
 import { theme } from '../../../../../lib/design';
 import { GooglePlaceMapSearch } from '../../../../../lib/trip-ui/GooglePlaceMapSearch';
-import { createGooglePlaceScheduleItem } from '../../../../../lib/places/client';
+import { createGoogleDayLodgingPlace, createGooglePlaceScheduleItem } from '../../../../../lib/places/client';
 import {
   addingGooglePlaceState,
   confirmingDuplicateGooglePlaceState,
@@ -24,6 +24,7 @@ import {
   selectedPlaceFromGoogleSearchResult,
 } from '../../../../../lib/places/place-schedule-detail';
 import { resolveDayItineraryAddPlaceReturnNavigation } from '../../../../../lib/trips/day-itinerary-add-place-navigation';
+import { buildGoogleDayLodgingPlaceRequest } from '../../../../../lib/trips/lodging-place';
 
 export default function GooglePlaceSearchScreen() {
   const {
@@ -59,6 +60,7 @@ export default function GooglePlaceSearchScreen() {
   const date = Array.isArray(dateParam) ? dateParam[0] : dateParam;
   const mode = Array.isArray(modeParam) ? modeParam[0] : modeParam;
   const isSelectorMode = mode === 'select';
+  const isLodgingMode = mode === 'lodging';
   const [addState, setAddState] = useState<GooglePlaceAddViewState>(idleGooglePlaceAddState());
 
   const returnToDay = () => {
@@ -104,7 +106,11 @@ export default function GooglePlaceSearchScreen() {
 
     setAddState(addingGooglePlaceState(result.id));
     try {
-      await createGooglePlaceScheduleItem(tripId, date, result.id, duplicateConfirmed, result.placeName);
+      if (isLodgingMode) {
+        await createGoogleDayLodgingPlace(tripId, date, buildGoogleDayLodgingPlaceRequest(result.id));
+      } else {
+        await createGooglePlaceScheduleItem(tripId, date, result.id, duplicateConfirmed, result.placeName);
+      }
       returnToDay();
     } catch (error) {
       if (
@@ -144,7 +150,7 @@ export default function GooglePlaceSearchScreen() {
 
   return (
     <GooglePlaceMapSearch
-      actionMode={isSelectorMode ? 'scheduleSelect' : 'scheduleAdd'}
+      actionMode={isSelectorMode ? 'scheduleSelect' : isLodgingMode ? 'lodgingRegister' : 'scheduleAdd'}
       actionState={addState}
       dayId={date}
       notFoundAction={{ label: '일정으로', onPress: returnToDay }}

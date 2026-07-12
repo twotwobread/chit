@@ -13,6 +13,7 @@ export type ItineraryTimelineItem = {
   status?: 'done' | 'next' | 'todo' | 'skipped';
   legLabel?: string;
   isLodging?: boolean;
+  lodgingBadgeLabel?: string | null;
 };
 
 export type ItineraryTimelineSegment =
