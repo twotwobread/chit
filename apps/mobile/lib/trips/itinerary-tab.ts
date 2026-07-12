@@ -20,7 +20,7 @@ export function buildItineraryTimelineItems(viewModel: DayItineraryViewModel): I
       order: Number(item.orderLabel),
       type: item.placeType,
       name: item.placeName,
-      area: item.address || item.placeTypeLabel,
+      area: item.itemType === 'non_place' ? item.placeTypeLabel : undefined,
       startTime: item.startTime,
       endTime: item.endTime,
       status: dayItineraryStatusToTimelineStatus(item.statusLabel),

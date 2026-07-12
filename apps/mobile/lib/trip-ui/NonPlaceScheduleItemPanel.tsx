@@ -13,27 +13,28 @@ import { styles } from './DayItineraryEditorStyles';
 import type { NonPlaceScheduleItemPanelState } from './DayItineraryEditorTypes';
 import { ScheduleTimeEditor } from './ScheduleTimeEditor';
 
-const nonPlaceTimeHelper =
-  '비워두면 순서만 있는 일정으로 저장돼요. 시간을 바꿔도 순서는 자동으로 바뀌지 않아요. 필요하면 순서 변경으로 조정해주세요.';
+type NonPlaceScheduleItemPanelVariant = 'card' | 'sheet';
 
 export function NonPlaceScheduleItemPanel({
   editorState,
   onCancel,
   onSubmit,
   onUpdateValues,
+  variant = 'card',
 }: {
   editorState: NonPlaceScheduleItemPanelState;
   onCancel: () => void;
   onSubmit: () => void;
   onUpdateValues: (values: NonPlaceScheduleItemFormValues) => void;
+  variant?: NonPlaceScheduleItemPanelVariant;
 }) {
   const isSaving = editorState.status === 'saving';
   const submitView = buildNonPlaceScheduleItemSubmitState(isSaving, editorState.mode);
   const update = (patch: Partial<NonPlaceScheduleItemFormValues>) =>
     onUpdateValues({ ...editorState.values, ...patch });
 
-  return (
-    <Card>
+  const content = (
+    <>
       <Text style={styles.panelTitle}>
         {editorState.mode === 'create' ? '장소 없는 일정 추가' : '장소 없는 일정 수정'}
       </Text>
@@ -72,9 +73,7 @@ export function NonPlaceScheduleItemPanel({
 
       <ScheduleTimeEditor
         disabled={isSaving}
-        emptyHelper="시간을 정하지 않으면 시간 미정 일정으로 저장돼요."
         endTimeError={editorState.errors.endTime}
-        helper={nonPlaceTimeHelper}
         onChange={update}
         startTimeError={editorState.errors.startTime}
         values={editorState.values}
@@ -231,16 +230,24 @@ export function NonPlaceScheduleItemPanel({
         </View>
       ) : null}
 
-      <View style={styles.actionGroup}>
+      <View style={variant === 'sheet' ? styles.sheetActionRow : styles.actionGroup}>
+        <SecondaryButton
+          disabled={isSaving}
+          label="취소"
+          onPress={onCancel}
+          style={variant === 'sheet' ? styles.sheetActionButton : null}
+        />
         <PrimaryButton
           disabled={submitView.disabled}
           label={submitView.label}
           loading={isSaving}
           loadingLabel={submitView.label}
           onPress={onSubmit}
+          style={variant === 'sheet' ? styles.sheetActionButton : null}
         />
-        <SecondaryButton disabled={isSaving} label="취소" onPress={onCancel} />
       </View>
-    </Card>
+    </>
   );
+
+  return variant === 'sheet' ? <View style={styles.sheetFormBody}>{content}</View> : <Card>{content}</Card>;
 }

@@ -9,6 +9,7 @@ export type DayItineraryEditFormValues = {
   placeType?: TripPlaceType | string;
   startTime: string;
   endTime: string;
+  memo: string;
 };
 
 export type DayItineraryEditFormErrors = {
@@ -17,6 +18,7 @@ export type DayItineraryEditFormErrors = {
   placeType?: string;
   startTime?: string;
   endTime?: string;
+  memo?: string;
   form?: string;
 };
 
@@ -51,7 +53,22 @@ export function buildDayItineraryEditForm(item: DayItineraryRowViewModel): DayIt
     placeType: item.placeType,
     startTime: item.startTime ?? '',
     endTime: item.endTime ?? '',
+    memo: item.placeMemo ?? '',
   };
+}
+
+export function hasDayItineraryEditFormChanges(
+  original: DayItineraryEditFormValues,
+  current: DayItineraryEditFormValues,
+): boolean {
+  return (
+    current.name.trim() !== original.name.trim() ||
+    current.address.trim() !== original.address.trim() ||
+    current.placeType !== original.placeType ||
+    current.startTime.trim() !== original.startTime.trim() ||
+    current.endTime.trim() !== original.endTime.trim() ||
+    current.memo.trim() !== original.memo.trim()
+  );
 }
 
 export function validateDayItineraryEditForm(
@@ -63,6 +80,7 @@ export function validateDayItineraryEditForm(
   const placeType = isTripPlaceType(current.placeType) ? current.placeType : undefined;
   const startTime = current.startTime.trim();
   const endTime = current.endTime.trim();
+  const memo = current.memo.trim();
   const errors: DayItineraryEditFormErrors = {};
 
   if (name.length === 0) {
@@ -94,6 +112,10 @@ export function validateDayItineraryEditForm(
     errors.endTime = '종료 시간은 시작 시간보다 늦어야 해요.';
   }
 
+  if ([...memo].length > 1000) {
+    errors.memo = '메모는 1000자 이하로 입력해주세요.';
+  }
+
   if (Object.keys(errors).length > 0 || !placeType) {
     return { ok: false, errors };
   }
@@ -103,6 +125,7 @@ export function validateDayItineraryEditForm(
   const originalPlaceType = isTripPlaceType(original.placeType) ? original.placeType : undefined;
   const originalStartTime = original.startTime.trim();
   const originalEndTime = original.endTime.trim();
+  const originalMemo = original.memo.trim();
   const request: UpdateScheduleItemRequest = {};
 
   if (name !== originalName) {
@@ -119,6 +142,9 @@ export function validateDayItineraryEditForm(
   }
   if (endTime !== originalEndTime) {
     request.endTime = endTime;
+  }
+  if (memo !== originalMemo) {
+    request.memo = memo;
   }
 
   if (Object.keys(request).length === 0) {

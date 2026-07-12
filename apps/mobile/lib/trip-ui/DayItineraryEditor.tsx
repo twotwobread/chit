@@ -4,12 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { theme } from '../design';
 import { buildTripRootFabLayout, shouldShowTripRootFab } from '../trips/trip-root-fab-layout';
-import {
-  DayItineraryContent,
-  DeletePlaceConfirmationModal,
-  EditPlacePanel,
-  NonPlaceScheduleItemPanel,
-} from './DayItineraryEditorParts';
+import { DayItineraryContent, DeletePlaceConfirmationModal } from './DayItineraryEditorParts';
 import { styles } from './DayItineraryEditorStyles';
 import { TripRootFab } from './TripRootFab';
 import { useDayItineraryEditorController } from './useDayItineraryEditorController';
@@ -123,13 +118,15 @@ export function DayItineraryEditor({
         {state.status === 'success' ? (
           <>
             <DayItineraryContent
+              editState={editState}
               focusRequest={contentFocusRequest}
               getReorderScrollOffsetY={getReorderScrollOffsetY}
               onFocusRequestHandled={clearContentFocusRequest}
               onCopyAddress={(item) => void copyPlaceAddress(item)}
               onDeletePlace={beginDelete}
+              onCancelEdit={cancelEdit}
+              onCancelNonPlaceEditor={cancelNonPlaceEditor}
               onEditPlace={beginEdit}
-              onEditTime={beginEdit}
               onEnterReorderMode={() => beginReorder(state.viewModel)}
               onExitReorderMode={cancelReorder}
               lodgingPickerState={lodgingPickerState}
@@ -144,30 +141,19 @@ export function DayItineraryEditor({
               onOpenLodgingSearchRegister={openLodgingSearchRegister}
               onSaveReorder={() => void submitReorder()}
               onSelectLodgingPlace={(option) => void submitSelectLodgingPlace(option)}
+              onSubmitEdit={() => void submitEdit()}
+              onSubmitNonPlaceEditor={() => void submitNonPlaceEditor()}
+              onUpdateEditValues={updateEditValues}
+              onUpdateNonPlaceEditorValues={updateNonPlaceEditorValues}
               mapActionFeedback={mapActionFeedback}
               onReloadSharedUpdate={requestSharedUpdateReload}
+              nonPlaceEditorState={nonPlaceEditorState}
               reorderFeedback={reorderFeedback}
               reorderState={reorderState}
               sharedUpdateBanner={sharedUpdateBanner}
               sharedUpdateReloadDisabled={sharedUpdateReloadDisabled}
               viewModel={state.viewModel}
             />
-            {nonPlaceEditorState.status === 'editing' || nonPlaceEditorState.status === 'saving' ? (
-              <NonPlaceScheduleItemPanel
-                editorState={nonPlaceEditorState}
-                onCancel={cancelNonPlaceEditor}
-                onSubmit={() => void submitNonPlaceEditor()}
-                onUpdateValues={updateNonPlaceEditorValues}
-              />
-            ) : null}
-            {editState.status === 'editing' || editState.status === 'saving' ? (
-              <EditPlacePanel
-                editState={editState}
-                onCancel={cancelEdit}
-                onSubmit={() => void submitEdit()}
-                onUpdateValues={updateEditValues}
-              />
-            ) : null}
           </>
         ) : null}
 

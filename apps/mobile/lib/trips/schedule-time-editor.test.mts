@@ -4,6 +4,7 @@ import { describe, it } from 'node:test';
 import {
   addScheduleEndTime,
   addScheduleStartTime,
+  buildScheduleTimeEditorSummary,
   clearScheduleTimes,
   type ScheduleTimeEditorValues,
 } from './schedule-time-editor';
@@ -29,6 +30,23 @@ describe('schedule time editor helpers', () => {
     assert.deepEqual(clearScheduleTimes({ startTime: '09:30', endTime: '10:30' }), {
       startTime: '',
       endTime: '',
+    });
+  });
+
+  it('summarizes unspecified and ranged times for compact editor rows', () => {
+    assert.deepEqual(buildScheduleTimeEditorSummary({ startTime: '', endTime: '' }), {
+      startLabel: '--:--',
+      endLabel: '--:--',
+      summaryLabel: '--:-- → --:--',
+      hasStartTime: false,
+      hasEndTime: false,
+    });
+    assert.deepEqual(buildScheduleTimeEditorSummary({ startTime: '08:12', endTime: '21:12' }), {
+      startLabel: '오전 8:12',
+      endLabel: '오후 9:12',
+      summaryLabel: '오전 8:12 → 오후 9:12',
+      hasStartTime: true,
+      hasEndTime: true,
     });
   });
 });

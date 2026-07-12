@@ -312,9 +312,7 @@ export default function NewPlaceScheduleDetailScreen() {
 
         <ScheduleTimeEditor
           disabled={isSubmitting}
-          emptyHelper="시간을 정하지 않으면 시간 미정 일정으로 저장돼요."
           endTimeError={errors.endTime}
-          helper="종료 시간은 선택 사항이에요. 필요 없으면 시간 미정을 눌러 비울 수 있어요."
           onChange={updateValues}
           startTimeError={errors.startTime}
           values={values}

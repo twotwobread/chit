@@ -118,6 +118,53 @@ export const styles = StyleSheet.create({
   placeList: {
     gap: theme.space[3],
   },
+  placeListHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: theme.space[3],
+    justifyContent: 'space-between',
+  },
+  placeListHeaderActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexShrink: 1,
+    gap: theme.space[2],
+    justifyContent: 'flex-end',
+  },
+  headerPrimaryButton: {
+    alignItems: 'center',
+    backgroundColor: theme.color.primary,
+    borderRadius: theme.radius.pill,
+    flexDirection: 'row',
+    gap: theme.space[2],
+    justifyContent: 'center',
+    minHeight: theme.layout.controlHSm,
+    paddingHorizontal: theme.space[4],
+    paddingVertical: theme.space[2],
+  },
+  headerPrimaryButtonText: {
+    color: theme.color.onPrimary,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.caption,
+    fontWeight: theme.font.weight.bold,
+  },
+  headerSecondaryButton: {
+    alignItems: 'center',
+    backgroundColor: theme.color.surface,
+    borderColor: theme.color.borderDefault,
+    borderRadius: theme.radius.pill,
+    borderWidth: 1,
+    justifyContent: 'center',
+    minHeight: theme.layout.controlHSm,
+    paddingHorizontal: theme.space[4],
+    paddingVertical: theme.space[2],
+  },
+  headerSecondaryButtonText: {
+    color: theme.color.textBody,
+    fontFamily: theme.font.family.semibold,
+    fontSize: theme.font.size.caption,
+    fontWeight: theme.font.weight.semibold,
+  },
   lodgingBox: {
     backgroundColor: theme.color.surfaceSunken,
     borderColor: theme.color.borderSubtle,
@@ -304,6 +351,10 @@ export const styles = StyleSheet.create({
   rowActionButtonDisabled: {
     opacity: 0.6,
   },
+  rowActionButtonPressed: {
+    backgroundColor: theme.color.surfaceSunken,
+    borderColor: theme.color.primary,
+  },
   rowDangerActionButton: {
     alignItems: 'center',
     borderColor: theme.color.danger,
@@ -324,6 +375,23 @@ export const styles = StyleSheet.create({
     fontFamily: theme.font.family.semibold,
     fontSize: theme.font.size.caption,
     fontWeight: theme.font.weight.semibold,
+  },
+  swipeDeleteButton: {
+    alignItems: 'center',
+    alignSelf: 'stretch',
+    justifyContent: 'center',
+    width: 52,
+  },
+  swipeDeleteButtonPressed: {
+    opacity: 0.82,
+  },
+  swipeDeleteIconButton: {
+    alignItems: 'center',
+    backgroundColor: theme.color.red[500],
+    borderRadius: theme.radius.pill,
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
   },
   expenseStatusBox: {
     alignItems: 'center',
@@ -420,6 +488,57 @@ export const styles = StyleSheet.create({
     fontWeight: theme.font.weight.bold,
     textAlign: 'center',
   },
+  detailSheetBody: {
+    gap: theme.space[5],
+    paddingBottom: theme.space[2],
+  },
+  sheetFormBody: {
+    gap: theme.space[4],
+    paddingBottom: theme.space[2],
+  },
+  detailSheetHeader: {
+    gap: theme.space[3],
+    paddingRight: theme.space[8],
+  },
+  detailSheetTitle: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.headline,
+    fontWeight: theme.font.weight.bold,
+  },
+  detailMetaRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.space[2],
+  },
+  detailSheetMeta: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.caption,
+  },
+  detailAddressBox: {
+    backgroundColor: theme.color.surfaceSunken,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    gap: theme.space[2],
+    padding: theme.space[4],
+  },
+  detailAddressText: {
+    color: theme.color.textBody,
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.body,
+    lineHeight: theme.font.size.body * theme.font.leading.normal,
+  },
+  detailActionGroup: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.space[3],
+  },
+  detailFooterActions: {
+    gap: theme.space[3],
+  },
   fieldGroup: {
     gap: theme.space[3],
   },
@@ -467,6 +586,11 @@ export const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: theme.space[3],
   },
+  compactChipList: {
+    flexDirection: 'row',
+    gap: theme.space[2],
+    paddingRight: theme.space[1],
+  },
   chip: {
     alignItems: 'center',
     backgroundColor: theme.color.surfaceSunken,
@@ -477,6 +601,11 @@ export const styles = StyleSheet.create({
     minHeight: theme.layout.tapMin,
     paddingHorizontal: theme.space[4],
     paddingVertical: theme.space[3],
+  },
+  chipCompact: {
+    minHeight: theme.layout.controlHSm,
+    paddingHorizontal: theme.space[3],
+    paddingVertical: theme.space[2],
   },
   chipSelected: {
     backgroundColor: theme.color.primarySoft,
@@ -506,6 +635,13 @@ export const styles = StyleSheet.create({
     borderWidth: 1,
     padding: theme.space[4],
   },
+  inlineSuccessNotice: {
+    backgroundColor: theme.color.green[50],
+    borderColor: theme.color.green[200],
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    padding: theme.space[4],
+  },
   sharedUpdateNotice: {
     backgroundColor: theme.color.primarySoft,
     borderColor: theme.color.primary,
@@ -516,6 +652,13 @@ export const styles = StyleSheet.create({
   },
   actionGroup: {
     gap: theme.space[3],
+  },
+  sheetActionRow: {
+    flexDirection: 'row',
+    gap: theme.space[3],
+  },
+  sheetActionButton: {
+    flex: 1,
   },
   button: {
     alignItems: 'center',

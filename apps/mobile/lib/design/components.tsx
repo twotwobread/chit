@@ -39,7 +39,12 @@ export function PrimaryButton({
       accessibilityRole="button"
       disabled={disabled || loading}
       onPress={onPress}
-      style={[styles.primaryButton, disabled || loading ? styles.disabled : null, style]}
+      style={({ pressed }) => [
+        styles.primaryButton,
+        pressed && !disabled && !loading ? styles.primaryButtonPressed : null,
+        disabled || loading ? styles.disabled : null,
+        style,
+      ]}
     >
       {loading ? (
         <View style={styles.loadingRow}>
@@ -72,7 +77,12 @@ export function SecondaryButton({
       accessibilityRole="button"
       disabled={disabled}
       onPress={onPress}
-      style={[styles.secondaryButton, disabled ? styles.disabled : null, style]}
+      style={({ pressed }) => [
+        styles.secondaryButton,
+        pressed && !disabled ? styles.secondaryButtonPressed : null,
+        disabled ? styles.disabled : null,
+        style,
+      ]}
     >
       <Text style={styles.secondaryButtonText}>{label}</Text>
     </Pressable>
@@ -100,6 +110,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.space[5],
     paddingVertical: theme.space[4],
   },
+  primaryButtonPressed: {
+    backgroundColor: theme.color.primaryPressed,
+  },
   primaryButtonText: {
     color: theme.color.onPrimary,
     fontFamily: theme.font.family.bold,
@@ -115,6 +128,10 @@ const styles = StyleSheet.create({
     minHeight: theme.layout.controlH,
     paddingHorizontal: theme.space[5],
     paddingVertical: theme.space[4],
+  },
+  secondaryButtonPressed: {
+    backgroundColor: theme.color.primarySoft,
+    borderColor: theme.color.primaryPressed,
   },
   secondaryButtonText: {
     color: theme.color.primary,

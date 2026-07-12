@@ -110,7 +110,8 @@ describe('day itinerary helpers', () => {
     }
     assert.equal(viewModel.items[0].placeName, '야경 산책');
     assert.equal(viewModel.items[0].address, 'Osaka');
-    assert.equal(buildDayItineraryPlaceAccessibilityLabel(viewModel.items[0]), '1번째 장소 야경 산책. 관광지. Osaka');
+    assert.equal(viewModel.items[0].placeMemo, '강가 걷기');
+    assert.equal(buildDayItineraryPlaceAccessibilityLabel(viewModel.items[0]), '1번째 장소 야경 산책. 관광지');
   });
 
   it('formats non-place rows with category and compact transport details', () => {
@@ -183,7 +184,7 @@ describe('day itinerary helpers', () => {
     }
     assert.equal(
       buildDayItineraryPlaceAccessibilityLabel(viewModel.items[0]),
-      '1번째 일정 08:00–09:30. 공항 이동. 이동. 버스 · 난바 → 간사이공항 · BUS-12 · T1 · 4',
+      '1번째 일정 08:00–09:30. 공항 이동. 이동',
     );
   });
 
@@ -219,7 +220,7 @@ describe('day itinerary helpers', () => {
         placeTypeLabel: '관광지',
         address: 'Umeda',
       }),
-      '1번째 장소 09:30–11:00. 우메다 공중정원. 관광지. Umeda',
+      '1번째 장소 09:30–11:00. 우메다 공중정원. 관광지',
     );
   });
 
