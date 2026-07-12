@@ -123,7 +123,6 @@ type CreateGooglePlaceScheduleItemInput struct {
 
 type CreateGoogleTripPlaceBookmarkInput struct {
 	GooglePlaceID string
-	Category      string
 }
 
 type PhotoAttribution struct {
@@ -158,6 +157,7 @@ type SearchResult struct {
 	FormattedAddress       string
 	PrimaryType            string
 	PrimaryTypeDisplayName string
+	PlaceType              string
 	Latitude               float64
 	Longitude              float64
 	Rating                 *float64

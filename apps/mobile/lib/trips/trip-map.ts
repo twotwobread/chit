@@ -159,10 +159,10 @@ export function buildTripMapScheduleMarkerDetail(
     id: item.id,
     title: item.placeName,
     subtitle: `${viewModel.dayLabel} · ${item.orderLabel}번째 일정`,
-    categoryLabel: item.nonPlaceCategoryLabel ?? item.placeTypeLabel,
+    categoryLabel: item.placeTypeLabel,
     address: item.address,
     ...(item.timeLabel ? { timeLabel: item.timeLabel } : {}),
-    ...(item.placeMemo || item.nonPlaceMemo ? { memo: item.placeMemo ?? item.nonPlaceMemo } : {}),
+    ...(item.placeMemo ? { memo: item.placeMemo } : {}),
   };
 }
 
@@ -238,17 +238,17 @@ export function buildRouteMapPlaces(items: ScheduleItem[]): RouteMapPlace[] {
     .slice()
     .sort((left, right) => left.itemOrder - right.itemOrder)
     .filter((item) => {
-      const coordinates = item.place?.routablePlace;
+      const coordinates = item.place.routablePlace;
       return coordinates && Number.isFinite(coordinates.latitude) && Number.isFinite(coordinates.longitude);
     })
     .map((item) => ({
       id: item.id,
-      latitude: item.place?.routablePlace?.latitude,
-      longitude: item.place?.routablePlace?.longitude,
-      name: item.place?.name ?? '장소 없는 일정',
+      latitude: item.place.routablePlace?.latitude,
+      longitude: item.place.routablePlace?.longitude,
+      name: item.place.name,
       order: item.itemOrder,
       status: mapScheduleItemStatus(item),
-      type: item.place?.placeType ?? 'etc',
+      type: item.place.placeType,
     }));
 }
 

@@ -3,10 +3,7 @@ import { router } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
 import { Heart } from 'lucide-react-native';
 
-import type { TripPlaceType } from '@i-um/api-contract';
-
 import { theme } from '../design';
-import { buildBookmarkCategoryOptions } from '../places/bookmarks';
 import { type GooglePlaceAddViewState, type GooglePlaceSearchRowViewModel } from '../places/google-search';
 import { type DayItineraryMapActionFeedback } from '../trips/day-itinerary-map-actions';
 import {
@@ -30,7 +27,7 @@ export function MapContent({
   bookmarkResults,
   feedback,
   mapPlaces,
-  onBookmarkCategorySelect,
+  onBookmarkSelect,
   onBookmarkDelete,
   onClearRoutePlaceSelection,
   onRoutePlacePress,
@@ -58,7 +55,7 @@ export function MapContent({
   feedback: DayItineraryMapActionFeedback | null;
   scheduleMarkerDetail: TripMapScheduleMarkerDetail | null;
   selectedRoutePlaceId: string | null;
-  onBookmarkCategorySelect: (result: GooglePlaceSearchRowViewModel, category: TripPlaceType) => void;
+  onBookmarkSelect: (result: GooglePlaceSearchRowViewModel) => void;
   onBookmarkDelete: (result: GooglePlaceSearchRowViewModel) => void;
   onClearRoutePlaceSelection: () => void;
   onRoutePlacePress: (place: RouteMapPlace) => void;
@@ -77,14 +74,13 @@ export function MapContent({
       <GooglePlaceMapSearch
         actionMode="bookmark"
         actionState={bookmarkActionState}
-        bookmarkCategoryOptions={buildBookmarkCategoryOptions()}
         bookmarkResults={bookmarkResults}
         bottomSheetFooter={scheduleMarkerDetail ? <ScheduleMarkerDetailCard detail={scheduleMarkerDetail} /> : null}
         dayId={selectedDayId}
         initialRegion={initialRegion}
         key={mapSearchKey}
         minimizedSheetBaseHeight={40}
-        onBookmarkCategorySelect={onBookmarkCategorySelect}
+        onBookmarkSelectResult={onBookmarkSelect}
         onBookmarkDeleteResult={onBookmarkDelete}
         onClearRoutePlaceSelection={onClearRoutePlaceSelection}
         onRoutePlacePress={onRoutePlacePress}

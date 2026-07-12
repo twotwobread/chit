@@ -15,7 +15,6 @@ import {
   type EditState,
   type LodgingPlacePickerState,
   type LodgingState,
-  type NonPlaceEditorState,
   type ReorderState,
 } from './DayItineraryEditorControllerTypes';
 import { createDayItineraryDeleteActions } from './day-itinerary-editor-delete-actions';
@@ -53,7 +52,6 @@ export function useDayItineraryEditorController({
 }: UseDayItineraryEditorControllerOptions) {
   const [state, setState] = useState<DayItineraryState>({ status: 'loading' });
   const [editState, setEditState] = useState<EditState>({ status: 'idle' });
-  const [nonPlaceEditorState, setNonPlaceEditorState] = useState<NonPlaceEditorState>({ status: 'idle' });
   const [deleteState, setDeleteState] = useState<DeleteState>({ status: 'idle' });
   const [reorderState, setReorderState] = useState<ReorderState>({ status: 'idle' });
   const [lodgingState, setLodgingState] = useState<LodgingState>({ status: 'idle' });
@@ -76,7 +74,6 @@ export function useDayItineraryEditorController({
     updateScrollOffset,
   } = useDayItineraryReorderAutoScroll();
   const editStateRef = useRef<EditState>({ status: 'idle' });
-  const nonPlaceEditorStateRef = useRef<NonPlaceEditorState>({ status: 'idle' });
   const deleteStateRef = useRef<DeleteState>({ status: 'idle' });
   const reorderStateRef = useRef<ReorderState>({ status: 'idle' });
   const lodgingStateRef = useRef<LodgingState>({ status: 'idle' });
@@ -104,7 +101,7 @@ export function useDayItineraryEditorController({
   const getSharedUpdateLocalState = useCallback(
     (): DayItinerarySharedUpdateLocalState => ({
       reorderStatus: reorderStateRef.current.status,
-      createStatus: nonPlaceEditorStateRef.current.status,
+      createStatus: 'idle',
       editStatus: editStateRef.current.status,
       deleteStatus: deleteStateRef.current.status,
       lodgingStatus: lodgingStateRef.current.status,
@@ -171,10 +168,6 @@ export function useDayItineraryEditorController({
   useEffect(() => {
     editStateRef.current = editState;
   }, [editState]);
-
-  useEffect(() => {
-    nonPlaceEditorStateRef.current = nonPlaceEditorState;
-  }, [nonPlaceEditorState]);
 
   useEffect(() => {
     deleteStateRef.current = deleteState;
@@ -330,7 +323,6 @@ export function useDayItineraryEditorController({
     void refetchSharedItinerary();
   }, [
     date,
-    nonPlaceEditorState.status,
     editState.status,
     deleteState.status,
     getSharedUpdateLocalState,
@@ -388,7 +380,6 @@ export function useDayItineraryEditorController({
   const discardDayScreenLocalState = useCallback(() => {
     setReorderDragActive(false);
     setEditState({ status: 'idle' });
-    setNonPlaceEditorState({ status: 'idle' });
     setDeleteState({ status: 'idle' });
     setReorderState({ status: 'idle' });
     setLodgingState({ status: 'idle' });
@@ -441,15 +432,7 @@ export function useDayItineraryEditorController({
     router.replace('/');
   };
 
-  const {
-    beginEdit,
-    cancelEdit,
-    cancelNonPlaceEditor,
-    submitEdit,
-    submitNonPlaceEditor,
-    updateEditValues,
-    updateNonPlaceEditorValues,
-  } = createDayItineraryEditActions({
+  const { beginEdit, cancelEdit, submitEdit, updateEditValues } = createDayItineraryEditActions({
     clearMapActionFeedback,
     date,
     deleteOriginFocusTargetRef,
@@ -457,11 +440,9 @@ export function useDayItineraryEditorController({
     editState,
     handleRecoverableMutationError,
     load,
-    nonPlaceEditorState,
     setDeleteState,
     setEditState,
     setLodgingState,
-    setNonPlaceEditorState,
     tripId,
   });
 
@@ -476,7 +457,6 @@ export function useDayItineraryEditorController({
     setDeleteState,
     setEditState,
     setLodgingState,
-    setNonPlaceEditorState,
     setReorderFeedback,
     setReorderState,
     tripId,
@@ -513,7 +493,6 @@ export function useDayItineraryEditorController({
     setDeleteState,
     setEditState,
     setLodgingState,
-    setNonPlaceEditorState,
     state,
     tripId,
   });
@@ -545,7 +524,7 @@ export function useDayItineraryEditorController({
 
   const sharedUpdateLocalState: DayItinerarySharedUpdateLocalState = {
     reorderStatus: reorderState.status,
-    createStatus: nonPlaceEditorState.status,
+    createStatus: 'idle',
     editStatus: editState.status,
     deleteStatus: deleteState.status,
     lodgingStatus: lodgingState.status,
@@ -571,7 +550,6 @@ export function useDayItineraryEditorController({
     cancelDelete,
     cancelEdit,
     cancelLodgingPicker,
-    cancelNonPlaceEditor,
     cancelReorder,
     clearContentFocusRequest,
     contentFocusRequest,
@@ -587,7 +565,6 @@ export function useDayItineraryEditorController({
     lodgingState,
     mapActionFeedback,
     moveReorderItem,
-    nonPlaceEditorState,
     openLodgingPlaceSelection,
     openLodgingSearchRegister,
     openPlaceMap,
@@ -604,12 +581,10 @@ export function useDayItineraryEditorController({
     submitClearLodging,
     submitDelete,
     submitEdit,
-    submitNonPlaceEditor,
     submitReorder,
     submitSelectLodgingPlace,
     submitSetLodging,
     updateEditValues,
-    updateNonPlaceEditorValues,
     updateScrollContentSize,
     updateScrollLayout,
     updateScrollOffset,

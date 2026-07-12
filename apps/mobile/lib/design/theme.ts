@@ -99,7 +99,7 @@ export const placeType = {
   lodging: { label: '숙소', color: violet[500] },
   cafe: { label: '카페', color: amber[600] },
   shopping: { label: '쇼핑', color: pink[500] },
-  transport: { label: '이동수단', color: blue[600] },
+  transport: { label: '교통', color: blue[600] },
   etc: { label: '기타', color: ink[500] },
 } as const;
 

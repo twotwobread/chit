@@ -1,21 +1,8 @@
 import type { Href } from 'expo-router';
 
-import type {
-  CreateGooglePlaceScheduleItemRequest,
-  CreateNonPlaceScheduleItemRequest,
-  NonPlaceScheduleItemCategory,
-  NonPlaceTransportMode,
-} from '@i-um/api-contract';
+import type { CreateGooglePlaceScheduleItemRequest } from '@i-um/api-contract';
 
 import { buildGooglePlaceSearchRoute, type GooglePlaceSearchRowViewModel } from './google-search';
-import {
-  emptyNonPlaceScheduleItemForm,
-  nonPlaceCategoryOptions,
-  nonPlaceTransportModeOptions,
-  validateCreateNonPlaceScheduleItemForm,
-  type NonPlaceScheduleItemFormErrors,
-  type NonPlaceScheduleItemFormValues,
-} from '../trips/non-place-schedule-item';
 
 export type PlaceScheduleSelectedPlace = {
   googlePlaceId: string;
@@ -31,43 +18,14 @@ export type PlaceScheduleDetailFormValues = {
   memo: string;
   titleTouched: boolean;
   selectedPlace: PlaceScheduleSelectedPlace | null;
-  nonPlaceCategory: NonPlaceScheduleItemCategory;
-  nonPlaceLink: string;
-  nonPlaceTransportMode: NonPlaceTransportMode | '';
-  nonPlaceReferenceNumber: string;
-  nonPlaceBookingReference: string;
-  nonPlaceOriginText: string;
-  nonPlaceDestinationText: string;
-  nonPlaceTerminalText: string;
-  nonPlaceGateText: string;
 };
 
-export type PlaceScheduleDetailFormErrorField =
-  | 'title'
-  | 'place'
-  | 'startTime'
-  | 'endTime'
-  | 'memo'
-  | 'form'
-  | 'nonPlaceCategory'
-  | 'nonPlaceLink'
-  | 'nonPlaceTransportMode'
-  | 'nonPlaceReferenceNumber'
-  | 'nonPlaceBookingReference'
-  | 'nonPlaceOriginText'
-  | 'nonPlaceDestinationText'
-  | 'nonPlaceTerminalText'
-  | 'nonPlaceGateText';
+export type PlaceScheduleDetailFormErrorField = 'title' | 'place' | 'startTime' | 'endTime' | 'memo' | 'form';
 
 export type PlaceScheduleDetailFormErrors = Partial<Record<PlaceScheduleDetailFormErrorField, string>>;
 
 export type PlaceScheduleDetailValidationResult =
   | { ok: true; request: CreateGooglePlaceScheduleItemRequest }
-  | { ok: false; errors: PlaceScheduleDetailFormErrors };
-
-export type UnifiedScheduleDetailValidationResult =
-  | { ok: true; kind: 'place'; request: CreateGooglePlaceScheduleItemRequest }
-  | { ok: true; kind: 'nonPlace'; request: CreateNonPlaceScheduleItemRequest }
   | { ok: false; errors: PlaceScheduleDetailFormErrors };
 
 export type PlaceScheduleDetailParams = {
@@ -80,15 +38,6 @@ export type PlaceScheduleDetailParams = {
   placeName?: string | string[];
   address?: string | string[];
   typeHint?: string | string[];
-  nonPlaceCategory?: string | string[];
-  nonPlaceLink?: string | string[];
-  nonPlaceTransportMode?: string | string[];
-  nonPlaceReferenceNumber?: string | string[];
-  nonPlaceBookingReference?: string | string[];
-  nonPlaceOriginText?: string | string[];
-  nonPlaceDestinationText?: string | string[];
-  nonPlaceTerminalText?: string | string[];
-  nonPlaceGateText?: string | string[];
 };
 
 const timePattern = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -106,7 +55,6 @@ export const scheduleTimeHourOptions = Array.from({ length: 12 }, (_, index) => 
 export const scheduleTimeMinuteOptions = Array.from({ length: 60 }, (_, index) => pad2(index));
 
 export function emptyPlaceScheduleDetailForm(): PlaceScheduleDetailFormValues {
-  const nonPlace = emptyNonPlaceScheduleItemForm();
   return {
     title: '',
     startTime: '',
@@ -114,15 +62,6 @@ export function emptyPlaceScheduleDetailForm(): PlaceScheduleDetailFormValues {
     memo: '',
     titleTouched: false,
     selectedPlace: null,
-    nonPlaceCategory: nonPlace.category,
-    nonPlaceLink: nonPlace.link,
-    nonPlaceTransportMode: nonPlace.transportMode,
-    nonPlaceReferenceNumber: nonPlace.referenceNumber,
-    nonPlaceBookingReference: nonPlace.bookingReference,
-    nonPlaceOriginText: nonPlace.originText,
-    nonPlaceDestinationText: nonPlace.destinationText,
-    nonPlaceTerminalText: nonPlace.terminalText,
-    nonPlaceGateText: nonPlace.gateText,
   };
 }
 
@@ -161,7 +100,6 @@ export function parsePlaceScheduleDetailParams(params: PlaceScheduleDetailParams
   const selectedPlace =
     googlePlaceId && placeName && address && typeHint ? { googlePlaceId, placeName, address, typeHint } : null;
 
-  const defaults = emptyPlaceScheduleDetailForm();
   const values: PlaceScheduleDetailFormValues = {
     title: firstParam(params.title) ?? '',
     titleTouched: firstParam(params.titleTouched) === 'true',
@@ -169,16 +107,6 @@ export function parsePlaceScheduleDetailParams(params: PlaceScheduleDetailParams
     endTime: firstParam(params.endTime) ?? '',
     memo: firstParam(params.memo) ?? '',
     selectedPlace,
-    nonPlaceCategory: parseNonPlaceCategory(firstParam(params.nonPlaceCategory)) ?? defaults.nonPlaceCategory,
-    nonPlaceLink: firstParam(params.nonPlaceLink) ?? defaults.nonPlaceLink,
-    nonPlaceTransportMode:
-      parseNonPlaceTransportMode(firstParam(params.nonPlaceTransportMode)) ?? defaults.nonPlaceTransportMode,
-    nonPlaceReferenceNumber: firstParam(params.nonPlaceReferenceNumber) ?? defaults.nonPlaceReferenceNumber,
-    nonPlaceBookingReference: firstParam(params.nonPlaceBookingReference) ?? defaults.nonPlaceBookingReference,
-    nonPlaceOriginText: firstParam(params.nonPlaceOriginText) ?? defaults.nonPlaceOriginText,
-    nonPlaceDestinationText: firstParam(params.nonPlaceDestinationText) ?? defaults.nonPlaceDestinationText,
-    nonPlaceTerminalText: firstParam(params.nonPlaceTerminalText) ?? defaults.nonPlaceTerminalText,
-    nonPlaceGateText: firstParam(params.nonPlaceGateText) ?? defaults.nonPlaceGateText,
   };
 
   if (selectedPlace && values.title.trim().length === 0) {
@@ -264,36 +192,8 @@ export function buildGooglePlaceSearchSelectorRoute(
   return `${buildGooglePlaceSearchRoute(tripId, date)}?${params.toString()}` as Href;
 }
 
-export function validateUnifiedScheduleDetailForm(
-  values: PlaceScheduleDetailFormValues,
-  duplicateConfirmed = false,
-): UnifiedScheduleDetailValidationResult {
-  if (values.selectedPlace) {
-    const validation = validatePlaceScheduleDetailForm(values, duplicateConfirmed);
-    if (!validation.ok) {
-      return validation;
-    }
-    return { ok: true, kind: 'place', request: validation.request };
-  }
-
-  const validation = validateCreateNonPlaceScheduleItemForm(detailValuesToNonPlaceForm(values));
-  if (!validation.ok) {
-    return { ok: false, errors: mapNonPlaceErrors(validation.errors) };
-  }
-  return { ok: true, kind: 'nonPlace', request: validation.request as CreateNonPlaceScheduleItemRequest };
-}
-
 export function hasRequiredPlaceScheduleDetailFields(values: PlaceScheduleDetailFormValues): boolean {
   return values.title.trim().length > 0 && values.selectedPlace !== null;
-}
-
-export function hasRequiredUnifiedScheduleDetailFields(values: PlaceScheduleDetailFormValues): boolean {
-  if (values.title.trim().length === 0) {
-    return false;
-  }
-  return (
-    values.selectedPlace !== null || values.nonPlaceCategory !== 'transport' || values.nonPlaceTransportMode !== ''
-  );
 }
 
 export function buildPlaceScheduleDetailSubmitState(
@@ -372,101 +272,6 @@ function appendPlaceScheduleDetailParams(params: URLSearchParams, values: PlaceS
     params.set('address', values.selectedPlace.address);
     params.set('typeHint', values.selectedPlace.typeHint);
   }
-  if (values.nonPlaceCategory !== 'memo') {
-    params.set('nonPlaceCategory', values.nonPlaceCategory);
-  }
-  appendString(params, 'nonPlaceLink', values.nonPlaceLink);
-  if (values.nonPlaceTransportMode !== 'other') {
-    appendString(params, 'nonPlaceTransportMode', values.nonPlaceTransportMode);
-  }
-  appendString(params, 'nonPlaceReferenceNumber', values.nonPlaceReferenceNumber);
-  appendString(params, 'nonPlaceBookingReference', values.nonPlaceBookingReference);
-  appendString(params, 'nonPlaceOriginText', values.nonPlaceOriginText);
-  appendString(params, 'nonPlaceDestinationText', values.nonPlaceDestinationText);
-  appendString(params, 'nonPlaceTerminalText', values.nonPlaceTerminalText);
-  appendString(params, 'nonPlaceGateText', values.nonPlaceGateText);
-}
-
-function detailValuesToNonPlaceForm(values: PlaceScheduleDetailFormValues): NonPlaceScheduleItemFormValues {
-  return {
-    category: values.nonPlaceCategory,
-    title: values.title,
-    startTime: values.startTime,
-    endTime: values.endTime,
-    memo: values.memo,
-    link: values.nonPlaceLink,
-    transportMode: values.nonPlaceTransportMode,
-    referenceNumber: values.nonPlaceReferenceNumber,
-    bookingReference: values.nonPlaceBookingReference,
-    originText: values.nonPlaceOriginText,
-    destinationText: values.nonPlaceDestinationText,
-    terminalText: values.nonPlaceTerminalText,
-    gateText: values.nonPlaceGateText,
-  };
-}
-
-function mapNonPlaceErrors(errors: NonPlaceScheduleItemFormErrors): PlaceScheduleDetailFormErrors {
-  const mapped: PlaceScheduleDetailFormErrors = {};
-  if (errors.category) {
-    mapped.nonPlaceCategory = errors.category;
-  }
-  if (errors.title) {
-    mapped.title = errors.title;
-  }
-  if (errors.startTime) {
-    mapped.startTime = errors.startTime;
-  }
-  if (errors.endTime) {
-    mapped.endTime = errors.endTime;
-  }
-  if (errors.memo) {
-    mapped.memo = errors.memo;
-  }
-  if (errors.link) {
-    mapped.nonPlaceLink = errors.link;
-  }
-  if (errors.transportMode) {
-    mapped.nonPlaceTransportMode = errors.transportMode;
-  }
-  if (errors.referenceNumber) {
-    mapped.nonPlaceReferenceNumber = errors.referenceNumber;
-  }
-  if (errors.bookingReference) {
-    mapped.nonPlaceBookingReference = errors.bookingReference;
-  }
-  if (errors.originText) {
-    mapped.nonPlaceOriginText = errors.originText;
-  }
-  if (errors.destinationText) {
-    mapped.nonPlaceDestinationText = errors.destinationText;
-  }
-  if (errors.terminalText) {
-    mapped.nonPlaceTerminalText = errors.terminalText;
-  }
-  if (errors.gateText) {
-    mapped.nonPlaceGateText = errors.gateText;
-  }
-  if (errors.form) {
-    mapped.form = errors.form;
-  }
-  return mapped;
-}
-
-function parseNonPlaceCategory(value: string | undefined): NonPlaceScheduleItemCategory | null {
-  if (nonPlaceCategoryOptions.some((option) => option.value === value)) {
-    return value as NonPlaceScheduleItemCategory;
-  }
-  return null;
-}
-
-function parseNonPlaceTransportMode(value: string | undefined): NonPlaceTransportMode | '' | null {
-  if (value === '') {
-    return '';
-  }
-  if (nonPlaceTransportModeOptions.some((option) => option.value === value)) {
-    return value as NonPlaceTransportMode;
-  }
-  return null;
 }
 
 function appendString(params: URLSearchParams, key: string, value: string): void {

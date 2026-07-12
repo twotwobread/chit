@@ -195,7 +195,7 @@ export class PlacesService {
     }
     /**
      * Bookmark a Google Place as a trip candidate place
-     * Resolves a Google-backed place server-side, reuses the trip-level place by googlePlaceId when present, and stores or updates a trip-level bookmark category without adding it to a Day schedule.
+     * Resolves a Google-backed place server-side, reuses the trip-level place by googlePlaceId when present, maps the initial TripPlaceType from provider metadata, and stores or updates a trip-level bookmark without adding it to a Day schedule.
      * @param tripId
      * @param requestBody
      * @returns CreateGoogleTripPlaceBookmarkResponse Google-backed candidate place bookmarked for the trip.

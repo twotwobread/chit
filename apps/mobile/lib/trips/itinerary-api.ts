@@ -3,8 +3,6 @@ import {
   type CreateManualDayLodgingPlaceRequest,
   type CreateManualScheduleItemRequest,
   type CreateManualScheduleItemResponse,
-  type CreateNonPlaceScheduleItemRequest,
-  type CreateNonPlaceScheduleItemResponse,
   type CreateRoutePreviewRequest,
   type GetDayScheduleItemsResponse,
   type MarkScheduleItemArrivedResponse,
@@ -33,15 +31,6 @@ export async function createManualScheduleItem(
 ): Promise<CreateManualScheduleItemResponse> {
   await getMeWithRefresh();
   return TripsService.createManualScheduleItem(tripId, date, request);
-}
-
-export async function createNonPlaceScheduleItem(
-  tripId: string,
-  date: string,
-  request: CreateNonPlaceScheduleItemRequest,
-): Promise<CreateNonPlaceScheduleItemResponse> {
-  await getMeWithRefresh();
-  return TripsService.createNonPlaceScheduleItem(tripId, date, request);
 }
 
 export async function setDayLodgingPlace(

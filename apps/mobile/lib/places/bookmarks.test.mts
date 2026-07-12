@@ -32,14 +32,14 @@ const bookmark: TripPlaceBookmark = {
 };
 
 describe('trip place bookmark helpers', () => {
-  it('uses TripPlaceType categories including 이동수단', () => {
+  it('uses TripPlaceType categories including 교통', () => {
     assert.deepEqual(buildBookmarkCategoryOptions(), [
       { value: 'sights', label: '관광지' },
       { value: 'food', label: '식당' },
       { value: 'lodging', label: '숙소' },
       { value: 'cafe', label: '카페' },
       { value: 'shopping', label: '쇼핑' },
-      { value: 'transport', label: '이동수단' },
+      { value: 'transport', label: '교통' },
       { value: 'etc', label: '기타' },
     ]);
   });
@@ -52,7 +52,7 @@ describe('trip place bookmark helpers', () => {
         coordinate: { latitude: 34.4347, longitude: 135.244 },
         title: '간사이공항',
         category: 'transport',
-        categoryLabel: '이동수단',
+        categoryLabel: '교통',
         selected: true,
         iconName: 'train-front',
         variant: 'bookmark',
@@ -68,17 +68,17 @@ describe('trip place bookmark helpers', () => {
       googlePlaceId: 'google-airport-1',
       placeName: '간사이공항',
       address: 'Kansai International Airport',
-      typeHint: '이동수단',
+      typeHint: '교통',
     });
     assert.deepEqual(tripPlaceBookmarkToGoogleSearchRow(bookmark), {
       id: 'google-airport-1',
       bookmarkId: 'bookmark-1',
       placeName: '간사이공항',
       address: 'Kansai International Airport',
-      typeHint: '이동수단',
+      typeHint: '교통',
       latitude: 34.4347,
       longitude: 135.244,
-      metadataLabels: ['이동수단', '찜한 장소'],
+      metadataLabels: ['교통', '찜한 장소'],
     });
   });
 });

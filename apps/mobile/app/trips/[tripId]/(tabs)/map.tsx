@@ -27,7 +27,7 @@ export default function TripMapTabScreen() {
         bookmarkResults={state.bookmarkResults}
         feedback={feedback}
         mapPlaces={state.mapPlaces}
-        onBookmarkCategorySelect={(result, category) => void createBookmark(result, category)}
+        onBookmarkSelect={(result) => void createBookmark(result)}
         onBookmarkDelete={(result) => void deleteBookmark(result)}
         onClearRoutePlaceSelection={clearRoutePlaceSelection}
         onRoutePlacePress={selectRoutePlace}

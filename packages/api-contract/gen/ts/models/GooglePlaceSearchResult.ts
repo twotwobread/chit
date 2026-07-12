@@ -3,11 +3,13 @@
 /* tslint:disable */
 /* eslint-disable */
 import type { GooglePlaceSearchPhoto } from './GooglePlaceSearchPhoto';
+import type { TripPlaceType } from './TripPlaceType';
 export type GooglePlaceSearchResult = {
     googlePlaceId: string;
     displayName: string;
     formattedAddress: string;
     primaryType: string;
+    placeType: TripPlaceType;
     primaryTypeDisplayName?: string;
     latitude: number;
     longitude: number;

@@ -5,7 +5,7 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 
 import { isApiStatus, isMobileAuthSessionError } from '../auth/errors';
 import type { RouteMapPlace, RouteMapPolyline } from './RouteMap';
-import type { GetDayScheduleItemsResponse, TripDay, TripPlaceType } from '@i-um/api-contract';
+import type { GetDayScheduleItemsResponse, TripDay } from '@i-um/api-contract';
 import { createGoogleTripPlaceBookmark, deleteTripPlaceBookmark, listTripPlaceBookmarks } from '../places/client';
 import { tripPlaceBookmarkToGoogleSearchRow } from '../places/bookmarks';
 import {
@@ -232,13 +232,13 @@ export function useTripMapController() {
   }, []);
 
   const createBookmark = useCallback(
-    async (result: GooglePlaceSearchRowViewModel, category: TripPlaceType) => {
+    async (result: GooglePlaceSearchRowViewModel) => {
       if (!tripId || bookmarkActionState.status === 'adding') {
         return;
       }
       setBookmarkActionState(addingGooglePlaceState(result.id));
       try {
-        await createGoogleTripPlaceBookmark(tripId, { googlePlaceId: result.id, category });
+        await createGoogleTripPlaceBookmark(tripId, { googlePlaceId: result.id });
         setBookmarkActionState(idleGooglePlaceAddState());
         bookmarkLayerVisibleRef.current = true;
         await load();

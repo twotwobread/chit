@@ -205,13 +205,17 @@ const typeHintByPrimaryType: Record<string, string> = {
   coffee_shop: '카페',
   shopping_mall: '쇼핑',
   store: '쇼핑',
-  airport: '이동수단',
-  bus_station: '이동수단',
-  subway_station: '이동수단',
-  train_station: '이동수단',
-  transit_station: '이동수단',
-  light_rail_station: '이동수단',
-  taxi_stand: '이동수단',
+  airport: '교통',
+  bus_station: '교통',
+  bus_stop: '교통',
+  subway_station: '교통',
+  train_station: '교통',
+  transit_station: '교통',
+  light_rail_station: '교통',
+  ferry_terminal: '교통',
+  taxi_stand: '교통',
+  parking: '교통',
+  car_rental: '교통',
 };
 
 export function buildGooglePlaceSearchRoute(tripId: string, tripDayId: string): Href {
@@ -359,7 +363,9 @@ export function successGooglePlaceSearchState(results: GooglePlaceSearchResult[]
   return {
     status: 'success',
     results: results.map((result) => {
-      const typeHint = result.primaryTypeDisplayName?.trim() || getGooglePlaceTypeHint(result.primaryType);
+      const mappedTypeHint = result.placeType ? theme.placeType[result.placeType]?.label : undefined;
+      const typeHint =
+        result.primaryTypeDisplayName?.trim() || mappedTypeHint || getGooglePlaceTypeHint(result.primaryType);
       const row: GooglePlaceSearchRowViewModel = {
         id: result.googlePlaceId,
         placeName: result.displayName,
@@ -899,16 +905,23 @@ function getGooglePlaceMarkerCategory(typeHint: string): GooglePlaceSearchMarker
     return 'shopping';
   }
   if (
+    normalized.includes('교통') ||
     normalized.includes('이동수단') ||
     normalized.includes('공항') ||
     normalized.includes('역') ||
+    normalized.includes('터미널') ||
     normalized.includes('정류장') ||
     normalized.includes('airport') ||
     normalized.includes('station') ||
-    normalized.includes('transit') ||
+    normalized.includes('terminal') ||
     normalized.includes('subway') ||
     normalized.includes('train') ||
-    normalized.includes('bus')
+    normalized.includes('bus') ||
+    normalized.includes('ferry') ||
+    normalized.includes('transit') ||
+    normalized.includes('parking') ||
+    normalized.includes('taxi') ||
+    normalized.includes('rental')
   ) {
     return 'transport';
   }

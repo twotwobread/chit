@@ -6,8 +6,6 @@ import type { AcceptTripInviteResponse } from '../models/AcceptTripInviteRespons
 import type { CreateManualDayLodgingPlaceRequest } from '../models/CreateManualDayLodgingPlaceRequest';
 import type { CreateManualScheduleItemRequest } from '../models/CreateManualScheduleItemRequest';
 import type { CreateManualScheduleItemResponse } from '../models/CreateManualScheduleItemResponse';
-import type { CreateNonPlaceScheduleItemRequest } from '../models/CreateNonPlaceScheduleItemRequest';
-import type { CreateNonPlaceScheduleItemResponse } from '../models/CreateNonPlaceScheduleItemResponse';
 import type { CreateQuickExpenseRequest } from '../models/CreateQuickExpenseRequest';
 import type { CreateQuickExpenseResponse } from '../models/CreateQuickExpenseResponse';
 import type { CreateRoutePreviewRequest } from '../models/CreateRoutePreviewRequest';
@@ -622,39 +620,6 @@ export class TripsService {
                 404: `Trip or trip day not found.`,
                 409: `Concurrent append conflict.`,
                 410: `Manual place creation is disabled; use Google-backed place add flow.`,
-                500: `Unexpected server error.`,
-            },
-        });
-    }
-    /**
-     * Add a non-place item to a trip day schedule
-     * Creates a manually entered schedule item that is not tied to a TripPlace, such as transport, rest, memo, or reminder.
-     * @param tripId
-     * @param tripDayId
-     * @param requestBody
-     * @returns CreateNonPlaceScheduleItemResponse Non-place item added to the selected Day schedule.
-     * @throws ApiError
-     */
-    public static createNonPlaceScheduleItem(
-        tripId: string,
-        tripDayId: string,
-        requestBody: CreateNonPlaceScheduleItemRequest,
-    ): CancelablePromise<CreateNonPlaceScheduleItemResponse> {
-        return __request(OpenAPI, {
-            method: 'POST',
-            url: '/trips/{tripId}/days/{tripDayId}/schedule-items/non-place',
-            path: {
-                'tripId': tripId,
-                'tripDayId': tripDayId,
-            },
-            body: requestBody,
-            mediaType: 'application/json',
-            errors: {
-                400: `Validation error.`,
-                401: `Unauthorized.`,
-                403: `Forbidden.`,
-                404: `Trip or trip day not found.`,
-                409: `Concurrent append conflict.`,
                 500: `Unexpected server error.`,
             },
         });

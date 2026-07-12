@@ -103,9 +103,6 @@ type fakeRepository struct {
 	createdManualRecords     []CreateManualScheduleItemRecord
 	createdManualItem        ScheduleItem
 	createManualErr          error
-	createdNonPlaceRecords   []CreateNonPlaceScheduleItemRecord
-	createdNonPlaceItem      ScheduleItem
-	createNonPlaceErr        error
 	dayItem                  ScheduleItem
 	dayItemFound             bool
 	dayItemLookupTripID      string
@@ -130,9 +127,6 @@ type fakeRepository struct {
 	updatedDayItemRecord     UpdateScheduleItemRecord
 	updatedDayItemCalled     bool
 	updatedDayItem           ScheduleItem
-	updatedNonPlaceRecord    UpdateNonPlaceScheduleItemRecord
-	updatedNonPlaceCalled    bool
-	updatedNonPlaceItem      ScheduleItem
 	deletedDayItemTripID     string
 	deletedDayItemDate       string
 	deletedDayItemID         string
@@ -511,25 +505,6 @@ func (r *fakeRepository) CreateManualScheduleItem(_ context.Context, record Crea
 	}, nil
 }
 
-func (r *fakeRepository) CreateNonPlaceScheduleItem(_ context.Context, record CreateNonPlaceScheduleItemRecord) (ScheduleItem, error) {
-	r.createdNonPlaceRecords = append(r.createdNonPlaceRecords, record)
-	if r.createNonPlaceErr != nil {
-		return ScheduleItem{}, r.createNonPlaceErr
-	}
-	if r.createdNonPlaceItem.ID != "" {
-		return r.createdNonPlaceItem, nil
-	}
-	return ScheduleItem{
-		ID:        "item-non-place-1",
-		ItemOrder: 1,
-		Version:   1,
-		ItemType:  ScheduleItemTypeNonPlace,
-		StartTime: record.StartTime,
-		EndTime:   record.EndTime,
-		NonPlace:  &record.Details,
-	}, nil
-}
-
 func (r *fakeRepository) GetScheduleItemByTripDayAndID(_ context.Context, tripID string, date string, itemID string) (ScheduleItem, bool, error) {
 	r.dayItemLookupTripID = tripID
 	r.dayItemLookupDate = date
@@ -623,23 +598,6 @@ func (r *fakeRepository) UpdateScheduleItemPlace(_ context.Context, record Updat
 			PlaceType: record.PlaceType,
 			Address:   record.Address,
 		},
-	}, nil
-}
-
-func (r *fakeRepository) UpdateNonPlaceScheduleItem(_ context.Context, record UpdateNonPlaceScheduleItemRecord) (ScheduleItem, error) {
-	r.updatedNonPlaceRecord = record
-	r.updatedNonPlaceCalled = true
-	if r.updatedNonPlaceItem.ID != "" {
-		return r.updatedNonPlaceItem, nil
-	}
-	return ScheduleItem{
-		ID:        record.ItemID,
-		ItemOrder: r.dayItem.ItemOrder,
-		Version:   r.dayItem.Version,
-		ItemType:  ScheduleItemTypeNonPlace,
-		StartTime: record.StartTime,
-		EndTime:   record.EndTime,
-		NonPlace:  &record.Details,
 	}, nil
 }
 
@@ -2208,203 +2166,6 @@ func TestServiceCreateManualScheduleItemAllowsDuplicates(t *testing.T) {
 	}
 	if len(repo.createdManualRecords) != 2 {
 		t.Fatalf("expected duplicate creates to call repository twice, got %#v", repo.createdManualRecords)
-	}
-}
-
-func TestServiceCreateNonPlaceScheduleItem(t *testing.T) {
-	repo := &fakeRepository{
-		trip:          Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"},
-		tripFound:     true,
-		isParticipant: true,
-	}
-	service := newTestService(repo)
-
-	result, err := service.CreateNonPlaceScheduleItem(context.Background(), "user-1", testTripID, "2026-07-11", CreateNonPlaceScheduleItemInput{
-		Category:         " transport ",
-		Title:            " 공항 이동 ",
-		StartTime:        stringPtr("08:00"),
-		EndTime:          stringPtr("09:30"),
-		Memo:             stringPtr(" 리무진 버스 "),
-		Link:             stringPtr(" https://example.com/ticket "),
-		TransportMode:    stringPtr(" bus "),
-		ReferenceNumber:  stringPtr(" BUS-12 "),
-		BookingReference: stringPtr(" ABC123 "),
-		OriginText:       stringPtr(" 난바 "),
-		DestinationText:  stringPtr(" 간사이공항 "),
-		TerminalText:     stringPtr(" T1 "),
-		GateText:         stringPtr(" 4 "),
-	})
-	if err != nil {
-		t.Fatalf("CreateNonPlaceScheduleItem returned error: %v", err)
-	}
-	if result.Day.Date != "2026-07-11" || result.Day.DayOrder != 2 {
-		t.Fatalf("expected server-calculated day, got %#v", result.Day)
-	}
-	if result.Item.ItemType != ScheduleItemTypeNonPlace || result.Item.NonPlace == nil || result.Item.NonPlace.Title != "공항 이동" {
-		t.Fatalf("expected created non-place item, got %#v", result.Item)
-	}
-	if len(repo.createdNonPlaceRecords) != 1 {
-		t.Fatalf("expected one repository create call, got %#v", repo.createdNonPlaceRecords)
-	}
-	record := repo.createdNonPlaceRecords[0]
-	if record.TripID != testTripID || record.TripDayID != "2026-07-11" || record.Details.Category != NonPlaceCategoryTransport || record.Details.Title != "공항 이동" || record.StartTime == nil || *record.StartTime != "08:00" || record.EndTime == nil || *record.EndTime != "09:30" {
-		t.Fatalf("expected trimmed create record, got %#v", record)
-	}
-	if record.Details.TransportMode == nil || *record.Details.TransportMode != TransportModeBus || record.Details.ReferenceNumber == nil || *record.Details.ReferenceNumber != "BUS-12" || record.Details.OriginText == nil || *record.Details.OriginText != "난바" {
-		t.Fatalf("expected normalized transport details, got %#v", record.Details)
-	}
-}
-
-func TestServiceCreateNonPlaceScheduleItemValidation(t *testing.T) {
-	validTrip := Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"}
-	tests := []struct {
-		name   string
-		tripID string
-		date   string
-		input  CreateNonPlaceScheduleItemInput
-	}{
-		{name: "invalid trip id", tripID: "not-a-uuid", date: "2026-07-10", input: CreateNonPlaceScheduleItemInput{Category: NonPlaceCategoryMemo, Title: "메모"}},
-		{name: "invalid date", tripID: testTripID, date: "2026/07/10", input: CreateNonPlaceScheduleItemInput{Category: NonPlaceCategoryMemo, Title: "메모"}},
-		{name: "invalid category", tripID: testTripID, date: "2026-07-10", input: CreateNonPlaceScheduleItemInput{Category: "meal", Title: "메모"}},
-		{name: "blank title", tripID: testTripID, date: "2026-07-10", input: CreateNonPlaceScheduleItemInput{Category: NonPlaceCategoryMemo, Title: " "}},
-		{name: "transport requires mode", tripID: testTripID, date: "2026-07-10", input: CreateNonPlaceScheduleItemInput{Category: NonPlaceCategoryTransport, Title: "공항 이동"}},
-		{name: "non transport rejects transport fields", tripID: testTripID, date: "2026-07-10", input: CreateNonPlaceScheduleItemInput{Category: NonPlaceCategoryMemo, Title: "메모", TransportMode: stringPtr(TransportModeBus)}},
-		{name: "invalid link", tripID: testTripID, date: "2026-07-10", input: CreateNonPlaceScheduleItemInput{Category: NonPlaceCategoryMemo, Title: "메모", Link: stringPtr("ftp://example.com")}},
-		{name: "invalid time", tripID: testTripID, date: "2026-07-10", input: CreateNonPlaceScheduleItemInput{Category: NonPlaceCategoryMemo, Title: "메모", StartTime: stringPtr("9:00")}},
-		{name: "end before start", tripID: testTripID, date: "2026-07-10", input: CreateNonPlaceScheduleItemInput{Category: NonPlaceCategoryMemo, Title: "메모", StartTime: stringPtr("11:00"), EndTime: stringPtr("10:00")}},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			repo := &fakeRepository{trip: validTrip, tripFound: true, isParticipant: true}
-			service := newTestService(repo)
-			_, err := service.CreateNonPlaceScheduleItem(context.Background(), "user-1", tt.tripID, tt.date, tt.input)
-			if !errors.Is(err, ErrValidation) {
-				t.Fatalf("expected ErrValidation, got %v", err)
-			}
-			if len(repo.createdNonPlaceRecords) != 0 {
-				t.Fatalf("expected invalid input not to create rows, got %#v", repo.createdNonPlaceRecords)
-			}
-		})
-	}
-}
-
-func TestServiceUpdateNonPlaceScheduleItem(t *testing.T) {
-	repo := &fakeRepository{
-		trip:          Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"},
-		tripFound:     true,
-		isParticipant: true,
-		dayItem: ScheduleItem{
-			ID:        testUUID(7101),
-			ItemOrder: 1,
-			ItemType:  ScheduleItemTypeNonPlace,
-			StartTime: stringPtr("08:00"),
-			NonPlace: &NonPlaceScheduleItemDetails{
-				Category:      NonPlaceCategoryTransport,
-				Title:         "공항 이동",
-				TransportMode: stringPtr(TransportModeBus),
-				OriginText:    stringPtr("난바"),
-			},
-		},
-		dayItemFound: true,
-	}
-	service := newTestService(repo)
-
-	result, err := service.UpdateScheduleItem(context.Background(), "user-1", testTripID, "2026-07-11", testUUID(7101), UpdateScheduleItemInput{
-		Category:  stringPtr(NonPlaceCategoryMemo),
-		Title:     stringPtr(" 공항 이동 메모 "),
-		Memo:      stringPtr(" 버스 취소 "),
-		StartTime: stringPtr(""),
-	})
-	if err != nil {
-		t.Fatalf("UpdateScheduleItem returned error: %v", err)
-	}
-	if result.Item.ItemType != ScheduleItemTypeNonPlace || result.Item.NonPlace == nil || result.Item.NonPlace.Title != "공항 이동 메모" {
-		t.Fatalf("expected updated non-place item, got %#v", result.Item)
-	}
-	if !repo.updatedNonPlaceCalled {
-		t.Fatal("expected non-place repository update call")
-	}
-	if repo.updatedDayItemCalled {
-		t.Fatal("did not expect place repository update call")
-	}
-	record := repo.updatedNonPlaceRecord
-	if record.Details.Category != NonPlaceCategoryMemo || record.Details.Title != "공항 이동 메모" || record.Details.Memo == nil || *record.Details.Memo != "버스 취소" || record.Details.TransportMode != nil || record.Details.OriginText != nil || record.StartTime != nil || record.EndTime != nil {
-		t.Fatalf("expected normalized non-place update record, got %#v", record)
-	}
-}
-
-func TestServiceUpdateScheduleItemRejectsCrossTypeFields(t *testing.T) {
-	validTrip := Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"}
-	tests := []struct {
-		name string
-		item ScheduleItem
-		in   UpdateScheduleItemInput
-	}{
-		{name: "place rejects non-place fields", item: ScheduleItem{ID: testUUID(7201), ItemOrder: 1, Place: TripPlaceSummary{ID: testUUID(8201), Name: "우메다", Address: "Umeda", PlaceType: "sights"}}, in: UpdateScheduleItemInput{Title: stringPtr("메모")}},
-		{name: "non-place rejects place fields", item: ScheduleItem{ID: testUUID(7201), ItemOrder: 1, ItemType: ScheduleItemTypeNonPlace, NonPlace: &NonPlaceScheduleItemDetails{Category: NonPlaceCategoryMemo, Title: "메모"}}, in: UpdateScheduleItemInput{Name: stringPtr("우메다")}},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			repo := &fakeRepository{trip: validTrip, tripFound: true, isParticipant: true, dayItem: tt.item, dayItemFound: true}
-			service := newTestService(repo)
-			_, err := service.UpdateScheduleItem(context.Background(), "user-1", testTripID, "2026-07-10", testUUID(7201), tt.in)
-			if !errors.Is(err, ErrValidation) {
-				t.Fatalf("expected ErrValidation, got %v", err)
-			}
-			if repo.updatedDayItemCalled || repo.updatedNonPlaceCalled {
-				t.Fatalf("expected no update calls, place=%v non-place=%v", repo.updatedDayItemCalled, repo.updatedNonPlaceCalled)
-			}
-		})
-	}
-}
-
-func TestServiceUpdateScheduleItem(t *testing.T) {
-	repo := &fakeRepository{
-		trip:          Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"},
-		tripFound:     true,
-		isParticipant: true,
-		dayItem: ScheduleItem{
-			ID:        testUUID(7001),
-			ItemOrder: 2,
-			StartTime: stringPtr("09:00"),
-			EndTime:   stringPtr("10:00"),
-			Place: TripPlaceSummary{
-				ID:        testUUID(8001),
-				Name:      "우메다 공중정원",
-				Address:   "Umeda",
-				PlaceType: "sights",
-			},
-		},
-		dayItemFound: true,
-	}
-	service := newTestService(repo)
-
-	result, err := service.UpdateScheduleItem(context.Background(), "user-1", testTripID, "2026-07-11", testUUID(7001), UpdateScheduleItemInput{
-		Name:      stringPtr("  우메다 스카이빌딩  "),
-		Address:   stringPtr("  Umeda Sky Building  "),
-		StartTime: stringPtr(" 09:30 "),
-		EndTime:   stringPtr(""),
-	})
-	if err != nil {
-		t.Fatalf("UpdateScheduleItem returned error: %v", err)
-	}
-
-	if result.Item.ID != testUUID(7001) || result.Item.ItemOrder != 2 || result.Item.Place.Name != "우메다 스카이빌딩" || result.Item.Place.Address != "Umeda Sky Building" || result.Item.Place.PlaceType != "sights" {
-		t.Fatalf("expected updated item with unchanged order/place type, got %#v", result.Item)
-	}
-	if repo.dayItemLookupTripID != testTripID || repo.dayItemLookupDate != "2026-07-11" || repo.dayItemLookupItemID != testUUID(7001) {
-		t.Fatalf("expected item lookup by trip/date/item, got trip=%q date=%q item=%q", repo.dayItemLookupTripID, repo.dayItemLookupDate, repo.dayItemLookupItemID)
-	}
-	if !repo.updatedDayItemCalled {
-		t.Fatal("expected repository update call")
-	}
-	if repo.updatedDayItemRecord.TripID != testTripID || repo.updatedDayItemRecord.TripDayID != "2026-07-11" || repo.updatedDayItemRecord.ItemID != testUUID(7001) || repo.updatedDayItemRecord.Name != "우메다 스카이빌딩" || repo.updatedDayItemRecord.Address != "Umeda Sky Building" || repo.updatedDayItemRecord.PlaceType != "sights" {
-		t.Fatalf("expected merged trimmed update record, got %#v", repo.updatedDayItemRecord)
-	}
-	if repo.updatedDayItemRecord.StartTime == nil || *repo.updatedDayItemRecord.StartTime != "09:30" || repo.updatedDayItemRecord.EndTime != nil {
-		t.Fatalf("expected start time set and end time cleared, got start=%v end=%v", repo.updatedDayItemRecord.StartTime, repo.updatedDayItemRecord.EndTime)
 	}
 }
 

@@ -25,8 +25,6 @@ export type { CreateGoogleTripPlaceBookmarkResponse } from './models/CreateGoogl
 export type { CreateManualDayLodgingPlaceRequest } from './models/CreateManualDayLodgingPlaceRequest';
 export type { CreateManualScheduleItemRequest } from './models/CreateManualScheduleItemRequest';
 export type { CreateManualScheduleItemResponse } from './models/CreateManualScheduleItemResponse';
-export type { CreateNonPlaceScheduleItemRequest } from './models/CreateNonPlaceScheduleItemRequest';
-export type { CreateNonPlaceScheduleItemResponse } from './models/CreateNonPlaceScheduleItemResponse';
 export type { CreateQuickExpenseRequest } from './models/CreateQuickExpenseRequest';
 export type { CreateQuickExpenseResponse } from './models/CreateQuickExpenseResponse';
 export type { CreateRoutePreviewRequest } from './models/CreateRoutePreviewRequest';
@@ -71,9 +69,6 @@ export type { MetadataReadinessCheck } from './models/MetadataReadinessCheck';
 export type { MySettlementCurrencySummary } from './models/MySettlementCurrencySummary';
 export type { MySettlementDirection } from './models/MySettlementDirection';
 export type { MySettlementTripSummary } from './models/MySettlementTripSummary';
-export type { NonPlaceScheduleItemCategory } from './models/NonPlaceScheduleItemCategory';
-export type { NonPlaceScheduleItemDetails } from './models/NonPlaceScheduleItemDetails';
-export type { NonPlaceTransportMode } from './models/NonPlaceTransportMode';
 export type { OAuthCredential } from './models/OAuthCredential';
 export type { OAuthLinkRequest } from './models/OAuthLinkRequest';
 export type { OAuthLoginRequest } from './models/OAuthLoginRequest';

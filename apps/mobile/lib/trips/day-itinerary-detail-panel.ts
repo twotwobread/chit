@@ -28,16 +28,13 @@ export type DayItineraryDetailPanelViewModel = {
 const excludedActions: DayItineraryDetailPanelViewModel['excludedActions'] = ['delete', 'lodging'];
 
 export function buildDayItineraryDetailPanel(item: DayItineraryRowViewModel): DayItineraryDetailPanelViewModel {
-  const isNonPlace = item.itemType === 'non_place';
-  const address = isNonPlace ? undefined : normalizeOptionalText(item.address);
-  const nonPlaceDetail = normalizeOptionalText(item.nonPlaceDetailLabel);
-  const detailLabel =
-    [item.timeLabel, isNonPlace ? nonPlaceDetail : undefined].filter(Boolean).join(' · ') || undefined;
-  const memo = normalizeOptionalText(isNonPlace ? item.nonPlaceMemo : item.placeMemo);
+  const address = normalizeOptionalText(item.address);
+  const detailLabel = normalizeOptionalText(item.timeLabel);
+  const memo = normalizeOptionalText(item.placeMemo);
 
   return {
     title: item.placeName,
-    categoryLabel: item.nonPlaceCategoryLabel ?? item.placeTypeLabel,
+    categoryLabel: item.placeTypeLabel,
     address,
     detailLabel,
     ...(memo ? { memo } : {}),
@@ -54,12 +51,10 @@ export function buildDayItineraryDetailPanel(item: DayItineraryRowViewModel): Da
         label: '수정',
         accessibilityLabel: `${item.placeName} 수정`,
       },
-      openMap: isNonPlace
-        ? undefined
-        : {
-            label: '지도에서 보기',
-            accessibilityLabel: `${item.placeName} 지도에서 보기`,
-          },
+      openMap: {
+        label: '지도에서 보기',
+        accessibilityLabel: `${item.placeName} 지도에서 보기`,
+      },
     },
     excludedActions,
   };

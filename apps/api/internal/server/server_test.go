@@ -2252,266 +2252,6 @@ func TestCreateManualScheduleItemRequiresAuth(t *testing.T) {
 	}
 }
 
-func TestCreateNonPlaceScheduleItemHandler(t *testing.T) {
-	backend := newFakeAuthBackend()
-	accessToken := loginTestUser(t, backend)
-	tripID := createTestTrip(t, backend, accessToken)
-
-	recorder := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/days/2026-07-11/schedule-items/non-place", bytes.NewReader([]byte(`{
-		"category":"transport",
-		"title":"공항 이동",
-		"startTime":"08:00",
-		"endTime":"09:30",
-		"transportMode":"bus",
-		"referenceNumber":"BUS-12",
-		"originText":"난바",
-		"destinationText":"간사이공항"
-	}`)))
-	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("Authorization", "Bearer "+accessToken)
-
-	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
-
-	if recorder.Code != http.StatusCreated {
-		t.Fatalf("expected status %d, got %d with body %s", http.StatusCreated, recorder.Code, recorder.Body.String())
-	}
-	var body struct {
-		ScheduleItem struct {
-			ID       string          `json:"id"`
-			ItemType string          `json:"itemType"`
-			Place    json.RawMessage `json:"place"`
-			NonPlace struct {
-				Category        string `json:"category"`
-				Title           string `json:"title"`
-				TransportMode   string `json:"transportMode"`
-				ReferenceNumber string `json:"referenceNumber"`
-				OriginText      string `json:"originText"`
-				DestinationText string `json:"destinationText"`
-			} `json:"nonPlace"`
-			StartTime string `json:"startTime"`
-			EndTime   string `json:"endTime"`
-		} `json:"scheduleItem"`
-	}
-	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
-	if body.ScheduleItem.ID == "" || body.ScheduleItem.ItemType != "non_place" || string(body.ScheduleItem.Place) != "null" || body.ScheduleItem.NonPlace.Category != "transport" || body.ScheduleItem.NonPlace.Title != "공항 이동" || body.ScheduleItem.NonPlace.TransportMode != "bus" || body.ScheduleItem.NonPlace.ReferenceNumber != "BUS-12" || body.ScheduleItem.NonPlace.OriginText != "난바" || body.ScheduleItem.NonPlace.DestinationText != "간사이공항" || body.ScheduleItem.StartTime != "08:00" || body.ScheduleItem.EndTime != "09:30" {
-		t.Fatalf("unexpected response body: %#v place=%s", body, string(body.ScheduleItem.Place))
-	}
-}
-
-func TestCreateNonPlaceScheduleItemValidation(t *testing.T) {
-	backend := newFakeAuthBackend()
-	accessToken := loginTestUser(t, backend)
-	tripID := createTestTrip(t, backend, accessToken)
-
-	tests := []struct {
-		name string
-		body string
-	}{
-		{name: "blank title", body: `{"category":"memo","title":" "}`},
-		{name: "transport missing mode", body: `{"category":"transport","title":"공항 이동"}`},
-		{name: "non transport rejects transport fields", body: `{"category":"memo","title":"메모","transportMode":"bus"}`},
-		{name: "unknown field", body: `{"category":"memo","title":"메모","placeId":"x"}`},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			recorder := httptest.NewRecorder()
-			request := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/days/2026-07-11/schedule-items/non-place", bytes.NewReader([]byte(tt.body)))
-			request.Header.Set("Content-Type", "application/json")
-			request.Header.Set("Authorization", "Bearer "+accessToken)
-
-			NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
-
-			if recorder.Code != http.StatusBadRequest {
-				t.Fatalf("expected status %d, got %d with body %s", http.StatusBadRequest, recorder.Code, recorder.Body.String())
-			}
-		})
-	}
-}
-
-func TestListDayExpensesHandler(t *testing.T) {
-	backend := newFakeAuthBackend()
-	ownerToken := loginTestUser(t, backend)
-	tripID := createTestTrip(t, backend, ownerToken)
-	item := createTestScheduleItem(t, backend, ownerToken, tripID, "2026-07-11", `{"name":"도톤보리","address":"Dotonbori","placeType":"food"}`)
-	_ = loginTestUserWithSubject(t, backend, "apple-2", "지영")
-	member := tripdomain.Participant{
-		ID:          testUUID(2222),
-		TripID:      tripID,
-		UserID:      "user-2",
-		Role:        tripdomain.RoleMember,
-		DisplayName: "지영",
-		JoinedAt:    time.Date(2026, 6, 22, 15, 0, 0, 0, time.UTC),
-	}
-	backend.participants[tripID] = append(backend.participants[tripID], member)
-	payerID := backend.participants[tripID][0].ID
-
-	createExpense := func(amountMinor int64) {
-		t.Helper()
-		requestBody := []byte(fmt.Sprintf(`{"scheduleItemId":%q,"amountMinor":%d,"payerParticipantId":%q,"splitPolicy":"equal","participantIds":[%q,%q]}`, item.ID, amountMinor, payerID, payerID, member.ID))
-		recorder := httptest.NewRecorder()
-		request := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/days/2026-07-11/expenses/quick", bytes.NewReader(requestBody))
-		request.Header.Set("Content-Type", "application/json")
-		request.Header.Set("Authorization", "Bearer "+ownerToken)
-
-		NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
-		if recorder.Code != http.StatusCreated {
-			t.Fatalf("expected create expense status %d, got %d with body %s", http.StatusCreated, recorder.Code, recorder.Body.String())
-		}
-	}
-	createExpense(1001)
-	createExpense(2000)
-
-	recorder := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodGet, "/trips/"+tripID+"/days/2026-07-11/expenses", nil)
-	request.Header.Set("Authorization", "Bearer "+ownerToken)
-
-	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
-
-	if recorder.Code != http.StatusOK {
-		t.Fatalf("expected status %d, got %d with body %s", http.StatusOK, recorder.Code, recorder.Body.String())
-	}
-
-	responseBody := recorder.Body.Bytes()
-	var body struct {
-		Expenses []struct {
-			ID             string `json:"id"`
-			AnchorType     string `json:"anchorType"`
-			DisplayTitle   string `json:"displayTitle"`
-			ScheduleItemID string `json:"scheduleItemId"`
-			AmountMinor    int64  `json:"amountMinor"`
-			Currency       string `json:"currency"`
-			SplitPolicy    string `json:"splitPolicy"`
-			Payer          struct {
-				ParticipantID string `json:"participantId"`
-				DisplayName   string `json:"displayName"`
-				Source        string `json:"source"`
-			} `json:"payer"`
-			Place struct {
-				TripPlaceID string `json:"tripPlaceId"`
-				Name        string `json:"name"`
-				Address     string `json:"address"`
-				PlaceType   string `json:"placeType"`
-				Source      string `json:"source"`
-			} `json:"place"`
-			Splits []struct {
-				SplitOrder  int `json:"splitOrder"`
-				Participant struct {
-					ParticipantID string `json:"participantId"`
-					DisplayName   string `json:"displayName"`
-					Source        string `json:"source"`
-				} `json:"participant"`
-				AmountMinor int64 `json:"amountMinor"`
-			} `json:"splits"`
-			CreatedAt string `json:"createdAt"`
-		} `json:"expenses"`
-	}
-	if err := json.NewDecoder(bytes.NewReader(responseBody)).Decode(&body); err != nil {
-		t.Fatalf("decode list response: %v", err)
-	}
-	if len(body.Expenses) != 2 {
-		t.Fatalf("expected two expenses, got %#v", body.Expenses)
-	}
-	if body.Expenses[0].AmountMinor != 2000 || body.Expenses[1].AmountMinor != 1001 {
-		t.Fatalf("expected newest-first expenses, got %#v", body.Expenses)
-	}
-	if body.Expenses[0].Place.Name != "도톤보리" || body.Expenses[0].Place.Source != "live" || body.Expenses[0].DisplayTitle != "도톤보리" || body.Expenses[0].Currency != "JPY" || body.Expenses[0].Payer.DisplayName != "민수" || body.Expenses[0].Payer.Source != "live" || body.Expenses[0].SplitPolicy != "equal" {
-		t.Fatalf("unexpected canonical display: %#v", body.Expenses[0])
-	}
-	if len(body.Expenses[0].Splits) != 2 || body.Expenses[0].Splits[0].SplitOrder != 1 || body.Expenses[0].Splits[0].Participant.DisplayName != "민수" || body.Expenses[0].Splits[1].SplitOrder != 2 || body.Expenses[0].Splits[1].Participant.DisplayName != "지영" {
-		t.Fatalf("unexpected split rows: %#v", body.Expenses[0].Splits)
-	}
-
-	var rawBody struct {
-		Expenses []map[string]any `json:"expenses"`
-	}
-	if err := json.Unmarshal(responseBody, &rawBody); err != nil {
-		t.Fatalf("decode raw list response: %v", err)
-	}
-	for _, field := range []string{"tripPlaceId", "payerParticipantId", "payerDisplayName"} {
-		if _, ok := rawBody.Expenses[0][field]; ok {
-			t.Fatalf("expected list item not to expose nullable source field %q: %#v", field, rawBody.Expenses[0])
-		}
-	}
-}
-
-func TestListDayExpensesEmpty(t *testing.T) {
-	backend := newFakeAuthBackend()
-	ownerToken := loginTestUser(t, backend)
-	tripID := createTestTrip(t, backend, ownerToken)
-
-	recorder := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodGet, "/trips/"+tripID+"/days/2026-07-11/expenses", nil)
-	request.Header.Set("Authorization", "Bearer "+ownerToken)
-
-	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
-
-	if recorder.Code != http.StatusOK {
-		t.Fatalf("expected status %d, got %d with body %s", http.StatusOK, recorder.Code, recorder.Body.String())
-	}
-	var body struct {
-		Expenses []struct{} `json:"expenses"`
-	}
-	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
-		t.Fatalf("decode list response: %v", err)
-	}
-	if body.Expenses == nil || len(body.Expenses) != 0 {
-		t.Fatalf("expected empty non-nil expenses, got %#v", body.Expenses)
-	}
-}
-
-func TestListDayExpensesErrors(t *testing.T) {
-	backend := newFakeAuthBackend()
-	ownerToken := loginTestUser(t, backend)
-	tripID := createTestTrip(t, backend, ownerToken)
-	nonParticipantToken := loginTestUserWithSubject(t, backend, "apple-2", "지영")
-
-	tests := []struct {
-		name       string
-		path       string
-		token      string
-		expectCode int
-		expectErr  string
-	}{
-		{name: "requires auth", path: "/trips/" + tripID + "/days/2026-07-11/expenses", expectCode: http.StatusUnauthorized, expectErr: "UNAUTHORIZED"},
-		{name: "invalid trip id", path: "/trips/not-a-uuid/days/2026-07-11/expenses", token: ownerToken, expectCode: http.StatusBadRequest, expectErr: "VALIDATION_ERROR"},
-		{name: "invalid date", path: "/trips/" + tripID + "/days/not-a-date/expenses", token: ownerToken, expectCode: http.StatusBadRequest, expectErr: "VALIDATION_ERROR"},
-		{name: "missing trip", path: "/trips/00000000-0000-0000-0000-000000000404/days/2026-07-11/expenses", token: ownerToken, expectCode: http.StatusNotFound, expectErr: "NOT_FOUND"},
-		{name: "out of range", path: "/trips/" + tripID + "/days/2026-07-14/expenses", token: ownerToken, expectCode: http.StatusNotFound, expectErr: "NOT_FOUND"},
-		{name: "forbidden", path: "/trips/" + tripID + "/days/2026-07-11/expenses", token: nonParticipantToken, expectCode: http.StatusForbidden, expectErr: "FORBIDDEN"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			recorder := httptest.NewRecorder()
-			request := httptest.NewRequest(http.MethodGet, tt.path, nil)
-			if tt.token != "" {
-				request.Header.Set("Authorization", "Bearer "+tt.token)
-			}
-
-			NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
-
-			if recorder.Code != tt.expectCode {
-				t.Fatalf("expected status %d, got %d with body %s", tt.expectCode, recorder.Code, recorder.Body.String())
-			}
-			var body struct {
-				Error struct {
-					Code string `json:"code"`
-				} `json:"error"`
-			}
-			if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
-				t.Fatalf("decode error response: %v", err)
-			}
-			if body.Error.Code != tt.expectErr {
-				t.Fatalf("expected error %q, got %q", tt.expectErr, body.Error.Code)
-			}
-		})
-	}
-}
-
 func TestCreateQuickExpenseHandler(t *testing.T) {
 	backend := newFakeAuthBackend()
 	ownerToken := loginTestUser(t, backend)
@@ -3328,7 +3068,7 @@ func TestUpdateScheduleItemValidation(t *testing.T) {
 		{name: "invalid date", path: "/trips/" + tripID + "/days/not-a-date/schedule-items/" + created.ID, body: `{"name":"도톤보리"}`},
 		{name: "invalid item id", path: "/trips/" + tripID + "/days/2026-07-11/schedule-items/not-a-uuid", body: `{"name":"도톤보리"}`},
 		{name: "empty patch", path: "/trips/" + tripID + "/days/2026-07-11/schedule-items/" + created.ID, body: `{}`},
-		{name: "unknown field", path: "/trips/" + tripID + "/days/2026-07-11/schedule-items/" + created.ID, body: `{"memo":"x"}`},
+		{name: "unknown field", path: "/trips/" + tripID + "/days/2026-07-11/schedule-items/" + created.ID, body: `{"category":"memo"}`},
 		{name: "blank name", path: "/trips/" + tripID + "/days/2026-07-11/schedule-items/" + created.ID, body: `{"name":" "}`},
 		{name: "invalid place type", path: "/trips/" + tripID + "/days/2026-07-11/schedule-items/" + created.ID, body: `{"placeType":"museum"}`},
 	}
@@ -3860,7 +3600,7 @@ func TestTripPlaceBookmarkHandlers(t *testing.T) {
 	router := NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true, PlaceProvider: provider})
 
 	createRecorder := httptest.NewRecorder()
-	createRequest := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/place-bookmarks/google", bytes.NewReader([]byte(`{"googlePlaceId":"google-airport-1","category":"transport"}`)))
+	createRequest := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/place-bookmarks/google", bytes.NewReader([]byte(`{"googlePlaceId":"google-airport-1"}`)))
 	createRequest.Header.Set("Content-Type", "application/json")
 	createRequest.Header.Set("Authorization", "Bearer "+accessToken)
 	router.ServeHTTP(createRecorder, createRequest)
@@ -5668,22 +5408,6 @@ func (b *fakeAuthBackend) CreateManualScheduleItem(_ context.Context, record tri
 	return item, nil
 }
 
-func (b *fakeAuthBackend) CreateNonPlaceScheduleItem(_ context.Context, record tripdomain.CreateNonPlaceScheduleItemRecord) (tripdomain.ScheduleItem, error) {
-	b.nextScheduleItem++
-	key := record.TripID + ":" + record.TripDayID
-	item := tripdomain.ScheduleItem{
-		ID:        testUUID(5000 + b.nextScheduleItem),
-		ItemOrder: len(b.dayScheduleItems[key]) + 1,
-		Version:   1,
-		ItemType:  tripdomain.ScheduleItemTypeNonPlace,
-		StartTime: record.StartTime,
-		EndTime:   record.EndTime,
-		NonPlace:  &record.Details,
-	}
-	b.dayScheduleItems[key] = append(b.dayScheduleItems[key], item)
-	return item, nil
-}
-
 func (b *fakeAuthBackend) AppendGooglePlaceScheduleItem(_ context.Context, record placedomain.AppendGooglePlaceScheduleItemRecord) (tripdomain.ScheduleItem, error) {
 	place, ok := b.tripPlaces[record.TripID+":"+record.TripPlaceID]
 	if !ok {
@@ -5917,22 +5641,6 @@ func (b *fakeAuthBackend) UpdateScheduleItemPlace(_ context.Context, record trip
 		b.dayScheduleItems[key] = items
 	}
 	return updated, nil
-}
-
-func (b *fakeAuthBackend) UpdateNonPlaceScheduleItem(_ context.Context, record tripdomain.UpdateNonPlaceScheduleItemRecord) (tripdomain.ScheduleItem, error) {
-	key := record.TripID + ":" + record.TripDayID
-	items := b.dayScheduleItems[key]
-	for index, item := range items {
-		if item.ID == record.ItemID && item.ItemType == tripdomain.ScheduleItemTypeNonPlace {
-			item.StartTime = record.StartTime
-			item.EndTime = record.EndTime
-			item.NonPlace = &record.Details
-			items[index] = item
-			b.dayScheduleItems[key] = items
-			return item, nil
-		}
-	}
-	return tripdomain.ScheduleItem{}, tripdomain.ErrNotFound
 }
 
 func (b *fakeAuthBackend) DeleteScheduleItem(_ context.Context, tripID string, date string, itemID string) (bool, error) {

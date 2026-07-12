@@ -467,7 +467,7 @@ func TestServiceCreateGoogleTripPlaceBookmarkCreatesGoogleSnapshot(t *testing.T)
 	}}
 	service := NewService(repo, provider)
 
-	result, err := service.CreateGoogleTripPlaceBookmark(context.Background(), "user-1", testTripID, CreateGoogleTripPlaceBookmarkInput{GooglePlaceID: " google-airport-1 ", Category: "transport"})
+	result, err := service.CreateGoogleTripPlaceBookmark(context.Background(), "user-1", testTripID, CreateGoogleTripPlaceBookmarkInput{GooglePlaceID: " google-airport-1 "})
 	if err != nil {
 		t.Fatalf("CreateGoogleTripPlaceBookmark returned error: %v", err)
 	}
@@ -515,35 +515,39 @@ func TestServiceListAndDeleteTripPlaceBookmarksAuthorizeParticipants(t *testing.
 
 func TestServiceCreateGoogleTripPlaceBookmarkValidationAndAuth(t *testing.T) {
 	service := NewService(&fakeRepository{trip: trip.Trip{ID: testTripID}, tripFound: true, isParticipant: true}, &fakeProvider{})
-	if _, err := service.CreateGoogleTripPlaceBookmark(context.Background(), " ", testTripID, CreateGoogleTripPlaceBookmarkInput{GooglePlaceID: "google-1", Category: "cafe"}); !errors.Is(err, ErrUnauthorized) {
+	if _, err := service.CreateGoogleTripPlaceBookmark(context.Background(), " ", testTripID, CreateGoogleTripPlaceBookmarkInput{GooglePlaceID: "google-1"}); !errors.Is(err, ErrUnauthorized) {
 		t.Fatalf("expected unauthorized, got %v", err)
 	}
-	if _, err := service.CreateGoogleTripPlaceBookmark(context.Background(), "user-1", testTripID, CreateGoogleTripPlaceBookmarkInput{GooglePlaceID: " ", Category: "cafe"}); !errors.Is(err, ErrValidation) {
+	if _, err := service.CreateGoogleTripPlaceBookmark(context.Background(), "user-1", testTripID, CreateGoogleTripPlaceBookmarkInput{GooglePlaceID: " "}); !errors.Is(err, ErrValidation) {
 		t.Fatalf("expected validation for blank google id, got %v", err)
 	}
-	if _, err := service.CreateGoogleTripPlaceBookmark(context.Background(), "user-1", testTripID, CreateGoogleTripPlaceBookmarkInput{GooglePlaceID: "google-1", Category: "museum"}); !errors.Is(err, ErrValidation) {
-		t.Fatalf("expected validation for unsupported category, got %v", err)
-	}
-	if _, err := NewService(&fakeRepository{trip: trip.Trip{ID: testTripID}, tripFound: true}, &fakeProvider{}).CreateGoogleTripPlaceBookmark(context.Background(), "user-1", testTripID, CreateGoogleTripPlaceBookmarkInput{GooglePlaceID: "google-1", Category: "cafe"}); !errors.Is(err, ErrForbidden) {
+	if _, err := NewService(&fakeRepository{trip: trip.Trip{ID: testTripID}, tripFound: true}, &fakeProvider{}).CreateGoogleTripPlaceBookmark(context.Background(), "user-1", testTripID, CreateGoogleTripPlaceBookmarkInput{GooglePlaceID: "google-1"}); !errors.Is(err, ErrForbidden) {
 		t.Fatalf("expected forbidden for non-participant, got %v", err)
 	}
 }
 
-func TestMapGooglePlaceType(t *testing.T) {
-	if got := mapGooglePlaceType("coffee_shop", nil); got != "cafe" {
-		t.Fatalf("expected coffee_shop to map to cafe, got %q", got)
+func TestMapProviderPlaceType(t *testing.T) {
+	tests := []struct {
+		name        string
+		provider    string
+		primaryType string
+		types       []string
+		want        string
+	}{
+		{name: "google primary cafe", provider: DestinationProviderGoogle, primaryType: "coffee_shop", want: "cafe"},
+		{name: "google fallback food", provider: DestinationProviderGoogle, primaryType: "unknown", types: []string{"restaurant"}, want: "food"},
+		{name: "google airport transport", provider: DestinationProviderGoogle, primaryType: "airport", want: "transport"},
+		{name: "google station fallback transport", provider: DestinationProviderGoogle, primaryType: "unknown", types: []string{"point_of_interest", "train_station"}, want: "transport"},
+		{name: "google unknown etc", provider: DestinationProviderGoogle, primaryType: "unknown", types: []string{"point_of_interest"}, want: "etc"},
+		{name: "unknown provider etc", provider: "naver", primaryType: "restaurant", want: "etc"},
 	}
-	if got := mapGooglePlaceType("unknown", []string{"restaurant"}); got != "food" {
-		t.Fatalf("expected raw type fallback to food, got %q", got)
-	}
-	if got := mapGooglePlaceType("airport", nil); got != "transport" {
-		t.Fatalf("expected airport to map to transport, got %q", got)
-	}
-	if got := mapGooglePlaceType("unknown", []string{"subway_station"}); got != "transport" {
-		t.Fatalf("expected subway_station raw type fallback to transport, got %q", got)
-	}
-	if got := mapGooglePlaceType("unknown", []string{"point_of_interest"}); got != "etc" {
-		t.Fatalf("expected unknown type to map to etc, got %q", got)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := MapProviderPlaceType(tt.provider, tt.primaryType, tt.types); got != tt.want {
+				t.Fatalf("MapProviderPlaceType() = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }
 

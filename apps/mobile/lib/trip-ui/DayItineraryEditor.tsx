@@ -33,7 +33,6 @@ export function DayItineraryEditor({
     cancelDelete,
     cancelEdit,
     cancelLodgingPicker,
-    cancelNonPlaceEditor,
     cancelReorder,
     clearContentFocusRequest,
     contentFocusRequest,
@@ -49,7 +48,6 @@ export function DayItineraryEditor({
     lodgingState,
     mapActionFeedback,
     moveReorderItem,
-    nonPlaceEditorState,
     openLodgingPlaceSelection,
     openLodgingSearchRegister,
     openPlaceMap,
@@ -65,11 +63,9 @@ export function DayItineraryEditor({
     submitClearCurrentLodging,
     submitDelete,
     submitEdit,
-    submitNonPlaceEditor,
     submitReorder,
     submitSelectLodgingPlace,
     updateEditValues,
-    updateNonPlaceEditorValues,
     updateScrollContentSize,
     updateScrollLayout,
     updateScrollOffset,
@@ -78,11 +74,7 @@ export function DayItineraryEditor({
   const addFabLayout = buildTripRootFabLayout({ bottomInset: insets.bottom, rightInset: insets.right });
   const showAddFab = shouldShowTripRootFab({
     hasAction: true,
-    isBlocked:
-      isDeleteModalVisible ||
-      editState.status !== 'idle' ||
-      nonPlaceEditorState.status !== 'idle' ||
-      reorderState.status !== 'idle',
+    isBlocked: isDeleteModalVisible || editState.status !== 'idle' || reorderState.status !== 'idle',
     status: state.status === 'success' ? 'ready' : state.status,
   });
 
@@ -125,7 +117,6 @@ export function DayItineraryEditor({
               onCopyAddress={(item) => void copyPlaceAddress(item)}
               onDeletePlace={beginDelete}
               onCancelEdit={cancelEdit}
-              onCancelNonPlaceEditor={cancelNonPlaceEditor}
               onEditPlace={beginEdit}
               onEnterReorderMode={() => beginReorder(state.viewModel)}
               onExitReorderMode={cancelReorder}
@@ -142,12 +133,9 @@ export function DayItineraryEditor({
               onSaveReorder={() => void submitReorder()}
               onSelectLodgingPlace={(option) => void submitSelectLodgingPlace(option)}
               onSubmitEdit={() => void submitEdit()}
-              onSubmitNonPlaceEditor={() => void submitNonPlaceEditor()}
               onUpdateEditValues={updateEditValues}
-              onUpdateNonPlaceEditorValues={updateNonPlaceEditorValues}
               mapActionFeedback={mapActionFeedback}
               onReloadSharedUpdate={requestSharedUpdateReload}
-              nonPlaceEditorState={nonPlaceEditorState}
               reorderFeedback={reorderFeedback}
               reorderState={reorderState}
               sharedUpdateBanner={sharedUpdateBanner}
@@ -188,7 +176,7 @@ export function DayItineraryEditor({
       </ScrollView>
       {showAddFab ? (
         <TripRootFab
-          accessibilityHint="장소 검색 또는 장소 없는 일정 추가를 시작합니다."
+          accessibilityHint="장소 검색으로 일정 추가를 시작합니다."
           accessibilityLabel="일정 추가"
           layout={addFabLayout.fab}
           onPress={addPlace}

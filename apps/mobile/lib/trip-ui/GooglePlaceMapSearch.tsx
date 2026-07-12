@@ -44,7 +44,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MapView, { Marker, type Region } from 'react-native-maps';
 
-import { ApiError, OpenAPI, type TripPlaceType } from '@i-um/api-contract';
+import { ApiError, OpenAPI } from '@i-um/api-contract';
 
 import { MobileAuthError } from '../auth/client';
 import { theme } from '../design';
@@ -131,20 +131,17 @@ type GooglePlaceSearchBottomSheetModule = {
   default?: unknown;
 };
 
-export type GooglePlaceBookmarkCategoryOption = { value: TripPlaceType; label: string };
-
 export type GooglePlaceMapSearchProps = {
   actionMode: GooglePlaceSearchResultActionMode;
   actionState?: GooglePlaceAddViewState;
-  bookmarkCategoryOptions?: GooglePlaceBookmarkCategoryOption[];
   bookmarkResults?: GooglePlaceSearchRowViewModel[];
   bottomSheetFooter?: ReactNode;
   dayId: string;
   initialRegion?: Region | null;
   minimizedSheetBaseHeight?: number;
   notFoundAction?: { label: string; onPress: () => void };
-  onBookmarkCategorySelect?: (result: GooglePlaceSearchRowViewModel, category: TripPlaceType) => void;
   onBookmarkDeleteResult?: (result: GooglePlaceSearchRowViewModel) => void;
+  onBookmarkSelectResult?: (result: GooglePlaceSearchRowViewModel) => void;
   onClearRoutePlaceSelection?: () => void;
   onPrimaryAction?: (result: GooglePlaceSearchRowViewModel, duplicateConfirmed: boolean) => void;
   onResetActionState?: () => void;
@@ -292,15 +289,14 @@ const GooglePlaceBottomSheetTextInput = (nativeBottomSheetModule?.BottomSheetTex
 export function GooglePlaceMapSearch({
   actionMode,
   actionState = idleGooglePlaceAddState(),
-  bookmarkCategoryOptions = [],
   bookmarkResults = [],
   bottomSheetFooter,
   dayId,
   initialRegion,
   minimizedSheetBaseHeight,
   notFoundAction,
-  onBookmarkCategorySelect,
   onBookmarkDeleteResult,
+  onBookmarkSelectResult,
   onClearRoutePlaceSelection,
   onPrimaryAction,
   onResetActionState,
@@ -346,7 +342,6 @@ export function GooglePlaceMapSearch({
   const [selectedResult, setSelectedResult] = useState<GooglePlaceSearchRowViewModel | null>(null);
   const [selectedResultSource, setSelectedResultSource] = useState<GooglePlaceSearchSelectionSource | null>(null);
   const [highlightedResultId, setHighlightedResultId] = useState<string | null>(null);
-  const [bookmarkCategoryResultId, setBookmarkCategoryResultId] = useState<string | null>(null);
   const [currentLocation, setCurrentLocation] = useState<GooglePlaceMapCoordinate | null>(null);
   const [mapRegion, setMapRegion] = useState<Region>(initialMapRegion);
   const [selectedDestinationId, setSelectedDestinationId] = useState<string | null>(defaultDestinationId);
@@ -456,7 +451,6 @@ export function GooglePlaceMapSearch({
     setSelectedResultSource(null);
     setHighlightedResultId(null);
     setDetailsState(buildGooglePlaceDetailsIdleState());
-    setBookmarkCategoryResultId(null);
     setMapActionMessage(null);
     onClearRoutePlaceSelection?.();
     setSheetState((current) => resolveGooglePlaceSearchSheetState(current, { kind: 'searchInputFocus' }));
@@ -644,7 +638,6 @@ export function GooglePlaceMapSearch({
     if (actionState.status !== 'adding') {
       resetActionState();
     }
-    setBookmarkCategoryResultId(null);
     setMapActionMessage(null);
     onClearRoutePlaceSelection?.();
     const nextRegion = buildGooglePlaceSelectedMapRegion(result, mapRegion);
@@ -682,7 +675,6 @@ export function GooglePlaceMapSearch({
     setSelectedResultSource(null);
     setHighlightedResultId(null);
     setDetailsState(buildGooglePlaceDetailsIdleState());
-    setBookmarkCategoryResultId(null);
     setMapActionMessage(null);
     onClearRoutePlaceSelection?.();
     setSheetState((current) => resolveGooglePlaceSearchSheetState(current, { kind: 'mapTap' }));
@@ -699,7 +691,6 @@ export function GooglePlaceMapSearch({
     setSelectedResultSource(null);
     setHighlightedResultId(null);
     setDetailsState(buildGooglePlaceDetailsIdleState());
-    setBookmarkCategoryResultId(null);
     setMapActionMessage(null);
     setQuery('');
     setState(clearGooglePlaceSearchResultsState(query));
@@ -708,23 +699,17 @@ export function GooglePlaceMapSearch({
   };
 
   const handleResultPrimaryAction = (result: GooglePlaceSearchRowViewModel) => {
-    if (actionMode === 'bookmark' && bookmarkCategoryOptions.length > 0 && onBookmarkCategorySelect) {
-      setBookmarkCategoryResultId(result.id);
+    if (actionMode === 'bookmark') {
+      onBookmarkSelectResult?.(result);
       return;
     }
     onPrimaryAction?.(result, false);
-  };
-
-  const handleBookmarkCategorySelect = (result: GooglePlaceSearchRowViewModel, category: TripPlaceType) => {
-    setBookmarkCategoryResultId(null);
-    onBookmarkCategorySelect?.(result, category);
   };
 
   const closeSearchResults = () => {
     const bookmarkSelection = resolveGooglePlaceSearchSelectionAfterResultsClose(selectedResult, bookmarkResults);
     setQuery('');
     setState(clearGooglePlaceSearchResultsState(query));
-    setBookmarkCategoryResultId(null);
     setMapActionMessage(null);
     if (bookmarkSelection) {
       setSelectedResult(bookmarkSelection);
@@ -1038,7 +1023,6 @@ export function GooglePlaceMapSearch({
                     mode: actionMode === 'bookmark' ? 'exploreOnly' : actionMode,
                     result: selectedResult,
                   })}
-                  bookmarkCategoryOptions={[]}
                   dayId={dayId}
                   detailsState={detailsState}
                   imageFailed={imageFailures[selectedResult.id] === true}
@@ -1059,9 +1043,7 @@ export function GooglePlaceMapSearch({
                   onOpenMaps={(url) => void openGoogleMaps(url)}
                   onPress={() => undefined}
                   onPrimaryAction={() => handleResultPrimaryAction(selectedResult)}
-                  onSelectBookmarkCategory={(category) => handleBookmarkCategorySelect(selectedResult, category)}
                   result={selectedResult}
-                  showBookmarkCategoryPicker={false}
                   tripId={tripId}
                 />
               </View>
@@ -1076,7 +1058,6 @@ export function GooglePlaceMapSearch({
                       mode: actionMode,
                       result: item,
                     })}
-                    bookmarkCategoryOptions={bookmarkCategoryOptions}
                     dayId={dayId}
                     detailsState={detailsState}
                     imageFailed={imageFailures[item.id] === true}
@@ -1098,9 +1079,7 @@ export function GooglePlaceMapSearch({
                     onOpenMaps={(url) => void openGoogleMaps(url)}
                     onPress={() => selectResult(item, 'list', 'search')}
                     onPrimaryAction={() => handleResultPrimaryAction(item)}
-                    onSelectBookmarkCategory={(category) => handleBookmarkCategorySelect(item, category)}
                     result={item}
-                    showBookmarkCategoryPicker={bookmarkCategoryResultId === item.id}
                     tripId={tripId}
                   />
                 ))}
@@ -1118,7 +1097,6 @@ type PlaceResultActionView = ReturnType<typeof buildGooglePlaceSearchResultActio
 
 function PlaceResultCard({
   actionView,
-  bookmarkCategoryOptions,
   dayId,
   detailsState,
   imageFailed,
@@ -1134,13 +1112,10 @@ function PlaceResultCard({
   onOpenMaps,
   onPress,
   onPrimaryAction,
-  onSelectBookmarkCategory,
   result,
-  showBookmarkCategoryPicker,
   tripId,
 }: {
   actionView: PlaceResultActionView;
-  bookmarkCategoryOptions: GooglePlaceBookmarkCategoryOption[];
   result: GooglePlaceSearchRowViewModel;
   tripId: string;
   dayId: string;
@@ -1155,11 +1130,9 @@ function PlaceResultCard({
   onDeleteBookmark?: () => void;
   onPrimaryAction: () => void;
   onPress: () => void;
-  onSelectBookmarkCategory: (category: TripPlaceType) => void;
   onImageError: () => void;
   onLayout: (y: number) => void;
   onOpenMaps: (url: string) => void;
-  showBookmarkCategoryPicker: boolean;
 }) {
   const detail =
     detailsState.status === 'success' && detailsState.googlePlaceId === result.id
@@ -1248,24 +1221,6 @@ function PlaceResultCard({
               </Pressable>
             ) : null}
           </View>
-          {showBookmarkCategoryPicker && bookmarkCategoryOptions.length > 0 ? (
-            <View style={styles.noticeCard}>
-              <Text style={styles.errorTitle}>카테고리를 선택해 주세요.</Text>
-              <View style={styles.categoryOptionGrid}>
-                {bookmarkCategoryOptions.map((option) => (
-                  <Pressable
-                    accessibilityRole="button"
-                    disabled={isBusy}
-                    key={option.value}
-                    onPress={() => onSelectBookmarkCategory(option.value)}
-                    style={[styles.categoryOptionButton, isBusy ? styles.secondaryButtonDisabled : null]}
-                  >
-                    <Text style={styles.secondaryButtonText}>{option.label}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            </View>
-          ) : null}
           {actionView.duplicateConfirmation ? (
             <DuplicateConfirmationCard
               confirmation={actionView.duplicateConfirmation}

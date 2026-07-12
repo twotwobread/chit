@@ -2,4 +2,4 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-export type ScheduleItemType = 'place' | 'non_place';
+export type ScheduleItemType = 'place';
