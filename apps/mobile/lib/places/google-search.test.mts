@@ -448,6 +448,15 @@ describe('google place search helpers', () => {
     assert.equal(buildGooglePlaceSearchSheetStateFromIndex(99), 'full');
   });
 
+  it('caps full sheet height below a reserved map overlay and supports a smaller minimized handle state', () => {
+    const metrics = buildGooglePlaceSearchSheetMetrics(800, 24, {
+      minimizedBaseHeight: 40,
+      topInset: 240,
+    });
+
+    assert.deepEqual(buildGooglePlaceSearchSheetSnapPoints(metrics), [64, 448, 560]);
+  });
+
   it('builds a current-location marker after locating the user', () => {
     assert.deepEqual(buildGooglePlaceCurrentLocationMarkerViewModel({ latitude: 37.5665, longitude: 126.978 }), {
       id: 'current-location',

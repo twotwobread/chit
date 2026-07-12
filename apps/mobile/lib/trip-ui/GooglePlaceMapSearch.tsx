@@ -23,6 +23,7 @@ import {
   TextInput,
   useWindowDimensions,
   View,
+  type LayoutChangeEvent,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
@@ -113,10 +114,12 @@ export type GooglePlaceMapSearchProps = {
   bottomSheetFooter?: ReactNode;
   dayId: string;
   initialRegion?: Region | null;
+  minimizedSheetBaseHeight?: number;
   notFoundAction?: { label: string; onPress: () => void };
   onPrimaryAction?: (result: GooglePlaceSearchRowViewModel, duplicateConfirmed: boolean) => void;
   onResetActionState?: () => void;
   routePlaces?: RouteMapPlace[];
+  sheetTopInset?: number;
   style?: StyleProp<ViewStyle>;
   tripId: string;
 };
@@ -258,10 +261,12 @@ export function GooglePlaceMapSearch({
   bottomSheetFooter,
   dayId,
   initialRegion,
+  minimizedSheetBaseHeight,
   notFoundAction,
   onPrimaryAction,
   onResetActionState,
   routePlaces = [],
+  sheetTopInset,
   style,
   tripId,
 }: GooglePlaceMapSearchProps) {
@@ -275,6 +280,7 @@ export function GooglePlaceMapSearch({
   const suppressNextRegionDirtyRef = useRef(false);
   const suppressNextMapTapRef = useRef(false);
   const initialMapRegion = initialRegion ?? defaultGooglePlaceSearchMapRegion;
+  const [containerHeight, setContainerHeight] = useState<number | null>(null);
   const [query, setQuery] = useState('');
   const [state, setState] = useState<GooglePlaceSearchViewState>(buildGooglePlaceSearchInputState(''));
   const [detailsState, setDetailsState] = useState<GooglePlaceDetailsViewState>(buildGooglePlaceDetailsIdleState());
@@ -296,9 +302,14 @@ export function GooglePlaceMapSearch({
   const currentLocationMarker = buildGooglePlaceCurrentLocationMarkerViewModel(currentLocation);
   const showRegionSearch = shouldShowGooglePlaceRegionSearchAction(query, regionDirty, isBusy, sheetState);
   const showCurrentLocation = shouldShowGooglePlaceCurrentLocationButton(sheetState);
+  const sheetMetricHeight = containerHeight ?? window.height;
   const sheetMetrics = useMemo(
-    () => buildGooglePlaceSearchSheetMetrics(window.height, insets.bottom),
-    [insets.bottom, window.height],
+    () =>
+      buildGooglePlaceSearchSheetMetrics(sheetMetricHeight, insets.bottom, {
+        minimizedBaseHeight: minimizedSheetBaseHeight,
+        topInset: sheetTopInset,
+      }),
+    [insets.bottom, minimizedSheetBaseHeight, sheetMetricHeight, sheetTopInset],
   );
   const sheetSnapPoints = useMemo(() => buildGooglePlaceSearchSheetSnapPoints(sheetMetrics), [sheetMetrics]);
   const sheetIndex = buildGooglePlaceSearchSheetIndex(sheetState);
@@ -553,6 +564,13 @@ export function GooglePlaceMapSearch({
     }
   };
 
+  const handleContainerLayout = (event: LayoutChangeEvent) => {
+    const nextHeight = event.nativeEvent.layout.height;
+    if (Number.isFinite(nextHeight) && Math.abs(nextHeight - (containerHeight ?? 0)) > 1) {
+      setContainerHeight(nextHeight);
+    }
+  };
+
   if (state.status === 'notFound') {
     return (
       <ScrollView contentContainerStyle={styles.notFoundContent} style={styles.notFoundRoot}>
@@ -570,7 +588,7 @@ export function GooglePlaceMapSearch({
   }
 
   return (
-    <View style={[styles.root, style]}>
+    <View onLayout={handleContainerLayout} style={[styles.root, style]}>
       <MapView
         initialRegion={initialMapRegion}
         onPress={handleMapTap}

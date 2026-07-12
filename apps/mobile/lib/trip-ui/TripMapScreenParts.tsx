@@ -31,6 +31,7 @@ export function MapContent({
   const layout = buildTripMapSearchLayout();
   const showDayChipsOverlay = layout.dayChipsPlacement === 'mapOverlay';
   const mapStyle = layout.screenMode === 'fullScreen' ? styles.mapSearchFullScreen : styles.mapSearch;
+  const sheetTopInset = theme.space[4] + theme.layout.controlHSm + theme.space[2] + theme.space[6];
 
   return (
     <View style={styles.mapFullScreenRoot}>
@@ -39,7 +40,9 @@ export function MapContent({
         dayId={selectedDayId}
         initialRegion={initialRegion}
         key={selectedDayId}
+        minimizedSheetBaseHeight={40}
         routePlaces={mapPlaces}
+        sheetTopInset={sheetTopInset}
         style={mapStyle}
         tripId={tripId}
       />

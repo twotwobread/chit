@@ -93,6 +93,11 @@ export type GooglePlaceSearchSheetMetrics = {
   fullHeight: number;
 };
 
+export type GooglePlaceSearchSheetMetricsOptions = {
+  minimizedBaseHeight?: number;
+  topInset?: number;
+};
+
 export type GooglePlaceSearchSheetContentState = 'results';
 
 export type GooglePlaceSearchSheetEvent =
@@ -412,13 +417,19 @@ export function shouldShowGooglePlaceRegionSearchAction(
 export function buildGooglePlaceSearchSheetMetrics(
   windowHeight: number,
   bottomInset = 0,
+  options: GooglePlaceSearchSheetMetricsOptions = {},
 ): GooglePlaceSearchSheetMetrics {
   const safeWindowHeight = Math.max(1, windowHeight);
   const safeBottomInset = Math.max(0, bottomInset);
+  const minimizedBaseHeight = Math.max(1, options.minimizedBaseHeight ?? 56);
+  const minimizedHeight = Math.round(minimizedBaseHeight + safeBottomInset);
+  const maxSheetHeight = Math.max(minimizedHeight, Math.round(safeWindowHeight - Math.max(0, options.topInset ?? 0)));
+  const expandedHeight = Math.round(clampNumber(safeWindowHeight * 0.56, minimizedHeight, maxSheetHeight));
+  const fullHeight = Math.round(clampNumber(safeWindowHeight * 0.76, expandedHeight, maxSheetHeight));
   return {
-    minimizedHeight: Math.round(56 + safeBottomInset),
-    expandedHeight: Math.round(safeWindowHeight * 0.56),
-    fullHeight: Math.round(safeWindowHeight * 0.76),
+    minimizedHeight,
+    expandedHeight,
+    fullHeight,
   };
 }
 
