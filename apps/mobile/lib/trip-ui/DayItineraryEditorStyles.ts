@@ -253,6 +253,10 @@ export const styles = StyleSheet.create({
   rowActionButtonDisabled: {
     opacity: 0.6,
   },
+  rowActionButtonPressed: {
+    backgroundColor: theme.color.surfaceSunken,
+    borderColor: theme.color.primary,
+  },
   rowDangerActionButton: {
     borderColor: theme.color.danger,
     borderRadius: theme.radius.sm,
@@ -280,11 +284,8 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: theme.space[3],
   },
-  swipeDeleteText: {
-    color: theme.color.onPrimary,
-    fontFamily: theme.font.family.bold,
-    fontSize: theme.font.size.caption,
-    fontWeight: theme.font.weight.bold,
+  swipeDeleteButtonPressed: {
+    opacity: 0.75,
   },
   expenseStatusBox: {
     alignItems: 'center',
@@ -385,6 +386,10 @@ export const styles = StyleSheet.create({
     gap: theme.space[5],
     paddingBottom: theme.space[2],
   },
+  sheetFormBody: {
+    gap: theme.space[5],
+    paddingBottom: theme.space[2],
+  },
   detailSheetHeader: {
     gap: theme.space[3],
     paddingRight: theme.space[8],
@@ -423,6 +428,9 @@ export const styles = StyleSheet.create({
   detailActionGroup: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    gap: theme.space[3],
+  },
+  detailFooterActions: {
     gap: theme.space[3],
   },
   fieldGroup: {
@@ -507,6 +515,13 @@ export const styles = StyleSheet.create({
   reorderNotice: {
     backgroundColor: theme.color.surfaceSunken,
     borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    padding: theme.space[4],
+  },
+  inlineSuccessNotice: {
+    backgroundColor: theme.color.green[50],
+    borderColor: theme.color.green[200],
     borderRadius: theme.radius.md,
     borderWidth: 1,
     padding: theme.space[4],

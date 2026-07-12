@@ -16,24 +16,28 @@ import { ScheduleTimeEditor } from './ScheduleTimeEditor';
 const nonPlaceTimeHelper =
   '비워두면 순서만 있는 일정으로 저장돼요. 시간을 바꿔도 순서는 자동으로 바뀌지 않아요. 필요하면 순서 변경으로 조정해주세요.';
 
+type NonPlaceScheduleItemPanelVariant = 'card' | 'sheet';
+
 export function NonPlaceScheduleItemPanel({
   editorState,
   onCancel,
   onSubmit,
   onUpdateValues,
+  variant = 'card',
 }: {
   editorState: NonPlaceScheduleItemPanelState;
   onCancel: () => void;
   onSubmit: () => void;
   onUpdateValues: (values: NonPlaceScheduleItemFormValues) => void;
+  variant?: NonPlaceScheduleItemPanelVariant;
 }) {
   const isSaving = editorState.status === 'saving';
   const submitView = buildNonPlaceScheduleItemSubmitState(isSaving, editorState.mode);
   const update = (patch: Partial<NonPlaceScheduleItemFormValues>) =>
     onUpdateValues({ ...editorState.values, ...patch });
 
-  return (
-    <Card>
+  const content = (
+    <>
       <Text style={styles.panelTitle}>
         {editorState.mode === 'create' ? '장소 없는 일정 추가' : '장소 없는 일정 수정'}
       </Text>
@@ -241,6 +245,8 @@ export function NonPlaceScheduleItemPanel({
         />
         <SecondaryButton disabled={isSaving} label="취소" onPress={onCancel} />
       </View>
-    </Card>
+    </>
   );
+
+  return variant === 'sheet' ? <View style={styles.sheetFormBody}>{content}</View> : <Card>{content}</Card>;
 }

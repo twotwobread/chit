@@ -25,6 +25,7 @@ export type DayItineraryRowViewModel = {
   placeType: TripPlaceType;
   placeTypeLabel: string;
   address: string;
+  placeMemo?: string;
   nonPlaceCategory?: NonPlaceScheduleItemCategory;
   nonPlaceCategoryLabel?: string;
   nonPlaceDetailLabel?: string;
@@ -224,6 +225,7 @@ function scheduleItemToDayItineraryRow(item: ScheduleItem): DayItineraryRowViewM
 
   const statusLabel = buildScheduleItemStatusLabel(item);
   const placeScheduleTitle = item.placeSchedule?.title?.trim();
+  const placeScheduleMemo = item.placeSchedule?.memo?.trim();
   return {
     id: item.id,
     version: item.version,
@@ -238,6 +240,7 @@ function scheduleItemToDayItineraryRow(item: ScheduleItem): DayItineraryRowViewM
     placeType: item.place.placeType,
     placeTypeLabel: getPlaceTypeLabel(item.place.placeType),
     address: item.place.address,
+    ...(placeScheduleMemo ? { placeMemo: placeScheduleMemo } : {}),
   };
 }
 

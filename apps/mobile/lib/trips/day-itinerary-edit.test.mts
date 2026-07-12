@@ -15,6 +15,7 @@ const item: DayItineraryRowViewModel = {
   id: 'item-1',
   version: 2,
   orderLabel: '1',
+  itemType: 'place',
   placeName: '우메다 공중정원',
   placeType: 'sights',
   placeTypeLabel: '관광지',
@@ -22,6 +23,7 @@ const item: DayItineraryRowViewModel = {
   startTime: '09:30',
   endTime: '11:00',
   timeLabel: '09:30–11:00',
+  placeMemo: '강가 걷기',
 };
 
 describe('day itinerary edit/delete helpers', () => {
@@ -32,6 +34,7 @@ describe('day itinerary edit/delete helpers', () => {
       placeType: 'sights',
       startTime: '09:30',
       endTime: '11:00',
+      memo: '강가 걷기',
     });
   });
 
@@ -40,17 +43,17 @@ describe('day itinerary edit/delete helpers', () => {
 
     assert.deepEqual(
       validateDayItineraryEditForm(original, {
+        ...original,
         name: ' 우메다 스카이빌딩 ',
-        address: 'Umeda',
         placeType: 'food',
-        startTime: '09:30',
-        endTime: '11:00',
+        memo: ' 노을 보기 ',
       }),
       {
         ok: true,
         request: {
           name: '우메다 스카이빌딩',
           placeType: 'food',
+          memo: '노을 보기',
         },
       },
     );
@@ -75,6 +78,23 @@ describe('day itinerary edit/delete helpers', () => {
     );
   });
 
+  it('builds memo clear patch field from an empty memo', () => {
+    const original = buildDayItineraryEditForm(item);
+
+    assert.deepEqual(
+      validateDayItineraryEditForm(original, {
+        ...original,
+        memo: ' ',
+      }),
+      {
+        ok: true,
+        request: {
+          memo: '',
+        },
+      },
+    );
+  });
+
   it('requires at least one changed supported field', () => {
     const original = buildDayItineraryEditForm(item);
 
@@ -89,11 +109,13 @@ describe('day itinerary edit/delete helpers', () => {
 
     assert.deepEqual(
       validateDayItineraryEditForm(original, {
+        ...original,
         name: ' ',
         address: '나'.repeat(301),
         placeType: 'museum',
         startTime: '9:00',
         endTime: '8:00',
+        memo: '메'.repeat(1001),
       }),
       {
         ok: false,
@@ -103,6 +125,7 @@ describe('day itinerary edit/delete helpers', () => {
           placeType: '장소 타입을 선택해주세요.',
           startTime: '시작 시간은 HH:mm 형식으로 입력해주세요.',
           endTime: '종료 시간은 HH:mm 형식으로 입력해주세요.',
+          memo: '메모는 1000자 이하로 입력해주세요.',
         },
       },
     );

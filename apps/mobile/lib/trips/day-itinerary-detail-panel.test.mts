@@ -20,12 +20,14 @@ describe('day itinerary detail panel helpers', () => {
         placeType: 'sights',
         placeTypeLabel: '관광지',
         address: ' Umeda ',
+        placeMemo: '노을 시간에 맞춰 방문',
       }),
       {
         title: '우메다 공중정원',
         categoryLabel: '관광지',
         address: 'Umeda',
         detailLabel: '09:30–11:00',
+        memo: '노을 시간에 맞춰 방문',
         actions: {
           copyAddress: {
             label: '주소 복사',
@@ -64,12 +66,14 @@ describe('day itinerary detail panel helpers', () => {
         nonPlaceCategory: 'transport',
         nonPlaceCategoryLabel: '이동',
         nonPlaceDetailLabel: '버스 · 난바 → 간사이공항',
+        nonPlaceMemo: '라피트 매진 시 버스 이용',
       }),
       {
         title: '공항 이동',
         categoryLabel: '이동',
         address: undefined,
         detailLabel: '버스 · 난바 → 간사이공항',
+        memo: '라피트 매진 시 버스 이용',
         actions: {
           copyAddress: undefined,
           edit: {

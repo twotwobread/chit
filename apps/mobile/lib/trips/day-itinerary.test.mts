@@ -110,6 +110,7 @@ describe('day itinerary helpers', () => {
     }
     assert.equal(viewModel.items[0].placeName, '야경 산책');
     assert.equal(viewModel.items[0].address, 'Osaka');
+    assert.equal(viewModel.items[0].placeMemo, '강가 걷기');
     assert.equal(buildDayItineraryPlaceAccessibilityLabel(viewModel.items[0]), '1번째 장소 야경 산책. 관광지');
   });
 

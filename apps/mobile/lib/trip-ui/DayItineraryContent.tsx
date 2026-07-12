@@ -1,14 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, findNodeHandle, Pressable, Text, View } from 'react-native';
+import { Trash2 } from 'lucide-react-native';
 
-import { Badge, theme } from '../design';
+import { Badge, PrimaryButton, SecondaryButton, theme } from '../design';
 import {
   buildDayItineraryPlaceAccessibilityLabel,
   type DayItineraryRowViewModel,
   type DayItineraryViewModel,
 } from '../trips/day-itinerary';
 import { buildDayItineraryDetailPanel } from '../trips/day-itinerary-detail-panel';
+import { type DayItineraryEditFormValues } from '../trips/day-itinerary-edit';
 import { type DayItineraryMapActionFeedback } from '../trips/day-itinerary-map-actions';
+import { resolveDayItinerarySheetMode, shouldDismissDayItinerarySheet } from '../trips/day-itinerary-sheet';
+import { type NonPlaceScheduleItemFormValues } from '../trips/non-place-schedule-item';
 import { buildDayItineraryReorderAction, buildDayItineraryReorderSubmitState } from '../trips/reorder-itinerary';
 import {
   ITINERARY_TAB_EMPTY_HELPER,
@@ -24,6 +28,8 @@ import { buildDayItinerarySharedUpdateBanner } from '../trips/shared-itinerary-u
 import { focusAccessibilityNode } from './accessibility-focus';
 import { BottomSheet } from './BottomSheet';
 import { DayLodgingPanel } from './DayLodgingPanel';
+import { EditPlacePanel } from './EditPlacePanel';
+import { NonPlaceScheduleItemPanel } from './NonPlaceScheduleItemPanel';
 import { ReorderPlaceList } from './DayItineraryReorderList';
 import { styles } from './DayItineraryEditorStyles';
 import type {
@@ -31,10 +37,13 @@ import type {
   DayItineraryLodgingPickerState,
   DayItineraryLodgingState,
   DayItineraryReorderState,
+  EditPlacePanelState,
+  NonPlaceScheduleItemPanelState,
 } from './DayItineraryEditorTypes';
 import { ItineraryTimeline, type ItineraryTimelineItem } from './ItineraryTimeline';
 
 export function DayItineraryContent({
+  editState,
   focusRequest,
   getReorderScrollOffsetY,
   lodgingPickerState,
@@ -45,6 +54,8 @@ export function DayItineraryContent({
   onCopyAddress,
   onCreateManualLodging,
   onDeletePlace,
+  onCancelEdit,
+  onCancelNonPlaceEditor,
   onEditPlace,
   onEnterReorderMode,
   onExitReorderMode,
@@ -56,15 +67,21 @@ export function DayItineraryContent({
   onReorderDragMove,
   onSaveReorder,
   onSelectLodgingPlace,
+  onSubmitEdit,
+  onSubmitNonPlaceEditor,
+  onUpdateEditValues,
   onUpdateManualLodgingValues,
+  onUpdateNonPlaceEditorValues,
   mapActionFeedback,
   onReloadSharedUpdate,
+  nonPlaceEditorState,
   reorderFeedback,
   reorderState,
   sharedUpdateBanner,
   sharedUpdateReloadDisabled,
   viewModel,
 }: {
+  editState: { status: 'idle' } | EditPlacePanelState;
   focusRequest: DayItineraryContentFocusRequest | null;
   getReorderScrollOffsetY: () => number;
   lodgingPickerState: DayItineraryLodgingPickerState;
@@ -75,6 +92,8 @@ export function DayItineraryContent({
   onCopyAddress: (item: DayItineraryRowViewModel) => void;
   onCreateManualLodging: () => void;
   onDeletePlace: (item: DayItineraryRowViewModel, originFocusTarget?: number | null) => void;
+  onCancelEdit: () => void;
+  onCancelNonPlaceEditor: () => void;
   onEditPlace: (item: DayItineraryRowViewModel) => void;
   onEnterReorderMode: () => void;
   onExitReorderMode: () => void;
@@ -86,9 +105,14 @@ export function DayItineraryContent({
   onReorderDragMove: (pointerY: number) => void;
   onSaveReorder: () => void;
   onSelectLodgingPlace: (option: DayLodgingPlaceOptionViewModel) => void;
+  onSubmitEdit: () => void;
+  onSubmitNonPlaceEditor: () => void;
+  onUpdateEditValues: (values: DayItineraryEditFormValues) => void;
   onUpdateManualLodgingValues: (values: DayLodgingManualFormValues) => void;
+  onUpdateNonPlaceEditorValues: (values: NonPlaceScheduleItemFormValues) => void;
   mapActionFeedback: DayItineraryMapActionFeedback | null;
   onReloadSharedUpdate: () => void;
+  nonPlaceEditorState: { status: 'idle' } | NonPlaceScheduleItemPanelState;
   reorderFeedback: string | null;
   reorderState: DayItineraryReorderState;
   sharedUpdateBanner: ReturnType<typeof buildDayItinerarySharedUpdateBanner>;
@@ -109,6 +133,11 @@ export function DayItineraryContent({
     viewModel.status === 'success' ? viewModel.items.map((item) => [item.id, item] as const) : [],
   );
   const selectedDetailItem = selectedDetailItemId ? (itineraryItemsById.get(selectedDetailItemId) ?? null) : null;
+  const sheetMode = resolveDayItinerarySheetMode({
+    selectedDetailItemId,
+    editStatus: editState.status,
+    nonPlaceEditorStatus: nonPlaceEditorState.status,
+  });
 
   useEffect(() => {
     if (!focusRequest) {
@@ -159,6 +188,24 @@ export function DayItineraryContent({
 
   const closeDetailSheet = () => setSelectedDetailItemId(null);
 
+  const closeActiveSheet = () => {
+    if (
+      !shouldDismissDayItinerarySheet({
+        editStatus: editState.status,
+        nonPlaceEditorStatus: nonPlaceEditorState.status,
+      })
+    ) {
+      return;
+    }
+    if (editState.status !== 'idle') {
+      onCancelEdit();
+    }
+    if (nonPlaceEditorState.status !== 'idle') {
+      onCancelNonPlaceEditor();
+    }
+    setSelectedDetailItemId(null);
+  };
+
   const handlePressTimelineItem = (timelineItem: ItineraryTimelineItem) => {
     const item = resolveTimelineItem(timelineItem);
     if (item) {
@@ -167,7 +214,6 @@ export function DayItineraryContent({
   };
 
   const handleEditFromDetail = (item: DayItineraryRowViewModel) => {
-    closeDetailSheet();
     onEditPlace(item);
   };
 
@@ -188,9 +234,9 @@ export function DayItineraryContent({
           closeDetailSheet();
           onDeletePlace(item, findNodeHandle(deleteTriggerRefs.current[item.id]));
         }}
-        style={styles.swipeDeleteButton}
+        style={({ pressed }) => [styles.swipeDeleteButton, pressed ? styles.swipeDeleteButtonPressed : null]}
       >
-        <Text style={styles.swipeDeleteText}>삭제</Text>
+        <Trash2 color={theme.color.onPrimary} size={22} strokeWidth={2.4} />
       </Pressable>
     );
   };
@@ -303,12 +349,6 @@ export function DayItineraryContent({
           </View>
         ) : null}
 
-        {mapActionFeedback ? (
-          <View style={mapActionFeedback.kind === 'error' ? styles.errorBox : styles.reorderNotice}>
-            <Text style={styles.message}>{mapActionFeedback.message}</Text>
-          </View>
-        ) : null}
-
         {lodgingState.status === 'error' ? (
           <View style={styles.errorBox}>
             <Text style={styles.errorTitle}>{lodgingState.error.title}</Text>
@@ -337,30 +377,103 @@ export function DayItineraryContent({
         ) : null}
       </View>
 
-      <DayItineraryItemDetailSheet
+      <DayItineraryItemSheet
+        editState={editState}
         item={selectedDetailItem}
-        onClose={closeDetailSheet}
+        mapActionFeedback={mapActionFeedback}
+        nonPlaceEditorState={nonPlaceEditorState}
+        onCancelEdit={onCancelEdit}
+        onCancelNonPlaceEditor={onCancelNonPlaceEditor}
+        onClose={closeActiveSheet}
+        onCloseDetail={closeDetailSheet}
         onCopyAddress={onCopyAddress}
         onEdit={handleEditFromDetail}
         onOpenMap={onOpenMap}
+        onSubmitEdit={onSubmitEdit}
+        onSubmitNonPlaceEditor={onSubmitNonPlaceEditor}
+        onUpdateEditValues={onUpdateEditValues}
+        onUpdateNonPlaceEditorValues={onUpdateNonPlaceEditorValues}
+        sheetMode={sheetMode}
       />
     </View>
   );
 }
 
-function DayItineraryItemDetailSheet({
+function DayItineraryItemSheet({
+  editState,
   item,
+  mapActionFeedback,
+  nonPlaceEditorState,
+  onCancelEdit,
+  onCancelNonPlaceEditor,
   onClose,
+  onCloseDetail,
   onCopyAddress,
   onEdit,
   onOpenMap,
+  onSubmitEdit,
+  onSubmitNonPlaceEditor,
+  onUpdateEditValues,
+  onUpdateNonPlaceEditorValues,
+  sheetMode,
 }: {
+  editState: { status: 'idle' } | EditPlacePanelState;
   item: DayItineraryRowViewModel | null;
+  mapActionFeedback: DayItineraryMapActionFeedback | null;
+  nonPlaceEditorState: { status: 'idle' } | NonPlaceScheduleItemPanelState;
+  onCancelEdit: () => void;
+  onCancelNonPlaceEditor: () => void;
   onClose: () => void;
+  onCloseDetail: () => void;
   onCopyAddress: (item: DayItineraryRowViewModel) => void;
   onEdit: (item: DayItineraryRowViewModel) => void;
   onOpenMap: (item: DayItineraryRowViewModel) => void;
+  onSubmitEdit: () => void;
+  onSubmitNonPlaceEditor: () => void;
+  onUpdateEditValues: (values: DayItineraryEditFormValues) => void;
+  onUpdateNonPlaceEditorValues: (values: NonPlaceScheduleItemFormValues) => void;
+  sheetMode: ReturnType<typeof resolveDayItinerarySheetMode>;
 }) {
+  if (sheetMode.kind === 'closed') {
+    return null;
+  }
+
+  if (sheetMode.kind === 'editPlace') {
+    if (editState.status === 'idle') {
+      return null;
+    }
+
+    return (
+      <BottomSheet onClose={onClose} scrollable visible>
+        <EditPlacePanel
+          editState={editState}
+          onCancel={onCancelEdit}
+          onSubmit={onSubmitEdit}
+          onUpdateValues={onUpdateEditValues}
+          variant="sheet"
+        />
+      </BottomSheet>
+    );
+  }
+
+  if (sheetMode.kind === 'editNonPlace') {
+    if (nonPlaceEditorState.status === 'idle') {
+      return null;
+    }
+
+    return (
+      <BottomSheet onClose={onClose} scrollable visible>
+        <NonPlaceScheduleItemPanel
+          editorState={nonPlaceEditorState}
+          onCancel={onCancelNonPlaceEditor}
+          onSubmit={onSubmitNonPlaceEditor}
+          onUpdateValues={onUpdateNonPlaceEditorValues}
+          variant="sheet"
+        />
+      </BottomSheet>
+    );
+  }
+
   if (!item) {
     return null;
   }
@@ -368,7 +481,7 @@ function DayItineraryItemDetailSheet({
   const panel = buildDayItineraryDetailPanel(item);
 
   return (
-    <BottomSheet onClose={onClose} visible>
+    <BottomSheet onClose={onClose} scrollable visible>
       <View style={styles.detailSheetBody}>
         <View style={styles.detailSheetHeader}>
           <Text style={styles.detailSheetTitle}>{panel.title}</Text>
@@ -386,13 +499,20 @@ function DayItineraryItemDetailSheet({
           </View>
         ) : null}
 
+        {panel.memo ? (
+          <View style={styles.detailAddressBox}>
+            <Text style={styles.label}>메모</Text>
+            <Text style={styles.detailAddressText}>{panel.memo}</Text>
+          </View>
+        ) : null}
+
         <View style={styles.detailActionGroup}>
           {panel.actions.copyAddress ? (
             <Pressable
               accessibilityLabel={panel.actions.copyAddress.accessibilityLabel}
               accessibilityRole="button"
               onPress={() => onCopyAddress(item)}
-              style={styles.rowActionButton}
+              style={({ pressed }) => [styles.rowActionButton, pressed ? styles.rowActionButtonPressed : null]}
             >
               <Text style={styles.rowActionText}>{panel.actions.copyAddress.label}</Text>
             </Pressable>
@@ -402,19 +522,26 @@ function DayItineraryItemDetailSheet({
               accessibilityLabel={panel.actions.openMap.accessibilityLabel}
               accessibilityRole="button"
               onPress={() => onOpenMap(item)}
-              style={styles.rowActionButton}
+              style={({ pressed }) => [styles.rowActionButton, pressed ? styles.rowActionButtonPressed : null]}
             >
               <Text style={styles.rowActionText}>{panel.actions.openMap.label}</Text>
             </Pressable>
           ) : null}
-          <Pressable
+        </View>
+
+        {mapActionFeedback ? (
+          <View style={mapActionFeedback.kind === 'error' ? styles.errorBox : styles.inlineSuccessNotice}>
+            <Text style={styles.message}>{mapActionFeedback.message}</Text>
+          </View>
+        ) : null}
+
+        <View style={styles.detailFooterActions}>
+          <PrimaryButton
             accessibilityLabel={panel.actions.edit.accessibilityLabel}
-            accessibilityRole="button"
+            label={panel.actions.edit.label}
             onPress={() => onEdit(item)}
-            style={styles.button}
-          >
-            <Text style={styles.buttonText}>{panel.actions.edit.label}</Text>
-          </Pressable>
+          />
+          <SecondaryButton label="취소" onPress={onCloseDetail} />
         </View>
       </View>
     </BottomSheet>

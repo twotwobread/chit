@@ -12,28 +12,33 @@ import { ScheduleTimeEditor } from './ScheduleTimeEditor';
 const editPlaceTimeHelper =
   '비워두면 순서만 있는 일정으로 유지돼요. 시간을 바꿔도 순서는 자동으로 바뀌지 않아요. 필요하면 순서 변경으로 조정해주세요.';
 
+type EditPlacePanelVariant = 'card' | 'sheet';
+
 export function EditPlacePanel({
   editState,
   onCancel,
   onSubmit,
   onUpdateValues,
+  variant = 'card',
 }: {
   editState: EditPlacePanelState;
   onCancel: () => void;
   onSubmit: () => void;
   onUpdateValues: (values: DayItineraryEditFormValues) => void;
+  variant?: EditPlacePanelVariant;
 }) {
   const isSaving = editState.status === 'saving';
   const submitView = buildDayItineraryEditSubmitState(isSaving);
+  const update = (patch: Partial<DayItineraryEditFormValues>) => onUpdateValues({ ...editState.values, ...patch });
 
-  return (
-    <Card>
+  const content = (
+    <>
       <Text style={styles.panelTitle}>장소 수정</Text>
       <View style={styles.fieldGroup}>
         <Text style={styles.label}>장소명</Text>
         <TextInput
           editable={!isSaving}
-          onChangeText={(name) => onUpdateValues({ ...editState.values, name })}
+          onChangeText={(name) => update({ name })}
           placeholder="예: 우메다 공중정원"
           placeholderTextColor={theme.color.textFaint}
           style={styles.input}
@@ -47,7 +52,7 @@ export function EditPlacePanel({
         <TextInput
           editable={!isSaving}
           multiline
-          onChangeText={(address) => onUpdateValues({ ...editState.values, address })}
+          onChangeText={(address) => update({ address })}
           placeholder="예: 1 Chome-1-88 Oyodonaka, Kita Ward, Osaka"
           placeholderTextColor={theme.color.textFaint}
           style={[styles.input, styles.addressInput]}
@@ -62,10 +67,25 @@ export function EditPlacePanel({
         emptyHelper="시간을 정하지 않으면 시간 미정 일정으로 유지돼요."
         endTimeError={editState.errors.endTime}
         helper={editPlaceTimeHelper}
-        onChange={(patch) => onUpdateValues({ ...editState.values, ...patch })}
+        onChange={update}
         startTimeError={editState.errors.startTime}
         values={editState.values}
       />
+
+      <View style={styles.fieldGroup}>
+        <Text style={styles.label}>메모</Text>
+        <TextInput
+          editable={!isSaving}
+          multiline
+          onChangeText={(memo) => update({ memo })}
+          placeholder="선택 입력"
+          placeholderTextColor={theme.color.textFaint}
+          style={[styles.input, styles.addressInput]}
+          textAlignVertical="top"
+          value={editState.values.memo}
+        />
+        {editState.errors.memo ? <Text style={styles.fieldError}>{editState.errors.memo}</Text> : null}
+      </View>
 
       <View style={styles.fieldGroup}>
         <Text style={styles.label}>장소 타입</Text>
@@ -77,7 +97,7 @@ export function EditPlacePanel({
                 accessibilityRole="button"
                 disabled={isSaving}
                 key={option.value}
-                onPress={() => onUpdateValues({ ...editState.values, placeType: option.value as TripPlaceType })}
+                onPress={() => update({ placeType: option.value as TripPlaceType })}
                 style={[styles.chip, selected ? styles.chipSelected : null]}
               >
                 <Text style={[styles.chipText, selected ? styles.chipTextSelected : null]}>{option.label}</Text>
@@ -106,6 +126,8 @@ export function EditPlacePanel({
         />
         <SecondaryButton disabled={isSaving} label="취소" onPress={onCancel} />
       </View>
-    </Card>
+    </>
   );
+
+  return variant === 'sheet' ? <View style={styles.sheetFormBody}>{content}</View> : <Card>{content}</Card>;
 }

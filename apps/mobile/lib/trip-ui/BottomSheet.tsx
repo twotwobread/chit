@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { X } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -9,10 +9,17 @@ export type BottomSheetProps = {
   visible: boolean;
   onClose: () => void;
   children: ReactNode;
+  scrollable?: boolean;
   showCloseButton?: boolean;
 };
 
-export function BottomSheet({ children, onClose, showCloseButton = true, visible }: BottomSheetProps) {
+export function BottomSheet({
+  children,
+  onClose,
+  scrollable = false,
+  showCloseButton = true,
+  visible,
+}: BottomSheetProps) {
   const insets = useSafeAreaInsets();
 
   return (
@@ -32,7 +39,18 @@ export function BottomSheet({ children, onClose, showCloseButton = true, visible
             </Pressable>
           ) : null}
           <View style={styles.grabber} />
-          {children}
+          {scrollable ? (
+            <ScrollView
+              bounces={false}
+              contentContainerStyle={styles.scrollContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              {children}
+            </ScrollView>
+          ) : (
+            children
+          )}
         </View>
       </View>
     </Modal>
@@ -66,6 +84,9 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     justifyContent: 'flex-end',
+  },
+  scrollContent: {
+    paddingBottom: theme.space[2],
   },
   scrim: {
     ...StyleSheet.absoluteFillObject,

@@ -1,14 +1,9 @@
-import { useMemo, useState, type ReactNode } from 'react';
-import { PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
+import { type ReactNode } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
 import { Clock } from 'lucide-react-native';
 
 import { Badge, PlacePin, PlaceTag, theme } from '../design';
-import {
-  DAY_ITINERARY_SWIPE_ACTION_WIDTH,
-  resolveDayItinerarySwipeOffset,
-  shouldOpenDayItinerarySwipeAction,
-  shouldStartDayItineraryHorizontalSwipe,
-} from '../trips/day-itinerary-swipe';
 import {
   buildItinerarySegments,
   itineraryDurationLabel,
@@ -208,26 +203,6 @@ function TimelineCard({
   const actions = renderActions?.(item);
   const swipeAction = renderSwipeAction?.(item);
   const accessibilityLabel = getItemAccessibilityLabel?.(item);
-  const [swipeOffset, setSwipeOffset] = useState(0);
-  const hasSwipeAction = Boolean(swipeAction);
-  const panResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onMoveShouldSetPanResponder: (_, gestureState) =>
-          hasSwipeAction && shouldStartDayItineraryHorizontalSwipe(gestureState),
-        onMoveShouldSetPanResponderCapture: (_, gestureState) =>
-          hasSwipeAction && shouldStartDayItineraryHorizontalSwipe(gestureState),
-        onPanResponderMove: (_, gestureState) => {
-          setSwipeOffset(resolveDayItinerarySwipeOffset(gestureState.dx));
-        },
-        onPanResponderRelease: (_, gestureState) => {
-          setSwipeOffset(shouldOpenDayItinerarySwipeAction(gestureState) ? -DAY_ITINERARY_SWIPE_ACTION_WIDTH : 0);
-        },
-        onPanResponderTerminate: () => setSwipeOffset(0),
-        onShouldBlockNativeResponder: () => false,
-      }),
-    [hasSwipeAction],
-  );
 
   const content = (
     <>
@@ -262,27 +237,12 @@ function TimelineCard({
     <Pressable
       accessibilityRole="button"
       onPress={() => onPressItem(item)}
-      style={({ pressed }) => [
-        styles.card,
-        compact ? styles.cardCompact : null,
-        swipeOffset ? { transform: [{ translateX: swipeOffset }] } : null,
-        pressed ? styles.pressed : null,
-      ]}
-      {...(hasSwipeAction ? panResponder.panHandlers : {})}
+      style={({ pressed }) => [styles.card, compact ? styles.cardCompact : null, pressed ? styles.pressed : null]}
     >
       {content}
     </Pressable>
   ) : (
-    <View
-      style={[
-        styles.card,
-        compact ? styles.cardCompact : null,
-        swipeOffset ? { transform: [{ translateX: swipeOffset }] } : null,
-      ]}
-      {...(hasSwipeAction ? panResponder.panHandlers : {})}
-    >
-      {content}
-    </View>
+    <View style={[styles.card, compact ? styles.cardCompact : null]}>{content}</View>
   );
 
   if (!swipeAction) {
@@ -290,10 +250,15 @@ function TimelineCard({
   }
 
   return (
-    <View style={styles.swipeWrap}>
-      <View style={styles.swipeActionSlot}>{swipeAction}</View>
+    <Swipeable
+      containerStyle={styles.swipeWrap}
+      friction={1.3}
+      overshootRight={false}
+      renderRightActions={() => <View style={styles.swipeActionSlot}>{swipeAction}</View>}
+      rightThreshold={48}
+    >
       {card}
-    </View>
+    </Swipeable>
   );
 }
 
@@ -417,7 +382,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 0,
     top: theme.space[2],
-    width: DAY_ITINERARY_SWIPE_ACTION_WIDTH,
+    width: 76,
   },
   swipeWrap: {
     overflow: 'hidden',

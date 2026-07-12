@@ -5,6 +5,7 @@ export type DayItineraryDetailPanelViewModel = {
   categoryLabel: string;
   address?: string;
   detailLabel?: string;
+  memo?: string;
   actions: {
     copyAddress?: {
       label: '주소 복사';
@@ -32,12 +33,14 @@ export function buildDayItineraryDetailPanel(item: DayItineraryRowViewModel): Da
   const nonPlaceDetail = normalizeOptionalText(item.nonPlaceDetailLabel);
   const detailLabel =
     [item.timeLabel, isNonPlace ? nonPlaceDetail : undefined].filter(Boolean).join(' · ') || undefined;
+  const memo = normalizeOptionalText(isNonPlace ? item.nonPlaceMemo : item.placeMemo);
 
   return {
     title: item.placeName,
     categoryLabel: item.nonPlaceCategoryLabel ?? item.placeTypeLabel,
     address,
     detailLabel,
+    ...(memo ? { memo } : {}),
     actions: {
       copyAddress: address
         ? {
