@@ -126,6 +126,15 @@ export type GooglePlaceAddViewState =
   | { status: 'confirmingDuplicate'; result: GooglePlaceSearchRowViewModel; message: string }
   | { status: 'error'; message: string };
 
+export type GooglePlaceSearchResultActionMode = 'exploreOnly' | 'scheduleAdd' | 'scheduleSelect';
+
+export type GooglePlaceSearchResultActionView = {
+  primaryAction: { label: string; loadingLabel: string; isLoading: boolean } | null;
+  favoriteAction: null;
+  duplicateConfirmation: { message: string; confirmLabel: string; cancelLabel: string; isLoading: boolean } | null;
+  errorMessage: string | null;
+};
+
 const typeHintByPrimaryType: Record<string, string> = {
   tourist_attraction: '관광지',
   museum: '관광지',
@@ -182,6 +191,45 @@ export function confirmingDuplicateGooglePlaceState(result: GooglePlaceSearchRow
 
 export function errorGooglePlaceAddState(): GooglePlaceAddViewState {
   return { status: 'error', message: googlePlaceAddFailureMessage };
+}
+
+export function buildGooglePlaceSearchResultActionView({
+  addState,
+  mode,
+  result,
+}: {
+  mode: GooglePlaceSearchResultActionMode;
+  result: GooglePlaceSearchRowViewModel;
+  addState: GooglePlaceAddViewState;
+}): GooglePlaceSearchResultActionView {
+  if (mode === 'exploreOnly') {
+    return {
+      duplicateConfirmation: null,
+      errorMessage: null,
+      favoriteAction: null,
+      primaryAction: null,
+    };
+  }
+
+  const label = mode === 'scheduleSelect' ? '이 장소 선택' : '장소 추가';
+  const loadingLabel = mode === 'scheduleSelect' ? '처리 중...' : '추가 중...';
+  const isLoading = addState.status === 'adding' && addState.googlePlaceId === result.id;
+  const duplicateConfirmation =
+    addState.status === 'confirmingDuplicate' && addState.result.id === result.id
+      ? {
+          cancelLabel: '취소',
+          confirmLabel: '한 번 더 추가',
+          isLoading,
+          message: addState.message,
+        }
+      : null;
+
+  return {
+    duplicateConfirmation,
+    errorMessage: addState.status === 'error' ? addState.message : null,
+    favoriteAction: null,
+    primaryAction: { isLoading, label, loadingLabel },
+  };
 }
 
 export function buildCreateGooglePlaceScheduleItemRequest(

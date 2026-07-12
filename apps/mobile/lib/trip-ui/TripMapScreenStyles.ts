@@ -42,6 +42,15 @@ export const styles = StyleSheet.create({
   mapExpanded: {
     height: 260,
   },
+  mapSearch: {
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.xl,
+    borderWidth: 1,
+    height: 640,
+    maxWidth: theme.layout.cardMaxW,
+    overflow: 'hidden',
+    width: '100%',
+  },
   mapSheetWrap: {
     borderColor: theme.color.borderSubtle,
     borderRadius: theme.radius.xl,

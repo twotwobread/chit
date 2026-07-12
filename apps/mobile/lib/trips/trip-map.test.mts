@@ -6,6 +6,7 @@ import type { ScheduleItem, TripDay } from '@i-um/api-contract';
 import {
   buildRouteMapPlaces,
   buildTripMapDayChips,
+  buildTripMapInitialRegion,
   resolveMapRouteSheetState,
   resolveTripMapSelectedDay,
 } from './trip-map';
@@ -69,6 +70,19 @@ test('resolves map route sheet state from vertical gestures', () => {
   assert.equal(resolveMapRouteSheetState('expanded', 20), 'collapsed');
   assert.equal(resolveMapRouteSheetState('collapsed', -6), 'collapsed');
   assert.equal(resolveMapRouteSheetState('expanded', 6), 'expanded');
+});
+
+test('builds an initial region from visible route map places', () => {
+  assert.deepEqual(
+    buildTripMapInitialRegion([
+      { id: 'place-1', latitude: 34.6687, longitude: 135.5013, name: '도톤보리', order: 1, type: 'sights' },
+      { id: 'place-2', latitude: 34.7, longitude: 135.49, name: '우메다', order: 2, type: 'cafe' },
+      { id: 'missing', latitude: null, longitude: null, name: '좌표 없음', order: 3, type: 'etc' },
+    ]),
+    { latitude: 34.68435, longitude: 135.49565, latitudeDelta: 0.05008, longitudeDelta: 0.01808 },
+  );
+
+  assert.equal(buildTripMapInitialRegion([{ id: 'missing', name: '좌표 없음', order: 1, type: 'etc' }]), null);
 });
 
 test('builds route map places from valid routable items while preserving duplicates and statuses', () => {

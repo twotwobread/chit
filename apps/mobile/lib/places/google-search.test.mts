@@ -13,6 +13,7 @@ import {
   buildGooglePlacePhotoUrl,
   buildGooglePlaceSearchBiasFromRegion,
   buildGooglePlaceSearchInputState,
+  buildGooglePlaceSearchResultActionView,
   buildGooglePlaceSearchMarkerViewModels,
   buildGooglePlaceSearchResultsRegion,
   buildGooglePlaceSearchRoute,
@@ -111,6 +112,64 @@ describe('google place search helpers', () => {
       message: duplicateDayPlaceConfirmationMessage,
     });
     assert.deepEqual(errorGooglePlaceAddState(), { status: 'error', message: googlePlaceAddFailureMessage });
+  });
+
+  it('resolves screen-specific result actions without exposing add or favorite actions in explore mode', () => {
+    const result = { id: 'google-1', placeName: '도톤보리', address: 'Osaka', typeHint: '관광지' };
+
+    assert.deepEqual(
+      buildGooglePlaceSearchResultActionView({ addState: idleGooglePlaceAddState(), mode: 'exploreOnly', result }),
+      {
+        duplicateConfirmation: null,
+        errorMessage: null,
+        favoriteAction: null,
+        primaryAction: null,
+      },
+    );
+    assert.deepEqual(
+      buildGooglePlaceSearchResultActionView({ addState: idleGooglePlaceAddState(), mode: 'scheduleAdd', result }),
+      {
+        duplicateConfirmation: null,
+        errorMessage: null,
+        favoriteAction: null,
+        primaryAction: { isLoading: false, label: '장소 추가', loadingLabel: '추가 중...' },
+      },
+    );
+    assert.deepEqual(
+      buildGooglePlaceSearchResultActionView({ addState: idleGooglePlaceAddState(), mode: 'scheduleSelect', result }),
+      {
+        duplicateConfirmation: null,
+        errorMessage: null,
+        favoriteAction: null,
+        primaryAction: { isLoading: false, label: '이 장소 선택', loadingLabel: '처리 중...' },
+      },
+    );
+    assert.deepEqual(
+      buildGooglePlaceSearchResultActionView({
+        addState: addingGooglePlaceState('google-1'),
+        mode: 'scheduleAdd',
+        result,
+      }).primaryAction,
+      { isLoading: true, label: '장소 추가', loadingLabel: '추가 중...' },
+    );
+    assert.deepEqual(
+      buildGooglePlaceSearchResultActionView({
+        addState: confirmingDuplicateGooglePlaceState(result),
+        mode: 'scheduleAdd',
+        result,
+      }).duplicateConfirmation,
+      {
+        cancelLabel: '취소',
+        confirmLabel: '한 번 더 추가',
+        isLoading: false,
+        message: duplicateDayPlaceConfirmationMessage,
+      },
+    );
+    assert.equal(
+      buildGooglePlaceSearchResultActionView({ addState: errorGooglePlaceAddState(), mode: 'scheduleAdd', result })
+        .errorMessage,
+      googlePlaceAddFailureMessage,
+    );
   });
 
   it('detects duplicate confirmation API errors', () => {
