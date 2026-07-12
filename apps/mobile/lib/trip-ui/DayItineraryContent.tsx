@@ -40,7 +40,6 @@ export function DayItineraryContent({
   lodgingPickerState,
   lodgingState,
   onFocusRequestHandled,
-  onAddPlace,
   onCancelLodgingPicker,
   onClearCurrentLodging,
   onClearLodging,
@@ -74,7 +73,6 @@ export function DayItineraryContent({
   lodgingPickerState: DayItineraryLodgingPickerState;
   lodgingState: DayItineraryLodgingState;
   onFocusRequestHandled: () => void;
-  onAddPlace: () => void;
   onCancelLodgingPicker: () => void;
   onClearCurrentLodging: () => void;
   onClearLodging: (item: DayItineraryRowViewModel) => void;
@@ -358,18 +356,11 @@ export function DayItineraryContent({
               <Text style={styles.secondaryButtonText}>취소</Text>
             </Pressable>
           </>
-        ) : (
-          <>
-            {reorderAction.status === 'enabled' ? (
-              <Pressable accessibilityRole="button" onPress={onEnterReorderMode} style={styles.secondaryButton}>
-                <Text style={styles.secondaryButtonText}>{reorderAction.label}</Text>
-              </Pressable>
-            ) : null}
-            <Pressable accessibilityRole="button" onPress={onAddPlace} style={styles.button}>
-              <Text style={styles.buttonText}>일정 추가</Text>
-            </Pressable>
-          </>
-        )}
+        ) : reorderAction.status === 'enabled' ? (
+          <Pressable accessibilityRole="button" onPress={onEnterReorderMode} style={styles.secondaryButton}>
+            <Text style={styles.secondaryButtonText}>{reorderAction.label}</Text>
+          </Pressable>
+        ) : null}
       </View>
     </View>
   );

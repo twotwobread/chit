@@ -1,7 +1,9 @@
 import { type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { theme } from '../design';
+import { buildTripRootFabLayout, shouldShowTripRootFab } from '../trips/trip-root-fab-layout';
 import {
   DayItineraryContent,
   DeletePlaceConfirmationModal,
@@ -9,6 +11,7 @@ import {
   NonPlaceScheduleItemPanel,
 } from './DayItineraryEditorParts';
 import { styles } from './DayItineraryEditorStyles';
+import { TripRootFab } from './TripRootFab';
 import { useDayItineraryEditorController } from './useDayItineraryEditorController';
 
 export type DayItineraryEditorProps = {
@@ -80,13 +83,24 @@ export function DayItineraryEditor({
     updateScrollLayout,
     updateScrollOffset,
   } = useDayItineraryEditorController({ tripId, date, initialAction });
+  const insets = useSafeAreaInsets();
+  const addFabLayout = buildTripRootFabLayout({ bottomInset: insets.bottom, rightInset: insets.right });
+  const showAddFab = shouldShowTripRootFab({
+    hasAction: true,
+    isBlocked:
+      isDeleteModalVisible ||
+      editState.status !== 'idle' ||
+      nonPlaceEditorState.status !== 'idle' ||
+      reorderState.status !== 'idle',
+    status: state.status === 'success' ? 'ready' : state.status,
+  });
 
   return (
-    <>
+    <View style={styles.root}>
       <ScrollView
         ref={scrollViewRef}
         accessibilityElementsHidden={isDeleteModalVisible}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, showAddFab ? addFabLayout.scrollContent : null]}
         importantForAccessibility={isDeleteModalVisible ? 'no-hide-descendants' : 'auto'}
         onContentSizeChange={updateScrollContentSize}
         onLayout={updateScrollLayout}
@@ -116,7 +130,6 @@ export function DayItineraryEditor({
               focusRequest={contentFocusRequest}
               getReorderScrollOffsetY={getReorderScrollOffsetY}
               onFocusRequestHandled={clearContentFocusRequest}
-              onAddPlace={addPlace}
               onCopyAddress={(item) => void copyPlaceAddress(item)}
               onDeletePlace={beginDelete}
               onEditPlace={beginEdit}
@@ -195,6 +208,14 @@ export function DayItineraryEditor({
           </View>
         ) : null}
       </ScrollView>
+      {showAddFab ? (
+        <TripRootFab
+          accessibilityHint="장소 검색 또는 장소 없는 일정 추가를 시작합니다."
+          accessibilityLabel="일정 추가"
+          layout={addFabLayout.fab}
+          onPress={addPlace}
+        />
+      ) : null}
       {isDeleteModalVisible && deleteState.status !== 'idle' ? (
         <DeletePlaceConfirmationModal
           deleteState={deleteState}
@@ -202,6 +223,6 @@ export function DayItineraryEditor({
           onConfirm={() => void submitDelete()}
         />
       ) : null}
-    </>
+    </View>
   );
 }

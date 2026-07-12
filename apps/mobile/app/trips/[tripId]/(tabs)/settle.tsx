@@ -1,13 +1,15 @@
 import { useCallback, useState } from 'react';
 import { Share, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import type { Href } from 'expo-router';
 
-import { PrimaryButton, SecondaryButton, theme } from '../../../../lib/design';
+import { SecondaryButton, theme } from '../../../../lib/design';
 import { DayChips } from '../../../../lib/trip-ui/DayChips';
 import { ExpenseRow } from '../../../../lib/trip-ui/ExpenseRow';
 import { TransferRow } from '../../../../lib/trip-ui/TransferRow';
-import { TripListCard, TripScreen, TripScreenHeader, TripStateCard } from '../../../../lib/trip-ui/TripScreenScaffold';
+import { TripRootFab } from '../../../../lib/trip-ui/TripRootFab';
+import { TripListCard, TripScreen, TripStateCard } from '../../../../lib/trip-ui/TripScreenScaffold';
 import { listDayExpenses } from '../../../../lib/trips/expense-api';
 import { getTripSettlement } from '../../../../lib/trips/settlement-api';
 import { beginStaleWhileRevalidate, resolveStaleWhileRevalidateFailure } from '../../../../lib/trips/stale-refresh';
@@ -27,6 +29,7 @@ import {
   type SettlementTransferViewModel,
 } from '../../../../lib/trips/settlement';
 import { localDateString } from '../../../../lib/trips/status';
+import { buildTripRootFabLayout, shouldShowTripRootFab } from '../../../../lib/trips/trip-root-fab-layout';
 
 type SettlementExpenseHistoryState =
   | { status: 'ready'; days: SettlementExpenseHistoryDayInput[] }
@@ -50,6 +53,7 @@ export default function TripSettleTabScreen() {
   const tripId = Array.isArray(tripIdParam) ? tripIdParam[0] : tripIdParam;
   const [selectedExpenseDayId, setSelectedExpenseDayId] = useState<string | null>(null);
   const [state, setState] = useState<TripSettleState>({ status: 'loading' });
+  const insets = useSafeAreaInsets();
 
   const load = useCallback(async () => {
     if (!tripId) {
@@ -102,50 +106,64 @@ export default function TripSettleTabScreen() {
     }, [load]),
   );
 
-  return (
-    <TripScreen>
-      <TripScreenHeader helper="지출을 등록하고 송금 요청을 보낼 수 있어요." title="정산" />
+  const expenseEntryRoute = state.status === 'settlement' ? state.expenseEntryRoute : null;
+  const expenseFabLayout = buildTripRootFabLayout({ bottomInset: insets.bottom, rightInset: insets.right });
+  const showExpenseFab = shouldShowTripRootFab({
+    hasAction: Boolean(expenseEntryRoute),
+    isBlocked: false,
+    status: state.status === 'settlement' ? 'ready' : state.status,
+  });
 
-      {state.status === 'loading' ? <TripStateCard loading title="정산을 불러오는 중..." /> : null}
-      {state.status === 'auth' ? (
-        <TripStateCard
-          primaryAction={{ label: '로그인하기', onPress: () => router.replace('/login') }}
-          title="다시 로그인해주세요."
+  return (
+    <View style={styles.root}>
+      <TripScreen contentContainerStyle={showExpenseFab ? expenseFabLayout.scrollContent : undefined}>
+        {state.status === 'loading' ? <TripStateCard loading title="정산을 불러오는 중..." /> : null}
+        {state.status === 'auth' ? (
+          <TripStateCard
+            primaryAction={{ label: '로그인하기', onPress: () => router.replace('/login') }}
+            title="다시 로그인해주세요."
+          />
+        ) : null}
+        {state.status === 'notFound' ? (
+          <TripStateCard
+            helper="삭제되었거나 접근할 수 없는 여행이에요."
+            primaryAction={{ label: '홈으로', onPress: () => router.replace('/') }}
+            title="여행을 찾을 수 없어요."
+          />
+        ) : null}
+        {state.status === 'error' ? (
+          <TripStateCard
+            helper={state.error.helper}
+            primaryAction={{ label: state.error.actionLabel, onPress: () => void load() }}
+            title={state.error.title}
+          />
+        ) : null}
+        {state.status === 'settlement' ? (
+          <SettlementContent
+            expenseHistory={state.expenseHistory}
+            onRetryExpenseHistory={() => void load()}
+            onSelectExpenseDay={setSelectedExpenseDayId}
+            selectedExpenseDayId={selectedExpenseDayId}
+            today={localDateString()}
+            tripId={tripId ?? ''}
+            tripName={state.tripName}
+            viewModel={state.viewModel}
+          />
+        ) : null}
+      </TripScreen>
+      {showExpenseFab && expenseEntryRoute ? (
+        <TripRootFab
+          accessibilityHint="선택한 여행의 지출 등록을 시작합니다."
+          accessibilityLabel="지출 등록"
+          layout={expenseFabLayout.fab}
+          onPress={() => router.push(expenseEntryRoute)}
         />
       ) : null}
-      {state.status === 'notFound' ? (
-        <TripStateCard
-          helper="삭제되었거나 접근할 수 없는 여행이에요."
-          primaryAction={{ label: '홈으로', onPress: () => router.replace('/') }}
-          title="여행을 찾을 수 없어요."
-        />
-      ) : null}
-      {state.status === 'error' ? (
-        <TripStateCard
-          helper={state.error.helper}
-          primaryAction={{ label: state.error.actionLabel, onPress: () => void load() }}
-          title={state.error.title}
-        />
-      ) : null}
-      {state.status === 'settlement' ? (
-        <SettlementContent
-          expenseEntryRoute={state.expenseEntryRoute}
-          expenseHistory={state.expenseHistory}
-          onRetryExpenseHistory={() => void load()}
-          onSelectExpenseDay={setSelectedExpenseDayId}
-          selectedExpenseDayId={selectedExpenseDayId}
-          today={localDateString()}
-          tripId={tripId ?? ''}
-          tripName={state.tripName}
-          viewModel={state.viewModel}
-        />
-      ) : null}
-    </TripScreen>
+    </View>
   );
 }
 
 function SettlementContent({
-  expenseEntryRoute,
   expenseHistory,
   onRetryExpenseHistory,
   onSelectExpenseDay,
@@ -155,7 +173,6 @@ function SettlementContent({
   tripName,
   viewModel,
 }: {
-  expenseEntryRoute: Href | null;
   expenseHistory: SettlementExpenseHistoryState;
   onRetryExpenseHistory: () => void;
   onSelectExpenseDay: (dayId: string) => void;
@@ -169,9 +186,6 @@ function SettlementContent({
     return (
       <View style={styles.successStack}>
         <TripStateCard helper={viewModel.helper} title={viewModel.title} />
-        {expenseEntryRoute ? (
-          <PrimaryButton label="지출 등록하기" onPress={() => router.push(expenseEntryRoute)} />
-        ) : null}
         <ExpenseHistoryContent
           expenseHistory={expenseHistory}
           onRetry={onRetryExpenseHistory}
@@ -192,10 +206,6 @@ function SettlementContent({
           <Text style={styles.summaryHelper}>{viewModel.summaryHelper}</Text>
         </View>
       </TripListCard>
-
-      {expenseEntryRoute ? (
-        <PrimaryButton label="지출 등록하기" onPress={() => router.push(expenseEntryRoute)} />
-      ) : null}
 
       <ExpenseHistoryContent
         expenseHistory={expenseHistory}
@@ -412,6 +422,10 @@ function settleFailureState(error: unknown): TripSettleState {
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: theme.color.bg,
+  },
   balanceList: {
     gap: theme.space[3],
     paddingBottom: theme.space[4],

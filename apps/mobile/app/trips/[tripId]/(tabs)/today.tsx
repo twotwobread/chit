@@ -6,7 +6,7 @@ import { BottomSheet } from '../../../../lib/trip-ui/BottomSheet';
 import { NextPlaceHeroCard } from '../../../../lib/trip-ui/NextPlaceHeroCard';
 import { QuickExpenseForm, type QuickExpenseSubmitPayload } from '../../../../lib/trip-ui/QuickExpenseForm';
 import { TodaySpendCard } from '../../../../lib/trip-ui/TodaySpendCard';
-import { TripScreen, TripScreenHeader, TripStateCard } from '../../../../lib/trip-ui/TripScreenScaffold';
+import { TripScreen, TripStateCard } from '../../../../lib/trip-ui/TripScreenScaffold';
 import { type QuickExpenseOverlayState, useTripTodayController } from '../../../../lib/trip-ui/useTripTodayController';
 import { buildQuickExpenseViewModel, type QuickExpenseRouteTarget } from '../../../../lib/trips/quick-expense';
 import {
@@ -38,8 +38,6 @@ export default function TripTodayTabScreen() {
 
   return (
     <TripScreen>
-      <TripScreenHeader helper="선택한 여행의 오늘 할 일을 바로 확인해요." title="오늘" />
-
       {state.status === 'loading' ? <TripStateCard loading title="오늘 일정을 불러오는 중..." /> : null}
       {state.status === 'auth' ? (
         <TripStateCard primaryAction={{ label: '로그인하기', onPress: goToLogin }} title="다시 로그인해주세요." />
