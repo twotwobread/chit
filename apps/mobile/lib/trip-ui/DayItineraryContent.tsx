@@ -236,7 +236,9 @@ export function DayItineraryContent({
         }}
         style={({ pressed }) => [styles.swipeDeleteButton, pressed ? styles.swipeDeleteButtonPressed : null]}
       >
-        <Trash2 color={theme.color.onPrimary} size={22} strokeWidth={2.4} />
+        <View style={styles.swipeDeleteIconButton}>
+          <Trash2 color={theme.color.onPrimary} size={20} strokeWidth={2.4} />
+        </View>
       </Pressable>
     );
   };

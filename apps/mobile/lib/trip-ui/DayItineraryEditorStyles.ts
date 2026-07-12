@@ -279,13 +279,19 @@ export const styles = StyleSheet.create({
   swipeDeleteButton: {
     alignItems: 'center',
     alignSelf: 'stretch',
-    backgroundColor: theme.color.danger,
-    borderRadius: theme.radius.md,
     justifyContent: 'center',
-    paddingHorizontal: theme.space[3],
+    width: 52,
   },
   swipeDeleteButtonPressed: {
-    opacity: 0.75,
+    opacity: 0.82,
+  },
+  swipeDeleteIconButton: {
+    alignItems: 'center',
+    backgroundColor: theme.color.red[500],
+    borderRadius: theme.radius.pill,
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
   },
   expenseStatusBox: {
     alignItems: 'center',

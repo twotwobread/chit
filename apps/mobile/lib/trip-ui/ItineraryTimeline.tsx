@@ -237,19 +237,30 @@ function TimelineCard({
     <Pressable
       accessibilityRole="button"
       onPress={() => onPressItem(item)}
-      style={({ pressed }) => [styles.card, compact ? styles.cardCompact : null, pressed ? styles.pressed : null]}
+      style={({ pressed }) => [
+        styles.card,
+        compact ? styles.cardCompact : null,
+        swipeAction ? styles.cardSwipeable : null,
+        pressed ? styles.pressed : null,
+      ]}
     >
       {content}
     </Pressable>
   ) : (
-    <View style={[styles.card, compact ? styles.cardCompact : null]}>{content}</View>
+    <View style={[styles.card, compact ? styles.cardCompact : null, swipeAction ? styles.cardSwipeable : null]}>
+      {content}
+    </View>
   );
 
   if (!swipeAction) {
     return card;
   }
 
-  return <SwipeActionRow renderRightAction={() => swipeAction}>{card}</SwipeActionRow>;
+  return (
+    <SwipeActionRow renderRightAction={() => swipeAction} style={compact ? null : styles.swipeRowSpacing}>
+      {card}
+    </SwipeActionRow>
+  );
 }
 
 function TimeButton({
@@ -302,6 +313,9 @@ const styles = StyleSheet.create({
   cardCompact: {
     marginTop: 0,
     shadowOpacity: 0,
+  },
+  cardSwipeable: {
+    marginTop: 0,
   },
   emptyBox: {
     alignItems: 'center',
@@ -368,6 +382,9 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     gap: theme.space[4],
+  },
+  swipeRowSpacing: {
+    marginTop: theme.space[2],
   },
   spine: {
     backgroundColor: theme.color.borderDefault,

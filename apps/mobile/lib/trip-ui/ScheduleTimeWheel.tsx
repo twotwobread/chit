@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 
 import { theme } from '../design';
+import { buildScheduleTimeWheelOffset } from '../trips/schedule-time-wheel-layout';
 import {
   buildScheduleTimeText,
   parseScheduleTimePickerValue,
@@ -85,6 +86,12 @@ function TimeWheelColumn<T extends string>({
   value: T;
 }) {
   const selectedIndex = Math.max(0, options.indexOf(value));
+  const contentOffsetY = buildScheduleTimeWheelOffset({
+    itemHeight: wheelItemHeight,
+    optionCount: options.length,
+    selectedIndex,
+    visibleItems: wheelVisibleItems,
+  });
   const selectByOffset = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     if (disabled) {
       return;
@@ -99,7 +106,7 @@ function TimeWheelColumn<T extends string>({
   return (
     <View style={styles.timeWheelColumn}>
       <ScrollView
-        contentOffset={{ x: 0, y: selectedIndex * wheelItemHeight }}
+        contentOffset={{ x: 0, y: contentOffsetY }}
         decelerationRate="fast"
         key={value}
         nestedScrollEnabled
