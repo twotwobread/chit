@@ -89,10 +89,7 @@ test('builds upcoming and past Today status landing states from the trip date ra
 
 test('does not build a Today status landing state for an ongoing trip', () => {
   assert.equal(
-    buildTripTodayStatusLandingViewModel(
-      detail({ startDate: '2026-07-10', endDate: '2026-07-13' }),
-      '2026-07-12',
-    ),
+    buildTripTodayStatusLandingViewModel(detail({ startDate: '2026-07-10', endDate: '2026-07-13' }), '2026-07-12'),
     null,
   );
 });

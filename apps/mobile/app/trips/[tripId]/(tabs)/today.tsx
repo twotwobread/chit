@@ -16,7 +16,10 @@ import {
   type TodaySkippedPlacesSectionViewModel,
 } from '../../../../lib/trips/today-execution';
 import { type TodaySpendSummaryViewModel } from '../../../../lib/trips/today-spend';
-import { type TripTabUnavailableViewModel, type TripTodayStatusLandingViewModel } from '../../../../lib/trips/trip-tabs';
+import {
+  type TripTabUnavailableViewModel,
+  type TripTodayStatusLandingViewModel,
+} from '../../../../lib/trips/trip-tabs';
 import { travelModeDisplayLabel, travelModeDisplayOptions } from '../../../../lib/trips/travel-mode';
 
 export default function TripTodayTabScreen() {
