@@ -7,6 +7,11 @@ import (
 	"github.com/twotwobread/i-um/apps/api/internal/trip"
 )
 
+const (
+	DestinationProviderGoogle      = "google"
+	defaultDestinationRadiusMeters = 25000
+)
+
 var (
 	ErrValidation                          = errors.New("validation error")
 	ErrUnauthorized                        = errors.New("unauthorized")
@@ -35,12 +40,15 @@ type Repository interface {
 	IsTripParticipant(ctx context.Context, tripID string, userID string) (bool, error)
 	GetActiveTripDayByTripAndID(ctx context.Context, tripID string, tripDayID string) (trip.TripDay, bool, error)
 	GetGoogleTripPlaceByGooglePlaceID(ctx context.Context, tripID string, googlePlaceID string) (trip.TripPlaceSummary, bool, error)
+	SetDayLodgingPlace(ctx context.Context, record trip.SetDayLodgingPlaceRecord) (trip.TripPlaceSummary, error)
+	CreateGoogleDayLodgingPlace(ctx context.Context, record CreateGoogleDayLodgingPlaceRecord) (trip.TripPlaceSummary, error)
 	AppendGooglePlaceScheduleItem(ctx context.Context, record AppendGooglePlaceScheduleItemRecord) (trip.ScheduleItem, error)
 	CreateGooglePlaceScheduleItem(ctx context.Context, record CreateGooglePlaceScheduleItemRecord) (trip.ScheduleItem, error)
 }
 
 type Provider interface {
 	Search(ctx context.Context, input ProviderSearchInput) ([]SearchResult, error)
+	SearchDestinations(ctx context.Context, input ProviderDestinationSearchInput) ([]DestinationSearchResult, error)
 	Details(ctx context.Context, input ProviderDetailsInput) (GooglePlaceDetails, error)
 	Description(ctx context.Context, input ProviderDescriptionInput) (GooglePlaceDescription, error)
 	Photo(ctx context.Context, input ProviderPhotoInput) (GooglePlacePhoto, error)
@@ -56,6 +64,11 @@ type ProviderSearchInput struct {
 	Query        string
 	Limit        int
 	LocationBias *SearchLocationBias
+}
+
+type ProviderDestinationSearchInput struct {
+	Query string
+	Limit int
 }
 
 type ProviderDetailsInput struct {
@@ -77,6 +90,11 @@ type SearchInput struct {
 	LocationBias *SearchLocationBias
 }
 
+type DestinationSearchInput struct {
+	Query string
+	Limit int
+}
+
 type SelectedDetailsInput struct {
 	GooglePlaceID string
 }
@@ -84,6 +102,10 @@ type SelectedDetailsInput struct {
 type PhotoInput struct {
 	Token      string
 	MaxWidthPx int
+}
+
+type CreateGoogleDayLodgingPlaceInput struct {
+	GooglePlaceID string
 }
 
 type CreateGooglePlaceScheduleItemInput struct {
@@ -107,6 +129,18 @@ type SearchResultPhoto struct {
 	WidthPx            int
 	HeightPx           int
 	AuthorAttributions []PhotoAttribution
+}
+
+type DestinationSearchResult struct {
+	CityName        string
+	CountryName     string
+	CountryCode     string
+	DisplayName     string
+	Latitude        float64
+	Longitude       float64
+	RadiusMeters    int
+	Provider        string
+	ProviderPlaceID string
 }
 
 type SearchResult struct {
@@ -154,6 +188,19 @@ type AppendGooglePlaceScheduleItemRecord struct {
 	Memo               *string
 }
 
+type CreateGoogleDayLodgingPlaceRecord struct {
+	TripID            string
+	TripDayID         string
+	GooglePlaceID     string
+	Name              string
+	Address           string
+	PlaceType         string
+	Latitude          float64
+	Longitude         float64
+	GooglePrimaryType string
+	GoogleTypes       []string
+}
+
 type CreateGooglePlaceScheduleItemRecord struct {
 	TripID             string
 	TripDayID          string
@@ -170,6 +217,11 @@ type CreateGooglePlaceScheduleItemRecord struct {
 	StartTime          *string
 	EndTime            *string
 	Memo               *string
+}
+
+type CreateGoogleDayLodgingPlaceResult struct {
+	Day          trip.TripDay
+	LodgingPlace trip.TripPlaceSummary
 }
 
 type CreateGooglePlaceScheduleItemResult struct {

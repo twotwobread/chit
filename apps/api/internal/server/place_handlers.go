@@ -8,6 +8,30 @@ import (
 	"github.com/twotwobread/i-um/apps/api/internal/place"
 )
 
+func (s apiServer) SearchDestinations(w http.ResponseWriter, r *http.Request, params openapi.SearchDestinationsParams) {
+	if s.auth == nil || s.places == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "destination search is not configured", nil)
+		return
+	}
+
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	limit := 0
+	if params.Limit != nil {
+		limit = *params.Limit
+	}
+	results, err := s.places.SearchDestinations(r.Context(), authContext.UserID, place.DestinationSearchInput{Query: params.Query, Limit: limit})
+	if err != nil {
+		writePlaceSearchError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, searchDestinationsResponseToOpenAPI(results))
+}
+
 func (s apiServer) SearchGooglePlaces(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, params openapi.SearchGooglePlacesParams) {
 	if s.auth == nil || s.places == nil {
 		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "place search is not configured", nil)
@@ -87,6 +111,33 @@ func (s apiServer) GetGooglePlacePhoto(w http.ResponseWriter, r *http.Request, t
 
 	w.Header().Set("Cache-Control", "no-store")
 	http.Redirect(w, r, photo.URI, http.StatusFound)
+}
+
+func (s apiServer) CreateGoogleDayLodgingPlace(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string) {
+	if s.auth == nil || s.places == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "google day lodging creation is not configured", nil)
+		return
+	}
+
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	var body openapi.CreateGoogleDayLodgingPlaceJSONRequestBody
+	if !decodeJSON(w, r, &body) {
+		return
+	}
+
+	result, err := s.places.CreateGoogleDayLodgingPlace(r.Context(), authContext.UserID, tripId, tripDayId, place.CreateGoogleDayLodgingPlaceInput{
+		GooglePlaceID: body.GooglePlaceId,
+	})
+	if err != nil {
+		writeGoogleDayLodgingPlaceError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, createGoogleDayLodgingPlaceResponseToOpenAPI(result))
 }
 
 func (s apiServer) CreateGooglePlaceScheduleItem(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string) {

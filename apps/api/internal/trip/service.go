@@ -87,6 +87,11 @@ func (s *Service) Create(ctx context.Context, userID string, input CreateInput) 
 		return CreateResult{}, ErrValidation
 	}
 
+	destinations, err := normalizeCreateDestinations(input.Destinations)
+	if err != nil {
+		return CreateResult{}, err
+	}
+
 	creator, ok, err := s.repo.GetCreator(ctx, userID)
 	if err != nil {
 		return CreateResult{}, err
@@ -102,6 +107,7 @@ func (s *Service) Create(ctx context.Context, userID string, input CreateInput) 
 		DefaultCurrency:  input.DefaultCurrency,
 		CreatedBy:        creator.ID,
 		OwnerDisplayName: creator.DisplayName,
+		Destinations:     destinations,
 	})
 }
 
@@ -1611,6 +1617,61 @@ func dateOnly(value time.Time) time.Time {
 		return time.Time{}
 	}
 	return parsed
+}
+
+func normalizeCreateDestinations(inputs []CreateDestinationInput) ([]CreateDestinationRecord, error) {
+	if len(inputs) < 1 || len(inputs) > 5 {
+		return nil, ErrValidation
+	}
+	seen := make(map[string]struct{}, len(inputs))
+	records := make([]CreateDestinationRecord, 0, len(inputs))
+	for index, input := range inputs {
+		cityName := strings.TrimSpace(input.CityName)
+		countryName := strings.TrimSpace(input.CountryName)
+		countryCode := strings.ToUpper(strings.TrimSpace(input.CountryCode))
+		displayName := strings.TrimSpace(input.DisplayName)
+		provider := strings.TrimSpace(input.Provider)
+		providerPlaceID := strings.TrimSpace(input.ProviderPlaceID)
+		if len([]rune(cityName)) < 1 || len([]rune(cityName)) > 120 || len([]rune(countryName)) < 1 || len([]rune(countryName)) > 120 || len([]rune(displayName)) < 1 || len([]rune(displayName)) > 160 {
+			return nil, ErrValidation
+		}
+		if !isCountryCode(countryCode) || provider != DestinationProviderGoogle || len([]rune(providerPlaceID)) < 1 || len([]rune(providerPlaceID)) > 255 {
+			return nil, ErrValidation
+		}
+		if input.Latitude < -90 || input.Latitude > 90 || input.Longitude < -180 || input.Longitude > 180 || input.RadiusMeters < 1 || input.RadiusMeters > 500000 {
+			return nil, ErrValidation
+		}
+		key := provider + ":" + providerPlaceID
+		if _, ok := seen[key]; ok {
+			return nil, ErrValidation
+		}
+		seen[key] = struct{}{}
+		records = append(records, CreateDestinationRecord{
+			CityName:        cityName,
+			CountryName:     countryName,
+			CountryCode:     countryCode,
+			DisplayName:     displayName,
+			Latitude:        input.Latitude,
+			Longitude:       input.Longitude,
+			RadiusMeters:    input.RadiusMeters,
+			Provider:        provider,
+			ProviderPlaceID: providerPlaceID,
+			SortOrder:       index,
+		})
+	}
+	return records, nil
+}
+
+func isCountryCode(value string) bool {
+	if len(value) != 2 {
+		return false
+	}
+	for _, char := range value {
+		if char < 'A' || char > 'Z' {
+			return false
+		}
+	}
+	return true
 }
 
 func isSupportedCurrency(value string) bool {

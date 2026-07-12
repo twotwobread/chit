@@ -126,6 +126,27 @@ func (s *Store) CreateTripWithOwner(ctx context.Context, record trip.CreateRecor
 		return trip.CreateResult{}, err
 	}
 
+	destinations := make([]trip.TripDestination, 0, len(record.Destinations))
+	for _, destination := range record.Destinations {
+		row, err := qtx.CreateTripDestination(ctx, db.CreateTripDestinationParams{
+			TripID:          mustUUID(createdTrip.ID),
+			CityName:        destination.CityName,
+			CountryName:     destination.CountryName,
+			CountryCode:     destination.CountryCode,
+			DisplayName:     destination.DisplayName,
+			Latitude:        destination.Latitude,
+			Longitude:       destination.Longitude,
+			RadiusMeters:    int32(destination.RadiusMeters),
+			Provider:        destination.Provider,
+			ProviderPlaceID: destination.ProviderPlaceID,
+			SortOrder:       int32(destination.SortOrder),
+		})
+		if err != nil {
+			return trip.CreateResult{}, err
+		}
+		destinations = append(destinations, tripDestinationFromCreateRow(row))
+	}
+
 	if err := syncActiveTripDays(ctx, tx, createdTrip.ID, createdTrip.StartDate, createdTrip.EndDate); err != nil {
 		return trip.CreateResult{}, err
 	}
@@ -144,6 +165,7 @@ func (s *Store) CreateTripWithOwner(ctx context.Context, record trip.CreateRecor
 			CreatedBy:       createdTrip.CreatedBy,
 			CreatedAt:       createdTrip.CreatedAt.Time,
 			UpdatedAt:       createdTrip.UpdatedAt.Time,
+			Destinations:    destinations,
 		},
 		OwnerParticipant: trip.Participant{
 			ID:          owner.ID,
@@ -165,6 +187,11 @@ func (s *Store) GetTripByID(ctx context.Context, tripID string) (trip.Trip, bool
 		return trip.Trip{}, false, err
 	}
 
+	destinations, err := s.listTripDestinations(ctx, tripID)
+	if err != nil {
+		return trip.Trip{}, false, err
+	}
+
 	return trip.Trip{
 		ID:              row.ID,
 		Name:            row.Name,
@@ -174,7 +201,54 @@ func (s *Store) GetTripByID(ctx context.Context, tripID string) (trip.Trip, bool
 		CreatedBy:       row.CreatedBy,
 		CreatedAt:       row.CreatedAt.Time,
 		UpdatedAt:       row.UpdatedAt.Time,
+		Destinations:    destinations,
 	}, true, nil
+}
+
+func (s *Store) listTripDestinations(ctx context.Context, tripID string) ([]trip.TripDestination, error) {
+	rows, err := s.queries.ListTripDestinationsByTrip(ctx, mustUUID(tripID))
+	if err != nil {
+		return nil, err
+	}
+	destinations := make([]trip.TripDestination, 0, len(rows))
+	for _, row := range rows {
+		destinations = append(destinations, tripDestinationFromListRow(row))
+	}
+	return destinations, nil
+}
+
+func tripDestinationFromCreateRow(row db.CreateTripDestinationRow) trip.TripDestination {
+	return trip.TripDestination{
+		ID:              row.ID,
+		TripID:          row.TripID,
+		CityName:        row.CityName,
+		CountryName:     row.CountryName,
+		CountryCode:     row.CountryCode,
+		DisplayName:     row.DisplayName,
+		Latitude:        row.Latitude,
+		Longitude:       row.Longitude,
+		RadiusMeters:    int(row.RadiusMeters),
+		Provider:        row.Provider,
+		ProviderPlaceID: row.ProviderPlaceID,
+		SortOrder:       int(row.SortOrder),
+	}
+}
+
+func tripDestinationFromListRow(row db.ListTripDestinationsByTripRow) trip.TripDestination {
+	return trip.TripDestination{
+		ID:              row.ID,
+		TripID:          row.TripID,
+		CityName:        row.CityName,
+		CountryName:     row.CountryName,
+		CountryCode:     row.CountryCode,
+		DisplayName:     row.DisplayName,
+		Latitude:        row.Latitude,
+		Longitude:       row.Longitude,
+		RadiusMeters:    int(row.RadiusMeters),
+		Provider:        row.Provider,
+		ProviderPlaceID: row.ProviderPlaceID,
+		SortOrder:       int(row.SortOrder),
+	}
 }
 
 func (s *Store) IsTripParticipant(ctx context.Context, tripID string, userID string) (bool, error) {
@@ -230,6 +304,11 @@ func (s *Store) UpdateTripBasicInfo(ctx context.Context, record trip.UpdateRecor
 		return trip.Trip{}, err
 	}
 
+	destinations, err := s.listTripDestinations(ctx, row.ID)
+	if err != nil {
+		return trip.Trip{}, err
+	}
+
 	return trip.Trip{
 		ID:              row.ID,
 		Name:            row.Name,
@@ -239,6 +318,7 @@ func (s *Store) UpdateTripBasicInfo(ctx context.Context, record trip.UpdateRecor
 		CreatedBy:       row.CreatedBy,
 		CreatedAt:       row.CreatedAt.Time,
 		UpdatedAt:       row.UpdatedAt.Time,
+		Destinations:    destinations,
 	}, nil
 }
 
@@ -488,9 +568,29 @@ func (s *Store) ListActiveTripDaysByTrip(ctx context.Context, tripID string) ([]
 }
 
 func (s *Store) GetActiveTripDayByTripAndID(ctx context.Context, tripID string, tripDayID string) (trip.TripDay, bool, error) {
+	tripDayUUID := pgtype.UUID{}
+	if err := tripDayUUID.Scan(tripDayID); err != nil {
+		row, err := s.queries.GetActiveTripDayByTripAndDate(ctx, db.GetActiveTripDayByTripAndDateParams{
+			TripID: mustUUID(tripID),
+			Date:   dateTextValue(tripDayID),
+		})
+		if err == pgx.ErrNoRows {
+			return trip.TripDay{}, false, nil
+		}
+		if err != nil {
+			return trip.TripDay{}, false, err
+		}
+		return trip.TripDay{
+			ID:           row.ID,
+			Date:         dateString(row.Date),
+			DayOrder:     int(row.DayOrder),
+			LodgingPlace: lodgingPlaceFromActiveTripDay(row.LodgingTripPlaceID, row.LodgingPlaceName, row.LodgingPlaceType, row.LodgingPlaceAddress, row.LodgingPlaceProvider, row.LodgingGooglePlaceID, row.LodgingLatitude, row.LodgingLongitude),
+		}, true, nil
+	}
+
 	row, err := s.queries.GetActiveTripDayByTripAndID(ctx, db.GetActiveTripDayByTripAndIDParams{
 		TripID:    mustUUID(tripID),
-		TripDayID: mustUUID(tripDayID),
+		TripDayID: tripDayUUID,
 	})
 	if err == pgx.ErrNoRows {
 		return trip.TripDay{}, false, nil
@@ -633,6 +733,47 @@ func (s *Store) CreateManualDayLodgingPlace(ctx context.Context, record trip.Cre
 	})
 	if isForeignKeyConstraintViolation(err, "trip_days_lodging_trip_place_fk") || err == pgx.ErrNoRows {
 		return trip.TripPlaceSummary{}, trip.ErrNotFound
+	}
+	if err != nil {
+		return trip.TripPlaceSummary{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return trip.TripPlaceSummary{}, err
+	}
+	return tripPlaceSummary(row.ID, row.Name, row.PlaceType, row.Address, row.Provider, row.GooglePlaceID, row.Latitude, row.Longitude), nil
+}
+
+func (s *Store) CreateGoogleDayLodgingPlace(ctx context.Context, record place.CreateGoogleDayLodgingPlaceRecord) (trip.TripPlaceSummary, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return trip.TripPlaceSummary{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	qtx := s.queries.WithTx(tx)
+	placeRow, err := qtx.UpsertGoogleTripPlace(ctx, db.UpsertGoogleTripPlaceParams{
+		TripID:            mustUUID(record.TripID),
+		Name:              record.Name,
+		Address:           record.Address,
+		PlaceType:         record.PlaceType,
+		GooglePlaceID:     textValue(record.GooglePlaceID),
+		Latitude:          float8Value(record.Latitude),
+		Longitude:         float8Value(record.Longitude),
+		GooglePrimaryType: textValue(record.GooglePrimaryType),
+		GoogleTypes:       record.GoogleTypes,
+	})
+	if err != nil {
+		return trip.TripPlaceSummary{}, err
+	}
+
+	row, err := qtx.SetDayLodgingPlace(ctx, db.SetDayLodgingPlaceParams{
+		TripID:      mustUUID(record.TripID),
+		TripDayID:   mustUUID(record.TripDayID),
+		TripPlaceID: mustUUID(placeRow.ID),
+	})
+	if isForeignKeyConstraintViolation(err, "trip_days_lodging_trip_place_fk") || err == pgx.ErrNoRows {
+		return trip.TripPlaceSummary{}, place.ErrNotFound
 	}
 	if err != nil {
 		return trip.TripPlaceSummary{}, err

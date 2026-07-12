@@ -101,6 +101,122 @@ func TestGoogleProviderSearch(t *testing.T) {
 	}
 }
 
+func TestGoogleProviderSearchDestinations(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Fatalf("expected POST, got %s", r.Method)
+		}
+		if got := r.Header.Get("X-Goog-Api-Key"); got != "test-key" {
+			t.Fatalf("expected api key header, got %q", got)
+		}
+		if got := r.Header.Get("X-Goog-FieldMask"); got != "places.id,places.displayName,places.formattedAddress,places.location,places.primaryType,places.types,places.addressComponents,places.viewport" {
+			t.Fatalf("unexpected field mask %q", got)
+		}
+
+		var body struct {
+			TextQuery      string `json:"textQuery"`
+			MaxResultCount int    `json:"maxResultCount"`
+			LanguageCode   string `json:"languageCode"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode provider request: %v", err)
+		}
+		if body.TextQuery != "오사카" || body.MaxResultCount != 5 || body.LanguageCode != "ko" {
+			t.Fatalf("unexpected provider request body %#v", body)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"places":[
+				{
+					"id":"google-city-osaka",
+					"displayName":{"text":"오사카"},
+					"formattedAddress":"오사카부 일본",
+					"location":{"latitude":34.6937,"longitude":135.5023},
+					"primaryType":"locality",
+					"addressComponents":[
+						{"longText":"오사카","shortText":"오사카","types":["locality","political"],"languageCode":"ko"},
+						{"longText":"일본","shortText":"JP","types":["country","political"],"languageCode":"ko"}
+					],
+					"viewport":{"low":{"latitude":34.55,"longitude":135.35},"high":{"latitude":34.85,"longitude":135.7}}
+				},
+				{
+					"id":"google-pref-osaka",
+					"displayName":{"text":"오사카부"},
+					"formattedAddress":"일본 오사카부",
+					"location":{"latitude":34.6863,"longitude":135.52},
+					"primaryType":"administrative_area_level_1",
+					"addressComponents":[
+						{"longText":"오사카부","shortText":"오사카부","types":["administrative_area_level_1","political"],"languageCode":"ko"},
+						{"longText":"일본","shortText":"JP","types":["country","political"],"languageCode":"ko"}
+					]
+				},
+				{
+					"id":"google-poi",
+					"displayName":{"text":"도톤보리"},
+					"formattedAddress":"오사카 도톤보리",
+					"location":{"latitude":34.6687,"longitude":135.5013},
+					"primaryType":"tourist_attraction",
+					"addressComponents":[{"longText":"일본","shortText":"JP","types":["country","political"],"languageCode":"ko"}]
+				}
+			]
+		}`))
+	}))
+	defer server.Close()
+
+	provider := NewGoogleProviderWithEndpoints(" test-key ", server.URL+"/search", server.URL+"/places", server.Client())
+	results, err := provider.SearchDestinations(context.Background(), ProviderDestinationSearchInput{Query: "오사카", Limit: 5})
+	if err != nil {
+		t.Fatalf("SearchDestinations returned error: %v", err)
+	}
+	if len(results) != 2 {
+		t.Fatalf("expected two city/admin destinations, got %#v", results)
+	}
+	if results[0].CityName != "오사카" || results[0].CountryName != "일본" || results[0].CountryCode != "JP" || results[0].DisplayName != "오사카, 일본" {
+		t.Fatalf("unexpected first destination %#v", results[0])
+	}
+	if results[0].Provider != DestinationProviderGoogle || results[0].ProviderPlaceID != "google-city-osaka" || results[0].RadiusMeters <= 0 {
+		t.Fatalf("expected provider identity and radius, got %#v", results[0])
+	}
+	if results[1].CityName != "오사카부" || results[1].RadiusMeters != defaultDestinationRadiusMeters {
+		t.Fatalf("expected admin destination fallback radius, got %#v", results[1])
+	}
+}
+
+func TestGoogleProviderSearchDestinationsUsesTypesWhenPrimaryTypeMissing(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"places":[
+				{
+					"id":"google-city-seoul",
+					"displayName":{"text":"서울특별시"},
+					"formattedAddress":"대한민국 서울특별시",
+					"location":{"latitude":37.5665,"longitude":126.9780},
+					"types":["administrative_area_level_1","political"],
+					"addressComponents":[
+						{"longText":"서울특별시","shortText":"서울특별시","types":["administrative_area_level_1","political"],"languageCode":"ko"},
+						{"longText":"대한민국","shortText":"KR","types":["country","political"],"languageCode":"ko"}
+					]
+				}
+			]
+		}`))
+	}))
+	defer server.Close()
+
+	provider := NewGoogleProviderWithEndpoints("test-key", server.URL+"/search", server.URL+"/places", server.Client())
+	results, err := provider.SearchDestinations(context.Background(), ProviderDestinationSearchInput{Query: "서울", Limit: 5})
+	if err != nil {
+		t.Fatalf("SearchDestinations returned error: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected type-derived city destination, got %#v", results)
+	}
+	if results[0].CityName != "서울특별시" || results[0].CountryCode != "KR" || results[0].ProviderPlaceID != "google-city-seoul" {
+		t.Fatalf("unexpected destination %#v", results[0])
+	}
+}
+
 func TestGoogleProviderDescription(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {

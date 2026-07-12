@@ -10,7 +10,10 @@ import {
 } from '../trips/day-itinerary';
 import { buildDayItineraryDetailPanel } from '../trips/day-itinerary-detail-panel';
 import { hasDayItineraryEditFormChanges, type DayItineraryEditFormValues } from '../trips/day-itinerary-edit';
-import { type DayItineraryMapActionFeedback } from '../trips/day-itinerary-map-actions';
+import {
+  type DayItineraryMapActionFeedback,
+  type DayItineraryMapActionInput,
+} from '../trips/day-itinerary-map-actions';
 import {
   buildDayItineraryDirtyClosePrompt,
   resolveDayItinerarySheetCloseAction,
@@ -29,7 +32,7 @@ import {
 } from '../trips/itinerary-tab';
 import {
   buildDayLodgingPanel,
-  type DayLodgingManualFormValues,
+  runDayLodgingSearchRegisterAction,
   type DayLodgingPlaceOptionViewModel,
 } from '../trips/lodging-place';
 import { buildDayItinerarySharedUpdateBanner } from '../trips/shared-itinerary-updates';
@@ -60,7 +63,6 @@ export function DayItineraryContent({
   onCancelLodgingPicker,
   onClearCurrentLodging,
   onCopyAddress,
-  onCreateManualLodging,
   onDeletePlace,
   onCancelEdit,
   onCancelNonPlaceEditor,
@@ -69,7 +71,7 @@ export function DayItineraryContent({
   onExitReorderMode,
   onMoveReorderItem,
   onOpenLodgingPlaceSelection,
-  onOpenManualLodgingForm,
+  onOpenLodgingSearchRegister,
   onOpenMap,
   onReorderDragActiveChange,
   onReorderDragMove,
@@ -78,7 +80,6 @@ export function DayItineraryContent({
   onSubmitEdit,
   onSubmitNonPlaceEditor,
   onUpdateEditValues,
-  onUpdateManualLodgingValues,
   onUpdateNonPlaceEditorValues,
   mapActionFeedback,
   onReloadSharedUpdate,
@@ -97,8 +98,7 @@ export function DayItineraryContent({
   onFocusRequestHandled: () => void;
   onCancelLodgingPicker: () => void;
   onClearCurrentLodging: () => void;
-  onCopyAddress: (item: DayItineraryRowViewModel) => void;
-  onCreateManualLodging: () => void;
+  onCopyAddress: (input: DayItineraryMapActionInput) => void;
   onDeletePlace: (item: DayItineraryRowViewModel, originFocusTarget?: number | null) => void;
   onCancelEdit: () => void;
   onCancelNonPlaceEditor: () => void;
@@ -107,7 +107,7 @@ export function DayItineraryContent({
   onExitReorderMode: () => void;
   onMoveReorderItem: (fromIndex: number, toIndex: number) => void;
   onOpenLodgingPlaceSelection: () => void;
-  onOpenManualLodgingForm: () => void;
+  onOpenLodgingSearchRegister: () => void;
   onOpenMap: (item: DayItineraryRowViewModel) => void;
   onReorderDragActiveChange: (isActive: boolean) => void;
   onReorderDragMove: (pointerY: number) => void;
@@ -116,7 +116,6 @@ export function DayItineraryContent({
   onSubmitEdit: () => void;
   onSubmitNonPlaceEditor: () => void;
   onUpdateEditValues: (values: DayItineraryEditFormValues) => void;
-  onUpdateManualLodgingValues: (values: DayLodgingManualFormValues) => void;
   onUpdateNonPlaceEditorValues: (values: NonPlaceScheduleItemFormValues) => void;
   mapActionFeedback: DayItineraryMapActionFeedback | null;
   onReloadSharedUpdate: () => void;
@@ -132,6 +131,7 @@ export function DayItineraryContent({
   const reorderSubmitState = isReorderMode
     ? buildDayItineraryReorderSubmitState(reorderState.status === 'saving', reorderState.draft)
     : null;
+  const [isLodgingSheetVisible, setIsLodgingSheetVisible] = useState(false);
   const emptyStateRef = useRef<View>(null);
   const rowRefs = useRef<Record<string, Text | null>>({});
   const deleteTriggerRefs = useRef<Record<string, View | null>>({});
@@ -283,17 +283,33 @@ export function DayItineraryContent({
     );
   };
 
+  const openLodgingSheet = () => setIsLodgingSheetVisible(true);
+  const closeLodgingSheet = () => setIsLodgingSheetVisible(false);
+  const copyCurrentLodgingAddress = () => {
+    if (!viewModel.lodgingPlace) {
+      return;
+    }
+    onCopyAddress({ placeName: viewModel.lodgingPlace.name, address: viewModel.lodgingPlace.address });
+  };
+  const openLodgingSearchRegisterFromSheet = () =>
+    runDayLodgingSearchRegisterAction({
+      closeSheet: closeLodgingSheet,
+      openSearchRegister: onOpenLodgingSearchRegister,
+    });
+
   return (
     <View style={styles.card}>
       <DayLodgingPanel
+        isSheetVisible={isLodgingSheetVisible}
         lodgingState={lodgingState}
         onCancelPicker={onCancelLodgingPicker}
         onClear={onClearCurrentLodging}
-        onCreateManual={onCreateManualLodging}
-        onOpenManual={onOpenManualLodgingForm}
+        onCloseSheet={closeLodgingSheet}
+        onCopyAddress={copyCurrentLodgingAddress}
+        onOpenSearchRegister={openLodgingSearchRegisterFromSheet}
         onOpenSelection={onOpenLodgingPlaceSelection}
+        onOpenSheet={openLodgingSheet}
         onSelectPlace={onSelectLodgingPlace}
-        onUpdateManualValues={onUpdateManualLodgingValues}
         pickerState={lodgingPickerState}
         viewModel={buildDayLodgingPanel(viewModel.lodgingPlace)}
       />
@@ -369,6 +385,8 @@ export function DayItineraryContent({
                 rowRefs.current[timelineItem.id] = node;
               }}
               onPressItem={handlePressTimelineItem}
+              onPressLodgingBadge={openLodgingSheet}
+              onPressTime={handlePressTimelineItem}
               renderSwipeAction={renderTimelineSwipeAction}
             />
           )}
@@ -388,6 +406,12 @@ export function DayItineraryContent({
             >
               <Text style={styles.secondaryButtonText}>{sharedUpdateBanner.actionLabel}</Text>
             </Pressable>
+          </View>
+        ) : null}
+
+        {mapActionFeedback && sheetMode.kind === 'closed' ? (
+          <View style={mapActionFeedback.kind === 'error' ? styles.errorBox : styles.reorderNotice}>
+            <Text style={styles.message}>{mapActionFeedback.message}</Text>
           </View>
         ) : null}
 
@@ -467,7 +491,7 @@ function DayItineraryItemSheet({
   onCancelNonPlaceEditor: () => void;
   onClose: () => void;
   onCloseDetail: () => void;
-  onCopyAddress: (item: DayItineraryRowViewModel) => void;
+  onCopyAddress: (input: DayItineraryMapActionInput) => void;
   onEdit: (item: DayItineraryRowViewModel) => void;
   onOpenMap: (item: DayItineraryRowViewModel) => void;
   onSubmitEdit: () => void;

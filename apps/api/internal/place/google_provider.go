@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"math"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -130,6 +131,140 @@ func (p *GoogleProvider) Search(ctx context.Context, input ProviderSearchInput) 
 	}
 
 	return results, nil
+}
+
+func (p *GoogleProvider) SearchDestinations(ctx context.Context, input ProviderDestinationSearchInput) ([]DestinationSearchResult, error) {
+	if p == nil || p.apiKey == "" || p.searchEndpoint == "" || p.client == nil {
+		return nil, ErrProviderUnavailable
+	}
+
+	requestBody := map[string]interface{}{
+		"textQuery":      input.Query,
+		"maxResultCount": input.Limit,
+		"languageCode":   "ko",
+	}
+	body, err := json.Marshal(requestBody)
+	if err != nil {
+		return nil, err
+	}
+
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, p.searchEndpoint, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("X-Goog-Api-Key", p.apiKey)
+	request.Header.Set("X-Goog-FieldMask", "places.id,places.displayName,places.formattedAddress,places.location,places.primaryType,places.types,places.addressComponents,places.viewport")
+
+	response, err := p.client.Do(request)
+	if err != nil {
+		return nil, ErrProviderUnavailable
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode == http.StatusTooManyRequests {
+		return nil, ErrProviderRateLimited
+	}
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return nil, ErrProviderUnavailable
+	}
+
+	var payload googleSearchTextResponse
+	if err := json.NewDecoder(response.Body).Decode(&payload); err != nil {
+		return nil, ErrProviderUnavailable
+	}
+
+	results := make([]DestinationSearchResult, 0, len(payload.Places))
+	for _, item := range payload.Places {
+		destinationType, ok := destinationResultType(item.PrimaryType, item.Types)
+		if !ok {
+			continue
+		}
+		cityName := destinationComponentName(destinationType, item.AddressComponents)
+		if cityName == "" {
+			cityName = strings.TrimSpace(item.DisplayName.Text)
+		}
+		countryName, countryCode := countryComponent(item.AddressComponents)
+		result := DestinationSearchResult{
+			CityName:        cityName,
+			CountryName:     countryName,
+			CountryCode:     countryCode,
+			DisplayName:     SearchDestinationDisplayName(cityName, countryName),
+			Latitude:        item.Location.Latitude,
+			Longitude:       item.Location.Longitude,
+			RadiusMeters:    destinationRadiusMeters(item.Viewport),
+			Provider:        DestinationProviderGoogle,
+			ProviderPlaceID: strings.TrimSpace(item.ID),
+		}
+		if result.ProviderPlaceID == "" || result.CityName == "" || result.CountryName == "" || result.CountryCode == "" || !validCoordinate(result.Latitude, result.Longitude) {
+			continue
+		}
+		results = append(results, result)
+	}
+	return results, nil
+}
+
+func destinationResultType(primaryType string, types []string) (string, bool) {
+	primaryType = strings.TrimSpace(primaryType)
+	if isDestinationPrimaryType(primaryType) {
+		return primaryType, true
+	}
+	for _, value := range types {
+		candidate := strings.TrimSpace(value)
+		if isDestinationPrimaryType(candidate) {
+			return candidate, true
+		}
+	}
+	return "", false
+}
+
+func isDestinationPrimaryType(value string) bool {
+	switch value {
+	case "locality", "administrative_area_level_1", "administrative_area_level_2":
+		return true
+	default:
+		return false
+	}
+}
+
+func destinationComponentName(primaryType string, components []googleAddressComponent) string {
+	preferredTypes := []string{primaryType}
+	if primaryType == "administrative_area_level_2" {
+		preferredTypes = append(preferredTypes, "locality")
+	}
+	for _, preferredType := range preferredTypes {
+		for _, component := range components {
+			if component.hasType(preferredType) {
+				return strings.TrimSpace(component.LongText)
+			}
+		}
+	}
+	return ""
+}
+
+func countryComponent(components []googleAddressComponent) (string, string) {
+	for _, component := range components {
+		if component.hasType("country") {
+			return strings.TrimSpace(component.LongText), strings.ToUpper(strings.TrimSpace(component.ShortText))
+		}
+	}
+	return "", ""
+}
+
+func destinationRadiusMeters(viewport googleViewport) int {
+	if !validCoordinate(viewport.Low.Latitude, viewport.Low.Longitude) || !validCoordinate(viewport.High.Latitude, viewport.High.Longitude) {
+		return defaultDestinationRadiusMeters
+	}
+	latMeters := math.Abs(viewport.High.Latitude-viewport.Low.Latitude) * 111000 / 2
+	lngMeters := math.Abs(viewport.High.Longitude-viewport.Low.Longitude) * 111000 * math.Cos((viewport.High.Latitude+viewport.Low.Latitude)*math.Pi/360) / 2
+	radius := int(math.Ceil(math.Max(latMeters, lngMeters)))
+	if radius < 1 {
+		return defaultDestinationRadiusMeters
+	}
+	if radius > 500000 {
+		return 500000
+	}
+	return radius
 }
 
 func (p *GoogleProvider) Details(ctx context.Context, input ProviderDetailsInput) (GooglePlaceDetails, error) {
@@ -307,15 +442,45 @@ type googlePhotoAttribution struct {
 	PhotoURI    string `json:"photoUri"`
 }
 
+type googleAddressComponent struct {
+	LongText     string   `json:"longText"`
+	ShortText    string   `json:"shortText"`
+	Types        []string `json:"types"`
+	LanguageCode string   `json:"languageCode"`
+}
+
+func (c googleAddressComponent) hasType(expected string) bool {
+	for _, value := range c.Types {
+		if strings.TrimSpace(value) == expected {
+			return true
+		}
+	}
+	return false
+}
+
+type googleViewport struct {
+	Low struct {
+		Latitude  float64 `json:"latitude"`
+		Longitude float64 `json:"longitude"`
+	} `json:"low"`
+	High struct {
+		Latitude  float64 `json:"latitude"`
+		Longitude float64 `json:"longitude"`
+	} `json:"high"`
+}
+
 type googleSearchTextResponse struct {
 	Places []struct {
-		ID               string   `json:"id"`
-		FormattedAddress string   `json:"formattedAddress"`
-		PrimaryType      string   `json:"primaryType"`
-		Rating           *float64 `json:"rating"`
-		UserRatingCount  *int     `json:"userRatingCount"`
-		GoogleMapsURI    string   `json:"googleMapsUri"`
-		DisplayName      struct {
+		ID                string                   `json:"id"`
+		FormattedAddress  string                   `json:"formattedAddress"`
+		PrimaryType       string                   `json:"primaryType"`
+		Types             []string                 `json:"types"`
+		AddressComponents []googleAddressComponent `json:"addressComponents"`
+		Viewport          googleViewport           `json:"viewport"`
+		Rating            *float64                 `json:"rating"`
+		UserRatingCount   *int                     `json:"userRatingCount"`
+		GoogleMapsURI     string                   `json:"googleMapsUri"`
+		DisplayName       struct {
 			Text string `json:"text"`
 		} `json:"displayName"`
 		PrimaryTypeDisplayName struct {

@@ -7,8 +7,8 @@ import {
   dayItineraryMapActionFailureState,
   dayItineraryMapActionSuccessState,
   type DayItineraryMapActionFeedback,
+  type DayItineraryMapActionInput,
 } from '../trips/day-itinerary-map-actions';
-import { type DayItineraryRowViewModel } from '../trips/day-itinerary';
 
 type UseDayItineraryMapActionsOptions = {
   discardReorder: () => void;
@@ -22,7 +22,7 @@ export function useDayItineraryMapActions({ discardReorder }: UseDayItineraryMap
   }, []);
 
   const openPlaceMap = useCallback(
-    async (item: DayItineraryRowViewModel) => {
+    async (item: DayItineraryMapActionInput) => {
       discardReorder();
       const actions = buildDayItineraryMapRowActions(item);
       clearMapActionFeedback();
@@ -37,7 +37,7 @@ export function useDayItineraryMapActions({ discardReorder }: UseDayItineraryMap
   );
 
   const copyPlaceAddress = useCallback(
-    async (item: DayItineraryRowViewModel) => {
+    async (item: DayItineraryMapActionInput) => {
       discardReorder();
       const actions = buildDayItineraryMapRowActions(item);
       if (actions.copy.disabled || !actions.copy.address) {

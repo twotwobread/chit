@@ -6,6 +6,8 @@ import type {
   GooglePlaceSearchResult,
 } from '@i-um/api-contract';
 
+import { theme } from '../design/theme';
+
 export const googlePlaceSearchMinLength = 2;
 export const googlePlaceSearchDefaultLimit = 10;
 export const googlePlacePhotoDefaultWidth = 320;
@@ -66,6 +68,13 @@ export type GooglePlaceSearchMarkerViewModel = {
   emphasis: GooglePlaceSearchMarkerEmphasis;
 };
 
+export type GooglePlaceSearchMarkerPinStyle = {
+  backgroundColor: string;
+  borderColor: string;
+  borderWidth: number;
+  iconColor: string;
+};
+
 export type GooglePlaceSearchMapRegion = {
   latitude: number;
   longitude: number;
@@ -79,6 +88,25 @@ export type GooglePlaceSearchBias = {
   radiusMeters: number;
 };
 
+export type GooglePlaceTripDestination = {
+  id: string;
+  displayName: string;
+  latitude: number;
+  longitude: number;
+  radiusMeters: number;
+};
+
+export type GooglePlaceDestinationChipViewModel = {
+  id: string;
+  label: string;
+  selected: boolean;
+  accessibilityLabel: string;
+};
+
+export type SearchBiasSource =
+  | { kind: 'tripDestination'; destinationId: string }
+  | { kind: 'mapRegion'; latitude: number; longitude: number; radiusMeters: number };
+
 export type GooglePlaceDetailsViewState =
   | { status: 'idle' }
   | { status: 'loading'; googlePlaceId: string; message: string }
@@ -91,6 +119,11 @@ export type GooglePlaceSearchSheetMetrics = {
   minimizedHeight: number;
   expandedHeight: number;
   fullHeight: number;
+};
+
+export type GooglePlaceSearchSheetMetricsOptions = {
+  minimizedBaseHeight?: number;
+  topInset?: number;
 };
 
 export type GooglePlaceSearchSheetContentState = 'results';
@@ -125,6 +158,15 @@ export type GooglePlaceAddViewState =
   | { status: 'adding'; googlePlaceId: string }
   | { status: 'confirmingDuplicate'; result: GooglePlaceSearchRowViewModel; message: string }
   | { status: 'error'; message: string };
+
+export type GooglePlaceSearchResultActionMode = 'exploreOnly' | 'scheduleAdd' | 'scheduleSelect' | 'lodgingRegister';
+
+export type GooglePlaceSearchResultActionView = {
+  primaryAction: { label: string; loadingLabel: string; isLoading: boolean } | null;
+  favoriteAction: null;
+  duplicateConfirmation: { message: string; confirmLabel: string; cancelLabel: string; isLoading: boolean } | null;
+  errorMessage: string | null;
+};
 
 const typeHintByPrimaryType: Record<string, string> = {
   tourist_attraction: '관광지',
@@ -182,6 +224,46 @@ export function confirmingDuplicateGooglePlaceState(result: GooglePlaceSearchRow
 
 export function errorGooglePlaceAddState(): GooglePlaceAddViewState {
   return { status: 'error', message: googlePlaceAddFailureMessage };
+}
+
+export function buildGooglePlaceSearchResultActionView({
+  addState,
+  mode,
+  result,
+}: {
+  mode: GooglePlaceSearchResultActionMode;
+  result: GooglePlaceSearchRowViewModel;
+  addState: GooglePlaceAddViewState;
+}): GooglePlaceSearchResultActionView {
+  if (mode === 'exploreOnly') {
+    return {
+      duplicateConfirmation: null,
+      errorMessage: null,
+      favoriteAction: null,
+      primaryAction: null,
+    };
+  }
+
+  const label = mode === 'scheduleSelect' ? '이 장소 선택' : mode === 'lodgingRegister' ? '숙소로 등록' : '장소 추가';
+  const loadingLabel =
+    mode === 'scheduleSelect' ? '처리 중...' : mode === 'lodgingRegister' ? '등록 중...' : '추가 중...';
+  const isLoading = addState.status === 'adding' && addState.googlePlaceId === result.id;
+  const duplicateConfirmation =
+    addState.status === 'confirmingDuplicate' && addState.result.id === result.id
+      ? {
+          cancelLabel: '취소',
+          confirmLabel: '한 번 더 추가',
+          isLoading,
+          message: addState.message,
+        }
+      : null;
+
+  return {
+    duplicateConfirmation,
+    errorMessage: addState.status === 'error' ? addState.message : null,
+    favoriteAction: null,
+    primaryAction: { isLoading, label, loadingLabel },
+  };
 }
 
 export function buildCreateGooglePlaceScheduleItemRequest(
@@ -344,12 +426,79 @@ export function buildGooglePlaceSearchBiasFromRegion(region: GooglePlaceSearchMa
   const latitudeMeters = Math.abs(region.latitudeDelta) * 111_320;
   const longitudeMeters =
     Math.abs(region.longitudeDelta) * 111_320 * Math.max(Math.cos(toRadians(region.latitude)), 0.01);
-  const radiusMeters = clampNumber(
-    Math.round(Math.max(latitudeMeters, longitudeMeters) / 2),
-    googlePlaceSearchMinBiasRadiusMeters,
-    googlePlaceSearchMaxBiasRadiusMeters,
-  );
+  const radiusMeters = clampGooglePlaceSearchBiasRadius(Math.round(Math.max(latitudeMeters, longitudeMeters) / 2));
   return { latitude: region.latitude, longitude: region.longitude, radiusMeters };
+}
+
+export function buildDefaultGooglePlaceDestinationSelection(destinations: GooglePlaceTripDestination[]): string | null {
+  return destinations[0]?.id ?? null;
+}
+
+export function buildGooglePlaceDestinationChips(
+  destinations: GooglePlaceTripDestination[],
+  selectedDestinationId: string | null,
+): GooglePlaceDestinationChipViewModel[] {
+  const resolvedSelectedDestinationId =
+    selectedDestinationId ?? buildDefaultGooglePlaceDestinationSelection(destinations);
+  return destinations.map((destination) => {
+    const selected = destination.id === resolvedSelectedDestinationId;
+    return {
+      id: destination.id,
+      label: destination.displayName,
+      selected,
+      accessibilityLabel: `${destination.displayName} 여행 도시 ${selected ? '선택됨' : '선택'}`,
+    };
+  });
+}
+
+export function buildGooglePlaceSearchRegionFromDestination(
+  destination: GooglePlaceTripDestination,
+): GooglePlaceSearchMapRegion | null {
+  if (!isValidGooglePlaceTripDestination(destination)) {
+    return null;
+  }
+  const radiusMeters = clampGooglePlaceSearchBiasRadius(destination.radiusMeters);
+  const latitudeDelta = clampNumber((radiusMeters * 2) / 111_320, 0.03, 1);
+  const longitudeDelta = clampNumber(
+    latitudeDelta / Math.max(Math.cos(toRadians(destination.latitude)), 0.01),
+    0.03,
+    1,
+  );
+  return {
+    latitude: roundCoordinate(destination.latitude),
+    longitude: roundCoordinate(destination.longitude),
+    latitudeDelta: roundDelta(latitudeDelta),
+    longitudeDelta: roundDelta(longitudeDelta),
+  };
+}
+
+export function buildGooglePlaceSearchBiasFromSource(
+  source: SearchBiasSource | null | undefined,
+  destinations: GooglePlaceTripDestination[],
+): GooglePlaceSearchBias | null {
+  if (!source) {
+    return null;
+  }
+  if (source.kind === 'mapRegion') {
+    if (!Number.isFinite(source.latitude) || !Number.isFinite(source.longitude)) {
+      return null;
+    }
+    return {
+      latitude: roundCoordinate(source.latitude),
+      longitude: roundCoordinate(source.longitude),
+      radiusMeters: clampGooglePlaceSearchBiasRadius(source.radiusMeters),
+    };
+  }
+
+  const destination = destinations.find((candidate) => candidate.id === source.destinationId);
+  if (!destination || !isValidGooglePlaceTripDestination(destination)) {
+    return null;
+  }
+  return {
+    latitude: roundCoordinate(destination.latitude),
+    longitude: roundCoordinate(destination.longitude),
+    radiusMeters: clampGooglePlaceSearchBiasRadius(destination.radiusMeters),
+  };
 }
 
 export function shouldShowGooglePlaceRegionSearchAction(
@@ -364,13 +513,19 @@ export function shouldShowGooglePlaceRegionSearchAction(
 export function buildGooglePlaceSearchSheetMetrics(
   windowHeight: number,
   bottomInset = 0,
+  options: GooglePlaceSearchSheetMetricsOptions = {},
 ): GooglePlaceSearchSheetMetrics {
   const safeWindowHeight = Math.max(1, windowHeight);
   const safeBottomInset = Math.max(0, bottomInset);
+  const minimizedBaseHeight = Math.max(1, options.minimizedBaseHeight ?? 56);
+  const minimizedHeight = Math.round(minimizedBaseHeight + safeBottomInset);
+  const maxSheetHeight = Math.max(minimizedHeight, Math.round(safeWindowHeight - Math.max(0, options.topInset ?? 0)));
+  const expandedHeight = Math.round(clampNumber(safeWindowHeight * 0.56, minimizedHeight, maxSheetHeight));
+  const fullHeight = Math.round(clampNumber(safeWindowHeight * 0.76, expandedHeight, maxSheetHeight));
   return {
-    minimizedHeight: Math.round(56 + safeBottomInset),
-    expandedHeight: Math.round(safeWindowHeight * 0.56),
-    fullHeight: Math.round(safeWindowHeight * 0.76),
+    minimizedHeight,
+    expandedHeight,
+    fullHeight,
   };
 }
 
@@ -475,6 +630,19 @@ export function buildGooglePlaceDetailsErrorState(googlePlaceId: string): Google
   };
 }
 
+export function buildGooglePlaceSearchMarkerPinStyle(
+  category: GooglePlaceSearchMarkerCategory,
+  selected: boolean,
+): GooglePlaceSearchMarkerPinStyle {
+  const categoryColor = theme.placeType[category].color;
+  return {
+    backgroundColor: selected ? theme.color.surface : categoryColor,
+    borderColor: selected ? categoryColor : theme.color.surface,
+    borderWidth: selected ? 4 : 3,
+    iconColor: selected ? categoryColor : theme.color.onPrimary,
+  };
+}
+
 export const defaultGooglePlaceSearchMapRegion: GooglePlaceSearchMapRegion = {
   latitude: 37.5665,
   longitude: 126.978,
@@ -542,6 +710,18 @@ function toRadians(value: number): number {
 
 function clampNumber(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
+}
+
+function clampGooglePlaceSearchBiasRadius(value: number): number {
+  return clampNumber(Math.round(value), googlePlaceSearchMinBiasRadiusMeters, googlePlaceSearchMaxBiasRadiusMeters);
+}
+
+function isValidGooglePlaceTripDestination(destination: GooglePlaceTripDestination): boolean {
+  return (
+    Number.isFinite(destination.latitude) &&
+    Number.isFinite(destination.longitude) &&
+    Number.isFinite(destination.radiusMeters)
+  );
 }
 
 function roundCoordinate(value: number): number {

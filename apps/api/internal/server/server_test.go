@@ -471,7 +471,18 @@ func TestCreateTripHandler(t *testing.T) {
 		"name":"  오사카 3박 4일  ",
 		"startDate":"2026-07-10",
 		"endDate":"2026-07-13",
-		"defaultCurrency":"JPY"
+		"defaultCurrency":"JPY",
+		"destinations":[{
+			"cityName":"오사카",
+			"countryName":"일본",
+			"countryCode":"JP",
+			"displayName":"오사카, 일본",
+			"latitude":34.6937,
+			"longitude":135.5023,
+			"radiusMeters":25000,
+			"provider":"google",
+			"providerPlaceId":"google-city-osaka"
+		}]
 	}`)
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/trips", bytes.NewReader(requestBody))
@@ -491,6 +502,11 @@ func TestCreateTripHandler(t *testing.T) {
 			EndDate         string `json:"endDate"`
 			DefaultCurrency string `json:"defaultCurrency"`
 			CreatedBy       string `json:"createdBy"`
+			Destinations    []struct {
+				DisplayName     string `json:"displayName"`
+				ProviderPlaceID string `json:"providerPlaceId"`
+				SortOrder       int    `json:"sortOrder"`
+			} `json:"destinations"`
 		} `json:"trip"`
 		OwnerParticipant struct {
 			Role        string `json:"role"`
@@ -512,6 +528,9 @@ func TestCreateTripHandler(t *testing.T) {
 	}
 	if body.Trip.CreatedBy != "user-1" {
 		t.Fatalf("expected createdBy user-1, got %q", body.Trip.CreatedBy)
+	}
+	if len(body.Trip.Destinations) != 1 || body.Trip.Destinations[0].DisplayName != "오사카, 일본" || body.Trip.Destinations[0].ProviderPlaceID != "google-city-osaka" || body.Trip.Destinations[0].SortOrder != 0 {
+		t.Fatalf("expected created trip destination in response, got %#v", body.Trip.Destinations)
 	}
 	if body.OwnerParticipant.Role != "owner" {
 		t.Fatalf("expected owner role, got %q", body.OwnerParticipant.Role)
@@ -1945,6 +1964,85 @@ func TestListTripPlacesAndCreateManualDayLodgingPlaceHandlers(t *testing.T) {
 	}
 }
 
+func TestCreateGoogleDayLodgingPlaceHandler(t *testing.T) {
+	backend := newFakeAuthBackend()
+	accessToken := loginTestUser(t, backend)
+	tripID := createTestTrip(t, backend, accessToken)
+	provider := &fakePlaceProvider{details: placedomain.GooglePlaceDetails{
+		GooglePlaceID:    "google-hotel-1",
+		DisplayName:      "호텔 니코 오사카",
+		FormattedAddress: "Nishi-Shinsaibashi",
+		Latitude:         34.6721,
+		Longitude:        135.5019,
+		PrimaryType:      "lodging",
+		Types:            []string{"lodging", "point_of_interest"},
+	}}
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/days/2026-07-12/lodging-place/google", bytes.NewReader([]byte(`{"googlePlaceId":" google-hotel-1 "}`)))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", "Bearer "+accessToken)
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true, PlaceProvider: provider}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusCreated, recorder.Code, recorder.Body.String())
+	}
+	if !provider.detailsCalled || provider.detailsInput.GooglePlaceID != "google-hotel-1" {
+		t.Fatalf("expected provider details call for trimmed google id, got called=%v input=%#v", provider.detailsCalled, provider.detailsInput)
+	}
+	var body struct {
+		Day struct {
+			Date         string `json:"date"`
+			LodgingPlace *struct {
+				ID string `json:"id"`
+			} `json:"lodgingPlace"`
+		} `json:"day"`
+		LodgingPlace struct {
+			ID            string `json:"id"`
+			Name          string `json:"name"`
+			Address       string `json:"address"`
+			PlaceType     string `json:"placeType"`
+			RoutablePlace *struct {
+				Provider      string  `json:"provider"`
+				GooglePlaceID string  `json:"googlePlaceId"`
+				Latitude      float64 `json:"latitude"`
+				Longitude     float64 `json:"longitude"`
+			} `json:"routablePlace"`
+		} `json:"lodgingPlace"`
+	}
+	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Day.Date != "2026-07-12" || body.Day.LodgingPlace == nil || body.Day.LodgingPlace.ID != body.LodgingPlace.ID {
+		t.Fatalf("expected lodging place set on day, got %#v", body)
+	}
+	if body.LodgingPlace.Name != "호텔 니코 오사카" || body.LodgingPlace.PlaceType != "lodging" || body.LodgingPlace.RoutablePlace == nil || body.LodgingPlace.RoutablePlace.GooglePlaceID != "google-hotel-1" {
+		t.Fatalf("expected Google-backed lodging place in response, got %#v", body.LodgingPlace)
+	}
+	if items := backend.dayScheduleItems[tripID+":"+"2026-07-12"]; len(items) != 0 {
+		t.Fatalf("expected Google lodging registration not to create schedule items, got %#v", items)
+	}
+
+	provider.detailsCalled = false
+	reuseRecorder := httptest.NewRecorder()
+	reuseRequest := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/days/2026-07-11/lodging-place/google", bytes.NewReader([]byte(`{"googlePlaceId":"google-hotel-1"}`)))
+	reuseRequest.Header.Set("Content-Type", "application/json")
+	reuseRequest.Header.Set("Authorization", "Bearer "+accessToken)
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true, PlaceProvider: provider}).ServeHTTP(reuseRecorder, reuseRequest)
+
+	if reuseRecorder.Code != http.StatusCreated {
+		t.Fatalf("expected reuse status %d, got %d with body %s", http.StatusCreated, reuseRecorder.Code, reuseRecorder.Body.String())
+	}
+	if provider.detailsCalled {
+		t.Fatal("expected existing Google-backed trip place to be reused without provider refresh")
+	}
+	if len(backend.tripPlaces) != 1 {
+		t.Fatalf("expected one trip place reused across days, got %#v", backend.tripPlaces)
+	}
+}
+
 func TestSetDayLodgingPlaceValidationNotFoundAndForbidden(t *testing.T) {
 	backend := newFakeAuthBackend()
 	ownerToken := loginTestUser(t, backend)
@@ -3369,6 +3467,72 @@ func TestDeleteScheduleItemValidationNotFoundAndForbidden(t *testing.T) {
 	}
 }
 
+func TestSearchDestinationsHandlerReturnsCityResults(t *testing.T) {
+	backend := newFakeAuthBackend()
+	accessToken := loginTestUser(t, backend)
+	provider := &fakePlaceProvider{destinationResults: []placedomain.DestinationSearchResult{{
+		CityName:        "오사카",
+		CountryName:     "일본",
+		CountryCode:     "JP",
+		DisplayName:     "오사카, 일본",
+		Latitude:        34.6937,
+		Longitude:       135.5023,
+		RadiusMeters:    25000,
+		Provider:        placedomain.DestinationProviderGoogle,
+		ProviderPlaceID: "google-city-osaka",
+	}}}
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/destinations/search?query=%20%EC%98%A4%EC%82%AC%EC%B9%B4%20&limit=3", nil)
+	request.Header.Set("Authorization", "Bearer "+accessToken)
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true, PlaceProvider: provider}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusOK, recorder.Code, recorder.Body.String())
+	}
+	if !provider.destinationCalled || provider.destinationInput.Query != "오사카" || provider.destinationInput.Limit != 3 {
+		t.Fatalf("expected destination provider input, got called=%v input=%#v", provider.destinationCalled, provider.destinationInput)
+	}
+	var body struct {
+		Results []struct {
+			DisplayName     string `json:"displayName"`
+			ProviderPlaceID string `json:"providerPlaceId"`
+		} `json:"results"`
+	}
+	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(body.Results) != 1 || body.Results[0].DisplayName != "오사카, 일본" || body.Results[0].ProviderPlaceID != "google-city-osaka" {
+		t.Fatalf("unexpected destination results: %#v", body.Results)
+	}
+}
+
+func TestSearchDestinationsRequiresAuth(t *testing.T) {
+	backend := newFakeAuthBackend()
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/destinations/search?query=%EC%98%A4%EC%82%AC%EC%B9%B4", nil)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true, PlaceProvider: &fakePlaceProvider{}}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusUnauthorized, recorder.Code, recorder.Body.String())
+	}
+}
+
+func TestSearchDestinationsValidation(t *testing.T) {
+	backend := newFakeAuthBackend()
+	accessToken := loginTestUser(t, backend)
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/destinations/search?query=%EC%98%A4", nil)
+	request.Header.Set("Authorization", "Bearer "+accessToken)
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true, PlaceProvider: &fakePlaceProvider{}}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusBadRequest, recorder.Code, recorder.Body.String())
+	}
+}
+
 func TestSearchGooglePlacesHandlerReturnsResults(t *testing.T) {
 	backend := newFakeAuthBackend()
 	accessToken := loginTestUser(t, backend)
@@ -4478,7 +4642,18 @@ func createTestTrip(t *testing.T, backend *fakeAuthBackend, accessToken string) 
 		"name":"오사카 3박 4일",
 		"startDate":"2026-07-10",
 		"endDate":"2026-07-13",
-		"defaultCurrency":"JPY"
+		"defaultCurrency":"JPY",
+		"destinations":[{
+			"cityName":"오사카",
+			"countryName":"일본",
+			"countryCode":"JP",
+			"displayName":"오사카, 일본",
+			"latitude":34.6937,
+			"longitude":135.5023,
+			"radiusMeters":25000,
+			"provider":"google",
+			"providerPlaceId":"google-city-osaka"
+		}]
 	}`)
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/trips", bytes.NewReader(requestBody))
@@ -4680,6 +4855,23 @@ func (b *fakeAuthBackend) CreateTripWithOwner(_ context.Context, record tripdoma
 	now := time.Date(2026, 6, 21, 15, 0, 0, 0, time.UTC)
 	tripID := testUUID(b.nextTrip)
 	participantID := testUUID(1000 + b.nextTrip)
+	destinations := make([]tripdomain.TripDestination, 0, len(record.Destinations))
+	for index, destination := range record.Destinations {
+		destinations = append(destinations, tripdomain.TripDestination{
+			ID:              testUUID(3000 + b.nextTrip*10 + index),
+			TripID:          tripID,
+			CityName:        destination.CityName,
+			CountryName:     destination.CountryName,
+			CountryCode:     destination.CountryCode,
+			DisplayName:     destination.DisplayName,
+			Latitude:        destination.Latitude,
+			Longitude:       destination.Longitude,
+			RadiusMeters:    destination.RadiusMeters,
+			Provider:        destination.Provider,
+			ProviderPlaceID: destination.ProviderPlaceID,
+			SortOrder:       destination.SortOrder,
+		})
+	}
 	createdTrip := tripdomain.Trip{
 		ID:              tripID,
 		Name:            record.Name,
@@ -4689,6 +4881,7 @@ func (b *fakeAuthBackend) CreateTripWithOwner(_ context.Context, record tripdoma
 		CreatedBy:       record.CreatedBy,
 		CreatedAt:       now,
 		UpdatedAt:       now,
+		Destinations:    destinations,
 	}
 	owner := tripdomain.Participant{
 		ID:          participantID,
@@ -4930,6 +5123,37 @@ func (b *fakeAuthBackend) CreateManualDayLodgingPlace(_ context.Context, record 
 		PlaceType: "lodging",
 	}
 	b.tripPlaces[record.TripID+":"+place.ID] = place
+	b.dayLodgingPlaces[record.TripID+":"+record.TripDayID] = place
+	b.markDayScheduleLodging(record.TripID, record.TripDayID)
+	return place, nil
+}
+
+func (b *fakeAuthBackend) CreateGoogleDayLodgingPlace(_ context.Context, record placedomain.CreateGoogleDayLodgingPlaceRecord) (tripdomain.TripPlaceSummary, error) {
+	if placeID, ok := b.googleTripPlaces[record.TripID+":"+record.GooglePlaceID]; ok {
+		place, ok := b.tripPlaces[record.TripID+":"+placeID]
+		if !ok {
+			return tripdomain.TripPlaceSummary{}, tripdomain.ErrNotFound
+		}
+		b.dayLodgingPlaces[record.TripID+":"+record.TripDayID] = place
+		b.markDayScheduleLodging(record.TripID, record.TripDayID)
+		return place, nil
+	}
+
+	b.nextPlace++
+	place := tripdomain.TripPlaceSummary{
+		ID:        testUUID(6000 + b.nextPlace),
+		Name:      record.Name,
+		Address:   record.Address,
+		PlaceType: record.PlaceType,
+		RoutablePlace: &tripdomain.RoutablePlace{
+			Provider:      "google",
+			GooglePlaceID: record.GooglePlaceID,
+			Latitude:      record.Latitude,
+			Longitude:     record.Longitude,
+		},
+	}
+	b.tripPlaces[record.TripID+":"+place.ID] = place
+	b.googleTripPlaces[record.TripID+":"+record.GooglePlaceID] = place.ID
 	b.dayLodgingPlaces[record.TripID+":"+record.TripDayID] = place
 	b.markDayScheduleLodging(record.TripID, record.TripDayID)
 	return place, nil
@@ -5702,28 +5926,38 @@ func (b *fakeAuthBackend) ListTripsByParticipantUser(_ context.Context, userID s
 }
 
 type fakePlaceProvider struct {
-	called            bool
-	input             placedomain.ProviderSearchInput
-	results           []placedomain.SearchResult
-	err               error
-	detailsCalled     bool
-	detailsInput      placedomain.ProviderDetailsInput
-	details           placedomain.GooglePlaceDetails
-	detailsErr        error
-	descriptionCalled bool
-	descriptionInput  placedomain.ProviderDescriptionInput
-	description       placedomain.GooglePlaceDescription
-	descriptionErr    error
-	photoCalled       bool
-	photoInput        placedomain.ProviderPhotoInput
-	photo             placedomain.GooglePlacePhoto
-	photoErr          error
+	called             bool
+	input              placedomain.ProviderSearchInput
+	results            []placedomain.SearchResult
+	err                error
+	destinationCalled  bool
+	destinationInput   placedomain.ProviderDestinationSearchInput
+	destinationResults []placedomain.DestinationSearchResult
+	destinationErr     error
+	detailsCalled      bool
+	detailsInput       placedomain.ProviderDetailsInput
+	details            placedomain.GooglePlaceDetails
+	detailsErr         error
+	descriptionCalled  bool
+	descriptionInput   placedomain.ProviderDescriptionInput
+	description        placedomain.GooglePlaceDescription
+	descriptionErr     error
+	photoCalled        bool
+	photoInput         placedomain.ProviderPhotoInput
+	photo              placedomain.GooglePlacePhoto
+	photoErr           error
 }
 
 func (p *fakePlaceProvider) Search(_ context.Context, input placedomain.ProviderSearchInput) ([]placedomain.SearchResult, error) {
 	p.called = true
 	p.input = input
 	return p.results, p.err
+}
+
+func (p *fakePlaceProvider) SearchDestinations(_ context.Context, input placedomain.ProviderDestinationSearchInput) ([]placedomain.DestinationSearchResult, error) {
+	p.destinationCalled = true
+	p.destinationInput = input
+	return p.destinationResults, p.destinationErr
 }
 
 func (p *fakePlaceProvider) Details(_ context.Context, input placedomain.ProviderDetailsInput) (placedomain.GooglePlaceDetails, error) {

@@ -19,6 +19,11 @@ export function buildDayItineraryAddPlaceSearchRoute(tripId: string, date: strin
   return `${detailRoute}?${returnParam}` as Href;
 }
 
+export function buildDayItineraryLodgingPlaceSearchRoute(tripId: string, date: string): Href {
+  const returnParam = `${dayItineraryAddPlaceReturnParamName}=${dayItineraryAddPlaceReturnToDayValue}`;
+  return `/trips/${tripId}/days/${date}/place-search?${returnParam}&mode=lodging` as Href;
+}
+
 export function isDayItineraryAddPlaceReturnToDay(returnTo: DayItineraryAddPlaceReturnParam): boolean {
   const value = Array.isArray(returnTo) ? returnTo[0] : returnTo;
   return value === dayItineraryAddPlaceReturnToDayValue;

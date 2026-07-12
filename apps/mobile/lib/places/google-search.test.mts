@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
+import { theme } from '../design/theme';
 import {
   addingGooglePlaceState,
   buildCreateGooglePlaceScheduleItemRequest,
@@ -10,9 +11,15 @@ import {
   buildGooglePlaceDetailsSuccessState,
   buildGooglePlaceCurrentLocationMarkerViewModel,
   buildGooglePlacePhotoImageSource,
+  buildDefaultGooglePlaceDestinationSelection,
+  buildGooglePlaceDestinationChips,
   buildGooglePlacePhotoUrl,
   buildGooglePlaceSearchBiasFromRegion,
+  buildGooglePlaceSearchBiasFromSource,
   buildGooglePlaceSearchInputState,
+  buildGooglePlaceSearchRegionFromDestination,
+  buildGooglePlaceSearchResultActionView,
+  buildGooglePlaceSearchMarkerPinStyle,
   buildGooglePlaceSearchMarkerViewModels,
   buildGooglePlaceSearchResultsRegion,
   buildGooglePlaceSearchRoute,
@@ -111,6 +118,64 @@ describe('google place search helpers', () => {
       message: duplicateDayPlaceConfirmationMessage,
     });
     assert.deepEqual(errorGooglePlaceAddState(), { status: 'error', message: googlePlaceAddFailureMessage });
+  });
+
+  it('resolves screen-specific result actions without exposing add or favorite actions in explore mode', () => {
+    const result = { id: 'google-1', placeName: '도톤보리', address: 'Osaka', typeHint: '관광지' };
+
+    assert.deepEqual(
+      buildGooglePlaceSearchResultActionView({ addState: idleGooglePlaceAddState(), mode: 'exploreOnly', result }),
+      {
+        duplicateConfirmation: null,
+        errorMessage: null,
+        favoriteAction: null,
+        primaryAction: null,
+      },
+    );
+    assert.deepEqual(
+      buildGooglePlaceSearchResultActionView({ addState: idleGooglePlaceAddState(), mode: 'scheduleAdd', result }),
+      {
+        duplicateConfirmation: null,
+        errorMessage: null,
+        favoriteAction: null,
+        primaryAction: { isLoading: false, label: '장소 추가', loadingLabel: '추가 중...' },
+      },
+    );
+    assert.deepEqual(
+      buildGooglePlaceSearchResultActionView({ addState: idleGooglePlaceAddState(), mode: 'scheduleSelect', result }),
+      {
+        duplicateConfirmation: null,
+        errorMessage: null,
+        favoriteAction: null,
+        primaryAction: { isLoading: false, label: '이 장소 선택', loadingLabel: '처리 중...' },
+      },
+    );
+    assert.deepEqual(
+      buildGooglePlaceSearchResultActionView({
+        addState: addingGooglePlaceState('google-1'),
+        mode: 'scheduleAdd',
+        result,
+      }).primaryAction,
+      { isLoading: true, label: '장소 추가', loadingLabel: '추가 중...' },
+    );
+    assert.deepEqual(
+      buildGooglePlaceSearchResultActionView({
+        addState: confirmingDuplicateGooglePlaceState(result),
+        mode: 'scheduleAdd',
+        result,
+      }).duplicateConfirmation,
+      {
+        cancelLabel: '취소',
+        confirmLabel: '한 번 더 추가',
+        isLoading: false,
+        message: duplicateDayPlaceConfirmationMessage,
+      },
+    );
+    assert.equal(
+      buildGooglePlaceSearchResultActionView({ addState: errorGooglePlaceAddState(), mode: 'scheduleAdd', result })
+        .errorMessage,
+      googlePlaceAddFailureMessage,
+    );
   });
 
   it('detects duplicate confirmation API errors', () => {
@@ -301,6 +366,21 @@ describe('google place search helpers', () => {
     );
   });
 
+  it('inverts selected map marker fill while keeping category-colored border and icon', () => {
+    assert.deepEqual(buildGooglePlaceSearchMarkerPinStyle('food', false), {
+      backgroundColor: theme.placeType.food.color,
+      borderColor: theme.color.surface,
+      borderWidth: 3,
+      iconColor: theme.color.onPrimary,
+    });
+    assert.deepEqual(buildGooglePlaceSearchMarkerPinStyle('food', true), {
+      backgroundColor: theme.color.surface,
+      borderColor: theme.placeType.food.color,
+      borderWidth: 4,
+      iconColor: theme.placeType.food.color,
+    });
+  });
+
   it('builds map regions for fitting results and centering selected cards', () => {
     const results = [
       {
@@ -336,6 +416,137 @@ describe('google place search helpers', () => {
       }),
       { latitude: 34.6934, longitude: 135.49, latitudeDelta: 0.03, longitudeDelta: 0.03 },
     );
+  });
+
+  it('builds destination chips and defaults to the first saved trip city', () => {
+    const destinations = [
+      {
+        id: 'destination-osaka',
+        displayName: '오사카',
+        latitude: 34.693725,
+        longitude: 135.502254,
+        radiusMeters: 30000,
+      },
+      {
+        id: 'destination-kyoto',
+        displayName: '교토',
+        latitude: 35.011636,
+        longitude: 135.768029,
+        radiusMeters: 20000,
+      },
+      {
+        id: 'destination-nara',
+        displayName: '나라',
+        latitude: 34.685087,
+        longitude: 135.805,
+        radiusMeters: 16000,
+      },
+    ];
+
+    assert.equal(buildDefaultGooglePlaceDestinationSelection(destinations), 'destination-osaka');
+    assert.deepEqual(buildGooglePlaceDestinationChips(destinations, null), [
+      {
+        id: 'destination-osaka',
+        label: '오사카',
+        selected: true,
+        accessibilityLabel: '오사카 여행 도시 선택됨',
+      },
+      {
+        id: 'destination-kyoto',
+        label: '교토',
+        selected: false,
+        accessibilityLabel: '교토 여행 도시 선택',
+      },
+      {
+        id: 'destination-nara',
+        label: '나라',
+        selected: false,
+        accessibilityLabel: '나라 여행 도시 선택',
+      },
+    ]);
+    assert.deepEqual(
+      buildGooglePlaceDestinationChips(destinations, 'destination-kyoto').map((chip) => [chip.id, chip.selected]),
+      [
+        ['destination-osaka', false],
+        ['destination-kyoto', true],
+        ['destination-nara', false],
+      ],
+    );
+    assert.equal(buildDefaultGooglePlaceDestinationSelection([]), null);
+  });
+
+  it('converts trip destination and map region sources to Google Places bias', () => {
+    const destinations = [
+      {
+        id: 'destination-osaka',
+        displayName: '오사카',
+        latitude: 34.693725,
+        longitude: 135.502254,
+        radiusMeters: 30000,
+      },
+      {
+        id: 'destination-kyoto',
+        displayName: '교토',
+        latitude: 35.011636,
+        longitude: 135.768029,
+        radiusMeters: 20000,
+      },
+    ];
+
+    assert.deepEqual(buildGooglePlaceSearchRegionFromDestination(destinations[0]), {
+      latitude: 34.693725,
+      longitude: 135.502254,
+      latitudeDelta: 0.53899,
+      longitudeDelta: 0.65554,
+    });
+    assert.deepEqual(
+      buildGooglePlaceSearchBiasFromSource(
+        { kind: 'tripDestination', destinationId: 'destination-kyoto' },
+        destinations,
+      ),
+      { latitude: 35.011636, longitude: 135.768029, radiusMeters: 20000 },
+    );
+    assert.deepEqual(
+      buildGooglePlaceSearchBiasFromSource(
+        { kind: 'mapRegion', latitude: 34.7, longitude: 135.5, radiusMeters: 5566 },
+        destinations,
+      ),
+      { latitude: 34.7, longitude: 135.5, radiusMeters: 5566 },
+    );
+    assert.equal(
+      buildGooglePlaceSearchBiasFromSource({ kind: 'tripDestination', destinationId: 'missing' }, destinations),
+      null,
+    );
+  });
+
+  it('keeps map region search and destination chip search as switchable bias sources', () => {
+    const destinations = [
+      {
+        id: 'destination-osaka',
+        displayName: '오사카',
+        latitude: 34.693725,
+        longitude: 135.502254,
+        radiusMeters: 30000,
+      },
+    ];
+    const destinationSource = { kind: 'tripDestination' as const, destinationId: 'destination-osaka' };
+    const mapRegionSource = { kind: 'mapRegion' as const, latitude: 35, longitude: 136, radiusMeters: 12000 };
+
+    assert.deepEqual(buildGooglePlaceSearchBiasFromSource(destinationSource, destinations), {
+      latitude: 34.693725,
+      longitude: 135.502254,
+      radiusMeters: 30000,
+    });
+    assert.deepEqual(buildGooglePlaceSearchBiasFromSource(mapRegionSource, destinations), {
+      latitude: 35,
+      longitude: 136,
+      radiusMeters: 12000,
+    });
+    assert.deepEqual(buildGooglePlaceSearchBiasFromSource(destinationSource, destinations), {
+      latitude: 34.693725,
+      longitude: 135.502254,
+      radiusMeters: 30000,
+    });
   });
 
   it('builds explicit map-region search bias without auto-searching on pan', () => {
@@ -387,6 +598,15 @@ describe('google place search helpers', () => {
     assert.equal(buildGooglePlaceSearchSheetStateFromIndex(2), 'full');
     assert.equal(buildGooglePlaceSearchSheetStateFromIndex(-1), 'minimized');
     assert.equal(buildGooglePlaceSearchSheetStateFromIndex(99), 'full');
+  });
+
+  it('caps full sheet height below a reserved map overlay and supports a smaller minimized handle state', () => {
+    const metrics = buildGooglePlaceSearchSheetMetrics(800, 24, {
+      minimizedBaseHeight: 40,
+      topInset: 240,
+    });
+
+    assert.deepEqual(buildGooglePlaceSearchSheetSnapPoints(metrics), [64, 448, 560]);
   });
 
   it('builds a current-location marker after locating the user', () => {

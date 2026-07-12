@@ -44,6 +44,11 @@ const (
 	RefreshSuccess AuthRefreshResponseResult = "refresh_success"
 )
 
+// Defines values for DestinationProvider.
+const (
+	DestinationProviderGoogle DestinationProvider = "google"
+)
+
 // Defines values for ExpenseAnchorType.
 const (
 	ExpenseAnchorTypeScheduleItem ExpenseAnchorType = "schedule_item"
@@ -113,7 +118,7 @@ const (
 
 // Defines values for RoutablePlaceProvider.
 const (
-	Google RoutablePlaceProvider = "google"
+	RoutablePlaceProviderGoogle RoutablePlaceProvider = "google"
 )
 
 // Defines values for RoutePreviewResponseMode.
@@ -227,6 +232,11 @@ type AuthUser struct {
 	Id          string  `json:"id"`
 }
 
+// CreateGoogleDayLodgingPlaceRequest defines model for CreateGoogleDayLodgingPlaceRequest.
+type CreateGoogleDayLodgingPlaceRequest struct {
+	GooglePlaceId string `json:"googlePlaceId"`
+}
+
 // CreateGooglePlaceScheduleItemRequest defines model for CreateGooglePlaceScheduleItemRequest.
 type CreateGooglePlaceScheduleItemRequest struct {
 	// DuplicateConfirmed Set true only after the user confirms adding the same Google place to the same Day again.
@@ -334,7 +344,8 @@ type CreateTripInviteResponse struct {
 
 // CreateTripRequest defines model for CreateTripRequest.
 type CreateTripRequest struct {
-	DefaultCurrency SupportedCurrency `json:"defaultCurrency"`
+	DefaultCurrency SupportedCurrency      `json:"defaultCurrency"`
+	Destinations    []TripDestinationInput `json:"destinations"`
 
 	// EndDate End date in YYYY-MM-DD format. Must be today or later and not before startDate.
 	EndDate openapi_types.Date `json:"endDate"`
@@ -377,6 +388,12 @@ type DayExpenseSplitListItem struct {
 	Participant ExpenseParticipantDisplay `json:"participant"`
 	SplitOrder  int                       `json:"splitOrder"`
 }
+
+// DestinationProvider defines model for DestinationProvider.
+type DestinationProvider string
+
+// DestinationSearchResult defines model for DestinationSearchResult.
+type DestinationSearchResult = TripDestinationInput
 
 // DeviceInfo defines model for DeviceInfo.
 type DeviceInfo struct {
@@ -822,6 +839,11 @@ type ScheduleItem struct {
 // ScheduleItemType defines model for ScheduleItemType.
 type ScheduleItemType string
 
+// SearchDestinationsResponse defines model for SearchDestinationsResponse.
+type SearchDestinationsResponse struct {
+	Results []DestinationSearchResult `json:"results"`
+}
+
 // SearchGooglePlacesResponse defines model for SearchGooglePlacesResponse.
 type SearchGooglePlacesResponse struct {
 	Results []GooglePlaceSearchResult `json:"results"`
@@ -885,6 +907,7 @@ type Trip struct {
 	CreatedAt       time.Time          `json:"createdAt"`
 	CreatedBy       string             `json:"createdBy"`
 	DefaultCurrency SupportedCurrency  `json:"defaultCurrency"`
+	Destinations    []TripDestination  `json:"destinations"`
 	EndDate         openapi_types.Date `json:"endDate"`
 	Id              string             `json:"id"`
 	Name            string             `json:"name"`
@@ -898,6 +921,35 @@ type TripDay struct {
 	DayOrder     int                `json:"dayOrder"`
 	Id           string             `json:"id"`
 	LodgingPlace *TripPlaceSummary  `json:"lodgingPlace"`
+}
+
+// TripDestination defines model for TripDestination.
+type TripDestination struct {
+	CityName        string              `json:"cityName"`
+	CountryCode     string              `json:"countryCode"`
+	CountryName     string              `json:"countryName"`
+	DisplayName     string              `json:"displayName"`
+	Id              string              `json:"id"`
+	Latitude        float64             `json:"latitude"`
+	Longitude       float64             `json:"longitude"`
+	Provider        DestinationProvider `json:"provider"`
+	ProviderPlaceId string              `json:"providerPlaceId"`
+	RadiusMeters    int                 `json:"radiusMeters"`
+	SortOrder       int                 `json:"sortOrder"`
+	TripId          string              `json:"tripId"`
+}
+
+// TripDestinationInput defines model for TripDestinationInput.
+type TripDestinationInput struct {
+	CityName        string              `json:"cityName"`
+	CountryCode     string              `json:"countryCode"`
+	CountryName     string              `json:"countryName"`
+	DisplayName     string              `json:"displayName"`
+	Latitude        float64             `json:"latitude"`
+	Longitude       float64             `json:"longitude"`
+	Provider        DestinationProvider `json:"provider"`
+	ProviderPlaceId string              `json:"providerPlaceId"`
+	RadiusMeters    int                 `json:"radiusMeters"`
 }
 
 // TripInvite defines model for TripInvite.
@@ -1069,6 +1121,13 @@ type UpdateTripResponse struct {
 	Trip Trip `json:"trip"`
 }
 
+// SearchDestinationsParams defines parameters for SearchDestinations.
+type SearchDestinationsParams struct {
+	// Query Trimmed search text. Must contain at least 2 characters.
+	Query string `form:"query" json:"query"`
+	Limit *int   `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
 // GetGooglePlacePhotoParams defines parameters for GetGooglePlacePhoto.
 type GetGooglePlacePhotoParams struct {
 	MaxWidthPx *int `form:"maxWidthPx,omitempty" json:"maxWidthPx,omitempty"`
@@ -1116,6 +1175,9 @@ type UpdateExpenseJSONRequestBody = UpdateExpenseRequest
 // SetDayLodgingPlaceJSONRequestBody defines body for SetDayLodgingPlace for application/json ContentType.
 type SetDayLodgingPlaceJSONRequestBody = SetDayLodgingPlaceRequest
 
+// CreateGoogleDayLodgingPlaceJSONRequestBody defines body for CreateGoogleDayLodgingPlace for application/json ContentType.
+type CreateGoogleDayLodgingPlaceJSONRequestBody = CreateGoogleDayLodgingPlaceRequest
+
 // CreateManualDayLodgingPlaceJSONRequestBody defines body for CreateManualDayLodgingPlace for application/json ContentType.
 type CreateManualDayLodgingPlaceJSONRequestBody = CreateManualDayLodgingPlaceRequest
 
@@ -1154,6 +1216,9 @@ type ServerInterface interface {
 	// Rotate a refresh token and issue a new token pair
 	// (POST /auth/token/refresh)
 	RefreshToken(w http.ResponseWriter, r *http.Request)
+	// Search travel destination cities
+	// (GET /destinations/search)
+	SearchDestinations(w http.ResponseWriter, r *http.Request, params SearchDestinationsParams)
 	// Check API health
 	// (GET /health)
 	GetHealth(w http.ResponseWriter, r *http.Request)
@@ -1211,6 +1276,9 @@ type ServerInterface interface {
 	// Set a trip day lodging place
 	// (PUT /trips/{tripId}/days/{tripDayId}/lodging-place)
 	SetDayLodgingPlace(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string)
+	// Create or reuse a Google-backed lodging place and set Day lodging
+	// (POST /trips/{tripId}/days/{tripDayId}/lodging-place/google)
+	CreateGoogleDayLodgingPlace(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string)
 	// Create a manual lodging place and set Day lodging
 	// (POST /trips/{tripId}/days/{tripDayId}/lodging-place/manual)
 	CreateManualDayLodgingPlace(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string)
@@ -1304,6 +1372,12 @@ func (_ Unimplemented) LoginWithOAuth(w http.ResponseWriter, r *http.Request) {
 // Rotate a refresh token and issue a new token pair
 // (POST /auth/token/refresh)
 func (_ Unimplemented) RefreshToken(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Search travel destination cities
+// (GET /destinations/search)
+func (_ Unimplemented) SearchDestinations(w http.ResponseWriter, r *http.Request, params SearchDestinationsParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1418,6 +1492,12 @@ func (_ Unimplemented) ClearDayLodgingPlace(w http.ResponseWriter, r *http.Reque
 // Set a trip day lodging place
 // (PUT /trips/{tripId}/days/{tripDayId}/lodging-place)
 func (_ Unimplemented) SetDayLodgingPlace(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Create or reuse a Google-backed lodging place and set Day lodging
+// (POST /trips/{tripId}/days/{tripDayId}/lodging-place/google)
+func (_ Unimplemented) CreateGoogleDayLodgingPlace(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1629,6 +1709,54 @@ func (siw *ServerInterfaceWrapper) RefreshToken(w http.ResponseWriter, r *http.R
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.RefreshToken(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SearchDestinations operation middleware
+func (siw *ServerInterfaceWrapper) SearchDestinations(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SearchDestinationsParams
+
+	// ------------- Required query parameter "query" -------------
+
+	if paramValue := r.URL.Query().Get("query"); paramValue != "" {
+
+	} else {
+		siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "query"})
+		return
+	}
+
+	err = runtime.BindQueryParameter("form", true, true, "query", r.URL.Query(), &params.Query)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "query", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "limit", r.URL.Query(), &params.Limit)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SearchDestinations(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2208,6 +2336,46 @@ func (siw *ServerInterfaceWrapper) SetDayLodgingPlace(w http.ResponseWriter, r *
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.SetDayLodgingPlace(w, r, tripId, tripDayId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateGoogleDayLodgingPlace operation middleware
+func (siw *ServerInterfaceWrapper) CreateGoogleDayLodgingPlace(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "tripDayId" -------------
+	var tripDayId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripDayId", chi.URLParam(r, "tripDayId"), &tripDayId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripDayId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateGoogleDayLodgingPlace(w, r, tripId, tripDayId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3243,6 +3411,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/auth/token/refresh", wrapper.RefreshToken)
 	})
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/destinations/search", wrapper.SearchDestinations)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/health", wrapper.GetHealth)
 	})
 	r.Group(func(r chi.Router) {
@@ -3298,6 +3469,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Put(options.BaseURL+"/trips/{tripId}/days/{tripDayId}/lodging-place", wrapper.SetDayLodgingPlace)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/trips/{tripId}/days/{tripDayId}/lodging-place/google", wrapper.CreateGoogleDayLodgingPlace)
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/trips/{tripId}/days/{tripDayId}/lodging-place/manual", wrapper.CreateManualDayLodgingPlace)

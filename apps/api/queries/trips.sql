@@ -42,6 +42,64 @@ RETURNING
   display_name,
   joined_at;
 
+-- name: CreateTripDestination :one
+INSERT INTO trip_destinations (
+  trip_id,
+  city_name,
+  country_name,
+  country_code,
+  display_name,
+  latitude,
+  longitude,
+  radius_meters,
+  provider,
+  provider_place_id,
+  sort_order
+) VALUES (
+  sqlc.arg(trip_id)::uuid,
+  sqlc.arg(city_name),
+  sqlc.arg(country_name),
+  sqlc.arg(country_code),
+  sqlc.arg(display_name),
+  sqlc.arg(latitude),
+  sqlc.arg(longitude),
+  sqlc.arg(radius_meters),
+  sqlc.arg(provider),
+  sqlc.arg(provider_place_id),
+  sqlc.arg(sort_order)
+)
+RETURNING
+  id::text,
+  trip_id::text,
+  city_name,
+  country_name,
+  country_code,
+  display_name,
+  latitude,
+  longitude,
+  radius_meters,
+  provider,
+  provider_place_id,
+  sort_order;
+
+-- name: ListTripDestinationsByTrip :many
+SELECT
+  id::text,
+  trip_id::text,
+  city_name,
+  country_name,
+  country_code,
+  display_name,
+  latitude,
+  longitude,
+  radius_meters,
+  provider,
+  provider_place_id,
+  sort_order
+FROM trip_destinations
+WHERE trip_id = $1::uuid
+ORDER BY sort_order ASC;
+
 -- name: GetTripByID :one
 SELECT
   id::text,
@@ -276,6 +334,27 @@ LEFT JOIN trip_places tp
  AND tp.trip_id = td.trip_id
 WHERE td.trip_id = sqlc.arg(trip_id)::uuid
   AND td.id = sqlc.arg(trip_day_id)::uuid
+  AND td.deleted_at IS NULL;
+
+-- name: GetActiveTripDayByTripAndDate :one
+SELECT
+  td.id::text AS id,
+  td.date,
+  td.day_order,
+  COALESCE(tp.id::text, ''::text)::text AS lodging_trip_place_id,
+  tp.name AS lodging_place_name,
+  tp.place_type AS lodging_place_type,
+  tp.address AS lodging_place_address,
+  tp.provider AS lodging_place_provider,
+  tp.google_place_id AS lodging_google_place_id,
+  tp.latitude AS lodging_latitude,
+  tp.longitude AS lodging_longitude
+FROM trip_days td
+LEFT JOIN trip_places tp
+  ON tp.id = td.lodging_trip_place_id
+ AND tp.trip_id = td.trip_id
+WHERE td.trip_id = sqlc.arg(trip_id)::uuid
+  AND td.date = sqlc.arg(date)::date
   AND td.deleted_at IS NULL;
 
 -- name: GetTripPlaceSummaryByTripAndPlace :one

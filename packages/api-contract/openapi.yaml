@@ -11,6 +11,7 @@ tags:
   - name: Auth
   - name: Trips
   - name: Places
+  - name: Destinations
 paths:
   /health:
     get:
@@ -73,6 +74,69 @@ paths:
                       code: SERVICE_UNAVAILABLE
                       message: database is not ready
                       details: []
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /destinations/search:
+    get:
+      operationId: searchDestinations
+      summary: Search travel destination cities
+      description: Returns Google-backed city/admin-level travel destination candidates for trip creation. Results are not persisted until trip creation.
+      tags:
+        - Destinations
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: query
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 2
+            maxLength: 120
+          description: Trimmed search text. Must contain at least 2 characters.
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 10
+            default: 10
+      responses:
+        '200':
+          description: Destination search results.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchDestinationsResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Destination provider rate limited.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Destination provider unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '500':
           description: Unexpected server error.
           content:
@@ -741,6 +805,81 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Trip or trip day not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /trips/{tripId}/days/{tripDayId}/lodging-place/google:
+    post:
+      operationId: createGoogleDayLodgingPlace
+      summary: Create or reuse a Google-backed lodging place and set Day lodging
+      description: Resolves a Google-backed place server-side, upserts or reuses the trip-level place by googlePlaceId, and stores it as the selected Day lodging target. Does not create a Day schedule item.
+      tags:
+        - Places
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: tripDayId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGoogleDayLodgingPlaceRequest'
+      responses:
+        '201':
+          description: Google-backed lodging place created or reused and set as Day lodging.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SetDayLodgingPlaceResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip or trip day not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Google Places provider rate limited.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Google Places provider unavailable.
           content:
             application/json:
               schema:
@@ -2585,6 +2724,7 @@ components:
         - startDate
         - endDate
         - defaultCurrency
+        - destinations
       additionalProperties: false
       properties:
         name:
@@ -2604,6 +2744,95 @@ components:
           example: '2026-07-13'
         defaultCurrency:
           $ref: '#/components/schemas/SupportedCurrency'
+        destinations:
+          type: array
+          minItems: 1
+          maxItems: 5
+          items:
+            $ref: '#/components/schemas/TripDestinationInput'
+    DestinationProvider:
+      type: string
+      enum:
+        - google
+    TripDestinationInput:
+      type: object
+      required:
+        - cityName
+        - countryName
+        - countryCode
+        - displayName
+        - latitude
+        - longitude
+        - radiusMeters
+        - provider
+        - providerPlaceId
+      additionalProperties: false
+      properties:
+        cityName:
+          type: string
+          minLength: 1
+          maxLength: 120
+        countryName:
+          type: string
+          minLength: 1
+          maxLength: 120
+        countryCode:
+          type: string
+          minLength: 2
+          maxLength: 2
+          pattern: '^[A-Z]{2}$'
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 160
+        latitude:
+          type: number
+          format: double
+          minimum: -90
+          maximum: 90
+        longitude:
+          type: number
+          format: double
+          minimum: -180
+          maximum: 180
+        radiusMeters:
+          type: integer
+          minimum: 1
+          maximum: 500000
+        provider:
+          $ref: '#/components/schemas/DestinationProvider'
+        providerPlaceId:
+          type: string
+          minLength: 1
+          maxLength: 255
+    DestinationSearchResult:
+      allOf:
+        - $ref: '#/components/schemas/TripDestinationInput'
+    SearchDestinationsResponse:
+      type: object
+      required:
+        - results
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/DestinationSearchResult'
+    TripDestination:
+      allOf:
+        - $ref: '#/components/schemas/TripDestinationInput'
+        - type: object
+          required:
+            - id
+            - tripId
+            - sortOrder
+          properties:
+            id:
+              type: string
+            tripId:
+              type: string
+            sortOrder:
+              type: integer
+              minimum: 0
     Trip:
       type: object
       required:
@@ -2615,6 +2844,7 @@ components:
         - createdBy
         - createdAt
         - updatedAt
+        - destinations
       properties:
         id:
           type: string
@@ -2636,6 +2866,10 @@ components:
         updatedAt:
           type: string
           format: date-time
+        destinations:
+          type: array
+          items:
+            $ref: '#/components/schemas/TripDestination'
     TripDay:
       type: object
       required:
@@ -3344,6 +3578,17 @@ components:
           minLength: 1
           maxLength: 300
           example: 1 Chome-3-3 Nishi-Shinsaibashi, Chuo Ward, Osaka
+    CreateGoogleDayLodgingPlaceRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - googlePlaceId
+      properties:
+        googlePlaceId:
+          type: string
+          minLength: 1
+          maxLength: 255
+          example: ChIJ...
     SetDayLodgingPlaceRequest:
       type: object
       additionalProperties: false

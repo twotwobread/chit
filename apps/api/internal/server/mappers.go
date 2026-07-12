@@ -71,6 +71,24 @@ func listTripsResponseToOpenAPI(trips []trip.ListItem) openapi.ListTripsResponse
 	return openapi.ListTripsResponse{Trips: items}
 }
 
+func createDestinationsFromOpenAPI(values []openapi.TripDestinationInput) []trip.CreateDestinationInput {
+	items := make([]trip.CreateDestinationInput, 0, len(values))
+	for _, value := range values {
+		items = append(items, trip.CreateDestinationInput{
+			CityName:        value.CityName,
+			CountryName:     value.CountryName,
+			CountryCode:     value.CountryCode,
+			DisplayName:     value.DisplayName,
+			Latitude:        value.Latitude,
+			Longitude:       value.Longitude,
+			RadiusMeters:    value.RadiusMeters,
+			Provider:        string(value.Provider),
+			ProviderPlaceID: value.ProviderPlaceId,
+		})
+	}
+	return items
+}
+
 func createTripResponseToOpenAPI(result trip.CreateResult) openapi.CreateTripResponse {
 	return openapi.CreateTripResponse{
 		Trip: tripToOpenAPI(result.Trip),
@@ -234,6 +252,13 @@ func setDayLodgingPlaceResponseToOpenAPI(result trip.SetDayLodgingPlaceResult) o
 }
 
 func createManualDayLodgingPlaceResponseToOpenAPI(result trip.CreateManualDayLodgingPlaceResult) openapi.SetDayLodgingPlaceResponse {
+	return openapi.SetDayLodgingPlaceResponse{
+		Day:          tripDayToOpenAPI(result.Day),
+		LodgingPlace: tripPlaceSummaryToOpenAPI(result.LodgingPlace),
+	}
+}
+
+func createGoogleDayLodgingPlaceResponseToOpenAPI(result place.CreateGoogleDayLodgingPlaceResult) openapi.SetDayLodgingPlaceResponse {
 	return openapi.SetDayLodgingPlaceResponse{
 		Day:          tripDayToOpenAPI(result.Day),
 		LodgingPlace: tripPlaceSummaryToOpenAPI(result.LodgingPlace),
@@ -446,6 +471,24 @@ func geoPointToOpenAPI(point route.GeoPoint) openapi.GeoPoint {
 	return openapi.GeoPoint{Latitude: point.Latitude, Longitude: point.Longitude}
 }
 
+func searchDestinationsResponseToOpenAPI(results []place.DestinationSearchResult) openapi.SearchDestinationsResponse {
+	items := make([]openapi.DestinationSearchResult, 0, len(results))
+	for _, result := range results {
+		items = append(items, openapi.DestinationSearchResult{
+			CityName:        result.CityName,
+			CountryName:     result.CountryName,
+			CountryCode:     result.CountryCode,
+			DisplayName:     result.DisplayName,
+			Latitude:        result.Latitude,
+			Longitude:       result.Longitude,
+			RadiusMeters:    result.RadiusMeters,
+			Provider:        openapi.DestinationProvider(result.Provider),
+			ProviderPlaceId: result.ProviderPlaceID,
+		})
+	}
+	return openapi.SearchDestinationsResponse{Results: items}
+}
+
 func searchGooglePlacesResponseToOpenAPI(results []place.SearchResult) openapi.SearchGooglePlacesResponse {
 	items := make([]openapi.GooglePlaceSearchResult, 0, len(results))
 	for _, result := range results {
@@ -593,7 +636,7 @@ func routablePlaceToOpenAPI(place *trip.RoutablePlace) *openapi.RoutablePlace {
 		return nil
 	}
 	return &openapi.RoutablePlace{
-		Provider:      openapi.Google,
+		Provider:      openapi.RoutablePlaceProviderGoogle,
 		GooglePlaceId: place.GooglePlaceID,
 		Latitude:      place.Latitude,
 		Longitude:     place.Longitude,
@@ -627,7 +670,29 @@ func tripToOpenAPI(value trip.Trip) openapi.Trip {
 		CreatedBy:       value.CreatedBy,
 		CreatedAt:       value.CreatedAt,
 		UpdatedAt:       value.UpdatedAt,
+		Destinations:    tripDestinationsToOpenAPI(value.Destinations),
 	}
+}
+
+func tripDestinationsToOpenAPI(values []trip.TripDestination) []openapi.TripDestination {
+	items := make([]openapi.TripDestination, 0, len(values))
+	for _, value := range values {
+		items = append(items, openapi.TripDestination{
+			Id:              value.ID,
+			TripId:          value.TripID,
+			CityName:        value.CityName,
+			CountryName:     value.CountryName,
+			CountryCode:     value.CountryCode,
+			DisplayName:     value.DisplayName,
+			Latitude:        value.Latitude,
+			Longitude:       value.Longitude,
+			RadiusMeters:    value.RadiusMeters,
+			Provider:        openapi.DestinationProvider(value.Provider),
+			ProviderPlaceId: value.ProviderPlaceID,
+			SortOrder:       value.SortOrder,
+		})
+	}
+	return items
 }
 
 func tripDaysToOpenAPI(days []trip.TripDay) []openapi.TripDay {

@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 
 import {
   buildDayItineraryAddPlaceSearchRoute,
+  buildDayItineraryLodgingPlaceSearchRoute,
   isDayItineraryAddPlaceReturnToDay,
   resolveDayItineraryAddPlaceReturnNavigation,
 } from './day-itinerary-add-place-navigation';
@@ -23,6 +24,13 @@ describe('day itinerary add-place navigation helpers', () => {
     assert.equal(isDayItineraryAddPlaceReturnToDay('day-detail'), false);
     assert.equal(isDayItineraryAddPlaceReturnToDay('trip-detail'), false);
     assert.equal(isDayItineraryAddPlaceReturnToDay(undefined), false);
+  });
+
+  it('builds the map search lodging selector route for Day lodging registration', () => {
+    assert.equal(
+      buildDayItineraryLodgingPlaceSearchRoute(tripId, date),
+      `/trips/${tripId}/days/${date}/place-search?returnTo=itinerary-tab&mode=lodging`,
+    );
   });
 
   it('dismisses back to the existing itinerary tab entry when search was launched from itinerary', () => {
