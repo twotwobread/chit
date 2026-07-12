@@ -1,7 +1,9 @@
-import type { ScheduleItem, TripDay } from '@i-um/api-contract';
+import type { GetDayScheduleItemsResponse, ScheduleItem, TripDay } from '@i-um/api-contract';
 
+import { theme } from '../design/theme';
 import type { DayChip } from '../trip-ui/DayChips';
-import type { RouteMapPlace } from '../trip-ui/RouteMap';
+import type { RouteMapPlace, RouteMapPolyline } from '../trip-ui/RouteMap';
+import { getScheduleItems } from './day-itinerary';
 import { formatTripDayDate } from './days';
 
 export type TripMapSearchLayout = {
@@ -27,6 +29,109 @@ export function buildTripMapDayChips(days: TripDay[]): DayChip[] {
       label: `Day ${day.dayOrder}`,
       dateLabel: formatTripDayDate(day.date),
     }));
+}
+
+export type TripMapRouteLayerChipId = 'all' | `day:${string}`;
+
+export type TripMapRouteLayerSelection = { kind: 'none' } | { kind: 'all' } | { kind: 'day'; dayId: string };
+
+export type TripMapRouteNotice = {
+  title: string;
+  helper: string;
+};
+
+export type TripMapDayRoute = {
+  color: string;
+  dayId: string;
+  dayOrder: number;
+  label: string;
+  places: RouteMapPlace[];
+  polylines: RouteMapPolyline[];
+};
+
+export type TripMapRouteLayerViewModel = {
+  places: RouteMapPlace[];
+  polylines: RouteMapPolyline[];
+  notice: TripMapRouteNotice | null;
+};
+
+export const emptyTripMapRouteLayerSelection: TripMapRouteLayerSelection = { kind: 'none' };
+
+const tripMapRouteLayerColors = [
+  theme.color.green[600],
+  theme.color.blue[600],
+  theme.color.amber[600],
+  theme.color.red[600],
+  theme.color.yellow[500],
+  theme.color.ink[600],
+] as const;
+
+export function buildTripMapRouteLayerChips(days: TripDay[]): DayChip[] {
+  const orderedDays = days.slice().sort((left, right) => left.dayOrder - right.dayOrder);
+  return [
+    { id: 'all', label: '전체' },
+    ...orderedDays.map((day, index) => ({
+      id: tripMapDayRouteChipId(day.id),
+      label: `Day ${day.dayOrder}`,
+      dateLabel: formatTripDayDate(day.date),
+      legendColor: tripMapRouteLayerColor(index),
+    })),
+  ];
+}
+
+export function tripMapRouteLayerChipId(layer: TripMapRouteLayerSelection): TripMapRouteLayerChipId | null {
+  if (layer.kind === 'all') {
+    return 'all';
+  }
+  if (layer.kind === 'day') {
+    return tripMapDayRouteChipId(layer.dayId);
+  }
+  return null;
+}
+
+export function toggleTripMapRouteLayer(
+  current: TripMapRouteLayerSelection,
+  chipId: TripMapRouteLayerChipId,
+): TripMapRouteLayerSelection {
+  if (tripMapRouteLayerChipId(current) === chipId) {
+    return emptyTripMapRouteLayerSelection;
+  }
+  if (chipId === 'all') {
+    return { kind: 'all' };
+  }
+  return { dayId: chipId.slice('day:'.length), kind: 'day' };
+}
+
+export function buildTripMapDayRoutes(itineraries: GetDayScheduleItemsResponse[]): TripMapDayRoute[] {
+  return itineraries
+    .slice()
+    .sort((left, right) => left.day.dayOrder - right.day.dayOrder)
+    .map((itinerary, index) => {
+      const color = tripMapRouteLayerColor(index);
+      const places = decorateTripMapRoutePlaces(buildRouteMapPlaces(getScheduleItems(itinerary)), color);
+      return {
+        color,
+        dayId: itinerary.day.id,
+        dayOrder: itinerary.day.dayOrder,
+        label: `Day ${itinerary.day.dayOrder}`,
+        places,
+        polylines: buildTripMapRoutePolylines(itinerary.day.id, places, color),
+      };
+    });
+}
+
+export function buildTripMapRouteLayerViewModel(
+  dayRoutes: TripMapDayRoute[],
+  layer: TripMapRouteLayerSelection,
+): TripMapRouteLayerViewModel {
+  const visibleRoutes = selectTripMapRouteLayers(dayRoutes, layer);
+  const places = visibleRoutes.flatMap((route) => route.places);
+  const polylines = visibleRoutes.flatMap((route) => route.polylines);
+  return {
+    notice: buildTripMapRouteNotice(layer, places, polylines),
+    places,
+    polylines,
+  };
 }
 
 export function resolveTripMapSelectedDay({
@@ -113,6 +218,71 @@ export function buildRouteMapPlaces(items: ScheduleItem[]): RouteMapPlace[] {
       status: mapScheduleItemStatus(item),
       type: item.place?.placeType ?? 'etc',
     }));
+}
+
+function tripMapDayRouteChipId(dayId: string): TripMapRouteLayerChipId {
+  return `day:${dayId}`;
+}
+
+function tripMapRouteLayerColor(dayIndex: number): string {
+  return tripMapRouteLayerColors[dayIndex % tripMapRouteLayerColors.length] ?? theme.color.primary;
+}
+
+function decorateTripMapRoutePlaces(places: RouteMapPlace[], color: string): RouteMapPlace[] {
+  const nextPlaceId = places.find((place) => place.status === 'todo')?.id;
+  return places.map((place) => ({
+    ...place,
+    markerColor: color,
+    status: place.id === nextPlaceId ? 'next' : place.status,
+  }));
+}
+
+function buildTripMapRoutePolylines(dayId: string, places: RouteMapPlace[], color: string): RouteMapPolyline[] {
+  const coordinates = places
+    .filter(
+      (place): place is RouteMapPlace & { latitude: number; longitude: number } =>
+        Number.isFinite(place.latitude) && Number.isFinite(place.longitude),
+    )
+    .map((place) => ({ latitude: place.latitude, longitude: place.longitude }));
+
+  if (coordinates.length < 2) {
+    return [];
+  }
+
+  return [{ color, coordinates, id: `route-${dayId}` }];
+}
+
+function selectTripMapRouteLayers(dayRoutes: TripMapDayRoute[], layer: TripMapRouteLayerSelection): TripMapDayRoute[] {
+  if (layer.kind === 'all') {
+    return dayRoutes;
+  }
+  if (layer.kind === 'day') {
+    return dayRoutes.filter((route) => route.dayId === layer.dayId);
+  }
+  return [];
+}
+
+function buildTripMapRouteNotice(
+  layer: TripMapRouteLayerSelection,
+  places: RouteMapPlace[],
+  polylines: RouteMapPolyline[],
+): TripMapRouteNotice | null {
+  if (layer.kind === 'none') {
+    return null;
+  }
+  if (places.length === 0) {
+    return {
+      helper: '일정 장소를 추가하면 지도에서 동선을 확인할 수 있어요.',
+      title: '표시할 일정 장소가 없어요',
+    };
+  }
+  if (polylines.length === 0) {
+    return {
+      helper: '장소가 2개 이상이면 일정 순서대로 동선을 연결해요.',
+      title: '연결할 장소가 부족해요',
+    };
+  }
+  return null;
 }
 
 function roundCoordinate(value: number): number {

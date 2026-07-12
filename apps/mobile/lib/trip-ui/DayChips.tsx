@@ -6,6 +6,7 @@ export type DayChip = {
   id: string;
   label: string;
   dateLabel?: string;
+  legendColor?: string;
   statusLabel?: string;
 };
 
@@ -52,7 +53,18 @@ export function DayChips({
               pressed ? styles.pressed : null,
             ]}
           >
-            <Text style={[styles.label, selected ? styles.labelSelected : null]}>{day.label}</Text>
+            <View style={styles.labelRow}>
+              {day.legendColor ? (
+                <View
+                  style={[
+                    styles.legendDot,
+                    { backgroundColor: day.legendColor },
+                    selected ? styles.legendDotSelected : null,
+                  ]}
+                />
+              ) : null}
+              <Text style={[styles.label, selected ? styles.labelSelected : null]}>{day.label}</Text>
+            </View>
             {day.dateLabel ? (
               <Text style={[styles.date, selected ? styles.dateSelected : null]}>{day.dateLabel}</Text>
             ) : null}
@@ -110,6 +122,22 @@ const styles = StyleSheet.create({
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.label,
     fontWeight: theme.font.weight.bold,
+  },
+  labelRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: theme.space[2],
+  },
+  legendDot: {
+    borderColor: theme.color.surface,
+    borderRadius: 5,
+    borderWidth: 1,
+    height: 10,
+    width: 10,
+  },
+  legendDotSelected: {
+    borderColor: theme.color.onPrimary,
+    borderWidth: 2,
   },
   labelSelected: {
     color: theme.color.onPrimary,

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
+import { theme } from '../design/theme';
 import {
   addingGooglePlaceState,
   buildCreateGooglePlaceScheduleItemRequest,
@@ -14,6 +15,7 @@ import {
   buildGooglePlaceSearchBiasFromRegion,
   buildGooglePlaceSearchInputState,
   buildGooglePlaceSearchResultActionView,
+  buildGooglePlaceSearchMarkerPinStyle,
   buildGooglePlaceSearchMarkerViewModels,
   buildGooglePlaceSearchResultsRegion,
   buildGooglePlaceSearchRoute,
@@ -358,6 +360,21 @@ describe('google place search helpers', () => {
         { id: 'google-5', category: 'shopping', selected: false, iconName: 'shopping-bag', emphasis: 'normal' },
       ],
     );
+  });
+
+  it('inverts selected map marker fill while keeping category-colored border and icon', () => {
+    assert.deepEqual(buildGooglePlaceSearchMarkerPinStyle('food', false), {
+      backgroundColor: theme.placeType.food.color,
+      borderColor: theme.color.surface,
+      borderWidth: 3,
+      iconColor: theme.color.onPrimary,
+    });
+    assert.deepEqual(buildGooglePlaceSearchMarkerPinStyle('food', true), {
+      backgroundColor: theme.color.surface,
+      borderColor: theme.placeType.food.color,
+      borderWidth: 4,
+      iconColor: theme.placeType.food.color,
+    });
   });
 
   it('builds map regions for fitting results and centering selected cards', () => {
