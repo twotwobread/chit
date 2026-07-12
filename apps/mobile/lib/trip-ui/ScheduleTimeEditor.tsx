@@ -9,7 +9,10 @@ import {
   clearScheduleTimes,
   type ScheduleTimeEditorValues,
 } from '../trips/schedule-time-editor';
+import { buildScheduleTimeEditorLayout } from '../trips/schedule-time-editor-layout';
 import { ScheduleTimeWheel } from './ScheduleTimeWheel';
+
+const timeEditorLayout = buildScheduleTimeEditorLayout();
 
 export function ScheduleTimeEditor({
   disabled,
@@ -163,23 +166,20 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.bold,
   },
   timeCompactBox: {
-    backgroundColor: theme.color.surfaceSunken,
-    borderColor: theme.color.borderSubtle,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    gap: theme.space[3],
-    padding: theme.space[3],
+    gap: timeEditorLayout.containerGap,
+    padding: timeEditorLayout.containerPadding,
   },
   timePill: {
+    alignItems: 'center',
     backgroundColor: theme.color.surface,
     borderColor: theme.color.borderDefault,
     borderRadius: theme.radius.md,
     borderWidth: 1,
-    flex: 1,
-    gap: theme.space[1],
-    minHeight: theme.layout.controlH,
-    paddingHorizontal: theme.space[3],
-    paddingVertical: theme.space[2],
+    flexDirection: timeEditorLayout.pillContentDirection,
+    gap: timeEditorLayout.pillGap,
+    minHeight: timeEditorLayout.pillMinHeight,
+    paddingHorizontal: timeEditorLayout.pillHorizontalPadding,
+    paddingVertical: timeEditorLayout.pillVerticalPadding,
   },
   timePillActive: {
     backgroundColor: theme.color.primarySoft,
@@ -205,6 +205,7 @@ const styles = StyleSheet.create({
   },
   timeRangeRow: {
     alignItems: 'center',
+    alignSelf: 'flex-start',
     flexDirection: 'row',
     gap: theme.space[2],
   },

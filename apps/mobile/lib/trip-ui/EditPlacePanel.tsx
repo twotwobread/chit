@@ -46,15 +46,6 @@ export function EditPlacePanel({
       <Text style={styles.panelTitle}>장소 수정</Text>
       <View style={styles.fieldGroup}>
         <Text style={styles.label}>장소명</Text>
-        <TextInput
-          editable={!isSaving}
-          onChangeText={(name) => update({ name })}
-          placeholder="예: 우메다 공중정원"
-          placeholderTextColor={theme.color.textFaint}
-          style={styles.input}
-          value={editState.values.name}
-        />
-        {editState.errors.name ? <Text style={styles.fieldError}>{editState.errors.name}</Text> : null}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.compactChipList}>
           {manualPlaceTypeOptions.map((option) => {
             const selected = editState.values.placeType === option.value;
@@ -72,6 +63,15 @@ export function EditPlacePanel({
           })}
         </ScrollView>
         {editState.errors.placeType ? <Text style={styles.fieldError}>{editState.errors.placeType}</Text> : null}
+        <TextInput
+          editable={!isSaving}
+          onChangeText={(name) => update({ name })}
+          placeholder="예: 우메다 공중정원"
+          placeholderTextColor={theme.color.textFaint}
+          style={styles.input}
+          value={editState.values.name}
+        />
+        {editState.errors.name ? <Text style={styles.fieldError}>{editState.errors.name}</Text> : null}
       </View>
 
       <View style={styles.fieldGroup}>
