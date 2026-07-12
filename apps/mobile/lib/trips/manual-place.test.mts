@@ -24,6 +24,7 @@ describe('manual place helpers', () => {
       { value: 'lodging', label: '숙소' },
       { value: 'cafe', label: '카페' },
       { value: 'shopping', label: '쇼핑' },
+      { value: 'transport', label: '이동수단' },
       { value: 'etc', label: '기타' },
     ]);
   });

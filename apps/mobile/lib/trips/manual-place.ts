@@ -30,7 +30,15 @@ export type ManualPlaceFailureViewModel =
       helper: string;
     };
 
-export const manualPlaceTypeValues: TripPlaceType[] = ['sights', 'food', 'lodging', 'cafe', 'shopping', 'etc'];
+export const manualPlaceTypeValues: TripPlaceType[] = [
+  'sights',
+  'food',
+  'lodging',
+  'cafe',
+  'shopping',
+  'transport',
+  'etc',
+];
 
 export const manualPlaceTypeOptions = manualPlaceTypeValues.map((value) => ({
   value,

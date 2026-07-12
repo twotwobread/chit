@@ -3844,6 +3844,79 @@ func TestSearchGooglePlacesProviderErrors(t *testing.T) {
 	}
 }
 
+func TestTripPlaceBookmarkHandlers(t *testing.T) {
+	backend := newFakeAuthBackend()
+	accessToken := loginTestUser(t, backend)
+	tripID := createTestTrip(t, backend, accessToken)
+	provider := &fakePlaceProvider{details: placedomain.GooglePlaceDetails{
+		GooglePlaceID:    "google-airport-1",
+		DisplayName:      "간사이공항",
+		FormattedAddress: "Kansai International Airport",
+		Latitude:         34.4347,
+		Longitude:        135.244,
+		PrimaryType:      "airport",
+		Types:            []string{"airport", "point_of_interest"},
+	}}
+	router := NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true, PlaceProvider: provider})
+
+	createRecorder := httptest.NewRecorder()
+	createRequest := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/place-bookmarks/google", bytes.NewReader([]byte(`{"googlePlaceId":"google-airport-1","category":"transport"}`)))
+	createRequest.Header.Set("Content-Type", "application/json")
+	createRequest.Header.Set("Authorization", "Bearer "+accessToken)
+	router.ServeHTTP(createRecorder, createRequest)
+	if createRecorder.Code != http.StatusCreated {
+		t.Fatalf("expected create status %d, got %d with body %s", http.StatusCreated, createRecorder.Code, createRecorder.Body.String())
+	}
+	var created struct {
+		Bookmark struct {
+			ID       string `json:"id"`
+			Category string `json:"category"`
+			Place    struct {
+				Name          string `json:"name"`
+				PlaceType     string `json:"placeType"`
+				RoutablePlace struct {
+					GooglePlaceID string  `json:"googlePlaceId"`
+					Latitude      float64 `json:"latitude"`
+				} `json:"routablePlace"`
+			} `json:"place"`
+		} `json:"bookmark"`
+	}
+	if err := json.NewDecoder(createRecorder.Body).Decode(&created); err != nil {
+		t.Fatalf("decode create response: %v", err)
+	}
+	if created.Bookmark.ID == "" || created.Bookmark.Category != "transport" || created.Bookmark.Place.PlaceType != "transport" || created.Bookmark.Place.RoutablePlace.GooglePlaceID != "google-airport-1" {
+		t.Fatalf("unexpected create body %#v", created.Bookmark)
+	}
+
+	listRecorder := httptest.NewRecorder()
+	listRequest := httptest.NewRequest(http.MethodGet, "/trips/"+tripID+"/place-bookmarks", nil)
+	listRequest.Header.Set("Authorization", "Bearer "+accessToken)
+	router.ServeHTTP(listRecorder, listRequest)
+	if listRecorder.Code != http.StatusOK {
+		t.Fatalf("expected list status %d, got %d with body %s", http.StatusOK, listRecorder.Code, listRecorder.Body.String())
+	}
+	var listed struct {
+		Bookmarks []struct {
+			ID       string `json:"id"`
+			Category string `json:"category"`
+		} `json:"bookmarks"`
+	}
+	if err := json.NewDecoder(listRecorder.Body).Decode(&listed); err != nil {
+		t.Fatalf("decode list response: %v", err)
+	}
+	if len(listed.Bookmarks) != 1 || listed.Bookmarks[0].ID != created.Bookmark.ID || listed.Bookmarks[0].Category != "transport" {
+		t.Fatalf("unexpected list body %#v", listed.Bookmarks)
+	}
+
+	deleteRecorder := httptest.NewRecorder()
+	deleteRequest := httptest.NewRequest(http.MethodDelete, "/trips/"+tripID+"/place-bookmarks/"+created.Bookmark.ID, nil)
+	deleteRequest.Header.Set("Authorization", "Bearer "+accessToken)
+	router.ServeHTTP(deleteRecorder, deleteRequest)
+	if deleteRecorder.Code != http.StatusNoContent {
+		t.Fatalf("expected delete status %d, got %d with body %s", http.StatusNoContent, deleteRecorder.Code, deleteRecorder.Body.String())
+	}
+}
+
 func TestCreateGooglePlaceScheduleItemHandler(t *testing.T) {
 	backend := newFakeAuthBackend()
 	accessToken := loginTestUser(t, backend)
@@ -4523,6 +4596,7 @@ type fakeAuthBackend struct {
 	participants     map[string][]tripdomain.Participant
 	tripPlaces       map[string]tripdomain.TripPlaceSummary
 	googleTripPlaces map[string]string
+	placeBookmarks   map[string]placedomain.TripPlaceBookmark
 	dayLodgingPlaces map[string]tripdomain.TripPlaceSummary
 	dayScheduleItems map[string][]tripdomain.ScheduleItem
 	dayExpenses      map[string][]tripdomain.DayExpenseListItem
@@ -4720,6 +4794,7 @@ func newFakeAuthBackend() *fakeAuthBackend {
 		participants:     map[string][]tripdomain.Participant{},
 		tripPlaces:       map[string]tripdomain.TripPlaceSummary{},
 		googleTripPlaces: map[string]string{},
+		placeBookmarks:   map[string]placedomain.TripPlaceBookmark{},
 		dayLodgingPlaces: map[string]tripdomain.TripPlaceSummary{},
 		dayScheduleItems: map[string][]tripdomain.ScheduleItem{},
 		dayExpenses:      map[string][]tripdomain.DayExpenseListItem{},
@@ -5102,6 +5177,69 @@ func (b *fakeAuthBackend) GetGoogleTripPlaceByGooglePlaceID(_ context.Context, t
 	}
 	place, ok := b.tripPlaces[tripID+":"+placeID]
 	return place, ok, nil
+}
+
+func (b *fakeAuthBackend) ListTripPlaceBookmarks(_ context.Context, tripID string) ([]placedomain.TripPlaceBookmark, error) {
+	bookmarks := make([]placedomain.TripPlaceBookmark, 0)
+	prefix := tripID + ":"
+	for key, bookmark := range b.placeBookmarks {
+		if strings.HasPrefix(key, prefix) {
+			bookmarks = append(bookmarks, bookmark)
+		}
+	}
+	sort.SliceStable(bookmarks, func(i, j int) bool { return bookmarks[i].ID < bookmarks[j].ID })
+	return bookmarks, nil
+}
+
+func (b *fakeAuthBackend) UpsertGoogleTripPlaceBookmark(_ context.Context, record placedomain.CreateGoogleTripPlaceBookmarkRecord) (placedomain.TripPlaceBookmark, error) {
+	placeID, ok := b.googleTripPlaces[record.TripID+":"+record.GooglePlaceID]
+	var place tripdomain.TripPlaceSummary
+	if ok {
+		place = b.tripPlaces[record.TripID+":"+placeID]
+	} else {
+		b.nextPlace++
+		place = tripdomain.TripPlaceSummary{
+			ID:        testUUID(6000 + b.nextPlace),
+			Name:      record.Name,
+			Address:   record.Address,
+			PlaceType: record.PlaceType,
+			RoutablePlace: &tripdomain.RoutablePlace{
+				Provider:      "google",
+				GooglePlaceID: record.GooglePlaceID,
+				Latitude:      record.Latitude,
+				Longitude:     record.Longitude,
+			},
+		}
+		b.tripPlaces[record.TripID+":"+place.ID] = place
+		b.googleTripPlaces[record.TripID+":"+record.GooglePlaceID] = place.ID
+	}
+
+	key := record.TripID + ":" + place.ID
+	bookmark, ok := b.placeBookmarks[key]
+	if !ok {
+		bookmark = placedomain.TripPlaceBookmark{
+			ID:        testUUID(8000 + len(b.placeBookmarks) + 1),
+			TripID:    record.TripID,
+			Place:     place,
+			CreatedAt: b.TripToday(),
+		}
+	}
+	bookmark.Category = record.Category
+	bookmark.Place = place
+	bookmark.UpdatedAt = b.TripToday()
+	b.placeBookmarks[key] = bookmark
+	return bookmark, nil
+}
+
+func (b *fakeAuthBackend) DeleteTripPlaceBookmark(_ context.Context, tripID string, bookmarkID string) (bool, error) {
+	prefix := tripID + ":"
+	for key, bookmark := range b.placeBookmarks {
+		if strings.HasPrefix(key, prefix) && bookmark.ID == bookmarkID {
+			delete(b.placeBookmarks, key)
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (b *fakeAuthBackend) SetDayLodgingPlace(_ context.Context, record tripdomain.SetDayLodgingPlaceRecord) (tripdomain.TripPlaceSummary, error) {

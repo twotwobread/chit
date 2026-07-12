@@ -375,6 +375,29 @@ func createGooglePlaceScheduleItemResponseToOpenAPI(result place.CreateGooglePla
 	}
 }
 
+func tripPlaceBookmarksResponseToOpenAPI(bookmarks []place.TripPlaceBookmark) openapi.ListTripPlaceBookmarksResponse {
+	items := make([]openapi.TripPlaceBookmark, 0, len(bookmarks))
+	for _, bookmark := range bookmarks {
+		items = append(items, tripPlaceBookmarkToOpenAPI(bookmark))
+	}
+	return openapi.ListTripPlaceBookmarksResponse{Bookmarks: items}
+}
+
+func createGoogleTripPlaceBookmarkResponseToOpenAPI(result place.CreateGoogleTripPlaceBookmarkResult) openapi.CreateGoogleTripPlaceBookmarkResponse {
+	return openapi.CreateGoogleTripPlaceBookmarkResponse{Bookmark: tripPlaceBookmarkToOpenAPI(result.Bookmark)}
+}
+
+func tripPlaceBookmarkToOpenAPI(bookmark place.TripPlaceBookmark) openapi.TripPlaceBookmark {
+	return openapi.TripPlaceBookmark{
+		Id:        bookmark.ID,
+		TripId:    bookmark.TripID,
+		Category:  openapi.TripPlaceType(bookmark.Category),
+		Place:     tripPlaceSummaryToOpenAPI(bookmark.Place),
+		CreatedAt: bookmark.CreatedAt.UTC(),
+		UpdatedAt: bookmark.UpdatedAt.UTC(),
+	}
+}
+
 func createNonPlaceScheduleItemResponseToOpenAPI(result trip.CreateNonPlaceScheduleItemResult) openapi.CreateNonPlaceScheduleItemResponse {
 	return openapi.CreateNonPlaceScheduleItemResponse{
 		Day:          tripDayToOpenAPI(result.Day),

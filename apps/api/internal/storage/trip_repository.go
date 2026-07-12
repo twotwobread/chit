@@ -1299,6 +1299,51 @@ func (s *Store) AppendGooglePlaceScheduleItem(ctx context.Context, record place.
 	}, nil
 }
 
+func (s *Store) ListTripPlaceBookmarks(ctx context.Context, tripID string) ([]place.TripPlaceBookmark, error) {
+	rows, err := s.queries.ListTripPlaceBookmarks(ctx, mustUUID(tripID))
+	if err != nil {
+		return nil, err
+	}
+	items := make([]place.TripPlaceBookmark, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, tripPlaceBookmark(row.ID, row.TripID, row.Category, row.CreatedAt, row.UpdatedAt, row.PlaceID, row.PlaceName, row.PlaceType, row.Address, row.Provider, row.GooglePlaceID, row.Latitude, row.Longitude))
+	}
+	return items, nil
+}
+
+func (s *Store) UpsertGoogleTripPlaceBookmark(ctx context.Context, record place.CreateGoogleTripPlaceBookmarkRecord) (place.TripPlaceBookmark, error) {
+	row, err := s.queries.UpsertGoogleTripPlaceBookmark(ctx, db.UpsertGoogleTripPlaceBookmarkParams{
+		TripID:            mustUUID(record.TripID),
+		Name:              record.Name,
+		Address:           record.Address,
+		PlaceType:         record.PlaceType,
+		GooglePlaceID:     textValue(record.GooglePlaceID),
+		Latitude:          float8Value(record.Latitude),
+		Longitude:         float8Value(record.Longitude),
+		GooglePrimaryType: textValue(record.GooglePrimaryType),
+		GoogleTypes:       record.GoogleTypes,
+		Category:          record.Category,
+	})
+	if err != nil {
+		return place.TripPlaceBookmark{}, err
+	}
+	return tripPlaceBookmark(row.ID, row.TripID, row.Category, row.CreatedAt, row.UpdatedAt, row.PlaceID, row.PlaceName, row.PlaceType, row.Address, row.Provider, row.GooglePlaceID, row.Latitude, row.Longitude), nil
+}
+
+func (s *Store) DeleteTripPlaceBookmark(ctx context.Context, tripID string, bookmarkID string) (bool, error) {
+	_, err := s.queries.DeleteTripPlaceBookmark(ctx, db.DeleteTripPlaceBookmarkParams{
+		TripID:     mustUUID(tripID),
+		BookmarkID: mustUUID(bookmarkID),
+	})
+	if err == pgx.ErrNoRows {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 func (s *Store) CreateGooglePlaceScheduleItem(ctx context.Context, record place.CreateGooglePlaceScheduleItemRecord) (trip.ScheduleItem, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -2365,6 +2410,17 @@ func scheduleItemFromGetRow(row db.GetScheduleItemByTripDayAndIDRow) trip.Schedu
 	return item
 }
 
+func tripPlaceBookmark(id string, tripID string, category string, createdAt pgtype.Timestamptz, updatedAt pgtype.Timestamptz, placeID string, placeName string, placeType string, address string, provider string, googlePlaceID pgtype.Text, latitude pgtype.Float8, longitude pgtype.Float8) place.TripPlaceBookmark {
+	return place.TripPlaceBookmark{
+		ID:        id,
+		TripID:    tripID,
+		Category:  category,
+		CreatedAt: timeFromTimestamptz(createdAt),
+		UpdatedAt: timeFromTimestamptz(updatedAt),
+		Place:     tripPlaceSummary(placeID, placeName, placeType, address, provider, googlePlaceID, latitude, longitude),
+	}
+}
+
 func lodgingPlaceFromActiveTripDay(id string, name pgtype.Text, placeType pgtype.Text, address pgtype.Text, provider pgtype.Text, googlePlaceID pgtype.Text, latitude pgtype.Float8, longitude pgtype.Float8) *trip.TripPlaceSummary {
 	if id == "" || !name.Valid || !placeType.Valid || !address.Valid || !provider.Valid {
 		return nil
@@ -2447,6 +2503,13 @@ func findScheduleItem(items []trip.ScheduleItem, itemID string) (trip.ScheduleIt
 func boolFromSQL(value interface{}) bool {
 	result, _ := value.(bool)
 	return result
+}
+
+func timeFromTimestamptz(value pgtype.Timestamptz) time.Time {
+	if !value.Valid {
+		return time.Time{}
+	}
+	return value.Time.UTC()
 }
 
 func timePtrFromTimestamptz(value pgtype.Timestamptz) *time.Time {

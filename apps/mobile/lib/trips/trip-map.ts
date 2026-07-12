@@ -3,7 +3,7 @@ import type { GetDayScheduleItemsResponse, ScheduleItem, TripDay } from '@i-um/a
 import { theme } from '../design/theme';
 import type { DayChip } from '../trip-ui/DayChips';
 import type { RouteMapPlace, RouteMapPolyline } from '../trip-ui/RouteMap';
-import { getScheduleItems } from './day-itinerary';
+import { getScheduleItems, type DayItineraryViewModel } from './day-itinerary';
 import { formatTripDayDate } from './days';
 
 export type TripMapSearchLayout = {
@@ -53,6 +53,16 @@ export type TripMapRouteLayerViewModel = {
   places: RouteMapPlace[];
   polylines: RouteMapPolyline[];
   notice: TripMapRouteNotice | null;
+};
+
+export type TripMapScheduleMarkerDetail = {
+  id: string;
+  title: string;
+  subtitle: string;
+  categoryLabel: string;
+  address: string;
+  timeLabel?: string;
+  memo?: string;
 };
 
 export const emptyTripMapRouteLayerSelection: TripMapRouteLayerSelection = { kind: 'none' };
@@ -131,6 +141,28 @@ export function buildTripMapRouteLayerViewModel(
     notice: buildTripMapRouteNotice(layer, places, polylines),
     places,
     polylines,
+  };
+}
+
+export function buildTripMapScheduleMarkerDetail(
+  viewModel: DayItineraryViewModel,
+  scheduleItemId: string | null,
+): TripMapScheduleMarkerDetail | null {
+  if (!scheduleItemId || viewModel.status !== 'success') {
+    return null;
+  }
+  const item = viewModel.items.find((candidate) => candidate.id === scheduleItemId);
+  if (!item) {
+    return null;
+  }
+  return {
+    id: item.id,
+    title: item.placeName,
+    subtitle: `${viewModel.dayLabel} · ${item.orderLabel}번째 일정`,
+    categoryLabel: item.nonPlaceCategoryLabel ?? item.placeTypeLabel,
+    address: item.address,
+    ...(item.timeLabel ? { timeLabel: item.timeLabel } : {}),
+    ...(item.placeMemo || item.nonPlaceMemo ? { memo: item.placeMemo ?? item.nonPlaceMemo } : {}),
   };
 }
 

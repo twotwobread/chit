@@ -2,4 +2,4 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-export type TripPlaceType = 'sights' | 'food' | 'lodging' | 'cafe' | 'shopping' | 'etc';
+export type TripPlaceType = 'sights' | 'food' | 'lodging' | 'cafe' | 'shopping' | 'transport' | 'etc';

@@ -20,6 +20,7 @@ import {
   buildGooglePlaceSearchRegionFromDestination,
   buildGooglePlaceSearchResultActionView,
   buildGooglePlaceSearchMarkerPinStyle,
+  buildGooglePlaceSearchMarkerScale,
   buildGooglePlaceSearchMarkerViewModels,
   buildGooglePlaceSearchResultsRegion,
   buildGooglePlaceSearchRoute,
@@ -29,6 +30,7 @@ import {
   buildGooglePlaceSearchSheetStateFromIndex,
   buildGooglePlaceSelectedMapRegion,
   canSearchGooglePlaces,
+  clearGooglePlaceSearchResultsState,
   confirmingDuplicateGooglePlaceState,
   duplicateDayPlaceConfirmationMessage,
   errorGooglePlaceAddState,
@@ -37,9 +39,12 @@ import {
   googlePlaceAddFailureMessage,
   googlePlaceSearchDefaultLimit,
   googlePlaceSearchLoadingState,
+  resolveGooglePlaceSearchSelectionAfterResultsClose,
   resolveGooglePlaceSearchSheetContentState,
   resolveGooglePlaceSearchSheetState,
   shouldNavigateBackFromGooglePlaceDetailGesture,
+  shouldRenderGooglePlaceBookmarkDetail,
+  shouldRenderGooglePlaceSearchResults,
   shouldShowGooglePlaceCurrentLocationButton,
   shouldShowGooglePlaceRegionSearchAction,
   idleGooglePlaceAddState,
@@ -148,6 +153,15 @@ describe('google place search helpers', () => {
         errorMessage: null,
         favoriteAction: null,
         primaryAction: { isLoading: false, label: '이 장소 선택', loadingLabel: '처리 중...' },
+      },
+    );
+    assert.deepEqual(
+      buildGooglePlaceSearchResultActionView({ addState: idleGooglePlaceAddState(), mode: 'bookmark', result }),
+      {
+        duplicateConfirmation: null,
+        errorMessage: null,
+        favoriteAction: null,
+        primaryAction: { isLoading: false, label: '장소 찜하기', loadingLabel: '저장 중...' },
       },
     );
     assert.deepEqual(
@@ -301,6 +315,8 @@ describe('google place search helpers', () => {
         ],
       },
     );
+    assert.equal(getGooglePlaceTypeHint('airport'), '이동수단');
+    assert.equal(getGooglePlaceTypeHint('subway_station'), '이동수단');
     assert.equal(getGooglePlaceTypeHint('unknown_google_type'), '장소');
   });
 
@@ -353,6 +369,15 @@ describe('google place search helpers', () => {
             longitude: 135.47,
             metadataLabels: ['쇼핑몰'],
           },
+          {
+            id: 'google-6',
+            placeName: '간사이공항',
+            address: '',
+            typeHint: '이동수단',
+            latitude: 34.43,
+            longitude: 135.24,
+            metadataLabels: ['이동수단'],
+          },
         ],
         'google-2',
       ).map(({ id, category, selected, iconName, emphasis }) => ({ id, category, selected, iconName, emphasis })),
@@ -362,11 +387,18 @@ describe('google place search helpers', () => {
         { id: 'google-3', category: 'food', selected: false, iconName: 'utensils', emphasis: 'normal' },
         { id: 'google-4', category: 'lodging', selected: false, iconName: 'bed', emphasis: 'normal' },
         { id: 'google-5', category: 'shopping', selected: false, iconName: 'shopping-bag', emphasis: 'normal' },
+        { id: 'google-6', category: 'transport', selected: false, iconName: 'train-front', emphasis: 'normal' },
       ],
     );
   });
 
   it('inverts selected map marker fill while keeping category-colored border and icon', () => {
+    assert.deepEqual(buildGooglePlaceSearchMarkerPinStyle('transport', false), {
+      backgroundColor: theme.placeType.transport.color,
+      borderColor: theme.color.surface,
+      borderWidth: 3,
+      iconColor: theme.color.onPrimary,
+    });
     assert.deepEqual(buildGooglePlaceSearchMarkerPinStyle('food', false), {
       backgroundColor: theme.placeType.food.color,
       borderColor: theme.color.surface,
@@ -379,6 +411,106 @@ describe('google place search helpers', () => {
       borderWidth: 4,
       iconColor: theme.placeType.food.color,
     });
+  });
+
+  it('builds category-visible bookmark markers with a distinct bookmark treatment', () => {
+    const [marker] = buildGooglePlaceSearchMarkerViewModels(
+      [
+        {
+          id: 'bookmark-hotel',
+          bookmarkId: 'bookmark-1',
+          placeName: '오사카 숙소',
+          address: '',
+          typeHint: '숙소',
+          latitude: 34.68,
+          longitude: 135.48,
+          metadataLabels: ['숙소'],
+        },
+      ],
+      'bookmark-hotel',
+      { selectedVariant: 'bookmark', variant: 'bookmark' },
+    );
+
+    assert.deepEqual(
+      marker && {
+        category: marker.category,
+        categoryLabel: marker.categoryLabel,
+        iconName: marker.iconName,
+        selected: marker.selected,
+        variant: marker.variant,
+      },
+      {
+        category: 'lodging',
+        categoryLabel: '숙소',
+        iconName: 'bed',
+        selected: true,
+        variant: 'bookmark',
+      },
+    );
+    assert.deepEqual(buildGooglePlaceSearchMarkerPinStyle('lodging', false, 'bookmark'), {
+      backgroundColor: theme.placeType.lodging.color,
+      borderColor: theme.color.accent,
+      borderWidth: 3,
+      iconColor: theme.color.onPrimary,
+      badgeBackgroundColor: theme.color.surface,
+      badgeColor: theme.color.accent,
+    });
+  });
+
+  it('scales only unselected markers down as the map zooms out', () => {
+    assert.equal(
+      buildGooglePlaceSearchMarkerScale(
+        { latitude: 34.7, longitude: 135.5, latitudeDelta: 0.04, longitudeDelta: 0.04 },
+        false,
+      ),
+      1,
+    );
+    assert.equal(
+      buildGooglePlaceSearchMarkerScale(
+        { latitude: 34.7, longitude: 135.5, latitudeDelta: 0.18, longitudeDelta: 0.18 },
+        false,
+      ),
+      0.82,
+    );
+    assert.equal(
+      buildGooglePlaceSearchMarkerScale(
+        { latitude: 34.7, longitude: 135.5, latitudeDelta: 0.8, longitudeDelta: 0.8 },
+        false,
+      ),
+      0.66,
+    );
+    assert.equal(
+      buildGooglePlaceSearchMarkerScale(
+        { latitude: 34.7, longitude: 135.5, latitudeDelta: 0.8, longitudeDelta: 0.8 },
+        true,
+      ),
+      1,
+    );
+  });
+
+  it('clears search-result UI while preserving matching bookmark detail context', () => {
+    const selectedSearchResult = {
+      id: 'google-hotel',
+      placeName: '오사카 숙소',
+      address: 'Osaka',
+      typeHint: '숙소',
+    };
+    const matchingBookmark = { ...selectedSearchResult, bookmarkId: 'bookmark-1' };
+
+    assert.deepEqual(clearGooglePlaceSearchResultsState(' 호텔 '), {
+      status: 'initial',
+      message: '장소 이름을 검색해 보세요.',
+      results: [],
+    });
+    assert.equal(shouldRenderGooglePlaceSearchResults(successGooglePlaceSearchState([selectedSearchResult])), true);
+    assert.equal(shouldRenderGooglePlaceSearchResults(clearGooglePlaceSearchResultsState('호텔')), false);
+    assert.equal(shouldRenderGooglePlaceBookmarkDetail('bookmark', matchingBookmark), true);
+    assert.equal(shouldRenderGooglePlaceBookmarkDetail('search', matchingBookmark), false);
+    assert.deepEqual(
+      resolveGooglePlaceSearchSelectionAfterResultsClose(selectedSearchResult, [matchingBookmark]),
+      matchingBookmark,
+    );
+    assert.equal(resolveGooglePlaceSearchSelectionAfterResultsClose(selectedSearchResult, []), null);
   });
 
   it('builds map regions for fitting results and centering selected cards', () => {

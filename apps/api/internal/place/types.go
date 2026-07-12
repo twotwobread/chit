@@ -3,6 +3,7 @@ package place
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/twotwobread/i-um/apps/api/internal/trip"
 )
@@ -44,6 +45,9 @@ type Repository interface {
 	CreateGoogleDayLodgingPlace(ctx context.Context, record CreateGoogleDayLodgingPlaceRecord) (trip.TripPlaceSummary, error)
 	AppendGooglePlaceScheduleItem(ctx context.Context, record AppendGooglePlaceScheduleItemRecord) (trip.ScheduleItem, error)
 	CreateGooglePlaceScheduleItem(ctx context.Context, record CreateGooglePlaceScheduleItemRecord) (trip.ScheduleItem, error)
+	ListTripPlaceBookmarks(ctx context.Context, tripID string) ([]TripPlaceBookmark, error)
+	UpsertGoogleTripPlaceBookmark(ctx context.Context, record CreateGoogleTripPlaceBookmarkRecord) (TripPlaceBookmark, error)
+	DeleteTripPlaceBookmark(ctx context.Context, tripID string, bookmarkID string) (bool, error)
 }
 
 type Provider interface {
@@ -115,6 +119,11 @@ type CreateGooglePlaceScheduleItemInput struct {
 	StartTime          *string
 	EndTime            *string
 	Memo               *string
+}
+
+type CreateGoogleTripPlaceBookmarkInput struct {
+	GooglePlaceID string
+	Category      string
 }
 
 type PhotoAttribution struct {
@@ -219,6 +228,28 @@ type CreateGooglePlaceScheduleItemRecord struct {
 	Memo               *string
 }
 
+type CreateGoogleTripPlaceBookmarkRecord struct {
+	TripID            string
+	GooglePlaceID     string
+	Name              string
+	Address           string
+	PlaceType         string
+	Category          string
+	Latitude          float64
+	Longitude         float64
+	GooglePrimaryType string
+	GoogleTypes       []string
+}
+
+type TripPlaceBookmark struct {
+	ID        string
+	TripID    string
+	Category  string
+	Place     trip.TripPlaceSummary
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
 type CreateGoogleDayLodgingPlaceResult struct {
 	Day          trip.TripDay
 	LodgingPlace trip.TripPlaceSummary
@@ -227,4 +258,8 @@ type CreateGoogleDayLodgingPlaceResult struct {
 type CreateGooglePlaceScheduleItemResult struct {
 	Day  trip.TripDay
 	Item trip.ScheduleItem
+}
+
+type CreateGoogleTripPlaceBookmarkResult struct {
+	Bookmark TripPlaceBookmark
 }

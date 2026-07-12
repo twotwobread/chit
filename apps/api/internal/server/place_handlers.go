@@ -113,6 +113,73 @@ func (s apiServer) GetGooglePlacePhoto(w http.ResponseWriter, r *http.Request, t
 	http.Redirect(w, r, photo.URI, http.StatusFound)
 }
 
+func (s apiServer) ListTripPlaceBookmarks(w http.ResponseWriter, r *http.Request, tripId string) {
+	if s.auth == nil || s.places == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "place bookmarks are not configured", nil)
+		return
+	}
+
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	bookmarks, err := s.places.ListTripPlaceBookmarks(r.Context(), authContext.UserID, tripId)
+	if err != nil {
+		writePlaceSearchError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, tripPlaceBookmarksResponseToOpenAPI(bookmarks))
+}
+
+func (s apiServer) CreateGoogleTripPlaceBookmark(w http.ResponseWriter, r *http.Request, tripId string) {
+	if s.auth == nil || s.places == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "place bookmarks are not configured", nil)
+		return
+	}
+
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	var body openapi.CreateGoogleTripPlaceBookmarkJSONRequestBody
+	if !decodeJSON(w, r, &body) {
+		return
+	}
+
+	result, err := s.places.CreateGoogleTripPlaceBookmark(r.Context(), authContext.UserID, tripId, place.CreateGoogleTripPlaceBookmarkInput{
+		GooglePlaceID: body.GooglePlaceId,
+		Category:      string(body.Category),
+	})
+	if err != nil {
+		writePlaceSearchError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, createGoogleTripPlaceBookmarkResponseToOpenAPI(result))
+}
+
+func (s apiServer) DeleteTripPlaceBookmark(w http.ResponseWriter, r *http.Request, tripId string, bookmarkId string) {
+	if s.auth == nil || s.places == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "place bookmarks are not configured", nil)
+		return
+	}
+
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	if err := s.places.DeleteTripPlaceBookmark(r.Context(), authContext.UserID, tripId, bookmarkId); err != nil {
+		writePlaceSearchError(w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (s apiServer) CreateGoogleDayLodgingPlace(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string) {
 	if s.auth == nil || s.places == nil {
 		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "google day lodging creation is not configured", nil)

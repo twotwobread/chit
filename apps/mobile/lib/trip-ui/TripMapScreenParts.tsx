@@ -1,8 +1,13 @@
 import { useMemo } from 'react';
 import { router } from 'expo-router';
-import { View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
+import { Heart } from 'lucide-react-native';
+
+import type { TripPlaceType } from '@i-um/api-contract';
 
 import { theme } from '../design';
+import { buildBookmarkCategoryOptions } from '../places/bookmarks';
+import { type GooglePlaceAddViewState, type GooglePlaceSearchRowViewModel } from '../places/google-search';
 import { type DayItineraryMapActionFeedback } from '../trips/day-itinerary-map-actions';
 import {
   buildTripMapInitialRegion,
@@ -10,6 +15,7 @@ import {
   buildTripMapSearchLayout,
   type TripMapRouteLayerChipId,
   type TripMapRouteNotice,
+  type TripMapScheduleMarkerDetail,
 } from '../trips/trip-map';
 import { type TripTabUnavailableViewModel } from '../trips/trip-tabs';
 import { DayChips } from './DayChips';
@@ -19,16 +25,29 @@ import { TripStateCard } from './TripScreenScaffold';
 import { styles } from './TripMapScreenStyles';
 
 export function MapContent({
+  bookmarkActionState,
+  bookmarkLayerVisible,
+  bookmarkResults,
   feedback,
   mapPlaces,
+  onBookmarkCategorySelect,
+  onBookmarkDelete,
+  onClearRoutePlaceSelection,
+  onRoutePlacePress,
+  onToggleBookmarkLayer,
   onToggleRouteLayer,
   routeChips,
   routeNotice,
   routePolylines,
+  scheduleMarkerDetail,
   selectedDayId,
   selectedRouteLayerChipId,
+  selectedRoutePlaceId,
   tripId,
 }: {
+  bookmarkActionState: GooglePlaceAddViewState;
+  bookmarkLayerVisible: boolean;
+  bookmarkResults: GooglePlaceSearchRowViewModel[];
   mapPlaces: RouteMapPlace[];
   routePolylines: RouteMapPolyline[];
   tripId: string;
@@ -37,25 +56,41 @@ export function MapContent({
   selectedDayId: string;
   selectedRouteLayerChipId: TripMapRouteLayerChipId | null;
   feedback: DayItineraryMapActionFeedback | null;
+  scheduleMarkerDetail: TripMapScheduleMarkerDetail | null;
+  selectedRoutePlaceId: string | null;
+  onBookmarkCategorySelect: (result: GooglePlaceSearchRowViewModel, category: TripPlaceType) => void;
+  onBookmarkDelete: (result: GooglePlaceSearchRowViewModel) => void;
+  onClearRoutePlaceSelection: () => void;
+  onRoutePlacePress: (place: RouteMapPlace) => void;
+  onToggleBookmarkLayer: () => void;
   onToggleRouteLayer: (chipId: TripMapRouteLayerChipId) => void;
 }) {
   const initialRegion = useMemo(() => buildTripMapInitialRegion(mapPlaces), [mapPlaces]);
   const layout = buildTripMapSearchLayout();
   const showDayChipsOverlay = layout.dayChipsPlacement === 'mapOverlay';
   const mapStyle = layout.screenMode === 'fullScreen' ? styles.mapSearchFullScreen : styles.mapSearch;
-  const sheetTopInset = theme.space[4] + theme.layout.controlHSm + theme.space[2] + theme.space[6];
+  const sheetTopInset = theme.space[4] + theme.layout.controlHSm + theme.space[4];
   const mapSearchKey = `${selectedDayId}:${selectedRouteLayerChipId ?? 'none'}`;
 
   return (
     <View style={styles.mapFullScreenRoot}>
       <GooglePlaceMapSearch
-        actionMode="exploreOnly"
+        actionMode="bookmark"
+        actionState={bookmarkActionState}
+        bookmarkCategoryOptions={buildBookmarkCategoryOptions()}
+        bookmarkResults={bookmarkResults}
+        bottomSheetFooter={scheduleMarkerDetail ? <ScheduleMarkerDetailCard detail={scheduleMarkerDetail} /> : null}
         dayId={selectedDayId}
         initialRegion={initialRegion}
         key={mapSearchKey}
         minimizedSheetBaseHeight={40}
+        onBookmarkCategorySelect={onBookmarkCategorySelect}
+        onBookmarkDeleteResult={onBookmarkDelete}
+        onClearRoutePlaceSelection={onClearRoutePlaceSelection}
+        onRoutePlacePress={onRoutePlacePress}
         routePlaces={mapPlaces}
         routePolylines={routePolylines}
+        selectedRoutePlaceId={selectedRoutePlaceId}
         sheetTopInset={sheetTopInset}
         style={mapStyle}
         tripId={tripId}
@@ -70,6 +105,23 @@ export function MapContent({
           />
         </View>
       ) : null}
+      <Pressable
+        accessibilityLabel={bookmarkLayerVisible ? '찜한 장소 숨기기' : '찜한 장소 보이기'}
+        accessibilityRole="button"
+        accessibilityState={{ selected: bookmarkLayerVisible }}
+        onPress={onToggleBookmarkLayer}
+        style={[
+          styles.bookmarkLayerFloatingButton,
+          bookmarkLayerVisible ? styles.bookmarkLayerFloatingButtonSelected : null,
+        ]}
+      >
+        <Heart
+          color={bookmarkLayerVisible ? theme.color.onPrimary : theme.color.accent}
+          fill={bookmarkLayerVisible ? theme.color.onPrimary : 'transparent'}
+          size={21}
+          strokeWidth={2.6}
+        />
+      </Pressable>
       {routeNotice ? (
         <View pointerEvents="box-none" style={styles.routeNoticeOverlay}>
           <TripStateCard helper={routeNotice.helper} title={routeNotice.title} />
@@ -80,6 +132,19 @@ export function MapContent({
           <TripStateCard helper={feedback.kind === 'error' ? undefined : feedback.message} title={feedback.message} />
         </View>
       ) : null}
+    </View>
+  );
+}
+
+function ScheduleMarkerDetailCard({ detail }: { detail: TripMapScheduleMarkerDetail }) {
+  return (
+    <View style={styles.scheduleMarkerDetailCard}>
+      <Text style={styles.scheduleMarkerDetailSubtitle}>{detail.subtitle}</Text>
+      <Text style={styles.scheduleMarkerDetailTitle}>{detail.title}</Text>
+      <Text style={styles.scheduleMarkerDetailMeta}>{detail.categoryLabel}</Text>
+      {detail.timeLabel ? <Text style={styles.scheduleMarkerDetailMeta}>{detail.timeLabel}</Text> : null}
+      {detail.address ? <Text style={styles.scheduleMarkerDetailText}>{detail.address}</Text> : null}
+      {detail.memo ? <Text style={styles.scheduleMarkerDetailText}>{detail.memo}</Text> : null}
     </View>
   );
 }

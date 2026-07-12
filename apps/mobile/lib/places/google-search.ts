@@ -34,6 +34,7 @@ export type GooglePlacePhotoImageSource = {
 
 export type GooglePlaceSearchRowViewModel = {
   id: string;
+  bookmarkId?: string;
   placeName: string;
   address: string;
   typeHint: string;
@@ -50,11 +51,20 @@ export type GooglePlaceExplorationDetailViewModel = GooglePlaceSearchRowViewMode
   mapUrl: string;
 };
 
-export type GooglePlaceSearchMarkerCategory = 'sights' | 'food' | 'lodging' | 'cafe' | 'shopping' | 'etc';
+export type GooglePlaceSearchMarkerCategory = 'sights' | 'food' | 'lodging' | 'cafe' | 'shopping' | 'transport' | 'etc';
 
-export type GooglePlaceSearchMarkerIconName = 'landmark' | 'utensils' | 'bed' | 'coffee' | 'shopping-bag' | 'map-pin';
+export type GooglePlaceSearchMarkerIconName =
+  | 'landmark'
+  | 'utensils'
+  | 'bed'
+  | 'coffee'
+  | 'shopping-bag'
+  | 'train-front'
+  | 'map-pin';
 
 export type GooglePlaceSearchMarkerEmphasis = 'normal' | 'focused';
+export type GooglePlaceSearchMarkerVariant = 'search' | 'bookmark';
+export type GooglePlaceSearchSelectionSource = GooglePlaceSearchMarkerVariant;
 
 export type GooglePlaceMapCoordinate = { latitude: number; longitude: number };
 
@@ -63,8 +73,10 @@ export type GooglePlaceSearchMarkerViewModel = {
   coordinate: GooglePlaceMapCoordinate;
   title: string;
   category: GooglePlaceSearchMarkerCategory;
+  categoryLabel: string;
   selected: boolean;
   iconName: GooglePlaceSearchMarkerIconName;
+  variant: GooglePlaceSearchMarkerVariant;
   emphasis: GooglePlaceSearchMarkerEmphasis;
 };
 
@@ -73,6 +85,13 @@ export type GooglePlaceSearchMarkerPinStyle = {
   borderColor: string;
   borderWidth: number;
   iconColor: string;
+  badgeBackgroundColor?: string;
+  badgeColor?: string;
+};
+
+export type GooglePlaceSearchMarkerOptions = {
+  selectedVariant?: GooglePlaceSearchMarkerVariant | null;
+  variant?: GooglePlaceSearchMarkerVariant;
 };
 
 export type GooglePlaceSearchMapRegion = {
@@ -159,7 +178,12 @@ export type GooglePlaceAddViewState =
   | { status: 'confirmingDuplicate'; result: GooglePlaceSearchRowViewModel; message: string }
   | { status: 'error'; message: string };
 
-export type GooglePlaceSearchResultActionMode = 'exploreOnly' | 'scheduleAdd' | 'scheduleSelect' | 'lodgingRegister';
+export type GooglePlaceSearchResultActionMode =
+  | 'exploreOnly'
+  | 'scheduleAdd'
+  | 'scheduleSelect'
+  | 'lodgingRegister'
+  | 'bookmark';
 
 export type GooglePlaceSearchResultActionView = {
   primaryAction: { label: string; loadingLabel: string; isLoading: boolean } | null;
@@ -181,6 +205,13 @@ const typeHintByPrimaryType: Record<string, string> = {
   coffee_shop: '카페',
   shopping_mall: '쇼핑',
   store: '쇼핑',
+  airport: '이동수단',
+  bus_station: '이동수단',
+  subway_station: '이동수단',
+  train_station: '이동수단',
+  transit_station: '이동수단',
+  light_rail_station: '이동수단',
+  taxi_stand: '이동수단',
 };
 
 export function buildGooglePlaceSearchRoute(tripId: string, tripDayId: string): Href {
@@ -204,6 +235,31 @@ export function buildGooglePlaceSearchInputState(query: string): GooglePlaceSear
     return { status: 'minQuery', message: '두 글자 이상 입력해 주세요.', results: [] };
   }
   return { status: 'initial', message: '', results: [] };
+}
+
+export function clearGooglePlaceSearchResultsState(_query: string): GooglePlaceSearchViewState {
+  return buildGooglePlaceSearchInputState('');
+}
+
+export function shouldRenderGooglePlaceSearchResults(state: GooglePlaceSearchViewState): boolean {
+  return state.status === 'success';
+}
+
+export function shouldRenderGooglePlaceBookmarkDetail(
+  selectionSource: GooglePlaceSearchSelectionSource | null,
+  selectedResult?: GooglePlaceSearchRowViewModel | null,
+): boolean {
+  return selectionSource === 'bookmark' && Boolean(selectedResult?.bookmarkId);
+}
+
+export function resolveGooglePlaceSearchSelectionAfterResultsClose(
+  selectedResult: GooglePlaceSearchRowViewModel | null,
+  bookmarkResults: GooglePlaceSearchRowViewModel[],
+): GooglePlaceSearchRowViewModel | null {
+  if (!selectedResult) {
+    return null;
+  }
+  return bookmarkResults.find((bookmark) => bookmark.id === selectedResult.id) ?? null;
 }
 
 export function googlePlaceSearchLoadingState(): GooglePlaceSearchViewState {
@@ -244,9 +300,22 @@ export function buildGooglePlaceSearchResultActionView({
     };
   }
 
-  const label = mode === 'scheduleSelect' ? '이 장소 선택' : mode === 'lodgingRegister' ? '숙소로 등록' : '장소 추가';
+  const label =
+    mode === 'scheduleSelect'
+      ? '이 장소 선택'
+      : mode === 'lodgingRegister'
+        ? '숙소로 등록'
+        : mode === 'bookmark'
+          ? '장소 찜하기'
+          : '장소 추가';
   const loadingLabel =
-    mode === 'scheduleSelect' ? '처리 중...' : mode === 'lodgingRegister' ? '등록 중...' : '추가 중...';
+    mode === 'scheduleSelect'
+      ? '처리 중...'
+      : mode === 'lodgingRegister'
+        ? '등록 중...'
+        : mode === 'bookmark'
+          ? '저장 중...'
+          : '추가 중...';
   const isLoading = addState.status === 'adding' && addState.googlePlaceId === result.id;
   const duplicateConfirmation =
     addState.status === 'confirmingDuplicate' && addState.result.id === result.id
@@ -357,19 +426,23 @@ export function buildGooglePlacePhotoImageSource(
 export function buildGooglePlaceSearchMarkerViewModels(
   results: GooglePlaceSearchRowViewModel[],
   selectedId?: string | null,
+  options: GooglePlaceSearchMarkerOptions = {},
 ): GooglePlaceSearchMarkerViewModel[] {
+  const variant = options.variant ?? 'search';
   return results
     .filter((result) => Number.isFinite(result.latitude) && Number.isFinite(result.longitude))
     .map((result) => {
       const category = getGooglePlaceMarkerCategory(result.typeHint);
-      const selected = result.id === selectedId;
+      const selected = result.id === selectedId && (!options.selectedVariant || options.selectedVariant === variant);
       return {
         id: result.id,
         coordinate: { latitude: result.latitude as number, longitude: result.longitude as number },
         title: result.placeName,
         category,
+        categoryLabel: theme.placeType[category].label,
         selected,
         iconName: getGooglePlaceMarkerIconName(category),
+        variant,
         emphasis: selected ? 'focused' : 'normal',
       };
     });
@@ -633,14 +706,39 @@ export function buildGooglePlaceDetailsErrorState(googlePlaceId: string): Google
 export function buildGooglePlaceSearchMarkerPinStyle(
   category: GooglePlaceSearchMarkerCategory,
   selected: boolean,
+  variant: GooglePlaceSearchMarkerVariant = 'search',
 ): GooglePlaceSearchMarkerPinStyle {
   const categoryColor = theme.placeType[category].color;
+  if (variant === 'bookmark') {
+    return {
+      backgroundColor: selected ? theme.color.surface : categoryColor,
+      borderColor: theme.color.accent,
+      borderWidth: selected ? 4 : 3,
+      iconColor: selected ? categoryColor : theme.color.onPrimary,
+      badgeBackgroundColor: theme.color.surface,
+      badgeColor: theme.color.accent,
+    };
+  }
   return {
     backgroundColor: selected ? theme.color.surface : categoryColor,
     borderColor: selected ? categoryColor : theme.color.surface,
     borderWidth: selected ? 4 : 3,
     iconColor: selected ? categoryColor : theme.color.onPrimary,
   };
+}
+
+export function buildGooglePlaceSearchMarkerScale(region: GooglePlaceSearchMapRegion, selected: boolean): number {
+  if (selected) {
+    return 1;
+  }
+  const zoomDelta = Math.max(Math.abs(region.latitudeDelta), Math.abs(region.longitudeDelta));
+  if (zoomDelta >= 0.5) {
+    return 0.66;
+  }
+  if (zoomDelta >= 0.12) {
+    return 0.82;
+  }
+  return 1;
 }
 
 export const defaultGooglePlaceSearchMapRegion: GooglePlaceSearchMapRegion = {
@@ -744,6 +842,8 @@ function getGooglePlaceMarkerIconName(category: GooglePlaceSearchMarkerCategory)
       return 'coffee';
     case 'shopping':
       return 'shopping-bag';
+    case 'transport':
+      return 'train-front';
     default:
       return 'map-pin';
   }
@@ -797,6 +897,20 @@ function getGooglePlaceMarkerCategory(typeHint: string): GooglePlaceSearchMarker
     normalized.includes('mall')
   ) {
     return 'shopping';
+  }
+  if (
+    normalized.includes('이동수단') ||
+    normalized.includes('공항') ||
+    normalized.includes('역') ||
+    normalized.includes('정류장') ||
+    normalized.includes('airport') ||
+    normalized.includes('station') ||
+    normalized.includes('transit') ||
+    normalized.includes('subway') ||
+    normalized.includes('train') ||
+    normalized.includes('bus')
+  ) {
+    return 'transport';
   }
   return 'etc';
 }

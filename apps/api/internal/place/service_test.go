@@ -450,12 +450,97 @@ func TestServiceCreateGooglePlaceScheduleItemValidatesScheduleDetails(t *testing
 	}
 }
 
+func TestServiceCreateGoogleTripPlaceBookmarkCreatesGoogleSnapshot(t *testing.T) {
+	repo := &fakeRepository{
+		trip:          trip.Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"},
+		tripFound:     true,
+		isParticipant: true,
+	}
+	provider := &fakeProvider{details: GooglePlaceDetails{
+		GooglePlaceID:    "google-airport-1",
+		DisplayName:      "간사이공항",
+		FormattedAddress: "Kansai International Airport",
+		Latitude:         34.4347,
+		Longitude:        135.244,
+		PrimaryType:      "airport",
+		Types:            []string{"airport", "point_of_interest"},
+	}}
+	service := NewService(repo, provider)
+
+	result, err := service.CreateGoogleTripPlaceBookmark(context.Background(), "user-1", testTripID, CreateGoogleTripPlaceBookmarkInput{GooglePlaceID: " google-airport-1 ", Category: "transport"})
+	if err != nil {
+		t.Fatalf("CreateGoogleTripPlaceBookmark returned error: %v", err)
+	}
+
+	if !provider.detailsCalled || provider.detailsInput.GooglePlaceID != "google-airport-1" {
+		t.Fatalf("expected provider details for trimmed google id, got called=%v input=%#v", provider.detailsCalled, provider.detailsInput)
+	}
+	if repo.createdBookmarkRecord.GooglePlaceID != "google-airport-1" || repo.createdBookmarkRecord.PlaceType != "transport" || repo.createdBookmarkRecord.Category != "transport" {
+		t.Fatalf("unexpected bookmark record %#v", repo.createdBookmarkRecord)
+	}
+	if result.Bookmark.Category != "transport" || result.Bookmark.Place.Name != "간사이공항" || result.Bookmark.Place.PlaceType != "transport" {
+		t.Fatalf("unexpected bookmark result %#v", result.Bookmark)
+	}
+}
+
+func TestServiceListAndDeleteTripPlaceBookmarksAuthorizeParticipants(t *testing.T) {
+	repo := &fakeRepository{
+		trip:          trip.Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"},
+		tripFound:     true,
+		isParticipant: true,
+		bookmarks: []TripPlaceBookmark{{
+			ID:       "bookmark-1",
+			TripID:   testTripID,
+			Category: "cafe",
+			Place:    trip.TripPlaceSummary{ID: "place-1", Name: "우메다 카페", PlaceType: "cafe", Address: "Umeda"},
+		}},
+	}
+	service := NewService(repo, nil)
+
+	bookmarks, err := service.ListTripPlaceBookmarks(context.Background(), "user-1", testTripID)
+	if err != nil {
+		t.Fatalf("ListTripPlaceBookmarks returned error: %v", err)
+	}
+	if len(bookmarks) != 1 || bookmarks[0].ID != "bookmark-1" || repo.checkedTripID != testTripID || repo.checkedUserID != "user-1" {
+		t.Fatalf("unexpected bookmarks/auth state bookmarks=%#v repo=%#v", bookmarks, repo)
+	}
+
+	if err := service.DeleteTripPlaceBookmark(context.Background(), "user-1", testTripID, " bookmark-1 "); err != nil {
+		t.Fatalf("DeleteTripPlaceBookmark returned error: %v", err)
+	}
+	if repo.deletedBookmarkID != "bookmark-1" {
+		t.Fatalf("expected trimmed bookmark id, got %q", repo.deletedBookmarkID)
+	}
+}
+
+func TestServiceCreateGoogleTripPlaceBookmarkValidationAndAuth(t *testing.T) {
+	service := NewService(&fakeRepository{trip: trip.Trip{ID: testTripID}, tripFound: true, isParticipant: true}, &fakeProvider{})
+	if _, err := service.CreateGoogleTripPlaceBookmark(context.Background(), " ", testTripID, CreateGoogleTripPlaceBookmarkInput{GooglePlaceID: "google-1", Category: "cafe"}); !errors.Is(err, ErrUnauthorized) {
+		t.Fatalf("expected unauthorized, got %v", err)
+	}
+	if _, err := service.CreateGoogleTripPlaceBookmark(context.Background(), "user-1", testTripID, CreateGoogleTripPlaceBookmarkInput{GooglePlaceID: " ", Category: "cafe"}); !errors.Is(err, ErrValidation) {
+		t.Fatalf("expected validation for blank google id, got %v", err)
+	}
+	if _, err := service.CreateGoogleTripPlaceBookmark(context.Background(), "user-1", testTripID, CreateGoogleTripPlaceBookmarkInput{GooglePlaceID: "google-1", Category: "museum"}); !errors.Is(err, ErrValidation) {
+		t.Fatalf("expected validation for unsupported category, got %v", err)
+	}
+	if _, err := NewService(&fakeRepository{trip: trip.Trip{ID: testTripID}, tripFound: true}, &fakeProvider{}).CreateGoogleTripPlaceBookmark(context.Background(), "user-1", testTripID, CreateGoogleTripPlaceBookmarkInput{GooglePlaceID: "google-1", Category: "cafe"}); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("expected forbidden for non-participant, got %v", err)
+	}
+}
+
 func TestMapGooglePlaceType(t *testing.T) {
 	if got := mapGooglePlaceType("coffee_shop", nil); got != "cafe" {
 		t.Fatalf("expected coffee_shop to map to cafe, got %q", got)
 	}
 	if got := mapGooglePlaceType("unknown", []string{"restaurant"}); got != "food" {
 		t.Fatalf("expected raw type fallback to food, got %q", got)
+	}
+	if got := mapGooglePlaceType("airport", nil); got != "transport" {
+		t.Fatalf("expected airport to map to transport, got %q", got)
+	}
+	if got := mapGooglePlaceType("unknown", []string{"subway_station"}); got != "transport" {
+		t.Fatalf("expected subway_station raw type fallback to transport, got %q", got)
 	}
 	if got := mapGooglePlaceType("unknown", []string{"point_of_interest"}); got != "etc" {
 		t.Fatalf("expected unknown type to map to etc, got %q", got)
@@ -472,6 +557,9 @@ type fakeRepository struct {
 	existingGoogleFound        bool
 	createdGoogleRecord        CreateGooglePlaceScheduleItemRecord
 	createdGoogleLodgingRecord CreateGoogleDayLodgingPlaceRecord
+	createdBookmarkRecord      CreateGoogleTripPlaceBookmarkRecord
+	bookmarks                  []TripPlaceBookmark
+	deletedBookmarkID          string
 	setGoogleLodgingRecord     trip.SetDayLodgingPlaceRecord
 	appendedGoogleRecord       AppendGooglePlaceScheduleItemRecord
 	appendErr                  error
@@ -563,6 +651,42 @@ func (r *fakeRepository) CreateGooglePlaceScheduleItem(_ context.Context, record
 			Address:   record.Address,
 		},
 	}, nil
+}
+
+func (r *fakeRepository) ListTripPlaceBookmarks(context.Context, string) ([]TripPlaceBookmark, error) {
+	return r.bookmarks, nil
+}
+
+func (r *fakeRepository) UpsertGoogleTripPlaceBookmark(_ context.Context, record CreateGoogleTripPlaceBookmarkRecord) (TripPlaceBookmark, error) {
+	r.createdBookmarkRecord = record
+	if r.appendErr != nil {
+		return TripPlaceBookmark{}, r.appendErr
+	}
+	return TripPlaceBookmark{
+		ID:       "bookmark-1",
+		TripID:   record.TripID,
+		Category: record.Category,
+		Place: trip.TripPlaceSummary{
+			ID:        "place-1",
+			Name:      record.Name,
+			PlaceType: record.PlaceType,
+			Address:   record.Address,
+			RoutablePlace: &trip.RoutablePlace{
+				Provider:      "google",
+				GooglePlaceID: record.GooglePlaceID,
+				Latitude:      record.Latitude,
+				Longitude:     record.Longitude,
+			},
+		},
+	}, nil
+}
+
+func (r *fakeRepository) DeleteTripPlaceBookmark(_ context.Context, _ string, bookmarkID string) (bool, error) {
+	r.deletedBookmarkID = bookmarkID
+	if r.appendErr != nil {
+		return false, r.appendErr
+	}
+	return true, nil
 }
 
 type fakeProvider struct {

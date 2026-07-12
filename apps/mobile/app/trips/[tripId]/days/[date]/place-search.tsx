@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 
@@ -7,7 +7,12 @@ import { ApiError } from '@i-um/api-contract';
 import { MobileAuthError } from '../../../../../lib/auth/client';
 import { theme } from '../../../../../lib/design';
 import { GooglePlaceMapSearch } from '../../../../../lib/trip-ui/GooglePlaceMapSearch';
-import { createGoogleDayLodgingPlace, createGooglePlaceScheduleItem } from '../../../../../lib/places/client';
+import {
+  createGoogleDayLodgingPlace,
+  createGooglePlaceScheduleItem,
+  listTripPlaceBookmarks,
+} from '../../../../../lib/places/client';
+import { tripPlaceBookmarkToGoogleSearchRow } from '../../../../../lib/places/bookmarks';
 import {
   addingGooglePlaceState,
   confirmingDuplicateGooglePlaceState,
@@ -63,6 +68,7 @@ export default function GooglePlaceSearchScreen() {
   const isSelectorMode = mode === 'select';
   const isLodgingMode = mode === 'lodging';
   const [addState, setAddState] = useState<GooglePlaceAddViewState>(idleGooglePlaceAddState());
+  const [bookmarkResults, setBookmarkResults] = useState<GooglePlaceSearchRowViewModel[]>([]);
   const tripShellState = useTripShellState();
   const tripDestinations = useMemo(() => {
     if (tripShellState?.status !== 'success' || tripShellState.tripId !== tripId) {
@@ -70,6 +76,34 @@ export default function GooglePlaceSearchScreen() {
     }
     return tripShellState.detail.trip.destinations;
   }, [tripId, tripShellState]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!tripId) {
+      setBookmarkResults([]);
+      return;
+    }
+    listTripPlaceBookmarks(tripId)
+      .then((response) => {
+        if (cancelled) {
+          return;
+        }
+        setBookmarkResults(
+          response.bookmarks.flatMap((bookmark) => {
+            const row = tripPlaceBookmarkToGoogleSearchRow(bookmark);
+            return row ? [row] : [];
+          }),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setBookmarkResults([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [tripId]);
 
   const returnToDay = () => {
     if (!tripId || !date) {
@@ -160,6 +194,7 @@ export default function GooglePlaceSearchScreen() {
     <GooglePlaceMapSearch
       actionMode={isSelectorMode ? 'scheduleSelect' : isLodgingMode ? 'lodgingRegister' : 'scheduleAdd'}
       actionState={addState}
+      bookmarkResults={bookmarkResults}
       dayId={date}
       notFoundAction={{ label: '일정으로', onPress: returnToDay }}
       onPrimaryAction={(result, duplicateConfirmed) => void submitAdd(result, duplicateConfirmed)}

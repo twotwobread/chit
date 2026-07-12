@@ -8,6 +8,7 @@ import { buildRouteWaypointMarkerChrome, buildRouteWaypointMarkerStyle } from '.
 import {
   buildRouteMapPlaces,
   buildTripMapDayChips,
+  buildTripMapScheduleMarkerDetail,
   buildTripMapDayRoutes,
   buildTripMapInitialRegion,
   buildTripMapRouteLayerChips,
@@ -83,6 +84,44 @@ function itinerary(items: ScheduleItem[], dayOverrides: Partial<TripDay> = {}): 
     items,
   };
 }
+
+test('builds a bottom-sheet detail for a selected Day route marker', () => {
+  assert.deepEqual(
+    buildTripMapScheduleMarkerDetail(
+      {
+        status: 'success',
+        dayLabel: 'Day 2',
+        formattedDate: '7월 11일',
+        lodgingPlace: null,
+        items: [
+          {
+            id: 'item-1',
+            version: 1,
+            orderLabel: '1',
+            placeName: '간사이공항 도착',
+            placeType: 'transport',
+            placeTypeLabel: '이동수단',
+            address: 'Kansai International Airport',
+            timeLabel: '09:30–11:00',
+            startTime: '09:30',
+            endTime: '11:00',
+            placeMemo: '입국 후 라피트 탑승',
+          },
+        ],
+      },
+      'item-1',
+    ),
+    {
+      id: 'item-1',
+      title: '간사이공항 도착',
+      subtitle: 'Day 2 · 1번째 일정',
+      categoryLabel: '이동수단',
+      address: 'Kansai International Airport',
+      timeLabel: '09:30–11:00',
+      memo: '입국 후 라피트 탑승',
+    },
+  );
+});
 
 test('builds ordered day chips from trip days', () => {
   assert.deepEqual(

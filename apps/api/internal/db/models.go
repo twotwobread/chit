@@ -181,6 +181,15 @@ type TripPlace struct {
 	UpdatedAt         pgtype.Timestamptz
 }
 
+type TripPlaceBookmark struct {
+	ID          pgtype.UUID
+	TripID      pgtype.UUID
+	TripPlaceID pgtype.UUID
+	Category    string
+	CreatedAt   pgtype.Timestamptz
+	UpdatedAt   pgtype.Timestamptz
+}
+
 type User struct {
 	ID              pgtype.UUID
 	DisplayName     string
