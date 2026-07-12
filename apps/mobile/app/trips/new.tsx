@@ -23,9 +23,16 @@ import {
   validateTripDestinations,
 } from '../../lib/trips/destinations';
 import { createTrip, searchDestinations } from '../../lib/trips/trip-api';
+import { TripDateRangeEditor } from '../../lib/trip-ui/TripDateRangeEditor';
 import { dateFromString, isValidDate, monthStringFromDate, todayString } from '../../lib/trips/date';
-import { TripDateFieldButton, TripDatePicker, TripFormField } from '../../lib/trips/date-picker';
+import { TripFormField } from '../../lib/trips/date-picker';
 import { tripDetailPath } from '../../lib/trips/routes';
+import {
+  keepTripDateRangePickerFieldAfterSelect,
+  minDateForTripDateRangeField,
+  selectTripDateRangeDate,
+  type TripDateRangeField,
+} from '../../lib/trips/trip-date-range-editor';
 
 type FormState = {
   name: string;
@@ -34,7 +41,6 @@ type FormState = {
   defaultCurrency: SupportedCurrency;
 };
 
-type DateField = 'startDate' | 'endDate';
 const currencies: SupportedCurrency[] = ['KRW', 'JPY', 'USD', 'EUR'];
 const yearOptionCount = 10;
 
@@ -51,7 +57,7 @@ export default function NewTripScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<CreateTripResponse | null>(null);
-  const [activeDateField, setActiveDateField] = useState<DateField | null>(null);
+  const [activeDateField, setActiveDateField] = useState<TripDateRangeField | null>(null);
   const [calendarMonth, setCalendarMonth] = useState(() => monthStringFromDate(new Date()));
   const [destinationSearchOpen, setDestinationSearchOpen] = useState(false);
   const [destinationQuery, setDestinationQuery] = useState('');
@@ -104,9 +110,9 @@ export default function NewTripScreen() {
     }
   };
 
-  const openDatePicker = (field: DateField) => {
+  const openDatePicker = (field: TripDateRangeField) => {
     const value = field === 'startDate' ? form.startDate : form.endDate;
-    const minDate = minDateForField(field, form.startDate, today);
+    const minDate = minDateForTripDateRangeField(field, form.startDate, today);
     setCalendarMonth(monthStringFromDate(dateFromString(value || minDate)));
     setActiveDateField(field);
     setError(null);
@@ -117,17 +123,8 @@ export default function NewTripScreen() {
       return;
     }
 
-    setForm((current) => {
-      if (activeDateField === 'startDate') {
-        return {
-          ...current,
-          startDate: date,
-          endDate: current.endDate && current.endDate < date ? '' : current.endDate,
-        };
-      }
-      return { ...current, endDate: date };
-    });
-    setActiveDateField(null);
+    setForm((current) => selectTripDateRangeDate(current, activeDateField, date));
+    setActiveDateField(keepTripDateRangePickerFieldAfterSelect(activeDateField));
   };
 
   const submit = async () => {
@@ -285,36 +282,18 @@ export default function NewTripScreen() {
           />
         </TripFormField>
 
-        <TripFormField label="시작일">
-          <TripDateFieldButton
-            disabled={submitting}
-            onPress={() => openDatePicker('startDate')}
-            value={form.startDate}
-          />
-        </TripFormField>
-
-        <TripFormField label="종료일">
-          <TripDateFieldButton disabled={submitting} onPress={() => openDatePicker('endDate')} value={form.endDate} />
-        </TripFormField>
-
-        {activeDateField ? (
-          <TripDatePicker
-            anchorDate={activeDateField === 'endDate' ? form.startDate : undefined}
-            helperText={
-              activeDateField === 'startDate'
-                ? '오늘 이전 날짜는 선택할 수 없어요.'
-                : '시작일 이전 날짜는 선택할 수 없어요.'
-            }
-            label={activeDateField === 'startDate' ? '시작일 선택' : '종료일 선택'}
-            minDate={minDateForField(activeDateField, form.startDate, today)}
-            month={calendarMonth}
-            onClose={() => setActiveDateField(null)}
-            onMonthChange={setCalendarMonth}
-            onSelect={selectDate}
-            selectedDate={activeDateField === 'startDate' ? form.startDate : form.endDate}
-            yearOptionCount={yearOptionCount}
-          />
-        ) : null}
+        <TripDateRangeEditor
+          activeField={activeDateField}
+          calendarMonth={calendarMonth}
+          disabled={submitting}
+          onClosePicker={() => setActiveDateField(null)}
+          onMonthChange={setCalendarMonth}
+          onOpenField={openDatePicker}
+          onSelectDate={selectDate}
+          today={today}
+          values={form}
+          yearOptionCount={yearOptionCount}
+        />
 
         <View style={styles.field}>
           <Text style={styles.label}>기본 통화</Text>
@@ -564,13 +543,6 @@ function validateForm(form: FormState, today: string): string | null {
     return '지원하는 통화를 선택해주세요.';
   }
   return null;
-}
-
-function minDateForField(field: DateField, startDate: string, today: string): string {
-  if (field === 'endDate' && isValidDate(startDate) && startDate > today) {
-    return startDate;
-  }
-  return today;
 }
 
 const styles = StyleSheet.create({
