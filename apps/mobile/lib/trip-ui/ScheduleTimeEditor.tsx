@@ -13,17 +13,13 @@ import { ScheduleTimeWheel } from './ScheduleTimeWheel';
 
 export function ScheduleTimeEditor({
   disabled,
-  emptyHelper,
   endTimeError,
-  helper,
   onChange,
   startTimeError,
   values,
 }: {
   disabled: boolean;
-  emptyHelper: string;
   endTimeError?: string;
-  helper: string;
   onChange: (patch: Partial<ScheduleTimeEditorValues>) => void;
   startTimeError?: string;
   values: ScheduleTimeEditorValues;
@@ -45,10 +41,12 @@ export function ScheduleTimeEditor({
   };
 
   const openEndWheel = () => {
-    if (disabled || !values.startTime) {
+    if (disabled) {
       return;
     }
-    if (!values.endTime) {
+    if (!values.startTime) {
+      updateValues(addScheduleEndTime(addScheduleStartTime(values)));
+    } else if (!values.endTime) {
       updateValues(addScheduleEndTime(values));
     }
     setActiveWheel('end');
@@ -74,50 +72,35 @@ export function ScheduleTimeEditor({
       </View>
 
       <View style={styles.timeCompactBox}>
-        {summary.hasStartTime ? (
-          <View style={styles.timeRangeRow}>
-            <Pressable
-              accessibilityLabel="시작 시간 수정"
-              accessibilityRole="button"
-              disabled={disabled}
-              onPress={openStartWheel}
-              style={[styles.timePill, activeWheel === 'start' ? styles.timePillActive : null]}
-            >
-              <Text style={[styles.timePillLabel, activeWheel === 'start' ? styles.timePillLabelActive : null]}>
-                시작
-              </Text>
-              <Text style={[styles.timePillText, activeWheel === 'start' ? styles.timePillTextActive : null]}>
-                {summary.startLabel}
-              </Text>
-            </Pressable>
-            <Text style={styles.timeArrow}>→</Text>
-            <Pressable
-              accessibilityLabel="종료 시간 수정"
-              accessibilityRole="button"
-              disabled={disabled}
-              onPress={openEndWheel}
-              style={[styles.timePill, activeWheel === 'end' ? styles.timePillActive : null]}
-            >
-              <Text style={[styles.timePillLabel, activeWheel === 'end' ? styles.timePillLabelActive : null]}>
-                종료
-              </Text>
-              <Text style={[styles.timePillText, activeWheel === 'end' ? styles.timePillTextActive : null]}>
-                {summary.endLabel}
-              </Text>
-            </Pressable>
-          </View>
-        ) : (
+        <View style={styles.timeRangeRow}>
           <Pressable
-            accessibilityLabel="시간 추가"
+            accessibilityLabel="시작 시간 수정"
             accessibilityRole="button"
             disabled={disabled}
             onPress={openStartWheel}
-            style={styles.timeUnspecifiedButton}
+            style={[styles.timePill, activeWheel === 'start' ? styles.timePillActive : null]}
           >
-            <Text style={styles.timeUnspecifiedText}>{summary.summaryLabel}</Text>
-            <Text style={styles.fieldHelper}>{emptyHelper}</Text>
+            <Text style={[styles.timePillLabel, activeWheel === 'start' ? styles.timePillLabelActive : null]}>
+              시작
+            </Text>
+            <Text style={[styles.timePillText, activeWheel === 'start' ? styles.timePillTextActive : null]}>
+              {summary.startLabel}
+            </Text>
           </Pressable>
-        )}
+          <Text style={styles.timeArrow}>→</Text>
+          <Pressable
+            accessibilityLabel="종료 시간 수정"
+            accessibilityRole="button"
+            disabled={disabled}
+            onPress={openEndWheel}
+            style={[styles.timePill, activeWheel === 'end' ? styles.timePillActive : null]}
+          >
+            <Text style={[styles.timePillLabel, activeWheel === 'end' ? styles.timePillLabelActive : null]}>종료</Text>
+            <Text style={[styles.timePillText, activeWheel === 'end' ? styles.timePillTextActive : null]}>
+              {summary.endLabel}
+            </Text>
+          </Pressable>
+        </View>
 
         {activeWheel === 'start' && values.startTime ? (
           <ScheduleTimeWheel
@@ -138,7 +121,6 @@ export function ScheduleTimeEditor({
           />
         ) : null}
         {endTimeError ? <Text style={styles.fieldError}>{endTimeError}</Text> : null}
-        {summary.hasStartTime ? <Text style={styles.fieldHelper}>{helper}</Text> : null}
       </View>
     </View>
   );
@@ -161,11 +143,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: theme.space[3],
     justifyContent: 'space-between',
-  },
-  fieldHelper: {
-    color: theme.color.textMuted,
-    fontFamily: theme.font.family.regular,
-    fontSize: theme.font.size.caption,
   },
   inlineActionText: {
     color: theme.color.textLink,
@@ -230,16 +207,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     gap: theme.space[2],
-  },
-  timeUnspecifiedButton: {
-    gap: theme.space[2],
-    minHeight: theme.layout.controlH,
-    justifyContent: 'center',
-  },
-  timeUnspecifiedText: {
-    color: theme.color.textStrong,
-    fontFamily: theme.font.family.bold,
-    fontSize: theme.font.size.body,
-    fontWeight: theme.font.weight.bold,
   },
 });

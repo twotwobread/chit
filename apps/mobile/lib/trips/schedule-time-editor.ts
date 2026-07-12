@@ -33,15 +33,15 @@ export function clearScheduleTimes<T extends ScheduleTimeEditorValues>(values: T
 export function buildScheduleTimeEditorSummary(values: ScheduleTimeEditorValues): ScheduleTimeEditorSummary {
   const startTime = values.startTime.trim();
   const endTime = values.endTime.trim();
-  const startLabel = startTime ? formatScheduleTimeLabel(startTime) : '시간 미정';
-  const endLabel = endTime ? formatScheduleTimeLabel(endTime) : '종료 시간';
+  const startLabel = startTime ? formatScheduleTimeLabel(startTime) : '--:--';
+  const endLabel = endTime ? formatScheduleTimeLabel(endTime) : '--:--';
   const hasStartTime = startTime.length > 0;
   const hasEndTime = endTime.length > 0;
 
   return {
     startLabel,
     endLabel,
-    summaryLabel: hasStartTime ? `${startLabel} → ${endLabel}` : '시간 미정',
+    summaryLabel: `${startLabel} → ${endLabel}`,
     hasStartTime,
     hasEndTime,
   };

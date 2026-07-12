@@ -1,4 +1,4 @@
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 
 import { type TripPlaceType } from '@i-um/api-contract';
 
@@ -10,9 +10,6 @@ import { manualPlaceTypeOptions } from '../trips/manual-place';
 import { styles } from './DayItineraryEditorStyles';
 import type { EditPlacePanelState } from './DayItineraryEditorTypes';
 import { ScheduleTimeEditor } from './ScheduleTimeEditor';
-
-const editPlaceTimeHelper =
-  '비워두면 순서만 있는 일정으로 유지돼요. 시간을 바꿔도 순서는 자동으로 바뀌지 않아요. 필요하면 순서 변경으로 조정해주세요.';
 
 type EditPlacePanelVariant = 'card' | 'sheet';
 
@@ -58,6 +55,23 @@ export function EditPlacePanel({
           value={editState.values.name}
         />
         {editState.errors.name ? <Text style={styles.fieldError}>{editState.errors.name}</Text> : null}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.compactChipList}>
+          {manualPlaceTypeOptions.map((option) => {
+            const selected = editState.values.placeType === option.value;
+            return (
+              <Pressable
+                accessibilityRole="button"
+                disabled={isSaving}
+                key={option.value}
+                onPress={() => update({ placeType: option.value as TripPlaceType })}
+                style={[styles.chip, styles.chipCompact, selected ? styles.chipSelected : null]}
+              >
+                <Text style={[styles.chipText, selected ? styles.chipTextSelected : null]}>{option.label}</Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+        {editState.errors.placeType ? <Text style={styles.fieldError}>{editState.errors.placeType}</Text> : null}
       </View>
 
       <View style={styles.fieldGroup}>
@@ -108,9 +122,7 @@ export function EditPlacePanel({
 
       <ScheduleTimeEditor
         disabled={isSaving}
-        emptyHelper="시간을 정하지 않으면 시간 미정 일정으로 유지돼요."
         endTimeError={editState.errors.endTime}
-        helper={editPlaceTimeHelper}
         onChange={update}
         startTimeError={editState.errors.startTime}
         values={editState.values}
@@ -131,27 +143,7 @@ export function EditPlacePanel({
         {editState.errors.memo ? <Text style={styles.fieldError}>{editState.errors.memo}</Text> : null}
       </View>
 
-      <View style={styles.fieldGroup}>
-        <Text style={styles.label}>장소 타입</Text>
-        <View style={styles.chipList}>
-          {manualPlaceTypeOptions.map((option) => {
-            const selected = editState.values.placeType === option.value;
-            return (
-              <Pressable
-                accessibilityRole="button"
-                disabled={isSaving}
-                key={option.value}
-                onPress={() => update({ placeType: option.value as TripPlaceType })}
-                style={[styles.chip, selected ? styles.chipSelected : null]}
-              >
-                <Text style={[styles.chipText, selected ? styles.chipTextSelected : null]}>{option.label}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
-        {editState.errors.placeType ? <Text style={styles.fieldError}>{editState.errors.placeType}</Text> : null}
-        {editState.errors.form ? <Text style={styles.fieldError}>{editState.errors.form}</Text> : null}
-      </View>
+      {editState.errors.form ? <Text style={styles.fieldError}>{editState.errors.form}</Text> : null}
 
       {editState.error ? (
         <View style={styles.errorBox}>

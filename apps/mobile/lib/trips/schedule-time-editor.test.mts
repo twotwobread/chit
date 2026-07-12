@@ -35,9 +35,9 @@ describe('schedule time editor helpers', () => {
 
   it('summarizes unspecified and ranged times for compact editor rows', () => {
     assert.deepEqual(buildScheduleTimeEditorSummary({ startTime: '', endTime: '' }), {
-      startLabel: '시간 미정',
-      endLabel: '종료 시간',
-      summaryLabel: '시간 미정',
+      startLabel: '--:--',
+      endLabel: '--:--',
+      summaryLabel: '--:-- → --:--',
       hasStartTime: false,
       hasEndTime: false,
     });

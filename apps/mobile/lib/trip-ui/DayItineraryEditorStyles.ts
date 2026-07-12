@@ -486,6 +486,11 @@ export const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: theme.space[3],
   },
+  compactChipList: {
+    flexDirection: 'row',
+    gap: theme.space[2],
+    paddingRight: theme.space[1],
+  },
   chip: {
     alignItems: 'center',
     backgroundColor: theme.color.surfaceSunken,
@@ -496,6 +501,11 @@ export const styles = StyleSheet.create({
     minHeight: theme.layout.tapMin,
     paddingHorizontal: theme.space[4],
     paddingVertical: theme.space[3],
+  },
+  chipCompact: {
+    minHeight: theme.layout.controlHSm,
+    paddingHorizontal: theme.space[3],
+    paddingVertical: theme.space[2],
   },
   chipSelected: {
     backgroundColor: theme.color.primarySoft,
