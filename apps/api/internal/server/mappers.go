@@ -258,6 +258,13 @@ func createManualDayLodgingPlaceResponseToOpenAPI(result trip.CreateManualDayLod
 	}
 }
 
+func createGoogleDayLodgingPlaceResponseToOpenAPI(result place.CreateGoogleDayLodgingPlaceResult) openapi.SetDayLodgingPlaceResponse {
+	return openapi.SetDayLodgingPlaceResponse{
+		Day:          tripDayToOpenAPI(result.Day),
+		LodgingPlace: tripPlaceSummaryToOpenAPI(result.LodgingPlace),
+	}
+}
+
 func createManualScheduleItemResponseToOpenAPI(result trip.CreateManualScheduleItemResult) openapi.CreateManualScheduleItemResponse {
 	return openapi.CreateManualScheduleItemResponse{
 		Day:          tripDayToOpenAPI(result.Day),

@@ -648,6 +648,66 @@ func (q *Queries) DeleteTripPlaceByID(ctx context.Context, arg DeleteTripPlaceBy
 	return err
 }
 
+const getActiveTripDayByTripAndDate = `-- name: GetActiveTripDayByTripAndDate :one
+SELECT
+  td.id::text AS id,
+  td.date,
+  td.day_order,
+  COALESCE(tp.id::text, ''::text)::text AS lodging_trip_place_id,
+  tp.name AS lodging_place_name,
+  tp.place_type AS lodging_place_type,
+  tp.address AS lodging_place_address,
+  tp.provider AS lodging_place_provider,
+  tp.google_place_id AS lodging_google_place_id,
+  tp.latitude AS lodging_latitude,
+  tp.longitude AS lodging_longitude
+FROM trip_days td
+LEFT JOIN trip_places tp
+  ON tp.id = td.lodging_trip_place_id
+ AND tp.trip_id = td.trip_id
+WHERE td.trip_id = $1::uuid
+  AND td.date = $2::date
+  AND td.deleted_at IS NULL
+`
+
+type GetActiveTripDayByTripAndDateParams struct {
+	TripID pgtype.UUID
+	Date   pgtype.Date
+}
+
+type GetActiveTripDayByTripAndDateRow struct {
+	ID                   string
+	Date                 pgtype.Date
+	DayOrder             int32
+	LodgingTripPlaceID   string
+	LodgingPlaceName     pgtype.Text
+	LodgingPlaceType     pgtype.Text
+	LodgingPlaceAddress  pgtype.Text
+	LodgingPlaceProvider pgtype.Text
+	LodgingGooglePlaceID pgtype.Text
+	LodgingLatitude      pgtype.Float8
+	LodgingLongitude     pgtype.Float8
+}
+
+func (q *Queries) GetActiveTripDayByTripAndDate(ctx context.Context, arg GetActiveTripDayByTripAndDateParams) (GetActiveTripDayByTripAndDateRow, error) {
+	row := q.db.QueryRow(ctx, getActiveTripDayByTripAndDate, arg.TripID, arg.Date)
+	var i GetActiveTripDayByTripAndDateRow
+	err := row.Scan(
+		&i.ID,
+		&i.Date,
+		&i.DayOrder,
+		&i.LodgingTripPlaceID,
+		&i.LodgingPlaceName,
+		&i.LodgingPlaceType,
+		&i.LodgingPlaceAddress,
+		&i.LodgingPlaceProvider,
+		&i.LodgingGooglePlaceID,
+		&i.LodgingLatitude,
+		&i.LodgingLongitude,
+	)
+	return i, err
+}
+
 const getActiveTripDayByTripAndID = `-- name: GetActiveTripDayByTripAndID :one
 SELECT
   td.id::text AS id,

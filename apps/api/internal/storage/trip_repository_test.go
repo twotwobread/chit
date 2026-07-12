@@ -890,6 +890,64 @@ func TestDayLodgingPlacePersistenceAndScheduleMapping(t *testing.T) {
 	if manualScheduleItemCount != 0 {
 		t.Fatalf("expected manual lodging registration not to create schedule items, got %d", manualScheduleItemCount)
 	}
+
+	google, err := store.CreateGoogleDayLodgingPlace(ctx, place.CreateGoogleDayLodgingPlaceRecord{
+		TripID:            tripID,
+		TripDayID:         tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-13"),
+		GooglePlaceID:     "google-hotel-1",
+		Name:              "호텔 니코 오사카 Google",
+		Address:           "Nishi Google",
+		PlaceType:         "lodging",
+		Latitude:          34.6721,
+		Longitude:         135.5019,
+		GooglePrimaryType: "lodging",
+		GoogleTypes:       []string{"lodging", "point_of_interest"},
+	})
+	if err != nil {
+		t.Fatalf("create google day lodging place: %v", err)
+	}
+	if google.Name != "호텔 니코 오사카 Google" || google.RoutablePlace == nil || google.RoutablePlace.GooglePlaceID != "google-hotel-1" || google.RoutablePlace.Latitude != 34.6721 || google.RoutablePlace.Longitude != 135.5019 {
+		t.Fatalf("unexpected google lodging place: %#v", google)
+	}
+	googleLodging, found, err := store.GetDayLodgingPlaceByTripAndDate(ctx, tripID, "2026-07-13")
+	if err != nil {
+		t.Fatalf("get google day lodging place: %v", err)
+	}
+	if !found || googleLodging.ID != google.ID || googleLodging.RoutablePlace == nil || googleLodging.RoutablePlace.GooglePlaceID != "google-hotel-1" {
+		t.Fatalf("expected google place to be selected as day lodging, found=%v place=%#v", found, googleLodging)
+	}
+	var googleScheduleItemCount int
+	if err := store.pool.QueryRow(ctx, `
+		SELECT count(*)::int
+		FROM schedule_items
+		WHERE trip_id = $1::uuid
+		  AND trip_day_id = $2::uuid
+		  AND trip_place_id = $3::uuid
+	`, tripID, tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-13"), google.ID).Scan(&googleScheduleItemCount); err != nil {
+		t.Fatalf("count google lodging schedule items: %v", err)
+	}
+	if googleScheduleItemCount != 0 {
+		t.Fatalf("expected google lodging registration not to create schedule items, got %d", googleScheduleItemCount)
+	}
+
+	reused, err := store.CreateGoogleDayLodgingPlace(ctx, place.CreateGoogleDayLodgingPlaceRecord{
+		TripID:            tripID,
+		TripDayID:         tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-12"),
+		GooglePlaceID:     "google-hotel-1",
+		Name:              "호텔 니코 오사카 Google Updated",
+		Address:           "Nishi Google Updated",
+		PlaceType:         "lodging",
+		Latitude:          34.7,
+		Longitude:         135.6,
+		GooglePrimaryType: "lodging",
+		GoogleTypes:       []string{"lodging"},
+	})
+	if err != nil {
+		t.Fatalf("reuse google day lodging place: %v", err)
+	}
+	if reused.ID != google.ID || reused.Name != "호텔 니코 오사카 Google" || reused.RoutablePlace == nil || reused.RoutablePlace.Latitude != 34.6721 {
+		t.Fatalf("expected existing google lodging place reuse without metadata refresh, got %#v initial=%#v", reused, google)
+	}
 }
 
 func TestDayLodgingPlaceEnforcesSameTripAndCascadesOnPlaceDelete(t *testing.T) {
