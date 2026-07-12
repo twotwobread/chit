@@ -7,6 +7,11 @@ import (
 	"github.com/twotwobread/i-um/apps/api/internal/trip"
 )
 
+const (
+	DestinationProviderGoogle      = "google"
+	defaultDestinationRadiusMeters = 25000
+)
+
 var (
 	ErrValidation                          = errors.New("validation error")
 	ErrUnauthorized                        = errors.New("unauthorized")
@@ -41,6 +46,7 @@ type Repository interface {
 
 type Provider interface {
 	Search(ctx context.Context, input ProviderSearchInput) ([]SearchResult, error)
+	SearchDestinations(ctx context.Context, input ProviderDestinationSearchInput) ([]DestinationSearchResult, error)
 	Details(ctx context.Context, input ProviderDetailsInput) (GooglePlaceDetails, error)
 	Description(ctx context.Context, input ProviderDescriptionInput) (GooglePlaceDescription, error)
 	Photo(ctx context.Context, input ProviderPhotoInput) (GooglePlacePhoto, error)
@@ -56,6 +62,11 @@ type ProviderSearchInput struct {
 	Query        string
 	Limit        int
 	LocationBias *SearchLocationBias
+}
+
+type ProviderDestinationSearchInput struct {
+	Query string
+	Limit int
 }
 
 type ProviderDetailsInput struct {
@@ -75,6 +86,11 @@ type SearchInput struct {
 	Query        string
 	Limit        int
 	LocationBias *SearchLocationBias
+}
+
+type DestinationSearchInput struct {
+	Query string
+	Limit int
 }
 
 type SelectedDetailsInput struct {
@@ -107,6 +123,18 @@ type SearchResultPhoto struct {
 	WidthPx            int
 	HeightPx           int
 	AuthorAttributions []PhotoAttribution
+}
+
+type DestinationSearchResult struct {
+	CityName        string
+	CountryName     string
+	CountryCode     string
+	DisplayName     string
+	Latitude        float64
+	Longitude       float64
+	RadiusMeters    int
+	Provider        string
+	ProviderPlaceID string
 }
 
 type SearchResult struct {

@@ -10,6 +10,8 @@ const (
 	RoleOwner  = "owner"
 	RoleMember = "member"
 
+	DestinationProviderGoogle = "google"
+
 	ScheduleItemTypePlace    = "place"
 	ScheduleItemTypeNonPlace = "non_place"
 
@@ -47,6 +49,19 @@ type CreateInput struct {
 	StartDate       string
 	EndDate         string
 	DefaultCurrency string
+	Destinations    []CreateDestinationInput
+}
+
+type CreateDestinationInput struct {
+	CityName        string
+	CountryName     string
+	CountryCode     string
+	DisplayName     string
+	Latitude        float64
+	Longitude       float64
+	RadiusMeters    int
+	Provider        string
+	ProviderPlaceID string
 }
 
 type UpdateInput struct {
@@ -146,6 +161,20 @@ type CreateRecord struct {
 	DefaultCurrency  string
 	CreatedBy        string
 	OwnerDisplayName string
+	Destinations     []CreateDestinationRecord
+}
+
+type CreateDestinationRecord struct {
+	CityName        string
+	CountryName     string
+	CountryCode     string
+	DisplayName     string
+	Latitude        float64
+	Longitude       float64
+	RadiusMeters    int
+	Provider        string
+	ProviderPlaceID string
+	SortOrder       int
 }
 
 type UpdateRecord struct {
@@ -297,6 +326,22 @@ type Trip struct {
 	CreatedBy       string
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
+	Destinations    []TripDestination
+}
+
+type TripDestination struct {
+	ID              string
+	TripID          string
+	CityName        string
+	CountryName     string
+	CountryCode     string
+	DisplayName     string
+	Latitude        float64
+	Longitude       float64
+	RadiusMeters    int
+	Provider        string
+	ProviderPlaceID string
+	SortOrder       int
 }
 
 type Participant struct {

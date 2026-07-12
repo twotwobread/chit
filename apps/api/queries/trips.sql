@@ -42,6 +42,64 @@ RETURNING
   display_name,
   joined_at;
 
+-- name: CreateTripDestination :one
+INSERT INTO trip_destinations (
+  trip_id,
+  city_name,
+  country_name,
+  country_code,
+  display_name,
+  latitude,
+  longitude,
+  radius_meters,
+  provider,
+  provider_place_id,
+  sort_order
+) VALUES (
+  sqlc.arg(trip_id)::uuid,
+  sqlc.arg(city_name),
+  sqlc.arg(country_name),
+  sqlc.arg(country_code),
+  sqlc.arg(display_name),
+  sqlc.arg(latitude),
+  sqlc.arg(longitude),
+  sqlc.arg(radius_meters),
+  sqlc.arg(provider),
+  sqlc.arg(provider_place_id),
+  sqlc.arg(sort_order)
+)
+RETURNING
+  id::text,
+  trip_id::text,
+  city_name,
+  country_name,
+  country_code,
+  display_name,
+  latitude,
+  longitude,
+  radius_meters,
+  provider,
+  provider_place_id,
+  sort_order;
+
+-- name: ListTripDestinationsByTrip :many
+SELECT
+  id::text,
+  trip_id::text,
+  city_name,
+  country_name,
+  country_code,
+  display_name,
+  latitude,
+  longitude,
+  radius_meters,
+  provider,
+  provider_place_id,
+  sort_order
+FROM trip_destinations
+WHERE trip_id = $1::uuid
+ORDER BY sort_order ASC;
+
 -- name: GetTripByID :one
 SELECT
   id::text,

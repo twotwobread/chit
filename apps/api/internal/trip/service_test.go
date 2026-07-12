@@ -173,6 +173,7 @@ func (r *fakeRepository) CreateTripWithOwner(_ context.Context, record CreateRec
 			CreatedBy:       record.CreatedBy,
 			CreatedAt:       time.Date(2026, 6, 21, 15, 0, 0, 0, time.UTC),
 			UpdatedAt:       time.Date(2026, 6, 21, 15, 0, 0, 0, time.UTC),
+			Destinations:    destinationRecordsToTripDestinations(testTripID, record.Destinations),
 		},
 		OwnerParticipant: Participant{
 			ID:          "participant-1",
@@ -659,6 +660,7 @@ func TestServiceCreate(t *testing.T) {
 		StartDate:       "2026-07-10",
 		EndDate:         "2026-07-13",
 		DefaultCurrency: "JPY",
+		Destinations:    validCreateDestinations(),
 	})
 	if err != nil {
 		t.Fatalf("Create returned error: %v", err)
@@ -679,6 +681,37 @@ func TestServiceCreate(t *testing.T) {
 	if repo.created.Name != "오사카 3박 4일" {
 		t.Fatalf("expected repository to receive trimmed name, got %q", repo.created.Name)
 	}
+	if len(repo.created.Destinations) != 1 || repo.created.Destinations[0].SortOrder != 0 || repo.created.Destinations[0].DisplayName != "오사카, 일본" {
+		t.Fatalf("expected normalized destination record, got %#v", repo.created.Destinations)
+	}
+	if len(result.Trip.Destinations) != 1 || result.Trip.Destinations[0].ProviderPlaceID != "google-city-osaka" {
+		t.Fatalf("expected created trip destinations in result, got %#v", result.Trip.Destinations)
+	}
+}
+
+func TestServiceCreateDestinationValidation(t *testing.T) {
+	service := newTestService(&fakeRepository{creator: Creator{ID: "user-1", DisplayName: "민수"}, creatorFound: true})
+	base := CreateInput{Name: "오사카", StartDate: "2026-07-10", EndDate: "2026-07-13", DefaultCurrency: "JPY", Destinations: validCreateDestinations()}
+	tests := []struct {
+		name         string
+		destinations []CreateDestinationInput
+	}{
+		{name: "missing destinations", destinations: nil},
+		{name: "too many destinations", destinations: []CreateDestinationInput{validCreateDestinations()[0], validCreateDestinations()[0], validCreateDestinations()[0], validCreateDestinations()[0], validCreateDestinations()[0], validCreateDestinations()[0]}},
+		{name: "duplicate provider place", destinations: []CreateDestinationInput{validCreateDestinations()[0], validCreateDestinations()[0]}},
+		{name: "invalid coordinate", destinations: []CreateDestinationInput{{CityName: "오사카", CountryName: "일본", CountryCode: "JP", DisplayName: "오사카, 일본", Latitude: 200, Longitude: 135.5023, RadiusMeters: 25000, Provider: DestinationProviderGoogle, ProviderPlaceID: "google-city-osaka"}}},
+		{name: "unsupported provider", destinations: []CreateDestinationInput{{CityName: "오사카", CountryName: "일본", CountryCode: "JP", DisplayName: "오사카, 일본", Latitude: 34.6937, Longitude: 135.5023, RadiusMeters: 25000, Provider: "naver", ProviderPlaceID: "naver-city-osaka"}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			input := base
+			input.Destinations = tt.destinations
+			_, err := service.Create(context.Background(), "user-1", input)
+			if !errors.Is(err, ErrValidation) {
+				t.Fatalf("expected ErrValidation, got %v", err)
+			}
+		})
+	}
 }
 
 func TestServiceCreateValidation(t *testing.T) {
@@ -688,11 +721,11 @@ func TestServiceCreateValidation(t *testing.T) {
 		name  string
 		input CreateInput
 	}{
-		{name: "empty name", input: CreateInput{Name: " ", StartDate: "2026-07-10", EndDate: "2026-07-13", DefaultCurrency: "JPY"}},
-		{name: "invalid start date", input: CreateInput{Name: "오사카", StartDate: "2026/07/10", EndDate: "2026-07-13", DefaultCurrency: "JPY"}},
-		{name: "end before start", input: CreateInput{Name: "오사카", StartDate: "2026-07-13", EndDate: "2026-07-10", DefaultCurrency: "JPY"}},
-		{name: "past start date", input: CreateInput{Name: "오사카", StartDate: "2026-06-20", EndDate: "2026-07-13", DefaultCurrency: "JPY"}},
-		{name: "unsupported currency", input: CreateInput{Name: "오사카", StartDate: "2026-07-10", EndDate: "2026-07-13", DefaultCurrency: "GBP"}},
+		{name: "empty name", input: CreateInput{Name: " ", StartDate: "2026-07-10", EndDate: "2026-07-13", DefaultCurrency: "JPY", Destinations: validCreateDestinations()}},
+		{name: "invalid start date", input: CreateInput{Name: "오사카", StartDate: "2026/07/10", EndDate: "2026-07-13", DefaultCurrency: "JPY", Destinations: validCreateDestinations()}},
+		{name: "end before start", input: CreateInput{Name: "오사카", StartDate: "2026-07-13", EndDate: "2026-07-10", DefaultCurrency: "JPY", Destinations: validCreateDestinations()}},
+		{name: "past start date", input: CreateInput{Name: "오사카", StartDate: "2026-06-20", EndDate: "2026-07-13", DefaultCurrency: "JPY", Destinations: validCreateDestinations()}},
+		{name: "unsupported currency", input: CreateInput{Name: "오사카", StartDate: "2026-07-10", EndDate: "2026-07-13", DefaultCurrency: "GBP", Destinations: validCreateDestinations()}},
 	}
 
 	for _, tt := range tests {
@@ -713,6 +746,7 @@ func TestServiceCreateRequiresCreator(t *testing.T) {
 		StartDate:       "2026-07-10",
 		EndDate:         "2026-07-13",
 		DefaultCurrency: "JPY",
+		Destinations:    validCreateDestinations(),
 	})
 	if !errors.Is(err, ErrUnauthorized) {
 		t.Fatalf("expected ErrUnauthorized, got %v", err)
@@ -3204,6 +3238,41 @@ func testUUID(value int) string {
 
 func stringPtr(value string) *string {
 	return &value
+}
+
+func validCreateDestinations() []CreateDestinationInput {
+	return []CreateDestinationInput{{
+		CityName:        "오사카",
+		CountryName:     "일본",
+		CountryCode:     "JP",
+		DisplayName:     "오사카, 일본",
+		Latitude:        34.6937,
+		Longitude:       135.5023,
+		RadiusMeters:    25000,
+		Provider:        DestinationProviderGoogle,
+		ProviderPlaceID: "google-city-osaka",
+	}}
+}
+
+func destinationRecordsToTripDestinations(tripID string, records []CreateDestinationRecord) []TripDestination {
+	items := make([]TripDestination, 0, len(records))
+	for index, record := range records {
+		items = append(items, TripDestination{
+			ID:              fmt.Sprintf("destination-%d", index+1),
+			TripID:          tripID,
+			CityName:        record.CityName,
+			CountryName:     record.CountryName,
+			CountryCode:     record.CountryCode,
+			DisplayName:     record.DisplayName,
+			Latitude:        record.Latitude,
+			Longitude:       record.Longitude,
+			RadiusMeters:    record.RadiusMeters,
+			Provider:        record.Provider,
+			ProviderPlaceID: record.ProviderPlaceID,
+			SortOrder:       record.SortOrder,
+		})
+	}
+	return items
 }
 
 func newTestService(repo Repository) *Service {

@@ -1,10 +1,12 @@
 import {
+  DestinationsService,
   TripsService,
   type AcceptTripInviteResponse,
   type CreateTripInviteResponse,
   type CreateTripRequest,
   type CreateTripResponse,
   type GetTripDetailResponse,
+  type SearchDestinationsResponse,
   type ListTripParticipantsResponse,
   type ListTripPlacesResponse,
   type ListTripsResponse,
@@ -17,6 +19,11 @@ import { getMeWithRefresh } from '../auth/client';
 export async function createTrip(request: CreateTripRequest): Promise<CreateTripResponse> {
   await getMeWithRefresh();
   return TripsService.createTrip(request);
+}
+
+export async function searchDestinations(query: string, limit = 10): Promise<SearchDestinationsResponse> {
+  await getMeWithRefresh();
+  return DestinationsService.searchDestinations(query, limit);
 }
 
 export async function getTripDetail(tripId: string): Promise<GetTripDetailResponse> {

@@ -11,6 +11,100 @@ import (
 
 const testTripID = "00000000-0000-0000-0000-000000000001"
 
+func TestServiceSearchDestinations(t *testing.T) {
+	provider := &fakeProvider{destinationResults: []DestinationSearchResult{
+		{
+			CityName:        "오사카",
+			CountryName:     "일본",
+			CountryCode:     "JP",
+			DisplayName:     "오사카, 일본",
+			Latitude:        34.6937,
+			Longitude:       135.5023,
+			RadiusMeters:    25000,
+			Provider:        DestinationProviderGoogle,
+			ProviderPlaceID: "google-city-osaka",
+		},
+	}}
+	service := NewService(nil, provider)
+
+	results, err := service.SearchDestinations(context.Background(), "user-1", DestinationSearchInput{Query: "  오사카  "})
+	if err != nil {
+		t.Fatalf("SearchDestinations returned error: %v", err)
+	}
+
+	if !provider.destinationCalled {
+		t.Fatal("expected provider destination search to be called")
+	}
+	if provider.destinationInput.Query != "오사카" || provider.destinationInput.Limit != defaultLimit {
+		t.Fatalf("expected trimmed query and default limit, got %#v", provider.destinationInput)
+	}
+	if len(results) != 1 || results[0].DisplayName != "오사카, 일본" || results[0].ProviderPlaceID != "google-city-osaka" {
+		t.Fatalf("unexpected destination results %#v", results)
+	}
+}
+
+func TestServiceSearchDestinationsValidation(t *testing.T) {
+	tests := []struct {
+		name   string
+		userID string
+		input  DestinationSearchInput
+	}{
+		{name: "requires auth", userID: " ", input: DestinationSearchInput{Query: "오사카"}},
+		{name: "short query", userID: "user-1", input: DestinationSearchInput{Query: "오"}},
+		{name: "long query", userID: "user-1", input: DestinationSearchInput{Query: strings.Repeat("가", maxQueryLen+1)}},
+		{name: "low limit", userID: "user-1", input: DestinationSearchInput{Query: "오사카", Limit: -1}},
+		{name: "high limit", userID: "user-1", input: DestinationSearchInput{Query: "오사카", Limit: maxLimit + 1}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			provider := &fakeProvider{}
+			service := NewService(nil, provider)
+			_, err := service.SearchDestinations(context.Background(), tt.userID, tt.input)
+			expected := ErrValidation
+			if strings.TrimSpace(tt.userID) == "" {
+				expected = ErrUnauthorized
+			}
+			if !errors.Is(err, expected) {
+				t.Fatalf("expected %v, got %v", expected, err)
+			}
+			if provider.destinationCalled {
+				t.Fatal("expected validation to happen before provider call")
+			}
+		})
+	}
+}
+
+func TestServiceSearchDestinationsFiltersInvalidProviderRows(t *testing.T) {
+	provider := &fakeProvider{destinationResults: []DestinationSearchResult{
+		{CityName: "오사카", CountryName: "일본", CountryCode: "JP", DisplayName: "오사카, 일본", Latitude: 34.6937, Longitude: 135.5023, RadiusMeters: 25000, Provider: DestinationProviderGoogle, ProviderPlaceID: "google-city-osaka"},
+		{CityName: "", CountryName: "일본", CountryCode: "JP", DisplayName: "missing city", Latitude: 34.6, Longitude: 135.5, RadiusMeters: 25000, Provider: DestinationProviderGoogle, ProviderPlaceID: "google-missing-city"},
+		{CityName: "나라", CountryName: "일본", CountryCode: "JP", DisplayName: "나라, 일본", Latitude: 200, Longitude: 135.8, RadiusMeters: 25000, Provider: DestinationProviderGoogle, ProviderPlaceID: "google-invalid-coordinate"},
+	}}
+	service := NewService(nil, provider)
+
+	results, err := service.SearchDestinations(context.Background(), "user-1", DestinationSearchInput{Query: "오사카", Limit: 3})
+	if err != nil {
+		t.Fatalf("SearchDestinations returned error: %v", err)
+	}
+	if len(results) != 1 || results[0].CityName != "오사카" {
+		t.Fatalf("expected only valid destination candidate, got %#v", results)
+	}
+}
+
+func TestServiceSearchDestinationsProviderErrors(t *testing.T) {
+	service := NewService(nil, &fakeProvider{destinationErr: ErrProviderRateLimited})
+	_, err := service.SearchDestinations(context.Background(), "user-1", DestinationSearchInput{Query: "오사카"})
+	if !errors.Is(err, ErrProviderRateLimited) {
+		t.Fatalf("expected provider error to pass through, got %v", err)
+	}
+
+	service = NewService(nil, nil)
+	_, err = service.SearchDestinations(context.Background(), "user-1", DestinationSearchInput{Query: "오사카"})
+	if !errors.Is(err, ErrProviderUnavailable) {
+		t.Fatalf("expected ErrProviderUnavailable, got %v", err)
+	}
+}
+
 func TestServiceSearchGoogle(t *testing.T) {
 	repo := &fakeRepository{
 		trip:          trip.Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"},
@@ -373,24 +467,34 @@ func (r *fakeRepository) CreateGooglePlaceScheduleItem(_ context.Context, record
 }
 
 type fakeProvider struct {
-	called        bool
-	input         ProviderSearchInput
-	results       []SearchResult
-	err           error
-	detailsCalled bool
-	detailsInput  ProviderDetailsInput
-	details       GooglePlaceDetails
-	detailsErr    error
-	photoCalled   bool
-	photoInput    ProviderPhotoInput
-	photo         GooglePlacePhoto
-	photoErr      error
+	called             bool
+	input              ProviderSearchInput
+	results            []SearchResult
+	err                error
+	destinationCalled  bool
+	destinationInput   ProviderDestinationSearchInput
+	destinationResults []DestinationSearchResult
+	destinationErr     error
+	detailsCalled      bool
+	detailsInput       ProviderDetailsInput
+	details            GooglePlaceDetails
+	detailsErr         error
+	photoCalled        bool
+	photoInput         ProviderPhotoInput
+	photo              GooglePlacePhoto
+	photoErr           error
 }
 
 func (p *fakeProvider) Search(_ context.Context, input ProviderSearchInput) ([]SearchResult, error) {
 	p.called = true
 	p.input = input
 	return p.results, p.err
+}
+
+func (p *fakeProvider) SearchDestinations(_ context.Context, input ProviderDestinationSearchInput) ([]DestinationSearchResult, error) {
+	p.destinationCalled = true
+	p.destinationInput = input
+	return p.destinationResults, p.destinationErr
 }
 
 func (p *fakeProvider) Details(_ context.Context, input ProviderDetailsInput) (GooglePlaceDetails, error) {

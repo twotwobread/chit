@@ -56,6 +56,85 @@ func NewService(repo Repository, provider Provider, options ...Option) *Service 
 	return service
 }
 
+func (s *Service) SearchDestinations(ctx context.Context, userID string, input DestinationSearchInput) ([]DestinationSearchResult, error) {
+	if strings.TrimSpace(userID) == "" {
+		return nil, ErrUnauthorized
+	}
+	query := strings.TrimSpace(input.Query)
+	queryLen := len([]rune(query))
+	if queryLen < 2 || queryLen > maxQueryLen {
+		return nil, ErrValidation
+	}
+	limit := input.Limit
+	if limit == 0 {
+		limit = defaultLimit
+	}
+	if limit < 1 || limit > maxLimit {
+		return nil, ErrValidation
+	}
+	if s == nil || s.provider == nil {
+		return nil, ErrProviderUnavailable
+	}
+	results, err := s.provider.SearchDestinations(ctx, ProviderDestinationSearchInput{Query: query, Limit: limit})
+	if err != nil {
+		return nil, err
+	}
+	return normalizeDestinationResults(results), nil
+}
+
+func normalizeDestinationResults(results []DestinationSearchResult) []DestinationSearchResult {
+	normalized := make([]DestinationSearchResult, 0, len(results))
+	seen := map[string]struct{}{}
+	for _, result := range results {
+		result.CityName = strings.TrimSpace(result.CityName)
+		result.CountryName = strings.TrimSpace(result.CountryName)
+		result.CountryCode = strings.ToUpper(strings.TrimSpace(result.CountryCode))
+		result.DisplayName = strings.TrimSpace(result.DisplayName)
+		result.Provider = strings.TrimSpace(result.Provider)
+		result.ProviderPlaceID = strings.TrimSpace(result.ProviderPlaceID)
+		if len([]rune(result.CityName)) < 1 || len([]rune(result.CityName)) > maxNameLen || len([]rune(result.CountryName)) < 1 || len([]rune(result.CountryName)) > maxNameLen || len([]rune(result.DisplayName)) < 1 || len([]rune(result.DisplayName)) > 160 {
+			continue
+		}
+		if !validCountryCode(result.CountryCode) || result.Provider != DestinationProviderGoogle || len([]rune(result.ProviderPlaceID)) < 1 || len([]rune(result.ProviderPlaceID)) > maxGooglePlaceIDLen {
+			continue
+		}
+		if result.Latitude < -90 || result.Latitude > 90 || result.Longitude < -180 || result.Longitude > 180 || result.RadiusMeters < 1 || result.RadiusMeters > 500000 {
+			continue
+		}
+		key := result.Provider + ":" + result.ProviderPlaceID
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		normalized = append(normalized, result)
+	}
+	return normalized
+}
+
+func validCountryCode(value string) bool {
+	if len(value) != 2 {
+		return false
+	}
+	for _, char := range value {
+		if char < 'A' || char > 'Z' {
+			return false
+		}
+	}
+	return true
+}
+
+func SearchDestinationDisplayName(cityName string, countryName string) string {
+	cityName = strings.TrimSpace(cityName)
+	countryName = strings.TrimSpace(countryName)
+	if cityName == "" {
+		return countryName
+	}
+	if countryName == "" || cityName == countryName {
+		return cityName
+	}
+	return cityName + ", " + countryName
+}
+
 func (s *Service) SearchGoogle(ctx context.Context, userID string, tripID string, tripDayID string, input SearchInput) ([]SearchResult, error) {
 	if strings.TrimSpace(userID) == "" {
 		return nil, ErrUnauthorized
