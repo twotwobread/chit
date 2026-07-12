@@ -28,6 +28,7 @@ export type UpcomingTripRowProps = {
   ddayLabel?: string;
   statusLabel?: string;
   statusTone?: 'amber' | 'neutral' | 'success';
+  surfaceTone?: 'default' | 'homeHero';
   metaLabels?: string[];
   onPress: () => void;
 };
@@ -128,12 +129,19 @@ export function UpcomingTripRow({
   onPress,
   statusLabel,
   statusTone = 'amber',
+  surfaceTone = 'default',
 }: UpcomingTripRowProps) {
+  const isHomeHeroSurface = surfaceTone === 'homeHero';
+
   return (
     <Pressable
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [styles.upcoming, pressed ? styles.pressed : null]}
+      style={({ pressed }) => [
+        styles.upcoming,
+        isHomeHeroSurface ? styles.upcomingHomeHero : null,
+        pressed ? styles.pressed : null,
+      ]}
     >
       {ddayLabel ? (
         <View style={styles.ddayBadge}>
@@ -142,16 +150,16 @@ export function UpcomingTripRow({
         </View>
       ) : null}
       <View style={styles.upcomingBody}>
-        <Text numberOfLines={1} style={styles.upcomingName}>
+        <Text numberOfLines={1} style={[styles.upcomingName, isHomeHeroSurface ? styles.upcomingNameOnHero : null]}>
           {name}
         </Text>
-        <Text numberOfLines={1} style={styles.upcomingMeta}>
+        <Text numberOfLines={1} style={[styles.upcomingMeta, isHomeHeroSurface ? styles.upcomingMetaOnHero : null]}>
           {[dateLabel, currencyLabel, companionsLabel].filter(Boolean).join(' · ')}
         </Text>
         {metaLabels.length > 0 ? (
           <View style={styles.rowMetaWrap}>
             {metaLabels.map((label) => (
-              <Text key={label} style={styles.rowMetaLabel}>
+              <Text key={label} style={[styles.rowMetaLabel, isHomeHeroSurface ? styles.rowMetaLabelOnHero : null]}>
                 {label}
               </Text>
             ))}
@@ -159,7 +167,11 @@ export function UpcomingTripRow({
         ) : null}
         {statusLabel ? <Badge label={statusLabel} tone={statusTone === 'success' ? 'success' : statusTone} /> : null}
       </View>
-      <ChevronRight color={theme.color.textFaint} size={20} strokeWidth={2} />
+      <ChevronRight
+        color={isHomeHeroSurface ? theme.color.onPrimary : theme.color.textFaint}
+        size={20}
+        strokeWidth={2}
+      />
     </Pressable>
   );
 }
@@ -377,6 +389,9 @@ const styles = StyleSheet.create({
     fontSize: theme.font.size.caption,
     fontWeight: theme.font.weight.bold,
   },
+  rowMetaLabelOnHero: {
+    color: theme.color.onPrimary,
+  },
   rowMetaWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -421,15 +436,25 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: theme.space[2],
   },
+  upcomingHomeHero: {
+    backgroundColor: theme.color.green[900],
+    borderColor: theme.color.green[800],
+  },
   upcomingMeta: {
     color: theme.color.textMuted,
     fontFamily: theme.font.family.regular,
     fontSize: theme.font.size.caption,
+  },
+  upcomingMetaOnHero: {
+    color: theme.color.green[100],
   },
   upcomingName: {
     color: theme.color.textStrong,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.subhead,
     fontWeight: theme.font.weight.bold,
+  },
+  upcomingNameOnHero: {
+    color: theme.color.onPrimary,
   },
 });

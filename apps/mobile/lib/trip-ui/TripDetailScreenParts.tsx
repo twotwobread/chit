@@ -14,6 +14,7 @@ import {
   type TripDeleteState,
 } from '../trips/delete-flow';
 import { formatTripDayDate } from '../trips/days';
+import { buildTripDetailPrimaryAction } from '../trips/trip-detail';
 import { deleteTrip } from '../trips/trip-api';
 import { styles } from './TripDetailScreenStyles';
 
@@ -29,6 +30,7 @@ export function TripDetailCard({
   participantsLoadFailed: boolean;
 }) {
   const canManage = currentUserId === detail.trip.createdBy;
+  const primaryAction = buildTripDetailPrimaryAction(detail.trip.id);
   const [deleteState, setDeleteState] = useState<TripDeleteState>({ status: 'idle' });
   const deletingRef = useRef(false);
 
@@ -75,6 +77,9 @@ export function TripDetailCard({
         loadFailed={participantsLoadFailed}
         participants={participants}
       />
+      <Pressable accessibilityRole="button" onPress={() => router.push(primaryAction.route)} style={styles.button}>
+        <Text style={styles.buttonText}>{primaryAction.label}</Text>
+      </Pressable>
       {canManage ? (
         <>
           <Pressable

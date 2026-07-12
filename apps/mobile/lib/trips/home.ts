@@ -4,7 +4,7 @@ import type { TripListItem } from '@i-um/api-contract';
 
 import { toTripCardViewModel, type MyTripCardViewModel } from './mypage';
 import { tripTodayPath } from './routes';
-import { groupTripsByStatus, localDateString, selectCurrentTrip, type TripStatusSection } from './status';
+import { groupTripsByStatus, localDateString, type TripStatusSection } from './status';
 
 export type HomeTripCardViewModel = MyTripCardViewModel & {
   detailPath: Href;
@@ -21,6 +21,8 @@ export type HomeTripStatusSectionViewModel = Omit<TripStatusSection, 'trips'> & 
 
 export type HomeViewModel = {
   currentTrip: HomeCurrentTripViewModel | null;
+  ongoingTrips: HomeCurrentTripViewModel[];
+  hasVisibleTrips: boolean;
   isEmpty: boolean;
   sections: HomeTripStatusSectionViewModel[];
 };
@@ -140,17 +142,22 @@ export function buildHomeRootViewModel(input: HomeRootInput): HomeRootViewModel 
 }
 
 export function buildHomeViewModel(trips: TripListItem[], today = localDateString()): HomeViewModel {
-  const currentTrip = selectCurrentTrip(trips, today);
-  const currentTripId = currentTrip?.id ?? null;
-  const sections = groupTripsByStatus(trips, today)
+  const groupedSections = groupTripsByStatus(trips, today);
+  const ongoingTrips =
+    groupedSections.find((section) => section.status === 'ongoing')?.trips.map(toHomeCurrentTripViewModel) ?? [];
+  const sections = groupedSections
+    .filter((section) => section.status === 'upcoming')
     .map((section) => ({
       ...section,
-      trips: section.trips.filter((trip) => trip.id !== currentTripId).map(toHomeTripCardViewModel),
+      trips: section.trips.map(toHomeTripCardViewModel),
     }))
     .filter((section) => section.trips.length > 0);
+  const hasVisibleTrips = ongoingTrips.length > 0 || sections.length > 0;
 
   return {
-    currentTrip: currentTrip ? toHomeCurrentTripViewModel(currentTrip) : null,
+    currentTrip: ongoingTrips[0] ?? null,
+    ongoingTrips,
+    hasVisibleTrips,
     isEmpty: trips.length === 0,
     sections,
   };

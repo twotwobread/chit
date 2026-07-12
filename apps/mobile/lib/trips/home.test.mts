@@ -86,11 +86,24 @@ test('ordinary root entry renders Home when no trip is ongoing', () => {
   assert.equal(viewModel.home.currentTrip, null);
   assert.deepEqual(
     viewModel.home.sections.map((section) => [section.status, section.trips.map((item) => item.id)]),
-    [
-      ['upcoming', ['upcoming']],
-      ['past', ['past']],
-    ],
+    [['upcoming', ['upcoming']]],
   );
+});
+
+test('Home hides past-only trip history from the Home feed', () => {
+  const viewModel = buildHomeViewModel(
+    [
+      trip({ id: 'past-a', startDate: '2026-06-18', endDate: '2026-06-20' }),
+      trip({ id: 'past-b', startDate: '2026-06-19', endDate: '2026-06-21' }),
+    ],
+    '2026-06-22',
+  );
+
+  assert.equal(viewModel.isEmpty, false);
+  assert.equal(viewModel.hasVisibleTrips, false);
+  assert.equal(viewModel.currentTrip, null);
+  assert.deepEqual(viewModel.ongoingTrips, []);
+  assert.deepEqual(viewModel.sections, []);
 });
 
 test('explicit Home intent renders the current-trip Home visit with resume action', () => {
@@ -154,7 +167,7 @@ test('Home focus refresh uses blocking loading and error when there is no stale 
   assert.equal(failureState.status, 'rootError');
 });
 
-test('Home pins the selected current trip and deduplicates it from grouped sections', () => {
+test('Home exposes all ongoing trips for the current-trip carousel without duplicating them in sections', () => {
   const viewModel = buildHomeViewModel(
     [
       trip({ id: 'current', startDate: '2026-06-20', endDate: '2026-06-22', participantCount: 2 }),
@@ -166,19 +179,19 @@ test('Home pins the selected current trip and deduplicates it from grouped secti
   );
 
   assert.equal(viewModel.currentTrip?.id, 'current');
-  assert.equal(viewModel.currentTrip?.resumeLabel, '여행 이어가기');
-  assert.equal(viewModel.currentTrip?.resumePath, '/trips/current/today');
-  assert.equal(viewModel.currentTrip?.detailPath, '/trips/current/today');
-  assert.equal(viewModel.currentTrip?.participantCountLabel, '참여자 2명');
-  assert.equal(viewModel.currentTrip?.dateRangeLabel, '2026.06.20 ~ 2026.06.22');
-  assert.equal(viewModel.currentTrip?.currencyLabel, '기본 통화 KRW');
+  assert.deepEqual(
+    viewModel.ongoingTrips.map((item) => [item.id, item.resumeLabel, item.resumePath, item.detailPath]),
+    [
+      ['current', '여행 이어가기', '/trips/current/today', '/trips/current/today'],
+      ['other-ongoing', '여행 이어가기', '/trips/other-ongoing/today', '/trips/other-ongoing/today'],
+    ],
+  );
+  assert.equal(viewModel.ongoingTrips[0]?.participantCountLabel, '참여자 2명');
+  assert.equal(viewModel.ongoingTrips[0]?.dateRangeLabel, '2026.06.20 ~ 2026.06.22');
+  assert.equal(viewModel.ongoingTrips[0]?.currencyLabel, '기본 통화 KRW');
   assert.deepEqual(
     viewModel.sections.map((section) => [section.status, section.trips.map((item) => [item.id, item.detailPath])]),
-    [
-      ['ongoing', [['other-ongoing', '/trips/other-ongoing/today']]],
-      ['upcoming', [['upcoming', '/trips/upcoming/today']]],
-      ['past', [['past', '/trips/past/today']]],
-    ],
+    [['upcoming', [['upcoming', '/trips/upcoming/today']]]],
   );
 });
 
@@ -187,5 +200,7 @@ test('Home empty state is explicit when there are no trips', () => {
 
   assert.equal(viewModel.isEmpty, true);
   assert.equal(viewModel.currentTrip, null);
+  assert.deepEqual(viewModel.ongoingTrips, []);
+  assert.equal(viewModel.hasVisibleTrips, false);
   assert.deepEqual(viewModel.sections, []);
 });
