@@ -69,6 +69,7 @@ func (s apiServer) CreateTrip(w http.ResponseWriter, r *http.Request) {
 		StartDate:       dateFromOpenAPI(body.StartDate),
 		EndDate:         dateFromOpenAPI(body.EndDate),
 		DefaultCurrency: string(body.DefaultCurrency),
+		Destinations:    createDestinationsFromOpenAPI(body.Destinations),
 	})
 	if err != nil {
 		writeTripError(w, err)

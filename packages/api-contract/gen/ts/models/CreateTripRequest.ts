@@ -3,6 +3,7 @@
 /* tslint:disable */
 /* eslint-disable */
 import type { SupportedCurrency } from './SupportedCurrency';
+import type { TripDestinationInput } from './TripDestinationInput';
 export type CreateTripRequest = {
     name: string;
     /**
@@ -14,4 +15,5 @@ export type CreateTripRequest = {
      */
     endDate: string;
     defaultCurrency: SupportedCurrency;
+    destinations: Array<TripDestinationInput>;
 };

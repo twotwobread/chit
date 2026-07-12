@@ -129,6 +129,23 @@ type TripDay struct {
 	UpdatedAt          pgtype.Timestamptz
 }
 
+type TripDestination struct {
+	ID              pgtype.UUID
+	TripID          pgtype.UUID
+	CityName        string
+	CountryName     string
+	CountryCode     string
+	DisplayName     string
+	Latitude        float64
+	Longitude       float64
+	RadiusMeters    int32
+	Provider        string
+	ProviderPlaceID string
+	SortOrder       int32
+	CreatedAt       pgtype.Timestamptz
+	UpdatedAt       pgtype.Timestamptz
+}
+
 type TripInvite struct {
 	ID            pgtype.UUID
 	TripID        pgtype.UUID

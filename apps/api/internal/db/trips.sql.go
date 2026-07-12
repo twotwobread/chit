@@ -247,6 +247,108 @@ func (q *Queries) CreateTrip(ctx context.Context, arg CreateTripParams) (CreateT
 	return i, err
 }
 
+const createTripDestination = `-- name: CreateTripDestination :one
+INSERT INTO trip_destinations (
+  trip_id,
+  city_name,
+  country_name,
+  country_code,
+  display_name,
+  latitude,
+  longitude,
+  radius_meters,
+  provider,
+  provider_place_id,
+  sort_order
+) VALUES (
+  $1::uuid,
+  $2,
+  $3,
+  $4,
+  $5,
+  $6,
+  $7,
+  $8,
+  $9,
+  $10,
+  $11
+)
+RETURNING
+  id::text,
+  trip_id::text,
+  city_name,
+  country_name,
+  country_code,
+  display_name,
+  latitude,
+  longitude,
+  radius_meters,
+  provider,
+  provider_place_id,
+  sort_order
+`
+
+type CreateTripDestinationParams struct {
+	TripID          pgtype.UUID
+	CityName        string
+	CountryName     string
+	CountryCode     string
+	DisplayName     string
+	Latitude        float64
+	Longitude       float64
+	RadiusMeters    int32
+	Provider        string
+	ProviderPlaceID string
+	SortOrder       int32
+}
+
+type CreateTripDestinationRow struct {
+	ID              string
+	TripID          string
+	CityName        string
+	CountryName     string
+	CountryCode     string
+	DisplayName     string
+	Latitude        float64
+	Longitude       float64
+	RadiusMeters    int32
+	Provider        string
+	ProviderPlaceID string
+	SortOrder       int32
+}
+
+func (q *Queries) CreateTripDestination(ctx context.Context, arg CreateTripDestinationParams) (CreateTripDestinationRow, error) {
+	row := q.db.QueryRow(ctx, createTripDestination,
+		arg.TripID,
+		arg.CityName,
+		arg.CountryName,
+		arg.CountryCode,
+		arg.DisplayName,
+		arg.Latitude,
+		arg.Longitude,
+		arg.RadiusMeters,
+		arg.Provider,
+		arg.ProviderPlaceID,
+		arg.SortOrder,
+	)
+	var i CreateTripDestinationRow
+	err := row.Scan(
+		&i.ID,
+		&i.TripID,
+		&i.CityName,
+		&i.CountryName,
+		&i.CountryCode,
+		&i.DisplayName,
+		&i.Latitude,
+		&i.Longitude,
+		&i.RadiusMeters,
+		&i.Provider,
+		&i.ProviderPlaceID,
+		&i.SortOrder,
+	)
+	return i, err
+}
+
 const createTripInvite = `-- name: CreateTripInvite :one
 INSERT INTO trip_invites (
   trip_id,
@@ -1169,6 +1271,73 @@ func (q *Queries) ListScheduleItemsByTripDay(ctx context.Context, arg ListSchedu
 			&i.GooglePlaceID,
 			&i.Latitude,
 			&i.Longitude,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listTripDestinationsByTrip = `-- name: ListTripDestinationsByTrip :many
+SELECT
+  id::text,
+  trip_id::text,
+  city_name,
+  country_name,
+  country_code,
+  display_name,
+  latitude,
+  longitude,
+  radius_meters,
+  provider,
+  provider_place_id,
+  sort_order
+FROM trip_destinations
+WHERE trip_id = $1::uuid
+ORDER BY sort_order ASC
+`
+
+type ListTripDestinationsByTripRow struct {
+	ID              string
+	TripID          string
+	CityName        string
+	CountryName     string
+	CountryCode     string
+	DisplayName     string
+	Latitude        float64
+	Longitude       float64
+	RadiusMeters    int32
+	Provider        string
+	ProviderPlaceID string
+	SortOrder       int32
+}
+
+func (q *Queries) ListTripDestinationsByTrip(ctx context.Context, dollar_1 pgtype.UUID) ([]ListTripDestinationsByTripRow, error) {
+	rows, err := q.db.Query(ctx, listTripDestinationsByTrip, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListTripDestinationsByTripRow
+	for rows.Next() {
+		var i ListTripDestinationsByTripRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.TripID,
+			&i.CityName,
+			&i.CountryName,
+			&i.CountryCode,
+			&i.DisplayName,
+			&i.Latitude,
+			&i.Longitude,
+			&i.RadiusMeters,
+			&i.Provider,
+			&i.ProviderPlaceID,
+			&i.SortOrder,
 		); err != nil {
 			return nil, err
 		}

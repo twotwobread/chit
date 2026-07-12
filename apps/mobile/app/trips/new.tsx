@@ -1,12 +1,28 @@
-import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 
-import type { CreateTripResponse, SupportedCurrency } from '@i-um/api-contract';
+import type {
+  CreateTripResponse,
+  DestinationSearchResult,
+  SupportedCurrency,
+  TripDestinationInput,
+} from '@i-um/api-contract';
 
 import { MobileAuthError } from '../../lib/auth/client';
 import { Card, PrimaryButton, SecondaryButton, theme } from '../../lib/design';
-import { createTrip } from '../../lib/trips/trip-api';
+import {
+  addTripDestination,
+  buildCreateTripDestinations,
+  destinationCountryMismatchConfirmation,
+  destinationKey,
+  destinationSearchSubmitState,
+  destinationSelectionStatus,
+  removeTripDestination,
+  tripDestinationInputFromSearchResult,
+  validateTripDestinations,
+} from '../../lib/trips/destinations';
+import { createTrip, searchDestinations } from '../../lib/trips/trip-api';
 import { dateFromString, isValidDate, monthStringFromDate, todayString } from '../../lib/trips/date';
 import { TripDateFieldButton, TripDatePicker, TripFormField } from '../../lib/trips/date-picker';
 import { tripDetailPath } from '../../lib/trips/routes';
@@ -31,12 +47,62 @@ const initialForm: FormState = {
 
 export default function NewTripScreen() {
   const [form, setForm] = useState<FormState>(initialForm);
+  const [destinations, setDestinations] = useState<TripDestinationInput[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<CreateTripResponse | null>(null);
   const [activeDateField, setActiveDateField] = useState<DateField | null>(null);
   const [calendarMonth, setCalendarMonth] = useState(() => monthStringFromDate(new Date()));
+  const [destinationSearchOpen, setDestinationSearchOpen] = useState(false);
+  const [destinationQuery, setDestinationQuery] = useState('');
+  const [destinationResults, setDestinationResults] = useState<DestinationSearchResult[]>([]);
+  const [destinationLoading, setDestinationLoading] = useState(false);
+  const [destinationError, setDestinationError] = useState<string | null>(null);
+  const [destinationSearched, setDestinationSearched] = useState(false);
+  const destinationSearchRequestId = useRef(0);
   const today = todayString();
+
+  const updateDestinationQuery = (query: string) => {
+    destinationSearchRequestId.current += 1;
+    setDestinationQuery(query);
+    setDestinationResults([]);
+    setDestinationError(null);
+    setDestinationLoading(false);
+    setDestinationSearched(false);
+  };
+
+  const runDestinationSearch = async () => {
+    const query = destinationQuery.trim();
+    if (query.length < 2) {
+      destinationSearchRequestId.current += 1;
+      setDestinationResults([]);
+      setDestinationLoading(false);
+      setDestinationError(null);
+      setDestinationSearched(false);
+      return;
+    }
+
+    const requestId = destinationSearchRequestId.current + 1;
+    destinationSearchRequestId.current = requestId;
+    setDestinationLoading(true);
+    setDestinationError(null);
+    setDestinationSearched(true);
+    try {
+      const response = await searchDestinations(query);
+      if (destinationSearchRequestId.current === requestId) {
+        setDestinationResults(response.results);
+      }
+    } catch {
+      if (destinationSearchRequestId.current === requestId) {
+        setDestinationResults([]);
+        setDestinationError('도시를 검색할 수 없어요. 잠시 후 다시 시도해주세요.');
+      }
+    } finally {
+      if (destinationSearchRequestId.current === requestId) {
+        setDestinationLoading(false);
+      }
+    }
+  };
 
   const openDatePicker = (field: DateField) => {
     const value = field === 'startDate' ? form.startDate : form.endDate;
@@ -65,7 +131,7 @@ export default function NewTripScreen() {
   };
 
   const submit = async () => {
-    const validationError = validateForm(form, today);
+    const validationError = validateForm(form, today) ?? validateTripDestinations(destinations);
     if (validationError) {
       setError(validationError);
       return;
@@ -79,6 +145,7 @@ export default function NewTripScreen() {
         startDate: form.startDate,
         endDate: form.endDate,
         defaultCurrency: form.defaultCurrency,
+        destinations: buildCreateTripDestinations(destinations),
       });
       setCreated(response);
     } catch (submitError) {
@@ -96,11 +163,42 @@ export default function NewTripScreen() {
   };
 
   const reset = () => {
+    destinationSearchRequestId.current += 1;
     setForm(initialForm);
+    setDestinations([]);
+    setDestinationQuery('');
+    setDestinationResults([]);
+    setDestinationError(null);
+    setDestinationSearched(false);
     setError(null);
     setCreated(null);
     setActiveDateField(null);
+    setDestinationSearchOpen(false);
   };
+
+  const addDestination = (result: DestinationSearchResult) => {
+    setDestinations((current) => addTripDestination(current, tripDestinationInputFromSearchResult(result)));
+  };
+
+  const destinationStatus = destinationSelectionStatus(destinations);
+
+  if (destinationSearchOpen) {
+    return (
+      <DestinationSearchFlow
+        destinations={destinations}
+        error={destinationError}
+        loading={destinationLoading}
+        onAdd={addDestination}
+        onDone={() => setDestinationSearchOpen(false)}
+        onQueryChange={updateDestinationQuery}
+        onSearch={() => void runDestinationSearch()}
+        onRemove={(key) => setDestinations((current) => removeTripDestination(current, key))}
+        query={destinationQuery}
+        results={destinationResults}
+        searched={destinationSearched}
+      />
+    );
+  }
 
   if (created) {
     return (
@@ -113,6 +211,11 @@ export default function NewTripScreen() {
               {created.trip.startDate} ~ {created.trip.endDate}
             </Text>
             <Text style={styles.summaryText}>기본 통화: {created.trip.defaultCurrency}</Text>
+            {created.trip.destinations.length > 0 ? (
+              <Text style={styles.summaryText}>
+                여행 도시: {created.trip.destinations.map((destination) => destination.displayName).join(', ')}
+              </Text>
+            ) : null}
           </View>
           <PrimaryButton label="여행 상세 보기" onPress={() => router.push(tripDetailPath(created.trip.id))} />
           <SecondaryButton label="마이페이지에서 보기" onPress={() => router.push('/mypage')} />
@@ -127,10 +230,50 @@ export default function NewTripScreen() {
     <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" style={styles.scroll}>
       <View style={styles.header}>
         <Text style={styles.title}>여행 생성</Text>
-        <Text style={styles.subtitle}>이름과 기간만 정하면 바로 시작할 수 있어요.</Text>
+        <Text style={styles.subtitle}>여행 도시와 이름, 기간을 정하면 바로 시작할 수 있어요.</Text>
       </View>
 
       <Card>
+        <View style={styles.field}>
+          <View style={styles.destinationHeaderRow}>
+            <View style={styles.destinationHeaderText}>
+              <Text style={styles.label}>여행 도시 *</Text>
+              <Text style={styles.helperText}>일정 장소를 검색할 기준 도시를 선택해 주세요.</Text>
+            </View>
+            <SecondaryButton
+              disabled={submitting || !destinationStatus.canAddMore}
+              label="+ 도시 검색"
+              onPress={() => {
+                setDestinationSearchOpen(true);
+                setError(null);
+              }}
+            />
+          </View>
+          {destinations.length > 0 ? (
+            <View style={styles.destinationChipRow}>
+              {destinations.map((destination, index) => (
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={submitting}
+                  key={destinationKey(destination)}
+                  onPress={() =>
+                    setDestinations((current) => removeTripDestination(current, destinationKey(destination)))
+                  }
+                  style={styles.destinationChip}
+                >
+                  <Text style={styles.destinationChipText}>
+                    {destination.displayName}
+                    {index === 0 ? '  대표' : ''}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          ) : (
+            <Text style={styles.emptyDestinationText}>선택한 도시가 없어요.</Text>
+          )}
+          {destinationStatus.helperText ? <Text style={styles.helperText}>{destinationStatus.helperText}</Text> : null}
+        </View>
+
         <TripFormField label="여행 이름">
           <TextInput
             editable={!submitting}
@@ -207,6 +350,196 @@ export default function NewTripScreen() {
   );
 }
 
+type DestinationSearchFlowProps = {
+  destinations: TripDestinationInput[];
+  error: string | null;
+  loading: boolean;
+  onAdd: (result: DestinationSearchResult) => void;
+  onDone: () => void;
+  onQueryChange: (query: string) => void;
+  onRemove: (key: string) => void;
+  onSearch: () => void;
+  query: string;
+  results: DestinationSearchResult[];
+  searched: boolean;
+};
+
+function DestinationSearchFlow({
+  destinations,
+  error,
+  loading,
+  onAdd,
+  onDone,
+  onQueryChange,
+  onRemove,
+  onSearch,
+  query,
+  results,
+  searched,
+}: DestinationSearchFlowProps) {
+  const selectedKeys = new Set(destinations.map(destinationKey));
+  const status = destinationSelectionStatus(destinations);
+  const searchSubmitState = destinationSearchSubmitState(query, loading);
+  const trimmedQuery = searchSubmitState.query;
+  const [pendingCountryMismatchResult, setPendingCountryMismatchResult] = useState<DestinationSearchResult | null>(
+    null,
+  );
+  const pendingCountryMismatchDestination = pendingCountryMismatchResult
+    ? tripDestinationInputFromSearchResult(pendingCountryMismatchResult)
+    : null;
+  const pendingCountryMismatchConfirmation = pendingCountryMismatchDestination
+    ? destinationCountryMismatchConfirmation(destinations, pendingCountryMismatchDestination)
+    : null;
+
+  const requestAddResult = (result: DestinationSearchResult) => {
+    const destination = tripDestinationInputFromSearchResult(result);
+    const confirmation = destinationCountryMismatchConfirmation(destinations, destination);
+    if (confirmation) {
+      setPendingCountryMismatchResult(result);
+      return;
+    }
+    setPendingCountryMismatchResult(null);
+    onAdd(result);
+  };
+
+  const confirmCountryMismatchAdd = () => {
+    if (!pendingCountryMismatchResult) {
+      return;
+    }
+    const result = pendingCountryMismatchResult;
+    setPendingCountryMismatchResult(null);
+    onAdd(result);
+  };
+
+  return (
+    <ScrollView contentContainerStyle={styles.searchContent} keyboardShouldPersistTaps="handled" style={styles.scroll}>
+      <View style={styles.searchHeader}>
+        <Text style={styles.title}>도시 검색</Text>
+        <SecondaryButton label="완료" onPress={onDone} />
+      </View>
+
+      <Card>
+        <View style={styles.field}>
+          <Text style={styles.label}>선택한 도시</Text>
+          {destinations.length > 0 ? (
+            <View style={styles.destinationChipRow}>
+              {destinations.map((destination) => (
+                <Pressable
+                  accessibilityRole="button"
+                  key={destinationKey(destination)}
+                  onPress={() => onRemove(destinationKey(destination))}
+                  style={styles.destinationChip}
+                >
+                  <Text style={styles.destinationChipText}>{destination.displayName}</Text>
+                </Pressable>
+              ))}
+            </View>
+          ) : (
+            <Text style={styles.emptyDestinationText}>아직 선택한 도시가 없어요.</Text>
+          )}
+          {status.helperText ? <Text style={styles.helperText}>{status.helperText}</Text> : null}
+        </View>
+
+        <View style={styles.field}>
+          <Text style={styles.label}>어느 도시를 여행하나요?</Text>
+          <View style={styles.destinationSearchRow}>
+            <TextInput
+              autoFocus
+              editable={!loading}
+              onChangeText={onQueryChange}
+              onSubmitEditing={() => {
+                if (searchSubmitState.canSearch) {
+                  onSearch();
+                }
+              }}
+              placeholder="예: 오사카"
+              placeholderTextColor={theme.color.textFaint}
+              returnKeyType="search"
+              style={[styles.input, styles.destinationSearchInput]}
+              value={query}
+            />
+            <Pressable
+              accessibilityRole="button"
+              disabled={!searchSubmitState.canSearch}
+              onPress={onSearch}
+              style={[
+                styles.destinationSearchButton,
+                !searchSubmitState.canSearch ? styles.destinationSearchButtonDisabled : null,
+              ]}
+            >
+              {loading ? <ActivityIndicator color={theme.color.onPrimary} /> : null}
+              <Text style={styles.destinationSearchButtonText}>{searchSubmitState.buttonLabel}</Text>
+            </Pressable>
+          </View>
+        </View>
+
+        <View style={styles.field}>
+          <Text style={styles.label}>검색 결과</Text>
+          {searchSubmitState.helperText ? <Text style={styles.helperText}>{searchSubmitState.helperText}</Text> : null}
+          {loading ? <Text style={styles.helperText}>도시를 검색하는 중...</Text> : null}
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+          {pendingCountryMismatchConfirmation ? (
+            <View style={styles.destinationWarningBox}>
+              <Text style={styles.destinationWarningTitle}>{pendingCountryMismatchConfirmation.title}</Text>
+              <Text style={styles.destinationWarningText}>{pendingCountryMismatchConfirmation.message}</Text>
+              <View style={styles.destinationWarningActions}>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => setPendingCountryMismatchResult(null)}
+                  style={styles.destinationWarningSecondaryButton}
+                >
+                  <Text style={styles.destinationWarningSecondaryText}>
+                    {pendingCountryMismatchConfirmation.cancelLabel}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={confirmCountryMismatchAdd}
+                  style={styles.destinationWarningPrimaryButton}
+                >
+                  <Text style={styles.destinationWarningPrimaryText}>
+                    {pendingCountryMismatchConfirmation.confirmLabel}
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : null}
+          {!loading && trimmedQuery.length >= 2 && !error && !searched ? (
+            <Text style={styles.helperText}>검색 버튼을 눌러 도시를 찾아보세요.</Text>
+          ) : null}
+          {!loading && searched && trimmedQuery.length >= 2 && !error && results.length === 0 ? (
+            <Text style={styles.helperText}>검색 결과가 없어요.</Text>
+          ) : null}
+          {results.map((result) => {
+            const selected = selectedKeys.has(destinationKey(result));
+            const disabled = selected || !status.canAddMore;
+            return (
+              <View key={destinationKey(result)} style={styles.resultRow}>
+                <View style={styles.resultTextBox}>
+                  <Text style={styles.resultTitle}>{result.displayName}</Text>
+                  <Text style={styles.resultSubtitle}>
+                    {result.cityName}, {result.countryName}
+                  </Text>
+                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={disabled}
+                  onPress={() => requestAddResult(result)}
+                  style={[styles.addResultButton, disabled ? styles.addResultButtonDisabled : null]}
+                >
+                  <Text style={[styles.addResultButtonText, disabled ? styles.addResultButtonTextDisabled : null]}>
+                    {selected ? '추가됨' : '추가'}
+                  </Text>
+                </Pressable>
+              </View>
+            );
+          })}
+        </View>
+      </Card>
+    </ScrollView>
+  );
+}
+
 function validateForm(form: FormState, today: string): string | null {
   const name = form.name.trim();
   if (name.length < 1) {
@@ -258,6 +591,19 @@ const styles = StyleSheet.create({
     backgroundColor: theme.color.bg,
     padding: theme.space[7],
   },
+  searchContent: {
+    flexGrow: 1,
+    gap: theme.space[6],
+    padding: theme.space[7],
+  },
+  searchHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    maxWidth: theme.layout.cardMaxW,
+    alignSelf: 'center',
+  },
   header: {
     width: '100%',
     maxWidth: theme.layout.cardMaxW,
@@ -279,6 +625,40 @@ const styles = StyleSheet.create({
   field: {
     gap: theme.space[3],
   },
+  destinationHeaderRow: {
+    gap: theme.space[4],
+  },
+  destinationHeaderText: {
+    gap: theme.space[2],
+  },
+  helperText: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.regular,
+    lineHeight: 20,
+  },
+  destinationChipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.space[3],
+  },
+  destinationChip: {
+    backgroundColor: theme.color.primarySoft,
+    borderColor: theme.color.primary,
+    borderRadius: theme.radius.pill,
+    borderWidth: 1,
+    minHeight: theme.layout.tapMin,
+    justifyContent: 'center',
+    paddingHorizontal: theme.space[4],
+  },
+  destinationChipText: {
+    color: theme.color.primary,
+    fontFamily: theme.font.family.semibold,
+    fontWeight: theme.font.weight.semibold,
+  },
+  emptyDestinationText: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.regular,
+  },
   label: {
     color: theme.color.textBody,
     fontFamily: theme.font.family.semibold,
@@ -294,6 +674,32 @@ const styles = StyleSheet.create({
     fontFamily: theme.font.family.regular,
     minHeight: theme.layout.controlH,
     paddingHorizontal: theme.space[5],
+  },
+  destinationSearchRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: theme.space[3],
+  },
+  destinationSearchInput: {
+    flex: 1,
+  },
+  destinationSearchButton: {
+    alignItems: 'center',
+    backgroundColor: theme.color.primary,
+    borderRadius: theme.radius.md,
+    flexDirection: 'row',
+    gap: theme.space[2],
+    justifyContent: 'center',
+    minHeight: theme.layout.controlH,
+    paddingHorizontal: theme.space[5],
+  },
+  destinationSearchButtonDisabled: {
+    opacity: 0.5,
+  },
+  destinationSearchButtonText: {
+    color: theme.color.onPrimary,
+    fontFamily: theme.font.family.bold,
+    fontWeight: theme.font.weight.bold,
   },
   currencyRow: {
     flexDirection: 'row',
@@ -324,6 +730,98 @@ const styles = StyleSheet.create({
     color: theme.color.danger,
     fontFamily: theme.font.family.regular,
     textAlign: 'center',
+  },
+  destinationWarningBox: {
+    backgroundColor: theme.color.accentSoft,
+    borderColor: theme.color.warning,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    gap: theme.space[3],
+    padding: theme.space[4],
+  },
+  destinationWarningTitle: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontWeight: theme.font.weight.bold,
+  },
+  destinationWarningText: {
+    color: theme.color.textBody,
+    fontFamily: theme.font.family.regular,
+    lineHeight: 20,
+  },
+  destinationWarningActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.space[3],
+    justifyContent: 'flex-end',
+  },
+  destinationWarningSecondaryButton: {
+    borderColor: theme.color.borderDefault,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    minHeight: theme.layout.tapMin,
+    justifyContent: 'center',
+    paddingHorizontal: theme.space[4],
+  },
+  destinationWarningSecondaryText: {
+    color: theme.color.textBody,
+    fontFamily: theme.font.family.semibold,
+    fontWeight: theme.font.weight.semibold,
+  },
+  destinationWarningPrimaryButton: {
+    backgroundColor: theme.color.primary,
+    borderRadius: theme.radius.md,
+    minHeight: theme.layout.tapMin,
+    justifyContent: 'center',
+    paddingHorizontal: theme.space[4],
+  },
+  destinationWarningPrimaryText: {
+    color: theme.color.onPrimary,
+    fontFamily: theme.font.family.semibold,
+    fontWeight: theme.font.weight.semibold,
+  },
+  resultRow: {
+    alignItems: 'center',
+    backgroundColor: theme.color.surfaceSunken,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: theme.space[4],
+    justifyContent: 'space-between',
+    padding: theme.space[4],
+  },
+  resultTextBox: {
+    flex: 1,
+    gap: theme.space[2],
+  },
+  resultTitle: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontWeight: theme.font.weight.bold,
+  },
+  resultSubtitle: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.regular,
+  },
+  addResultButton: {
+    borderColor: theme.color.primary,
+    borderRadius: theme.radius.pill,
+    borderWidth: 1,
+    minHeight: theme.layout.tapMin,
+    justifyContent: 'center',
+    paddingHorizontal: theme.space[4],
+  },
+  addResultButtonDisabled: {
+    borderColor: theme.color.borderDefault,
+  },
+  addResultButtonText: {
+    color: theme.color.primary,
+    fontFamily: theme.font.family.semibold,
+    fontWeight: theme.font.weight.semibold,
+  },
+  addResultButtonTextDisabled: {
+    color: theme.color.textMuted,
   },
   successTitle: {
     color: theme.color.success,
