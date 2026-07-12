@@ -20,6 +20,7 @@ export type ItineraryTimelineProps = {
   emptyHelper?: string;
   onPressItem?: (item: ItineraryTimelineItem) => void;
   onPressTime?: (item: ItineraryTimelineItem) => void;
+  onPressLodgingBadge?: (item: ItineraryTimelineItem) => void;
   getItemAccessibilityLabel?: (item: ItineraryTimelineItem) => string;
   onItemNameRef?: (item: ItineraryTimelineItem, node: Text | null) => void;
   renderActions?: (item: ItineraryTimelineItem) => ReactNode;
@@ -33,6 +34,7 @@ export function ItineraryTimeline({
   onItemNameRef,
   onPressItem,
   onPressTime,
+  onPressLodgingBadge,
   renderActions,
 }: ItineraryTimelineProps) {
   if (items.length === 0) {
@@ -56,6 +58,7 @@ export function ItineraryTimeline({
             onItemNameRef={onItemNameRef}
             onPressItem={onPressItem}
             onPressTime={onPressTime}
+            onPressLodgingBadge={onPressLodgingBadge}
             renderActions={renderActions}
           />
         ) : (
@@ -66,6 +69,7 @@ export function ItineraryTimeline({
             onItemNameRef={onItemNameRef}
             onPressItem={onPressItem}
             onPressTime={onPressTime}
+            onPressLodgingBadge={onPressLodgingBadge}
             renderActions={renderActions}
           />
         ),
@@ -80,11 +84,13 @@ function AnchorRow({
   onItemNameRef,
   onPressItem,
   onPressTime,
+  onPressLodgingBadge,
   renderActions,
 }: {
   item: ItineraryTimelineItem;
   onPressItem?: (item: ItineraryTimelineItem) => void;
   onPressTime?: (item: ItineraryTimelineItem) => void;
+  onPressLodgingBadge?: (item: ItineraryTimelineItem) => void;
   getItemAccessibilityLabel?: (item: ItineraryTimelineItem) => string;
   onItemNameRef?: (item: ItineraryTimelineItem, node: Text | null) => void;
   renderActions?: (item: ItineraryTimelineItem) => ReactNode;
@@ -112,6 +118,7 @@ function AnchorRow({
           item={item}
           onItemNameRef={onItemNameRef}
           onPressItem={onPressItem}
+          onPressLodgingBadge={onPressLodgingBadge}
           renderActions={renderActions}
         />
       </View>
@@ -125,11 +132,13 @@ function UntimedSegment({
   onItemNameRef,
   onPressItem,
   onPressTime,
+  onPressLodgingBadge,
   renderActions,
 }: {
   items: ItineraryTimelineItem[];
   onPressItem?: (item: ItineraryTimelineItem) => void;
   onPressTime?: (item: ItineraryTimelineItem) => void;
+  onPressLodgingBadge?: (item: ItineraryTimelineItem) => void;
   getItemAccessibilityLabel?: (item: ItineraryTimelineItem) => string;
   onItemNameRef?: (item: ItineraryTimelineItem, node: Text | null) => void;
   renderActions?: (item: ItineraryTimelineItem) => ReactNode;
@@ -157,6 +166,7 @@ function UntimedSegment({
                   onItemNameRef={onItemNameRef}
                   onPressItem={onPressItem}
                   onPressTime={onPressTime}
+                  onPressLodgingBadge={onPressLodgingBadge}
                   renderActions={renderActions}
                 />
               </View>
@@ -176,6 +186,7 @@ function TimelineCard({
   onItemNameRef,
   onPressItem,
   onPressTime,
+  onPressLodgingBadge,
   renderActions,
 }: {
   compact?: boolean;
@@ -183,6 +194,7 @@ function TimelineCard({
   item: ItineraryTimelineItem;
   onPressItem?: (item: ItineraryTimelineItem) => void;
   onPressTime?: (item: ItineraryTimelineItem) => void;
+  onPressLodgingBadge?: (item: ItineraryTimelineItem) => void;
   getItemAccessibilityLabel?: (item: ItineraryTimelineItem) => string;
   onItemNameRef?: (item: ItineraryTimelineItem, node: Text | null) => void;
   renderActions?: (item: ItineraryTimelineItem) => ReactNode;
@@ -205,7 +217,21 @@ function TimelineCard({
           {item.status === 'next' ? <Badge label="다음" solid tone="primary" /> : null}
           {item.status === 'done' ? <Badge label="완료" tone="neutral" /> : null}
           {item.status === 'skipped' ? <Badge label="건너뜀" tone="neutral" /> : null}
-          {item.isLodging ? <Badge label="숙소" tone="neutral" /> : null}
+          {item.lodgingBadgeLabel ? (
+            onPressLodgingBadge ? (
+              <Pressable
+                accessibilityLabel={`${item.name} 대표 숙소 관리`}
+                accessibilityRole="button"
+                hitSlop={6}
+                onPress={() => onPressLodgingBadge(item)}
+                style={({ pressed }) => (pressed ? styles.pressed : null)}
+              >
+                <Badge label={item.lodgingBadgeLabel} tone="primary" />
+              </Pressable>
+            ) : (
+              <Badge label={item.lodgingBadgeLabel} tone="primary" />
+            )
+          ) : null}
         </View>
         <View style={styles.metaRow}>
           <PlaceTag type={item.type} />

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, findNodeHandle, Pressable, Text, View } from 'react-native';
 
 import { theme } from '../design';
@@ -7,7 +7,11 @@ import {
   type DayItineraryRowViewModel,
   type DayItineraryViewModel,
 } from '../trips/day-itinerary';
-import { buildDayItineraryMapRowActions, type DayItineraryMapActionFeedback } from '../trips/day-itinerary-map-actions';
+import {
+  buildDayItineraryMapRowActions,
+  type DayItineraryMapActionFeedback,
+  type DayItineraryMapActionInput,
+} from '../trips/day-itinerary-map-actions';
 import { buildDayItineraryReorderAction, buildDayItineraryReorderSubmitState } from '../trips/reorder-itinerary';
 import {
   ITINERARY_TAB_EMPTY_HELPER,
@@ -16,10 +20,8 @@ import {
 } from '../trips/itinerary-tab';
 import {
   buildDayLodgingPanel,
-  buildDayLodgingRowViewModel,
-  type DayLodgingManualFormValues,
+  runDayLodgingSearchRegisterAction,
   type DayLodgingPlaceOptionViewModel,
-  type DayLodgingSubmittingState,
 } from '../trips/lodging-place';
 import { buildDayItinerarySharedUpdateBanner } from '../trips/shared-itinerary-updates';
 import { focusAccessibilityNode } from './accessibility-focus';
@@ -42,9 +44,7 @@ export function DayItineraryContent({
   onFocusRequestHandled,
   onCancelLodgingPicker,
   onClearCurrentLodging,
-  onClearLodging,
   onCopyAddress,
-  onCreateManualLodging,
   onDeletePlace,
   onEditPlace,
   onEditTime,
@@ -52,14 +52,12 @@ export function DayItineraryContent({
   onExitReorderMode,
   onMoveReorderItem,
   onOpenLodgingPlaceSelection,
-  onOpenManualLodgingForm,
+  onOpenLodgingSearchRegister,
   onOpenMap,
   onReorderDragActiveChange,
   onReorderDragMove,
   onSaveReorder,
   onSelectLodgingPlace,
-  onSetLodging,
-  onUpdateManualLodgingValues,
   mapActionFeedback,
   onReloadSharedUpdate,
   reorderFeedback,
@@ -75,9 +73,7 @@ export function DayItineraryContent({
   onFocusRequestHandled: () => void;
   onCancelLodgingPicker: () => void;
   onClearCurrentLodging: () => void;
-  onClearLodging: (item: DayItineraryRowViewModel) => void;
-  onCopyAddress: (item: DayItineraryRowViewModel) => void;
-  onCreateManualLodging: () => void;
+  onCopyAddress: (input: DayItineraryMapActionInput) => void;
   onDeletePlace: (item: DayItineraryRowViewModel, originFocusTarget?: number | null) => void;
   onEditPlace: (item: DayItineraryRowViewModel) => void;
   onEditTime: (item: DayItineraryRowViewModel) => void;
@@ -85,14 +81,12 @@ export function DayItineraryContent({
   onExitReorderMode: () => void;
   onMoveReorderItem: (fromIndex: number, toIndex: number) => void;
   onOpenLodgingPlaceSelection: () => void;
-  onOpenManualLodgingForm: () => void;
+  onOpenLodgingSearchRegister: () => void;
   onOpenMap: (item: DayItineraryRowViewModel) => void;
   onReorderDragActiveChange: (isActive: boolean) => void;
   onReorderDragMove: (pointerY: number) => void;
   onSaveReorder: () => void;
   onSelectLodgingPlace: (option: DayLodgingPlaceOptionViewModel) => void;
-  onSetLodging: (item: DayItineraryRowViewModel) => void;
-  onUpdateManualLodgingValues: (values: DayLodgingManualFormValues) => void;
   mapActionFeedback: DayItineraryMapActionFeedback | null;
   onReloadSharedUpdate: () => void;
   reorderFeedback: string | null;
@@ -106,12 +100,7 @@ export function DayItineraryContent({
     reorderState.status === 'editing' || reorderState.status === 'saving'
       ? buildDayItineraryReorderSubmitState(reorderState.status === 'saving', reorderState.draft)
       : null;
-  const lodgingSubmittingState: DayLodgingSubmittingState | null =
-    lodgingState.status === 'setting'
-      ? { kind: 'set', itemId: lodgingState.itemId }
-      : lodgingState.status === 'clearing'
-        ? { kind: 'clear', itemId: lodgingState.itemId }
-        : null;
+  const [isLodgingSheetVisible, setIsLodgingSheetVisible] = useState(false);
   const emptyStateRef = useRef<View>(null);
   const rowRefs = useRef<Record<string, Text | null>>({});
   const deleteTriggerRefs = useRef<Record<string, View | null>>({});
@@ -180,7 +169,6 @@ export function DayItineraryContent({
       return null;
     }
 
-    const lodging = buildDayLodgingRowViewModel(item, lodgingSubmittingState);
     const mapActions = buildDayItineraryMapRowActions(item);
 
     return (
@@ -206,15 +194,6 @@ export function DayItineraryContent({
             >
               <Text style={styles.rowActionText}>{mapActions.copy.label}</Text>
             </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              disabled={lodging.action.disabled}
-              onPress={() => (lodging.action.kind === 'set' ? onSetLodging(item) : onClearLodging(item))}
-              style={[styles.rowActionButton, lodging.action.disabled ? styles.rowActionButtonDisabled : null]}
-            >
-              {lodging.action.isSubmitting ? <ActivityIndicator color={theme.color.primary} /> : null}
-              <Text style={styles.rowActionText}>{lodging.action.label}</Text>
-            </Pressable>
           </>
         ) : null}
         <Pressable accessibilityRole="button" onPress={() => onEditPlace(item)} style={styles.rowActionButton}>
@@ -235,17 +214,33 @@ export function DayItineraryContent({
     );
   };
 
+  const openLodgingSheet = () => setIsLodgingSheetVisible(true);
+  const closeLodgingSheet = () => setIsLodgingSheetVisible(false);
+  const copyCurrentLodgingAddress = () => {
+    if (!viewModel.lodgingPlace) {
+      return;
+    }
+    onCopyAddress({ placeName: viewModel.lodgingPlace.name, address: viewModel.lodgingPlace.address });
+  };
+  const openLodgingSearchRegisterFromSheet = () =>
+    runDayLodgingSearchRegisterAction({
+      closeSheet: closeLodgingSheet,
+      openSearchRegister: onOpenLodgingSearchRegister,
+    });
+
   return (
     <View style={styles.card}>
       <DayLodgingPanel
+        isSheetVisible={isLodgingSheetVisible}
         lodgingState={lodgingState}
         onCancelPicker={onCancelLodgingPicker}
         onClear={onClearCurrentLodging}
-        onCreateManual={onCreateManualLodging}
-        onOpenManual={onOpenManualLodgingForm}
+        onCloseSheet={closeLodgingSheet}
+        onCopyAddress={copyCurrentLodgingAddress}
+        onOpenSearchRegister={openLodgingSearchRegisterFromSheet}
         onOpenSelection={onOpenLodgingPlaceSelection}
+        onOpenSheet={openLodgingSheet}
         onSelectPlace={onSelectLodgingPlace}
-        onUpdateManualValues={onUpdateManualLodgingValues}
         pickerState={lodgingPickerState}
         viewModel={buildDayLodgingPanel(viewModel.lodgingPlace)}
       />
@@ -286,6 +281,7 @@ export function DayItineraryContent({
                 rowRefs.current[timelineItem.id] = node;
               }}
               onPressTime={handlePressTimelineTime}
+              onPressLodgingBadge={openLodgingSheet}
               renderActions={renderTimelineActions}
             />
           )}

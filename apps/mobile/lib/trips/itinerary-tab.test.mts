@@ -58,6 +58,7 @@ test('buildItineraryTimelineItems maps selected day rows to timeline presentatio
         endTime: '11:00',
         status: 'done',
         isLodging: true,
+        lodgingBadgeLabel: '대표 숙소',
       },
       {
         id: 'item-2',
@@ -69,6 +70,7 @@ test('buildItineraryTimelineItems maps selected day rows to timeline presentatio
         endTime: null,
         status: 'skipped',
         isLodging: false,
+        lodgingBadgeLabel: null,
       },
     ],
   );

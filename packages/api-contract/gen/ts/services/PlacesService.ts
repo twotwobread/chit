@@ -2,14 +2,50 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
+import type { CreateGoogleDayLodgingPlaceRequest } from '../models/CreateGoogleDayLodgingPlaceRequest';
 import type { CreateGooglePlaceScheduleItemRequest } from '../models/CreateGooglePlaceScheduleItemRequest';
 import type { CreateGooglePlaceScheduleItemResponse } from '../models/CreateGooglePlaceScheduleItemResponse';
 import type { GooglePlaceDetailsResponse } from '../models/GooglePlaceDetailsResponse';
 import type { SearchGooglePlacesResponse } from '../models/SearchGooglePlacesResponse';
+import type { SetDayLodgingPlaceResponse } from '../models/SetDayLodgingPlaceResponse';
 import type { CancelablePromise } from '../core/CancelablePromise';
 import { OpenAPI } from '../core/OpenAPI';
 import { request as __request } from '../core/request';
 export class PlacesService {
+    /**
+     * Create or reuse a Google-backed lodging place and set Day lodging
+     * Resolves a Google-backed place server-side, upserts or reuses the trip-level place by googlePlaceId, and stores it as the selected Day lodging target. Does not create a Day schedule item.
+     * @param tripId
+     * @param tripDayId
+     * @param requestBody
+     * @returns SetDayLodgingPlaceResponse Google-backed lodging place created or reused and set as Day lodging.
+     * @throws ApiError
+     */
+    public static createGoogleDayLodgingPlace(
+        tripId: string,
+        tripDayId: string,
+        requestBody: CreateGoogleDayLodgingPlaceRequest,
+    ): CancelablePromise<SetDayLodgingPlaceResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/trips/{tripId}/days/{tripDayId}/lodging-place/google',
+            path: {
+                'tripId': tripId,
+                'tripDayId': tripDayId,
+            },
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                403: `Forbidden.`,
+                404: `Trip or trip day not found.`,
+                429: `Google Places provider rate limited.`,
+                500: `Unexpected server error.`,
+                502: `Google Places provider unavailable.`,
+            },
+        });
+    }
     /**
      * Search Google Places for a trip day
      * Returns display-only Google Places text search results for an authenticated trip participant and in-range virtual trip day. Results are not persisted.

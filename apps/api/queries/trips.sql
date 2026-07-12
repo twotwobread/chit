@@ -336,6 +336,27 @@ WHERE td.trip_id = sqlc.arg(trip_id)::uuid
   AND td.id = sqlc.arg(trip_day_id)::uuid
   AND td.deleted_at IS NULL;
 
+-- name: GetActiveTripDayByTripAndDate :one
+SELECT
+  td.id::text AS id,
+  td.date,
+  td.day_order,
+  COALESCE(tp.id::text, ''::text)::text AS lodging_trip_place_id,
+  tp.name AS lodging_place_name,
+  tp.place_type AS lodging_place_type,
+  tp.address AS lodging_place_address,
+  tp.provider AS lodging_place_provider,
+  tp.google_place_id AS lodging_google_place_id,
+  tp.latitude AS lodging_latitude,
+  tp.longitude AS lodging_longitude
+FROM trip_days td
+LEFT JOIN trip_places tp
+  ON tp.id = td.lodging_trip_place_id
+ AND tp.trip_id = td.trip_id
+WHERE td.trip_id = sqlc.arg(trip_id)::uuid
+  AND td.date = sqlc.arg(date)::date
+  AND td.deleted_at IS NULL;
+
 -- name: GetTripPlaceSummaryByTripAndPlace :one
 SELECT
   id::text AS id,

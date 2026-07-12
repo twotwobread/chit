@@ -140,7 +140,7 @@ export type GooglePlaceAddViewState =
   | { status: 'confirmingDuplicate'; result: GooglePlaceSearchRowViewModel; message: string }
   | { status: 'error'; message: string };
 
-export type GooglePlaceSearchResultActionMode = 'exploreOnly' | 'scheduleAdd' | 'scheduleSelect';
+export type GooglePlaceSearchResultActionMode = 'exploreOnly' | 'scheduleAdd' | 'scheduleSelect' | 'lodgingRegister';
 
 export type GooglePlaceSearchResultActionView = {
   primaryAction: { label: string; loadingLabel: string; isLoading: boolean } | null;
@@ -225,8 +225,9 @@ export function buildGooglePlaceSearchResultActionView({
     };
   }
 
-  const label = mode === 'scheduleSelect' ? '이 장소 선택' : '장소 추가';
-  const loadingLabel = mode === 'scheduleSelect' ? '처리 중...' : '추가 중...';
+  const label = mode === 'scheduleSelect' ? '이 장소 선택' : mode === 'lodgingRegister' ? '숙소로 등록' : '장소 추가';
+  const loadingLabel =
+    mode === 'scheduleSelect' ? '처리 중...' : mode === 'lodgingRegister' ? '등록 중...' : '추가 중...';
   const isLoading = addState.status === 'adding' && addState.googlePlaceId === result.id;
   const duplicateConfirmation =
     addState.status === 'confirmingDuplicate' && addState.result.id === result.id

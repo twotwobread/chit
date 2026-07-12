@@ -10,6 +10,7 @@ import (
 )
 
 const testTripID = "00000000-0000-0000-0000-000000000001"
+const testTripDayID = "00000000-0000-0000-0000-000000000011"
 
 func TestServiceSearchDestinations(t *testing.T) {
 	provider := &fakeProvider{destinationResults: []DestinationSearchResult{
@@ -246,6 +247,68 @@ func TestServiceSearchGoogleProviderErrors(t *testing.T) {
 	}
 }
 
+func TestServiceCreateGoogleDayLodgingPlaceCreatesGooglePlaceAndDoesNotAppendScheduleItem(t *testing.T) {
+	repo := &fakeRepository{trip: trip.Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"}, tripFound: true, isParticipant: true}
+	provider := &fakeProvider{details: GooglePlaceDetails{
+		GooglePlaceID:    "google-hotel-1",
+		DisplayName:      "호텔 니코 오사카",
+		FormattedAddress: "Nishi-Shinsaibashi",
+		Latitude:         34.6721,
+		Longitude:        135.5019,
+		PrimaryType:      "lodging",
+		Types:            []string{"lodging", "point_of_interest"},
+	}}
+	service := NewService(repo, provider)
+
+	result, err := service.CreateGoogleDayLodgingPlace(context.Background(), "user-1", testTripID, "2026-07-11", CreateGoogleDayLodgingPlaceInput{GooglePlaceID: " google-hotel-1 "})
+	if err != nil {
+		t.Fatalf("CreateGoogleDayLodgingPlace returned error: %v", err)
+	}
+
+	if !provider.detailsCalled || provider.detailsInput.GooglePlaceID != "google-hotel-1" {
+		t.Fatalf("expected details lookup for trimmed google id, got called=%v input=%#v", provider.detailsCalled, provider.detailsInput)
+	}
+	if repo.createdGoogleLodgingRecord.GooglePlaceID != "google-hotel-1" || repo.createdGoogleLodgingRecord.Name != "호텔 니코 오사카" || repo.createdGoogleLodgingRecord.PlaceType != "lodging" || repo.createdGoogleLodgingRecord.TripDayID != testTripDayID {
+		t.Fatalf("unexpected created google lodging record: %#v", repo.createdGoogleLodgingRecord)
+	}
+	if repo.createdGoogleLodgingRecord.Latitude != 34.6721 || repo.createdGoogleLodgingRecord.Longitude != 135.5019 || len(repo.createdGoogleLodgingRecord.GoogleTypes) != 2 {
+		t.Fatalf("expected provider metadata in lodging record, got %#v", repo.createdGoogleLodgingRecord)
+	}
+	if repo.appendedGoogleRecord.TripPlaceID != "" {
+		t.Fatalf("expected no schedule append for Day lodging registration, got %#v", repo.appendedGoogleRecord)
+	}
+	if result.Day.LodgingPlace == nil || result.Day.LodgingPlace.ID != result.LodgingPlace.ID || result.LodgingPlace.Name != "호텔 니코 오사카" {
+		t.Fatalf("expected Google lodging set on day, got %#v", result)
+	}
+}
+
+func TestServiceCreateGoogleDayLodgingPlaceReusesExistingTripPlaceWithoutProviderRefresh(t *testing.T) {
+	repo := &fakeRepository{
+		trip:                trip.Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"},
+		tripFound:           true,
+		isParticipant:       true,
+		existingGooglePlace: trip.TripPlaceSummary{ID: "place-1", Name: "호텔 니코 오사카", PlaceType: "lodging", Address: "Nishi"},
+		existingGoogleFound: true,
+	}
+	provider := &fakeProvider{}
+	service := NewService(repo, provider)
+
+	result, err := service.CreateGoogleDayLodgingPlace(context.Background(), "user-1", testTripID, "2026-07-11", CreateGoogleDayLodgingPlaceInput{GooglePlaceID: "google-hotel-1"})
+	if err != nil {
+		t.Fatalf("CreateGoogleDayLodgingPlace returned error: %v", err)
+	}
+
+	if provider.detailsCalled {
+		t.Fatal("expected existing Google-backed place to be reused without provider details call")
+	}
+	if repo.setGoogleLodgingRecord.TripPlaceID != "place-1" || repo.setGoogleLodgingRecord.TripDayID != testTripDayID {
+		t.Fatalf("expected existing Google place to be set as lodging with resolved day id, got %#v", repo.setGoogleLodgingRecord)
+	}
+	if result.LodgingPlace.ID != "place-1" || result.Day.LodgingPlace == nil || result.Day.LodgingPlace.ID != "place-1" {
+		t.Fatalf("expected existing place in result, got %#v", result)
+	}
+}
+
 func TestServiceCreateGooglePlaceScheduleItemCreatesSnapshotAndItem(t *testing.T) {
 	repo := &fakeRepository{trip: trip.Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"}, tripFound: true, isParticipant: true}
 	provider := &fakeProvider{details: GooglePlaceDetails{
@@ -400,16 +463,18 @@ func TestMapGooglePlaceType(t *testing.T) {
 }
 
 type fakeRepository struct {
-	trip                 trip.Trip
-	tripFound            bool
-	isParticipant        bool
-	checkedTripID        string
-	checkedUserID        string
-	existingGooglePlace  trip.TripPlaceSummary
-	existingGoogleFound  bool
-	createdGoogleRecord  CreateGooglePlaceScheduleItemRecord
-	appendedGoogleRecord AppendGooglePlaceScheduleItemRecord
-	appendErr            error
+	trip                       trip.Trip
+	tripFound                  bool
+	isParticipant              bool
+	checkedTripID              string
+	checkedUserID              string
+	existingGooglePlace        trip.TripPlaceSummary
+	existingGoogleFound        bool
+	createdGoogleRecord        CreateGooglePlaceScheduleItemRecord
+	createdGoogleLodgingRecord CreateGoogleDayLodgingPlaceRecord
+	setGoogleLodgingRecord     trip.SetDayLodgingPlaceRecord
+	appendedGoogleRecord       AppendGooglePlaceScheduleItemRecord
+	appendErr                  error
 }
 
 func (r *fakeRepository) GetTripByID(context.Context, string) (trip.Trip, bool, error) {
@@ -426,11 +491,45 @@ func (r *fakeRepository) GetActiveTripDayByTripAndID(_ context.Context, tripID s
 	if !r.tripFound || tripDayID == "2026-07-14" {
 		return trip.TripDay{}, false, nil
 	}
-	return trip.TripDay{ID: tripDayID, Date: "2026-07-10", DayOrder: 1}, true, nil
+	day := trip.TripDay{ID: testTripDayID, Date: "2026-07-10", DayOrder: 1}
+	switch tripDayID {
+	case "2026-07-11":
+		day.Date = "2026-07-11"
+		day.DayOrder = 2
+	case "2026-07-12":
+		day.Date = "2026-07-12"
+		day.DayOrder = 3
+	}
+	return day, true, nil
 }
 
 func (r *fakeRepository) GetGoogleTripPlaceByGooglePlaceID(context.Context, string, string) (trip.TripPlaceSummary, bool, error) {
 	return r.existingGooglePlace, r.existingGoogleFound, nil
+}
+
+func (r *fakeRepository) SetDayLodgingPlace(_ context.Context, record trip.SetDayLodgingPlaceRecord) (trip.TripPlaceSummary, error) {
+	r.setGoogleLodgingRecord = record
+	if r.appendErr != nil {
+		return trip.TripPlaceSummary{}, r.appendErr
+	}
+	placeSummary := r.existingGooglePlace
+	if placeSummary.ID == "" {
+		placeSummary = trip.TripPlaceSummary{ID: record.TripPlaceID, Name: "호텔 니코 오사카", PlaceType: "lodging", Address: "Nishi"}
+	}
+	return placeSummary, nil
+}
+
+func (r *fakeRepository) CreateGoogleDayLodgingPlace(_ context.Context, record CreateGoogleDayLodgingPlaceRecord) (trip.TripPlaceSummary, error) {
+	r.createdGoogleLodgingRecord = record
+	if r.appendErr != nil {
+		return trip.TripPlaceSummary{}, r.appendErr
+	}
+	return trip.TripPlaceSummary{
+		ID:        "place-1",
+		Name:      record.Name,
+		PlaceType: record.PlaceType,
+		Address:   record.Address,
+	}, nil
 }
 
 func (r *fakeRepository) AppendGooglePlaceScheduleItem(_ context.Context, record AppendGooglePlaceScheduleItemRecord) (trip.ScheduleItem, error) {

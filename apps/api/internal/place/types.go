@@ -40,6 +40,8 @@ type Repository interface {
 	IsTripParticipant(ctx context.Context, tripID string, userID string) (bool, error)
 	GetActiveTripDayByTripAndID(ctx context.Context, tripID string, tripDayID string) (trip.TripDay, bool, error)
 	GetGoogleTripPlaceByGooglePlaceID(ctx context.Context, tripID string, googlePlaceID string) (trip.TripPlaceSummary, bool, error)
+	SetDayLodgingPlace(ctx context.Context, record trip.SetDayLodgingPlaceRecord) (trip.TripPlaceSummary, error)
+	CreateGoogleDayLodgingPlace(ctx context.Context, record CreateGoogleDayLodgingPlaceRecord) (trip.TripPlaceSummary, error)
 	AppendGooglePlaceScheduleItem(ctx context.Context, record AppendGooglePlaceScheduleItemRecord) (trip.ScheduleItem, error)
 	CreateGooglePlaceScheduleItem(ctx context.Context, record CreateGooglePlaceScheduleItemRecord) (trip.ScheduleItem, error)
 }
@@ -100,6 +102,10 @@ type SelectedDetailsInput struct {
 type PhotoInput struct {
 	Token      string
 	MaxWidthPx int
+}
+
+type CreateGoogleDayLodgingPlaceInput struct {
+	GooglePlaceID string
 }
 
 type CreateGooglePlaceScheduleItemInput struct {
@@ -182,6 +188,19 @@ type AppendGooglePlaceScheduleItemRecord struct {
 	Memo               *string
 }
 
+type CreateGoogleDayLodgingPlaceRecord struct {
+	TripID            string
+	TripDayID         string
+	GooglePlaceID     string
+	Name              string
+	Address           string
+	PlaceType         string
+	Latitude          float64
+	Longitude         float64
+	GooglePrimaryType string
+	GoogleTypes       []string
+}
+
 type CreateGooglePlaceScheduleItemRecord struct {
 	TripID             string
 	TripDayID          string
@@ -198,6 +217,11 @@ type CreateGooglePlaceScheduleItemRecord struct {
 	StartTime          *string
 	EndTime            *string
 	Memo               *string
+}
+
+type CreateGoogleDayLodgingPlaceResult struct {
+	Day          trip.TripDay
+	LodgingPlace trip.TripPlaceSummary
 }
 
 type CreateGooglePlaceScheduleItemResult struct {

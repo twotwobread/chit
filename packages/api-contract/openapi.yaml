@@ -815,6 +815,81 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /trips/{tripId}/days/{tripDayId}/lodging-place/google:
+    post:
+      operationId: createGoogleDayLodgingPlace
+      summary: Create or reuse a Google-backed lodging place and set Day lodging
+      description: Resolves a Google-backed place server-side, upserts or reuses the trip-level place by googlePlaceId, and stores it as the selected Day lodging target. Does not create a Day schedule item.
+      tags:
+        - Places
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: tripDayId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGoogleDayLodgingPlaceRequest'
+      responses:
+        '201':
+          description: Google-backed lodging place created or reused and set as Day lodging.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SetDayLodgingPlaceResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip or trip day not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Google Places provider rate limited.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Google Places provider unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /trips/{tripId}/days/{tripDayId}/lodging-place/manual:
     post:
       operationId: createManualDayLodgingPlace
@@ -3503,6 +3578,17 @@ components:
           minLength: 1
           maxLength: 300
           example: 1 Chome-3-3 Nishi-Shinsaibashi, Chuo Ward, Osaka
+    CreateGoogleDayLodgingPlaceRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - googlePlaceId
+      properties:
+        googlePlaceId:
+          type: string
+          minLength: 1
+          maxLength: 255
+          example: ChIJ...
     SetDayLodgingPlaceRequest:
       type: object
       additionalProperties: false

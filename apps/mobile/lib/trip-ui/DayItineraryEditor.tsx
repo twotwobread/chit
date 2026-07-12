@@ -56,7 +56,7 @@ export function DayItineraryEditor({
     moveReorderItem,
     nonPlaceEditorState,
     openLodgingPlaceSelection,
-    openManualLodgingForm,
+    openLodgingSearchRegister,
     openPlaceMap,
     reorderFeedback,
     reorderState,
@@ -68,16 +68,12 @@ export function DayItineraryEditor({
     sharedUpdateReloadDisabled,
     state,
     submitClearCurrentLodging,
-    submitClearLodging,
     submitDelete,
     submitEdit,
-    submitManualLodging,
     submitNonPlaceEditor,
     submitReorder,
     submitSelectLodgingPlace,
-    submitSetLodging,
     updateEditValues,
-    updateManualLodgingValues,
     updateNonPlaceEditorValues,
     updateScrollContentSize,
     updateScrollLayout,
@@ -140,18 +136,14 @@ export function DayItineraryEditor({
               lodgingState={lodgingState}
               onCancelLodgingPicker={cancelLodgingPicker}
               onClearCurrentLodging={() => void submitClearCurrentLodging()}
-              onClearLodging={(item) => void submitClearLodging(item)}
-              onCreateManualLodging={() => void submitManualLodging()}
               onMoveReorderItem={moveReorderItem}
               onOpenMap={(item) => void openPlaceMap(item)}
               onReorderDragActiveChange={setReorderDragActive}
               onReorderDragMove={requestReorderAutoScroll}
               onOpenLodgingPlaceSelection={() => void openLodgingPlaceSelection()}
-              onOpenManualLodgingForm={openManualLodgingForm}
+              onOpenLodgingSearchRegister={openLodgingSearchRegister}
               onSaveReorder={() => void submitReorder()}
               onSelectLodgingPlace={(option) => void submitSelectLodgingPlace(option)}
-              onSetLodging={(item) => void submitSetLodging(item)}
-              onUpdateManualLodgingValues={updateManualLodgingValues}
               mapActionFeedback={mapActionFeedback}
               onReloadSharedUpdate={requestSharedUpdateReload}
               reorderFeedback={reorderFeedback}
