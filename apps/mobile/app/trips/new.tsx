@@ -2,12 +2,7 @@ import { useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 
-import type {
-  CreateTripResponse,
-  DestinationSearchResult,
-  SupportedCurrency,
-  TripDestinationInput,
-} from '@i-um/api-contract';
+import type { DestinationSearchResult, SupportedCurrency, TripDestinationInput } from '@i-um/api-contract';
 
 import { MobileAuthError } from '../../lib/auth/client';
 import { Card, PrimaryButton, SecondaryButton, theme } from '../../lib/design';
@@ -26,7 +21,6 @@ import { createTrip, searchDestinations } from '../../lib/trips/trip-api';
 import { TripDateRangeEditor } from '../../lib/trip-ui/TripDateRangeEditor';
 import { dateFromString, isValidDate, monthStringFromDate, todayString } from '../../lib/trips/date';
 import { TripFormField } from '../../lib/trips/date-picker';
-import { tripDetailPath } from '../../lib/trips/routes';
 import {
   keepTripDateRangePickerFieldAfterSelect,
   minDateForTripDateRangeField,
@@ -56,7 +50,6 @@ export default function NewTripScreen() {
   const [destinations, setDestinations] = useState<TripDestinationInput[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [created, setCreated] = useState<CreateTripResponse | null>(null);
   const [activeDateField, setActiveDateField] = useState<TripDateRangeField | null>(null);
   const [calendarMonth, setCalendarMonth] = useState(() => monthStringFromDate(new Date()));
   const [destinationSearchOpen, setDestinationSearchOpen] = useState(false);
@@ -137,14 +130,14 @@ export default function NewTripScreen() {
     setSubmitting(true);
     setError(null);
     try {
-      const response = await createTrip({
+      await createTrip({
         name: form.name,
         startDate: form.startDate,
         endDate: form.endDate,
         defaultCurrency: form.defaultCurrency,
         destinations: buildCreateTripDestinations(destinations),
       });
-      setCreated(response);
+      router.replace('/');
     } catch (submitError) {
       if (
         submitError instanceof MobileAuthError &&
@@ -157,20 +150,6 @@ export default function NewTripScreen() {
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const reset = () => {
-    destinationSearchRequestId.current += 1;
-    setForm(initialForm);
-    setDestinations([]);
-    setDestinationQuery('');
-    setDestinationResults([]);
-    setDestinationError(null);
-    setDestinationSearched(false);
-    setError(null);
-    setCreated(null);
-    setActiveDateField(null);
-    setDestinationSearchOpen(false);
   };
 
   const addDestination = (result: DestinationSearchResult) => {
@@ -194,32 +173,6 @@ export default function NewTripScreen() {
         results={destinationResults}
         searched={destinationSearched}
       />
-    );
-  }
-
-  if (created) {
-    return (
-      <View style={styles.container}>
-        <Card>
-          <Text style={styles.successTitle}>여행이 만들어졌어요.</Text>
-          <View style={styles.summaryBox}>
-            <Text style={styles.summaryTitle}>{created.trip.name}</Text>
-            <Text style={styles.summaryText}>
-              {created.trip.startDate} ~ {created.trip.endDate}
-            </Text>
-            <Text style={styles.summaryText}>기본 통화: {created.trip.defaultCurrency}</Text>
-            {created.trip.destinations.length > 0 ? (
-              <Text style={styles.summaryText}>
-                여행 도시: {created.trip.destinations.map((destination) => destination.displayName).join(', ')}
-              </Text>
-            ) : null}
-          </View>
-          <PrimaryButton label="여행 상세 보기" onPress={() => router.push(tripDetailPath(created.trip.id))} />
-          <SecondaryButton label="마이페이지에서 보기" onPress={() => router.push('/mypage')} />
-          <SecondaryButton label="새 여행 만들기" onPress={reset} />
-          <SecondaryButton label="홈으로" onPress={() => router.replace('/')} />
-        </Card>
-      </View>
     );
   }
 
@@ -556,13 +509,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: theme.space[7],
   },
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.color.bg,
-    padding: theme.space[7],
-  },
   searchContent: {
     flexGrow: 1,
     gap: theme.space[6],
@@ -794,32 +740,5 @@ const styles = StyleSheet.create({
   },
   addResultButtonTextDisabled: {
     color: theme.color.textMuted,
-  },
-  successTitle: {
-    color: theme.color.success,
-    fontFamily: theme.font.family.bold,
-    fontSize: theme.font.size.headline,
-    fontWeight: theme.font.weight.bold,
-    textAlign: 'center',
-  },
-  summaryBox: {
-    backgroundColor: theme.color.surfaceSunken,
-    borderColor: theme.color.borderSubtle,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    gap: theme.space[3],
-    padding: theme.space[5],
-  },
-  summaryTitle: {
-    color: theme.color.textStrong,
-    fontFamily: theme.font.family.bold,
-    fontSize: theme.font.size.subhead,
-    fontWeight: theme.font.weight.bold,
-    textAlign: 'center',
-  },
-  summaryText: {
-    color: theme.color.textBody,
-    fontFamily: theme.font.family.regular,
-    textAlign: 'center',
   },
 });
