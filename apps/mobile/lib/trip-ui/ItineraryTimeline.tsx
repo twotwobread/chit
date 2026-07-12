@@ -1,9 +1,9 @@
 import { type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Swipeable } from 'react-native-gesture-handler';
 import { Clock } from 'lucide-react-native';
 
 import { Badge, PlacePin, PlaceTag, theme } from '../design';
+import { SwipeActionRow } from './SwipeActionRow';
 import {
   buildItinerarySegments,
   itineraryDurationLabel,
@@ -249,17 +249,7 @@ function TimelineCard({
     return card;
   }
 
-  return (
-    <Swipeable
-      containerStyle={styles.swipeWrap}
-      friction={1.3}
-      overshootRight={false}
-      renderRightActions={() => <View style={styles.swipeActionSlot}>{swipeAction}</View>}
-      rightThreshold={48}
-    >
-      {card}
-    </Swipeable>
-  );
+  return <SwipeActionRow renderRightAction={() => swipeAction}>{card}</SwipeActionRow>;
 }
 
 function TimeButton({
@@ -374,18 +364,6 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.72,
-  },
-  swipeActionSlot: {
-    alignItems: 'stretch',
-    bottom: 0,
-    justifyContent: 'center',
-    position: 'absolute',
-    right: 0,
-    top: theme.space[2],
-    width: 76,
-  },
-  swipeWrap: {
-    overflow: 'hidden',
   },
   row: {
     flexDirection: 'row',
