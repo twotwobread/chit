@@ -168,16 +168,16 @@ test('Home pins the selected current trip and deduplicates it from grouped secti
   assert.equal(viewModel.currentTrip?.id, 'current');
   assert.equal(viewModel.currentTrip?.resumeLabel, '여행 이어가기');
   assert.equal(viewModel.currentTrip?.resumePath, '/trips/current/today');
-  assert.equal(viewModel.currentTrip?.detailPath, '/trips/current/detail');
+  assert.equal(viewModel.currentTrip?.detailPath, '/trips/current/today');
   assert.equal(viewModel.currentTrip?.participantCountLabel, '참여자 2명');
   assert.equal(viewModel.currentTrip?.dateRangeLabel, '2026.06.20 ~ 2026.06.22');
   assert.equal(viewModel.currentTrip?.currencyLabel, '기본 통화 KRW');
   assert.deepEqual(
     viewModel.sections.map((section) => [section.status, section.trips.map((item) => [item.id, item.detailPath])]),
     [
-      ['ongoing', [['other-ongoing', '/trips/other-ongoing/detail']]],
-      ['upcoming', [['upcoming', '/trips/upcoming/detail']]],
-      ['past', [['past', '/trips/past/detail']]],
+      ['ongoing', [['other-ongoing', '/trips/other-ongoing/today']]],
+      ['upcoming', [['upcoming', '/trips/upcoming/today']]],
+      ['past', [['past', '/trips/past/today']]],
     ],
   );
 });

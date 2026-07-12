@@ -3,7 +3,8 @@ import type { GetTripDetailResponse, TripDay, TripListItem } from '@i-um/api-con
 import type { AppBarMember } from '../trip-ui/AppBar';
 import type { SwitchableTrip } from '../trip-ui/TripSwitcherSheet';
 import { formatTripDayDate } from './days';
-import { tripDetailPath, tripItineraryPath } from './routes';
+import { tripDetailPath, tripItineraryPath, tripSettlePath } from './routes';
+import { tripStatus } from './status';
 
 export type TripTabUnavailableSurface = 'today' | 'map' | 'settle';
 
@@ -17,6 +18,23 @@ export type TripTabUnavailableViewModel = {
   secondaryAction: {
     label: string;
     route: ReturnType<typeof tripDetailPath>;
+  };
+};
+
+export type TripTodayStatusLandingViewModel = {
+  status: 'upcoming' | 'past';
+  tone: 'amber' | 'muted';
+  eyebrow: string;
+  heroLabel: string;
+  title: string;
+  helper: string;
+  primaryAction: {
+    label: string;
+    route: ReturnType<typeof tripItineraryPath> | ReturnType<typeof tripSettlePath>;
+  };
+  secondaryAction?: {
+    label: string;
+    route: ReturnType<typeof tripItineraryPath>;
   };
 };
 
@@ -54,6 +72,56 @@ export function buildTripTabUnavailableViewModel(
   };
 }
 
+export function buildTripTodayStatusLandingViewModel(
+  detail: GetTripDetailResponse,
+  localToday: string,
+): TripTodayStatusLandingViewModel | null {
+  const trip = detail.trip;
+  const status = tripStatus(
+    {
+      id: trip.id,
+      name: trip.name,
+      startDate: trip.startDate,
+      endDate: trip.endDate,
+      defaultCurrency: trip.defaultCurrency,
+      createdAt: trip.createdAt,
+      joinedAt: trip.createdAt,
+      myRole: 'member',
+      participantCount: detail.participantSummary.totalCount,
+    },
+    localToday,
+  );
+  const tripName = trip.name.trim() || '여행';
+
+  if (status === 'upcoming') {
+    const daysUntil = daysBetween(localToday, trip.startDate);
+    return {
+      status: 'upcoming',
+      tone: 'amber',
+      eyebrow: '다가오는 여행',
+      heroLabel: `D-${daysUntil}`,
+      title: `${tripName}까지 ${daysUntil}일 남았어요.`,
+      helper: '여행 전 설레는 마음으로 Day별 일정을 준비해보세요.',
+      primaryAction: { label: '일정 준비하기', route: tripItineraryPath(trip.id) },
+    };
+  }
+
+  if (status === 'past') {
+    return {
+      status: 'past',
+      tone: 'muted',
+      eyebrow: '다녀온 여행',
+      heroLabel: '여행 완료',
+      title: `${tripName}은 다녀온 여행입니다.`,
+      helper: '여행은 끝났지만 지출과 정산을 계속 확인할 수 있어요.',
+      primaryAction: { label: '지출·정산 확인하기', route: tripSettlePath(trip.id) },
+      secondaryAction: { label: '전체 일정 보기', route: tripItineraryPath(trip.id) },
+    };
+  }
+
+  return null;
+}
+
 export function findTripCalendarDay(days: TripDay[], localToday: string): TripDay | null {
   return days.find((day) => day.date === localToday) ?? null;
 }
@@ -77,4 +145,14 @@ export function buildSwitchableTrips(trips: TripListItem[], currentTripId: strin
 
 export function formatTripDateRange(startDate: string, endDate: string): string {
   return `${formatTripDayDate(startDate)} ~ ${formatTripDayDate(endDate)}`;
+}
+
+function daysBetween(fromDate: string, toDate: string): number {
+  const diff = dateToUtcTimestamp(toDate) - dateToUtcTimestamp(fromDate);
+  return Math.max(1, Math.round(diff / 86_400_000));
+}
+
+function dateToUtcTimestamp(date: string): number {
+  const [year = '0', month = '1', day = '1'] = date.split('-');
+  return Date.UTC(Number(year), Number(month) - 1, Number(day));
 }

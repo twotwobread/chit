@@ -57,8 +57,10 @@ import {
 } from '../trips/today-execution';
 import {
   buildTripTabUnavailableViewModel,
+  buildTripTodayStatusLandingViewModel,
   findTripCalendarDay,
   type TripTabUnavailableViewModel,
+  type TripTodayStatusLandingViewModel,
 } from '../trips/trip-tabs';
 import { readStoredTravelMode, saveSelectedTravelMode, travelModeFromDisplayLabel } from '../trips/travel-mode';
 import { localDateString } from '../trips/status';
@@ -66,6 +68,7 @@ import { localDateString } from '../trips/status';
 export type TripTodayState =
   | { status: 'loading' }
   | { status: 'ready'; viewModel: TodayExecutionViewModel; spendSummary: TodaySpendSummaryViewModel }
+  | { status: 'statusLanding'; viewModel: TripTodayStatusLandingViewModel }
   | { status: 'unavailable'; viewModel: TripTabUnavailableViewModel }
   | { status: 'auth' }
   | { status: 'notFound' }
@@ -110,6 +113,12 @@ export function useTripTodayController() {
     try {
       const [detail, storedTravelMode] = await Promise.all([getTripDetail(tripId), readStoredTravelMode()]);
       const today = localDateString();
+      const statusLanding = buildTripTodayStatusLandingViewModel(detail, today);
+      if (statusLanding) {
+        setState({ status: 'statusLanding', viewModel: statusLanding });
+        return;
+      }
+
       const currentDay = findTripCalendarDay(detail.days, today);
       if (!currentDay) {
         setState({ status: 'unavailable', viewModel: buildTripTabUnavailableViewModel('today', tripId) });
