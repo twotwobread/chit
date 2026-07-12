@@ -88,6 +88,25 @@ export type GooglePlaceSearchBias = {
   radiusMeters: number;
 };
 
+export type GooglePlaceTripDestination = {
+  id: string;
+  displayName: string;
+  latitude: number;
+  longitude: number;
+  radiusMeters: number;
+};
+
+export type GooglePlaceDestinationChipViewModel = {
+  id: string;
+  label: string;
+  selected: boolean;
+  accessibilityLabel: string;
+};
+
+export type SearchBiasSource =
+  | { kind: 'tripDestination'; destinationId: string }
+  | { kind: 'mapRegion'; latitude: number; longitude: number; radiusMeters: number };
+
 export type GooglePlaceDetailsViewState =
   | { status: 'idle' }
   | { status: 'loading'; googlePlaceId: string; message: string }
@@ -407,12 +426,79 @@ export function buildGooglePlaceSearchBiasFromRegion(region: GooglePlaceSearchMa
   const latitudeMeters = Math.abs(region.latitudeDelta) * 111_320;
   const longitudeMeters =
     Math.abs(region.longitudeDelta) * 111_320 * Math.max(Math.cos(toRadians(region.latitude)), 0.01);
-  const radiusMeters = clampNumber(
-    Math.round(Math.max(latitudeMeters, longitudeMeters) / 2),
-    googlePlaceSearchMinBiasRadiusMeters,
-    googlePlaceSearchMaxBiasRadiusMeters,
-  );
+  const radiusMeters = clampGooglePlaceSearchBiasRadius(Math.round(Math.max(latitudeMeters, longitudeMeters) / 2));
   return { latitude: region.latitude, longitude: region.longitude, radiusMeters };
+}
+
+export function buildDefaultGooglePlaceDestinationSelection(destinations: GooglePlaceTripDestination[]): string | null {
+  return destinations[0]?.id ?? null;
+}
+
+export function buildGooglePlaceDestinationChips(
+  destinations: GooglePlaceTripDestination[],
+  selectedDestinationId: string | null,
+): GooglePlaceDestinationChipViewModel[] {
+  const resolvedSelectedDestinationId =
+    selectedDestinationId ?? buildDefaultGooglePlaceDestinationSelection(destinations);
+  return destinations.map((destination) => {
+    const selected = destination.id === resolvedSelectedDestinationId;
+    return {
+      id: destination.id,
+      label: destination.displayName,
+      selected,
+      accessibilityLabel: `${destination.displayName} 여행 도시 ${selected ? '선택됨' : '선택'}`,
+    };
+  });
+}
+
+export function buildGooglePlaceSearchRegionFromDestination(
+  destination: GooglePlaceTripDestination,
+): GooglePlaceSearchMapRegion | null {
+  if (!isValidGooglePlaceTripDestination(destination)) {
+    return null;
+  }
+  const radiusMeters = clampGooglePlaceSearchBiasRadius(destination.radiusMeters);
+  const latitudeDelta = clampNumber((radiusMeters * 2) / 111_320, 0.03, 1);
+  const longitudeDelta = clampNumber(
+    latitudeDelta / Math.max(Math.cos(toRadians(destination.latitude)), 0.01),
+    0.03,
+    1,
+  );
+  return {
+    latitude: roundCoordinate(destination.latitude),
+    longitude: roundCoordinate(destination.longitude),
+    latitudeDelta: roundDelta(latitudeDelta),
+    longitudeDelta: roundDelta(longitudeDelta),
+  };
+}
+
+export function buildGooglePlaceSearchBiasFromSource(
+  source: SearchBiasSource | null | undefined,
+  destinations: GooglePlaceTripDestination[],
+): GooglePlaceSearchBias | null {
+  if (!source) {
+    return null;
+  }
+  if (source.kind === 'mapRegion') {
+    if (!Number.isFinite(source.latitude) || !Number.isFinite(source.longitude)) {
+      return null;
+    }
+    return {
+      latitude: roundCoordinate(source.latitude),
+      longitude: roundCoordinate(source.longitude),
+      radiusMeters: clampGooglePlaceSearchBiasRadius(source.radiusMeters),
+    };
+  }
+
+  const destination = destinations.find((candidate) => candidate.id === source.destinationId);
+  if (!destination || !isValidGooglePlaceTripDestination(destination)) {
+    return null;
+  }
+  return {
+    latitude: roundCoordinate(destination.latitude),
+    longitude: roundCoordinate(destination.longitude),
+    radiusMeters: clampGooglePlaceSearchBiasRadius(destination.radiusMeters),
+  };
 }
 
 export function shouldShowGooglePlaceRegionSearchAction(
@@ -624,6 +710,18 @@ function toRadians(value: number): number {
 
 function clampNumber(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
+}
+
+function clampGooglePlaceSearchBiasRadius(value: number): number {
+  return clampNumber(Math.round(value), googlePlaceSearchMinBiasRadiusMeters, googlePlaceSearchMaxBiasRadiusMeters);
+}
+
+function isValidGooglePlaceTripDestination(destination: GooglePlaceTripDestination): boolean {
+  return (
+    Number.isFinite(destination.latitude) &&
+    Number.isFinite(destination.longitude) &&
+    Number.isFinite(destination.radiusMeters)
+  );
 }
 
 function roundCoordinate(value: number): number {

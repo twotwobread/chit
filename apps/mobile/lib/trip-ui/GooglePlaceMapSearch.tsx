@@ -39,7 +39,9 @@ import { MobileAuthError } from '../auth/client';
 import { theme } from '../design';
 import { getGooglePlaceDetails, searchGooglePlaces } from '../places/client';
 import {
+  buildDefaultGooglePlaceDestinationSelection,
   buildGooglePlaceCurrentLocationMarkerViewModel,
+  buildGooglePlaceDestinationChips,
   buildGooglePlaceDetailsErrorState,
   buildGooglePlaceDetailsIdleState,
   buildGooglePlaceDetailsLoadingState,
@@ -47,10 +49,12 @@ import {
   buildGooglePlaceExplorationDetail,
   buildGooglePlacePhotoImageSource,
   buildGooglePlaceSearchBiasFromRegion,
+  buildGooglePlaceSearchBiasFromSource,
   buildGooglePlaceSearchInputState,
   buildGooglePlaceSearchMarkerPinStyle,
   buildGooglePlaceSearchMarkerViewModels,
   buildGooglePlaceSearchResultActionView,
+  buildGooglePlaceSearchRegionFromDestination,
   buildGooglePlaceSearchResultsRegion,
   buildGooglePlaceSearchSheetIndex,
   buildGooglePlaceSearchSheetMetrics,
@@ -75,8 +79,10 @@ import {
   type GooglePlaceSearchMarkerIconName,
   type GooglePlaceSearchResultActionMode,
   type GooglePlaceSearchRowViewModel,
+  type GooglePlaceTripDestination,
   type GooglePlaceSearchSheetState,
   type GooglePlaceSearchViewState,
+  type SearchBiasSource,
 } from '../places/google-search';
 import { RouteMapOverlay, type RouteMapPlace, type RouteMapPolyline } from './RouteMap';
 
@@ -122,6 +128,7 @@ export type GooglePlaceMapSearchProps = {
   routePolylines?: RouteMapPolyline[];
   sheetTopInset?: number;
   style?: StyleProp<ViewStyle>;
+  tripDestinations?: GooglePlaceTripDestination[];
   tripId: string;
 };
 
@@ -270,10 +277,26 @@ export function GooglePlaceMapSearch({
   routePolylines,
   sheetTopInset,
   style,
+  tripDestinations = [],
   tripId,
 }: GooglePlaceMapSearchProps) {
   const insets = useSafeAreaInsets();
   const window = useWindowDimensions();
+  const defaultDestinationId = useMemo(
+    () => buildDefaultGooglePlaceDestinationSelection(tripDestinations),
+    [tripDestinations],
+  );
+  const defaultTripDestination = useMemo(
+    () =>
+      defaultDestinationId
+        ? (tripDestinations.find((destination) => destination.id === defaultDestinationId) ?? null)
+        : null,
+    [defaultDestinationId, tripDestinations],
+  );
+  const initialDestinationRegion = useMemo(
+    () => (defaultTripDestination ? buildGooglePlaceSearchRegionFromDestination(defaultTripDestination) : null),
+    [defaultTripDestination],
+  );
   const mapRef = useRef<MapView | null>(null);
   const bottomSheetRef = useRef<GooglePlaceSearchBottomSheetHandle | null>(null);
   const resultScrollRef = useRef<GooglePlaceSearchScrollHandle | null>(null);
@@ -281,7 +304,8 @@ export function GooglePlaceMapSearch({
   const pendingResultFocusIdRef = useRef<string | null>(null);
   const suppressNextRegionDirtyRef = useRef(false);
   const suppressNextMapTapRef = useRef(false);
-  const initialMapRegion = initialRegion ?? defaultGooglePlaceSearchMapRegion;
+  const defaultDestinationAppliedRef = useRef<string | null>(defaultDestinationId);
+  const initialMapRegion = initialRegion ?? initialDestinationRegion ?? defaultGooglePlaceSearchMapRegion;
   const [containerHeight, setContainerHeight] = useState<number | null>(null);
   const [query, setQuery] = useState('');
   const [state, setState] = useState<GooglePlaceSearchViewState>(buildGooglePlaceSearchInputState(''));
@@ -290,6 +314,10 @@ export function GooglePlaceMapSearch({
   const [highlightedResultId, setHighlightedResultId] = useState<string | null>(null);
   const [currentLocation, setCurrentLocation] = useState<GooglePlaceMapCoordinate | null>(null);
   const [mapRegion, setMapRegion] = useState<Region>(initialMapRegion);
+  const [selectedDestinationId, setSelectedDestinationId] = useState<string | null>(defaultDestinationId);
+  const [activeBiasSource, setActiveBiasSource] = useState<SearchBiasSource | null>(
+    defaultDestinationId ? { kind: 'tripDestination', destinationId: defaultDestinationId } : null,
+  );
   const [regionDirty, setRegionDirty] = useState(false);
   const [sheetState, setSheetState] = useState<GooglePlaceSearchSheetState>('minimized');
   const [locationMessage, setLocationMessage] = useState<string | null>(null);
@@ -298,6 +326,17 @@ export function GooglePlaceMapSearch({
   const isLoading = state.status === 'loading';
   const isActionBusy = actionState.status === 'adding';
   const isBusy = isLoading || isActionBusy;
+  const selectedChipDestinationId =
+    activeBiasSource?.kind === 'tripDestination'
+      ? activeBiasSource.destinationId
+      : activeBiasSource?.kind === 'mapRegion'
+        ? ''
+        : selectedDestinationId;
+  const destinationChips = useMemo(
+    () => buildGooglePlaceDestinationChips(tripDestinations, selectedChipDestinationId),
+    [selectedChipDestinationId, tripDestinations],
+  );
+  const hasDestinationChips = destinationChips.length > 0;
 
   const results = state.status === 'success' ? state.results : [];
   const markers = buildGooglePlaceSearchMarkerViewModels(results, highlightedResultId);
@@ -347,6 +386,26 @@ export function GooglePlaceMapSearch({
   useEffect(() => {
     bottomSheetRef.current?.snapToIndex(sheetIndex);
   }, [sheetIndex, sheetSnapPoints]);
+
+  useEffect(() => {
+    if (initialRegion || !defaultTripDestination || !defaultDestinationId) {
+      return;
+    }
+    if (defaultDestinationAppliedRef.current === defaultDestinationId) {
+      return;
+    }
+
+    const nextRegion = buildGooglePlaceSearchRegionFromDestination(defaultTripDestination);
+    setSelectedDestinationId(defaultDestinationId);
+    setActiveBiasSource({ kind: 'tripDestination', destinationId: defaultDestinationId });
+    setRegionDirty(false);
+    if (nextRegion) {
+      suppressNextRegionDirtyRef.current = true;
+      setMapRegion(nextRegion);
+      mapRef.current?.animateToRegion(nextRegion, 260);
+    }
+    defaultDestinationAppliedRef.current = defaultDestinationId;
+  }, [defaultDestinationId, defaultTripDestination, initialRegion]);
 
   const focusSearchInput = () => {
     setSheetState((current) => resolveGooglePlaceSearchSheetState(current, { kind: 'searchInputFocus' }));
@@ -463,8 +522,36 @@ export function GooglePlaceMapSearch({
     }
   };
 
+  const runActiveSearch = () => {
+    void runSearch(buildGooglePlaceSearchBiasFromSource(activeBiasSource, tripDestinations));
+  };
+
   const runRegionSearch = () => {
-    void runSearch(buildGooglePlaceSearchBiasFromRegion(mapRegion));
+    const regionBias = buildGooglePlaceSearchBiasFromRegion(mapRegion);
+    setSelectedDestinationId(null);
+    setActiveBiasSource(regionBias ? { kind: 'mapRegion', ...regionBias } : null);
+    void runSearch(regionBias);
+  };
+
+  const selectDestinationChip = (destinationId: string) => {
+    if (isBusy) {
+      return;
+    }
+    const destination = tripDestinations.find((candidate) => candidate.id === destinationId);
+    if (!destination) {
+      return;
+    }
+    const nextRegion = buildGooglePlaceSearchRegionFromDestination(destination);
+    setSelectedDestinationId(destinationId);
+    setActiveBiasSource({ kind: 'tripDestination', destinationId });
+    setRegionDirty(false);
+    setLocationMessage(null);
+    setMapActionMessage(null);
+    if (nextRegion) {
+      suppressNextRegionDirtyRef.current = true;
+      setMapRegion(nextRegion);
+      mapRef.current?.animateToRegion(nextRegion, 260);
+    }
   };
 
   const updateQuery = (nextQuery: string) => {
@@ -510,6 +597,10 @@ export function GooglePlaceMapSearch({
     if (suppressNextRegionDirtyRef.current) {
       suppressNextRegionDirtyRef.current = false;
       return;
+    }
+    if (activeBiasSource?.kind === 'mapRegion') {
+      const regionBias = buildGooglePlaceSearchBiasFromRegion(region);
+      setActiveBiasSource(regionBias ? { kind: 'mapRegion', ...regionBias } : null);
     }
     if (state.status === 'success' || canSearchGooglePlaces(query)) {
       setRegionDirty(true);
@@ -693,13 +784,45 @@ export function GooglePlaceMapSearch({
                 <Text style={styles.sheetHelper}>주소는 카드에 표시하지 않아요. 지도 핀으로 위치를 확인하세요.</Text>
               </View>
             </View>
+            {hasDestinationChips ? (
+              <ScrollView
+                horizontal
+                keyboardShouldPersistTaps="handled"
+                showsHorizontalScrollIndicator={false}
+                style={styles.destinationChipScroller}
+              >
+                <View style={styles.destinationChipRow}>
+                  {destinationChips.map((chip) => (
+                    <Pressable
+                      accessibilityLabel={chip.accessibilityLabel}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: chip.selected }}
+                      disabled={isBusy}
+                      key={chip.id}
+                      onPress={() => selectDestinationChip(chip.id)}
+                      style={[
+                        styles.destinationChip,
+                        chip.selected ? styles.destinationChipSelected : null,
+                        isBusy ? styles.destinationChipDisabled : null,
+                      ]}
+                    >
+                      <Text
+                        style={[styles.destinationChipText, chip.selected ? styles.destinationChipTextSelected : null]}
+                      >
+                        {chip.label}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </ScrollView>
+            ) : null}
             <View style={styles.searchRow}>
               <GooglePlaceBottomSheetTextInput
                 autoCapitalize="none"
                 editable={!isBusy}
                 onChangeText={updateQuery}
                 onFocus={focusSearchInput}
-                onSubmitEditing={() => void runSearch()}
+                onSubmitEditing={runActiveSearch}
                 placeholder="예: 도톤보리, 우메다 카페"
                 placeholderTextColor={theme.color.textFaint}
                 returnKeyType="search"
@@ -709,7 +832,7 @@ export function GooglePlaceMapSearch({
               <Pressable
                 accessibilityRole="button"
                 disabled={isBusy}
-                onPress={() => void runSearch()}
+                onPress={runActiveSearch}
                 style={[styles.searchButton, isBusy ? styles.searchButtonDisabled : null]}
               >
                 {isLoading ? <ActivityIndicator color={theme.color.onPrimary} /> : null}
@@ -1108,6 +1231,38 @@ const styles = StyleSheet.create({
     fontFamily: theme.font.family.regular,
     fontSize: theme.font.size.caption,
     lineHeight: theme.font.size.caption * theme.font.leading.normal,
+  },
+  destinationChipScroller: {
+    marginHorizontal: -theme.space[1],
+  },
+  destinationChipRow: {
+    flexDirection: 'row',
+    gap: theme.space[2],
+    paddingHorizontal: theme.space[1],
+  },
+  destinationChip: {
+    backgroundColor: theme.color.surfaceSunken,
+    borderColor: theme.color.borderDefault,
+    borderRadius: theme.radius.pill,
+    borderWidth: 1,
+    paddingHorizontal: theme.space[4],
+    paddingVertical: theme.space[2],
+  },
+  destinationChipSelected: {
+    backgroundColor: theme.color.primarySoft,
+    borderColor: theme.color.primary,
+  },
+  destinationChipDisabled: {
+    opacity: 0.6,
+  },
+  destinationChipText: {
+    color: theme.color.textBody,
+    fontFamily: theme.font.family.semibold,
+    fontSize: theme.font.size.label,
+    fontWeight: theme.font.weight.semibold,
+  },
+  destinationChipTextSelected: {
+    color: theme.color.primary,
   },
   searchRow: {
     flexDirection: 'row',
