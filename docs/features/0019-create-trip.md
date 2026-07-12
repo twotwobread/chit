@@ -7,14 +7,14 @@
 - Owner: TBD
 - Target Sprint: TBD
 - Created: 2026-06-21
-- Updated: 2026-06-21
+- Updated: 2026-07-12
 
 ## Ouroboros Source
 
 - Interview Session: `interview_20260621_145014`
 - Seed: `seed_1c2628195a0e`
 - PM Document: N/A
-- Notes: Ambiguity score `0.088`. Scope was clarified as the minimum create-trip slice: authenticated user creates a `Trip`, the server creates the Owner `TripParticipant`, and the mobile create screen shows an in-screen success state. Created-trip list reflection, trip detail navigation, and trip-day generation are deferred to #20, #21, and #24.
+- Notes: Ambiguity score `0.088`. Scope was clarified as the minimum create-trip slice: authenticated user creates a `Trip`, and the server creates the Owner `TripParticipant`. 2026-07-12 UX revision: after a successful mobile create, the app redirects to Home instead of showing an in-screen success action state. Trip detail navigation and trip-day generation remain deferred to #21 and #24.
 
 ## Goal
 
@@ -36,14 +36,14 @@ F-019는 여행 생성 자체를 검증하는 최소 vertical slice다. 생성�
 4. 사용자가 `여행 만들기`를 누른다.
 5. 앱이 generated API client로 `POST /trips`를 호출한다.
 6. 서버는 인증된 user를 기준으로 `trips` row와 Owner `trip_participants` row를 같은 transaction에서 생성한다.
-7. 생성이 성공하면 앱은 같은 생성 화면 안에서 `여행이 만들어졌어요.` 성공 상태와 생성된 여행 요약을 보여준다.
-8. 사용자는 `새 여행 만들기`로 폼을 초기화하거나 `홈으로` 돌아갈 수 있다.
+7. 생성이 성공하면 앱은 완료 버튼 화면을 표시하지 않고 Home으로 `replace` 이동한다.
+8. Home은 기존 여행 목록 조회 흐름으로 새로 생성된 여행을 반영한다.
 
 ## Scope
 
 이번 feature slice에 포함되는 범위다.
 
-- [ ] App UI: 여행 생성 화면, 홈 또는 현재 인증 후 화면의 `새 여행 만들기` 진입점, loading/error/success 상태
+- [ ] App UI: 여행 생성 화면, 홈 또는 현재 인증 후 화면의 `새 여행 만들기` 진입점, loading/error 상태와 성공 후 Home 리다이렉트
 - [ ] API Contract: 인증된 `POST /trips` endpoint, request/response/error schema
 - [ ] API Server: trip handler/service/repository, 인증 user 기반 생성, validation, transaction 처리
 - [ ] DB: `trips`, `trip_participants` migration, constraint/index, sqlc query
@@ -70,7 +70,7 @@ F-019는 여행 생성 자체를 검증하는 최소 vertical slice다. 생성�
 ### Screens
 
 - `apps/mobile/app/index.tsx` 또는 현재 인증 후 홈 화면: `새 여행 만들기` 진입점을 제공한다.
-- `apps/mobile/app/trips/new.tsx` 또는 동등한 Expo Router 경로: 여행 생성 폼과 성공 상태를 제공한다.
+- `apps/mobile/app/trips/new.tsx` 또는 동등한 Expo Router 경로: 여행 생성 폼과 성공 후 Home 리다이렉트를 제공한다.
 
 정확한 route 파일명은 구현 시 기존 Expo Router 구조에 맞춰 조정할 수 있지만, 사용자 흐름과 상태는 유지한다.
 
@@ -101,7 +101,7 @@ F-019 날짜 입력은 직접 텍스트 입력이 아니라 앱 내 월간 캘�
 - Loading: 생성 요청 중 `여행 만드는 중...`을 표시하고 submit button을 중복 입력할 수 없게 한다.
 - Empty: 별도 empty state는 필요 없다. 초기 상태는 빈 폼이다.
 - Error: validation 또는 API 오류 시 화면 안에 오류 문구를 표시하고 사용자가 수정 후 다시 제출할 수 있게 한다.
-- Success: 생성 성공 시 같은 화면 안에서 성공 상태로 전환한다.
+- Success: 생성 성공 시 별도 완료 화면을 표시하지 않고 Home으로 `replace` 이동한다.
 
 ### Copy / Labels
 
@@ -109,9 +109,7 @@ F-019 날짜 입력은 직접 텍스트 입력이 아니라 앱 내 월간 캘�
 - Screen subtitle: `이름과 기간만 정하면 바로 시작할 수 있어요.`
 - Submit: `여행 만들기`
 - Submitting: `여행 만드는 중...`
-- Success title: `여행이 만들어졌어요.`
-- Reset action: `새 여행 만들기`
-- Home action: `홈으로`
+- Success feedback: 별도 완료 버튼 화면 없음. 생성 성공 후 Home으로 이동한다.
 - Generic error: `여행을 만들 수 없어요. 입력 내용을 확인하고 다시 시도해주세요.`
 - Name validation: `여행 이름을 입력해주세요.`
 - Date format validation: `날짜는 YYYY-MM-DD 형식으로 입력해주세요.`
@@ -307,7 +305,7 @@ CREATE TABLE trip_participants (
 - 여행별 표시명 수정이나 초대 수락 시 이름 입력은 후속 collaboration/invite feature에서 다룬다.
 - Trip row와 Owner participant row는 같은 transaction에서 생성되어야 한다.
 - Owner participant 생성에 실패하면 Trip row도 남지 않아야 한다.
-- F-019는 생성 성공 후 상세 화면으로 이동하지 않고, 같은 생성 화면 안에서 success state를 보여준다.
+- F-019는 생성 성공 후 상세 화면이나 다중 액션 완료 화면으로 이동하지 않고 Home으로 `replace` 이동한다.
 
 ## Acceptance Criteria
 
@@ -333,12 +331,11 @@ CREATE TABLE trip_participants (
 - [x] 앱은 validation/API error 상태를 사용자 문구로 표시한다.
 - [x] 앱은 시작일/종료일을 `react-native-calendars` 기반 캘린더로 선택하게 하며 오늘 이전 날짜를 선택할 수 없게 한다.
 - [x] 캘린더 커스텀 헤더에서 년도와 월을 각각 선택할 수 있다.
-- [x] 생성 성공 후 같은 화면에 `여행이 만들어졌어요.`와 여행 이름, 기간, 기본 통화 요약이 표시된다.
-- [x] 성공 상태에서 `새 여행 만들기`는 폼을 초기화한다.
-- [x] 성공 상태에서 `홈으로`는 홈으로 돌아간다.
+- [x] 생성 성공 후 앱은 다중 액션 완료 화면을 표시하지 않고 Home으로 `replace` 이동한다.
+- [x] 생성 성공 후 `여행 상세 보기`, `마이페이지에서 보기`, `새 여행 만들기`, `홈으로` 버튼 묶음을 표시하지 않는다.
 - [x] F-019 구현은 생성된 여행 목록 반영, 여행 상세 이동, trip-day 생성 behavior를 포함하지 않는다.
 - [x] API tests, DB migration verification, mobile typecheck, generated artifact consistency check가 통과한다.
-- [ ] staging 또는 internal build에서 authenticated happy path로 여행 생성 성공 상태를 확인하고 결과를 기록한다.
+- [ ] staging 또는 internal build에서 authenticated happy path로 여행 생성 후 Home 리다이렉트를 확인하고 결과를 기록한다.
 
 ## Implementation Plan
 
@@ -367,8 +364,8 @@ CREATE TABLE trip_participants (
    - Verify: `pnpm --filter @i-um/mobile typecheck`가 통과하고 hand-written duplicate API type이 없다.
 
 7. Mobile create-trip UI 구현
-   - 작업: `새 여행 만들기` 진입점, 생성 폼, client-side validation, loading/error/success state, `새 여행 만들기`/`홈으로` action을 구현한다.
-   - Verify: 앱에서 valid input으로 성공 상태가 표시되고 invalid input에서는 지정된 문구가 표시된다.
+   - 작업: `새 여행 만들기` 진입점, 생성 폼, client-side validation, loading/error state, 성공 후 Home 리다이렉트를 구현한다.
+   - Verify: 앱에서 valid input으로 생성 후 Home으로 이동하고 invalid input에서는 지정된 문구가 표시된다.
 
 8. Repository verification 통합
    - 작업: root verification이 OpenAPI/sqlc generated drift, Go test/build, mobile typecheck를 모두 통과하도록 정리한다.
@@ -439,14 +436,12 @@ pnpm --filter @i-um/mobile typecheck
 
 - [ ] 로그인된 사용자가 `새 여행 만들기` 진입점을 볼 수 있다.
 - [ ] valid name/date/currency 입력 후 `여행 만들기`를 누르면 loading 상태가 표시된다.
-- [ ] 생성 성공 후 같은 화면에 `여행이 만들어졌어요.`와 여행 이름, 기간, 기본 통화가 표시된다.
-- [ ] `새 여행 만들기`를 누르면 폼이 초기화된다.
-- [ ] `홈으로`를 누르면 홈으로 돌아간다.
+- [ ] 생성 성공 후 완료 버튼 화면 없이 Home으로 이동한다.
 - [ ] 빈 이름, 과거 날짜, `startDate > endDate`, 미지원 통화가 사용자 문구로 막힌다.
 - [ ] 시작일/종료일 선택 시 캘린더가 열리고 오늘 이전 날짜가 disabled되어 선택할 수 없다.
 - [ ] 캘린더 헤더에서 년도와 월 드롭다운을 열어 월을 직접 이동할 수 있다.
-- [ ] 생성 성공 후 여행 상세 화면으로 자동 이동하지 않는다.
-- [ ] 생성 성공 후 여행 목록 반영을 F-019 완료 조건으로 주장하지 않는다.
+- [ ] 생성 성공 후 여행 상세 화면이나 마이페이지로 자동 이동하지 않는다.
+- [ ] Home에서 기존 여행 목록 조회 흐름으로 새 여행을 확인할 수 있다.
 - [ ] staging 또는 internal build에서 authenticated happy path를 확인한다.
 
 ## Release Notes
@@ -454,8 +449,8 @@ pnpm --filter @i-um/mobile typecheck
 ```text
 - 로그인한 사용자가 여행 이름, 기간, 기본 통화를 입력해 새 여행을 만들 수 있는 최소 생성 흐름을 추가한다.
 - 여행 생성자는 자동으로 Owner participant가 된다.
-- 생성 성공 후 같은 화면에서 여행 생성 완료와 요약을 확인할 수 있다.
-- 생성된 여행의 목록 반영, 상세 화면, Day 생성은 후속 feature에서 제공한다.
+- 생성 성공 후 완료 버튼 화면을 건너뛰고 Home으로 돌아간다.
+- 생성된 여행의 상세 화면과 Day 생성은 후속 feature에서 제공한다.
 ```
 
 ## Open Questions
@@ -464,14 +459,14 @@ None for implementation after Ouroboros clarification.
 
 Resolved by Ouroboros interview:
 
-- F-019 범위는 Trip 생성 + Owner participant 생성 + 생성 화면 success state까지로 제한한다.
+- F-019 범위는 Trip 생성 + Owner participant 생성 + 성공 후 Home 리다이렉트까지로 제한한다.
 - 생성된 여행 목록 반영은 #20, 여행 상세 기본 화면은 #21, trip-day generation은 #24로 defer한다.
 - `POST /trips`는 인증 필수다.
 - `name`은 trim 후 1..80자다.
 - `startDate`와 `endDate`는 `YYYY-MM-DD`이며 `startDate <= endDate`여야 한다.
 - `defaultCurrency`는 `KRW`, `JPY`, `USD`, `EUR`만 허용한다.
 - Owner participant `display_name`은 authenticated user `displayName`의 생성 시점 스냅샷이다.
-- 생성 성공 후 모바일은 같은 create-trip screen 안에서 `여행이 만들어졌어요.` 성공 상태와 요약을 표시한다.
+- 2026-07-12 UX revision: 생성 성공 후 모바일은 같은 create-trip screen의 다중 액션 성공 상태를 표시하지 않고 Home으로 이동한다.
 
 ## Follow-up Issues
 
