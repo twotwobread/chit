@@ -139,6 +139,8 @@ function expenseCategory(placeType?: TripPlaceType | null): ExpenseCategory {
     case 'shopping':
     case 'sights':
       return placeType;
+    case 'transport':
+      return 'transit';
     case 'etc':
     case 'lodging':
     case null:

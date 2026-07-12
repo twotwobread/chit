@@ -2220,6 +2220,181 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /trips/{tripId}/place-bookmarks:
+    get:
+      operationId: listTripPlaceBookmarks
+      summary: List bookmarked candidate places for a trip
+      description: Returns trip-level Google-backed candidate places saved before scheduling.
+      tags:
+        - Places
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Bookmarked candidate places for the trip.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListTripPlaceBookmarksResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /trips/{tripId}/place-bookmarks/google:
+    post:
+      operationId: createGoogleTripPlaceBookmark
+      summary: Bookmark a Google Place as a trip candidate place
+      description: Resolves a Google-backed place server-side, reuses the trip-level place by googlePlaceId when present, and stores or updates a trip-level bookmark category without adding it to a Day schedule.
+      tags:
+        - Places
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGoogleTripPlaceBookmarkRequest'
+      responses:
+        '201':
+          description: Google-backed candidate place bookmarked for the trip.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateGoogleTripPlaceBookmarkResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip or Google place not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Google Places provider rate limited.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Google Places provider unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /trips/{tripId}/place-bookmarks/{bookmarkId}:
+    delete:
+      operationId: deleteTripPlaceBookmark
+      summary: Remove a bookmarked candidate place from a trip
+      description: Deletes the trip-level bookmark. The underlying trip_place remains available for existing schedule items.
+      tags:
+        - Places
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: bookmarkId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Bookmark removed.
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip or bookmark not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /trips/{tripId}/days/{tripDayId}/places/google/schedule-items:
     post:
       operationId: createGooglePlaceScheduleItem
@@ -2898,6 +3073,7 @@ components:
         - lodging
         - cafe
         - shopping
+        - transport
         - etc
     TripPlaceSummary:
       type: object
@@ -2944,6 +3120,63 @@ components:
           format: double
           minimum: -180
           maximum: 180
+    TripPlaceBookmark:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - tripId
+        - category
+        - place
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+        tripId:
+          type: string
+        category:
+          $ref: '#/components/schemas/TripPlaceType'
+        place:
+          $ref: '#/components/schemas/TripPlaceSummary'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    ListTripPlaceBookmarksResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - bookmarks
+      properties:
+        bookmarks:
+          type: array
+          items:
+            $ref: '#/components/schemas/TripPlaceBookmark'
+    CreateGoogleTripPlaceBookmarkRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - googlePlaceId
+        - category
+      properties:
+        googlePlaceId:
+          type: string
+          minLength: 1
+          maxLength: 255
+          example: ChIJ...
+        category:
+          $ref: '#/components/schemas/TripPlaceType'
+    CreateGoogleTripPlaceBookmarkResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - bookmark
+      properties:
+        bookmark:
+          $ref: '#/components/schemas/TripPlaceBookmark'
     GeoPoint:
       type: object
       required:

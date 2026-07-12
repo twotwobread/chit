@@ -425,6 +425,102 @@ func (s *Service) CreateGooglePlaceScheduleItem(ctx context.Context, userID stri
 	return CreateGooglePlaceScheduleItemResult{Day: day, Item: item}, nil
 }
 
+func (s *Service) ListTripPlaceBookmarks(ctx context.Context, userID string, tripID string) ([]TripPlaceBookmark, error) {
+	if strings.TrimSpace(userID) == "" {
+		return nil, ErrUnauthorized
+	}
+	if s == nil || s.repo == nil {
+		return nil, ErrProviderUnavailable
+	}
+	tripID = strings.TrimSpace(tripID)
+	if _, err := uuid.Parse(tripID); err != nil {
+		return nil, ErrValidation
+	}
+	if err := s.validateTripParticipant(ctx, userID, tripID); err != nil {
+		return nil, err
+	}
+	return s.repo.ListTripPlaceBookmarks(ctx, tripID)
+}
+
+func (s *Service) CreateGoogleTripPlaceBookmark(ctx context.Context, userID string, tripID string, input CreateGoogleTripPlaceBookmarkInput) (CreateGoogleTripPlaceBookmarkResult, error) {
+	if strings.TrimSpace(userID) == "" {
+		return CreateGoogleTripPlaceBookmarkResult{}, ErrUnauthorized
+	}
+	if s == nil || s.repo == nil {
+		return CreateGoogleTripPlaceBookmarkResult{}, ErrProviderUnavailable
+	}
+	tripID = strings.TrimSpace(tripID)
+	if _, err := uuid.Parse(tripID); err != nil {
+		return CreateGoogleTripPlaceBookmarkResult{}, ErrValidation
+	}
+	googlePlaceID := strings.TrimSpace(input.GooglePlaceID)
+	if len([]rune(googlePlaceID)) < 1 || len([]rune(googlePlaceID)) > maxGooglePlaceIDLen {
+		return CreateGoogleTripPlaceBookmarkResult{}, ErrValidation
+	}
+	category := strings.TrimSpace(input.Category)
+	if !validTripPlaceType(category) {
+		return CreateGoogleTripPlaceBookmarkResult{}, ErrValidation
+	}
+	if err := s.validateTripParticipant(ctx, userID, tripID); err != nil {
+		return CreateGoogleTripPlaceBookmarkResult{}, err
+	}
+	if s.provider == nil {
+		return CreateGoogleTripPlaceBookmarkResult{}, ErrProviderUnavailable
+	}
+	details, err := s.provider.Details(ctx, ProviderDetailsInput{GooglePlaceID: googlePlaceID})
+	if err != nil {
+		return CreateGoogleTripPlaceBookmarkResult{}, err
+	}
+	snapshot, err := buildGooglePlaceSnapshot(googlePlaceID, details)
+	if err != nil {
+		return CreateGoogleTripPlaceBookmarkResult{}, err
+	}
+	bookmark, err := s.repo.UpsertGoogleTripPlaceBookmark(ctx, CreateGoogleTripPlaceBookmarkRecord{
+		TripID:            tripID,
+		GooglePlaceID:     snapshot.GooglePlaceID,
+		Name:              snapshot.DisplayName,
+		Address:           snapshot.FormattedAddress,
+		PlaceType:         category,
+		Category:          category,
+		Latitude:          snapshot.Latitude,
+		Longitude:         snapshot.Longitude,
+		GooglePrimaryType: snapshot.PrimaryType,
+		GoogleTypes:       snapshot.Types,
+	})
+	if err != nil {
+		return CreateGoogleTripPlaceBookmarkResult{}, err
+	}
+	return CreateGoogleTripPlaceBookmarkResult{Bookmark: bookmark}, nil
+}
+
+func (s *Service) DeleteTripPlaceBookmark(ctx context.Context, userID string, tripID string, bookmarkID string) error {
+	if strings.TrimSpace(userID) == "" {
+		return ErrUnauthorized
+	}
+	if s == nil || s.repo == nil {
+		return ErrProviderUnavailable
+	}
+	tripID = strings.TrimSpace(tripID)
+	if _, err := uuid.Parse(tripID); err != nil {
+		return ErrValidation
+	}
+	bookmarkID = strings.TrimSpace(bookmarkID)
+	if bookmarkID == "" {
+		return ErrValidation
+	}
+	if err := s.validateTripParticipant(ctx, userID, tripID); err != nil {
+		return err
+	}
+	deleted, err := s.repo.DeleteTripPlaceBookmark(ctx, tripID, bookmarkID)
+	if err != nil {
+		return err
+	}
+	if !deleted {
+		return ErrNotFound
+	}
+	return nil
+}
+
 func activeTripDayRecordID(day trip.TripDay) (string, error) {
 	if strings.TrimSpace(day.ID) == "" {
 		return "", ErrNotFound
@@ -487,6 +583,31 @@ func normalizeOptionalMemo(value *string) (*string, error) {
 		return nil, ErrValidation
 	}
 	return &trimmed, nil
+}
+
+func validTripPlaceType(value string) bool {
+	switch value {
+	case "sights", "food", "lodging", "cafe", "shopping", "transport", "etc":
+		return true
+	default:
+		return false
+	}
+}
+
+func (s *Service) validateTripParticipant(ctx context.Context, userID string, tripID string) error {
+	if _, ok, err := s.repo.GetTripByID(ctx, tripID); err != nil {
+		return err
+	} else if !ok {
+		return ErrNotFound
+	}
+	isParticipant, err := s.repo.IsTripParticipant(ctx, tripID, userID)
+	if err != nil {
+		return err
+	}
+	if !isParticipant {
+		return ErrForbidden
+	}
+	return nil
 }
 
 func (s *Service) validateTripDayParticipant(ctx context.Context, userID string, tripID string, tripDayID string) (trip.TripDay, error) {
@@ -673,6 +794,8 @@ func internalPlaceTypeForGoogleType(value string) (string, bool) {
 		return "food", true
 	case "shopping_mall", "store", "department_store", "clothing_store", "supermarket", "convenience_store":
 		return "shopping", true
+	case "airport", "bus_station", "subway_station", "train_station", "transit_station", "light_rail_station", "taxi_stand":
+		return "transport", true
 	case "tourist_attraction", "museum", "park", "art_gallery", "amusement_park", "zoo", "aquarium", "landmark", "historical_landmark", "place_of_worship":
 		return "sights", true
 	default:

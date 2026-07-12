@@ -3,19 +3,43 @@ import { TripScreen, TripStateCard } from '../../../../lib/trip-ui/TripScreenSca
 import { useTripMapController } from '../../../../lib/trip-ui/useTripMapController';
 
 export default function TripMapTabScreen() {
-  const { feedback, goHome, goLogin, load, state, toggleRouteLayer, tripId } = useTripMapController();
+  const {
+    bookmarkActionState,
+    clearRoutePlaceSelection,
+    createBookmark,
+    deleteBookmark,
+    feedback,
+    goHome,
+    goLogin,
+    load,
+    selectRoutePlace,
+    state,
+    toggleBookmarkLayer,
+    toggleRouteLayer,
+    tripId,
+  } = useTripMapController();
 
   if (state.status === 'success') {
     return (
       <MapContent
+        bookmarkActionState={bookmarkActionState}
+        bookmarkLayerVisible={state.bookmarkLayerVisible}
+        bookmarkResults={state.bookmarkResults}
         feedback={feedback}
         mapPlaces={state.mapPlaces}
+        onBookmarkCategorySelect={(result, category) => void createBookmark(result, category)}
+        onBookmarkDelete={(result) => void deleteBookmark(result)}
+        onClearRoutePlaceSelection={clearRoutePlaceSelection}
+        onRoutePlacePress={selectRoutePlace}
+        onToggleBookmarkLayer={toggleBookmarkLayer}
         onToggleRouteLayer={toggleRouteLayer}
         routeChips={state.routeChips}
         routeNotice={state.routeNotice}
         routePolylines={state.routePolylines}
+        scheduleMarkerDetail={state.scheduleMarkerDetail}
         selectedDayId={state.selectedDayId}
         selectedRouteLayerChipId={state.selectedRouteLayerChipId}
+        selectedRoutePlaceId={state.selectedRoutePlaceId}
         tripId={tripId ?? ''}
       />
     );

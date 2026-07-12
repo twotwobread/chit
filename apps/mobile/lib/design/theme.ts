@@ -39,6 +39,8 @@ const ink = {
 
 const red = { 100: '#ffe3e3', 500: '#fa5252', 600: '#e03131' } as const;
 const blue = { 100: '#d7e7ff', 500: '#3b82f6', 600: '#2563eb' } as const;
+const violet = { 500: '#7048e8' } as const;
+const pink = { 500: '#e64980' } as const;
 const yellow = { 100: '#fff3bf', 500: '#f7b500' } as const;
 
 export const color = {
@@ -47,6 +49,8 @@ export const color = {
   ink,
   red,
   blue,
+  violet,
+  pink,
   yellow,
 
   primary: green[600],
@@ -92,9 +96,10 @@ export const providerColor = {
 export const placeType = {
   sights: { label: '관광지', color: green[500] },
   food: { label: '식당', color: red[500] },
-  lodging: { label: '숙소', color: '#7048e8' },
+  lodging: { label: '숙소', color: violet[500] },
   cafe: { label: '카페', color: amber[600] },
-  shopping: { label: '쇼핑', color: '#e64980' },
+  shopping: { label: '쇼핑', color: pink[500] },
+  transport: { label: '이동수단', color: blue[600] },
   etc: { label: '기타', color: ink[500] },
 } as const;
 

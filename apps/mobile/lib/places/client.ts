@@ -3,7 +3,10 @@ import {
   type CreateGoogleDayLodgingPlaceRequest,
   type CreateGooglePlaceScheduleItemRequest,
   type CreateGooglePlaceScheduleItemResponse,
+  type CreateGoogleTripPlaceBookmarkRequest,
+  type CreateGoogleTripPlaceBookmarkResponse,
   type GooglePlaceDetailsResponse,
+  type ListTripPlaceBookmarksResponse,
   type SearchGooglePlacesResponse,
   type SetDayLodgingPlaceResponse,
 } from '@i-um/api-contract';
@@ -44,6 +47,24 @@ export async function getGooglePlaceDetails(
 ): Promise<GooglePlaceDetailsResponse> {
   await getMeWithRefresh();
   return PlacesService.getGooglePlaceDetails(tripId, tripDayId, googlePlaceId);
+}
+
+export async function listTripPlaceBookmarks(tripId: string): Promise<ListTripPlaceBookmarksResponse> {
+  await getMeWithRefresh();
+  return PlacesService.listTripPlaceBookmarks(tripId);
+}
+
+export async function createGoogleTripPlaceBookmark(
+  tripId: string,
+  request: CreateGoogleTripPlaceBookmarkRequest,
+): Promise<CreateGoogleTripPlaceBookmarkResponse> {
+  await getMeWithRefresh();
+  return PlacesService.createGoogleTripPlaceBookmark(tripId, request);
+}
+
+export async function deleteTripPlaceBookmark(tripId: string, bookmarkId: string): Promise<void> {
+  await getMeWithRefresh();
+  await PlacesService.deleteTripPlaceBookmark(tripId, bookmarkId);
 }
 
 export async function createGoogleDayLodgingPlace(

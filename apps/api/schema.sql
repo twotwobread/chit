@@ -160,7 +160,7 @@ CREATE TABLE trip_places (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT trip_places_name_length_check CHECK (char_length(name) BETWEEN 1 AND 120),
-  CONSTRAINT trip_places_place_type_check CHECK (place_type IN ('sights', 'food', 'lodging', 'cafe', 'shopping', 'etc')),
+  CONSTRAINT trip_places_place_type_check CHECK (place_type IN ('sights', 'food', 'lodging', 'cafe', 'shopping', 'transport', 'etc')),
   CONSTRAINT trip_places_provider_check CHECK (provider IN ('manual', 'google')),
   CONSTRAINT trip_places_google_metadata_check CHECK (
     (
@@ -191,6 +191,21 @@ CREATE TABLE trip_places (
 CREATE UNIQUE INDEX trip_places_trip_google_place_unique
   ON trip_places (trip_id, google_place_id)
   WHERE provider = 'google';
+
+CREATE TABLE trip_place_bookmarks (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  trip_id uuid NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+  trip_place_id uuid NOT NULL,
+  category text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT trip_place_bookmarks_category_check CHECK (category IN ('sights', 'food', 'lodging', 'cafe', 'shopping', 'transport', 'etc')),
+  CONSTRAINT trip_place_bookmarks_trip_place_fk FOREIGN KEY (trip_place_id, trip_id) REFERENCES trip_places(id, trip_id) ON DELETE CASCADE,
+  CONSTRAINT trip_place_bookmarks_trip_place_unique UNIQUE (trip_id, trip_place_id)
+);
+
+CREATE INDEX trip_place_bookmarks_trip_id_idx
+  ON trip_place_bookmarks (trip_id, created_at, id);
 
 CREATE TABLE trip_days (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

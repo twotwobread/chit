@@ -400,6 +400,111 @@ WHERE trip_id = sqlc.arg(trip_id)::uuid
   AND provider = 'google'
   AND google_place_id = sqlc.arg(google_place_id);
 
+-- name: ListTripPlaceBookmarks :many
+SELECT
+  b.id::text AS id,
+  b.trip_id::text AS trip_id,
+  b.category,
+  b.created_at,
+  b.updated_at,
+  tp.id::text AS place_id,
+  tp.name AS place_name,
+  tp.place_type,
+  tp.address,
+  tp.provider,
+  tp.google_place_id,
+  tp.latitude,
+  tp.longitude
+FROM trip_place_bookmarks b
+JOIN trip_places tp
+  ON tp.trip_id = b.trip_id
+ AND tp.id = b.trip_place_id
+WHERE b.trip_id = sqlc.arg(trip_id)::uuid
+ORDER BY b.created_at ASC, b.id ASC;
+
+-- name: UpsertGoogleTripPlaceBookmark :one
+WITH upserted_place AS (
+  INSERT INTO trip_places (
+    trip_id,
+    name,
+    address,
+    place_type,
+    provider,
+    google_place_id,
+    latitude,
+    longitude,
+    google_primary_type,
+    google_types
+  ) VALUES (
+    sqlc.arg(trip_id)::uuid,
+    sqlc.arg(name),
+    sqlc.arg(address),
+    sqlc.arg(place_type),
+    'google',
+    sqlc.arg(google_place_id),
+    sqlc.arg(latitude),
+    sqlc.arg(longitude),
+    sqlc.arg(google_primary_type),
+    sqlc.arg(google_types)::text[]
+  )
+  ON CONFLICT (trip_id, google_place_id) WHERE provider = 'google' DO UPDATE
+  SET google_place_id = EXCLUDED.google_place_id
+  RETURNING
+    id,
+    id::text AS place_id,
+    name AS place_name,
+    place_type,
+    address,
+    provider,
+    google_place_id,
+    latitude,
+    longitude
+), upserted_bookmark AS (
+  INSERT INTO trip_place_bookmarks (
+    trip_id,
+    trip_place_id,
+    category
+  )
+  SELECT
+    sqlc.arg(trip_id)::uuid,
+    id,
+    sqlc.arg(category)
+  FROM upserted_place
+  ON CONFLICT (trip_id, trip_place_id) DO UPDATE
+  SET category = EXCLUDED.category,
+      updated_at = now()
+  RETURNING
+    id::text AS id,
+    trip_id::text AS trip_id,
+    category,
+    created_at,
+    updated_at,
+    trip_place_id
+)
+SELECT
+  b.id,
+  b.trip_id,
+  b.category,
+  b.created_at,
+  b.updated_at,
+  p.place_id,
+  p.place_name,
+  p.place_type,
+  p.address,
+  p.provider,
+  p.google_place_id,
+  p.latitude,
+  p.longitude
+FROM upserted_bookmark b
+JOIN upserted_place p
+  ON p.id = b.trip_place_id;
+
+-- name: DeleteTripPlaceBookmark :one
+DELETE FROM trip_place_bookmarks
+WHERE trip_id = sqlc.arg(trip_id)::uuid
+  AND id = sqlc.arg(bookmark_id)::uuid
+RETURNING id::text;
+
 -- name: CreateTripPlace :one
 INSERT INTO trip_places (
   trip_id,

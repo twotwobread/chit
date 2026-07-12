@@ -28,7 +28,9 @@ export type RouteMapProps = {
   initialRegion?: Region;
   emptyTitle?: string;
   emptyHelper?: string;
+  selectedPlaceId?: string | null;
   style?: StyleProp<ViewStyle>;
+  onPlacePress?: (place: RouteMapPlace) => void;
 };
 
 type ValidMapPlace = RouteMapPlace & { latitude: number; longitude: number };
@@ -37,8 +39,10 @@ export function RouteMap({
   emptyHelper = '좌표를 불러오면 지도를 표시해요.',
   emptyTitle = '지도에 표시할 장소가 없어요',
   initialRegion,
+  onPlacePress,
   places,
   polylines,
+  selectedPlaceId,
   style,
 }: RouteMapProps) {
   const validPlaces = places.filter(isValidPlace);
@@ -55,12 +59,27 @@ export function RouteMap({
 
   return (
     <MapView initialRegion={region} showsMyLocationButton={false} style={[styles.map, style]}>
-      <RouteMapOverlay places={validPlaces} polylines={polylines} />
+      <RouteMapOverlay
+        onPlacePress={onPlacePress}
+        places={validPlaces}
+        polylines={polylines}
+        selectedPlaceId={selectedPlaceId}
+      />
     </MapView>
   );
 }
 
-export function RouteMapOverlay({ places, polylines }: { places: RouteMapPlace[]; polylines?: RouteMapPolyline[] }) {
+export function RouteMapOverlay({
+  onPlacePress,
+  places,
+  polylines,
+  selectedPlaceId,
+}: {
+  places: RouteMapPlace[];
+  polylines?: RouteMapPolyline[];
+  selectedPlaceId?: string | null;
+  onPlacePress?: (place: RouteMapPlace) => void;
+}) {
   const validPlaces = places.filter(isValidPlace);
   const routeLines =
     polylines == null ? defaultPolylines(validPlaces) : polylines.map(sanitizePolyline).filter(isVisiblePolyline);
@@ -80,11 +99,12 @@ export function RouteMapOverlay({ places, polylines }: { places: RouteMapPlace[]
         <Marker
           coordinate={toLatLng(place)}
           key={place.id}
+          onPress={onPlacePress ? () => onPlacePress(place) : undefined}
           title={place.name}
           tracksViewChanges={false}
-          zIndex={place.status === 'next' ? 3 : 2}
+          zIndex={place.id === selectedPlaceId ? 5 : place.status === 'next' ? 3 : 2}
         >
-          <RouteMarker place={place} />
+          <RouteMarker place={place.id === selectedPlaceId ? { ...place, status: 'next' } : place} />
         </Marker>
       ))}
     </>

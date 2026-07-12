@@ -632,6 +632,25 @@ func (q *Queries) DeleteTripMemberParticipant(ctx context.Context, arg DeleteTri
 	return i, err
 }
 
+const deleteTripPlaceBookmark = `-- name: DeleteTripPlaceBookmark :one
+DELETE FROM trip_place_bookmarks
+WHERE trip_id = $1::uuid
+  AND id = $2::uuid
+RETURNING id::text
+`
+
+type DeleteTripPlaceBookmarkParams struct {
+	TripID     pgtype.UUID
+	BookmarkID pgtype.UUID
+}
+
+func (q *Queries) DeleteTripPlaceBookmark(ctx context.Context, arg DeleteTripPlaceBookmarkParams) (string, error) {
+	row := q.db.QueryRow(ctx, deleteTripPlaceBookmark, arg.TripID, arg.BookmarkID)
+	var id string
+	err := row.Scan(&id)
+	return id, err
+}
+
 const deleteTripPlaceByID = `-- name: DeleteTripPlaceByID :exec
 DELETE FROM trip_places
 WHERE trip_id = $1::uuid
@@ -1486,6 +1505,79 @@ func (q *Queries) ListTripParticipantsByTripID(ctx context.Context, dollar_1 pgt
 	return items, nil
 }
 
+const listTripPlaceBookmarks = `-- name: ListTripPlaceBookmarks :many
+SELECT
+  b.id::text AS id,
+  b.trip_id::text AS trip_id,
+  b.category,
+  b.created_at,
+  b.updated_at,
+  tp.id::text AS place_id,
+  tp.name AS place_name,
+  tp.place_type,
+  tp.address,
+  tp.provider,
+  tp.google_place_id,
+  tp.latitude,
+  tp.longitude
+FROM trip_place_bookmarks b
+JOIN trip_places tp
+  ON tp.trip_id = b.trip_id
+ AND tp.id = b.trip_place_id
+WHERE b.trip_id = $1::uuid
+ORDER BY b.created_at ASC, b.id ASC
+`
+
+type ListTripPlaceBookmarksRow struct {
+	ID            string
+	TripID        string
+	Category      string
+	CreatedAt     pgtype.Timestamptz
+	UpdatedAt     pgtype.Timestamptz
+	PlaceID       string
+	PlaceName     string
+	PlaceType     string
+	Address       string
+	Provider      string
+	GooglePlaceID pgtype.Text
+	Latitude      pgtype.Float8
+	Longitude     pgtype.Float8
+}
+
+func (q *Queries) ListTripPlaceBookmarks(ctx context.Context, tripID pgtype.UUID) ([]ListTripPlaceBookmarksRow, error) {
+	rows, err := q.db.Query(ctx, listTripPlaceBookmarks, tripID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListTripPlaceBookmarksRow
+	for rows.Next() {
+		var i ListTripPlaceBookmarksRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.TripID,
+			&i.Category,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.PlaceID,
+			&i.PlaceName,
+			&i.PlaceType,
+			&i.Address,
+			&i.Provider,
+			&i.GooglePlaceID,
+			&i.Latitude,
+			&i.Longitude,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTripPlacesByTrip = `-- name: ListTripPlacesByTrip :many
 SELECT
   id::text AS id,
@@ -2035,6 +2127,145 @@ func (q *Queries) UpsertGoogleTripPlace(ctx context.Context, arg UpsertGoogleTri
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
+		&i.PlaceType,
+		&i.Address,
+		&i.Provider,
+		&i.GooglePlaceID,
+		&i.Latitude,
+		&i.Longitude,
+	)
+	return i, err
+}
+
+const upsertGoogleTripPlaceBookmark = `-- name: UpsertGoogleTripPlaceBookmark :one
+WITH upserted_place AS (
+  INSERT INTO trip_places (
+    trip_id,
+    name,
+    address,
+    place_type,
+    provider,
+    google_place_id,
+    latitude,
+    longitude,
+    google_primary_type,
+    google_types
+  ) VALUES (
+    $1::uuid,
+    $2,
+    $3,
+    $4,
+    'google',
+    $5,
+    $6,
+    $7,
+    $8,
+    $9::text[]
+  )
+  ON CONFLICT (trip_id, google_place_id) WHERE provider = 'google' DO UPDATE
+  SET google_place_id = EXCLUDED.google_place_id
+  RETURNING
+    id,
+    id::text AS place_id,
+    name AS place_name,
+    place_type,
+    address,
+    provider,
+    google_place_id,
+    latitude,
+    longitude
+), upserted_bookmark AS (
+  INSERT INTO trip_place_bookmarks (
+    trip_id,
+    trip_place_id,
+    category
+  )
+  SELECT
+    $1::uuid,
+    id,
+    $10
+  FROM upserted_place
+  ON CONFLICT (trip_id, trip_place_id) DO UPDATE
+  SET category = EXCLUDED.category,
+      updated_at = now()
+  RETURNING
+    id::text AS id,
+    trip_id::text AS trip_id,
+    category,
+    created_at,
+    updated_at,
+    trip_place_id
+)
+SELECT
+  b.id,
+  b.trip_id,
+  b.category,
+  b.created_at,
+  b.updated_at,
+  p.place_id,
+  p.place_name,
+  p.place_type,
+  p.address,
+  p.provider,
+  p.google_place_id,
+  p.latitude,
+  p.longitude
+FROM upserted_bookmark b
+JOIN upserted_place p
+  ON p.id = b.trip_place_id
+`
+
+type UpsertGoogleTripPlaceBookmarkParams struct {
+	TripID            pgtype.UUID
+	Name              string
+	Address           string
+	PlaceType         string
+	GooglePlaceID     pgtype.Text
+	Latitude          pgtype.Float8
+	Longitude         pgtype.Float8
+	GooglePrimaryType pgtype.Text
+	GoogleTypes       []string
+	Category          string
+}
+
+type UpsertGoogleTripPlaceBookmarkRow struct {
+	ID            string
+	TripID        string
+	Category      string
+	CreatedAt     pgtype.Timestamptz
+	UpdatedAt     pgtype.Timestamptz
+	PlaceID       string
+	PlaceName     string
+	PlaceType     string
+	Address       string
+	Provider      string
+	GooglePlaceID pgtype.Text
+	Latitude      pgtype.Float8
+	Longitude     pgtype.Float8
+}
+
+func (q *Queries) UpsertGoogleTripPlaceBookmark(ctx context.Context, arg UpsertGoogleTripPlaceBookmarkParams) (UpsertGoogleTripPlaceBookmarkRow, error) {
+	row := q.db.QueryRow(ctx, upsertGoogleTripPlaceBookmark,
+		arg.TripID,
+		arg.Name,
+		arg.Address,
+		arg.PlaceType,
+		arg.GooglePlaceID,
+		arg.Latitude,
+		arg.Longitude,
+		arg.GooglePrimaryType,
+		arg.GoogleTypes,
+		arg.Category,
+	)
+	var i UpsertGoogleTripPlaceBookmarkRow
+	err := row.Scan(
+		&i.ID,
+		&i.TripID,
+		&i.Category,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.PlaceID,
+		&i.PlaceName,
 		&i.PlaceType,
 		&i.Address,
 		&i.Provider,

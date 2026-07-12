@@ -91,10 +91,10 @@ const (
 
 // Defines values for NonPlaceScheduleItemCategory.
 const (
-	Memo      NonPlaceScheduleItemCategory = "memo"
-	Reminder  NonPlaceScheduleItemCategory = "reminder"
-	Rest      NonPlaceScheduleItemCategory = "rest"
-	Transport NonPlaceScheduleItemCategory = "transport"
+	NonPlaceScheduleItemCategoryMemo      NonPlaceScheduleItemCategory = "memo"
+	NonPlaceScheduleItemCategoryReminder  NonPlaceScheduleItemCategory = "reminder"
+	NonPlaceScheduleItemCategoryRest      NonPlaceScheduleItemCategory = "rest"
+	NonPlaceScheduleItemCategoryTransport NonPlaceScheduleItemCategory = "transport"
 )
 
 // Defines values for NonPlaceTransportMode.
@@ -154,12 +154,13 @@ const (
 
 // Defines values for TripPlaceType.
 const (
-	Cafe     TripPlaceType = "cafe"
-	Etc      TripPlaceType = "etc"
-	Food     TripPlaceType = "food"
-	Lodging  TripPlaceType = "lodging"
-	Shopping TripPlaceType = "shopping"
-	Sights   TripPlaceType = "sights"
+	TripPlaceTypeCafe      TripPlaceType = "cafe"
+	TripPlaceTypeEtc       TripPlaceType = "etc"
+	TripPlaceTypeFood      TripPlaceType = "food"
+	TripPlaceTypeLodging   TripPlaceType = "lodging"
+	TripPlaceTypeShopping  TripPlaceType = "shopping"
+	TripPlaceTypeSights    TripPlaceType = "sights"
+	TripPlaceTypeTransport TripPlaceType = "transport"
 )
 
 // AcceptTripInviteResponse defines model for AcceptTripInviteResponse.
@@ -260,6 +261,17 @@ type CreateGooglePlaceScheduleItemRequest struct {
 type CreateGooglePlaceScheduleItemResponse struct {
 	Day          TripDay      `json:"day"`
 	ScheduleItem ScheduleItem `json:"scheduleItem"`
+}
+
+// CreateGoogleTripPlaceBookmarkRequest defines model for CreateGoogleTripPlaceBookmarkRequest.
+type CreateGoogleTripPlaceBookmarkRequest struct {
+	Category      TripPlaceType `json:"category"`
+	GooglePlaceId string        `json:"googlePlaceId"`
+}
+
+// CreateGoogleTripPlaceBookmarkResponse defines model for CreateGoogleTripPlaceBookmarkResponse.
+type CreateGoogleTripPlaceBookmarkResponse struct {
+	Bookmark TripPlaceBookmark `json:"bookmark"`
 }
 
 // CreateManualDayLodgingPlaceRequest defines model for CreateManualDayLodgingPlaceRequest.
@@ -577,6 +589,11 @@ type ListDayExpensesResponse struct {
 // ListTripParticipantsResponse defines model for ListTripParticipantsResponse.
 type ListTripParticipantsResponse struct {
 	Participants []TripParticipantListItem `json:"participants"`
+}
+
+// ListTripPlaceBookmarksResponse defines model for ListTripPlaceBookmarksResponse.
+type ListTripPlaceBookmarksResponse struct {
+	Bookmarks []TripPlaceBookmark `json:"bookmarks"`
 }
 
 // ListTripPlacesResponse defines model for ListTripPlacesResponse.
@@ -1009,6 +1026,16 @@ type TripParticipantSummary struct {
 	TotalCount    int      `json:"totalCount"`
 }
 
+// TripPlaceBookmark defines model for TripPlaceBookmark.
+type TripPlaceBookmark struct {
+	Category  TripPlaceType    `json:"category"`
+	CreatedAt time.Time        `json:"createdAt"`
+	Id        string           `json:"id"`
+	Place     TripPlaceSummary `json:"place"`
+	TripId    string           `json:"tripId"`
+	UpdatedAt time.Time        `json:"updatedAt"`
+}
+
 // TripPlaceSummary defines model for TripPlaceSummary.
 type TripPlaceSummary struct {
 	Address       string         `json:"address"`
@@ -1199,6 +1226,9 @@ type UpdateScheduleItemJSONRequestBody = UpdateScheduleItemRequest
 // CreateRoutePreviewJSONRequestBody defines body for CreateRoutePreview for application/json ContentType.
 type CreateRoutePreviewJSONRequestBody = CreateRoutePreviewRequest
 
+// CreateGoogleTripPlaceBookmarkJSONRequestBody defines body for CreateGoogleTripPlaceBookmark for application/json ContentType.
+type CreateGoogleTripPlaceBookmarkJSONRequestBody = CreateGoogleTripPlaceBookmarkRequest
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// Revoke the current session
@@ -1333,6 +1363,15 @@ type ServerInterface interface {
 	// Remove a trip participant
 	// (DELETE /trips/{tripId}/participants/{participantId})
 	RemoveTripParticipant(w http.ResponseWriter, r *http.Request, tripId string, participantId string)
+	// List bookmarked candidate places for a trip
+	// (GET /trips/{tripId}/place-bookmarks)
+	ListTripPlaceBookmarks(w http.ResponseWriter, r *http.Request, tripId string)
+	// Bookmark a Google Place as a trip candidate place
+	// (POST /trips/{tripId}/place-bookmarks/google)
+	CreateGoogleTripPlaceBookmark(w http.ResponseWriter, r *http.Request, tripId string)
+	// Remove a bookmarked candidate place from a trip
+	// (DELETE /trips/{tripId}/place-bookmarks/{bookmarkId})
+	DeleteTripPlaceBookmark(w http.ResponseWriter, r *http.Request, tripId string, bookmarkId string)
 	// List trip places
 	// (GET /trips/{tripId}/places)
 	ListTripPlaces(w http.ResponseWriter, r *http.Request, tripId string)
@@ -1606,6 +1645,24 @@ func (_ Unimplemented) ListTripParticipants(w http.ResponseWriter, r *http.Reque
 // Remove a trip participant
 // (DELETE /trips/{tripId}/participants/{participantId})
 func (_ Unimplemented) RemoveTripParticipant(w http.ResponseWriter, r *http.Request, tripId string, participantId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// List bookmarked candidate places for a trip
+// (GET /trips/{tripId}/place-bookmarks)
+func (_ Unimplemented) ListTripPlaceBookmarks(w http.ResponseWriter, r *http.Request, tripId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Bookmark a Google Place as a trip candidate place
+// (POST /trips/{tripId}/place-bookmarks/google)
+func (_ Unimplemented) CreateGoogleTripPlaceBookmark(w http.ResponseWriter, r *http.Request, tripId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Remove a bookmarked candidate place from a trip
+// (DELETE /trips/{tripId}/place-bookmarks/{bookmarkId})
+func (_ Unimplemented) DeleteTripPlaceBookmark(w http.ResponseWriter, r *http.Request, tripId string, bookmarkId string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -3220,6 +3277,108 @@ func (siw *ServerInterfaceWrapper) RemoveTripParticipant(w http.ResponseWriter, 
 	handler.ServeHTTP(w, r)
 }
 
+// ListTripPlaceBookmarks operation middleware
+func (siw *ServerInterfaceWrapper) ListTripPlaceBookmarks(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListTripPlaceBookmarks(w, r, tripId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateGoogleTripPlaceBookmark operation middleware
+func (siw *ServerInterfaceWrapper) CreateGoogleTripPlaceBookmark(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateGoogleTripPlaceBookmark(w, r, tripId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteTripPlaceBookmark operation middleware
+func (siw *ServerInterfaceWrapper) DeleteTripPlaceBookmark(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "bookmarkId" -------------
+	var bookmarkId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "bookmarkId", chi.URLParam(r, "bookmarkId"), &bookmarkId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "bookmarkId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteTripPlaceBookmark(w, r, tripId, bookmarkId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListTripPlaces operation middleware
 func (siw *ServerInterfaceWrapper) ListTripPlaces(w http.ResponseWriter, r *http.Request) {
 
@@ -3526,6 +3685,15 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Delete(options.BaseURL+"/trips/{tripId}/participants/{participantId}", wrapper.RemoveTripParticipant)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/trips/{tripId}/place-bookmarks", wrapper.ListTripPlaceBookmarks)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/trips/{tripId}/place-bookmarks/google", wrapper.CreateGoogleTripPlaceBookmark)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/trips/{tripId}/place-bookmarks/{bookmarkId}", wrapper.DeleteTripPlaceBookmark)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/trips/{tripId}/places", wrapper.ListTripPlaces)
