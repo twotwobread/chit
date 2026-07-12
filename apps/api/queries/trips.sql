@@ -661,18 +661,6 @@ SELECT
   si.place_memo,
   si.arrived_at,
   si.skipped_at,
-  si.item_kind,
-  si.non_place_category,
-  si.non_place_title,
-  si.non_place_memo,
-  si.non_place_link,
-  si.transport_mode,
-  si.transport_reference_number,
-  si.transport_booking_reference,
-  si.transport_origin_text,
-  si.transport_destination_text,
-  si.transport_terminal_text,
-  si.transport_gate_text,
   COALESCE(td.lodging_trip_place_id = si.trip_place_id, false) AS is_lodging,
   COALESCE(tp.id::text, '')::text AS trip_place_id,
   tp.name AS place_name,
@@ -706,18 +694,6 @@ SELECT
   si.place_memo,
   si.arrived_at,
   si.skipped_at,
-  si.item_kind,
-  si.non_place_category,
-  si.non_place_title,
-  si.non_place_memo,
-  si.non_place_link,
-  si.transport_mode,
-  si.transport_reference_number,
-  si.transport_booking_reference,
-  si.transport_origin_text,
-  si.transport_destination_text,
-  si.transport_terminal_text,
-  si.transport_gate_text,
   COALESCE(td.lodging_trip_place_id = si.trip_place_id, false) AS is_lodging,
   COALESCE(tp.id::text, '')::text AS trip_place_id,
   tp.name AS place_name,
@@ -763,13 +739,13 @@ WITH target AS (
   WHERE si.trip_id = sqlc.arg(trip_id)::uuid
     AND si.trip_day_id = sqlc.arg(trip_day_id)::uuid
     AND si.id = sqlc.arg(schedule_item_id)::uuid
-    AND si.item_kind = 'place'
     AND si.deleted_at IS NULL
 ), updated_item AS (
   UPDATE schedule_items si
   SET
     start_time = sqlc.narg(start_time)::time,
     end_time = sqlc.narg(end_time)::time,
+    place_memo = sqlc.narg(place_memo),
     updated_at = now()
   FROM target
   WHERE si.id = target.id

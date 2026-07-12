@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
-	"net/url"
 	"sort"
 	"strings"
 	"time"
@@ -855,24 +854,6 @@ func (s *Service) CreateManualScheduleItem(ctx context.Context, userID string, t
 	return CreateManualScheduleItemResult{Day: day, Item: item}, nil
 }
 
-func (s *Service) CreateNonPlaceScheduleItem(ctx context.Context, userID string, tripID string, tripDayID string, input CreateNonPlaceScheduleItemInput) (CreateNonPlaceScheduleItemResult, error) {
-	day, err := s.activeTripDay(ctx, userID, tripID, tripDayID)
-	if err != nil {
-		return CreateNonPlaceScheduleItemResult{}, err
-	}
-
-	details, startTime, endTime, err := normalizeCreateNonPlaceScheduleItemInput(input)
-	if err != nil {
-		return CreateNonPlaceScheduleItemResult{}, err
-	}
-
-	item, err := s.repo.CreateNonPlaceScheduleItem(ctx, CreateNonPlaceScheduleItemRecord{TripID: strings.TrimSpace(tripID), TripDayID: strings.TrimSpace(tripDayID), Details: details, StartTime: startTime, EndTime: endTime})
-	if err != nil {
-		return CreateNonPlaceScheduleItemResult{}, err
-	}
-	return CreateNonPlaceScheduleItemResult{Day: day, Item: item}, nil
-}
-
 func (s *Service) UpdateScheduleItem(ctx context.Context, userID string, tripID string, tripDayID string, itemID string, input UpdateScheduleItemInput) (UpdateScheduleItemResult, error) {
 	if _, err := s.activeTripDay(ctx, userID, tripID, tripDayID); err != nil {
 		return UpdateScheduleItemResult{}, err
@@ -891,18 +872,6 @@ func (s *Service) UpdateScheduleItem(ctx context.Context, userID string, tripID 
 	}
 	if !ok {
 		return UpdateScheduleItemResult{}, ErrNotFound
-	}
-
-	if scheduleItemType(foundItem) == ScheduleItemTypeNonPlace {
-		merged, err := mergeUpdateNonPlaceScheduleItemInput(strings.TrimSpace(tripID), strings.TrimSpace(tripDayID), itemID, foundItem, input)
-		if err != nil {
-			return UpdateScheduleItemResult{}, err
-		}
-		updatedItem, err := s.repo.UpdateNonPlaceScheduleItem(ctx, merged)
-		if err != nil {
-			return UpdateScheduleItemResult{}, err
-		}
-		return UpdateScheduleItemResult{Item: updatedItem}, nil
 	}
 
 	merged, err := mergeUpdateScheduleItemInput(strings.TrimSpace(tripID), strings.TrimSpace(tripDayID), itemID, foundItem, input)
@@ -1153,7 +1122,7 @@ func isEmptyUpdate(input UpdateInput) bool {
 }
 
 func isEmptyScheduleItemUpdate(input UpdateScheduleItemInput) bool {
-	return input.Name == nil && input.Address == nil && input.PlaceType == nil && input.StartTime == nil && input.EndTime == nil && input.Category == nil && input.Title == nil && input.Memo == nil && input.Link == nil && input.TransportMode == nil && input.ReferenceNumber == nil && input.BookingReference == nil && input.OriginText == nil && input.DestinationText == nil && input.TerminalText == nil && input.GateText == nil
+	return input.Name == nil && input.Address == nil && input.PlaceType == nil && input.StartTime == nil && input.EndTime == nil && input.Memo == nil
 }
 
 func validateUpdateScheduleItemInput(input UpdateScheduleItemInput) error {
@@ -1185,42 +1154,15 @@ func validateUpdateScheduleItemInput(input UpdateScheduleItemInput) error {
 			return err
 		}
 	}
-	if input.Category != nil && !isSupportedNonPlaceCategory(strings.TrimSpace(*input.Category)) {
-		return ErrValidation
-	}
-	if input.Title != nil {
-		title := strings.TrimSpace(*input.Title)
-		if len([]rune(title)) < 1 || len([]rune(title)) > 120 {
-			return ErrValidation
-		}
-	}
 	if input.Memo != nil {
 		if _, err := normalizeOptionalText(*input.Memo, 1000); err != nil {
 			return err
 		}
 	}
-	if input.Link != nil {
-		if _, err := normalizeOptionalLink(*input.Link); err != nil {
-			return err
-		}
-	}
-	if input.TransportMode != nil {
-		mode := strings.TrimSpace(*input.TransportMode)
-		if mode != "" && !isSupportedTransportMode(mode) {
-			return ErrValidation
-		}
-	}
-	if err := validateOptionalTextInputs(input.ReferenceNumber, 80, input.BookingReference, 80, input.OriginText, 200, input.DestinationText, 200, input.TerminalText, 120, input.GateText, 80); err != nil {
-		return err
-	}
 	return nil
 }
 
 func mergeUpdateScheduleItemInput(tripID string, tripDayID string, itemID string, foundItem ScheduleItem, input UpdateScheduleItemInput) (UpdateScheduleItemRecord, error) {
-	if input.Category != nil || input.Title != nil || input.Memo != nil || input.Link != nil || input.TransportMode != nil || input.ReferenceNumber != nil || input.BookingReference != nil || input.OriginText != nil || input.DestinationText != nil || input.TerminalText != nil || input.GateText != nil {
-		return UpdateScheduleItemRecord{}, ErrValidation
-	}
-
 	name := foundItem.Place.Name
 	if input.Name != nil {
 		name = strings.TrimSpace(*input.Name)
@@ -1271,6 +1213,18 @@ func mergeUpdateScheduleItemInput(tripID string, tripDayID string, itemID string
 		return UpdateScheduleItemRecord{}, ErrValidation
 	}
 
+	var memo *string
+	if foundItem.PlaceSchedule != nil {
+		memo = foundItem.PlaceSchedule.Memo
+	}
+	if input.Memo != nil {
+		normalized, err := normalizeOptionalText(*input.Memo, 1000)
+		if err != nil {
+			return UpdateScheduleItemRecord{}, err
+		}
+		memo = normalized
+	}
+
 	return UpdateScheduleItemRecord{
 		TripID:    tripID,
 		TripDayID: tripDayID,
@@ -1280,154 +1234,8 @@ func mergeUpdateScheduleItemInput(tripID string, tripDayID string, itemID string
 		PlaceType: placeType,
 		StartTime: startTime,
 		EndTime:   endTime,
+		Memo:      memo,
 	}, nil
-}
-
-func normalizeCreateNonPlaceScheduleItemInput(input CreateNonPlaceScheduleItemInput) (NonPlaceScheduleItemDetails, *string, *string, error) {
-	details, err := normalizeNonPlaceDetails(NonPlaceScheduleItemDetails{}, nonPlacePatchValues{
-		Category:         &input.Category,
-		Title:            &input.Title,
-		Memo:             input.Memo,
-		Link:             input.Link,
-		TransportMode:    input.TransportMode,
-		ReferenceNumber:  input.ReferenceNumber,
-		BookingReference: input.BookingReference,
-		OriginText:       input.OriginText,
-		DestinationText:  input.DestinationText,
-		TerminalText:     input.TerminalText,
-		GateText:         input.GateText,
-	}, true)
-	if err != nil {
-		return NonPlaceScheduleItemDetails{}, nil, nil, err
-	}
-	startTime, endTime, err := normalizeScheduleItemTimePair(nil, nil, input.StartTime, input.EndTime)
-	if err != nil {
-		return NonPlaceScheduleItemDetails{}, nil, nil, err
-	}
-	return details, startTime, endTime, nil
-}
-
-func mergeUpdateNonPlaceScheduleItemInput(tripID string, tripDayID string, itemID string, foundItem ScheduleItem, input UpdateScheduleItemInput) (UpdateNonPlaceScheduleItemRecord, error) {
-	if input.Name != nil || input.Address != nil || input.PlaceType != nil {
-		return UpdateNonPlaceScheduleItemRecord{}, ErrValidation
-	}
-	if foundItem.NonPlace == nil {
-		return UpdateNonPlaceScheduleItemRecord{}, ErrValidation
-	}
-
-	details, err := normalizeNonPlaceDetails(*foundItem.NonPlace, nonPlacePatchValues{
-		Category:         input.Category,
-		Title:            input.Title,
-		Memo:             input.Memo,
-		Link:             input.Link,
-		TransportMode:    input.TransportMode,
-		ReferenceNumber:  input.ReferenceNumber,
-		BookingReference: input.BookingReference,
-		OriginText:       input.OriginText,
-		DestinationText:  input.DestinationText,
-		TerminalText:     input.TerminalText,
-		GateText:         input.GateText,
-	}, false)
-	if err != nil {
-		return UpdateNonPlaceScheduleItemRecord{}, err
-	}
-	startTime, endTime, err := normalizeScheduleItemTimePair(foundItem.StartTime, foundItem.EndTime, input.StartTime, input.EndTime)
-	if err != nil {
-		return UpdateNonPlaceScheduleItemRecord{}, err
-	}
-	return UpdateNonPlaceScheduleItemRecord{TripID: tripID, TripDayID: tripDayID, ItemID: itemID, Details: details, StartTime: startTime, EndTime: endTime}, nil
-}
-
-type nonPlacePatchValues struct {
-	Category         *string
-	Title            *string
-	Memo             *string
-	Link             *string
-	TransportMode    *string
-	ReferenceNumber  *string
-	BookingReference *string
-	OriginText       *string
-	DestinationText  *string
-	TerminalText     *string
-	GateText         *string
-}
-
-func normalizeNonPlaceDetails(base NonPlaceScheduleItemDetails, patch nonPlacePatchValues, creating bool) (NonPlaceScheduleItemDetails, error) {
-	details := base
-	if patch.Category != nil {
-		details.Category = strings.TrimSpace(*patch.Category)
-	}
-	if !isSupportedNonPlaceCategory(details.Category) {
-		return NonPlaceScheduleItemDetails{}, ErrValidation
-	}
-	if patch.Title != nil {
-		details.Title = strings.TrimSpace(*patch.Title)
-	}
-	if len([]rune(details.Title)) < 1 || len([]rune(details.Title)) > 120 {
-		return NonPlaceScheduleItemDetails{}, ErrValidation
-	}
-
-	var err error
-	if patch.Memo != nil || creating {
-		details.Memo, err = normalizeOptionalTextValue(patch.Memo, details.Memo, 1000)
-		if err != nil {
-			return NonPlaceScheduleItemDetails{}, err
-		}
-	}
-	if patch.Link != nil || creating {
-		details.Link, err = normalizeOptionalLinkValue(patch.Link, details.Link)
-		if err != nil {
-			return NonPlaceScheduleItemDetails{}, err
-		}
-	}
-
-	transportFields := []*string{patch.TransportMode, patch.ReferenceNumber, patch.BookingReference, patch.OriginText, patch.DestinationText, patch.TerminalText, patch.GateText}
-	if details.Category != NonPlaceCategoryTransport {
-		for _, field := range transportFields {
-			if field != nil && strings.TrimSpace(*field) != "" {
-				return NonPlaceScheduleItemDetails{}, ErrValidation
-			}
-		}
-		details.TransportMode = nil
-		details.ReferenceNumber = nil
-		details.BookingReference = nil
-		details.OriginText = nil
-		details.DestinationText = nil
-		details.TerminalText = nil
-		details.GateText = nil
-		return details, nil
-	}
-
-	if patch.TransportMode != nil {
-		mode := strings.TrimSpace(*patch.TransportMode)
-		if mode == "" {
-			details.TransportMode = nil
-		} else {
-			details.TransportMode = &mode
-		}
-	}
-	if details.TransportMode == nil || !isSupportedTransportMode(*details.TransportMode) {
-		return NonPlaceScheduleItemDetails{}, ErrValidation
-	}
-	if details.ReferenceNumber, err = normalizeOptionalTextValue(patch.ReferenceNumber, details.ReferenceNumber, 80); err != nil {
-		return NonPlaceScheduleItemDetails{}, err
-	}
-	if details.BookingReference, err = normalizeOptionalTextValue(patch.BookingReference, details.BookingReference, 80); err != nil {
-		return NonPlaceScheduleItemDetails{}, err
-	}
-	if details.OriginText, err = normalizeOptionalTextValue(patch.OriginText, details.OriginText, 200); err != nil {
-		return NonPlaceScheduleItemDetails{}, err
-	}
-	if details.DestinationText, err = normalizeOptionalTextValue(patch.DestinationText, details.DestinationText, 200); err != nil {
-		return NonPlaceScheduleItemDetails{}, err
-	}
-	if details.TerminalText, err = normalizeOptionalTextValue(patch.TerminalText, details.TerminalText, 120); err != nil {
-		return NonPlaceScheduleItemDetails{}, err
-	}
-	if details.GateText, err = normalizeOptionalTextValue(patch.GateText, details.GateText, 80); err != nil {
-		return NonPlaceScheduleItemDetails{}, err
-	}
-	return details, nil
 }
 
 func normalizeScheduleItemTimePair(currentStart *string, currentEnd *string, patchStart *string, patchEnd *string) (*string, *string, error) {
@@ -1459,13 +1267,6 @@ func normalizeScheduleItemTimePair(currentStart *string, currentEnd *string, pat
 	return startTime, endTime, nil
 }
 
-func normalizeOptionalTextValue(input *string, current *string, maxLength int) (*string, error) {
-	if input == nil {
-		return current, nil
-	}
-	return normalizeOptionalText(*input, maxLength)
-}
-
 func normalizeOptionalText(value string, maxLength int) (*string, error) {
 	trimmed := strings.TrimSpace(value)
 	if trimmed == "" {
@@ -1475,60 +1276,6 @@ func normalizeOptionalText(value string, maxLength int) (*string, error) {
 		return nil, ErrValidation
 	}
 	return &trimmed, nil
-}
-
-func normalizeOptionalLinkValue(input *string, current *string) (*string, error) {
-	if input == nil {
-		return current, nil
-	}
-	return normalizeOptionalLink(*input)
-}
-
-func normalizeOptionalLink(value string) (*string, error) {
-	trimmed := strings.TrimSpace(value)
-	if trimmed == "" {
-		return nil, nil
-	}
-	if len([]rune(trimmed)) > 500 {
-		return nil, ErrValidation
-	}
-	parsed, err := url.Parse(trimmed)
-	if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
-		return nil, ErrValidation
-	}
-	return &trimmed, nil
-}
-
-func validateOptionalTextInputs(valuesAndLimits ...interface{}) error {
-	for index := 0; index < len(valuesAndLimits); index += 2 {
-		value, _ := valuesAndLimits[index].(*string)
-		limit, _ := valuesAndLimits[index+1].(int)
-		if value == nil {
-			continue
-		}
-		if _, err := normalizeOptionalText(*value, limit); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func isSupportedNonPlaceCategory(value string) bool {
-	switch value {
-	case NonPlaceCategoryTransport, NonPlaceCategoryRest, NonPlaceCategoryMemo, NonPlaceCategoryReminder:
-		return true
-	default:
-		return false
-	}
-}
-
-func isSupportedTransportMode(value string) bool {
-	switch value {
-	case TransportModeFlight, TransportModeTrain, TransportModeBus, TransportModeFerry, TransportModeOther:
-		return true
-	default:
-		return false
-	}
 }
 
 func scheduleItemType(item ScheduleItem) string {
@@ -1685,7 +1432,7 @@ func isSupportedCurrency(value string) bool {
 
 func isSupportedPlaceType(value string) bool {
 	switch value {
-	case "sights", "food", "lodging", "cafe", "shopping", "etc":
+	case "sights", "food", "lodging", "cafe", "shopping", "transport", "etc":
 		return true
 	default:
 		return false

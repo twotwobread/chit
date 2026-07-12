@@ -1404,75 +1404,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-  /trips/{tripId}/days/{tripDayId}/schedule-items/non-place:
-    post:
-      operationId: createNonPlaceScheduleItem
-      summary: Add a non-place item to a trip day schedule
-      description: Creates a manually entered schedule item that is not tied to a TripPlace, such as transport, rest, memo, or reminder.
-      tags:
-        - Trips
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: tripId
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: tripDayId
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateNonPlaceScheduleItemRequest'
-      responses:
-        '201':
-          description: Non-place item added to the selected Day schedule.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CreateNonPlaceScheduleItemResponse'
-        '400':
-          description: Validation error.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '403':
-          description: Forbidden.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '404':
-          description: Trip or trip day not found.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '409':
-          description: Concurrent append conflict.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '500':
-          description: Unexpected server error.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
   /trips/{tripId}/days/{tripDayId}/schedule-items/order:
     patch:
       operationId: reorderScheduleItems
@@ -2276,7 +2207,7 @@ paths:
     post:
       operationId: createGoogleTripPlaceBookmark
       summary: Bookmark a Google Place as a trip candidate place
-      description: Resolves a Google-backed place server-side, reuses the trip-level place by googlePlaceId when present, and stores or updates a trip-level bookmark category without adding it to a Day schedule.
+      description: Resolves a Google-backed place server-side, reuses the trip-level place by googlePlaceId when present, maps the initial TripPlaceType from provider metadata, and stores or updates a trip-level bookmark without adding it to a Day schedule.
       tags:
         - Places
       security:
@@ -3160,15 +3091,12 @@ components:
       additionalProperties: false
       required:
         - googlePlaceId
-        - category
       properties:
         googlePlaceId:
           type: string
           minLength: 1
           maxLength: 255
           example: ChIJ...
-        category:
-          $ref: '#/components/schemas/TripPlaceType'
     CreateGoogleTripPlaceBookmarkResponse:
       type: object
       additionalProperties: false
@@ -3275,22 +3203,6 @@ components:
       type: string
       enum:
         - place
-        - non_place
-    NonPlaceScheduleItemCategory:
-      type: string
-      enum:
-        - transport
-        - rest
-        - memo
-        - reminder
-    NonPlaceTransportMode:
-      type: string
-      enum:
-        - flight
-        - train
-        - bus
-        - ferry
-        - other
     PlaceScheduleItemDetails:
       type: object
       additionalProperties: false
@@ -3309,72 +3221,6 @@ components:
           nullable: true
           maxLength: 1000
           description: Optional memo for the place-backed schedule item.
-    NonPlaceScheduleItemDetails:
-      type: object
-      additionalProperties: false
-      required:
-        - category
-        - title
-        - memo
-        - link
-        - transportMode
-        - referenceNumber
-        - bookingReference
-        - originText
-        - destinationText
-        - terminalText
-        - gateText
-      properties:
-        category:
-          $ref: '#/components/schemas/NonPlaceScheduleItemCategory'
-        title:
-          type: string
-          minLength: 1
-          maxLength: 120
-          example: 간사이공항에서 난바 이동
-        memo:
-          type: string
-          nullable: true
-          maxLength: 1000
-        link:
-          type: string
-          nullable: true
-          maxLength: 500
-          example: https://example.com/reservation
-        transportMode:
-          allOf:
-            - $ref: '#/components/schemas/NonPlaceTransportMode'
-          nullable: true
-        referenceNumber:
-          type: string
-          nullable: true
-          maxLength: 80
-          example: MM123
-        bookingReference:
-          type: string
-          nullable: true
-          maxLength: 80
-          example: ABC123
-        originText:
-          type: string
-          nullable: true
-          maxLength: 200
-          example: 인천공항 T1
-        destinationText:
-          type: string
-          nullable: true
-          maxLength: 200
-          example: 간사이공항 T2
-        terminalText:
-          type: string
-          nullable: true
-          maxLength: 120
-          example: Terminal 1
-        gateText:
-          type: string
-          nullable: true
-          maxLength: 80
-          example: 12A
     ScheduleItem:
       type: object
       required:
@@ -3389,7 +3235,6 @@ components:
         - skippedAt
         - place
         - placeSchedule
-        - nonPlace
       properties:
         id:
           type: string
@@ -3426,16 +3271,10 @@ components:
           nullable: true
           description: Server-generated skip timestamp for this schedule item instance. Null means the item is not currently skipped.
         place:
-          allOf:
-            - $ref: '#/components/schemas/TripPlaceSummary'
-          nullable: true
+          $ref: '#/components/schemas/TripPlaceSummary'
         placeSchedule:
           allOf:
             - $ref: '#/components/schemas/PlaceScheduleItemDetails'
-          nullable: true
-        nonPlace:
-          allOf:
-            - $ref: '#/components/schemas/NonPlaceScheduleItemDetails'
           nullable: true
     GetDayScheduleItemsResponse:
       type: object
@@ -3968,71 +3807,6 @@ components:
           $ref: '#/components/schemas/TripDay'
         scheduleItem:
           $ref: '#/components/schemas/ScheduleItem'
-    CreateNonPlaceScheduleItemRequest:
-      type: object
-      additionalProperties: false
-      required:
-        - category
-        - title
-      properties:
-        category:
-          $ref: '#/components/schemas/NonPlaceScheduleItemCategory'
-        title:
-          type: string
-          minLength: 1
-          maxLength: 120
-          example: 간사이공항에서 난바 이동
-        startTime:
-          type: string
-          pattern: '^([01]\\d|2[0-3]):[0-5]\\d$'
-          example: '09:30'
-        endTime:
-          type: string
-          pattern: '^([01]\\d|2[0-3]):[0-5]\\d$'
-          example: '11:00'
-        memo:
-          type: string
-          maxLength: 1000
-        link:
-          type: string
-          maxLength: 500
-          example: https://example.com/reservation
-        transportMode:
-          $ref: '#/components/schemas/NonPlaceTransportMode'
-        referenceNumber:
-          type: string
-          maxLength: 80
-          example: MM123
-        bookingReference:
-          type: string
-          maxLength: 80
-          example: ABC123
-        originText:
-          type: string
-          maxLength: 200
-          example: 인천공항 T1
-        destinationText:
-          type: string
-          maxLength: 200
-          example: 간사이공항 T2
-        terminalText:
-          type: string
-          maxLength: 120
-          example: Terminal 1
-        gateText:
-          type: string
-          maxLength: 80
-          example: 12A
-    CreateNonPlaceScheduleItemResponse:
-      type: object
-      required:
-        - day
-        - scheduleItem
-      properties:
-        day:
-          $ref: '#/components/schemas/TripDay'
-        scheduleItem:
-          $ref: '#/components/schemas/ScheduleItem'
     CreateGooglePlaceScheduleItemRequest:
       type: object
       additionalProperties: false
@@ -4105,46 +3879,10 @@ components:
           type: string
           description: Optional local end time in HH:mm. Empty string clears end time; absent leaves unchanged.
           example: '11:00'
-        category:
-          $ref: '#/components/schemas/NonPlaceScheduleItemCategory'
-        title:
-          type: string
-          maxLength: 120
-          description: Non-place item title. Empty string is invalid because title is required.
         memo:
           type: string
           maxLength: 1000
-          description: Non-place memo. Empty string clears the memo.
-        link:
-          type: string
-          maxLength: 500
-          description: Non-place link. Empty string clears the link.
-        transportMode:
-          $ref: '#/components/schemas/NonPlaceTransportMode'
-        referenceNumber:
-          type: string
-          maxLength: 80
-          description: Transport reference number. Empty string clears the field.
-        bookingReference:
-          type: string
-          maxLength: 80
-          description: Transport booking reference. Empty string clears the field.
-        originText:
-          type: string
-          maxLength: 200
-          description: Transport origin text. Empty string clears the field.
-        destinationText:
-          type: string
-          maxLength: 200
-          description: Transport destination text. Empty string clears the field.
-        terminalText:
-          type: string
-          maxLength: 120
-          description: Transport terminal text. Empty string clears the field.
-        gateText:
-          type: string
-          maxLength: 80
-          description: Transport gate text. Empty string clears the field.
+          description: Place-backed schedule memo. Empty string clears the memo.
     UpdateScheduleItemResponse:
       type: object
       required:
@@ -4192,6 +3930,7 @@ components:
         - displayName
         - formattedAddress
         - primaryType
+        - placeType
         - latitude
         - longitude
       properties:
@@ -4207,6 +3946,8 @@ components:
         primaryType:
           type: string
           example: tourist_attraction
+        placeType:
+          $ref: '#/components/schemas/TripPlaceType'
         primaryTypeDisplayName:
           type: string
           example: 관광명소

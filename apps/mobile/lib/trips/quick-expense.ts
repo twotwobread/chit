@@ -12,9 +12,9 @@ import type {
 
 import {
   formatScheduleItemTimeLabel,
-  getNonPlaceCategoryLabel,
   getPlaceTypeLabel,
   getScheduleItems,
+  type PlaceBackedScheduleItem,
 } from './day-itinerary';
 import { formatTripDayDate } from './days';
 import { tripItineraryDayPath, tripSettlePath } from './routes';
@@ -673,7 +673,7 @@ export function quickExpenseFailureMessage(status?: number): string {
 }
 
 function toItemOption(
-  item: ScheduleItem,
+  item: PlaceBackedScheduleItem,
   itinerary: GetDayScheduleItemsResponse,
   selectedItemId: string | null,
 ): QuickExpenseItemOption {
@@ -682,18 +682,6 @@ function toItemOption(
     dayLabel: `Day ${itinerary.day.dayOrder}`,
     formattedDate: formatTripDayDate(itinerary.day.date),
   };
-  if (!item.place) {
-    return {
-      itemId: item.id,
-      ...dayFields,
-      orderLabel: String(item.itemOrder),
-      placeName: item.nonPlace?.title ?? '장소 없는 일정',
-      placeTypeLabel: item.nonPlace ? getNonPlaceCategoryLabel(item.nonPlace.category) : '일정',
-      address: item.nonPlace?.memo ?? '',
-      timeLabel: formatScheduleItemTimeLabel(item.startTime, item.endTime) ?? null,
-      selected: item.id === selectedItemId,
-    };
-  }
   return {
     itemId: item.id,
     ...dayFields,
@@ -730,7 +718,7 @@ function itineraryDateRangeLabel(itineraries: GetDayScheduleItemsResponse[]): st
   return `${formatTripDayDate(first.day.date)}–${formatTripDayDate(last.day.date)}`;
 }
 
-function orderedItems(items: ScheduleItem[]): ScheduleItem[] {
+function orderedItems<T extends ScheduleItem>(items: T[]): T[] {
   return [...items].sort((left, right) => left.itemOrder - right.itemOrder);
 }
 

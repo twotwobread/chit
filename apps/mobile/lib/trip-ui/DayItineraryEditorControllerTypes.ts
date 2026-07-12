@@ -9,7 +9,6 @@ import type {
   DayItineraryReorderState,
   DeletePlaceConfirmationState,
   EditPlacePanelState,
-  NonPlaceScheduleItemPanelState,
 } from './DayItineraryEditorParts';
 
 export type DayItineraryState =
@@ -20,8 +19,6 @@ export type DayItineraryState =
   | { status: 'error'; title: string; helper: string };
 
 export type EditState = { status: 'idle' } | EditPlacePanelState;
-
-export type NonPlaceEditorState = { status: 'idle' } | NonPlaceScheduleItemPanelState;
 
 export type DeleteState = { status: 'idle' } | DeletePlaceConfirmationState;
 
@@ -37,7 +34,6 @@ export type DayItineraryControllerSetters = {
   setEditState: Dispatch<SetStateAction<EditState>>;
   setLodgingPickerState: Dispatch<SetStateAction<LodgingPlacePickerState>>;
   setLodgingState: Dispatch<SetStateAction<LodgingState>>;
-  setNonPlaceEditorState: Dispatch<SetStateAction<NonPlaceEditorState>>;
   setReorderFeedback: Dispatch<SetStateAction<string | null>>;
   setReorderState: Dispatch<SetStateAction<ReorderState>>;
 };
@@ -48,7 +44,6 @@ export type DayItineraryControllerState = {
   editState: EditState;
   lodgingPickerState: LodgingPlacePickerState;
   lodgingState: LodgingState;
-  nonPlaceEditorState: NonPlaceEditorState;
   reorderFeedback: string | null;
   reorderState: ReorderState;
   state: DayItineraryState;

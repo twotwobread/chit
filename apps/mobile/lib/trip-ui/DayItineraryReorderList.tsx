@@ -104,11 +104,7 @@ export function ReorderPlaceList({
         <View style={styles.placeContent}>
           <View style={styles.placeTitleRow}>
             <Text style={styles.placeName}>{item.placeName}</Text>
-            {item.itemType === 'non_place' ? (
-              <Badge label={item.placeTypeLabel} tone="primary" />
-            ) : (
-              <PlaceTag type={item.placeType} />
-            )}
+            <PlaceTag type={item.placeType} />
             {item.isLodging ? <Badge label="대표 숙소" tone="neutral" /> : null}
             {item.statusLabel ? <Badge label={item.statusLabel} tone="neutral" /> : null}
           </View>

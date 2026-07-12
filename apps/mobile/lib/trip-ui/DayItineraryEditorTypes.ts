@@ -5,7 +5,6 @@ import type {
   DayItineraryEditFormValues,
 } from '../trips/day-itinerary-edit';
 import type { DayLodgingMutationFailureViewModel, DayLodgingPlaceOptionViewModel } from '../trips/lodging-place';
-import type { NonPlaceScheduleItemFormErrors, NonPlaceScheduleItemFormValues } from '../trips/non-place-schedule-item';
 import type { DayItineraryReorderDraftViewModel } from '../trips/reorder-itinerary';
 
 export type DayItineraryLodgingState =
@@ -17,24 +16,6 @@ export type DayItineraryLodgingPickerState =
   | { status: 'idle' }
   | { status: 'loading' }
   | { status: 'selecting'; options: DayLodgingPlaceOptionViewModel[] };
-
-export type NonPlaceScheduleItemPanelState =
-  | {
-      status: 'editing' | 'saving';
-      mode: 'create';
-      values: NonPlaceScheduleItemFormValues;
-      errors: NonPlaceScheduleItemFormErrors;
-      error?: { title: string; helper: string };
-    }
-  | {
-      status: 'editing' | 'saving';
-      mode: 'edit';
-      item: DayItineraryRowViewModel;
-      original: NonPlaceScheduleItemFormValues;
-      values: NonPlaceScheduleItemFormValues;
-      errors: NonPlaceScheduleItemFormErrors;
-      error?: { title: string; helper: string };
-    };
 
 export type EditPlacePanelState = {
   status: 'editing' | 'saving';

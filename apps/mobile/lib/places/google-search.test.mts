@@ -283,6 +283,15 @@ describe('google place search helpers', () => {
           latitude: 34.7,
           longitude: 135.49,
         },
+        {
+          googlePlaceId: 'google-3',
+          displayName: '간사이공항역',
+          formattedAddress: 'Kansai Airport',
+          primaryType: 'point_of_interest',
+          placeType: 'transport',
+          latitude: 34.4359,
+          longitude: 135.2436,
+        },
       ]),
       {
         status: 'success',
@@ -312,11 +321,20 @@ describe('google place search helpers', () => {
             longitude: 135.49,
             metadataLabels: ['카페'],
           },
+          {
+            id: 'google-3',
+            placeName: '간사이공항역',
+            address: 'Kansai Airport',
+            typeHint: '교통',
+            latitude: 34.4359,
+            longitude: 135.2436,
+            metadataLabels: ['교통'],
+          },
         ],
       },
     );
-    assert.equal(getGooglePlaceTypeHint('airport'), '이동수단');
-    assert.equal(getGooglePlaceTypeHint('subway_station'), '이동수단');
+    assert.equal(getGooglePlaceTypeHint('airport'), '교통');
+    assert.equal(getGooglePlaceTypeHint('subway_station'), '교통');
     assert.equal(getGooglePlaceTypeHint('unknown_google_type'), '장소');
   });
 
@@ -371,12 +389,12 @@ describe('google place search helpers', () => {
           },
           {
             id: 'google-6',
-            placeName: '간사이공항',
+            placeName: '간사이공항역',
             address: '',
-            typeHint: '이동수단',
+            typeHint: '교통',
             latitude: 34.43,
             longitude: 135.24,
-            metadataLabels: ['이동수단'],
+            metadataLabels: ['교통'],
           },
         ],
         'google-2',

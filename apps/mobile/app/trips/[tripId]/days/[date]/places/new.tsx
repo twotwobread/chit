@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 
-import { ApiError, type NonPlaceTransportMode } from '@i-um/api-contract';
+import { ApiError } from '@i-um/api-contract';
 
 import { MobileAuthError } from '../../../../../../lib/auth/client';
 import { Card, PrimaryButton, SecondaryButton, theme } from '../../../../../../lib/design';
@@ -12,18 +12,13 @@ import {
   buildGooglePlaceSearchSelectorRoute,
   buildPlaceScheduleDetailSubmitState,
   clearSelectedPlaceFromPlaceScheduleForm,
-  hasRequiredUnifiedScheduleDetailFields,
+  hasRequiredPlaceScheduleDetailFields,
   parsePlaceScheduleDetailParams,
   placeScheduleFailureMessage,
-  validateUnifiedScheduleDetailForm,
+  validatePlaceScheduleDetailForm,
   type PlaceScheduleDetailFormErrors,
   type PlaceScheduleDetailFormValues,
 } from '../../../../../../lib/places/place-schedule-detail';
-import { createNonPlaceScheduleItem } from '../../../../../../lib/trips/itinerary-api';
-import {
-  nonPlaceCategoryOptions,
-  nonPlaceTransportModeOptions,
-} from '../../../../../../lib/trips/non-place-schedule-item';
 import { tripItineraryDayPath, tripItineraryPath } from '../../../../../../lib/trips/routes';
 import { ScheduleTimeEditor } from '../../../../../../lib/trip-ui/ScheduleTimeEditor';
 
@@ -40,15 +35,6 @@ export default function NewPlaceScheduleDetailScreen() {
     placeName: placeNameParam,
     address: addressParam,
     typeHint: typeHintParam,
-    nonPlaceCategory: nonPlaceCategoryParam,
-    nonPlaceLink: nonPlaceLinkParam,
-    nonPlaceTransportMode: nonPlaceTransportModeParam,
-    nonPlaceReferenceNumber: nonPlaceReferenceNumberParam,
-    nonPlaceBookingReference: nonPlaceBookingReferenceParam,
-    nonPlaceOriginText: nonPlaceOriginTextParam,
-    nonPlaceDestinationText: nonPlaceDestinationTextParam,
-    nonPlaceTerminalText: nonPlaceTerminalTextParam,
-    nonPlaceGateText: nonPlaceGateTextParam,
   } = useLocalSearchParams<{
     tripId?: string | string[];
     date?: string | string[];
@@ -61,15 +47,6 @@ export default function NewPlaceScheduleDetailScreen() {
     placeName?: string | string[];
     address?: string | string[];
     typeHint?: string | string[];
-    nonPlaceCategory?: string | string[];
-    nonPlaceLink?: string | string[];
-    nonPlaceTransportMode?: string | string[];
-    nonPlaceReferenceNumber?: string | string[];
-    nonPlaceBookingReference?: string | string[];
-    nonPlaceOriginText?: string | string[];
-    nonPlaceDestinationText?: string | string[];
-    nonPlaceTerminalText?: string | string[];
-    nonPlaceGateText?: string | string[];
   }>();
   const tripId = Array.isArray(tripIdParam) ? tripIdParam[0] : tripIdParam;
   const date = Array.isArray(dateParam) ? dateParam[0] : dateParam;
@@ -84,15 +61,6 @@ export default function NewPlaceScheduleDetailScreen() {
       placeName: placeNameParam,
       address: addressParam,
       typeHint: typeHintParam,
-      nonPlaceCategory: nonPlaceCategoryParam,
-      nonPlaceLink: nonPlaceLinkParam,
-      nonPlaceTransportMode: nonPlaceTransportModeParam,
-      nonPlaceReferenceNumber: nonPlaceReferenceNumberParam,
-      nonPlaceBookingReference: nonPlaceBookingReferenceParam,
-      nonPlaceOriginText: nonPlaceOriginTextParam,
-      nonPlaceDestinationText: nonPlaceDestinationTextParam,
-      nonPlaceTerminalText: nonPlaceTerminalTextParam,
-      nonPlaceGateText: nonPlaceGateTextParam,
     }),
   );
   const [errors, setErrors] = useState<PlaceScheduleDetailFormErrors>({});
@@ -112,15 +80,6 @@ export default function NewPlaceScheduleDetailScreen() {
         placeName: placeNameParam,
         address: addressParam,
         typeHint: typeHintParam,
-        nonPlaceCategory: nonPlaceCategoryParam,
-        nonPlaceLink: nonPlaceLinkParam,
-        nonPlaceTransportMode: nonPlaceTransportModeParam,
-        nonPlaceReferenceNumber: nonPlaceReferenceNumberParam,
-        nonPlaceBookingReference: nonPlaceBookingReferenceParam,
-        nonPlaceOriginText: nonPlaceOriginTextParam,
-        nonPlaceDestinationText: nonPlaceDestinationTextParam,
-        nonPlaceTerminalText: nonPlaceTerminalTextParam,
-        nonPlaceGateText: nonPlaceGateTextParam,
       }),
     );
     setErrors({});
@@ -131,15 +90,6 @@ export default function NewPlaceScheduleDetailScreen() {
     endTimeParam,
     googlePlaceIdParam,
     memoParam,
-    nonPlaceBookingReferenceParam,
-    nonPlaceCategoryParam,
-    nonPlaceDestinationTextParam,
-    nonPlaceGateTextParam,
-    nonPlaceLinkParam,
-    nonPlaceOriginTextParam,
-    nonPlaceReferenceNumberParam,
-    nonPlaceTerminalTextParam,
-    nonPlaceTransportModeParam,
     placeNameParam,
     startTimeParam,
     titleParam,
@@ -184,7 +134,7 @@ export default function NewPlaceScheduleDetailScreen() {
     if (!tripId || !date || isSubmitting) {
       return;
     }
-    const validation = validateUnifiedScheduleDetailForm(values, duplicateConfirmed);
+    const validation = validatePlaceScheduleDetailForm(values, duplicateConfirmed);
     if (!validation.ok) {
       setErrors(validation.errors);
       setFailure(null);
@@ -196,11 +146,7 @@ export default function NewPlaceScheduleDetailScreen() {
     setErrors({});
     setFailure(null);
     try {
-      if (validation.kind === 'place') {
-        await createGooglePlaceScheduleItem(tripId, date, validation.request);
-      } else {
-        await createNonPlaceScheduleItem(tripId, date, validation.request);
-      }
+      await createGooglePlaceScheduleItem(tripId, date, validation.request);
       backToDay();
     } catch (error) {
       if (
@@ -215,7 +161,7 @@ export default function NewPlaceScheduleDetailScreen() {
           router.replace('/login');
           return;
         }
-        if (validation.kind === 'place' && error.status === 409 && isDuplicateDayPlaceConfirmationError(error.body)) {
+        if (error.status === 409 && isDuplicateDayPlaceConfirmationError(error.body)) {
           setDuplicateConfirmation('이미 이 Day에 추가된 장소입니다. 같은 장소를 한 번 더 일정에 추가할까요?');
           return;
         }
@@ -228,7 +174,7 @@ export default function NewPlaceScheduleDetailScreen() {
     }
   };
 
-  const submitView = buildPlaceScheduleDetailSubmitState(isSubmitting, hasRequiredUnifiedScheduleDetailFields(values));
+  const submitView = buildPlaceScheduleDetailSubmitState(isSubmitting, hasRequiredPlaceScheduleDetailFields(values));
 
   if (!tripId || !date) {
     return (
@@ -246,7 +192,7 @@ export default function NewPlaceScheduleDetailScreen() {
     <ScrollView contentContainerStyle={styles.scrollContent} style={styles.scroll}>
       <View style={styles.header}>
         <Text style={styles.screenTitle}>일정 상세 입력</Text>
-        <Text style={styles.screenHelper}>장소를 검색하거나, 장소 없이 카테고리만 선택해 저장할 수 있어요.</Text>
+        <Text style={styles.screenHelper}>장소를 검색해 일정에 추가해 주세요.</Text>
       </View>
 
       <Card>
@@ -261,7 +207,7 @@ export default function NewPlaceScheduleDetailScreen() {
               <Text style={styles.placeAddress}>{values.selectedPlace.address}</Text>
             </View>
           ) : (
-            <Text style={styles.helperText}>장소 없이 저장해도 괜찮아요. 장소가 필요한 일정이면 검색해 주세요.</Text>
+            <Text style={styles.helperText}>일정을 저장하려면 장소를 먼저 검색해 주세요.</Text>
           )}
           {errors.place ? <Text style={styles.fieldError}>{errors.place}</Text> : null}
           <PrimaryButton
@@ -273,29 +219,6 @@ export default function NewPlaceScheduleDetailScreen() {
             <SecondaryButton disabled={isSubmitting} label="장소 지우기" onPress={clearSelectedPlace} />
           ) : null}
         </View>
-
-        {!values.selectedPlace ? (
-          <View style={styles.fieldGroup}>
-            <Text style={styles.label}>카테고리</Text>
-            <View style={styles.chipList}>
-              {nonPlaceCategoryOptions.map((option) => {
-                const selected = values.nonPlaceCategory === option.value;
-                return (
-                  <Pressable
-                    accessibilityRole="button"
-                    disabled={isSubmitting}
-                    key={option.value}
-                    onPress={() => updateValues({ nonPlaceCategory: option.value })}
-                    style={[styles.chip, selected ? styles.chipSelected : null]}
-                  >
-                    <Text style={[styles.chipText, selected ? styles.chipTextSelected : null]}>{option.label}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-            {errors.nonPlaceCategory ? <Text style={styles.fieldError}>{errors.nonPlaceCategory}</Text> : null}
-          </View>
-        ) : null}
 
         <View style={styles.fieldGroup}>
           <Text style={styles.label}>일정 제목</Text>
@@ -332,140 +255,6 @@ export default function NewPlaceScheduleDetailScreen() {
           />
           {errors.memo ? <Text style={styles.fieldError}>{errors.memo}</Text> : null}
         </View>
-
-        {!values.selectedPlace ? (
-          <>
-            <View style={styles.fieldGroup}>
-              <Text style={styles.label}>링크</Text>
-              <TextInput
-                autoCapitalize="none"
-                editable={!isSubmitting}
-                keyboardType="url"
-                onChangeText={(nonPlaceLink) => updateValues({ nonPlaceLink })}
-                placeholder="https://..."
-                placeholderTextColor={theme.color.textFaint}
-                style={styles.input}
-                value={values.nonPlaceLink}
-              />
-              {errors.nonPlaceLink ? <Text style={styles.fieldError}>{errors.nonPlaceLink}</Text> : null}
-            </View>
-
-            {values.nonPlaceCategory === 'transport' ? (
-              <>
-                <View style={styles.fieldGroup}>
-                  <Text style={styles.label}>이동 수단</Text>
-                  <View style={styles.chipList}>
-                    {nonPlaceTransportModeOptions.map((option) => {
-                      const selected = values.nonPlaceTransportMode === option.value;
-                      return (
-                        <Pressable
-                          accessibilityRole="button"
-                          disabled={isSubmitting}
-                          key={option.value}
-                          onPress={() => updateValues({ nonPlaceTransportMode: option.value as NonPlaceTransportMode })}
-                          style={[styles.chip, selected ? styles.chipSelected : null]}
-                        >
-                          <Text style={[styles.chipText, selected ? styles.chipTextSelected : null]}>
-                            {option.label}
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                  {errors.nonPlaceTransportMode ? (
-                    <Text style={styles.fieldError}>{errors.nonPlaceTransportMode}</Text>
-                  ) : null}
-                </View>
-
-                <View style={styles.fieldGroup}>
-                  <Text style={styles.label}>출발/도착</Text>
-                  <View style={styles.inputGrid}>
-                    <View style={styles.inputGridItem}>
-                      <TextInput
-                        editable={!isSubmitting}
-                        onChangeText={(nonPlaceOriginText) => updateValues({ nonPlaceOriginText })}
-                        placeholder="출발지"
-                        placeholderTextColor={theme.color.textFaint}
-                        style={styles.input}
-                        value={values.nonPlaceOriginText}
-                      />
-                      {errors.nonPlaceOriginText ? (
-                        <Text style={styles.fieldError}>{errors.nonPlaceOriginText}</Text>
-                      ) : null}
-                    </View>
-                    <View style={styles.inputGridItem}>
-                      <TextInput
-                        editable={!isSubmitting}
-                        onChangeText={(nonPlaceDestinationText) => updateValues({ nonPlaceDestinationText })}
-                        placeholder="도착지"
-                        placeholderTextColor={theme.color.textFaint}
-                        style={styles.input}
-                        value={values.nonPlaceDestinationText}
-                      />
-                      {errors.nonPlaceDestinationText ? (
-                        <Text style={styles.fieldError}>{errors.nonPlaceDestinationText}</Text>
-                      ) : null}
-                    </View>
-                  </View>
-                </View>
-
-                <View style={styles.fieldGroup}>
-                  <Text style={styles.label}>예약/탑승 정보</Text>
-                  <TextInput
-                    editable={!isSubmitting}
-                    onChangeText={(nonPlaceReferenceNumber) => updateValues({ nonPlaceReferenceNumber })}
-                    placeholder="편명/열차번호"
-                    placeholderTextColor={theme.color.textFaint}
-                    style={styles.input}
-                    value={values.nonPlaceReferenceNumber}
-                  />
-                  {errors.nonPlaceReferenceNumber ? (
-                    <Text style={styles.fieldError}>{errors.nonPlaceReferenceNumber}</Text>
-                  ) : null}
-                  <TextInput
-                    editable={!isSubmitting}
-                    onChangeText={(nonPlaceBookingReference) => updateValues({ nonPlaceBookingReference })}
-                    placeholder="예약번호"
-                    placeholderTextColor={theme.color.textFaint}
-                    style={styles.input}
-                    value={values.nonPlaceBookingReference}
-                  />
-                  {errors.nonPlaceBookingReference ? (
-                    <Text style={styles.fieldError}>{errors.nonPlaceBookingReference}</Text>
-                  ) : null}
-                  <View style={styles.inputGrid}>
-                    <View style={styles.inputGridItem}>
-                      <TextInput
-                        editable={!isSubmitting}
-                        onChangeText={(nonPlaceTerminalText) => updateValues({ nonPlaceTerminalText })}
-                        placeholder="터미널"
-                        placeholderTextColor={theme.color.textFaint}
-                        style={styles.input}
-                        value={values.nonPlaceTerminalText}
-                      />
-                      {errors.nonPlaceTerminalText ? (
-                        <Text style={styles.fieldError}>{errors.nonPlaceTerminalText}</Text>
-                      ) : null}
-                    </View>
-                    <View style={styles.inputGridItem}>
-                      <TextInput
-                        editable={!isSubmitting}
-                        onChangeText={(nonPlaceGateText) => updateValues({ nonPlaceGateText })}
-                        placeholder="게이트"
-                        placeholderTextColor={theme.color.textFaint}
-                        style={styles.input}
-                        value={values.nonPlaceGateText}
-                      />
-                      {errors.nonPlaceGateText ? (
-                        <Text style={styles.fieldError}>{errors.nonPlaceGateText}</Text>
-                      ) : null}
-                    </View>
-                  </View>
-                </View>
-              </>
-            ) : null}
-          </>
-        ) : null}
 
         {duplicateConfirmation ? (
           <View style={styles.noticeBox}>
@@ -565,40 +354,6 @@ const styles = StyleSheet.create({
     fontFamily: theme.font.family.semibold,
     fontSize: theme.font.size.label,
     fontWeight: theme.font.weight.semibold,
-  },
-  chipList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: theme.space[2],
-  },
-  chip: {
-    backgroundColor: theme.color.surface,
-    borderColor: theme.color.borderDefault,
-    borderRadius: theme.radius.pill,
-    borderWidth: 1,
-    paddingHorizontal: theme.space[4],
-    paddingVertical: theme.space[2],
-  },
-  chipSelected: {
-    backgroundColor: theme.color.primarySoft,
-    borderColor: theme.color.primary,
-  },
-  chipText: {
-    color: theme.color.textBody,
-    fontFamily: theme.font.family.semibold,
-    fontSize: theme.font.size.label,
-    fontWeight: theme.font.weight.semibold,
-  },
-  chipTextSelected: {
-    color: theme.color.primary,
-  },
-  inputGrid: {
-    flexDirection: 'row',
-    gap: theme.space[3],
-  },
-  inputGridItem: {
-    flex: 1,
-    gap: theme.space[2],
   },
   placeCard: {
     backgroundColor: theme.color.surfaceSunken,

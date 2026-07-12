@@ -151,7 +151,6 @@ func (s apiServer) CreateGoogleTripPlaceBookmark(w http.ResponseWriter, r *http.
 
 	result, err := s.places.CreateGoogleTripPlaceBookmark(r.Context(), authContext.UserID, tripId, place.CreateGoogleTripPlaceBookmarkInput{
 		GooglePlaceID: body.GooglePlaceId,
-		Category:      string(body.Category),
 	})
 	if err != nil {
 		writePlaceSearchError(w, err)

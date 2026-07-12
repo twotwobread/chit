@@ -1,14 +1,9 @@
-import type {
-  GetDayScheduleItemsResponse,
-  NonPlaceScheduleItemCategory,
-  NonPlaceTransportMode,
-  ScheduleItem,
-  TripPlaceSummary,
-  TripPlaceType,
-} from '@i-um/api-contract';
+import type { GetDayScheduleItemsResponse, ScheduleItem, TripPlaceSummary, TripPlaceType } from '@i-um/api-contract';
 
 import { theme } from '../design/theme';
 import { formatTripDayDate } from './days';
+
+export type PlaceBackedScheduleItem = ScheduleItem;
 
 export type DayItineraryRowViewModel = {
   id: string;
@@ -19,25 +14,12 @@ export type DayItineraryRowViewModel = {
   startTime?: string | null;
   endTime?: string | null;
   timeLabel?: string;
-  itemType?: 'place' | 'non_place';
   placeId?: string;
   placeName: string;
   placeType: TripPlaceType;
   placeTypeLabel: string;
   address: string;
   placeMemo?: string;
-  nonPlaceCategory?: NonPlaceScheduleItemCategory;
-  nonPlaceCategoryLabel?: string;
-  nonPlaceDetailLabel?: string;
-  nonPlaceMemo?: string;
-  nonPlaceLink?: string;
-  transportMode?: NonPlaceTransportMode;
-  referenceNumber?: string;
-  bookingReference?: string;
-  originText?: string;
-  destinationText?: string;
-  terminalText?: string;
-  gateText?: string;
 };
 
 export type DayItineraryViewModel =
@@ -85,7 +67,7 @@ export function buildDayItineraryViewModel(response: GetDayScheduleItemsResponse
       formattedDate,
       lodgingPlace: response.day.lodgingPlace,
       title: '아직 등록된 일정이 없어요.',
-      helper: '일정 추가를 눌러 방문할 장소나 장소 없는 일정을 등록해보세요.',
+      helper: '일정 추가를 눌러 방문할 장소를 등록해보세요.',
     };
   }
 
@@ -100,65 +82,13 @@ export function buildDayItineraryViewModel(response: GetDayScheduleItemsResponse
   };
 }
 
-export function getScheduleItems(response: GetDayScheduleItemsResponse): ScheduleItem[] {
+export function getScheduleItems(response: GetDayScheduleItemsResponse): PlaceBackedScheduleItem[] {
   return response.scheduleItems ?? ((response as unknown as { items?: ScheduleItem[] }).items || []);
 }
 
 export function buildDayItineraryPlaceAccessibilityLabel(item: DayItineraryRowViewModel): string {
   const timeText = item.timeLabel ? `${item.timeLabel}. ` : '';
-  const rowKind = item.itemType === 'non_place' ? '일정' : '장소';
-  return `${item.orderLabel}번째 ${rowKind} ${timeText}${item.placeName}. ${item.placeTypeLabel}`;
-}
-
-export function getNonPlaceCategoryLabel(category: NonPlaceScheduleItemCategory): string {
-  switch (category) {
-    case 'transport':
-      return '이동';
-    case 'rest':
-      return '휴식';
-    case 'memo':
-      return '메모';
-    case 'reminder':
-      return '알림';
-  }
-}
-
-export function getTransportModeLabel(mode: NonPlaceTransportMode): string {
-  switch (mode) {
-    case 'flight':
-      return '비행기';
-    case 'train':
-      return '기차';
-    case 'bus':
-      return '버스';
-    case 'ferry':
-      return '페리';
-    case 'other':
-      return '기타';
-  }
-}
-
-export function buildNonPlaceDetailLabel(item: ScheduleItem): string | undefined {
-  const details = item.nonPlace;
-  if (!details) {
-    return undefined;
-  }
-  if (details.category === 'transport') {
-    const parts: string[] = [];
-    if (details.transportMode) {
-      parts.push(getTransportModeLabel(details.transportMode));
-    }
-    const route = [details.originText, details.destinationText].filter(Boolean).join(' → ');
-    if (route) {
-      parts.push(route);
-    }
-    const meta = [details.referenceNumber, details.terminalText, details.gateText].filter(Boolean).join(' · ');
-    if (meta) {
-      parts.push(meta);
-    }
-    return parts.length > 0 ? parts.join(' · ') : undefined;
-  }
-  return details.memo ?? undefined;
+  return `${item.orderLabel}번째 장소 ${timeText}${item.placeName}. ${item.placeTypeLabel}`;
 }
 
 function buildScheduleItemStatusLabel(item: ScheduleItem): string | undefined {
@@ -171,58 +101,7 @@ function buildScheduleItemStatusLabel(item: ScheduleItem): string | undefined {
   return undefined;
 }
 
-function scheduleItemToDayItineraryRow(item: ScheduleItem): DayItineraryRowViewModel {
-  if (item.itemType === 'non_place' && item.nonPlace) {
-    const categoryLabel = getNonPlaceCategoryLabel(item.nonPlace.category);
-    const statusLabel = buildScheduleItemStatusLabel(item);
-    return {
-      id: item.id,
-      version: item.version,
-      orderLabel: String(item.itemOrder),
-      itemType: 'non_place',
-      isLodging: false,
-      ...(statusLabel ? { statusLabel } : {}),
-      startTime: item.startTime,
-      endTime: item.endTime,
-      timeLabel: formatScheduleItemTimeLabel(item.startTime, item.endTime),
-      placeName: item.nonPlace.title,
-      placeType: 'etc',
-      placeTypeLabel: categoryLabel,
-      address: buildNonPlaceDetailLabel(item) ?? '',
-      nonPlaceCategory: item.nonPlace.category,
-      nonPlaceCategoryLabel: categoryLabel,
-      nonPlaceDetailLabel: buildNonPlaceDetailLabel(item),
-      ...(item.nonPlace.memo ? { nonPlaceMemo: item.nonPlace.memo } : {}),
-      ...(item.nonPlace.link ? { nonPlaceLink: item.nonPlace.link } : {}),
-      ...(item.nonPlace.transportMode ? { transportMode: item.nonPlace.transportMode } : {}),
-      ...(item.nonPlace.referenceNumber ? { referenceNumber: item.nonPlace.referenceNumber } : {}),
-      ...(item.nonPlace.bookingReference ? { bookingReference: item.nonPlace.bookingReference } : {}),
-      ...(item.nonPlace.originText ? { originText: item.nonPlace.originText } : {}),
-      ...(item.nonPlace.destinationText ? { destinationText: item.nonPlace.destinationText } : {}),
-      ...(item.nonPlace.terminalText ? { terminalText: item.nonPlace.terminalText } : {}),
-      ...(item.nonPlace.gateText ? { gateText: item.nonPlace.gateText } : {}),
-    };
-  }
-
-  if (!item.place) {
-    const statusLabel = buildScheduleItemStatusLabel(item);
-    return {
-      id: item.id,
-      version: item.version,
-      orderLabel: String(item.itemOrder),
-      itemType: 'non_place',
-      isLodging: false,
-      ...(statusLabel ? { statusLabel } : {}),
-      startTime: item.startTime,
-      endTime: item.endTime,
-      timeLabel: formatScheduleItemTimeLabel(item.startTime, item.endTime),
-      placeName: '장소 없는 일정',
-      placeType: 'etc',
-      placeTypeLabel: '일정',
-      address: '',
-    };
-  }
-
+function scheduleItemToDayItineraryRow(item: PlaceBackedScheduleItem): DayItineraryRowViewModel {
   const statusLabel = buildScheduleItemStatusLabel(item);
   const placeScheduleTitle = item.placeSchedule?.title?.trim();
   const placeScheduleMemo = item.placeSchedule?.memo?.trim();

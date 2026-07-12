@@ -23,7 +23,7 @@
 ## File Structure
 
 - `packages/api-contract/openapi.yaml`: source-of-truth API schema. Add `transport`, remove non-place schemas/endpoints/fields, optionally expose mapped search result `placeType`.
-- `apps/api/migrations/00021_unify_schedule_place_types.sql`: DB migration adding `transport` and dropping non-place schedule columns/checks.
+- `apps/api/migrations/00022_unify_schedule_place_types.sql`: DB migration adding `transport` and dropping non-place schedule columns/checks.
 - `apps/api/schema.sql`: generated/applied schema snapshot after migration.
 - `apps/api/internal/place/provider_place_type_mapping.go`: new provider-aware static raw type mapper.
 - `apps/api/internal/place/service.go`: call the mapper instead of direct Google switch logic.
@@ -46,7 +46,7 @@
 
 **Files:**
 - Modify: `packages/api-contract/openapi.yaml`
-- Create: `apps/api/migrations/00021_unify_schedule_place_types.sql`
+- Create: `apps/api/migrations/00022_unify_schedule_place_types.sql`
 - Modify: `apps/api/schema.sql`
 - Generated after implementation: `apps/api/internal/openapi/server.gen.go`, `packages/api-contract/gen/ts/**`
 
@@ -98,7 +98,7 @@ This lets mobile use server-owned mapping instead of a divergent local raw-type 
 
 - [ ] **Step 3: Write DB migration**
 
-Create `apps/api/migrations/00021_unify_schedule_place_types.sql`:
+Create `apps/api/migrations/00022_unify_schedule_place_types.sql`:
 
 ```sql
 -- +goose Up

@@ -185,6 +185,7 @@ func (s *Service) SearchGoogle(ctx context.Context, userID string, tripID string
 		return nil, err
 	}
 	for index := range results {
+		results[index].PlaceType = MapProviderPlaceType(DestinationProviderGoogle, results[index].PrimaryType, []string{results[index].PrimaryType})
 		if results[index].Photo == nil || strings.TrimSpace(results[index].Photo.Name) == "" {
 			continue
 		}
@@ -319,7 +320,7 @@ func (s *Service) CreateGoogleDayLodgingPlace(ctx context.Context, userID string
 			GooglePlaceID:     snapshot.GooglePlaceID,
 			Name:              snapshot.DisplayName,
 			Address:           snapshot.FormattedAddress,
-			PlaceType:         mapGooglePlaceType(snapshot.PrimaryType, snapshot.Types),
+			PlaceType:         MapProviderPlaceType(DestinationProviderGoogle, snapshot.PrimaryType, snapshot.Types),
 			Latitude:          snapshot.Latitude,
 			Longitude:         snapshot.Longitude,
 			GooglePrimaryType: snapshot.PrimaryType,
@@ -406,7 +407,7 @@ func (s *Service) CreateGooglePlaceScheduleItem(ctx context.Context, userID stri
 			GooglePlaceID:      snapshot.GooglePlaceID,
 			Name:               snapshot.DisplayName,
 			Address:            snapshot.FormattedAddress,
-			PlaceType:          mapGooglePlaceType(snapshot.PrimaryType, snapshot.Types),
+			PlaceType:          MapProviderPlaceType(DestinationProviderGoogle, snapshot.PrimaryType, snapshot.Types),
 			Latitude:           snapshot.Latitude,
 			Longitude:          snapshot.Longitude,
 			GooglePrimaryType:  snapshot.PrimaryType,
@@ -457,10 +458,6 @@ func (s *Service) CreateGoogleTripPlaceBookmark(ctx context.Context, userID stri
 	if len([]rune(googlePlaceID)) < 1 || len([]rune(googlePlaceID)) > maxGooglePlaceIDLen {
 		return CreateGoogleTripPlaceBookmarkResult{}, ErrValidation
 	}
-	category := strings.TrimSpace(input.Category)
-	if !validTripPlaceType(category) {
-		return CreateGoogleTripPlaceBookmarkResult{}, ErrValidation
-	}
 	if err := s.validateTripParticipant(ctx, userID, tripID); err != nil {
 		return CreateGoogleTripPlaceBookmarkResult{}, err
 	}
@@ -475,6 +472,7 @@ func (s *Service) CreateGoogleTripPlaceBookmark(ctx context.Context, userID stri
 	if err != nil {
 		return CreateGoogleTripPlaceBookmarkResult{}, err
 	}
+	category := MapProviderPlaceType(DestinationProviderGoogle, snapshot.PrimaryType, snapshot.Types)
 	bookmark, err := s.repo.UpsertGoogleTripPlaceBookmark(ctx, CreateGoogleTripPlaceBookmarkRecord{
 		TripID:            tripID,
 		GooglePlaceID:     snapshot.GooglePlaceID,
@@ -770,37 +768,6 @@ func hmacSignature(value []byte, secret []byte) []byte {
 
 func validLocationBias(value SearchLocationBias) bool {
 	return value.Latitude >= -90 && value.Latitude <= 90 && value.Longitude >= -180 && value.Longitude <= 180 && value.RadiusMeters >= 1 && value.RadiusMeters <= 50000
-}
-
-func mapGooglePlaceType(primaryType string, rawTypes []string) string {
-	if mapped, ok := internalPlaceTypeForGoogleType(strings.TrimSpace(primaryType)); ok {
-		return mapped
-	}
-	for _, value := range rawTypes {
-		if mapped, ok := internalPlaceTypeForGoogleType(strings.TrimSpace(value)); ok {
-			return mapped
-		}
-	}
-	return "etc"
-}
-
-func internalPlaceTypeForGoogleType(value string) (string, bool) {
-	switch value {
-	case "lodging", "hotel", "motel", "resort_hotel", "guest_house", "hostel", "bed_and_breakfast":
-		return "lodging", true
-	case "cafe", "coffee_shop":
-		return "cafe", true
-	case "restaurant", "meal_takeaway", "meal_delivery", "bakery", "bar", "food":
-		return "food", true
-	case "shopping_mall", "store", "department_store", "clothing_store", "supermarket", "convenience_store":
-		return "shopping", true
-	case "airport", "bus_station", "subway_station", "train_station", "transit_station", "light_rail_station", "taxi_stand":
-		return "transport", true
-	case "tourist_attraction", "museum", "park", "art_gallery", "amusement_park", "zoo", "aquarium", "landmark", "historical_landmark", "place_of_worship":
-		return "sights", true
-	default:
-		return "", false
-	}
 }
 
 func dateInTripRange(start string, end string, selected time.Time) (bool, error) {

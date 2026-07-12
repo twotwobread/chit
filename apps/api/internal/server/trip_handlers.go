@@ -463,45 +463,6 @@ func (s apiServer) CreateManualScheduleItem(w http.ResponseWriter, r *http.Reque
 	writeError(w, http.StatusGone, "MANUAL_PLACE_CREATION_DISABLED", "manual place creation is disabled; use google place search", nil)
 }
 
-func (s apiServer) CreateNonPlaceScheduleItem(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string) {
-	if s.auth == nil || s.trips == nil {
-		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "non-place schedule creation is not configured", nil)
-		return
-	}
-
-	authContext, ok := s.requireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	var body openapi.CreateNonPlaceScheduleItemJSONRequestBody
-	if !decodeJSON(w, r, &body) {
-		return
-	}
-
-	result, err := s.trips.CreateNonPlaceScheduleItem(r.Context(), authContext.UserID, tripId, tripDayId, trip.CreateNonPlaceScheduleItemInput{
-		Category:         string(body.Category),
-		Title:            body.Title,
-		StartTime:        body.StartTime,
-		EndTime:          body.EndTime,
-		Memo:             body.Memo,
-		Link:             body.Link,
-		TransportMode:    optionalTransportModeFromOpenAPI(body.TransportMode),
-		ReferenceNumber:  body.ReferenceNumber,
-		BookingReference: body.BookingReference,
-		OriginText:       body.OriginText,
-		DestinationText:  body.DestinationText,
-		TerminalText:     body.TerminalText,
-		GateText:         body.GateText,
-	})
-	if err != nil {
-		writeTripDayScheduleError(w, err)
-		return
-	}
-
-	writeJSON(w, http.StatusCreated, createNonPlaceScheduleItemResponseToOpenAPI(result))
-}
-
 func (s apiServer) ReorderScheduleItems(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string) {
 	if s.auth == nil || s.trips == nil {
 		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "day schedule reorder is not configured", nil)
@@ -641,22 +602,12 @@ func (s apiServer) UpdateScheduleItem(w http.ResponseWriter, r *http.Request, tr
 	}
 
 	result, err := s.trips.UpdateScheduleItem(r.Context(), authContext.UserID, tripId, tripDayId, scheduleItemId, trip.UpdateScheduleItemInput{
-		Name:             body.Name,
-		Address:          body.Address,
-		PlaceType:        optionalPlaceTypeFromOpenAPI(body.PlaceType),
-		StartTime:        body.StartTime,
-		EndTime:          body.EndTime,
-		Category:         optionalNonPlaceCategoryFromOpenAPI(body.Category),
-		Title:            body.Title,
-		Memo:             body.Memo,
-		Link:             body.Link,
-		TransportMode:    optionalTransportModeFromOpenAPI(body.TransportMode),
-		ReferenceNumber:  body.ReferenceNumber,
-		BookingReference: body.BookingReference,
-		OriginText:       body.OriginText,
-		DestinationText:  body.DestinationText,
-		TerminalText:     body.TerminalText,
-		GateText:         body.GateText,
+		Name:      body.Name,
+		Address:   body.Address,
+		PlaceType: optionalPlaceTypeFromOpenAPI(body.PlaceType),
+		StartTime: body.StartTime,
+		EndTime:   body.EndTime,
+		Memo:      body.Memo,
 	})
 	if err != nil {
 		writeTripDayScheduleError(w, err)

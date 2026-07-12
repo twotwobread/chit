@@ -398,13 +398,6 @@ func tripPlaceBookmarkToOpenAPI(bookmark place.TripPlaceBookmark) openapi.TripPl
 	}
 }
 
-func createNonPlaceScheduleItemResponseToOpenAPI(result trip.CreateNonPlaceScheduleItemResult) openapi.CreateNonPlaceScheduleItemResponse {
-	return openapi.CreateNonPlaceScheduleItemResponse{
-		Day:          tripDayToOpenAPI(result.Day),
-		ScheduleItem: dayScheduleItemToOpenAPI(result.Item),
-	}
-}
-
 func updateScheduleItemResponseToOpenAPI(result trip.UpdateScheduleItemResult) openapi.UpdateScheduleItemResponse {
 	return openapi.UpdateScheduleItemResponse{ScheduleItem: dayScheduleItemToOpenAPI(result.Item)}
 }
@@ -520,6 +513,7 @@ func searchGooglePlacesResponseToOpenAPI(results []place.SearchResult) openapi.S
 			DisplayName:      result.DisplayName,
 			FormattedAddress: result.FormattedAddress,
 			PrimaryType:      result.PrimaryType,
+			PlaceType:        openapi.TripPlaceType(result.PlaceType),
 			Latitude:         result.Latitude,
 			Longitude:        result.Longitude,
 			Rating:           result.Rating,
@@ -584,11 +578,6 @@ func dayScheduleItemToOpenAPI(item trip.ScheduleItem) openapi.ScheduleItem {
 	if itemType == "" {
 		itemType = openapi.Place
 	}
-	var place *openapi.TripPlaceSummary
-	if itemType == openapi.Place {
-		mappedPlace := tripPlaceSummaryToOpenAPI(item.Place)
-		place = &mappedPlace
-	}
 	return openapi.ScheduleItem{
 		Id:            item.ID,
 		ItemOrder:     item.ItemOrder,
@@ -599,9 +588,8 @@ func dayScheduleItemToOpenAPI(item trip.ScheduleItem) openapi.ScheduleItem {
 		EndTime:       item.EndTime,
 		ArrivedAt:     optionalTimeToOpenAPI(item.ArrivedAt),
 		SkippedAt:     optionalTimeToOpenAPI(item.SkippedAt),
-		Place:         place,
+		Place:         tripPlaceSummaryToOpenAPI(item.Place),
 		PlaceSchedule: placeScheduleItemDetailsToOpenAPI(item.PlaceSchedule),
-		NonPlace:      nonPlaceScheduleItemDetailsToOpenAPI(item.NonPlace),
 	}
 }
 
@@ -610,30 +598,6 @@ func placeScheduleItemDetailsToOpenAPI(details *trip.PlaceScheduleItemDetails) *
 		return nil
 	}
 	return &openapi.PlaceScheduleItemDetails{Title: details.Title, Memo: details.Memo}
-}
-
-func nonPlaceScheduleItemDetailsToOpenAPI(details *trip.NonPlaceScheduleItemDetails) *openapi.NonPlaceScheduleItemDetails {
-	if details == nil {
-		return nil
-	}
-	var transportMode *openapi.NonPlaceTransportMode
-	if details.TransportMode != nil {
-		mode := openapi.NonPlaceTransportMode(*details.TransportMode)
-		transportMode = &mode
-	}
-	return &openapi.NonPlaceScheduleItemDetails{
-		Category:         openapi.NonPlaceScheduleItemCategory(details.Category),
-		Title:            details.Title,
-		Memo:             details.Memo,
-		Link:             details.Link,
-		TransportMode:    transportMode,
-		ReferenceNumber:  details.ReferenceNumber,
-		BookingReference: details.BookingReference,
-		OriginText:       details.OriginText,
-		DestinationText:  details.DestinationText,
-		TerminalText:     details.TerminalText,
-		GateText:         details.GateText,
-	}
 }
 
 func optionalTimeToOpenAPI(value *time.Time) *time.Time {
@@ -755,22 +719,6 @@ func optionalPlaceTypeFromOpenAPI(value *openapi.TripPlaceType) *string {
 	}
 	placeType := string(*value)
 	return &placeType
-}
-
-func optionalNonPlaceCategoryFromOpenAPI(value *openapi.NonPlaceScheduleItemCategory) *string {
-	if value == nil {
-		return nil
-	}
-	category := string(*value)
-	return &category
-}
-
-func optionalTransportModeFromOpenAPI(value *openapi.NonPlaceTransportMode) *string {
-	if value == nil {
-		return nil
-	}
-	mode := string(*value)
-	return &mode
 }
 
 func dateToOpenAPI(value string) openapi_types.Date {

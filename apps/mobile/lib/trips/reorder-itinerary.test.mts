@@ -25,7 +25,7 @@ describe('reorder itinerary helpers', () => {
       dayLabel: 'Day 1',
       formattedDate: '2026.07.10',
       title: '아직 등록된 일정이 없어요.',
-      helper: '일정 추가를 눌러 방문할 장소나 장소 없는 일정을 등록해보세요.',
+      helper: '일정 추가를 눌러 방문할 장소를 등록해보세요.',
     };
     const singlePlaceViewModel: DayItineraryViewModel = {
       status: 'success',

@@ -19,7 +19,6 @@ import {
   type DeleteState,
   type EditState,
   type LodgingState,
-  type NonPlaceEditorState,
   type ReorderState,
 } from './DayItineraryEditorControllerTypes';
 
@@ -34,7 +33,6 @@ type DayItineraryReorderActionContext = {
   setDeleteState: Dispatch<SetStateAction<DeleteState>>;
   setEditState: Dispatch<SetStateAction<EditState>>;
   setLodgingState: Dispatch<SetStateAction<LodgingState>>;
-  setNonPlaceEditorState: Dispatch<SetStateAction<NonPlaceEditorState>>;
   setReorderFeedback: Dispatch<SetStateAction<string | null>>;
   setReorderState: Dispatch<SetStateAction<ReorderState>>;
   tripId?: string;
@@ -51,7 +49,6 @@ export function createDayItineraryReorderActions({
   setDeleteState,
   setEditState,
   setLodgingState,
-  setNonPlaceEditorState,
   setReorderFeedback,
   setReorderState,
   tripId,
@@ -64,7 +61,6 @@ export function createDayItineraryReorderActions({
 
     setReorderFeedback(null);
     setEditState({ status: 'idle' });
-    setNonPlaceEditorState({ status: 'idle' });
     deleteOriginFocusTargetRef.current = null;
     setDeleteState({ status: 'idle' });
     setLodgingState({ status: 'idle' });

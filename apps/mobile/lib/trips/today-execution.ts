@@ -1,7 +1,6 @@
 import type { Href } from 'expo-router';
 
 import type {
-  ScheduleItem,
   GetDayScheduleItemsResponse,
   GetTripDetailResponse,
   RoutablePlace,
@@ -11,12 +10,7 @@ import type {
   TripPlaceType,
 } from '@i-um/api-contract';
 
-import {
-  buildNonPlaceDetailLabel,
-  getNonPlaceCategoryLabel,
-  getPlaceTypeLabel,
-  getScheduleItems,
-} from './day-itinerary';
+import { getPlaceTypeLabel, getScheduleItems, type PlaceBackedScheduleItem } from './day-itinerary';
 import { formatTripDayDate } from './days';
 import { tripDetailPath } from './mypage';
 import { tripItineraryDayPath } from './routes';
@@ -313,39 +307,24 @@ export function buildTodayExecutionViewModel({
   }
 
   const placeBackedNext = nextItem.place;
-  const nonPlaceDetails = nextItem.nonPlace;
-  const nonPlaceDetailLabel = buildNonPlaceDetailLabel(nextItem);
 
   return {
     status: 'success',
     ...common,
-    nextPlace: placeBackedNext
-      ? {
-          itemId: nextItem.id,
-          order: nextItem.itemOrder,
-          orderLabel: String(nextItem.itemOrder),
-          placeName: placeBackedNext.name,
-          placeType: placeBackedNext.placeType,
-          placeTypeLabel: getPlaceTypeLabel(placeBackedNext.placeType),
-          address: placeBackedNext.address,
-          routablePlace: placeBackedNext.routablePlace ?? null,
-          navigationAction: navigateAction('길찾기', placeBackedNext.name, placeBackedNext.address, travelMode),
-          travelModeSelector: buildTravelModeSelectorViewModel(travelMode),
-        }
-      : {
-          itemId: nextItem.id,
-          order: nextItem.itemOrder,
-          orderLabel: String(nextItem.itemOrder),
-          placeName: nonPlaceDetails?.title ?? '장소 없는 일정',
-          placeType: 'etc' as const,
-          placeTypeLabel: nonPlaceDetails ? getNonPlaceCategoryLabel(nonPlaceDetails.category) : '일정',
-          address: nonPlaceDetailLabel ?? '세부 정보 없음',
-          routablePlace: null,
-          navigationAction: navigateAction('', '', '', travelMode),
-          travelModeSelector: buildTravelModeSelectorViewModel(travelMode),
-        },
+    nextPlace: {
+      itemId: nextItem.id,
+      order: nextItem.itemOrder,
+      orderLabel: String(nextItem.itemOrder),
+      placeName: placeBackedNext.name,
+      placeType: placeBackedNext.placeType,
+      placeTypeLabel: getPlaceTypeLabel(placeBackedNext.placeType),
+      address: placeBackedNext.address,
+      routablePlace: placeBackedNext.routablePlace ?? null,
+      navigationAction: navigateAction('길찾기', placeBackedNext.name, placeBackedNext.address, travelMode),
+      travelModeSelector: buildTravelModeSelectorViewModel(travelMode),
+    },
     skippedSection: skippedItems.length > 0 ? buildSkippedSection(skippedItems, selectedTrip.id, currentDay.id) : null,
-    arrivalAction: arriveAction(selectedTrip.id, currentDay.id, nextItem.id, placeBackedNext ? undefined : '완료'),
+    arrivalAction: arriveAction(selectedTrip.id, currentDay.id, nextItem.id),
     quickExpenseAction: routeAction('지출 등록', buildQuickExpenseRoute(selectedTrip.id, currentDay.id, nextItem.id)),
     skipAction: skipAction(selectedTrip.id, currentDay.id, nextItem.id),
   };
@@ -397,32 +376,32 @@ export function findTodayTripDay(days: TripDay[], today: string): TripDay | null
   return days.find((day) => day.date === today) ?? null;
 }
 
-function orderedItineraryItems(items: ScheduleItem[]): ScheduleItem[] {
+function orderedItineraryItems(items: PlaceBackedScheduleItem[]): PlaceBackedScheduleItem[] {
   return [...items].sort((left, right) => left.itemOrder - right.itemOrder);
 }
 
-function isPendingItem(item: ScheduleItem): boolean {
+function isPendingItem(item: PlaceBackedScheduleItem): boolean {
   return item.arrivedAt === null && item.skippedAt === null;
 }
 
-function isSkippedItem(item: ScheduleItem): boolean {
+function isSkippedItem(item: PlaceBackedScheduleItem): boolean {
   return item.arrivedAt === null && item.skippedAt !== null;
 }
 
-function buildSkippedSection(items: ScheduleItem[], tripId: string, date: string): TodaySkippedPlacesSectionViewModel {
+function buildSkippedSection(
+  items: PlaceBackedScheduleItem[],
+  tripId: string,
+  date: string,
+): TodaySkippedPlacesSectionViewModel {
   return {
     title: '스킵한 장소',
     countLabel: `${items.length}곳을 나중에 다시 볼 수 있어요.`,
     items: items.map((item) => ({
       itemId: item.id,
       orderLabel: String(item.itemOrder),
-      placeName: item.place?.name ?? item.nonPlace?.title ?? '장소 없는 일정',
-      placeTypeLabel: item.place
-        ? getPlaceTypeLabel(item.place.placeType)
-        : item.nonPlace
-          ? getNonPlaceCategoryLabel(item.nonPlace.category)
-          : '일정',
-      address: item.place?.address ?? '',
+      placeName: item.place.name,
+      placeTypeLabel: getPlaceTypeLabel(item.place.placeType),
+      address: item.place.address,
       restoreAction: restoreAction(tripId, date, item.id),
     })),
   };

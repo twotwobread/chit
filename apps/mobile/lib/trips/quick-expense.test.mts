@@ -231,25 +231,6 @@ test('builds schedule item options with time labels and marks selected item', ()
         endTime: '14:30',
       }),
       item({ id: 'item-a', itemOrder: 1, startTime: '09:00', endTime: '10:00' }),
-      item({
-        id: 'item-non-place',
-        itemOrder: 3,
-        place: null,
-        itemType: 'non_place',
-        nonPlace: {
-          category: 'memo',
-          title: '체크인 준비',
-          memo: '프론트 데스크',
-          link: null,
-          transportMode: null,
-          referenceNumber: null,
-          bookingReference: null,
-          originText: null,
-          destinationText: null,
-          terminalText: null,
-          gateText: null,
-        },
-      }),
     ]),
     participants: [participant({ participantId: 'participant-a', displayName: ' 민수 ' })],
     selectedItemId: 'item-b',
@@ -263,7 +244,6 @@ test('builds schedule item options with time labels and marks selected item', ()
     [
       ['item-a', '도톤보리', '식당', '09:00–10:00'],
       ['item-b', '오사카성', '관광지', '13:00–14:30'],
-      ['item-non-place', '체크인 준비', '메모', null],
     ],
   );
   assert.equal(viewModel.itemOptions[1].selected, true);

@@ -2,7 +2,6 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-import type { NonPlaceScheduleItemDetails } from './NonPlaceScheduleItemDetails';
 import type { PlaceScheduleItemDetails } from './PlaceScheduleItemDetails';
 import type { ScheduleItemType } from './ScheduleItemType';
 import type { TripPlaceSummary } from './TripPlaceSummary';
@@ -28,7 +27,6 @@ export type ScheduleItem = {
      * Server-generated skip timestamp for this schedule item instance. Null means the item is not currently skipped.
      */
     skippedAt: string | null;
-    place: TripPlaceSummary | null;
+    place: TripPlaceSummary;
     placeSchedule: PlaceScheduleItemDetails | null;
-    nonPlace: NonPlaceScheduleItemDetails | null;
 };

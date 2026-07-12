@@ -10,7 +10,6 @@ describe('day itinerary detail panel helpers', () => {
         id: 'item-1',
         version: 7,
         orderLabel: '1',
-        itemType: 'place',
         isLodging: true,
         startTime: '09:30',
         endTime: '11:00',
@@ -43,44 +42,6 @@ describe('day itinerary detail panel helpers', () => {
             label: '지도에서 보기',
             accessibilityLabel: '우메다 공중정원 지도에서 보기',
           },
-        },
-        excludedActions: ['delete', 'lodging'],
-      },
-    );
-  });
-
-  it('builds a non-place detail panel without address copy, map, delete, or lodging actions', () => {
-    assert.deepEqual(
-      buildDayItineraryDetailPanel({
-        id: 'item-transport',
-        version: 4,
-        orderLabel: '2',
-        itemType: 'non_place',
-        isLodging: false,
-        startTime: null,
-        endTime: null,
-        placeName: '공항 이동',
-        placeType: 'etc',
-        placeTypeLabel: '이동',
-        address: '버스 · 난바 → 간사이공항',
-        nonPlaceCategory: 'transport',
-        nonPlaceCategoryLabel: '이동',
-        nonPlaceDetailLabel: '버스 · 난바 → 간사이공항',
-        nonPlaceMemo: '라피트 매진 시 버스 이용',
-      }),
-      {
-        title: '공항 이동',
-        categoryLabel: '이동',
-        address: undefined,
-        detailLabel: '버스 · 난바 → 간사이공항',
-        memo: '라피트 매진 시 버스 이용',
-        actions: {
-          copyAddress: undefined,
-          edit: {
-            label: '수정',
-            accessibilityLabel: '공항 이동 수정',
-          },
-          openMap: undefined,
         },
         excludedActions: ['delete', 'lodging'],
       },

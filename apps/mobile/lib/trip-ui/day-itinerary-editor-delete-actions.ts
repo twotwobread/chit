@@ -17,7 +17,6 @@ import {
   type DeleteState,
   type EditState,
   type LodgingState,
-  type NonPlaceEditorState,
 } from './DayItineraryEditorControllerTypes';
 
 type DayItineraryDeleteActionContext = {
@@ -34,7 +33,6 @@ type DayItineraryDeleteActionContext = {
   setDeleteState: Dispatch<SetStateAction<DeleteState>>;
   setEditState: Dispatch<SetStateAction<EditState>>;
   setLodgingState: Dispatch<SetStateAction<LodgingState>>;
-  setNonPlaceEditorState: Dispatch<SetStateAction<NonPlaceEditorState>>;
   state: DayItineraryState;
   tripId?: string;
 };
@@ -53,7 +51,6 @@ export function createDayItineraryDeleteActions({
   setDeleteState,
   setEditState,
   setLodgingState,
-  setNonPlaceEditorState,
   state,
   tripId,
 }: DayItineraryDeleteActionContext) {
@@ -61,7 +58,6 @@ export function createDayItineraryDeleteActions({
     discardReorder();
     deleteOriginFocusTargetRef.current = typeof originFocusTarget === 'number' ? originFocusTarget : null;
     setEditState({ status: 'idle' });
-    setNonPlaceEditorState({ status: 'idle' });
     setLodgingState({ status: 'idle' });
     clearMapActionFeedback();
     setDeleteState({ status: 'confirming', item });

@@ -98,7 +98,6 @@ describe('day itinerary helpers', () => {
           skippedAt: null,
           place: { id: 'place-1', name: '도톤보리', placeType: 'sights', address: 'Osaka' },
           placeSchedule: { title: '야경 산책', memo: '강가 걷기' },
-          nonPlace: null,
         },
       ],
     };
@@ -114,80 +113,6 @@ describe('day itinerary helpers', () => {
     assert.equal(buildDayItineraryPlaceAccessibilityLabel(viewModel.items[0]), '1번째 장소 야경 산책. 관광지');
   });
 
-  it('formats non-place rows with category and compact transport details', () => {
-    const response: GetDayScheduleItemsResponse = {
-      day: { date: '2026-07-10', dayOrder: 1, lodgingPlace: null },
-      items: [
-        {
-          id: 'item-transport',
-          itemOrder: 1,
-          version: 4,
-          itemType: 'non_place',
-          isLodging: false,
-          startTime: '08:00',
-          endTime: '09:30',
-          arrivedAt: null,
-          skippedAt: null,
-          place: null,
-          nonPlace: {
-            category: 'transport',
-            title: '공항 이동',
-            memo: null,
-            link: null,
-            transportMode: 'bus',
-            referenceNumber: 'BUS-12',
-            bookingReference: null,
-            originText: '난바',
-            destinationText: '간사이공항',
-            terminalText: 'T1',
-            gateText: '4',
-          },
-        },
-      ],
-    };
-
-    const viewModel = buildDayItineraryViewModel(response);
-
-    assert.deepEqual(viewModel, {
-      status: 'success',
-      dayLabel: 'Day 1',
-      formattedDate: '2026.07.10',
-      lodgingPlace: null,
-      items: [
-        {
-          id: 'item-transport',
-          version: 4,
-          orderLabel: '1',
-          itemType: 'non_place',
-          isLodging: false,
-          startTime: '08:00',
-          endTime: '09:30',
-          timeLabel: '08:00–09:30',
-          placeName: '공항 이동',
-          placeType: 'etc',
-          placeTypeLabel: '이동',
-          address: '버스 · 난바 → 간사이공항 · BUS-12 · T1 · 4',
-          nonPlaceCategory: 'transport',
-          nonPlaceCategoryLabel: '이동',
-          nonPlaceDetailLabel: '버스 · 난바 → 간사이공항 · BUS-12 · T1 · 4',
-          transportMode: 'bus',
-          referenceNumber: 'BUS-12',
-          originText: '난바',
-          destinationText: '간사이공항',
-          terminalText: 'T1',
-          gateText: '4',
-        },
-      ],
-    });
-    if (viewModel.status !== 'success') {
-      assert.fail('expected success view model');
-    }
-    assert.equal(
-      buildDayItineraryPlaceAccessibilityLabel(viewModel.items[0]),
-      '1번째 일정 08:00–09:30. 공항 이동. 이동',
-    );
-  });
-
   it('returns empty state for an in-range day with no items', () => {
     const response: GetDayScheduleItemsResponse = {
       day: { date: '2026-07-10', dayOrder: 1, lodgingPlace: null },
@@ -200,7 +125,7 @@ describe('day itinerary helpers', () => {
       formattedDate: '2026.07.10',
       lodgingPlace: null,
       title: '아직 등록된 일정이 없어요.',
-      helper: '일정 추가를 눌러 방문할 장소나 장소 없는 일정을 등록해보세요.',
+      helper: '일정 추가를 눌러 방문할 장소를 등록해보세요.',
     });
   });
 
@@ -231,6 +156,7 @@ describe('day itinerary helpers', () => {
     assert.equal(getPlaceTypeLabel('cafe'), '카페');
     assert.equal(getPlaceTypeLabel('shopping'), '쇼핑');
     assert.equal(getPlaceTypeLabel('etc'), '기타');
+    assert.equal(getPlaceTypeLabel('transport'), '교통');
   });
 
   it('maps HTTP failures to not-found or retryable states', () => {

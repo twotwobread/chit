@@ -7,7 +7,7 @@ import type {
   UpdateExpenseRequest,
 } from '@i-um/api-contract';
 
-import { getPlaceTypeLabel, getScheduleItems } from './day-itinerary';
+import { getPlaceTypeLabel, getScheduleItems, type PlaceBackedScheduleItem } from './day-itinerary';
 import { formatTripDayDate } from './days';
 import {
   buildDefaultEqualSplitPreview,
@@ -228,15 +228,7 @@ function noPlaceOption(selectedItemId: string | null): ExpenseEditPlaceOption {
   };
 }
 
-function placeOption(item: ScheduleItem, selectedItemId: string | null): ExpenseEditPlaceOption {
-  if (!item.place) {
-    return {
-      itemId: item.id,
-      label: '장소 없는 일정',
-      detail: '장소 연결 없이 일정에만 연결돼요.',
-      selected: item.id === selectedItemId,
-    };
-  }
+function placeOption(item: PlaceBackedScheduleItem, selectedItemId: string | null): ExpenseEditPlaceOption {
   return {
     itemId: item.id,
     label: item.place.name,
@@ -245,8 +237,8 @@ function placeOption(item: ScheduleItem, selectedItemId: string | null): Expense
   };
 }
 
-function orderedItems(items: ScheduleItem[]): ScheduleItem[] {
-  return [...items].filter((item) => item.place !== null).sort((left, right) => left.itemOrder - right.itemOrder);
+function orderedItems(items: ScheduleItem[]): PlaceBackedScheduleItem[] {
+  return [...items].sort((left, right) => left.itemOrder - right.itemOrder);
 }
 
 function currencyLabel(currency: SupportedCurrency): string {
