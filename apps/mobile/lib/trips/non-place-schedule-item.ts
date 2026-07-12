@@ -80,6 +80,17 @@ export function buildNonPlaceScheduleItemEditForm(item: DayItineraryRowViewModel
   };
 }
 
+export function hasNonPlaceScheduleItemFormChanges(
+  original: NonPlaceScheduleItemFormValues,
+  current: NonPlaceScheduleItemFormValues,
+): boolean {
+  const normalizedOriginal = normalize(original);
+  const normalizedCurrent = normalize(current);
+  return (Object.keys(normalizedOriginal) as (keyof NonPlaceScheduleItemFormValues)[]).some(
+    (key) => normalizedOriginal[key] !== normalizedCurrent[key],
+  );
+}
+
 export function validateCreateNonPlaceScheduleItemForm(
   values: NonPlaceScheduleItemFormValues,
 ): NonPlaceScheduleItemValidationResult {

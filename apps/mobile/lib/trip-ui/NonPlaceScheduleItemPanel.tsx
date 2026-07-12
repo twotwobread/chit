@@ -235,15 +235,21 @@ export function NonPlaceScheduleItemPanel({
         </View>
       ) : null}
 
-      <View style={styles.actionGroup}>
+      <View style={variant === 'sheet' ? styles.sheetActionRow : styles.actionGroup}>
+        <SecondaryButton
+          disabled={isSaving}
+          label="취소"
+          onPress={onCancel}
+          style={variant === 'sheet' ? styles.sheetActionButton : null}
+        />
         <PrimaryButton
           disabled={submitView.disabled}
           label={submitView.label}
           loading={isSaving}
           loadingLabel={submitView.label}
           onPress={onSubmit}
+          style={variant === 'sheet' ? styles.sheetActionButton : null}
         />
-        <SecondaryButton disabled={isSaving} label="취소" onPress={onCancel} />
       </View>
     </>
   );

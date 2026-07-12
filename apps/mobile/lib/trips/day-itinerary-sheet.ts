@@ -6,6 +6,11 @@ export type DayItinerarySheetMode =
 
 export type DayItinerarySheetStatus = 'idle' | 'editing' | 'saving' | 'error';
 
+export type DayItinerarySheetCloseAction =
+  | { kind: 'blocked' }
+  | { kind: 'close' }
+  | { kind: 'promptSave'; target: 'place' | 'nonPlace' };
+
 export function resolveDayItinerarySheetMode(input: {
   selectedDetailItemId: string | null;
   editStatus: DayItinerarySheetStatus;
@@ -29,6 +34,24 @@ export function shouldDismissDayItinerarySheet(input: {
   nonPlaceEditorStatus: DayItinerarySheetStatus;
 }): boolean {
   return input.editStatus !== 'saving' && input.nonPlaceEditorStatus !== 'saving';
+}
+
+export function resolveDayItinerarySheetCloseAction(input: {
+  editStatus: DayItinerarySheetStatus;
+  hasEditChanges: boolean;
+  hasNonPlaceEditorChanges: boolean;
+  nonPlaceEditorStatus: DayItinerarySheetStatus;
+}): DayItinerarySheetCloseAction {
+  if (!shouldDismissDayItinerarySheet(input)) {
+    return { kind: 'blocked' };
+  }
+  if (isActiveSheetFormStatus(input.editStatus) && input.hasEditChanges) {
+    return { kind: 'promptSave', target: 'place' };
+  }
+  if (isActiveSheetFormStatus(input.nonPlaceEditorStatus) && input.hasNonPlaceEditorChanges) {
+    return { kind: 'promptSave', target: 'nonPlace' };
+  }
+  return { kind: 'close' };
 }
 
 function isActiveSheetFormStatus(status: DayItinerarySheetStatus): boolean {

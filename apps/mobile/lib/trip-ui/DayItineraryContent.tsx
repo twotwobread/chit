@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, findNodeHandle, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, findNodeHandle, Pressable, Text, View } from 'react-native';
 import { Trash2 } from 'lucide-react-native';
 
 import { Badge, PrimaryButton, SecondaryButton, theme } from '../design';
@@ -9,10 +9,14 @@ import {
   type DayItineraryViewModel,
 } from '../trips/day-itinerary';
 import { buildDayItineraryDetailPanel } from '../trips/day-itinerary-detail-panel';
-import { type DayItineraryEditFormValues } from '../trips/day-itinerary-edit';
+import { hasDayItineraryEditFormChanges, type DayItineraryEditFormValues } from '../trips/day-itinerary-edit';
 import { type DayItineraryMapActionFeedback } from '../trips/day-itinerary-map-actions';
-import { resolveDayItinerarySheetMode, shouldDismissDayItinerarySheet } from '../trips/day-itinerary-sheet';
-import { type NonPlaceScheduleItemFormValues } from '../trips/non-place-schedule-item';
+import { resolveDayItinerarySheetCloseAction, resolveDayItinerarySheetMode } from '../trips/day-itinerary-sheet';
+import {
+  emptyNonPlaceScheduleItemForm,
+  hasNonPlaceScheduleItemFormChanges,
+  type NonPlaceScheduleItemFormValues,
+} from '../trips/non-place-schedule-item';
 import { buildDayItineraryReorderAction, buildDayItineraryReorderSubmitState } from '../trips/reorder-itinerary';
 import {
   ITINERARY_TAB_EMPTY_HELPER,
@@ -189,12 +193,28 @@ export function DayItineraryContent({
   const closeDetailSheet = () => setSelectedDetailItemId(null);
 
   const closeActiveSheet = () => {
-    if (
-      !shouldDismissDayItinerarySheet({
-        editStatus: editState.status,
-        nonPlaceEditorStatus: nonPlaceEditorState.status,
-      })
-    ) {
+    const closeAction = resolveDayItinerarySheetCloseAction({
+      editStatus: editState.status,
+      hasEditChanges:
+        editState.status === 'idle' ? false : hasDayItineraryEditFormChanges(editState.original, editState.values),
+      hasNonPlaceEditorChanges:
+        nonPlaceEditorState.status === 'idle'
+          ? false
+          : hasNonPlaceScheduleItemFormChanges(
+              nonPlaceEditorState.mode === 'edit' ? nonPlaceEditorState.original : emptyNonPlaceScheduleItemForm(),
+              nonPlaceEditorState.values,
+            ),
+      nonPlaceEditorStatus: nonPlaceEditorState.status,
+    });
+
+    if (closeAction.kind === 'blocked') {
+      return;
+    }
+    if (closeAction.kind === 'promptSave') {
+      Alert.alert('변경 사항을 저장할까요?', undefined, [
+        { text: '취소', style: 'cancel' },
+        { text: '저장', onPress: closeAction.target === 'place' ? onSubmitEdit : onSubmitNonPlaceEditor },
+      ]);
       return;
     }
     if (editState.status !== 'idle') {
@@ -209,7 +229,8 @@ export function DayItineraryContent({
   const handlePressTimelineItem = (timelineItem: ItineraryTimelineItem) => {
     const item = resolveTimelineItem(timelineItem);
     if (item) {
-      setSelectedDetailItemId(item.id);
+      setSelectedDetailItemId(null);
+      onEditPlace(item);
     }
   };
 
@@ -449,7 +470,10 @@ function DayItineraryItemSheet({
       <BottomSheet onClose={onClose} scrollable visible>
         <EditPlacePanel
           editState={editState}
+          mapActionFeedback={mapActionFeedback}
           onCancel={onCancelEdit}
+          onCopyAddress={onCopyAddress}
+          onOpenMap={onOpenMap}
           onSubmit={onSubmitEdit}
           onUpdateValues={onUpdateEditValues}
           variant="sheet"

@@ -57,6 +57,20 @@ export function buildDayItineraryEditForm(item: DayItineraryRowViewModel): DayIt
   };
 }
 
+export function hasDayItineraryEditFormChanges(
+  original: DayItineraryEditFormValues,
+  current: DayItineraryEditFormValues,
+): boolean {
+  return (
+    current.name.trim() !== original.name.trim() ||
+    current.address.trim() !== original.address.trim() ||
+    current.placeType !== original.placeType ||
+    current.startTime.trim() !== original.startTime.trim() ||
+    current.endTime.trim() !== original.endTime.trim() ||
+    current.memo.trim() !== original.memo.trim()
+  );
+}
+
 export function validateDayItineraryEditForm(
   original: DayItineraryEditFormValues,
   current: DayItineraryEditFormValues,

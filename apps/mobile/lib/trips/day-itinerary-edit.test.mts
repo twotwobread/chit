@@ -8,6 +8,7 @@ import {
   buildDayItineraryEditForm,
   buildDayItineraryEditSubmitState,
   dayItineraryMutationFailureState,
+  hasDayItineraryEditFormChanges,
   validateDayItineraryEditForm,
 } from './day-itinerary-edit';
 
@@ -102,6 +103,13 @@ describe('day itinerary edit/delete helpers', () => {
       ok: false,
       errors: { form: '변경할 내용을 입력해주세요.' },
     });
+  });
+
+  it('detects normalized edit changes for close confirmation', () => {
+    const original = buildDayItineraryEditForm(item);
+
+    assert.equal(hasDayItineraryEditFormChanges(original, { ...original, name: ' 우메다 공중정원 ' }), false);
+    assert.equal(hasDayItineraryEditFormChanges(original, { ...original, memo: '새 메모' }), true);
   });
 
   it('validates editable fields before submit', () => {

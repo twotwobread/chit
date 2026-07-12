@@ -6,6 +6,7 @@ import {
   buildNonPlaceScheduleItemEditForm,
   buildNonPlaceScheduleItemSubmitState,
   emptyNonPlaceScheduleItemForm,
+  hasNonPlaceScheduleItemFormChanges,
   validateCreateNonPlaceScheduleItemForm,
   validateUpdateNonPlaceScheduleItemForm,
 } from './non-place-schedule-item';
@@ -144,6 +145,13 @@ describe('non-place schedule item helpers', () => {
         },
       },
     );
+  });
+
+  it('detects normalized edit changes for close confirmation', () => {
+    const original = emptyNonPlaceScheduleItemForm();
+
+    assert.equal(hasNonPlaceScheduleItemFormChanges(original, { ...original, title: '  ' }), false);
+    assert.equal(hasNonPlaceScheduleItemFormChanges(original, { ...original, title: '체크아웃' }), true);
   });
 
   it('maps submit labels for create and edit modes', () => {

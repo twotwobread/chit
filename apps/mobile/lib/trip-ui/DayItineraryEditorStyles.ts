@@ -393,7 +393,7 @@ export const styles = StyleSheet.create({
     paddingBottom: theme.space[2],
   },
   sheetFormBody: {
-    gap: theme.space[5],
+    gap: theme.space[4],
     paddingBottom: theme.space[2],
   },
   detailSheetHeader: {
@@ -542,6 +542,13 @@ export const styles = StyleSheet.create({
   },
   actionGroup: {
     gap: theme.space[3],
+  },
+  sheetActionRow: {
+    flexDirection: 'row',
+    gap: theme.space[3],
+  },
+  sheetActionButton: {
+    flex: 1,
   },
   button: {
     alignItems: 'center',

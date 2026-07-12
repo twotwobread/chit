@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { resolveDayItinerarySheetMode, shouldDismissDayItinerarySheet } from './day-itinerary-sheet';
+import {
+  resolveDayItinerarySheetCloseAction,
+  resolveDayItinerarySheetMode,
+  shouldDismissDayItinerarySheet,
+} from './day-itinerary-sheet';
 
 describe('day itinerary sheet state helpers', () => {
   it('shows detail when a row is selected and no edit form is active', () => {
@@ -58,5 +62,35 @@ describe('day itinerary sheet state helpers', () => {
     assert.equal(shouldDismissDayItinerarySheet({ editStatus: 'idle', nonPlaceEditorStatus: 'saving' }), false);
     assert.equal(shouldDismissDayItinerarySheet({ editStatus: 'editing', nonPlaceEditorStatus: 'idle' }), true);
     assert.equal(shouldDismissDayItinerarySheet({ editStatus: 'idle', nonPlaceEditorStatus: 'idle' }), true);
+  });
+
+  it('prompts to save when closing a dirty edit sheet and closes clean sheets directly', () => {
+    assert.deepEqual(
+      resolveDayItinerarySheetCloseAction({
+        editStatus: 'editing',
+        hasEditChanges: true,
+        hasNonPlaceEditorChanges: false,
+        nonPlaceEditorStatus: 'idle',
+      }),
+      { kind: 'promptSave', target: 'place' },
+    );
+    assert.deepEqual(
+      resolveDayItinerarySheetCloseAction({
+        editStatus: 'editing',
+        hasEditChanges: false,
+        hasNonPlaceEditorChanges: false,
+        nonPlaceEditorStatus: 'idle',
+      }),
+      { kind: 'close' },
+    );
+    assert.deepEqual(
+      resolveDayItinerarySheetCloseAction({
+        editStatus: 'idle',
+        hasEditChanges: false,
+        hasNonPlaceEditorChanges: true,
+        nonPlaceEditorStatus: 'editing',
+      }),
+      { kind: 'promptSave', target: 'nonPlace' },
+    );
   });
 });
