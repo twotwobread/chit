@@ -10,6 +10,7 @@ tags:
   - name: Health
   - name: Auth
   - name: Trips
+  - name: Flights
   - name: Places
   - name: Destinations
 paths:
@@ -356,6 +357,445 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Trip not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /trips/{tripId}/flights:
+    get:
+      operationId: listTripFlights
+      summary: List trip flights
+      description: Returns shared trip flight information and only the authenticated passenger's own personal flight detail summary.
+      tags:
+        - Flights
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Trip flights.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListTripFlightsResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      operationId: createTripFlight
+      summary: Create a trip flight
+      description: Creates shared flight metadata and passenger membership for a trip. Personal reservation fields are not created for other passengers.
+      tags:
+        - Flights
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTripFlightRequest'
+      responses:
+        '201':
+          description: Flight created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateTripFlightResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip or passenger participant not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /trips/{tripId}/flights/{flightId}:
+    get:
+      operationId: getTripFlight
+      summary: Get trip flight detail
+      description: Returns shared flight detail and only the authenticated passenger's own personal flight detail.
+      tags:
+        - Flights
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: flightId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Flight detail.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetTripFlightResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip or flight not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /trips/{tripId}/flights/{flightId}/my-detail:
+    put:
+      operationId: upsertMyFlightPersonalDetail
+      summary: Upsert my flight personal detail
+      description: Upserts private reservation fields for the authenticated passenger only.
+      tags:
+        - Flights
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: flightId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpsertMyFlightPersonalDetailRequest'
+      responses:
+        '200':
+          description: Personal flight detail saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpsertMyFlightPersonalDetailResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden; current user is not a passenger for this flight.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip or flight not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /trips/{tripId}/flights/{flightId}/my-detail/boarding-pass:
+    put:
+      operationId: uploadMyFlightBoardingPass
+      summary: Upload or replace my flight boarding-pass image
+      description: Stores one private boarding-pass/check-in image for the authenticated passenger. The image is stored in private object storage; list/detail responses never return object keys or signed URLs.
+      tags:
+        - Flights
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: flightId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          image/jpeg:
+            schema:
+              type: string
+              format: binary
+          image/png:
+            schema:
+              type: string
+              format: binary
+          image/webp:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '200':
+          description: Boarding pass uploaded or replaced.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadMyFlightBoardingPassResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden; current user is not a passenger for this flight.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip or flight not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Boarding-pass image exceeds 10 MiB.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '415':
+          description: Unsupported boarding-pass image media type.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Boarding-pass object storage unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      operationId: deleteMyFlightBoardingPass
+      summary: Delete my flight boarding-pass image
+      description: Deletes the authenticated passenger's boarding-pass metadata and schedules private object cleanup. Deleting a missing own attachment is a no-op.
+      tags:
+        - Flights
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: flightId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Boarding pass deleted or already absent.
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden; current user is not a passenger for this flight.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip or flight not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /trips/{tripId}/flights/{flightId}/my-detail/boarding-pass/open-url:
+    post:
+      operationId: openMyFlightBoardingPass
+      summary: Create a short-lived URL for my flight boarding pass
+      description: Authorizes the authenticated passenger and returns a short-lived signed URL for the passenger's own boarding-pass image. The URL must not be persisted by clients.
+      tags:
+        - Flights
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: flightId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Short-lived boarding-pass URL.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: API response should be `no-store`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpenMyFlightBoardingPassResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden; current user is not a passenger for this flight.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip, flight, or own boarding pass not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Boarding-pass object storage unavailable.
           content:
             application/json:
               schema:
@@ -2823,6 +3263,281 @@ components:
       enum:
         - owner
         - member
+    FlightImageContentType:
+      type: string
+      enum:
+        - image/jpeg
+        - image/png
+        - image/webp
+    FlightEndpointInput:
+      type: object
+      required:
+        - airportText
+        - localDate
+        - localTime
+        - timeZone
+      additionalProperties: false
+      properties:
+        airportText:
+          type: string
+          minLength: 1
+          maxLength: 120
+          description: Server trims leading/trailing whitespace.
+        airportCode:
+          type: string
+          nullable: true
+          minLength: 1
+          maxLength: 8
+          description: Optional manually entered airport code. Server trims and uppercases when present.
+        localDate:
+          type: string
+          format: date
+          description: Airport-local date in YYYY-MM-DD format.
+        localTime:
+          type: string
+          pattern: '^([01]\\d|2[0-3]):[0-5]\\d$'
+          description: Airport-local time in HH:mm 24-hour format.
+        timeZone:
+          type: string
+          minLength: 1
+          maxLength: 80
+          description: IANA time zone identifier. Abbreviations such as KST or PST are invalid.
+    FlightEndpoint:
+      allOf:
+        - $ref: '#/components/schemas/FlightEndpointInput'
+        - type: object
+          required:
+            - at
+          properties:
+            at:
+              type: string
+              format: date-time
+              description: Server-derived UTC instant for ordering and Today windows.
+    FlightPassenger:
+      type: object
+      required:
+        - participantId
+        - displayName
+      additionalProperties: false
+      properties:
+        participantId:
+          type: string
+        displayName:
+          type: string
+    FlightBoardingPassSummary:
+      type: object
+      required:
+        - exists
+        - contentType
+        - byteSize
+        - uploadedAt
+      additionalProperties: false
+      properties:
+        exists:
+          type: boolean
+        contentType:
+          allOf:
+            - $ref: '#/components/schemas/FlightImageContentType'
+          nullable: true
+        byteSize:
+          type: integer
+          nullable: true
+          minimum: 1
+          maximum: 10485760
+        uploadedAt:
+          type: string
+          format: date-time
+          nullable: true
+    MyFlightPersonalDetail:
+      type: object
+      required:
+        - reservationNumber
+        - seat
+        - checkInUrl
+        - boardingPass
+      additionalProperties: false
+      properties:
+        reservationNumber:
+          type: string
+          nullable: true
+          maxLength: 80
+        seat:
+          type: string
+          nullable: true
+          maxLength: 20
+        checkInUrl:
+          type: string
+          nullable: true
+          maxLength: 500
+          description: Optional http/https check-in or reservation URL.
+        boardingPass:
+          $ref: '#/components/schemas/FlightBoardingPassSummary'
+    FlightSummary:
+      type: object
+      required:
+        - id
+        - displayTitle
+        - flightNumber
+        - departure
+        - arrival
+        - passengers
+        - myPersonalDetail
+        - createdByUserId
+        - createdAt
+        - updatedAt
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+        displayTitle:
+          type: string
+          minLength: 1
+          maxLength: 80
+        flightNumber:
+          type: string
+          nullable: true
+          maxLength: 20
+        departure:
+          $ref: '#/components/schemas/FlightEndpoint'
+        arrival:
+          $ref: '#/components/schemas/FlightEndpoint'
+        passengers:
+          type: array
+          items:
+            $ref: '#/components/schemas/FlightPassenger'
+        myPersonalDetail:
+          allOf:
+            - $ref: '#/components/schemas/MyFlightPersonalDetail'
+          nullable: true
+          description: Current passenger's private detail only. Other passengers' private details are never returned.
+        createdByUserId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    FlightDetail:
+      allOf:
+        - $ref: '#/components/schemas/FlightSummary'
+    ListTripFlightsResponse:
+      type: object
+      required:
+        - flights
+      additionalProperties: false
+      properties:
+        flights:
+          type: array
+          items:
+            $ref: '#/components/schemas/FlightSummary'
+    CreateTripFlightRequest:
+      type: object
+      required:
+        - displayTitle
+        - flightNumber
+        - departure
+        - arrival
+        - passengerParticipantIds
+      additionalProperties: false
+      properties:
+        displayTitle:
+          type: string
+          minLength: 1
+          maxLength: 80
+          description: Server trims leading/trailing whitespace.
+        flightNumber:
+          type: string
+          nullable: true
+          maxLength: 20
+          description: Optional flight number. Blank strings are stored as null.
+        departure:
+          $ref: '#/components/schemas/FlightEndpointInput'
+        arrival:
+          $ref: '#/components/schemas/FlightEndpointInput'
+        passengerParticipantIds:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+    CreateTripFlightResponse:
+      type: object
+      required:
+        - flight
+      additionalProperties: false
+      properties:
+        flight:
+          $ref: '#/components/schemas/FlightDetail'
+    GetTripFlightResponse:
+      type: object
+      required:
+        - flight
+      additionalProperties: false
+      properties:
+        flight:
+          $ref: '#/components/schemas/FlightDetail'
+    UpsertMyFlightPersonalDetailRequest:
+      type: object
+      required:
+        - reservationNumber
+        - seat
+        - checkInUrl
+      additionalProperties: false
+      properties:
+        reservationNumber:
+          type: string
+          nullable: true
+          maxLength: 80
+          description: Server trims; blank strings clear to null.
+        seat:
+          type: string
+          nullable: true
+          maxLength: 20
+          description: Server trims; blank strings clear to null.
+        checkInUrl:
+          type: string
+          nullable: true
+          maxLength: 500
+          description: Server trims; blank strings clear to null; non-null values must be http or https URLs.
+    UpsertMyFlightPersonalDetailResponse:
+      type: object
+      required:
+        - personalDetail
+      additionalProperties: false
+      properties:
+        personalDetail:
+          $ref: '#/components/schemas/MyFlightPersonalDetail'
+    UploadMyFlightBoardingPassResponse:
+      type: object
+      required:
+        - personalDetail
+      additionalProperties: false
+      properties:
+        personalDetail:
+          $ref: '#/components/schemas/MyFlightPersonalDetail'
+    OpenMyFlightBoardingPassResponse:
+      type: object
+      required:
+        - url
+        - expiresAt
+        - contentType
+        - byteSize
+      additionalProperties: false
+      properties:
+        url:
+          type: string
+          format: uri
+          description: Short-lived signed URL. Clients must not persist it.
+        expiresAt:
+          type: string
+          format: date-time
+        contentType:
+          $ref: '#/components/schemas/FlightImageContentType'
+        byteSize:
+          type: integer
+          minimum: 1
+          maximum: 10485760
     CreateTripRequest:
       type: object
       required:

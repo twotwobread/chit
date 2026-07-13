@@ -18,6 +18,8 @@ import {
   isApiStatus,
   isMobileAuthSessionError,
 } from '../auth/errors';
+import { listTripFlights } from '../flights/flight-api';
+import { buildTodayFlightCard, type TodayFlightCardViewModel } from '../flights/today';
 import { createQuickExpense, listDayExpenses, updateExpense } from '../trips/expense-api';
 import {
   createRoutePreview,
@@ -67,9 +69,14 @@ import { localDateString } from '../trips/status';
 
 export type TripTodayState =
   | { status: 'loading' }
-  | { status: 'ready'; viewModel: TodayExecutionViewModel; spendSummary: TodaySpendSummaryViewModel }
-  | { status: 'statusLanding'; viewModel: TripTodayStatusLandingViewModel }
-  | { status: 'unavailable'; viewModel: TripTabUnavailableViewModel }
+  | {
+      status: 'ready';
+      viewModel: TodayExecutionViewModel;
+      spendSummary: TodaySpendSummaryViewModel;
+      flightCard: TodayFlightCardViewModel | null;
+    }
+  | { status: 'statusLanding'; viewModel: TripTodayStatusLandingViewModel; flightCard: TodayFlightCardViewModel | null }
+  | { status: 'unavailable'; viewModel: TripTabUnavailableViewModel; flightCard: TodayFlightCardViewModel | null }
   | { status: 'auth' }
   | { status: 'notFound' }
   | { status: 'error' };
@@ -111,17 +118,26 @@ export function useTripTodayController() {
     setRouteChip(todayRoutePreviewHeroChipFallbackCopy);
     setState({ status: 'loading' });
     try {
-      const [detail, storedTravelMode] = await Promise.all([getTripDetail(tripId), readStoredTravelMode()]);
+      const [detail, storedTravelMode, flightsResult] = await Promise.all([
+        getTripDetail(tripId),
+        readStoredTravelMode(),
+        listTripFlights(tripId).catch(() => null),
+      ]);
+      const todayFlightCard = flightsResult ? buildTodayFlightCard(flightsResult.flights, new Date()) : null;
       const today = localDateString();
       const statusLanding = buildTripTodayStatusLandingViewModel(detail, today);
       if (statusLanding) {
-        setState({ status: 'statusLanding', viewModel: statusLanding });
+        setState({ status: 'statusLanding', viewModel: statusLanding, flightCard: todayFlightCard });
         return;
       }
 
       const currentDay = findTripCalendarDay(detail.days, today);
       if (!currentDay) {
-        setState({ status: 'unavailable', viewModel: buildTripTabUnavailableViewModel('today', tripId) });
+        setState({
+          status: 'unavailable',
+          viewModel: buildTripTabUnavailableViewModel('today', tripId),
+          flightCard: todayFlightCard,
+        });
         return;
       }
 
@@ -139,13 +155,18 @@ export function useTripTodayController() {
       });
 
       if (viewModel.status === 'unavailable') {
-        setState({ status: 'unavailable', viewModel: buildTripTabUnavailableViewModel('today', tripId) });
+        setState({
+          status: 'unavailable',
+          viewModel: buildTripTabUnavailableViewModel('today', tripId),
+          flightCard: todayFlightCard,
+        });
         return;
       }
 
       setState({
         status: 'ready',
         viewModel,
+        flightCard: todayFlightCard,
         spendSummary: buildTodaySpendSummaryViewModel({
           actionRoute:
             'quickExpenseAction' in viewModel ? viewModel.quickExpenseAction.route : viewModel.primaryAction.route,

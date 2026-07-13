@@ -8,6 +8,9 @@ export type TripHiddenRouteKind =
   | 'detail'
   | 'edit'
   | 'participants'
+  | 'flights'
+  | 'flightNew'
+  | 'flightDetail'
   | 'day'
   | 'dayPlaceSearch'
   | 'dayPlaceNew'
@@ -18,6 +21,7 @@ export type TripRouteFallbackInput =
   | { kind: 'detail'; tripId: string }
   | { kind: 'edit'; tripId: string }
   | { kind: 'participants'; tripId: string }
+  | { kind: 'flights' | 'flightNew' | 'flightDetail'; tripId: string }
   | { kind: 'day'; tripId: string }
   | { kind: 'dayPlaceSearch' | 'dayPlaceNew' | 'dayQuickExpense'; tripId: string; tripDayId: string };
 
@@ -57,6 +61,18 @@ export function tripParticipantsPath(tripId: string): `/trips/${string}/particip
   return `/trips/${tripId}/participants`;
 }
 
+export function tripFlightsPath(tripId: string): `/trips/${string}/flights` {
+  return `/trips/${tripId}/flights`;
+}
+
+export function tripFlightNewPath(tripId: string): `/trips/${string}/flights/new` {
+  return `/trips/${tripId}/flights/new`;
+}
+
+export function tripFlightDetailPath(tripId: string, flightId: string): `/trips/${string}/flights/${string}` {
+  return `/trips/${tripId}/flights/${flightId}`;
+}
+
 export function isTripRootTab(value: string): value is TripRootTab {
   return TRIP_ROOT_TABS.includes(value as TripRootTab);
 }
@@ -87,6 +103,11 @@ export function tripFallbackPath(input: TripRouteFallbackInput): Href {
     case 'edit':
     case 'participants':
       return tripDetailPath(input.tripId);
+    case 'flights':
+      return tripTodayPath(input.tripId);
+    case 'flightNew':
+    case 'flightDetail':
+      return tripFlightsPath(input.tripId);
     case 'day':
       return tripItineraryPath(input.tripId);
     case 'dayPlaceSearch':
@@ -111,6 +132,15 @@ export function tripFallbackPathForPathname(pathname: string, tripId: string): H
   }
   if (normalizedPathname === `/trips/${tripId}/participants`) {
     return tripFallbackPath({ kind: 'participants', tripId });
+  }
+  if (normalizedPathname === `/trips/${tripId}/flights`) {
+    return tripFallbackPath({ kind: 'flights', tripId });
+  }
+  if (normalizedPathname === `/trips/${tripId}/flights/new`) {
+    return tripFallbackPath({ kind: 'flightNew', tripId });
+  }
+  if (normalizedPathname.startsWith(`/trips/${tripId}/flights/`)) {
+    return tripFallbackPath({ kind: 'flightDetail', tripId });
   }
 
   const dayRoutePrefix = `/trips/${tripId}/days/`;

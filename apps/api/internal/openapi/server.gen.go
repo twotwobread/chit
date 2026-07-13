@@ -68,6 +68,13 @@ const (
 	Manual ExpenseSplitPolicy = "manual"
 )
 
+// Defines values for FlightImageContentType.
+const (
+	Imagejpeg FlightImageContentType = "image/jpeg"
+	Imagepng  FlightImageContentType = "image/png"
+	Imagewebp FlightImageContentType = "image/webp"
+)
+
 // Defines values for HealthResponseStatus.
 const (
 	HealthResponseStatusOk HealthResponseStatus = "ok"
@@ -305,6 +312,24 @@ type CreateRoutePreviewRequest struct {
 	Origin GeoPoint `json:"origin"`
 }
 
+// CreateTripFlightRequest defines model for CreateTripFlightRequest.
+type CreateTripFlightRequest struct {
+	Arrival   FlightEndpointInput `json:"arrival"`
+	Departure FlightEndpointInput `json:"departure"`
+
+	// DisplayTitle Server trims leading/trailing whitespace.
+	DisplayTitle string `json:"displayTitle"`
+
+	// FlightNumber Optional flight number. Blank strings are stored as null.
+	FlightNumber            *string  `json:"flightNumber"`
+	PassengerParticipantIds []string `json:"passengerParticipantIds"`
+}
+
+// CreateTripFlightResponse defines model for CreateTripFlightResponse.
+type CreateTripFlightResponse struct {
+	Flight FlightDetail `json:"flight"`
+}
+
 // CreateTripInviteResponse defines model for CreateTripInviteResponse.
 type CreateTripInviteResponse struct {
 	// Created true when this request created a new invite, false when an existing unexpired current invite was reused.
@@ -440,6 +465,81 @@ type ExpenseSplit struct {
 // ExpenseSplitPolicy Persisted split policy for current quick expenses.
 type ExpenseSplitPolicy string
 
+// FlightBoardingPassSummary defines model for FlightBoardingPassSummary.
+type FlightBoardingPassSummary struct {
+	ByteSize    *int                    `json:"byteSize"`
+	ContentType *FlightImageContentType `json:"contentType"`
+	Exists      bool                    `json:"exists"`
+	UploadedAt  *time.Time              `json:"uploadedAt"`
+}
+
+// FlightDetail defines model for FlightDetail.
+type FlightDetail = FlightSummary
+
+// FlightEndpoint defines model for FlightEndpoint.
+type FlightEndpoint struct {
+	// AirportCode Optional manually entered airport code. Server trims and uppercases when present.
+	AirportCode *string `json:"airportCode"`
+
+	// AirportText Server trims leading/trailing whitespace.
+	AirportText string `json:"airportText"`
+
+	// At Server-derived UTC instant for ordering and Today windows.
+	At time.Time `json:"at"`
+
+	// LocalDate Airport-local date in YYYY-MM-DD format.
+	LocalDate openapi_types.Date `json:"localDate"`
+
+	// LocalTime Airport-local time in HH:mm 24-hour format.
+	LocalTime string `json:"localTime"`
+
+	// TimeZone IANA time zone identifier. Abbreviations such as KST or PST are invalid.
+	TimeZone string `json:"timeZone"`
+}
+
+// FlightEndpointInput defines model for FlightEndpointInput.
+type FlightEndpointInput struct {
+	// AirportCode Optional manually entered airport code. Server trims and uppercases when present.
+	AirportCode *string `json:"airportCode"`
+
+	// AirportText Server trims leading/trailing whitespace.
+	AirportText string `json:"airportText"`
+
+	// LocalDate Airport-local date in YYYY-MM-DD format.
+	LocalDate openapi_types.Date `json:"localDate"`
+
+	// LocalTime Airport-local time in HH:mm 24-hour format.
+	LocalTime string `json:"localTime"`
+
+	// TimeZone IANA time zone identifier. Abbreviations such as KST or PST are invalid.
+	TimeZone string `json:"timeZone"`
+}
+
+// FlightImageContentType defines model for FlightImageContentType.
+type FlightImageContentType string
+
+// FlightPassenger defines model for FlightPassenger.
+type FlightPassenger struct {
+	DisplayName   string `json:"displayName"`
+	ParticipantId string `json:"participantId"`
+}
+
+// FlightSummary defines model for FlightSummary.
+type FlightSummary struct {
+	Arrival         FlightEndpoint `json:"arrival"`
+	CreatedAt       time.Time      `json:"createdAt"`
+	CreatedByUserId string         `json:"createdByUserId"`
+	Departure       FlightEndpoint `json:"departure"`
+	DisplayTitle    string         `json:"displayTitle"`
+	FlightNumber    *string        `json:"flightNumber"`
+	Id              string         `json:"id"`
+
+	// MyPersonalDetail Current passenger's private detail only. Other passengers' private details are never returned.
+	MyPersonalDetail *MyFlightPersonalDetail `json:"myPersonalDetail"`
+	Passengers       []FlightPassenger       `json:"passengers"`
+	UpdatedAt        time.Time               `json:"updatedAt"`
+}
+
 // GeoBounds defines model for GeoBounds.
 type GeoBounds struct {
 	Northeast GeoPoint `json:"northeast"`
@@ -473,6 +573,11 @@ type GetTripDetailResponse struct {
 	Days               []TripDay              `json:"days"`
 	ParticipantSummary TripParticipantSummary `json:"participantSummary"`
 	Trip               Trip                   `json:"trip"`
+}
+
+// GetTripFlightResponse defines model for GetTripFlightResponse.
+type GetTripFlightResponse struct {
+	Flight FlightDetail `json:"flight"`
 }
 
 // GetTripSettlementResponse defines model for GetTripSettlementResponse.
@@ -545,6 +650,11 @@ type ListDayExpensesResponse struct {
 	Expenses []DayExpenseListItem `json:"expenses"`
 }
 
+// ListTripFlightsResponse defines model for ListTripFlightsResponse.
+type ListTripFlightsResponse struct {
+	Flights []FlightSummary `json:"flights"`
+}
+
 // ListTripParticipantsResponse defines model for ListTripParticipantsResponse.
 type ListTripParticipantsResponse struct {
 	Participants []TripParticipantListItem `json:"participants"`
@@ -604,6 +714,16 @@ type MetadataReadinessCheckSchema string
 // MetadataReadinessCheckStatus defines model for MetadataReadinessCheck.Status.
 type MetadataReadinessCheckStatus string
 
+// MyFlightPersonalDetail defines model for MyFlightPersonalDetail.
+type MyFlightPersonalDetail struct {
+	BoardingPass FlightBoardingPassSummary `json:"boardingPass"`
+
+	// CheckInUrl Optional http/https check-in or reservation URL.
+	CheckInUrl        *string `json:"checkInUrl"`
+	ReservationNumber *string `json:"reservationNumber"`
+	Seat              *string `json:"seat"`
+}
+
 // MySettlementCurrencySummary defines model for MySettlementCurrencySummary.
 type MySettlementCurrencySummary struct {
 	Currency  SupportedCurrency     `json:"currency"`
@@ -652,6 +772,16 @@ type OAuthLoginRequest struct {
 	Credential OAuthCredential `json:"credential"`
 	Device     *DeviceInfo     `json:"device,omitempty"`
 	Provider   AuthProvider    `json:"provider"`
+}
+
+// OpenMyFlightBoardingPassResponse defines model for OpenMyFlightBoardingPassResponse.
+type OpenMyFlightBoardingPassResponse struct {
+	ByteSize    int                    `json:"byteSize"`
+	ContentType FlightImageContentType `json:"contentType"`
+	ExpiresAt   time.Time              `json:"expiresAt"`
+
+	// Url Short-lived signed URL. Clients must not persist it.
+	Url string `json:"url"`
 }
 
 // PlaceScheduleItemDetails defines model for PlaceScheduleItemDetails.
@@ -1059,6 +1189,28 @@ type UpdateTripResponse struct {
 	Trip Trip `json:"trip"`
 }
 
+// UploadMyFlightBoardingPassResponse defines model for UploadMyFlightBoardingPassResponse.
+type UploadMyFlightBoardingPassResponse struct {
+	PersonalDetail MyFlightPersonalDetail `json:"personalDetail"`
+}
+
+// UpsertMyFlightPersonalDetailRequest defines model for UpsertMyFlightPersonalDetailRequest.
+type UpsertMyFlightPersonalDetailRequest struct {
+	// CheckInUrl Server trims; blank strings clear to null; non-null values must be http or https URLs.
+	CheckInUrl *string `json:"checkInUrl"`
+
+	// ReservationNumber Server trims; blank strings clear to null.
+	ReservationNumber *string `json:"reservationNumber"`
+
+	// Seat Server trims; blank strings clear to null.
+	Seat *string `json:"seat"`
+}
+
+// UpsertMyFlightPersonalDetailResponse defines model for UpsertMyFlightPersonalDetailResponse.
+type UpsertMyFlightPersonalDetailResponse struct {
+	PersonalDetail MyFlightPersonalDetail `json:"personalDetail"`
+}
+
 // SearchDestinationsParams defines parameters for SearchDestinations.
 type SearchDestinationsParams struct {
 	// Query Trimmed search text. Must contain at least 2 characters.
@@ -1133,6 +1285,12 @@ type UpdateScheduleItemJSONRequestBody = UpdateScheduleItemRequest
 
 // CreateRoutePreviewJSONRequestBody defines body for CreateRoutePreview for application/json ContentType.
 type CreateRoutePreviewJSONRequestBody = CreateRoutePreviewRequest
+
+// CreateTripFlightJSONRequestBody defines body for CreateTripFlight for application/json ContentType.
+type CreateTripFlightJSONRequestBody = CreateTripFlightRequest
+
+// UpsertMyFlightPersonalDetailJSONRequestBody defines body for UpsertMyFlightPersonalDetail for application/json ContentType.
+type UpsertMyFlightPersonalDetailJSONRequestBody = UpsertMyFlightPersonalDetailRequest
 
 // CreateGoogleTripPlaceBookmarkJSONRequestBody defines body for CreateGoogleTripPlaceBookmark for application/json ContentType.
 type CreateGoogleTripPlaceBookmarkJSONRequestBody = CreateGoogleTripPlaceBookmarkRequest
@@ -1259,6 +1417,27 @@ type ServerInterface interface {
 	// Mark a trip day schedule item skipped
 	// (POST /trips/{tripId}/days/{tripDayId}/schedule-items/{scheduleItemId}/skip)
 	MarkScheduleItemSkipped(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, scheduleItemId string)
+	// List trip flights
+	// (GET /trips/{tripId}/flights)
+	ListTripFlights(w http.ResponseWriter, r *http.Request, tripId string)
+	// Create a trip flight
+	// (POST /trips/{tripId}/flights)
+	CreateTripFlight(w http.ResponseWriter, r *http.Request, tripId string)
+	// Get trip flight detail
+	// (GET /trips/{tripId}/flights/{flightId})
+	GetTripFlight(w http.ResponseWriter, r *http.Request, tripId string, flightId string)
+	// Upsert my flight personal detail
+	// (PUT /trips/{tripId}/flights/{flightId}/my-detail)
+	UpsertMyFlightPersonalDetail(w http.ResponseWriter, r *http.Request, tripId string, flightId string)
+	// Delete my flight boarding-pass image
+	// (DELETE /trips/{tripId}/flights/{flightId}/my-detail/boarding-pass)
+	DeleteMyFlightBoardingPass(w http.ResponseWriter, r *http.Request, tripId string, flightId string)
+	// Upload or replace my flight boarding-pass image
+	// (PUT /trips/{tripId}/flights/{flightId}/my-detail/boarding-pass)
+	UploadMyFlightBoardingPass(w http.ResponseWriter, r *http.Request, tripId string, flightId string)
+	// Create a short-lived URL for my flight boarding pass
+	// (POST /trips/{tripId}/flights/{flightId}/my-detail/boarding-pass/open-url)
+	OpenMyFlightBoardingPass(w http.ResponseWriter, r *http.Request, tripId string, flightId string)
 	// Create or retrieve the current trip invite link
 	// (POST /trips/{tripId}/invites)
 	CreateTripInvite(w http.ResponseWriter, r *http.Request, tripId string)
@@ -1526,6 +1705,48 @@ func (_ Unimplemented) CreateRoutePreview(w http.ResponseWriter, r *http.Request
 // Mark a trip day schedule item skipped
 // (POST /trips/{tripId}/days/{tripDayId}/schedule-items/{scheduleItemId}/skip)
 func (_ Unimplemented) MarkScheduleItemSkipped(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, scheduleItemId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// List trip flights
+// (GET /trips/{tripId}/flights)
+func (_ Unimplemented) ListTripFlights(w http.ResponseWriter, r *http.Request, tripId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Create a trip flight
+// (POST /trips/{tripId}/flights)
+func (_ Unimplemented) CreateTripFlight(w http.ResponseWriter, r *http.Request, tripId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Get trip flight detail
+// (GET /trips/{tripId}/flights/{flightId})
+func (_ Unimplemented) GetTripFlight(w http.ResponseWriter, r *http.Request, tripId string, flightId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Upsert my flight personal detail
+// (PUT /trips/{tripId}/flights/{flightId}/my-detail)
+func (_ Unimplemented) UpsertMyFlightPersonalDetail(w http.ResponseWriter, r *http.Request, tripId string, flightId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Delete my flight boarding-pass image
+// (DELETE /trips/{tripId}/flights/{flightId}/my-detail/boarding-pass)
+func (_ Unimplemented) DeleteMyFlightBoardingPass(w http.ResponseWriter, r *http.Request, tripId string, flightId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Upload or replace my flight boarding-pass image
+// (PUT /trips/{tripId}/flights/{flightId}/my-detail/boarding-pass)
+func (_ Unimplemented) UploadMyFlightBoardingPass(w http.ResponseWriter, r *http.Request, tripId string, flightId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Create a short-lived URL for my flight boarding pass
+// (POST /trips/{tripId}/flights/{flightId}/my-detail/boarding-pass/open-url)
+func (_ Unimplemented) OpenMyFlightBoardingPass(w http.ResponseWriter, r *http.Request, tripId string, flightId string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -3034,6 +3255,268 @@ func (siw *ServerInterfaceWrapper) MarkScheduleItemSkipped(w http.ResponseWriter
 	handler.ServeHTTP(w, r)
 }
 
+// ListTripFlights operation middleware
+func (siw *ServerInterfaceWrapper) ListTripFlights(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListTripFlights(w, r, tripId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateTripFlight operation middleware
+func (siw *ServerInterfaceWrapper) CreateTripFlight(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateTripFlight(w, r, tripId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetTripFlight operation middleware
+func (siw *ServerInterfaceWrapper) GetTripFlight(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "flightId" -------------
+	var flightId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "flightId", chi.URLParam(r, "flightId"), &flightId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "flightId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetTripFlight(w, r, tripId, flightId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpsertMyFlightPersonalDetail operation middleware
+func (siw *ServerInterfaceWrapper) UpsertMyFlightPersonalDetail(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "flightId" -------------
+	var flightId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "flightId", chi.URLParam(r, "flightId"), &flightId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "flightId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpsertMyFlightPersonalDetail(w, r, tripId, flightId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteMyFlightBoardingPass operation middleware
+func (siw *ServerInterfaceWrapper) DeleteMyFlightBoardingPass(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "flightId" -------------
+	var flightId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "flightId", chi.URLParam(r, "flightId"), &flightId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "flightId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteMyFlightBoardingPass(w, r, tripId, flightId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UploadMyFlightBoardingPass operation middleware
+func (siw *ServerInterfaceWrapper) UploadMyFlightBoardingPass(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "flightId" -------------
+	var flightId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "flightId", chi.URLParam(r, "flightId"), &flightId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "flightId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UploadMyFlightBoardingPass(w, r, tripId, flightId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// OpenMyFlightBoardingPass operation middleware
+func (siw *ServerInterfaceWrapper) OpenMyFlightBoardingPass(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "flightId" -------------
+	var flightId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "flightId", chi.URLParam(r, "flightId"), &flightId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "flightId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.OpenMyFlightBoardingPass(w, r, tripId, flightId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // CreateTripInvite operation middleware
 func (siw *ServerInterfaceWrapper) CreateTripInvite(w http.ResponseWriter, r *http.Request) {
 
@@ -3532,6 +4015,27 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/trips/{tripId}/days/{tripDayId}/schedule-items/{scheduleItemId}/skip", wrapper.MarkScheduleItemSkipped)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/trips/{tripId}/flights", wrapper.ListTripFlights)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/trips/{tripId}/flights", wrapper.CreateTripFlight)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/trips/{tripId}/flights/{flightId}", wrapper.GetTripFlight)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/trips/{tripId}/flights/{flightId}/my-detail", wrapper.UpsertMyFlightPersonalDetail)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/trips/{tripId}/flights/{flightId}/my-detail/boarding-pass", wrapper.DeleteMyFlightBoardingPass)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/trips/{tripId}/flights/{flightId}/my-detail/boarding-pass", wrapper.UploadMyFlightBoardingPass)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/trips/{tripId}/flights/{flightId}/my-detail/boarding-pass/open-url", wrapper.OpenMyFlightBoardingPass)
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/trips/{tripId}/invites", wrapper.CreateTripInvite)

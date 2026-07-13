@@ -1,5 +1,5 @@
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 
 import { Card, ListRow, PrimaryButton, SecondaryButton, theme } from '../../../../lib/design';
 import { BottomSheet } from '../../../../lib/trip-ui/BottomSheet';
@@ -7,6 +7,7 @@ import { NextPlaceHeroCard } from '../../../../lib/trip-ui/NextPlaceHeroCard';
 import { QuickExpenseForm, type QuickExpenseSubmitPayload } from '../../../../lib/trip-ui/QuickExpenseForm';
 import { TodaySpendCard } from '../../../../lib/trip-ui/TodaySpendCard';
 import { TripScreen, TripStateCard } from '../../../../lib/trip-ui/TripScreenScaffold';
+import type { TodayFlightCardViewModel } from '../../../../lib/flights/today';
 import { type QuickExpenseOverlayState, useTripTodayController } from '../../../../lib/trip-ui/useTripTodayController';
 import { buildQuickExpenseViewModel, type QuickExpenseRouteTarget } from '../../../../lib/trips/quick-expense';
 import {
@@ -20,9 +21,12 @@ import {
   type TripTabUnavailableViewModel,
   type TripTodayStatusLandingViewModel,
 } from '../../../../lib/trips/trip-tabs';
+import { tripFlightDetailPath } from '../../../../lib/trips/routes';
 import { travelModeDisplayLabel, travelModeDisplayOptions } from '../../../../lib/trips/travel-mode';
 
 export default function TripTodayTabScreen() {
+  const { tripId: tripIdParam } = useLocalSearchParams<{ tripId?: string | string[] }>();
+  const tripId = Array.isArray(tripIdParam) ? tripIdParam[0] : tripIdParam;
   const {
     actionMessage,
     closeQuickExpenseOverlay,
@@ -39,9 +43,12 @@ export default function TripTodayTabScreen() {
     submitQuickExpenseOverlay,
   } = useTripTodayController();
 
+  const flightCard = 'flightCard' in state ? state.flightCard : null;
+
   return (
     <TripScreen>
       {state.status === 'loading' ? <TripStateCard loading title="오늘 일정을 불러오는 중..." /> : null}
+      {flightCard && tripId ? <TodayFlightCard card={flightCard} tripId={tripId} /> : null}
       {state.status === 'auth' ? (
         <TripStateCard primaryAction={{ label: '로그인하기', onPress: goToLogin }} title="다시 로그인해주세요." />
       ) : null}
@@ -80,6 +87,21 @@ export default function TripTodayTabScreen() {
         state={quickExpenseState}
       />
     </TripScreen>
+  );
+}
+
+function TodayFlightCard({ card, tripId }: { card: TodayFlightCardViewModel; tripId: string }) {
+  return (
+    <Card>
+      <Text style={styles.eyebrow}>오늘 항공편</Text>
+      <Text style={styles.cardTitle}>{card.title}</Text>
+      <Text style={styles.cardHelper}>{card.routeLabel}</Text>
+      <Text style={styles.cardHelper}>{card.timeLabel}</Text>
+      <PrimaryButton
+        label={card.actionLabel}
+        onPress={() => router.push(tripFlightDetailPath(tripId, card.flightId))}
+      />
+    </Card>
   );
 }
 

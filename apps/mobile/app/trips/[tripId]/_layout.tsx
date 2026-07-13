@@ -38,7 +38,12 @@ import {
   removeParticipantFromViewModel,
   type ParticipantListViewModel,
 } from '../../../lib/trips/participants';
-import { isTripRootTabPath, tripFallbackPathForPathname, tripTodayPath } from '../../../lib/trips/routes';
+import {
+  isTripRootTabPath,
+  tripFallbackPathForPathname,
+  tripFlightsPath,
+  tripTodayPath,
+} from '../../../lib/trips/routes';
 import { TripShellProvider, type TripShellState } from '../../../lib/trips/trip-shell-context';
 import { buildSwitchableTrips, buildTripAppBarMembers } from '../../../lib/trips/trip-tabs';
 
@@ -331,6 +336,7 @@ export default function TripLayout() {
           members={buildTripAppBarMembers(detail)}
           onBack={handleBack}
           onPressMembers={detail ? openCompanions : undefined}
+          onPressTickets={detail && tripId ? () => router.push(tripFlightsPath(tripId)) : undefined}
           onPressTitle={() => setSwitcherOpen(true)}
           tripName={tripName}
         />
@@ -342,6 +348,9 @@ export default function TripLayout() {
             <Stack.Screen name="detail" />
             <Stack.Screen name="edit" />
             <Stack.Screen name="participants" />
+            <Stack.Screen name="flights/index" />
+            <Stack.Screen name="flights/new" />
+            <Stack.Screen name="flights/[flightId]" />
             <Stack.Screen name="days/[date]/place-search" />
             <Stack.Screen name="days/[date]/places/new" />
             <Stack.Screen name="days/[date]/expenses/quick" />

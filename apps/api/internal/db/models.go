@@ -76,6 +76,56 @@ type ExpenseSplit struct {
 	CreatedAt              pgtype.Timestamptz
 }
 
+type Flight struct {
+	ID                   pgtype.UUID
+	TripID               pgtype.UUID
+	FlightNumber         pgtype.Text
+	DisplayTitle         string
+	DepartureAirportText string
+	DepartureAirportCode pgtype.Text
+	DepartureLocalDate   pgtype.Date
+	DepartureLocalTime   pgtype.Time
+	DepartureTimeZone    string
+	DepartureAt          pgtype.Timestamptz
+	ArrivalAirportText   string
+	ArrivalAirportCode   pgtype.Text
+	ArrivalLocalDate     pgtype.Date
+	ArrivalLocalTime     pgtype.Time
+	ArrivalTimeZone      string
+	ArrivalAt            pgtype.Timestamptz
+	CreatedByUserID      pgtype.UUID
+	CreatedAt            pgtype.Timestamptz
+	UpdatedAt            pgtype.Timestamptz
+}
+
+type FlightPassenger struct {
+	ID            pgtype.UUID
+	FlightID      pgtype.UUID
+	TripID        pgtype.UUID
+	ParticipantID pgtype.UUID
+	AddedByUserID pgtype.UUID
+	CreatedAt     pgtype.Timestamptz
+}
+
+type FlightPersonalDetail struct {
+	ID                      pgtype.UUID
+	FlightID                pgtype.UUID
+	TripID                  pgtype.UUID
+	PassengerParticipantID  pgtype.UUID
+	CreatedByUserID         pgtype.UUID
+	ReservationNumber       pgtype.Text
+	Seat                    pgtype.Text
+	CheckInUrl              pgtype.Text
+	BoardingPassBucket      pgtype.Text
+	BoardingPassObjectKey   pgtype.Text
+	BoardingPassGeneration  pgtype.Text
+	BoardingPassContentType pgtype.Text
+	BoardingPassByteSize    pgtype.Int4
+	BoardingPassUploadedAt  pgtype.Timestamptz
+	CreatedAt               pgtype.Timestamptz
+	UpdatedAt               pgtype.Timestamptz
+}
+
 type ScheduleItem struct {
 	ID          pgtype.UUID
 	TripID      pgtype.UUID
@@ -93,6 +143,21 @@ type ScheduleItem struct {
 	DeletedAt   pgtype.Timestamptz
 	CreatedAt   pgtype.Timestamptz
 	UpdatedAt   pgtype.Timestamptz
+}
+
+type StorageObjectDeletionJob struct {
+	ID               pgtype.UUID
+	Bucket           string
+	ObjectKey        string
+	ObjectGeneration pgtype.Text
+	Reason           string
+	Status           string
+	Attempts         int32
+	NextAttemptAt    pgtype.Timestamptz
+	LastError        pgtype.Text
+	CreatedAt        pgtype.Timestamptz
+	UpdatedAt        pgtype.Timestamptz
+	ProcessedAt      pgtype.Timestamptz
 }
 
 type Trip struct {
