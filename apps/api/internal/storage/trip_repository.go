@@ -341,6 +341,13 @@ func (s *Store) DeleteTripByID(ctx context.Context, tripID string) (bool, error)
 	}
 
 	qtx := s.queries.WithTx(tx)
+	if hasCleanupJobs, err := storageObjectDeletionJobsTableExists(ctx, tx); err != nil {
+		return false, err
+	} else if hasCleanupJobs {
+		if err := qtx.EnqueueFlightBoardingPassDeletionJobsForTrip(ctx, db.EnqueueFlightBoardingPassDeletionJobsForTripParams{Reason: "trip_deleted", TripID: tripUUID}); err != nil {
+			return false, err
+		}
+	}
 	_, err = qtx.DeleteTripByID(ctx, tripUUID)
 	if err == pgx.ErrNoRows {
 		return false, nil
@@ -355,7 +362,21 @@ func (s *Store) DeleteTripByID(ctx context.Context, tripID string) (bool, error)
 }
 
 func (s *Store) DeleteTripMemberParticipant(ctx context.Context, tripID string, participantID string) (bool, error) {
-	_, err := s.queries.DeleteTripMemberParticipant(ctx, db.DeleteTripMemberParticipantParams{
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	qtx := s.queries.WithTx(tx)
+	if hasCleanupJobs, err := storageObjectDeletionJobsTableExists(ctx, tx); err != nil {
+		return false, err
+	} else if hasCleanupJobs {
+		if err := qtx.EnqueueFlightBoardingPassDeletionJobsForParticipant(ctx, db.EnqueueFlightBoardingPassDeletionJobsForParticipantParams{Reason: "participant_removed", TripID: mustUUID(tripID), ParticipantID: mustUUID(participantID)}); err != nil {
+			return false, err
+		}
+	}
+	_, err = qtx.DeleteTripMemberParticipant(ctx, db.DeleteTripMemberParticipantParams{
 		TripID:        mustUUID(tripID),
 		ParticipantID: mustUUID(participantID),
 	})
@@ -363,6 +384,9 @@ func (s *Store) DeleteTripMemberParticipant(ctx context.Context, tripID string, 
 		return false, nil
 	}
 	if err != nil {
+		return false, err
+	}
+	if err := tx.Commit(ctx); err != nil {
 		return false, err
 	}
 	return true, nil
@@ -1196,6 +1220,21 @@ func (s *Store) CreateQuickExpense(ctx context.Context, record trip.CreateQuickE
 		Splits:         splits,
 		CreatedAt:      expenseRow.CreatedAt.Time,
 	}}, nil
+}
+
+func (s *Store) GetScheduleItemByTripDayAndID(ctx context.Context, tripID string, tripDayID string, itemID string) (trip.ScheduleItem, bool, error) {
+	row, err := s.queries.GetScheduleItemByTripDayAndID(ctx, db.GetScheduleItemByTripDayAndIDParams{
+		TripID:         mustUUID(tripID),
+		TripDayID:      mustUUID(tripDayID),
+		ScheduleItemID: mustUUID(itemID),
+	})
+	if err == pgx.ErrNoRows {
+		return trip.ScheduleItem{}, false, nil
+	}
+	if err != nil {
+		return trip.ScheduleItem{}, false, err
+	}
+	return scheduleItemFromGetRow(row), true, nil
 }
 
 func (s *Store) CreateManualScheduleItem(ctx context.Context, record trip.CreateManualScheduleItemRecord) (trip.ScheduleItem, error) {
@@ -2494,4 +2533,12 @@ func isForeignKeyConstraintViolation(err error, constraintName string) bool {
 func isForeignKeyViolation(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == "23503"
+}
+
+func storageObjectDeletionJobsTableExists(ctx context.Context, tx pgx.Tx) (bool, error) {
+	var exists bool
+	if err := tx.QueryRow(ctx, `SELECT to_regclass('public.storage_object_deletion_jobs') IS NOT NULL`).Scan(&exists); err != nil {
+		return false, err
+	}
+	return exists, nil
 }

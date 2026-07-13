@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/twotwobread/i-um/apps/api/internal/auth"
+	flightdomain "github.com/twotwobread/i-um/apps/api/internal/flight"
 	placedomain "github.com/twotwobread/i-um/apps/api/internal/place"
 	routedomain "github.com/twotwobread/i-um/apps/api/internal/route"
 	tripdomain "github.com/twotwobread/i-um/apps/api/internal/trip"
@@ -168,6 +169,162 @@ func TestLoginWithOAuthRejectsDevCredentialWhenDisabled(t *testing.T) {
 	}
 	if body.Error.Code != "INVALID_PROVIDER_TOKEN" {
 		t.Fatalf("expected INVALID_PROVIDER_TOKEN, got %q", body.Error.Code)
+	}
+}
+
+func TestCreateAndListTripFlightsExposeOnlyMyPersonalDetail(t *testing.T) {
+	backend := newFakeAuthBackend()
+	owner := loginTestUserSession(t, backend, "owner-flight", "민수")
+	member := loginTestUserSession(t, backend, "member-flight", "지영")
+	tripID := createTestTrip(t, backend, owner.AccessToken)
+	memberParticipantID := backend.addTripMember(t, tripID, member.UserID, "지영")
+	ownerParticipantID := backend.participants[tripID][0].ID
+
+	requestBody := []byte(fmt.Sprintf(`{
+		"displayTitle":" KE 017 ",
+		"flightNumber":" ke017 ",
+		"departure":{"airportText":" ICN ","airportCode":" icn ","localDate":"2026-08-01","localTime":"14:30","timeZone":"Asia/Seoul"},
+		"arrival":{"airportText":" LAX ","airportCode":" lax ","localDate":"2026-08-01","localTime":"09:50","timeZone":"America/Los_Angeles"},
+		"passengerParticipantIds":[%q,%q]
+	}`, ownerParticipantID, memberParticipantID))
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/flights", bytes.NewReader(requestBody))
+	request.Header.Set("Authorization", "Bearer "+owner.AccessToken)
+	request.Header.Set("Content-Type", "application/json")
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("expected create flight status %d, got %d with body %s", http.StatusCreated, recorder.Code, recorder.Body.String())
+	}
+	var createBody struct {
+		Flight struct {
+			ID           string  `json:"id"`
+			DisplayTitle string  `json:"displayTitle"`
+			FlightNumber *string `json:"flightNumber"`
+			Departure    struct {
+				AirportText string  `json:"airportText"`
+				AirportCode *string `json:"airportCode"`
+				At          string  `json:"at"`
+			} `json:"departure"`
+			MyPersonalDetail *struct{} `json:"myPersonalDetail"`
+		} `json:"flight"`
+	}
+	if err := json.NewDecoder(recorder.Body).Decode(&createBody); err != nil {
+		t.Fatalf("decode create response: %v", err)
+	}
+	if createBody.Flight.ID == "" || createBody.Flight.DisplayTitle != "KE 017" || createBody.Flight.FlightNumber == nil || *createBody.Flight.FlightNumber != "KE017" {
+		t.Fatalf("unexpected created flight: %#v", createBody.Flight)
+	}
+	if createBody.Flight.Departure.AirportText != "ICN" || createBody.Flight.Departure.AirportCode == nil || *createBody.Flight.Departure.AirportCode != "ICN" || createBody.Flight.Departure.At != "2026-08-01T05:30:00Z" {
+		t.Fatalf("unexpected departure mapping: %#v", createBody.Flight.Departure)
+	}
+	if createBody.Flight.MyPersonalDetail != nil {
+		t.Fatalf("expected no auto-created personal detail, got %#v", createBody.Flight.MyPersonalDetail)
+	}
+
+	listRecorder := httptest.NewRecorder()
+	listRequest := httptest.NewRequest(http.MethodGet, "/trips/"+tripID+"/flights", nil)
+	listRequest.Header.Set("Authorization", "Bearer "+member.AccessToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(listRecorder, listRequest)
+	if listRecorder.Code != http.StatusOK {
+		t.Fatalf("expected list status %d, got %d with body %s", http.StatusOK, listRecorder.Code, listRecorder.Body.String())
+	}
+	var listBody struct {
+		Flights []struct {
+			ID         string `json:"id"`
+			Passengers []struct {
+				ParticipantID string `json:"participantId"`
+			} `json:"passengers"`
+			MyPersonalDetail *struct{} `json:"myPersonalDetail"`
+		} `json:"flights"`
+	}
+	if err := json.NewDecoder(listRecorder.Body).Decode(&listBody); err != nil {
+		t.Fatalf("decode list response: %v", err)
+	}
+	if len(listBody.Flights) != 1 || len(listBody.Flights[0].Passengers) != 2 || listBody.Flights[0].MyPersonalDetail == nil {
+		t.Fatalf("unexpected list response: %#v", listBody)
+	}
+}
+
+func TestFlightBoardingPassUploadOpenAndDeleteRequiresCurrentPassenger(t *testing.T) {
+	backend := newFakeAuthBackend()
+	objectStore := &fakeBoardingPassObjectStore{}
+	owner := loginTestUserSession(t, backend, "owner-flight-attachment", "민수")
+	member := loginTestUserSession(t, backend, "member-flight-attachment", "지영")
+	tripID := createTestTrip(t, backend, owner.AccessToken)
+	memberParticipantID := backend.addTripMember(t, tripID, member.UserID, "지영")
+
+	createBody := []byte(fmt.Sprintf(`{
+		"displayTitle":"KE 017",
+		"departure":{"airportText":"ICN","localDate":"2026-08-01","localTime":"14:30","timeZone":"Asia/Seoul"},
+		"arrival":{"airportText":"LAX","localDate":"2026-08-01","localTime":"09:50","timeZone":"America/Los_Angeles"},
+		"passengerParticipantIds":[%q]
+	}`, memberParticipantID))
+	createRecorder := httptest.NewRecorder()
+	createRequest := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/flights", bytes.NewReader(createBody))
+	createRequest.Header.Set("Authorization", "Bearer "+owner.AccessToken)
+	createRequest.Header.Set("Content-Type", "application/json")
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true, BoardingPassObjectStore: objectStore}).ServeHTTP(createRecorder, createRequest)
+	if createRecorder.Code != http.StatusCreated {
+		t.Fatalf("expected create flight status %d, got %d with body %s", http.StatusCreated, createRecorder.Code, createRecorder.Body.String())
+	}
+	var created struct {
+		Flight struct {
+			ID string `json:"id"`
+		} `json:"flight"`
+	}
+	if err := json.NewDecoder(createRecorder.Body).Decode(&created); err != nil {
+		t.Fatalf("decode create flight: %v", err)
+	}
+
+	pngBytes := []byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n', 0, 0, 0, 0, 'I', 'H', 'D', 'R'}
+	nonPassengerUpload := httptest.NewRecorder()
+	nonPassengerRequest := httptest.NewRequest(http.MethodPut, "/trips/"+tripID+"/flights/"+created.Flight.ID+"/my-detail/boarding-pass", bytes.NewReader(pngBytes))
+	nonPassengerRequest.Header.Set("Authorization", "Bearer "+owner.AccessToken)
+	nonPassengerRequest.Header.Set("Content-Type", "image/png")
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true, BoardingPassObjectStore: objectStore}).ServeHTTP(nonPassengerUpload, nonPassengerRequest)
+	if nonPassengerUpload.Code != http.StatusForbidden {
+		t.Fatalf("expected non-passenger upload status %d, got %d with body %s", http.StatusForbidden, nonPassengerUpload.Code, nonPassengerUpload.Body.String())
+	}
+
+	uploadRecorder := httptest.NewRecorder()
+	uploadRequest := httptest.NewRequest(http.MethodPut, "/trips/"+tripID+"/flights/"+created.Flight.ID+"/my-detail/boarding-pass", bytes.NewReader(pngBytes))
+	uploadRequest.Header.Set("Authorization", "Bearer "+member.AccessToken)
+	uploadRequest.Header.Set("Content-Type", "image/png")
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true, BoardingPassObjectStore: objectStore}).ServeHTTP(uploadRecorder, uploadRequest)
+	if uploadRecorder.Code != http.StatusOK {
+		t.Fatalf("expected upload status %d, got %d with body %s", http.StatusOK, uploadRecorder.Code, uploadRecorder.Body.String())
+	}
+	if strings.Contains(uploadRecorder.Body.String(), "objectKey") || strings.Contains(uploadRecorder.Body.String(), "signed") {
+		t.Fatalf("upload response leaked private object data: %s", uploadRecorder.Body.String())
+	}
+
+	openRecorder := httptest.NewRecorder()
+	openRequest := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/flights/"+created.Flight.ID+"/my-detail/boarding-pass/open-url", nil)
+	openRequest.Header.Set("Authorization", "Bearer "+member.AccessToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true, BoardingPassObjectStore: objectStore}).ServeHTTP(openRecorder, openRequest)
+	if openRecorder.Code != http.StatusOK || openRecorder.Header().Get("Cache-Control") != "no-store" {
+		t.Fatalf("expected open status 200/no-store, got %d cache=%q body=%s", openRecorder.Code, openRecorder.Header().Get("Cache-Control"), openRecorder.Body.String())
+	}
+	var opened struct {
+		URL         string `json:"url"`
+		ContentType string `json:"contentType"`
+		ByteSize    int    `json:"byteSize"`
+	}
+	if err := json.NewDecoder(openRecorder.Body).Decode(&opened); err != nil {
+		t.Fatalf("decode open response: %v", err)
+	}
+	if opened.URL == "" || opened.ContentType != "image/png" || opened.ByteSize != len(pngBytes) {
+		t.Fatalf("unexpected open response: %#v", opened)
+	}
+
+	deleteRecorder := httptest.NewRecorder()
+	deleteRequest := httptest.NewRequest(http.MethodDelete, "/trips/"+tripID+"/flights/"+created.Flight.ID+"/my-detail/boarding-pass", nil)
+	deleteRequest.Header.Set("Authorization", "Bearer "+member.AccessToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true, BoardingPassObjectStore: objectStore}).ServeHTTP(deleteRecorder, deleteRequest)
+	if deleteRecorder.Code != http.StatusNoContent {
+		t.Fatalf("expected delete status %d, got %d with body %s", http.StatusNoContent, deleteRecorder.Code, deleteRecorder.Body.String())
 	}
 }
 
@@ -4341,6 +4498,8 @@ type fakeAuthBackend struct {
 	dayScheduleItems map[string][]tripdomain.ScheduleItem
 	dayExpenses      map[string][]tripdomain.DayExpenseListItem
 	tripInvites      map[string]tripdomain.TripInvite
+	flights          map[string]flightdomain.FlightDetail
+	personalDetails  map[string]flightdomain.PersonalDetail
 	reorderErr       error
 	arrivalErr       error
 	skipErr          error
@@ -4354,6 +4513,8 @@ type fakeAuthBackend struct {
 	nextPlace        int
 	nextScheduleItem int
 	nextExpense      int
+	nextFlight       int
+	nextPersonal     int
 }
 
 func (b *fakeAuthBackend) TripToday() time.Time {
@@ -4499,6 +4660,20 @@ type createdScheduleItem struct {
 	PlaceID string
 }
 
+func (b *fakeAuthBackend) addTripMember(t *testing.T, tripID string, userID string, displayName string) string {
+	t.Helper()
+	participant := tripdomain.Participant{
+		ID:          testUUID(9000 + len(b.participants[tripID])),
+		TripID:      tripID,
+		UserID:      userID,
+		Role:        tripdomain.RoleMember,
+		DisplayName: displayName,
+		JoinedAt:    time.Date(2026, 6, 22, 10, 0, 0, 0, time.UTC),
+	}
+	b.participants[tripID] = append(b.participants[tripID], participant)
+	return participant.ID
+}
+
 func createTestScheduleItem(t *testing.T, backend *fakeAuthBackend, _ string, tripID string, date string, body string) createdScheduleItem {
 	t.Helper()
 
@@ -4539,6 +4714,8 @@ func newFakeAuthBackend() *fakeAuthBackend {
 		dayScheduleItems: map[string][]tripdomain.ScheduleItem{},
 		dayExpenses:      map[string][]tripdomain.DayExpenseListItem{},
 		tripInvites:      map[string]tripdomain.TripInvite{},
+		flights:          map[string]flightdomain.FlightDetail{},
+		personalDetails:  map[string]flightdomain.PersonalDetail{},
 	}
 }
 
@@ -5835,6 +6012,197 @@ func (p *fakeRouteProvider) Preview(_ context.Context, input routedomain.Provide
 	p.called = true
 	p.input = input
 	return p.result, p.err
+}
+
+func (b *fakeAuthBackend) GetTripParticipantID(_ context.Context, tripID string, userID string) (string, error) {
+	for _, participant := range b.participants[tripID] {
+		if participant.UserID == userID {
+			return participant.ID, nil
+		}
+	}
+	return "", flightdomain.ErrNotFound
+}
+
+func (b *fakeAuthBackend) CreateFlightWithPassengers(_ context.Context, record flightdomain.CreateFlightRecord) (flightdomain.FlightDetail, error) {
+	b.nextFlight++
+	now := time.Date(2026, 6, 22, 12, 0, 0, 0, time.UTC)
+	flightRecord := flightdomain.Flight{
+		ID:              testUUID(10000 + b.nextFlight),
+		TripID:          record.TripID,
+		DisplayTitle:    record.DisplayTitle,
+		FlightNumber:    record.FlightNumber,
+		Departure:       record.Departure,
+		Arrival:         record.Arrival,
+		CreatedByUserID: record.CreatedByUserID,
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	}
+	passengers := b.flightPassengers(record.TripID, record.PassengerIDs)
+	detail := flightdomain.FlightDetail{Flight: flightRecord, Passengers: passengers}
+	b.flights[flightRecord.ID] = detail
+	return detail, nil
+}
+
+func (b *fakeAuthBackend) ListFlights(_ context.Context, tripID string, userID string) ([]flightdomain.FlightDetail, error) {
+	result := []flightdomain.FlightDetail{}
+	participantID, _ := b.GetTripParticipantID(context.Background(), tripID, userID)
+	for _, detail := range b.flights {
+		if detail.TripID != tripID {
+			continue
+		}
+		copyDetail := detail
+		if personal, ok := b.personalDetails[detail.ID+":"+participantID]; ok {
+			copyDetail.MyPersonalDetail = &personal
+		} else if passengerListContainsFake(detail.Passengers, participantID) {
+			personal := flightdomain.PersonalDetail{FlightID: detail.ID, TripID: tripID, PassengerParticipantID: participantID}
+			copyDetail.MyPersonalDetail = &personal
+		} else {
+			copyDetail.MyPersonalDetail = nil
+		}
+		result = append(result, copyDetail)
+	}
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Departure.At.Before(result[j].Departure.At)
+	})
+	return result, nil
+}
+
+func (b *fakeAuthBackend) GetFlight(_ context.Context, tripID string, flightID string, userID string) (flightdomain.FlightDetail, error) {
+	detail, ok := b.flights[flightID]
+	if !ok || detail.TripID != tripID {
+		return flightdomain.FlightDetail{}, flightdomain.ErrNotFound
+	}
+	participantID, _ := b.GetTripParticipantID(context.Background(), tripID, userID)
+	if personal, ok := b.personalDetails[flightID+":"+participantID]; ok {
+		detail.MyPersonalDetail = &personal
+	} else if passengerListContainsFake(detail.Passengers, participantID) {
+		personal := flightdomain.PersonalDetail{FlightID: flightID, TripID: tripID, PassengerParticipantID: participantID}
+		detail.MyPersonalDetail = &personal
+	} else {
+		detail.MyPersonalDetail = nil
+	}
+	return detail, nil
+}
+
+func (b *fakeAuthBackend) GetFlightPassengerParticipantID(_ context.Context, tripID string, flightID string, userID string) (string, error) {
+	detail, ok := b.flights[flightID]
+	if !ok || detail.TripID != tripID {
+		return "", flightdomain.ErrNotFound
+	}
+	participantID, err := b.GetTripParticipantID(context.Background(), tripID, userID)
+	if err != nil {
+		return "", err
+	}
+	for _, passenger := range detail.Passengers {
+		if passenger.ParticipantID == participantID {
+			return participantID, nil
+		}
+	}
+	return "", flightdomain.ErrNotFound
+}
+
+func (b *fakeAuthBackend) UpsertPersonalDetail(_ context.Context, record flightdomain.UpsertPersonalDetailRecord) (flightdomain.PersonalDetail, error) {
+	b.nextPersonal++
+	now := time.Date(2026, 6, 22, 12, 0, 0, 0, time.UTC)
+	key := record.FlightID + ":" + record.PassengerParticipantID
+	detail := b.personalDetails[key]
+	if detail.ID == "" {
+		detail.ID = testUUID(11000 + b.nextPersonal)
+		detail.FlightID = record.FlightID
+		detail.TripID = record.TripID
+		detail.PassengerParticipantID = record.PassengerParticipantID
+		detail.CreatedByUserID = record.CreatedByUserID
+		detail.CreatedAt = now
+	}
+	detail.ReservationNumber = record.ReservationNumber
+	detail.Seat = record.Seat
+	detail.CheckInURL = record.CheckInURL
+	detail.UpdatedAt = now
+	b.personalDetails[key] = detail
+	return detail, nil
+}
+
+func (b *fakeAuthBackend) UpsertBoardingPassMetadata(_ context.Context, record flightdomain.UpsertBoardingPassMetadataRecord) (flightdomain.PersonalDetail, *flightdomain.BoardingPassObject, error) {
+	b.nextPersonal++
+	now := time.Date(2026, 6, 22, 12, 0, 0, 0, time.UTC)
+	key := record.FlightID + ":" + record.PassengerParticipantID
+	detail := b.personalDetails[key]
+	var oldObject *flightdomain.BoardingPassObject
+	if detail.BoardingPass.Exists {
+		oldObject = &flightdomain.BoardingPassObject{Bucket: "test-bucket", ObjectKey: "old-object", ContentType: *detail.BoardingPass.ContentType, ByteSize: *detail.BoardingPass.ByteSize, UploadedAt: *detail.BoardingPass.UploadedAt}
+	}
+	if detail.ID == "" {
+		detail.ID = testUUID(11000 + b.nextPersonal)
+		detail.FlightID = record.FlightID
+		detail.TripID = record.TripID
+		detail.PassengerParticipantID = record.PassengerParticipantID
+		detail.CreatedByUserID = record.CreatedByUserID
+		detail.CreatedAt = now
+	}
+	contentType := record.Object.ContentType
+	byteSize := record.Object.ByteSize
+	uploadedAt := record.Object.UploadedAt
+	detail.BoardingPass = flightdomain.BoardingPassSummary{Exists: true, ContentType: &contentType, ByteSize: &byteSize, UploadedAt: &uploadedAt}
+	detail.UpdatedAt = now
+	b.personalDetails[key] = detail
+	return detail, oldObject, nil
+}
+
+func (b *fakeAuthBackend) ClearBoardingPassMetadata(_ context.Context, tripID string, flightID string, passengerParticipantID string) (*flightdomain.BoardingPassObject, error) {
+	key := flightID + ":" + passengerParticipantID
+	detail := b.personalDetails[key]
+	if !detail.BoardingPass.Exists {
+		return nil, nil
+	}
+	oldObject := flightdomain.BoardingPassObject{Bucket: "test-bucket", ObjectKey: "old-object", ContentType: *detail.BoardingPass.ContentType, ByteSize: *detail.BoardingPass.ByteSize, UploadedAt: *detail.BoardingPass.UploadedAt}
+	detail.BoardingPass = flightdomain.BoardingPassSummary{}
+	b.personalDetails[key] = detail
+	return &oldObject, nil
+}
+
+func (b *fakeAuthBackend) GetBoardingPassObject(_ context.Context, tripID string, flightID string, passengerParticipantID string) (flightdomain.BoardingPassObject, error) {
+	detail := b.personalDetails[flightID+":"+passengerParticipantID]
+	if !detail.BoardingPass.Exists {
+		return flightdomain.BoardingPassObject{}, flightdomain.ErrNotFound
+	}
+	return flightdomain.BoardingPassObject{Bucket: "test-bucket", ObjectKey: "object", ContentType: *detail.BoardingPass.ContentType, ByteSize: *detail.BoardingPass.ByteSize, UploadedAt: *detail.BoardingPass.UploadedAt}, nil
+}
+
+type fakeBoardingPassObjectStore struct{}
+
+func (s *fakeBoardingPassObjectStore) UploadBoardingPass(_ context.Context, objectKey string, contentType string, data []byte) (flightdomain.BoardingPassObject, error) {
+	generation := "1"
+	return flightdomain.BoardingPassObject{Bucket: "test-bucket", ObjectKey: objectKey, Generation: &generation, ContentType: contentType, ByteSize: len(data), UploadedAt: time.Date(2026, 6, 22, 12, 30, 0, 0, time.UTC)}, nil
+}
+
+func (s *fakeBoardingPassObjectStore) DeleteObject(_ context.Context, object flightdomain.BoardingPassObject) error {
+	return nil
+}
+
+func (s *fakeBoardingPassObjectStore) SignedGetURL(_ context.Context, object flightdomain.BoardingPassObject, ttl time.Duration) (flightdomain.SignedBoardingPassURL, error) {
+	return flightdomain.SignedBoardingPassURL{URL: "https://storage.example/signed", ExpiresAt: time.Date(2026, 6, 22, 12, 35, 0, 0, time.UTC), ContentType: object.ContentType, ByteSize: object.ByteSize}, nil
+}
+
+func passengerListContainsFake(passengers []flightdomain.Passenger, participantID string) bool {
+	for _, passenger := range passengers {
+		if passenger.ParticipantID == participantID {
+			return true
+		}
+	}
+	return false
+}
+
+func (b *fakeAuthBackend) flightPassengers(tripID string, passengerIDs []string) []flightdomain.Passenger {
+	participantsByID := map[string]tripdomain.Participant{}
+	for _, participant := range b.participants[tripID] {
+		participantsByID[participant.ID] = participant
+	}
+	passengers := make([]flightdomain.Passenger, 0, len(passengerIDs))
+	for _, participantID := range passengerIDs {
+		participant := participantsByID[participantID]
+		passengers = append(passengers, flightdomain.Passenger{ParticipantID: participantID, DisplayName: participant.DisplayName})
+	}
+	return passengers
 }
 
 func testUUID(value int) string {

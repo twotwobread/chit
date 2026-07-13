@@ -4,6 +4,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/twotwobread/i-um/apps/api/internal/flight"
 	"github.com/twotwobread/i-um/apps/api/internal/place"
 	"github.com/twotwobread/i-um/apps/api/internal/route"
 )
@@ -24,6 +25,7 @@ type Config struct {
 	PlayStoreURL                        string
 	PlaceProvider                       place.Provider
 	RouteProvider                       route.Provider
+	BoardingPassObjectStore             flight.BoardingPassObjectStore
 }
 
 func ConfigFromEnv() Config {

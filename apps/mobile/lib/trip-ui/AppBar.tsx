@@ -1,5 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { ChevronDown, ChevronLeft, House } from 'lucide-react-native';
+import { ChevronDown, ChevronLeft, House, Ticket } from 'lucide-react-native';
 import { router } from 'expo-router';
 
 import { AvatarGroup, theme } from '../design';
@@ -12,6 +12,7 @@ export type AppBarProps = {
   leadingAction?: 'back' | 'home';
   members?: AppBarMember[];
   onPressMembers?: () => void;
+  onPressTickets?: () => void;
   onPressTitle?: () => void;
   onBack?: () => void;
 };
@@ -22,6 +23,7 @@ export function AppBar({
   members = [],
   onBack,
   onPressMembers,
+  onPressTickets,
   onPressTitle,
   tripName,
 }: AppBarProps) {
@@ -66,6 +68,18 @@ export function AppBar({
       )}
 
       <View style={[styles.side, styles.sideEnd]}>
+        {onPressTickets ? (
+          <Pressable
+            accessibilityLabel="항공권 보관함 열기"
+            accessibilityRole="button"
+            hitSlop={8}
+            onPress={onPressTickets}
+            style={({ pressed }) => [styles.ticketButton, pressed ? styles.pressed : null]}
+          >
+            <Ticket color={theme.color.textBody} size={23} strokeWidth={2.2} />
+            <Text style={styles.ticketLabel}>항공권</Text>
+          </Pressable>
+        ) : null}
         {members.length > 0 && onPressMembers ? (
           <Pressable
             accessibilityLabel="동행자 보기"
@@ -108,7 +122,21 @@ const styles = StyleSheet.create({
     width: 54,
   },
   sideEnd: {
-    alignItems: 'flex-end',
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: theme.space[3],
+    justifyContent: 'flex-end',
+    width: 118,
+  },
+  ticketButton: {
+    alignItems: 'center',
+    gap: 1,
+  },
+  ticketLabel: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.bold,
+    fontSize: 10,
+    fontWeight: theme.font.weight.bold,
   },
   title: {
     color: theme.color.textStrong,

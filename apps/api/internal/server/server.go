@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/twotwobread/i-um/apps/api/internal/auth"
+	"github.com/twotwobread/i-um/apps/api/internal/flight"
 	"github.com/twotwobread/i-um/apps/api/internal/openapi"
 	"github.com/twotwobread/i-um/apps/api/internal/place"
 	"github.com/twotwobread/i-um/apps/api/internal/route"
@@ -25,6 +26,7 @@ type apiServer struct {
 	readiness                           readinessChecker
 	auth                                *auth.Service
 	trips                               *trip.Service
+	flights                             *flight.Service
 	places                              *place.Service
 	routes                              *route.Service
 	inviteBaseURL                       string
@@ -62,6 +64,15 @@ func NewRouterWithConfig(readiness readinessChecker, config Config) http.Handler
 		tripService = trip.NewService(repo, options...)
 	}
 
+	var flightService *flight.Service
+	if repo, ok := readiness.(flight.Repository); ok {
+		options := []flight.ServiceOption{}
+		if config.BoardingPassObjectStore != nil {
+			options = append(options, flight.WithBoardingPassObjectStore(config.BoardingPassObjectStore))
+		}
+		flightService = flight.NewService(repo, options...)
+	}
+
 	var placeService *place.Service
 	if repo, ok := readiness.(place.Repository); ok {
 		provider := config.PlaceProvider
@@ -85,6 +96,7 @@ func NewRouterWithConfig(readiness readinessChecker, config Config) http.Handler
 		readiness:                           readiness,
 		auth:                                authService,
 		trips:                               tripService,
+		flights:                             flightService,
 		places:                              placeService,
 		routes:                              routeService,
 		inviteBaseURL:                       config.InviteBaseURL,
