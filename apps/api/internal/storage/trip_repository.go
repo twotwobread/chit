@@ -1222,6 +1222,21 @@ func (s *Store) CreateQuickExpense(ctx context.Context, record trip.CreateQuickE
 	}}, nil
 }
 
+func (s *Store) GetScheduleItemByTripDayAndID(ctx context.Context, tripID string, tripDayID string, itemID string) (trip.ScheduleItem, bool, error) {
+	row, err := s.queries.GetScheduleItemByTripDayAndID(ctx, db.GetScheduleItemByTripDayAndIDParams{
+		TripID:         mustUUID(tripID),
+		TripDayID:      mustUUID(tripDayID),
+		ScheduleItemID: mustUUID(itemID),
+	})
+	if err == pgx.ErrNoRows {
+		return trip.ScheduleItem{}, false, nil
+	}
+	if err != nil {
+		return trip.ScheduleItem{}, false, err
+	}
+	return scheduleItemFromGetRow(row), true, nil
+}
+
 func (s *Store) CreateManualScheduleItem(ctx context.Context, record trip.CreateManualScheduleItemRecord) (trip.ScheduleItem, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
