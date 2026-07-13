@@ -1,15 +1,28 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ApiError, type CreateTripFlightRequest, type TripParticipantListItem } from '@i-um/api-contract';
+import { ApiError, type TripParticipantListItem } from '@i-um/api-contract';
 
 import { Card, PrimaryButton, theme } from '../../../../lib/design';
+import {
+  buildFlightCreateRequest,
+  defaultFlightCreateFormValues,
+  flightEndpointFieldKey,
+  flightTimeZoneLabel,
+  flightTimeZoneOptions,
+  openFlightDateTimePicker,
+  validateFlightCreateRequest,
+  type FlightCreateFormValues,
+  type FlightDateTimePickerTarget,
+  type FlightEndpointPrefix,
+} from '../../../../lib/flights/create-form';
 import { createTripFlight } from '../../../../lib/flights/flight-api';
+import { ScheduleTimeWheel } from '../../../../lib/trip-ui/ScheduleTimeWheel';
 import { TripScreen, TripScreenHeader, TripStateCard } from '../../../../lib/trip-ui/TripScreenScaffold';
+import { dateFromString, monthStringFromDate } from '../../../../lib/trips/date';
+import { TripDatePicker } from '../../../../lib/trips/date-picker';
 import { listTripParticipants } from '../../../../lib/trips/trip-api';
 import { tripFlightDetailPath } from '../../../../lib/trips/routes';
-
-const DEFAULT_TIME_ZONE = 'Asia/Seoul';
 
 export default function NewFlightScreen() {
   const { tripId: tripIdParam } = useLocalSearchParams<{ tripId?: string | string[] }>();
@@ -22,20 +35,9 @@ export default function NewFlightScreen() {
   const [selectedPassengerIds, setSelectedPassengerIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
-  const [form, setForm] = useState({
-    displayTitle: '',
-    flightNumber: '',
-    departureAirportText: '',
-    departureAirportCode: '',
-    departureLocalDate: '',
-    departureLocalTime: '',
-    departureTimeZone: DEFAULT_TIME_ZONE,
-    arrivalAirportText: '',
-    arrivalAirportCode: '',
-    arrivalLocalDate: '',
-    arrivalLocalTime: '',
-    arrivalTimeZone: DEFAULT_TIME_ZONE,
-  });
+  const [activePicker, setActivePicker] = useState<FlightDateTimePickerTarget | null>(null);
+  const [calendarMonth, setCalendarMonth] = useState(() => monthStringFromDate(new Date()));
+  const [form, setForm] = useState<FlightCreateFormValues>(defaultFlightCreateFormValues);
 
   const loadParticipants = useCallback(async () => {
     if (!tripId) {
@@ -58,12 +60,32 @@ export default function NewFlightScreen() {
     void loadParticipants();
   }, [loadParticipants]);
 
+  const openPicker = useCallback((target: FlightDateTimePickerTarget) => {
+    setFeedback(null);
+    setForm((current) => {
+      const result = openFlightDateTimePicker(current, target);
+      if (target.kind === 'date') {
+        const dateKey = flightEndpointFieldKey(target.prefix, 'LocalDate');
+        setCalendarMonth(monthForFlightDate(current[dateKey]));
+      }
+      setActivePicker(result.activePicker);
+      return result.values;
+    });
+  }, []);
+
+  const selectDate = useCallback((prefix: FlightEndpointPrefix, date: string) => {
+    const dateKey = flightEndpointFieldKey(prefix, 'LocalDate');
+    setForm((current) => ({ ...current, [dateKey]: date }));
+    setActivePicker(null);
+    setFeedback(null);
+  }, []);
+
   const save = useCallback(async () => {
     if (!tripId || participantsState.status !== 'success') {
       return;
     }
-    const request = buildCreateRequest(form, selectedPassengerIds);
-    const validationError = validateCreateRequest(request);
+    const request = buildFlightCreateRequest(form, selectedPassengerIds);
+    const validationError = validateFlightCreateRequest(request);
     if (validationError) {
       setFeedback(validationError);
       return;
@@ -103,17 +125,19 @@ export default function NewFlightScreen() {
   return (
     <TripScreen>
       <TripScreenHeader
-        helper="티켓에 적힌 각 공항 현지 날짜·시간과 IANA 시간대를 입력해주세요. 예: Asia/Seoul, America/Los_Angeles"
+        helper="티켓에 적힌 각 공항 현지 날짜·시간과 시간대를 선택해주세요. 시간대는 목록에서만 선택할 수 있어요."
         title="항공편 추가"
       />
       <Card>
         <Field
+          editable={!saving}
           label="표시 이름"
           onChangeText={(value) => setForm((current) => ({ ...current, displayTitle: value }))}
           placeholder="예: KE 017"
           value={form.displayTitle}
         />
         <Field
+          editable={!saving}
           label="편명"
           onChangeText={(value) => setForm((current) => ({ ...current, flightNumber: value }))}
           placeholder="선택: KE017"
@@ -122,16 +146,30 @@ export default function NewFlightScreen() {
       </Card>
 
       <EndpointFields
+        activePicker={activePicker}
+        calendarMonth={calendarMonth}
+        disabled={saving}
+        onCalendarMonthChange={setCalendarMonth}
+        onChange={(key, value) => setForm((current) => ({ ...current, [key]: value }))}
+        onClosePicker={() => setActivePicker(null)}
+        onOpenPicker={openPicker}
+        onSelectDate={selectDate}
         prefix="departure"
         title="출발"
         values={form}
-        onChange={(key, value) => setForm((current) => ({ ...current, [key]: value }))}
       />
       <EndpointFields
+        activePicker={activePicker}
+        calendarMonth={calendarMonth}
+        disabled={saving}
+        onCalendarMonthChange={setCalendarMonth}
+        onChange={(key, value) => setForm((current) => ({ ...current, [key]: value }))}
+        onClosePicker={() => setActivePicker(null)}
+        onOpenPicker={openPicker}
+        onSelectDate={selectDate}
         prefix="arrival"
         title="도착"
         values={form}
-        onChange={(key, value) => setForm((current) => ({ ...current, [key]: value }))}
       />
 
       <Card>
@@ -142,6 +180,7 @@ export default function NewFlightScreen() {
             <Pressable
               accessibilityLabel={`${participant.displayName} 탑승자 ${selected ? '해제' : '선택'}`}
               accessibilityRole="button"
+              disabled={saving}
               key={participant.participantId}
               onPress={() =>
                 setSelectedPassengerIds((current) =>
@@ -150,7 +189,11 @@ export default function NewFlightScreen() {
                     : [...current, participant.participantId],
                 )
               }
-              style={({ pressed }) => [styles.passengerRow, pressed ? styles.pressed : null]}
+              style={({ pressed }) => [
+                styles.passengerRow,
+                pressed ? styles.pressed : null,
+                saving ? styles.disabled : null,
+              ]}
             >
               <Text style={styles.passengerName}>{participant.displayName}</Text>
               <Text style={[styles.passengerState, selected ? styles.passengerStateSelected : null]}>
@@ -168,52 +211,247 @@ export default function NewFlightScreen() {
 }
 
 function EndpointFields({
+  activePicker,
+  calendarMonth,
+  disabled,
+  onCalendarMonthChange,
   onChange,
+  onClosePicker,
+  onOpenPicker,
+  onSelectDate,
   prefix,
   title,
   values,
 }: {
+  activePicker: FlightDateTimePickerTarget | null;
+  calendarMonth: string;
+  disabled: boolean;
+  onCalendarMonthChange: (month: string) => void;
+  onChange: (key: keyof FlightCreateFormValues, value: string) => void;
+  onClosePicker: () => void;
+  onOpenPicker: (target: FlightDateTimePickerTarget) => void;
+  onSelectDate: (prefix: FlightEndpointPrefix, date: string) => void;
+  prefix: FlightEndpointPrefix;
   title: string;
-  prefix: 'departure' | 'arrival';
-  values: Record<string, string>;
-  onChange: (key: keyof ReturnType<typeof initialFormShape>, value: string) => void;
+  values: FlightCreateFormValues;
 }) {
-  const key = (suffix: string) => `${prefix}${suffix}` as keyof ReturnType<typeof initialFormShape>;
+  const airportTextKey = flightEndpointFieldKey(prefix, 'AirportText');
+  const airportCodeKey = flightEndpointFieldKey(prefix, 'AirportCode');
+  const dateKey = flightEndpointFieldKey(prefix, 'LocalDate');
+  const timeKey = flightEndpointFieldKey(prefix, 'LocalTime');
+  const timeZoneKey = flightEndpointFieldKey(prefix, 'TimeZone');
+  const dateActive = activePicker?.prefix === prefix && activePicker.kind === 'date';
+  const timeActive = activePicker?.prefix === prefix && activePicker.kind === 'time';
+
   return (
     <Card>
       <Text style={styles.sectionTitle}>{title}</Text>
       <Field
+        editable={!disabled}
         label="공항 이름"
-        onChangeText={(value) => onChange(key('AirportText'), value)}
+        onChangeText={(value) => onChange(airportTextKey, value)}
         placeholder="예: ICN 또는 인천"
-        value={values[key('AirportText')]}
+        value={values[airportTextKey]}
       />
       <Field
+        editable={!disabled}
         label="공항 코드"
-        onChangeText={(value) => onChange(key('AirportCode'), value)}
+        onChangeText={(value) => onChange(airportCodeKey, value)}
         placeholder="선택: ICN"
-        value={values[key('AirportCode')]}
+        value={values[airportCodeKey]}
       />
-      <Field
-        label="현지 날짜"
-        onChangeText={(value) => onChange(key('LocalDate'), value)}
-        placeholder="YYYY-MM-DD"
-        value={values[key('LocalDate')]}
+      <DateTimeField
+        calendarMonth={calendarMonth}
+        dateActive={dateActive}
+        dateValue={values[dateKey]}
+        disabled={disabled}
+        onCalendarMonthChange={onCalendarMonthChange}
+        onChangeTime={(time) => onChange(timeKey, time)}
+        onClosePicker={onClosePicker}
+        onOpenDate={() => onOpenPicker({ prefix, kind: 'date' })}
+        onOpenTime={() => onOpenPicker({ prefix, kind: 'time' })}
+        onSelectDate={(date) => onSelectDate(prefix, date)}
+        timeActive={timeActive}
+        timeValue={values[timeKey]}
+        title={title}
       />
-      <Field
-        label="현지 시간"
-        onChangeText={(value) => onChange(key('LocalTime'), value)}
-        placeholder="HH:mm"
-        value={values[key('LocalTime')]}
-      />
-      <Field
-        autoCapitalize="none"
+      <TimeZoneSelect
+        disabled={disabled}
         label="시간대"
-        onChangeText={(value) => onChange(key('TimeZone'), value)}
-        placeholder="Asia/Seoul"
-        value={values[key('TimeZone')]}
+        onChange={(value) => onChange(timeZoneKey, value)}
+        value={values[timeZoneKey]}
       />
     </Card>
+  );
+}
+
+function DateTimeField({
+  calendarMonth,
+  dateActive,
+  dateValue,
+  disabled,
+  onCalendarMonthChange,
+  onChangeTime,
+  onClosePicker,
+  onOpenDate,
+  onOpenTime,
+  onSelectDate,
+  timeActive,
+  timeValue,
+  title,
+}: {
+  calendarMonth: string;
+  dateActive: boolean;
+  dateValue: string;
+  disabled: boolean;
+  onCalendarMonthChange: (month: string) => void;
+  onChangeTime: (time: string) => void;
+  onClosePicker: () => void;
+  onOpenDate: () => void;
+  onOpenTime: () => void;
+  onSelectDate: (date: string) => void;
+  timeActive: boolean;
+  timeValue: string;
+  title: string;
+}) {
+  return (
+    <View style={styles.field}>
+      <Text style={styles.label}>현지 날짜·시간</Text>
+      <View style={styles.dateTimeRow}>
+        <DateTimeButton
+          active={dateActive}
+          disabled={disabled}
+          label="날짜"
+          onPress={onOpenDate}
+          placeholder="날짜 선택"
+          value={dateValue}
+        />
+        <DateTimeButton
+          active={timeActive}
+          disabled={disabled}
+          label="시간"
+          onPress={onOpenTime}
+          placeholder="시간 선택"
+          value={timeValue}
+        />
+      </View>
+      {dateActive ? (
+        <TripDatePicker
+          helperText="항공권에 표시된 공항 현지 날짜를 선택해주세요."
+          label={`${title} 날짜`}
+          month={calendarMonth}
+          onClose={onClosePicker}
+          onMonthChange={onCalendarMonthChange}
+          onSelect={onSelectDate}
+          selectedDate={dateValue}
+          yearOptionRadius={3}
+        />
+      ) : null}
+      {timeActive ? (
+        <ScheduleTimeWheel
+          disabled={disabled}
+          label={`${title} 현지 시간`}
+          onChangeTime={onChangeTime}
+          value={timeValue}
+        />
+      ) : null}
+    </View>
+  );
+}
+
+function DateTimeButton({
+  active,
+  disabled,
+  label,
+  onPress,
+  placeholder,
+  value,
+}: {
+  active: boolean;
+  disabled: boolean;
+  label: string;
+  onPress: () => void;
+  placeholder: string;
+  value: string;
+}) {
+  return (
+    <Pressable
+      accessibilityLabel={`${label} ${value || placeholder}`}
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.dateTimeButton,
+        active ? styles.dateTimeButtonActive : null,
+        pressed ? styles.pressed : null,
+        disabled ? styles.disabled : null,
+      ]}
+    >
+      <Text style={[styles.dateTimeButtonLabel, active ? styles.dateTimeButtonLabelActive : null]}>{label}</Text>
+      <Text style={[styles.dateTimeButtonValue, value ? null : styles.placeholderText]}>{value || placeholder}</Text>
+    </Pressable>
+  );
+}
+
+function TimeZoneSelect({
+  disabled,
+  label,
+  onChange,
+  value,
+}: {
+  disabled: boolean;
+  label: string;
+  onChange: (value: string) => void;
+  value: string;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <View style={styles.field}>
+      <Text style={styles.label}>{label}</Text>
+      <Pressable
+        accessibilityLabel={`${label} 선택`}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        disabled={disabled}
+        onPress={() => setOpen((current) => !current)}
+        style={({ pressed }) => [
+          styles.selectButton,
+          pressed ? styles.pressed : null,
+          disabled ? styles.disabled : null,
+        ]}
+      >
+        <Text style={styles.selectButtonText}>{flightTimeZoneLabel(value)}</Text>
+        <Text style={styles.selectChevron}>{open ? '접기' : '변경'}</Text>
+      </Pressable>
+      {open ? (
+        <View style={styles.selectOptions}>
+          {flightTimeZoneOptions.map((option) => {
+            const selected = option.value === value;
+            return (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+                key={option.value}
+                onPress={() => {
+                  onChange(option.value);
+                  setOpen(false);
+                }}
+                style={({ pressed }) => [
+                  styles.selectOption,
+                  selected ? styles.selectOptionSelected : null,
+                  pressed ? styles.pressed : null,
+                ]}
+              >
+                <Text style={[styles.selectOptionText, selected ? styles.selectOptionTextSelected : null]}>
+                  {option.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
+    </View>
   );
 }
 
@@ -226,65 +464,11 @@ function Field({ label, ...props }: { label: string } & TextInputProps) {
   );
 }
 
-function initialFormShape() {
-  return {
-    displayTitle: '',
-    flightNumber: '',
-    departureAirportText: '',
-    departureAirportCode: '',
-    departureLocalDate: '',
-    departureLocalTime: '',
-    departureTimeZone: '',
-    arrivalAirportText: '',
-    arrivalAirportCode: '',
-    arrivalLocalDate: '',
-    arrivalLocalTime: '',
-    arrivalTimeZone: '',
-  };
-}
-
-function buildCreateRequest(
-  form: ReturnType<typeof initialFormShape>,
-  passengerParticipantIds: string[],
-): CreateTripFlightRequest {
-  return {
-    displayTitle: form.displayTitle,
-    flightNumber: form.flightNumber.trim() ? form.flightNumber : null,
-    departure: {
-      airportText: form.departureAirportText,
-      airportCode: form.departureAirportCode.trim() ? form.departureAirportCode : null,
-      localDate: form.departureLocalDate,
-      localTime: form.departureLocalTime,
-      timeZone: form.departureTimeZone,
-    },
-    arrival: {
-      airportText: form.arrivalAirportText,
-      airportCode: form.arrivalAirportCode.trim() ? form.arrivalAirportCode : null,
-      localDate: form.arrivalLocalDate,
-      localTime: form.arrivalLocalTime,
-      timeZone: form.arrivalTimeZone,
-    },
-    passengerParticipantIds,
-  };
-}
-
-function validateCreateRequest(request: CreateTripFlightRequest): string | null {
-  if (!request.displayTitle.trim()) {
-    return '표시 이름을 입력해주세요.';
+function monthForFlightDate(value: string): string {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return monthStringFromDate(dateFromString(value));
   }
-  if (!request.departure.airportText.trim() || !request.arrival.airportText.trim()) {
-    return '출발/도착 공항을 입력해주세요.';
-  }
-  if (!request.departure.localDate || !request.departure.localTime || !request.departure.timeZone.trim()) {
-    return '출발 날짜, 시간, 시간대를 입력해주세요.';
-  }
-  if (!request.arrival.localDate || !request.arrival.localTime || !request.arrival.timeZone.trim()) {
-    return '도착 날짜, 시간, 시간대를 입력해주세요.';
-  }
-  if (request.passengerParticipantIds.length === 0) {
-    return '탑승자를 한 명 이상 선택해주세요.';
-  }
-  return null;
+  return monthStringFromDate(new Date());
 }
 
 function participantsErrorMessage(error: unknown): string {
@@ -296,7 +480,7 @@ function participantsErrorMessage(error: unknown): string {
 
 function createErrorMessage(error: unknown): string {
   if (error instanceof ApiError && error.status === 400) {
-    return '입력값을 다시 확인해주세요. 시간대는 IANA 형식이어야 해요.';
+    return '입력값을 다시 확인해주세요. 날짜, 시간, 시간대 선택을 확인해주세요.';
   }
   if (error instanceof ApiError && (error.status === 403 || error.status === 404)) {
     return '이 여행에 항공편을 추가할 수 없어요.';
@@ -305,6 +489,42 @@ function createErrorMessage(error: unknown): string {
 }
 
 const styles = StyleSheet.create({
+  dateTimeButton: {
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    flex: 1,
+    gap: theme.space[1],
+    minHeight: theme.layout.controlH,
+    paddingHorizontal: theme.space[4],
+    paddingVertical: theme.space[3],
+  },
+  dateTimeButtonActive: {
+    backgroundColor: theme.color.primarySoft,
+    borderColor: theme.color.primary,
+  },
+  dateTimeButtonLabel: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.semibold,
+    fontSize: theme.font.size.caption,
+    fontWeight: theme.font.weight.semibold,
+  },
+  dateTimeButtonLabelActive: {
+    color: theme.color.primary,
+  },
+  dateTimeButtonValue: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.body,
+    fontWeight: theme.font.weight.bold,
+  },
+  dateTimeRow: {
+    flexDirection: 'row',
+    gap: theme.space[3],
+  },
+  disabled: {
+    opacity: 0.5,
+  },
   feedback: {
     color: theme.color.danger,
     fontFamily: theme.font.family.bold,
@@ -353,6 +573,11 @@ const styles = StyleSheet.create({
   passengerStateSelected: {
     color: theme.color.primary,
   },
+  placeholderText: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.regular,
+    fontWeight: theme.font.weight.regular,
+  },
   pressed: {
     opacity: 0.7,
   },
@@ -361,5 +586,55 @@ const styles = StyleSheet.create({
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.subhead,
     fontWeight: theme.font.weight.bold,
+  },
+  selectButton: {
+    alignItems: 'center',
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: theme.space[3],
+    justifyContent: 'space-between',
+    minHeight: theme.layout.controlH,
+    paddingHorizontal: theme.space[4],
+  },
+  selectButtonText: {
+    color: theme.color.textStrong,
+    flex: 1,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.body,
+    fontWeight: theme.font.weight.bold,
+  },
+  selectChevron: {
+    color: theme.color.primary,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.caption,
+    fontWeight: theme.font.weight.bold,
+  },
+  selectOption: {
+    borderRadius: theme.radius.sm,
+    paddingHorizontal: theme.space[3],
+    paddingVertical: theme.space[3],
+  },
+  selectOptionSelected: {
+    backgroundColor: theme.color.primarySoft,
+  },
+  selectOptionText: {
+    color: theme.color.textBody,
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.body,
+  },
+  selectOptionTextSelected: {
+    color: theme.color.primary,
+    fontFamily: theme.font.family.bold,
+    fontWeight: theme.font.weight.bold,
+  },
+  selectOptions: {
+    backgroundColor: theme.color.surfaceSunken,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    gap: theme.space[1],
+    padding: theme.space[2],
   },
 });
