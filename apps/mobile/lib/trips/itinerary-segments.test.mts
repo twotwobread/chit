@@ -4,8 +4,6 @@ import test from 'node:test';
 import {
   buildItinerarySegments,
   itineraryDurationLabel,
-  itineraryTimeActionAccessibilityLabel,
-  itineraryTimeActionLabel,
   type ItineraryTimelineItem,
 } from '../trip-ui/itinerary-segments';
 
@@ -59,14 +57,4 @@ test('itineraryDurationLabel formats valid ranged anchors and ignores invalid ra
   assert.equal(itineraryDurationLabel('09:00', '10:30'), '1시간 30분');
   assert.equal(itineraryDurationLabel('11:00', '10:00'), null);
   assert.equal(itineraryDurationLabel('bad', '10:00'), null);
-});
-
-test('itinerary time actions distinguish assigning untimed items from editing timed items', () => {
-  const untimed = item('도톤보리', null);
-  const timed = item('우메다', '09:30');
-
-  assert.equal(itineraryTimeActionLabel(untimed), '시간 지정');
-  assert.equal(itineraryTimeActionAccessibilityLabel(untimed), '도톤보리 시간 지정');
-  assert.equal(itineraryTimeActionLabel(timed), '시간 수정');
-  assert.equal(itineraryTimeActionAccessibilityLabel(timed), '우메다 시간 수정');
 });

@@ -7,8 +7,6 @@ import { SwipeActionRow } from './SwipeActionRow';
 import {
   buildItinerarySegments,
   itineraryDurationLabel,
-  itineraryTimeActionAccessibilityLabel,
-  itineraryTimeActionLabel,
   type ItineraryTimelineItem,
   type ItineraryTimelineSegment,
 } from './itinerary-segments';
@@ -20,7 +18,6 @@ export type ItineraryTimelineProps = {
   emptyTitle?: string;
   emptyHelper?: string;
   onPressItem?: (item: ItineraryTimelineItem) => void;
-  onPressTime?: (item: ItineraryTimelineItem) => void;
   onPressLodgingBadge?: (item: ItineraryTimelineItem) => void;
   getItemAccessibilityLabel?: (item: ItineraryTimelineItem) => string;
   onItemNameRef?: (item: ItineraryTimelineItem, node: Text | null) => void;
@@ -35,7 +32,6 @@ export function ItineraryTimeline({
   items,
   onItemNameRef,
   onPressItem,
-  onPressTime,
   onPressLodgingBadge,
   renderActions,
   renderSwipeAction,
@@ -60,7 +56,6 @@ export function ItineraryTimeline({
             key={segment.item.id}
             onItemNameRef={onItemNameRef}
             onPressItem={onPressItem}
-            onPressTime={onPressTime}
             onPressLodgingBadge={onPressLodgingBadge}
             renderActions={renderActions}
             renderSwipeAction={renderSwipeAction}
@@ -72,7 +67,6 @@ export function ItineraryTimeline({
             key={segment.id}
             onItemNameRef={onItemNameRef}
             onPressItem={onPressItem}
-            onPressTime={onPressTime}
             onPressLodgingBadge={onPressLodgingBadge}
             renderActions={renderActions}
             renderSwipeAction={renderSwipeAction}
@@ -88,14 +82,12 @@ function AnchorRow({
   item,
   onItemNameRef,
   onPressItem,
-  onPressTime,
   onPressLodgingBadge,
   renderActions,
   renderSwipeAction,
 }: {
   item: ItineraryTimelineItem;
   onPressItem?: (item: ItineraryTimelineItem) => void;
-  onPressTime?: (item: ItineraryTimelineItem) => void;
   onPressLodgingBadge?: (item: ItineraryTimelineItem) => void;
   getItemAccessibilityLabel?: (item: ItineraryTimelineItem) => string;
   onItemNameRef?: (item: ItineraryTimelineItem, node: Text | null) => void;
@@ -117,7 +109,6 @@ function AnchorRow({
           <Text style={styles.time}>{timeLabel}</Text>
           {duration ? <Badge label={duration} tone="success" /> : null}
           {item.note ? <Badge label={item.note} tone="amber" /> : null}
-          {onPressTime ? <TimeButton item={item} onPressTime={onPressTime} /> : null}
         </View>
         <TimelineCard
           done={done}
@@ -139,14 +130,12 @@ function UntimedSegment({
   items,
   onItemNameRef,
   onPressItem,
-  onPressTime,
   onPressLodgingBadge,
   renderActions,
   renderSwipeAction,
 }: {
   items: ItineraryTimelineItem[];
   onPressItem?: (item: ItineraryTimelineItem) => void;
-  onPressTime?: (item: ItineraryTimelineItem) => void;
   onPressLodgingBadge?: (item: ItineraryTimelineItem) => void;
   getItemAccessibilityLabel?: (item: ItineraryTimelineItem) => string;
   onItemNameRef?: (item: ItineraryTimelineItem, node: Text | null) => void;
@@ -175,7 +164,6 @@ function UntimedSegment({
                   item={item}
                   onItemNameRef={onItemNameRef}
                   onPressItem={onPressItem}
-                  onPressTime={onPressTime}
                   onPressLodgingBadge={onPressLodgingBadge}
                   renderActions={renderActions}
                   renderSwipeAction={renderSwipeAction}
@@ -196,7 +184,6 @@ function TimelineCard({
   item,
   onItemNameRef,
   onPressItem,
-  onPressTime,
   onPressLodgingBadge,
   renderActions,
   renderSwipeAction,
@@ -205,7 +192,6 @@ function TimelineCard({
   done: boolean;
   item: ItineraryTimelineItem;
   onPressItem?: (item: ItineraryTimelineItem) => void;
-  onPressTime?: (item: ItineraryTimelineItem) => void;
   onPressLodgingBadge?: (item: ItineraryTimelineItem) => void;
   getItemAccessibilityLabel?: (item: ItineraryTimelineItem) => string;
   onItemNameRef?: (item: ItineraryTimelineItem, node: Text | null) => void;
@@ -218,7 +204,11 @@ function TimelineCard({
 
   const content = (
     <>
-      <PlacePin faded={done} order={item.order} size={compact ? 30 : 32} type={item.type} />
+      {compact ? (
+        <View style={styles.compactOrderBadge}>
+          <Text style={styles.compactOrderText}>{item.order}</Text>
+        </View>
+      ) : null}
       <View style={styles.cardBody}>
         <View style={styles.nameRow}>
           <Text
@@ -255,7 +245,6 @@ function TimelineCard({
         {item.legLabel ? <Text style={styles.leg}>{item.legLabel}</Text> : null}
         {actions ? <View style={styles.cardActions}>{actions}</View> : null}
       </View>
-      {compact && onPressTime ? <TimeButton item={item} onPressTime={onPressTime} /> : null}
     </>
   );
 
@@ -289,29 +278,6 @@ function TimelineCard({
   );
 }
 
-function TimeButton({
-  item,
-  onPressTime,
-}: {
-  item: ItineraryTimelineItem;
-  onPressTime: (item: ItineraryTimelineItem) => void;
-}) {
-  const label = itineraryTimeActionLabel(item);
-
-  return (
-    <Pressable
-      accessibilityLabel={itineraryTimeActionAccessibilityLabel(item)}
-      accessibilityRole="button"
-      hitSlop={8}
-      onPress={() => onPressTime(item)}
-      style={({ pressed }) => [styles.timeButton, pressed ? styles.pressed : null]}
-    >
-      <Clock color={theme.color.primary} size={13} strokeWidth={2.2} />
-      <Text style={styles.timeButtonText}>{label}</Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   body: {
     flex: 1,
@@ -332,16 +298,32 @@ const styles = StyleSheet.create({
   cardBody: {
     flex: 1,
     gap: theme.space[2],
+    minWidth: 0,
   },
   cardActions: {
     marginTop: theme.space[1],
   },
   cardCompact: {
     marginTop: 0,
+    paddingVertical: theme.space[3],
     shadowOpacity: 0,
   },
   cardSwipeable: {
     marginTop: 0,
+  },
+  compactOrderBadge: {
+    alignItems: 'center',
+    backgroundColor: theme.color.primarySoft,
+    borderRadius: theme.radius.pill,
+    height: 28,
+    justifyContent: 'center',
+    width: 28,
+  },
+  compactOrderText: {
+    color: theme.color.primary,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.caption,
+    fontWeight: theme.font.weight.bold,
   },
   emptyBox: {
     alignItems: 'center',
@@ -437,22 +419,6 @@ const styles = StyleSheet.create({
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.label,
     fontVariant: ['tabular-nums'],
-    fontWeight: theme.font.weight.bold,
-  },
-  timeButton: {
-    alignItems: 'center',
-    alignSelf: 'center',
-    backgroundColor: theme.color.primarySoft,
-    borderRadius: theme.radius.pill,
-    flexDirection: 'row',
-    gap: theme.space[1],
-    paddingHorizontal: theme.space[3],
-    paddingVertical: theme.space[2],
-  },
-  timeButtonText: {
-    color: theme.color.primary,
-    fontFamily: theme.font.family.bold,
-    fontSize: theme.font.size.micro,
     fontWeight: theme.font.weight.bold,
   },
   timeRow: {
