@@ -16,7 +16,7 @@ import {
   getScheduleItems,
   type PlaceBackedScheduleItem,
 } from './day-itinerary';
-import { formatTripDayDate } from './days';
+import { formatTripDayDate, formatTripDayLabel } from './days';
 import { tripItineraryDayPath, tripSettlePath } from './routes';
 
 export type QuickExpenseFormErrors = {
@@ -310,7 +310,7 @@ export function buildQuickExpenseViewModel({
   const dayOptions = isAllDayMode
     ? itineraryList.map((optionItinerary) => ({
         tripDayId: optionItinerary.day.id,
-        dayLabel: `Day ${optionItinerary.day.dayOrder}`,
+        dayLabel: formatTripDayLabel(optionItinerary.day.dayOrder),
         formattedDate: formatTripDayDate(optionItinerary.day.date),
         itemCount: getScheduleItems(optionItinerary).length,
         selected: optionItinerary.day.id === activeTripDayId,
@@ -332,7 +332,7 @@ export function buildQuickExpenseViewModel({
       })
     : [];
   return {
-    dayLabel: isAllDayMode ? '전체 일정' : `Day ${itinerary.day.dayOrder}`,
+    dayLabel: isAllDayMode ? '전체 일정' : formatTripDayLabel(itinerary.day.dayOrder),
     formattedDate: isAllDayMode ? itineraryDateRangeLabel(itineraryList) : formatTripDayDate(itinerary.day.date),
     currency,
     currencyLabel: currencyLabel(currency),
@@ -366,7 +366,7 @@ export function buildQuickExpenseViewModel({
       itemOptions.length === 0
         ? isAllDayMode
           ? hasAnyItemOptions
-            ? '선택한 Day에 등록된 일정이 없어 다른 Day를 선택해주세요.'
+            ? '선택한 일차에 등록된 일정이 없어 다른 일차를 선택해주세요.'
             : '여행 일정에 등록된 일정이 없어 지출을 저장할 수 없어요.'
           : '오늘 일정에 등록된 일정이 없어 지출을 저장할 수 없어요.'
         : null,
@@ -679,7 +679,7 @@ function toItemOption(
 ): QuickExpenseItemOption {
   const dayFields = {
     tripDayId: itinerary.day.id,
-    dayLabel: `Day ${itinerary.day.dayOrder}`,
+    dayLabel: formatTripDayLabel(itinerary.day.dayOrder),
     formattedDate: formatTripDayDate(itinerary.day.date),
   };
   return {

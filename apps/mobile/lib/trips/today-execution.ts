@@ -11,7 +11,7 @@ import type {
 } from '@i-um/api-contract';
 
 import { getPlaceTypeLabel, getScheduleItems, type PlaceBackedScheduleItem } from './day-itinerary';
-import { formatTripDayDate } from './days';
+import { formatTripDayDate, formatTripDayLabel } from './days';
 import { tripDetailPath } from './mypage';
 import { tripItineraryDayPath } from './routes';
 import { buildQuickExpenseRoute } from './quick-expense';
@@ -266,7 +266,7 @@ export function buildTodayExecutionViewModel({
   const lodgingSourceDay = itinerary.day.date === currentDay.date ? itinerary.day : currentDay;
   const common = {
     tripName: tripDetail.trip.name,
-    dayLabel: `Day ${currentDay.dayOrder}`,
+    dayLabel: formatTripDayLabel(currentDay.dayOrder),
     formattedDate: formatTripDayDate(currentDay.date),
     primaryAction: routeAction(orderedItems.length === 0 ? '오늘 일정 열기' : '오늘 일정 보기', dayRoute),
     lodgingNavigationAction: buildLodgingNavigationAction(lodgingSourceDay.lodgingPlace, travelMode),

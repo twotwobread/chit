@@ -150,9 +150,9 @@ test('builds day-tabbed settlement expense history with selected-day editable ro
   assert.equal(viewModel.helper, '총 2건의 지출을 확인하고 수정할 수 있어요.');
   assert.equal(viewModel.selectedDayId, 'day-3');
   assert.deepEqual(viewModel.dayChips, [
-    { id: 'day-1', label: 'Day 1', dateLabel: '2026.07.10', statusLabel: '1건' },
-    { id: 'day-2', label: 'Day 2', dateLabel: '2026.07.11', statusLabel: '지출 없음' },
-    { id: 'day-3', label: 'Day 3', dateLabel: '2026.07.12', statusLabel: '1건' },
+    { id: 'day-1', label: '1일차', dateLabel: '2026.07.10', statusLabel: '1건' },
+    { id: 'day-2', label: '2일차', dateLabel: '2026.07.11', statusLabel: '지출 없음' },
+    { id: 'day-3', label: '3일차', dateLabel: '2026.07.12', statusLabel: '1건' },
   ]);
   assert.deepEqual(
     [
@@ -161,7 +161,7 @@ test('builds day-tabbed settlement expense history with selected-day editable ro
       viewModel.selectedSection.helper,
       viewModel.selectedSection.expenseCount,
     ],
-    ['day-3', 'Day 3', '2026.07.12 · 1건', 1],
+    ['day-3', '3일차', '2026.07.12 · 1건', 1],
   );
   assert.deepEqual(
     viewModel.selectedSection.rows.map((row) => [row.id, row.amountLabel, row.editRoute]),
@@ -183,7 +183,7 @@ test('defaults settlement expense history selection to today then first expense 
     return;
   }
   assert.equal(todayViewModel.selectedDayId, 'day-2');
-  assert.equal(todayViewModel.selectedSection.emptyTitle, '이 Day에 등록된 지출이 없어요.');
+  assert.equal(todayViewModel.selectedSection.emptyTitle, '이 일차에 등록된 지출이 없어요.');
 
   const firstExpenseViewModel = buildSettlementExpenseHistoryViewModel({
     tripId: 'trip-a',

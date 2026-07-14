@@ -10,7 +10,7 @@ import { buildGooglePlaceSearchRegionFromDestination, type GooglePlaceTripDestin
 import type { DayChip } from '../trip-ui/DayChips';
 import type { RouteMapPlace, RouteMapPolyline } from '../trip-ui/RouteMap';
 import { getScheduleItems, type DayItineraryViewModel } from './day-itinerary';
-import { formatTripDayDate } from './days';
+import { formatTripDayDate, formatTripDayLabel } from './days';
 
 export type TripMapSearchLayout = {
   screenMode: 'fullScreen';
@@ -32,7 +32,7 @@ export function buildTripMapDayChips(days: TripDay[]): DayChip[] {
     .sort((left, right) => left.dayOrder - right.dayOrder)
     .map((day) => ({
       id: day.id,
-      label: `Day ${day.dayOrder}`,
+      label: formatTripDayLabel(day.dayOrder),
       dateLabel: formatTripDayDate(day.date),
     }));
 }
@@ -88,7 +88,7 @@ export function buildTripMapRouteLayerChips(days: TripDay[]): DayChip[] {
     { id: 'all', label: '전체' },
     ...orderedDays.map((day, index) => ({
       id: tripMapDayRouteChipId(day.id),
-      label: `Day ${day.dayOrder}`,
+      label: formatTripDayLabel(day.dayOrder),
       dateLabel: formatTripDayDate(day.date),
       legendColor: tripMapRouteLayerColor(index),
     })),
@@ -137,7 +137,7 @@ export function buildTripMapDayRoutes(itineraries: GetDayScheduleItemsResponse[]
         color,
         dayId: itinerary.day.id,
         dayOrder: itinerary.day.dayOrder,
-        label: `Day ${itinerary.day.dayOrder}`,
+        label: formatTripDayLabel(itinerary.day.dayOrder),
         places,
         polylines: buildTripMapRoutePolylines(itinerary.day.id, places, color),
       };

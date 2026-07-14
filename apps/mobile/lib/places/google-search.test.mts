@@ -203,7 +203,7 @@ describe('google place search helpers', () => {
     assert.equal(isDuplicateDayPlaceConfirmationError(undefined), false);
   });
 
-  it('builds selected inline expansion data with description and Google Maps action only', () => {
+  it('builds selected inline expansion data with description and Korean map action only', () => {
     assert.deepEqual(
       buildGooglePlaceExplorationDetail(
         {
@@ -228,7 +228,7 @@ describe('google place search helpers', () => {
         metadataLabels: ['카페', '평점 4.2 · 리뷰 842개', '영업 중'],
         googleMapsUri: 'https://maps.google.com/?cid=1',
         description: '쇼핑 동선 중 쉬어가기 좋은 스페셜티 커피 매장입니다.',
-        mapSearchLabel: 'Google Maps',
+        mapSearchLabel: '구글 지도에서 보기',
         mapUrl: 'https://maps.google.com/?cid=1',
       },
     );
@@ -868,7 +868,7 @@ describe('google place search helpers', () => {
       detail: {
         ...result,
         description: '대표 쇼핑몰 근처 카페입니다.',
-        mapSearchLabel: 'Google Maps',
+        mapSearchLabel: '구글 지도에서 보기',
         mapUrl:
           'https://www.google.com/maps/search/?api=1&query=%EC%9A%B0%EB%A9%94%EB%8B%A4%20%EC%B9%B4%ED%8E%98%20Umeda',
       },
@@ -876,7 +876,7 @@ describe('google place search helpers', () => {
     assert.deepEqual(buildGooglePlaceDetailsErrorState('google-1'), {
       status: 'error',
       googlePlaceId: 'google-1',
-      message: '장소 설명을 불러오지 못했어요. Google Maps에서 자세한 정보를 확인해 주세요.',
+      message: '장소 설명을 불러오지 못했어요. 구글 지도에서 자세한 정보를 확인해 주세요.',
     });
   });
 });

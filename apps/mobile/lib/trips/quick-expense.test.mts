@@ -188,13 +188,13 @@ test('builds settlement day tabs and filters schedule options to the selected da
   assert.deepEqual(
     viewModel.dayOptions.map((option) => [option.tripDayId, option.dayLabel, option.itemCount, option.selected]),
     [
-      ['day-1', 'Day 1', 1, false],
-      ['day-2', 'Day 2', 1, true],
+      ['day-1', '1일차', 1, false],
+      ['day-2', '2일차', 1, true],
     ],
   );
   assert.deepEqual(
     viewModel.itemOptions.map((option) => [option.itemId, option.tripDayId, option.dayLabel, option.orderLabel]),
-    [['item-b', 'day-2', 'Day 2', '2']],
+    [['item-b', 'day-2', '2일차', '2']],
   );
   assert.equal(viewModel.selectedItem?.tripDayId, 'day-2');
 });

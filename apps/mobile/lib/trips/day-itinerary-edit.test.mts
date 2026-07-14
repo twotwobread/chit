@@ -162,7 +162,7 @@ describe('day itinerary edit/delete helpers', () => {
   it('builds delete confirmation copy for a selected row', () => {
     assert.deepEqual(buildDayItineraryDeleteConfirmation(item), {
       title: '이 장소를 삭제할까요?',
-      helper: '이 Day 일정에서만 삭제돼요.',
+      helper: '이 일차 일정에서만 삭제돼요.',
       itemLabel: '1번째 장소 · 우메다 공중정원',
       contextLabel: '관광지 · Umeda',
     });

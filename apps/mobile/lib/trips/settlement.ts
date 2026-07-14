@@ -12,7 +12,7 @@ import type {
 import type { DayChip } from '../trip-ui/DayChips';
 
 import { type DayExpenseRowViewModel, buildDayExpensesViewModel } from './day-expenses';
-import { formatTripDayDate } from './days';
+import { formatTripDayDate, formatTripDayLabel } from './days';
 import { buildQuickExpenseRoute, formatMoney } from './quick-expense';
 
 export type AuthoritativeTripSettlement = GetTripSettlementResponse;
@@ -95,12 +95,12 @@ export function buildSettlementExpenseHistoryViewModel({
 
     return {
       dayId: dayInput.day.id,
-      title: `Day ${dayInput.day.dayOrder}`,
+      title: formatTripDayLabel(dayInput.day.dayOrder),
       helper: `${formatTripDayDate(dayInput.day.date)} · ${expenseCount > 0 ? `${expenseCount}건` : '지출 없음'}`,
       expenseCount,
       rows,
-      emptyTitle: expenseCount === 0 ? '이 Day에 등록된 지출이 없어요.' : null,
-      emptyHelper: expenseCount === 0 ? '다른 Day를 선택하거나 지출을 등록해 주세요.' : null,
+      emptyTitle: expenseCount === 0 ? '이 일차에 등록된 지출이 없어요.' : null,
+      emptyHelper: expenseCount === 0 ? '다른 일차를 선택하거나 지출을 등록해 주세요.' : null,
     };
   });
 

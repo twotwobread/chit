@@ -766,7 +766,7 @@ export function GooglePlaceMapSearch({
     try {
       await Linking.openURL(url);
     } catch {
-      setMapActionMessage('Google Maps를 열지 못했어요. 잠시 후 다시 시도해 주세요.');
+      setMapActionMessage('구글 지도를 열지 못했어요. 잠시 후 다시 시도해 주세요.');
     }
   };
 

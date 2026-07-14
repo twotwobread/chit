@@ -36,7 +36,7 @@ export function TodayRouteSummaryCard({
             <Text style={styles.eyebrow}>현 위치 기준</Text>
             <Text style={styles.title}>{state.title}</Text>
           </View>
-          <Text style={styles.source}>Google Maps</Text>
+          <Text style={styles.source}>구글 지도</Text>
         </View>
         <View style={styles.modeGrid}>
           {state.rows.map((row) => {

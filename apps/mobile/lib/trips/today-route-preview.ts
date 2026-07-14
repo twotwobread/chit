@@ -27,7 +27,7 @@ export type TodayRoutePreviewViewModel = {
   modeLabel: string;
   summaryText: string;
   map: TodayRoutePreviewMapViewModel | null;
-  detailActionLabel: 'Google Maps에서 자세히';
+  detailActionLabel: '구글 지도에서 자세히';
 };
 
 export type TodayRoutePreviewModeSummaryRow =
@@ -104,7 +104,7 @@ export const todayRoutePreviewUnavailableState = (
 ): Extract<TodayRoutePreviewNonSuccessState, { status: 'unavailable' }> => ({
   status: 'unavailable',
   title,
-  helper: '잠시 후 다시 시도하거나 Google Maps에서 자세히 확인해주세요.',
+  helper: '잠시 후 다시 시도하거나 구글 지도에서 자세히 확인해주세요.',
   retryLabel: '다시 시도',
 });
 
@@ -127,7 +127,7 @@ export function buildTodayRoutePreviewViewModel(response: RoutePreviewResponse):
     modeLabel: routeModeLabel(response.mode),
     summaryText: response.summary.summaryText || '환승 정보 없음',
     map: response.map ? buildMapViewModel(response.map) : null,
-    detailActionLabel: 'Google Maps에서 자세히',
+    detailActionLabel: '구글 지도에서 자세히',
   };
 }
 
@@ -160,7 +160,7 @@ export function buildTodayRoutePreviewSummarySuccessState(
   return {
     status: 'success',
     title: '현 위치 기준 예상 이동',
-    helper: '실제 경로와 소요 시간은 Google Maps에서 확인해주세요.',
+    helper: '실제 경로와 소요 시간은 구글 지도에서 확인해주세요.',
     rows,
   };
 }

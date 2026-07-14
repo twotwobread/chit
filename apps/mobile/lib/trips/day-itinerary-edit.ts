@@ -167,7 +167,7 @@ export function buildDayItineraryDeleteConfirmation(
 ): DayItineraryDeleteConfirmationViewModel {
   return {
     title: '이 장소를 삭제할까요?',
-    helper: '이 Day 일정에서만 삭제돼요.',
+    helper: '이 일차 일정에서만 삭제돼요.',
     itemLabel: `${item.orderLabel}번째 장소 · ${item.placeName}`,
     contextLabel: `${item.placeTypeLabel} · ${item.address}`,
   };
