@@ -278,6 +278,9 @@ func (p *GoogleProvider) Details(ctx context.Context, input ProviderDetailsInput
 	if err != nil {
 		return GooglePlaceDetails{}, err
 	}
+	query := request.URL.Query()
+	query.Set("languageCode", "ko")
+	request.URL.RawQuery = query.Encode()
 	request.Header.Set("X-Goog-Api-Key", p.apiKey)
 	request.Header.Set("X-Goog-FieldMask", "id,displayName,formattedAddress,location,primaryType,types")
 
@@ -324,8 +327,11 @@ func (p *GoogleProvider) Description(ctx context.Context, input ProviderDescript
 	if err != nil {
 		return GooglePlaceDescription{}, err
 	}
+	query := request.URL.Query()
+	query.Set("languageCode", "ko")
+	request.URL.RawQuery = query.Encode()
 	request.Header.Set("X-Goog-Api-Key", p.apiKey)
-	request.Header.Set("X-Goog-FieldMask", "id,editorialSummary,generativeSummary")
+	request.Header.Set("X-Goog-FieldMask", "id,displayName,formattedAddress,editorialSummary,generativeSummary")
 
 	response, err := p.client.Do(request)
 	if err != nil {
@@ -348,8 +354,10 @@ func (p *GoogleProvider) Description(ctx context.Context, input ProviderDescript
 		return GooglePlaceDescription{}, ErrProviderUnavailable
 	}
 	return GooglePlaceDescription{
-		GooglePlaceID: strings.TrimSpace(payload.ID),
-		Description:   firstNonEmptyString(payload.EditorialSummary.Text, payload.GenerativeSummary.Text),
+		GooglePlaceID:    strings.TrimSpace(payload.ID),
+		DisplayName:      strings.TrimSpace(payload.DisplayName.Text),
+		FormattedAddress: strings.TrimSpace(payload.FormattedAddress),
+		Description:      firstNonEmptyString(payload.EditorialSummary.Text, payload.GenerativeSummary.Text),
 	}, nil
 }
 
@@ -518,6 +526,10 @@ type googlePlaceDetailsResponse struct {
 
 type googlePlaceDescriptionResponse struct {
 	ID               string `json:"id"`
+	FormattedAddress string `json:"formattedAddress"`
+	DisplayName      struct {
+		Text string `json:"text"`
+	} `json:"displayName"`
 	EditorialSummary struct {
 		Text string `json:"text"`
 	} `json:"editorialSummary"`

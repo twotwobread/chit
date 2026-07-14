@@ -168,8 +168,10 @@ type SearchResult struct {
 }
 
 type GooglePlaceDescription struct {
-	GooglePlaceID string
-	Description   string
+	GooglePlaceID    string
+	DisplayName      string
+	FormattedAddress string
+	Description      string
 }
 
 type GooglePlacePhoto struct {

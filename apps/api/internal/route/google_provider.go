@@ -30,7 +30,8 @@ func NewGoogleProviderWithClient(apiKey string, endpoint string, client *http.Cl
 }
 
 func (p *GoogleProvider) Preview(ctx context.Context, input ProviderPreviewInput) (ProviderPreviewResult, error) {
-	if p == nil || p.apiKey == "" || p.endpoint == "" || p.client == nil || input.Mode != transitMode {
+	googleMode, ok := googleTravelMode(input.Mode)
+	if p == nil || p.apiKey == "" || p.endpoint == "" || p.client == nil || !ok {
 		return ProviderPreviewResult{}, ErrProviderDown
 	}
 
@@ -45,7 +46,7 @@ func (p *GoogleProvider) Preview(ctx context.Context, input ProviderPreviewInput
 				"latLng": map[string]float64{"latitude": input.Destination.Latitude, "longitude": input.Destination.Longitude},
 			},
 		},
-		"travelMode":               "TRANSIT",
+		"travelMode":               googleMode,
 		"computeAlternativeRoutes": false,
 		"polylineEncoding":         "ENCODED_POLYLINE",
 	})
@@ -102,6 +103,19 @@ func (p *GoogleProvider) Preview(ctx context.Context, input ProviderPreviewInput
 		result.Bounds = &bounds
 	}
 	return result, nil
+}
+
+func googleTravelMode(mode string) (string, bool) {
+	switch mode {
+	case transitMode:
+		return "TRANSIT", true
+	case walkingMode:
+		return "WALK", true
+	case drivingMode:
+		return "DRIVE", true
+	default:
+		return "", false
+	}
 }
 
 func parseGoogleDurationSeconds(value string) (int, bool) {

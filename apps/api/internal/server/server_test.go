@@ -3556,7 +3556,7 @@ func TestGooglePlaceDetailsAndPhotoHandlers(t *testing.T) {
 	accessToken := loginTestUser(t, backend)
 	tripID := createTestTrip(t, backend, accessToken)
 	provider := &fakePlaceProvider{
-		description: placedomain.GooglePlaceDescription{GooglePlaceID: "google-1", Description: "공중정원 전망대로 유명한 오사카 대표 명소입니다."},
+		description: placedomain.GooglePlaceDescription{GooglePlaceID: "google-1", DisplayName: "우메다 스카이 빌딩", FormattedAddress: "일본 오사카부 오사카시 기타구", Description: "공중정원 전망대로 유명한 오사카 대표 명소입니다."},
 		photo:       placedomain.GooglePlacePhoto{URI: "https://lh3.googleusercontent.com/photo"},
 		results: []placedomain.SearchResult{{
 			GooglePlaceID:    "google-1",
@@ -3581,13 +3581,15 @@ func TestGooglePlaceDetailsAndPhotoHandlers(t *testing.T) {
 		t.Fatalf("expected selected details provider call, got called=%v input=%#v", provider.descriptionCalled, provider.descriptionInput)
 	}
 	var detailBody struct {
-		GooglePlaceID string `json:"googlePlaceId"`
-		Description   string `json:"description"`
+		GooglePlaceID    string `json:"googlePlaceId"`
+		DisplayName      string `json:"displayName"`
+		FormattedAddress string `json:"formattedAddress"`
+		Description      string `json:"description"`
 	}
 	if err := json.NewDecoder(detailRecorder.Body).Decode(&detailBody); err != nil {
 		t.Fatalf("decode details response: %v", err)
 	}
-	if detailBody.Description != "공중정원 전망대로 유명한 오사카 대표 명소입니다." {
+	if detailBody.DisplayName != "우메다 스카이 빌딩" || detailBody.FormattedAddress != "일본 오사카부 오사카시 기타구" || detailBody.Description != "공중정원 전망대로 유명한 오사카 대표 명소입니다." {
 		t.Fatalf("unexpected details body %#v", detailBody)
 	}
 
@@ -4030,7 +4032,7 @@ func TestCreateRoutePreviewHandler(t *testing.T) {
 	}}
 
 	recorder := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/days/2026-07-10/schedule-items/"+item.ID+"/route-preview", bytes.NewReader([]byte(`{"origin":{"latitude":34.6,"longitude":135.5}}`)))
+	request := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/days/2026-07-10/schedule-items/"+item.ID+"/route-preview", bytes.NewReader([]byte(`{"origin":{"latitude":34.6,"longitude":135.5},"mode":"walking"}`)))
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Authorization", "Bearer "+accessToken)
 	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true, RouteProvider: provider}).ServeHTTP(recorder, request)
@@ -4038,7 +4040,7 @@ func TestCreateRoutePreviewHandler(t *testing.T) {
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d with body %s", http.StatusOK, recorder.Code, recorder.Body.String())
 	}
-	if !provider.called || provider.input.Mode != "transit" || provider.input.Destination.Latitude != 34.6687 {
+	if !provider.called || provider.input.Mode != "walking" || provider.input.Destination.Latitude != 34.6687 {
 		t.Fatalf("unexpected provider input: %#v", provider.input)
 	}
 	var body struct {
@@ -4055,7 +4057,7 @@ func TestCreateRoutePreviewHandler(t *testing.T) {
 	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if body.Mode != "transit" || body.Summary.DurationSeconds != 1200 || body.Summary.DistanceMeters != 3500 || body.Summary.SummaryText != "환승 1회" || body.Map == nil || body.Map.EncodedPolyline == "" {
+	if body.Mode != "walking" || body.Summary.DurationSeconds != 1200 || body.Summary.DistanceMeters != 3500 || body.Summary.SummaryText == "환승 1회" || body.Map == nil || body.Map.EncodedPolyline == "" {
 		t.Fatalf("unexpected route preview response: %#v", body)
 	}
 }

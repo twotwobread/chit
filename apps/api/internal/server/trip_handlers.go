@@ -614,8 +614,13 @@ func (s apiServer) CreateRoutePreview(w http.ResponseWriter, r *http.Request, tr
 		return
 	}
 
+	mode := ""
+	if body.Mode != nil {
+		mode = string(*body.Mode)
+	}
 	result, err := s.routes.CreatePreview(r.Context(), authContext.UserID, tripId, tripDayId, scheduleItemId, route.PreviewInput{
 		Origin: route.GeoPoint{Latitude: body.Origin.Latitude, Longitude: body.Origin.Longitude},
+		Mode:   mode,
 	})
 	if err != nil {
 		writeRoutePreviewError(w, err)

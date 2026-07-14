@@ -13,6 +13,8 @@ import (
 const (
 	dateLayout  = "2006-01-02"
 	transitMode = "transit"
+	walkingMode = "walking"
+	drivingMode = "driving"
 )
 
 type Service struct {
@@ -101,10 +103,15 @@ func (s *Service) CreatePreview(ctx context.Context, userID string, tripID strin
 		return PreviewResult{}, ErrUnsupportedPlace
 	}
 
+	mode, ok := normalizeRouteMode(input.Mode)
+	if !ok {
+		return PreviewResult{}, ErrValidation
+	}
+
 	providerResult, err := s.provider.Preview(ctx, ProviderPreviewInput{
 		Origin:      input.Origin,
 		Destination: destination,
-		Mode:        transitMode,
+		Mode:        mode,
 	})
 	if err != nil {
 		return PreviewResult{}, err
@@ -115,11 +122,11 @@ func (s *Service) CreatePreview(ctx context.Context, userID string, tripID strin
 
 	result := PreviewResult{
 		ItemID: itemID,
-		Mode:   transitMode,
+		Mode:   mode,
 		Summary: PreviewSummary{
 			DurationSeconds: providerResult.DurationSeconds,
 			DistanceMeters:  providerResult.DistanceMeters,
-			SummaryText:     routeSummaryText(providerResult.TransferCount),
+			SummaryText:     routeSummaryText(mode, providerResult.TransferCount),
 			TransferCount:   providerResult.TransferCount,
 		},
 		GeneratedAt: s.now(),
@@ -176,7 +183,23 @@ func (s *Service) validateTripDayParticipant(ctx context.Context, userID string,
 	return nil
 }
 
-func routeSummaryText(transferCount *int) string {
+func normalizeRouteMode(mode string) (string, bool) {
+	mode = strings.TrimSpace(mode)
+	if mode == "" {
+		return transitMode, true
+	}
+	switch mode {
+	case transitMode, walkingMode, drivingMode:
+		return mode, true
+	default:
+		return "", false
+	}
+}
+
+func routeSummaryText(mode string, transferCount *int) string {
+	if mode != transitMode {
+		return "Google Maps 기준 예상 경로"
+	}
 	if transferCount == nil {
 		return "환승 정보 없음"
 	}

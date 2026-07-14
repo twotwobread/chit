@@ -3950,6 +3950,12 @@ components:
           $ref: '#/components/schemas/GeoPoint'
         southwest:
           $ref: '#/components/schemas/GeoPoint'
+    RoutePreviewMode:
+      type: string
+      enum:
+        - transit
+        - walking
+        - driving
     CreateRoutePreviewRequest:
       type: object
       required:
@@ -3958,6 +3964,9 @@ components:
       properties:
         origin:
           $ref: '#/components/schemas/GeoPoint'
+        mode:
+          $ref: '#/components/schemas/RoutePreviewMode'
+          default: transit
     RoutePreviewSummary:
       type: object
       required:
@@ -4006,9 +4015,7 @@ components:
         scheduleItemId:
           type: string
         mode:
-          type: string
-          enum:
-            - transit
+          $ref: '#/components/schemas/RoutePreviewMode'
         summary:
           $ref: '#/components/schemas/RoutePreviewSummary'
         map:
@@ -4853,6 +4860,12 @@ components:
       properties:
         googlePlaceId:
           type: string
+        displayName:
+          type: string
+          description: Localized Google display name when available.
+        formattedAddress:
+          type: string
+          description: Localized Google formatted address when available.
         description:
           type: string
           description: Selected-only provider summary when available.

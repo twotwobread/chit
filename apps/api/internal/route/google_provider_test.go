@@ -70,6 +70,43 @@ func TestGoogleProviderPreviewSuccess(t *testing.T) {
 	}
 }
 
+func TestGoogleProviderPreviewMapsTravelModes(t *testing.T) {
+	tests := []struct {
+		mode       string
+		googleMode string
+	}{
+		{mode: transitMode, googleMode: "TRANSIT"},
+		{mode: walkingMode, googleMode: "WALK"},
+		{mode: drivingMode, googleMode: "DRIVE"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.mode, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				var body map[string]interface{}
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+					t.Fatalf("decode request body: %v", err)
+				}
+				if got := body["travelMode"]; got != tc.googleMode {
+					t.Fatalf("expected %s request, got %#v", tc.googleMode, got)
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"routes":[{"duration":"600s","distanceMeters":1200,"polyline":{"encodedPolyline":"encoded"},"viewport":{"high":{"latitude":37.6,"longitude":127.1},"low":{"latitude":37.5,"longitude":127.0}}}]}`))
+			}))
+			defer server.Close()
+
+			provider := NewGoogleProviderWithClient("routes-key", server.URL, server.Client())
+			if _, err := provider.Preview(context.Background(), ProviderPreviewInput{
+				Origin:      GeoPoint{Latitude: 37.5, Longitude: 127.0},
+				Destination: GeoPoint{Latitude: 37.6, Longitude: 127.1},
+				Mode:        tc.mode,
+			}); err != nil {
+				t.Fatalf("Preview returned error: %v", err)
+			}
+		})
+	}
+}
+
 func TestGoogleProviderPreviewRequiresRouteProviderConfig(t *testing.T) {
 	provider := NewGoogleProviderWithClient("", "http://example.invalid", http.DefaultClient)
 	_, err := provider.Preview(context.Background(), ProviderPreviewInput{
