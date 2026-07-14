@@ -1,4 +1,5 @@
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 
 import { Card, ListRow, PrimaryButton, SecondaryButton, theme } from '../../../../lib/design';
@@ -7,7 +8,8 @@ import { NextPlaceHeroCard } from '../../../../lib/trip-ui/NextPlaceHeroCard';
 import { QuickExpenseForm, type QuickExpenseSubmitPayload } from '../../../../lib/trip-ui/QuickExpenseForm';
 import { TodaySpendCard } from '../../../../lib/trip-ui/TodaySpendCard';
 import { TripScreen, TripStateCard } from '../../../../lib/trip-ui/TripScreenScaffold';
-import type { TodayFlightCardViewModel } from '../../../../lib/flights/today';
+import { openTodayFlightBoardingPass, type TodayFlightCardViewModel } from '../../../../lib/flights/today';
+import { openMyFlightBoardingPass } from '../../../../lib/flights/flight-api';
 import { type QuickExpenseOverlayState, useTripTodayController } from '../../../../lib/trip-ui/useTripTodayController';
 import { buildQuickExpenseViewModel, type QuickExpenseRouteTarget } from '../../../../lib/trips/quick-expense';
 import {
@@ -91,17 +93,64 @@ export default function TripTodayTabScreen() {
 }
 
 function TodayFlightCard({ card, tripId }: { card: TodayFlightCardViewModel; tripId: string }) {
+  const [opening, setOpening] = useState(false);
+  const [feedback, setFeedback] = useState<string | null>(null);
+
+  const handlePrimaryAction = async () => {
+    if (card.primaryActionKind === 'routeToDetail') {
+      router.push(tripFlightDetailPath(tripId, card.flightId));
+      return;
+    }
+    if (opening) {
+      return;
+    }
+    setOpening(true);
+    setFeedback(null);
+    try {
+      await openTodayFlightBoardingPass({
+        tripId,
+        flightId: card.flightId,
+        openBoardingPass: openMyFlightBoardingPass,
+        openUrl: (url) => Linking.openURL(url),
+      });
+    } catch {
+      setFeedback('탑승권을 열 수 없어요. 잠시 후 다시 시도해주세요.');
+    } finally {
+      setOpening(false);
+    }
+  };
+
   return (
     <Card>
       <Text style={styles.eyebrow}>오늘 항공편</Text>
       <Text style={styles.cardTitle}>{card.title}</Text>
-      <Text style={styles.cardHelper}>{card.routeLabel}</Text>
-      <Text style={styles.cardHelper}>{card.timeLabel}</Text>
+      <View style={styles.flightRoutePanel}>
+        <FlightEndpoint endpoint={card.departure} />
+        <View style={styles.flightConnector}>
+          <Text style={styles.flightConnectorText}>→</Text>
+        </View>
+        <FlightEndpoint endpoint={card.arrival} />
+      </View>
+      <Text style={styles.cardHelper}>각 공항 현지 시간 기준이에요.</Text>
       <PrimaryButton
         label={card.actionLabel}
-        onPress={() => router.push(tripFlightDetailPath(tripId, card.flightId))}
+        loading={opening}
+        loadingLabel="여는 중..."
+        onPress={() => void handlePrimaryAction()}
       />
+      {feedback ? <Text style={styles.flightFeedback}>{feedback}</Text> : null}
     </Card>
+  );
+}
+
+function FlightEndpoint({ endpoint }: { endpoint: TodayFlightCardViewModel['departure'] }) {
+  return (
+    <View style={styles.flightEndpoint}>
+      <Text style={styles.flightEndpointRole}>{endpoint.roleLabel}</Text>
+      <Text style={styles.flightAirport}>{endpoint.airportLabel}</Text>
+      <Text style={styles.flightTime}>{endpoint.timeLabel}</Text>
+      <Text style={styles.flightDate}>{endpoint.dateLabel}</Text>
+    </View>
   );
 }
 
@@ -406,6 +455,64 @@ const styles = StyleSheet.create({
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.caption,
     fontWeight: theme.font.weight.bold,
+  },
+  flightAirport: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.headline,
+    fontWeight: theme.font.weight.bold,
+  },
+  flightConnector: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: theme.space[6],
+  },
+  flightConnectorText: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.subhead,
+    fontWeight: theme.font.weight.bold,
+  },
+  flightDate: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.caption,
+  },
+  flightEndpoint: {
+    backgroundColor: theme.color.surfaceSunken,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    flex: 1,
+    gap: theme.space[2],
+    minWidth: 0,
+    padding: theme.space[4],
+  },
+  flightEndpointRole: {
+    color: theme.color.primary,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.micro,
+    fontWeight: theme.font.weight.bold,
+    letterSpacing: 0.5,
+  },
+  flightFeedback: {
+    color: theme.color.danger,
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.caption,
+    lineHeight: theme.font.size.caption * theme.font.leading.normal,
+    textAlign: 'center',
+  },
+  flightRoutePanel: {
+    alignItems: 'stretch',
+    flexDirection: 'row',
+    gap: theme.space[3],
+  },
+  flightTime: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.title,
+    fontWeight: theme.font.weight.bold,
+    letterSpacing: -0.3,
   },
   message: {
     color: theme.color.textBody,
