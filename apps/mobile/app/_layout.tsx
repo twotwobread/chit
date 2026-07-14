@@ -2,7 +2,8 @@ import type { ComponentType } from 'react';
 import { Stack } from 'expo-router';
 import { View, type ViewProps } from 'react-native';
 
-import { theme, useDesignFonts } from '../lib/design';
+import { useDesignFonts } from '../lib/design';
+import { rootStackScreenOptions } from '../lib/navigation/root-stack-options';
 
 type GestureHandlerModule = {
   GestureHandlerRootView?: ComponentType<ViewProps>;
@@ -29,15 +30,7 @@ export default function RootLayout() {
 
   return (
     <AppRootView style={{ flex: 1 }}>
-      <Stack
-        screenOptions={{
-          title: 'i-um',
-          contentStyle: { backgroundColor: theme.color.bg },
-          headerStyle: { backgroundColor: theme.color.bg },
-          headerTintColor: theme.color.textStrong,
-          headerTitleStyle: { fontFamily: theme.font.family.bold, fontWeight: theme.font.weight.bold },
-        }}
-      />
+      <Stack screenOptions={rootStackScreenOptions} />
     </AppRootView>
   );
 }
