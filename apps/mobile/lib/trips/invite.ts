@@ -182,7 +182,9 @@ export function buildKakaoInviteTemplate(input: InviteShareInput): TextTemplateT
   };
 }
 
-export function toKakaoInviteRedirectPath(params: Record<string, string | string[] | undefined>): `/invite/${string}` | null {
+export function toKakaoInviteRedirectPath(
+  params: Record<string, string | string[] | undefined>,
+): `/invite/${string}` | null {
   const token = firstParam(params[kakaoInviteTokenParamKey]);
   return isInviteTokenFormatValid(token) ? `/invite/${token.trim()}` : null;
 }
