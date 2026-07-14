@@ -107,12 +107,18 @@ export async function getOAuthCredential(
     throw new OAuthProviderUnavailableError(config.id, availability.reason);
   }
 
-  const env = options.env ?? process.env;
+  const env = options.env ?? getDefaultOAuthEnv();
   if (env.EXPO_PUBLIC_AUTH_DEV_MODE === 'true') {
     return getDevCredential(config);
   }
 
   return config.getCredential();
+}
+
+function getDefaultOAuthEnv(): OAuthEnv {
+  return {
+    EXPO_PUBLIC_AUTH_DEV_MODE: process.env.EXPO_PUBLIC_AUTH_DEV_MODE,
+  };
 }
 
 function getDevCredential(provider: OAuthProviderConfig): OAuthCredential {
