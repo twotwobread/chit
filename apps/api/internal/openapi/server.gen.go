@@ -1362,6 +1362,9 @@ type CreateRoutePreviewJSONRequestBody = CreateRoutePreviewRequest
 // CreateTripExpenseJSONRequestBody defines body for CreateTripExpense for application/json ContentType.
 type CreateTripExpenseJSONRequestBody = CreateTripExpenseRequest
 
+// UpdateTripExpenseJSONRequestBody defines body for UpdateTripExpense for application/json ContentType.
+type UpdateTripExpenseJSONRequestBody = UpdateExpenseRequest
+
 // CreateTripFlightJSONRequestBody defines body for CreateTripFlight for application/json ContentType.
 type CreateTripFlightJSONRequestBody = CreateTripFlightRequest
 
@@ -1499,6 +1502,15 @@ type ServerInterface interface {
 	// Create a general trip expense
 	// (POST /trips/{tripId}/expenses)
 	CreateTripExpense(w http.ResponseWriter, r *http.Request, tripId string)
+	// Delete a trip-level expense
+	// (DELETE /trips/{tripId}/expenses/{expenseId})
+	DeleteTripExpense(w http.ResponseWriter, r *http.Request, tripId string, expenseId string)
+	// Get a trip-level expense
+	// (GET /trips/{tripId}/expenses/{expenseId})
+	GetTripExpense(w http.ResponseWriter, r *http.Request, tripId string, expenseId string)
+	// Update a trip-level expense
+	// (PATCH /trips/{tripId}/expenses/{expenseId})
+	UpdateTripExpense(w http.ResponseWriter, r *http.Request, tripId string, expenseId string)
 	// List trip flights
 	// (GET /trips/{tripId}/flights)
 	ListTripFlights(w http.ResponseWriter, r *http.Request, tripId string)
@@ -1802,6 +1814,24 @@ func (_ Unimplemented) ListTripExpenses(w http.ResponseWriter, r *http.Request, 
 // Create a general trip expense
 // (POST /trips/{tripId}/expenses)
 func (_ Unimplemented) CreateTripExpense(w http.ResponseWriter, r *http.Request, tripId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Delete a trip-level expense
+// (DELETE /trips/{tripId}/expenses/{expenseId})
+func (_ Unimplemented) DeleteTripExpense(w http.ResponseWriter, r *http.Request, tripId string, expenseId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Get a trip-level expense
+// (GET /trips/{tripId}/expenses/{expenseId})
+func (_ Unimplemented) GetTripExpense(w http.ResponseWriter, r *http.Request, tripId string, expenseId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Update a trip-level expense
+// (PATCH /trips/{tripId}/expenses/{expenseId})
+func (_ Unimplemented) UpdateTripExpense(w http.ResponseWriter, r *http.Request, tripId string, expenseId string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -3420,6 +3450,126 @@ func (siw *ServerInterfaceWrapper) CreateTripExpense(w http.ResponseWriter, r *h
 	handler.ServeHTTP(w, r)
 }
 
+// DeleteTripExpense operation middleware
+func (siw *ServerInterfaceWrapper) DeleteTripExpense(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "expenseId" -------------
+	var expenseId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "expenseId", chi.URLParam(r, "expenseId"), &expenseId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "expenseId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteTripExpense(w, r, tripId, expenseId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetTripExpense operation middleware
+func (siw *ServerInterfaceWrapper) GetTripExpense(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "expenseId" -------------
+	var expenseId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "expenseId", chi.URLParam(r, "expenseId"), &expenseId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "expenseId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetTripExpense(w, r, tripId, expenseId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateTripExpense operation middleware
+func (siw *ServerInterfaceWrapper) UpdateTripExpense(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "expenseId" -------------
+	var expenseId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "expenseId", chi.URLParam(r, "expenseId"), &expenseId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "expenseId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateTripExpense(w, r, tripId, expenseId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListTripFlights operation middleware
 func (siw *ServerInterfaceWrapper) ListTripFlights(w http.ResponseWriter, r *http.Request) {
 
@@ -4217,6 +4367,15 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/trips/{tripId}/expenses", wrapper.CreateTripExpense)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/trips/{tripId}/expenses/{expenseId}", wrapper.DeleteTripExpense)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/trips/{tripId}/expenses/{expenseId}", wrapper.GetTripExpense)
+	})
+	r.Group(func(r chi.Router) {
+		r.Patch(options.BaseURL+"/trips/{tripId}/expenses/{expenseId}", wrapper.UpdateTripExpense)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/trips/{tripId}/flights", wrapper.ListTripFlights)

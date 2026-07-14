@@ -249,7 +249,7 @@ test('builds compact trip-level settlement expense rows under 여행 전체', ()
       row.splitLabel,
       row.editRoute,
     ]),
-    [['항공권', '650,000원', '민수 결제', '2명 분할 · 2026.06.12', null]],
+    [['항공권', '650,000원', '민수 결제', '2명 분할 · 2026.06.12', '/trips/trip-a/expenses/expense-flight/edit']],
   );
 });
 

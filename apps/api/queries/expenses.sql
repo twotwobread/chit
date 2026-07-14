@@ -357,6 +357,45 @@ WHERE e.trip_id = sqlc.arg(trip_id)::uuid
   AND e.id = sqlc.arg(expense_id)::uuid
   AND e.anchor_type IN ('trip_day', 'schedule_item');
 
+-- name: GetTripExpenseByID :one
+SELECT
+  e.id::text AS id,
+  e.trip_id::text AS trip_id,
+  e.anchor_type,
+  COALESCE(e.trip_day_id::text, '')::text AS trip_day_id,
+  COALESCE(e.schedule_item_id::text, '')::text AS schedule_item_id,
+  e.expense_date,
+  e.title,
+  COALESCE(e.title, e.place_name, '지출')::text AS display_title,
+  COALESCE(e.trip_place_id::text, '')::text AS trip_place_id,
+  COALESCE(e.place_name, '')::text AS place_name,
+  COALESCE(e.place_address, '')::text AS place_address,
+  COALESCE(e.place_type, '')::text AS place_type,
+  CASE
+    WHEN e.place_name IS NOT NULL THEN 'fallback'
+    ELSE ''
+  END::text AS place_source,
+  e.amount_minor,
+  e.currency,
+  COALESCE(payer.id::text, e.payer_participant_id::text, '')::text AS payer_participant_id,
+  COALESCE(payer.display_name, e.payer_display_name, '여행자')::text AS payer_display_name,
+  CASE
+    WHEN payer.id IS NOT NULL THEN 'live'
+    ELSE 'fallback'
+  END::text AS payer_source,
+  e.memo,
+  e.split_policy,
+  e.created_at
+FROM expenses e
+LEFT JOIN trip_participants payer
+  ON payer.id = e.payer_participant_id
+ AND payer.trip_id = e.trip_id
+WHERE e.trip_id = sqlc.arg(trip_id)::uuid
+  AND e.id = sqlc.arg(expense_id)::uuid
+  AND e.anchor_type = 'trip'
+  AND e.trip_day_id IS NULL
+  AND e.schedule_item_id IS NULL;
+
 -- name: ListExpenseSplitsByExpenseID :many
 SELECT
   COALESCE(participant.id::text, es.participant_id::text, '')::text AS participant_id,
@@ -416,9 +455,53 @@ RETURNING
   memo,
   created_at;
 
+-- name: UpdateTripExpense :one
+UPDATE expenses
+SET
+  title = sqlc.narg(title),
+  amount_minor = sqlc.arg(amount_minor),
+  split_policy = sqlc.arg(split_policy),
+  payer_participant_id = sqlc.arg(payer_participant_id)::uuid,
+  payer_display_name = sqlc.arg(payer_display_name),
+  memo = sqlc.narg(memo),
+  updated_at = now()
+WHERE trip_id = sqlc.arg(trip_id)::uuid
+  AND id = sqlc.arg(expense_id)::uuid
+  AND anchor_type = 'trip'
+  AND trip_day_id IS NULL
+  AND schedule_item_id IS NULL
+RETURNING
+  id::text,
+  trip_id::text,
+  anchor_type,
+  COALESCE(trip_day_id::text, '')::text AS trip_day_id,
+  COALESCE(schedule_item_id::text, '')::text AS schedule_item_id,
+  expense_date,
+  title,
+  COALESCE(trip_place_id::text, '')::text AS trip_place_id,
+  COALESCE(place_name, '')::text AS place_name,
+  COALESCE(place_address, '')::text AS place_address,
+  COALESCE(place_type, '')::text AS place_type,
+  amount_minor,
+  currency,
+  split_policy,
+  COALESCE(payer_participant_id::text, '')::text AS payer_participant_id,
+  payer_display_name,
+  memo,
+  created_at;
+
 -- name: DeleteExpenseSplitsByExpenseID :exec
 DELETE FROM expense_splits
 WHERE expense_id = sqlc.arg(expense_id)::uuid;
+
+-- name: DeleteTripExpenseByID :one
+DELETE FROM expenses
+WHERE trip_id = sqlc.arg(trip_id)::uuid
+  AND id = sqlc.arg(expense_id)::uuid
+  AND anchor_type = 'trip'
+  AND trip_day_id IS NULL
+  AND schedule_item_id IS NULL
+RETURNING id::text;
 
 -- name: DeleteExpenseByTripDayAndID :one
 DELETE FROM expenses

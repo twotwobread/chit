@@ -665,6 +665,89 @@ func (s *Service) GetDayExpense(ctx context.Context, userID string, tripID strin
 	return GetExpenseResult{Expense: expense}, nil
 }
 
+func (s *Service) GetTripExpense(ctx context.Context, userID string, tripID string, expenseID string) (GetExpenseResult, error) {
+	expenseID = strings.TrimSpace(expenseID)
+	if !isUUID(expenseID) {
+		return GetExpenseResult{}, ErrValidation
+	}
+	tripID, err := s.authorizedTrip(ctx, userID, tripID)
+	if err != nil {
+		return GetExpenseResult{}, err
+	}
+
+	expense, ok, err := s.repo.GetTripExpenseByID(ctx, tripID, expenseID)
+	if err != nil {
+		return GetExpenseResult{}, err
+	}
+	if !ok {
+		return GetExpenseResult{}, ErrNotFound
+	}
+	return GetExpenseResult{Expense: expense}, nil
+}
+
+func (s *Service) UpdateTripExpense(ctx context.Context, userID string, tripID string, expenseID string, input UpdateExpenseInput) (UpdateExpenseResult, error) {
+	expenseID = strings.TrimSpace(expenseID)
+	payerParticipantID := strings.TrimSpace(input.PayerParticipantID)
+	splitPolicy, participantIDs, manualSplits, err := normalizeExpenseSplitInput(input.SplitPolicy, input.ParticipantIDs, input.ManualSplits, input.AmountMinor)
+	if err != nil {
+		return UpdateExpenseResult{}, err
+	}
+	if !isUUID(expenseID) || !isUUID(payerParticipantID) || input.AmountMinor < 1 {
+		return UpdateExpenseResult{}, ErrValidation
+	}
+	if input.ScheduleItemID != nil {
+		return UpdateExpenseResult{}, ErrValidation
+	}
+	memo, err := normalizeExpenseMemo(input.Memo)
+	if err != nil {
+		return UpdateExpenseResult{}, err
+	}
+	title, err := normalizeExpenseTitle(input.Title, true)
+	if err != nil {
+		return UpdateExpenseResult{}, err
+	}
+	tripID, err = s.authorizedTrip(ctx, userID, tripID)
+	if err != nil {
+		return UpdateExpenseResult{}, err
+	}
+
+	expense, err := s.repo.UpdateTripExpense(ctx, UpdateExpenseRecord{
+		TripID:             tripID,
+		ExpenseID:          expenseID,
+		AmountMinor:        input.AmountMinor,
+		PayerParticipantID: payerParticipantID,
+		SplitPolicy:        splitPolicy,
+		ParticipantIDs:     participantIDs,
+		ManualSplits:       manualSplits,
+		Memo:               memo,
+		Title:              title,
+		ScheduleItemID:     nil,
+	})
+	if err != nil {
+		return UpdateExpenseResult{}, err
+	}
+	return UpdateExpenseResult{Expense: expense}, nil
+}
+
+func (s *Service) DeleteTripExpense(ctx context.Context, userID string, tripID string, expenseID string) error {
+	expenseID = strings.TrimSpace(expenseID)
+	if !isUUID(expenseID) {
+		return ErrValidation
+	}
+	tripID, err := s.authorizedTrip(ctx, userID, tripID)
+	if err != nil {
+		return err
+	}
+	deleted, err := s.repo.DeleteTripExpenseByID(ctx, tripID, expenseID)
+	if err != nil {
+		return err
+	}
+	if !deleted {
+		return ErrNotFound
+	}
+	return nil
+}
+
 func (s *Service) UpdateExpense(ctx context.Context, userID string, tripID string, tripDayID string, expenseID string, input UpdateExpenseInput) (UpdateExpenseResult, error) {
 	expenseID = strings.TrimSpace(expenseID)
 	payerParticipantID := strings.TrimSpace(input.PayerParticipantID)
@@ -1189,6 +1272,31 @@ func (s *Service) ReorderScheduleItems(ctx context.Context, userID string, tripI
 		return ReorderScheduleItemsResult{}, err
 	}
 	return ReorderScheduleItemsResult{Day: day, Items: items}, nil
+}
+
+func (s *Service) authorizedTrip(ctx context.Context, userID string, tripID string) (string, error) {
+	if strings.TrimSpace(userID) == "" {
+		return "", ErrUnauthorized
+	}
+	tripID = strings.TrimSpace(tripID)
+	if !isUUID(tripID) {
+		return "", ErrValidation
+	}
+	_, ok, err := s.repo.GetTripByID(ctx, tripID)
+	if err != nil {
+		return "", err
+	}
+	if !ok {
+		return "", ErrNotFound
+	}
+	isParticipant, err := s.repo.IsTripParticipant(ctx, tripID, userID)
+	if err != nil {
+		return "", err
+	}
+	if !isParticipant {
+		return "", ErrForbidden
+	}
+	return tripID, nil
 }
 
 func (s *Service) activeTripDay(ctx context.Context, userID string, tripID string, tripDayID string) (TripDay, error) {

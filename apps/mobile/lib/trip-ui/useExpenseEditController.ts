@@ -5,7 +5,14 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { type Expense, type GetDayScheduleItemsResponse, type TripParticipantListItem } from '@i-um/api-contract';
 
 import { clearStoredSessionOnAuthError, isApiStatus } from '../auth/errors';
-import { deleteExpense, getDayExpense, updateExpense } from '../trips/expense-api';
+import {
+  deleteExpense,
+  deleteTripExpense,
+  getDayExpense,
+  getTripExpense,
+  updateExpense,
+  updateTripExpense,
+} from '../trips/expense-api';
 import { getTripDayItinerary } from '../trips/itinerary-api';
 import { listTripParticipants } from '../trips/trip-api';
 import {
@@ -20,14 +27,14 @@ import {
   type ExpenseEditViewModel,
 } from '../trips/expense-edit';
 import { type QuickExpenseManualSplitInput, type QuickExpenseSplitPolicy } from '../trips/quick-expense';
-import { tripItineraryDayPath } from '../trips/routes';
+import { tripItineraryDayPath, tripSettlePath } from '../trips/routes';
 
 export type ExpenseEditState =
   | { status: 'loading' }
   | {
       status: 'success';
       expense: Expense;
-      itinerary: GetDayScheduleItemsResponse;
+      itinerary: GetDayScheduleItemsResponse | null;
       participants: TripParticipantListItem[];
     }
   | { status: 'auth' }
@@ -72,7 +79,7 @@ export function useExpenseEditController() {
   }, []);
 
   const load = useCallback(async () => {
-    if (!tripId || !date || !expenseId) {
+    if (!tripId || !expenseId) {
       setState({ status: 'invalid' });
       return;
     }
@@ -83,15 +90,17 @@ export function useExpenseEditController() {
     setErrors({});
     setFormMessage(null);
     try {
-      const [expenseResponse, itinerary, participantsResponse] = await Promise.all([
-        getDayExpense(tripId, date, expenseId),
-        getTripDayItinerary(tripId, date),
-        listTripParticipants(tripId),
-      ]);
+      const [expenseResponse, itinerary, participantsResponse] = date
+        ? await Promise.all([
+            getDayExpense(tripId, date, expenseId),
+            getTripDayItinerary(tripId, date),
+            listTripParticipants(tripId),
+          ])
+        : await Promise.all([getTripExpense(tripId, expenseId), Promise.resolve(null), listTripParticipants(tripId)]);
       const expense = expenseResponse.expense;
       const participantIDs = new Set(participantsResponse.participants.map((participant) => participant.participantId));
-      const itemIDs = new Set(itinerary.scheduleItems.map((item) => item.id));
-      setTitleInput(expense.title ?? '');
+      const itemIDs = new Set(itinerary?.scheduleItems.map((item) => item.id) ?? []);
+      setTitleInput(expense.title ?? (expense.anchorType === 'trip' ? expense.displayTitle : ''));
       setAmountInput(buildExpenseEditInitialAmountInput(expense));
       setMemoInput(expense.memo ?? '');
       setPayerParticipantId(
@@ -124,9 +133,14 @@ export function useExpenseEditController() {
   );
 
   const submitSave = useCallback(async () => {
-    if (state.status !== 'success' || !tripId || !date || !expenseId || saving || deleting) {
+    if (state.status !== 'success' || !tripId || !expenseId || saving || deleting) {
       return;
     }
+    const isTripLevel = state.itinerary === null;
+    if (!isTripLevel && !date) {
+      return;
+    }
+    const tripDayId = date ?? '';
 
     const validation = buildUpdateExpenseRequest({
       amountInput,
@@ -136,7 +150,7 @@ export function useExpenseEditController() {
       memoInput,
       participantIds: buildExpenseEditParticipantIds(state.participants),
       manualSplitInputs,
-      scheduleItemId: selectedItemId,
+      scheduleItemId: isTripLevel ? null : selectedItemId,
       titleInput,
     });
     if (!validation.ok) {
@@ -149,8 +163,13 @@ export function useExpenseEditController() {
     setErrors({});
     setFormMessage(null);
     try {
-      await updateExpense(tripId, date, expenseId, validation.request);
-      router.replace(tripItineraryDayPath(tripId, date));
+      if (isTripLevel) {
+        await updateTripExpense(tripId, expenseId, validation.request);
+        router.replace(tripSettlePath(tripId));
+      } else {
+        await updateExpense(tripId, tripDayId, expenseId, validation.request);
+        router.replace(tripItineraryDayPath(tripId, tripDayId));
+      }
     } catch (error) {
       if (await handleAuthError(error)) {
         return;
@@ -177,15 +196,25 @@ export function useExpenseEditController() {
   ]);
 
   const submitDelete = useCallback(async () => {
-    if (!tripId || !date || !expenseId || saving || deleting) {
+    if (state.status !== 'success' || !tripId || !expenseId || saving || deleting) {
       return;
     }
+    const isTripLevel = state.itinerary === null;
+    if (!isTripLevel && !date) {
+      return;
+    }
+    const tripDayId = date ?? '';
 
     setDeleting(true);
     setFormMessage(null);
     try {
-      await deleteExpense(tripId, date, expenseId);
-      router.replace(tripItineraryDayPath(tripId, date));
+      if (isTripLevel) {
+        await deleteTripExpense(tripId, expenseId);
+        router.replace(tripSettlePath(tripId));
+      } else {
+        await deleteExpense(tripId, tripDayId, expenseId);
+        router.replace(tripItineraryDayPath(tripId, tripDayId));
+      }
     } catch (error) {
       if (await handleAuthError(error)) {
         return;
@@ -194,7 +223,7 @@ export function useExpenseEditController() {
     } finally {
       setDeleting(false);
     }
-  }, [date, deleting, expenseId, handleAuthError, saving, tripId]);
+  }, [date, deleting, expenseId, handleAuthError, saving, state, tripId]);
 
   const updateManualSplitInput = useCallback((participantId: string, amount: string) => {
     setManualSplitInputs((current) => {

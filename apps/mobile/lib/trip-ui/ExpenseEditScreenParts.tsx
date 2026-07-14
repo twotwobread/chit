@@ -129,24 +129,26 @@ export function ExpenseEditForm({
         {errors.payer ? <Text style={styles.validationText}>{errors.payer}</Text> : null}
       </View>
 
-      <View style={styles.fieldGroup}>
-        <Text style={styles.label}>연결 장소</Text>
-        <View style={styles.optionListVertical}>
-          {viewModel.placeOptions.map((option) => (
-            <Pressable
-              key={option.itemId ?? 'none'}
-              accessibilityRole="button"
-              onPress={() => onPlaceChange(option.itemId)}
-              style={[styles.placeOption, option.selected ? styles.placeOptionSelected : null]}
-            >
-              <Text style={[styles.optionText, option.selected ? styles.optionTextSelected : null]}>
-                {option.label}
-              </Text>
-              <Text style={styles.optionDetail}>{option.detail}</Text>
-            </Pressable>
-          ))}
+      {viewModel.showPlaceField ? (
+        <View style={styles.fieldGroup}>
+          <Text style={styles.label}>연결 장소</Text>
+          <View style={styles.optionListVertical}>
+            {viewModel.placeOptions.map((option) => (
+              <Pressable
+                key={option.itemId ?? 'none'}
+                accessibilityRole="button"
+                onPress={() => onPlaceChange(option.itemId)}
+                style={[styles.placeOption, option.selected ? styles.placeOptionSelected : null]}
+              >
+                <Text style={[styles.optionText, option.selected ? styles.optionTextSelected : null]}>
+                  {option.label}
+                </Text>
+                <Text style={styles.optionDetail}>{option.detail}</Text>
+              </Pressable>
+            ))}
+          </View>
         </View>
-      </View>
+      ) : null}
 
       <View style={styles.fieldGroup}>
         <Text style={styles.label}>메모</Text>
