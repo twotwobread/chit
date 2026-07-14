@@ -568,6 +568,49 @@ describe('google place search helpers', () => {
     );
   });
 
+  it('fits search-result markers into the map area visible above the expanded search sheet', () => {
+    const results = [
+      {
+        id: 'google-1',
+        placeName: '도톤보리',
+        address: '',
+        typeHint: '관광명소',
+        latitude: 34.6687,
+        longitude: 135.5013,
+      },
+      {
+        id: 'google-2',
+        placeName: '우메다 카페',
+        address: '',
+        typeHint: '카페',
+        latitude: 34.7,
+        longitude: 135.49,
+      },
+    ];
+    const viewportHeight = 800;
+    const coveredBottomHeight = 448;
+    const verticalPadding = 24;
+    const region = buildGooglePlaceSearchResultsRegion(results, undefined, {
+      coveredBottomHeight,
+      verticalPadding,
+      viewportHeight,
+    });
+    const markerYs = results.map(
+      (result) =>
+        ((region.latitude + region.latitudeDelta / 2 - (result.latitude as number)) / region.latitudeDelta) *
+        viewportHeight,
+    );
+
+    assert.deepEqual(region, {
+      latitude: 34.642836,
+      longitude: 135.49565,
+      latitudeDelta: 0.14826,
+      longitudeDelta: 0.02034,
+    });
+    assert.ok(Math.min(...markerYs) >= verticalPadding);
+    assert.ok(Math.max(...markerYs) <= viewportHeight - coveredBottomHeight - verticalPadding);
+  });
+
   it('builds destination chips and defaults to the first saved trip city', () => {
     const destinations = [
       {

@@ -545,7 +545,11 @@ export function GooglePlaceMapSearch({
       setSheetState((current) => resolveGooglePlaceSearchSheetState(current, { kind: 'searchResults' }));
       setRegionDirty(false);
       if (nextState.status === 'success') {
-        const nextRegion = buildGooglePlaceSearchResultsRegion(nextState.results, mapRegion);
+        const nextRegion = buildGooglePlaceSearchResultsRegion(nextState.results, mapRegion, {
+          coveredBottomHeight: sheetMetrics.expandedHeight,
+          verticalPadding: theme.space[7],
+          viewportHeight: sheetMetricHeight,
+        });
         suppressNextRegionDirtyRef.current = true;
         setMapRegion(nextRegion);
         mapRef.current?.animateToRegion(nextRegion, 320);
