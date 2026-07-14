@@ -19,5 +19,23 @@ test('itinerary timeline keeps item press editing but does not expose inline tim
   assert.equal(segmentSource.includes('시간 수정'), false);
   assert.equal(contentSource.includes('onPressItem={handlePressTimelineItem}'), true);
   assert.equal(contentSource.includes('onPressTime={handlePressTimelineItem}'), false);
-  assert.equal((timelineSource.match(/<PlacePin/g) ?? []).length, 1);
+  assert.equal(timelineSource.includes('PlacePin'), false);
+});
+
+test('itinerary timeline uses axis markers and explicit time labels for timed and untimed items', async () => {
+  const timelineSource = await readFile(path.join(tripUiDir, 'ItineraryTimeline.tsx'), 'utf8');
+
+  assert.equal(timelineSource.includes('itineraryTimeLabel(item.startTime, item.endTime)'), true);
+  assert.equal(timelineSource.includes("const markerLabel = markerTone === 'timed' ? String(item.order) : '?';"), true);
+  assert.equal(
+    timelineSource.includes('<TimelineMarker faded={done} label={markerLabel} size={34} tone={markerTone} />'),
+    true,
+  );
+  assert.equal(timelineSource.includes('시간 미정 · 순서대로 방문'), false);
+  assert.equal(timelineSource.includes('untimedBox'), false);
+  assert.equal(timelineSource.includes('cardCompact'), false);
+  assert.equal(timelineSource.includes("borderStyle: 'solid'"), true);
+  assert.equal(timelineSource.includes("borderStyle: 'dashed'"), true);
+  assert.equal(timelineSource.includes('borderColor: theme.color.green[600]'), true);
+  assert.equal(timelineSource.includes('borderColor: theme.color.borderStrong'), true);
 });

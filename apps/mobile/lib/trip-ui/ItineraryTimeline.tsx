@@ -2,11 +2,12 @@ import { type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Clock } from 'lucide-react-native';
 
-import { Badge, PlacePin, PlaceTag, theme } from '../design';
+import { Badge, PlaceTag, theme } from '../design';
 import { SwipeActionRow } from './SwipeActionRow';
 import {
   buildItinerarySegments,
   itineraryDurationLabel,
+  itineraryTimeLabel,
   type ItineraryTimelineItem,
   type ItineraryTimelineSegment,
 } from './itinerary-segments';
@@ -48,38 +49,29 @@ export function ItineraryTimeline({
 
   return (
     <View style={styles.wrap}>
-      {buildItinerarySegments(items).map((segment) =>
-        segment.kind === 'anchor' ? (
-          <AnchorRow
-            getItemAccessibilityLabel={getItemAccessibilityLabel}
-            item={segment.item}
-            key={segment.item.id}
-            onItemNameRef={onItemNameRef}
-            onPressItem={onPressItem}
-            onPressLodgingBadge={onPressLodgingBadge}
-            renderActions={renderActions}
-            renderSwipeAction={renderSwipeAction}
-          />
-        ) : (
-          <UntimedSegment
-            getItemAccessibilityLabel={getItemAccessibilityLabel}
-            items={segment.items}
-            key={segment.id}
-            onItemNameRef={onItemNameRef}
-            onPressItem={onPressItem}
-            onPressLodgingBadge={onPressLodgingBadge}
-            renderActions={renderActions}
-            renderSwipeAction={renderSwipeAction}
-          />
-        ),
-      )}
+      {buildItinerarySegments(items).map((segment) => (
+        <TimelineRow
+          getItemAccessibilityLabel={getItemAccessibilityLabel}
+          item={segment.item}
+          key={segment.id}
+          markerTone={segment.kind === 'anchor' ? 'timed' : 'untimed'}
+          onItemNameRef={onItemNameRef}
+          onPressItem={onPressItem}
+          onPressLodgingBadge={onPressLodgingBadge}
+          renderActions={renderActions}
+          renderSwipeAction={renderSwipeAction}
+        />
+      ))}
     </View>
   );
 }
 
-function AnchorRow({
+type TimelineMarkerTone = 'timed' | 'untimed';
+
+function TimelineRow({
   getItemAccessibilityLabel,
   item,
+  markerTone,
   onItemNameRef,
   onPressItem,
   onPressLodgingBadge,
@@ -87,6 +79,7 @@ function AnchorRow({
   renderSwipeAction,
 }: {
   item: ItineraryTimelineItem;
+  markerTone: TimelineMarkerTone;
   onPressItem?: (item: ItineraryTimelineItem) => void;
   onPressLodgingBadge?: (item: ItineraryTimelineItem) => void;
   getItemAccessibilityLabel?: (item: ItineraryTimelineItem) => string;
@@ -94,15 +87,18 @@ function AnchorRow({
   renderActions?: (item: ItineraryTimelineItem) => ReactNode;
   renderSwipeAction?: (item: ItineraryTimelineItem) => ReactNode;
 }) {
-  const duration = itineraryDurationLabel(item.startTime ?? '', item.endTime);
+  const duration = markerTone === 'timed' ? itineraryDurationLabel(item.startTime ?? '', item.endTime) : null;
   const done = item.status === 'done' || item.status === 'skipped';
-  const timeLabel = item.endTime ? `${item.startTime} – ${item.endTime}` : item.startTime;
+  const markerLabel = markerTone === 'timed' ? String(item.order) : '?';
+  const timeLabel = itineraryTimeLabel(item.startTime, item.endTime);
 
   return (
     <View style={styles.row}>
       <View style={styles.gutter}>
-        <View style={[styles.spine, duration ? styles.spineStrong : null]} />
-        <PlacePin faded={done} order={item.order} size={34} type={item.type} />
+        <View
+          style={markerTone === 'timed' ? [styles.spine, duration ? styles.spineStrong : null] : styles.spineDashed}
+        />
+        <TimelineMarker faded={done} label={markerLabel} size={34} tone={markerTone} />
       </View>
       <View style={styles.body}>
         <View style={styles.timeRow}>
@@ -125,60 +121,44 @@ function AnchorRow({
   );
 }
 
-function UntimedSegment({
-  getItemAccessibilityLabel,
-  items,
-  onItemNameRef,
-  onPressItem,
-  onPressLodgingBadge,
-  renderActions,
-  renderSwipeAction,
+function TimelineMarker({
+  faded = false,
+  label,
+  size,
+  tone,
 }: {
-  items: ItineraryTimelineItem[];
-  onPressItem?: (item: ItineraryTimelineItem) => void;
-  onPressLodgingBadge?: (item: ItineraryTimelineItem) => void;
-  getItemAccessibilityLabel?: (item: ItineraryTimelineItem) => string;
-  onItemNameRef?: (item: ItineraryTimelineItem, node: Text | null) => void;
-  renderActions?: (item: ItineraryTimelineItem) => ReactNode;
-  renderSwipeAction?: (item: ItineraryTimelineItem) => ReactNode;
+  faded?: boolean;
+  label: string;
+  size: number;
+  tone: TimelineMarkerTone;
 }) {
   return (
-    <View style={styles.row}>
-      <View style={styles.gutter}>
-        <View style={styles.spineDashed} />
-      </View>
-      <View style={styles.body}>
-        <View style={styles.untimedBox}>
-          <View style={styles.untimedHead}>
-            <Clock color={theme.color.textMuted} size={14} strokeWidth={2} />
-            <Text style={styles.untimedHeadText}>시간 미정 · 순서대로 방문</Text>
-          </View>
-          {items.map((item, index) => {
-            const done = item.status === 'done' || item.status === 'skipped';
-            return (
-              <View key={item.id} style={index === 0 ? null : styles.untimedItemGap}>
-                <TimelineCard
-                  compact
-                  done={done}
-                  getItemAccessibilityLabel={getItemAccessibilityLabel}
-                  item={item}
-                  onItemNameRef={onItemNameRef}
-                  onPressItem={onPressItem}
-                  onPressLodgingBadge={onPressLodgingBadge}
-                  renderActions={renderActions}
-                  renderSwipeAction={renderSwipeAction}
-                />
-              </View>
-            );
-          })}
-        </View>
-      </View>
+    <View
+      style={[
+        styles.timelineMarker,
+        {
+          borderRadius: size / 2,
+          height: size,
+          opacity: faded ? 0.5 : 1,
+          width: size,
+        },
+        tone === 'timed' ? styles.timelineMarkerTimed : styles.timelineMarkerUntimed,
+      ]}
+    >
+      <Text
+        style={[
+          styles.timelineMarkerText,
+          { fontSize: size * 0.46 },
+          tone === 'timed' ? styles.timelineMarkerTextTimed : styles.timelineMarkerTextUntimed,
+        ]}
+      >
+        {label}
+      </Text>
     </View>
   );
 }
 
 function TimelineCard({
-  compact = false,
   done,
   getItemAccessibilityLabel,
   item,
@@ -188,7 +168,6 @@ function TimelineCard({
   renderActions,
   renderSwipeAction,
 }: {
-  compact?: boolean;
   done: boolean;
   item: ItineraryTimelineItem;
   onPressItem?: (item: ItineraryTimelineItem) => void;
@@ -203,68 +182,54 @@ function TimelineCard({
   const accessibilityLabel = getItemAccessibilityLabel?.(item);
 
   const content = (
-    <>
-      {compact ? (
-        <View style={styles.compactOrderBadge}>
-          <Text style={styles.compactOrderText}>{item.order}</Text>
-        </View>
-      ) : null}
-      <View style={styles.cardBody}>
-        <View style={styles.nameRow}>
-          <Text
-            accessibilityLabel={accessibilityLabel}
-            ref={(node) => onItemNameRef?.(item, node)}
-            style={[styles.name, done ? styles.nameDone : null]}
-          >
-            {item.name}
-          </Text>
-          {item.status === 'next' ? <Badge label="다음" solid tone="primary" /> : null}
-          {item.status === 'done' ? <Badge label="완료" tone="neutral" /> : null}
-          {item.status === 'skipped' ? <Badge label="건너뜀" tone="neutral" /> : null}
-          {item.lodgingBadgeLabel ? (
-            onPressLodgingBadge ? (
-              <Pressable
-                accessibilityLabel={`${item.name} 대표 숙소 관리`}
-                accessibilityRole="button"
-                hitSlop={6}
-                onPress={() => onPressLodgingBadge(item)}
-                style={({ pressed }) => (pressed ? styles.pressed : null)}
-              >
-                <Badge label={item.lodgingBadgeLabel} tone="primary" />
-              </Pressable>
-            ) : (
+    <View style={styles.cardBody}>
+      <View style={styles.nameRow}>
+        <Text
+          accessibilityLabel={accessibilityLabel}
+          ref={(node) => onItemNameRef?.(item, node)}
+          style={[styles.name, done ? styles.nameDone : null]}
+        >
+          {item.name}
+        </Text>
+        {item.status === 'next' ? <Badge label="다음" solid tone="primary" /> : null}
+        {item.status === 'done' ? <Badge label="완료" tone="neutral" /> : null}
+        {item.status === 'skipped' ? <Badge label="건너뜀" tone="neutral" /> : null}
+        {item.lodgingBadgeLabel ? (
+          onPressLodgingBadge ? (
+            <Pressable
+              accessibilityLabel={`${item.name} 대표 숙소 관리`}
+              accessibilityRole="button"
+              hitSlop={6}
+              onPress={() => onPressLodgingBadge(item)}
+              style={({ pressed }) => (pressed ? styles.pressed : null)}
+            >
               <Badge label={item.lodgingBadgeLabel} tone="primary" />
-            )
-          ) : null}
-        </View>
-        <View style={styles.metaRow}>
-          <PlaceTag type={item.type} />
-          {item.area ? <Text style={styles.meta}>{item.area}</Text> : null}
-          {item.addedBy ? <Text style={styles.meta}>· {item.addedBy} 추가</Text> : null}
-        </View>
-        {item.legLabel ? <Text style={styles.leg}>{item.legLabel}</Text> : null}
-        {actions ? <View style={styles.cardActions}>{actions}</View> : null}
+            </Pressable>
+          ) : (
+            <Badge label={item.lodgingBadgeLabel} tone="primary" />
+          )
+        ) : null}
       </View>
-    </>
+      <View style={styles.metaRow}>
+        <PlaceTag type={item.type} />
+        {item.area ? <Text style={styles.meta}>{item.area}</Text> : null}
+        {item.addedBy ? <Text style={styles.meta}>· {item.addedBy} 추가</Text> : null}
+      </View>
+      {item.legLabel ? <Text style={styles.leg}>{item.legLabel}</Text> : null}
+      {actions ? <View style={styles.cardActions}>{actions}</View> : null}
+    </View>
   );
 
   const card = onPressItem ? (
     <Pressable
       accessibilityRole="button"
       onPress={() => onPressItem(item)}
-      style={({ pressed }) => [
-        styles.card,
-        compact ? styles.cardCompact : null,
-        swipeAction ? styles.cardSwipeable : null,
-        pressed ? styles.pressed : null,
-      ]}
+      style={({ pressed }) => [styles.card, swipeAction ? styles.cardSwipeable : null, pressed ? styles.pressed : null]}
     >
       {content}
     </Pressable>
   ) : (
-    <View style={[styles.card, compact ? styles.cardCompact : null, swipeAction ? styles.cardSwipeable : null]}>
-      {content}
-    </View>
+    <View style={[styles.card, swipeAction ? styles.cardSwipeable : null]}>{content}</View>
   );
 
   if (!swipeAction) {
@@ -272,7 +237,7 @@ function TimelineCard({
   }
 
   return (
-    <SwipeActionRow renderRightAction={() => swipeAction} style={compact ? null : styles.swipeRowSpacing}>
+    <SwipeActionRow renderRightAction={() => swipeAction} style={styles.swipeRowSpacing}>
       {card}
     </SwipeActionRow>
   );
@@ -303,27 +268,32 @@ const styles = StyleSheet.create({
   cardActions: {
     marginTop: theme.space[1],
   },
-  cardCompact: {
-    marginTop: 0,
-    paddingVertical: theme.space[3],
-    shadowOpacity: 0,
-  },
   cardSwipeable: {
     marginTop: 0,
   },
-  compactOrderBadge: {
+  timelineMarker: {
     alignItems: 'center',
-    backgroundColor: theme.color.primarySoft,
-    borderRadius: theme.radius.pill,
-    height: 28,
+    backgroundColor: theme.color.surface,
+    borderWidth: 2,
     justifyContent: 'center',
-    width: 28,
   },
-  compactOrderText: {
-    color: theme.color.primary,
+  timelineMarkerText: {
     fontFamily: theme.font.family.bold,
-    fontSize: theme.font.size.caption,
     fontWeight: theme.font.weight.bold,
+  },
+  timelineMarkerTextTimed: {
+    color: theme.color.green[600],
+  },
+  timelineMarkerTextUntimed: {
+    color: theme.color.textMuted,
+  },
+  timelineMarkerTimed: {
+    borderColor: theme.color.green[600],
+    borderStyle: 'solid',
+  },
+  timelineMarkerUntimed: {
+    borderColor: theme.color.borderStrong,
+    borderStyle: 'dashed',
   },
   emptyBox: {
     alignItems: 'center',
@@ -426,28 +396,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: theme.space[2],
-  },
-  untimedBox: {
-    backgroundColor: theme.color.surfaceSunken,
-    borderColor: theme.color.borderSubtle,
-    borderRadius: theme.radius.xl,
-    borderWidth: 1,
-    gap: theme.space[3],
-    padding: theme.space[4],
-  },
-  untimedHead: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: theme.space[2],
-  },
-  untimedHeadText: {
-    color: theme.color.textMuted,
-    fontFamily: theme.font.family.semibold,
-    fontSize: theme.font.size.caption,
-    fontWeight: theme.font.weight.semibold,
-  },
-  untimedItemGap: {
-    marginTop: theme.space[2],
   },
   wrap: {
     width: '100%',
