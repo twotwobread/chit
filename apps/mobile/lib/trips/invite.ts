@@ -1,8 +1,9 @@
 import type { AcceptTripInviteResponse, CreateTripInviteResponse, GetTripDetailResponse } from '@i-um/api-contract';
 import type { ShareContent } from 'react-native';
-import type { TextTemplateType } from 'react-native-kakao-share-link';
+import type { ExecutionParamType, LinkType, TextTemplateType } from 'react-native-kakao-share-link';
 
 const inviteTokenPattern = /^[A-Za-z0-9_-]{32,128}$/;
+const kakaoInviteTokenParamKey = 'inviteToken';
 
 export type InviteShareInput = {
   tripName: string;
@@ -167,7 +168,7 @@ export function getInviteAcceptErrorViewModel(error: unknown): InviteAcceptViewM
 
 export function buildKakaoInviteTemplate(input: InviteShareInput): TextTemplateType {
   const text = `${input.tripName} 여행에 초대받았어요.\n이음에서 함께 일정을 확인해보세요.\n${input.inviteUrl}`;
-  const link = { webUrl: input.inviteUrl, mobileWebUrl: input.inviteUrl };
+  const link = buildKakaoInviteLink(input.inviteUrl);
 
   return {
     text,
@@ -179,6 +180,11 @@ export function buildKakaoInviteTemplate(input: InviteShareInput): TextTemplateT
       },
     ],
   };
+}
+
+export function toKakaoInviteRedirectPath(params: Record<string, string | string[] | undefined>): `/invite/${string}` | null {
+  const token = firstParam(params[kakaoInviteTokenParamKey]);
+  return isInviteTokenFormatValid(token) ? `/invite/${token.trim()}` : null;
 }
 
 export function buildFallbackShareContent(input: InviteShareInput): ShareContent {
@@ -202,6 +208,53 @@ export function getInviteActionErrorMessage(error: unknown): string {
 
 export function getKakaoShareFailureMessage(): string {
   return '카카오톡 공유를 열 수 없어요. 링크를 복사하거나 다른 앱으로 공유해보세요.';
+}
+
+function buildKakaoInviteLink(inviteUrl: string): LinkType {
+  const executionParams = buildKakaoInviteExecutionParams(inviteUrl);
+  if (!executionParams) {
+    return { webUrl: inviteUrl, mobileWebUrl: inviteUrl };
+  }
+  return {
+    webUrl: inviteUrl,
+    mobileWebUrl: inviteUrl,
+    iosExecutionParams: executionParams,
+    androidExecutionParams: executionParams,
+  };
+}
+
+function buildKakaoInviteExecutionParams(inviteUrl: string): ExecutionParamType[] | null {
+  const token = inviteTokenFromInviteUrl(inviteUrl);
+  return token ? [{ key: kakaoInviteTokenParamKey, value: token }] : null;
+}
+
+function inviteTokenFromInviteUrl(inviteUrl: string): string | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(inviteUrl);
+  } catch {
+    return null;
+  }
+
+  const parts = parsed.pathname.split('/').filter(Boolean);
+  if (parts.length !== 2 || parts[0] !== 'invite') {
+    return null;
+  }
+
+  let token: string;
+  try {
+    token = decodeURIComponent(parts[1]).trim();
+  } catch {
+    return null;
+  }
+  return isInviteTokenFormatValid(token) ? token : null;
+}
+
+function firstParam(value: string | string[] | undefined): string | null {
+  if (Array.isArray(value)) {
+    return value[0] ?? null;
+  }
+  return value ?? null;
 }
 
 function getErrorStatus(error: unknown): number | null {

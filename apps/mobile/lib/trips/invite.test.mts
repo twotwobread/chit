@@ -17,6 +17,7 @@ import {
   isInviteTokenFormatValid,
   toInviteAcceptViewModel,
   toInviteViewModel,
+  toKakaoInviteRedirectPath,
 } from './invite.ts';
 
 const tripDetail: GetTripDetailResponse = {
@@ -34,13 +35,15 @@ const tripDetail: GetTripDetailResponse = {
   days: [],
 };
 
+const validInviteToken = 'valid-token-abcdefghijklmnopqrstuvwxyz123456';
+
 const inviteResponse: CreateTripInviteResponse = {
   created: true,
   invite: {
     id: 'invite-1',
     tripId: 'trip-1',
-    token: 'invite-token',
-    inviteUrl: 'https://invite.i-um.app/invite/invite-token',
+    token: validInviteToken,
+    inviteUrl: `https://invite.i-um.app/invite/${validInviteToken}`,
     expiresAt: '2026-06-30T15:00:00Z',
     createdAt: '2026-06-23T15:00:00Z',
     createdBy: 'owner-1',
@@ -55,8 +58,8 @@ test('invite action is visible only to the trip Owner', () => {
 
 test('invite response maps to copyable view model with created/reused status', () => {
   const created = toInviteViewModel(inviteResponse);
-  assert.equal(created.token, 'invite-token');
-  assert.equal(created.inviteUrl, 'https://invite.i-um.app/invite/invite-token');
+  assert.equal(created.token, validInviteToken);
+  assert.equal(created.inviteUrl, `https://invite.i-um.app/invite/${validInviteToken}`);
   assert.equal(created.statusLabel, '초대 링크가 준비됐어요.');
   assert.match(created.expiryLabel, /만료:/);
 
@@ -77,6 +80,21 @@ test('copy and share helpers use inviteUrl rather than the raw token', () => {
   const fallbackPayload = buildFallbackShareContent(input);
   assert.equal(fallbackPayload.url, input.inviteUrl);
   assert.equal(String(fallbackPayload.message).includes(input.inviteUrl), true);
+});
+
+test('Kakao installed-app callback carries the invite token back to the invite route', () => {
+  const input = { tripName: '제주 여행', inviteUrl: inviteResponse.invite.inviteUrl };
+  const expectedExecutionParams = [{ key: 'inviteToken', value: validInviteToken }];
+
+  const kakaoPayload = buildKakaoInviteTemplate(input);
+
+  assert.deepEqual(kakaoPayload.link.iosExecutionParams, expectedExecutionParams);
+  assert.deepEqual(kakaoPayload.link.androidExecutionParams, expectedExecutionParams);
+  assert.deepEqual(kakaoPayload.buttons?.[0]?.link.iosExecutionParams, expectedExecutionParams);
+  assert.deepEqual(kakaoPayload.buttons?.[0]?.link.androidExecutionParams, expectedExecutionParams);
+  assert.equal(toKakaoInviteRedirectPath({ inviteToken: validInviteToken }), `/invite/${validInviteToken}`);
+  assert.equal(toKakaoInviteRedirectPath({ inviteToken: [validInviteToken, 'ignored'] }), `/invite/${validInviteToken}`);
+  assert.equal(toKakaoInviteRedirectPath({ inviteToken: 'short' }), null);
 });
 
 test('failure copy separates invite API errors from Kakao share fallback guidance', () => {
