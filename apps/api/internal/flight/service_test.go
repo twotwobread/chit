@@ -60,6 +60,27 @@ func TestServiceCreateFlightDerivesAirportLocalInstants(t *testing.T) {
 	}
 }
 
+func TestServiceCreateFlightAllowsReportedKoreaSameZoneTimes(t *testing.T) {
+	repo := &fakeRepository{membershipParticipantID: testParticipantID, createdFlight: Flight{ID: testFlightID}}
+	service := NewService(repo)
+
+	_, err := service.CreateFlight(context.Background(), testUserID, testTripID, CreateFlightInput{
+		DisplayTitle: "국내선",
+		PassengerIDs: []string{testParticipantID},
+		Departure:    FlightEndpointInput{AirportText: "김포", AirportCode: stringPtr("GMP"), LocalDate: "2026-07-15", LocalTime: "07:10", TimeZone: "Asia/Seoul"},
+		Arrival:      FlightEndpointInput{AirportText: "제주", AirportCode: stringPtr("CJU"), LocalDate: "2026-07-15", LocalTime: "08:30", TimeZone: "Asia/Seoul"},
+	})
+	if err != nil {
+		t.Fatalf("CreateFlight returned error for reported Korea same-zone times: %v", err)
+	}
+	if got, want := repo.createRecord.Departure.At.Format(time.RFC3339), "2026-07-14T22:10:00Z"; got != want {
+		t.Fatalf("departure instant = %s, want %s", got, want)
+	}
+	if got, want := repo.createRecord.Arrival.At.Format(time.RFC3339), "2026-07-14T23:30:00Z"; got != want {
+		t.Fatalf("arrival instant = %s, want %s", got, want)
+	}
+}
+
 func TestServiceCreateFlightValidatesTimeZonesAndDSTGaps(t *testing.T) {
 	service := NewService(&fakeRepository{membershipParticipantID: testParticipantID})
 	base := CreateFlightInput{
