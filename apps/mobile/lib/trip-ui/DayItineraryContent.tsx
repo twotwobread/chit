@@ -358,7 +358,6 @@ export function DayItineraryContent({
               }}
               onPressItem={handlePressTimelineItem}
               onPressLodgingBadge={openLodgingSheet}
-              onPressTime={handlePressTimelineItem}
               renderSwipeAction={renderTimelineSwipeAction}
             />
           )}
