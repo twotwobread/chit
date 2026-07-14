@@ -9,7 +9,13 @@ import {
 } from 'react-native';
 
 import { theme } from '../design';
-import { buildScheduleTimeWheelOffset } from '../trips/schedule-time-wheel-layout';
+import {
+  DEFAULT_SCHEDULE_TIME_WHEEL_ITEM_HEIGHT,
+  DEFAULT_SCHEDULE_TIME_WHEEL_VISIBLE_ITEMS,
+  buildScheduleTimeWheelContentPadding,
+  buildScheduleTimeWheelOffset,
+  buildScheduleTimeWheelSelectedIndex,
+} from '../trips/schedule-time-wheel-layout';
 import {
   buildScheduleTimeText,
   parseScheduleTimePickerValue,
@@ -20,8 +26,12 @@ import {
   type PlaceScheduleTimePickerValue,
 } from '../places/place-schedule-detail';
 
-const wheelItemHeight = 36;
-const wheelVisibleItems = 4;
+const wheelItemHeight = DEFAULT_SCHEDULE_TIME_WHEEL_ITEM_HEIGHT;
+const wheelVisibleItems = DEFAULT_SCHEDULE_TIME_WHEEL_VISIBLE_ITEMS;
+const wheelContentPadding = buildScheduleTimeWheelContentPadding({
+  itemHeight: wheelItemHeight,
+  visibleItems: wheelVisibleItems,
+});
 
 export function ScheduleTimeWheel({
   disabled,
@@ -96,16 +106,19 @@ function TimeWheelColumn<T extends string>({
     if (disabled) {
       return;
     }
-    const index = Math.max(
-      0,
-      Math.min(options.length - 1, Math.round(event.nativeEvent.contentOffset.y / wheelItemHeight)),
-    );
+    const index = buildScheduleTimeWheelSelectedIndex({
+      contentOffsetY: event.nativeEvent.contentOffset.y,
+      itemHeight: wheelItemHeight,
+      optionCount: options.length,
+    });
     onChange(options[index]);
   };
 
   return (
     <View style={styles.timeWheelColumn}>
+      <View pointerEvents="none" style={styles.timeWheelSelectionFrame} />
       <ScrollView
+        contentContainerStyle={styles.timeWheelContent}
         contentOffset={{ x: 0, y: contentOffsetY }}
         decelerationRate="fast"
         key={value}
@@ -123,7 +136,8 @@ function TimeWheelColumn<T extends string>({
               disabled={disabled}
               key={item}
               onPress={() => onChange(item)}
-              style={[styles.timeWheelOption, selected ? styles.timeWheelOptionSelected : null]}
+              accessibilityState={{ selected }}
+              style={styles.timeWheelOption}
             >
               <Text style={[styles.timeWheelOptionText, selected ? styles.timeWheelOptionTextSelected : null]}>
                 {labelForOption(item)}
@@ -176,21 +190,35 @@ const styles = StyleSheet.create({
     gap: theme.space[2],
   },
   timeWheelColumn: {
+    backgroundColor: theme.color.surface,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
     flex: 1,
     height: wheelItemHeight * wheelVisibleItems,
     overflow: 'hidden',
   },
+  timeWheelContent: {
+    paddingVertical: wheelContentPadding,
+  },
   timeWheelList: {
     borderRadius: theme.radius.md,
+  },
+  timeWheelSelectionFrame: {
+    backgroundColor: theme.color.primarySoft,
+    borderColor: theme.color.primary,
+    borderRadius: theme.radius.sm,
+    borderWidth: 1,
+    height: wheelItemHeight,
+    left: theme.space[1],
+    position: 'absolute',
+    right: theme.space[1],
+    top: wheelItemHeight * Math.floor(wheelVisibleItems / 2),
   },
   timeWheelOption: {
     alignItems: 'center',
     height: wheelItemHeight,
     justifyContent: 'center',
-  },
-  timeWheelOptionSelected: {
-    backgroundColor: theme.color.primarySoft,
-    borderRadius: theme.radius.sm,
   },
   timeWheelOptionText: {
     color: theme.color.textMuted,
