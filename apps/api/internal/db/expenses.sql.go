@@ -43,6 +43,28 @@ func (q *Queries) DeleteExpenseSplitsByExpenseID(ctx context.Context, expenseID 
 	return err
 }
 
+const deleteTripExpenseByID = `-- name: DeleteTripExpenseByID :one
+DELETE FROM expenses
+WHERE trip_id = $1::uuid
+  AND id = $2::uuid
+  AND anchor_type = 'trip'
+  AND trip_day_id IS NULL
+  AND schedule_item_id IS NULL
+RETURNING id::text
+`
+
+type DeleteTripExpenseByIDParams struct {
+	TripID    pgtype.UUID
+	ExpenseID pgtype.UUID
+}
+
+func (q *Queries) DeleteTripExpenseByID(ctx context.Context, arg DeleteTripExpenseByIDParams) (string, error) {
+	row := q.db.QueryRow(ctx, deleteTripExpenseByID, arg.TripID, arg.ExpenseID)
+	var id string
+	err := row.Scan(&id)
+	return id, err
+}
+
 const getExpenseByTripDayAndID = `-- name: GetExpenseByTripDayAndID :one
 SELECT
   e.id::text AS id,
@@ -250,6 +272,104 @@ func (q *Queries) GetTripDefaultCurrencyForQuickExpense(ctx context.Context, tri
 	row := q.db.QueryRow(ctx, getTripDefaultCurrencyForQuickExpense, tripID)
 	var i GetTripDefaultCurrencyForQuickExpenseRow
 	err := row.Scan(&i.ID, &i.DefaultCurrency)
+	return i, err
+}
+
+const getTripExpenseByID = `-- name: GetTripExpenseByID :one
+SELECT
+  e.id::text AS id,
+  e.trip_id::text AS trip_id,
+  e.anchor_type,
+  COALESCE(e.trip_day_id::text, '')::text AS trip_day_id,
+  COALESCE(e.schedule_item_id::text, '')::text AS schedule_item_id,
+  e.expense_date,
+  e.title,
+  COALESCE(e.title, e.place_name, '지출')::text AS display_title,
+  COALESCE(e.trip_place_id::text, '')::text AS trip_place_id,
+  COALESCE(e.place_name, '')::text AS place_name,
+  COALESCE(e.place_address, '')::text AS place_address,
+  COALESCE(e.place_type, '')::text AS place_type,
+  CASE
+    WHEN e.place_name IS NOT NULL THEN 'fallback'
+    ELSE ''
+  END::text AS place_source,
+  e.amount_minor,
+  e.currency,
+  COALESCE(payer.id::text, e.payer_participant_id::text, '')::text AS payer_participant_id,
+  COALESCE(payer.display_name, e.payer_display_name, '여행자')::text AS payer_display_name,
+  CASE
+    WHEN payer.id IS NOT NULL THEN 'live'
+    ELSE 'fallback'
+  END::text AS payer_source,
+  e.memo,
+  e.split_policy,
+  e.created_at
+FROM expenses e
+LEFT JOIN trip_participants payer
+  ON payer.id = e.payer_participant_id
+ AND payer.trip_id = e.trip_id
+WHERE e.trip_id = $1::uuid
+  AND e.id = $2::uuid
+  AND e.anchor_type = 'trip'
+  AND e.trip_day_id IS NULL
+  AND e.schedule_item_id IS NULL
+`
+
+type GetTripExpenseByIDParams struct {
+	TripID    pgtype.UUID
+	ExpenseID pgtype.UUID
+}
+
+type GetTripExpenseByIDRow struct {
+	ID                 string
+	TripID             string
+	AnchorType         string
+	TripDayID          string
+	ScheduleItemID     string
+	ExpenseDate        pgtype.Date
+	Title              pgtype.Text
+	DisplayTitle       string
+	TripPlaceID        string
+	PlaceName          string
+	PlaceAddress       string
+	PlaceType          string
+	PlaceSource        string
+	AmountMinor        int64
+	Currency           string
+	PayerParticipantID string
+	PayerDisplayName   string
+	PayerSource        string
+	Memo               pgtype.Text
+	SplitPolicy        string
+	CreatedAt          pgtype.Timestamptz
+}
+
+func (q *Queries) GetTripExpenseByID(ctx context.Context, arg GetTripExpenseByIDParams) (GetTripExpenseByIDRow, error) {
+	row := q.db.QueryRow(ctx, getTripExpenseByID, arg.TripID, arg.ExpenseID)
+	var i GetTripExpenseByIDRow
+	err := row.Scan(
+		&i.ID,
+		&i.TripID,
+		&i.AnchorType,
+		&i.TripDayID,
+		&i.ScheduleItemID,
+		&i.ExpenseDate,
+		&i.Title,
+		&i.DisplayTitle,
+		&i.TripPlaceID,
+		&i.PlaceName,
+		&i.PlaceAddress,
+		&i.PlaceType,
+		&i.PlaceSource,
+		&i.AmountMinor,
+		&i.Currency,
+		&i.PayerParticipantID,
+		&i.PayerDisplayName,
+		&i.PayerSource,
+		&i.Memo,
+		&i.SplitPolicy,
+		&i.CreatedAt,
+	)
 	return i, err
 }
 
@@ -1203,6 +1323,109 @@ func (q *Queries) UpdateExpense(ctx context.Context, arg UpdateExpenseParams) (U
 		arg.ExpenseID,
 	)
 	var i UpdateExpenseRow
+	err := row.Scan(
+		&i.ID,
+		&i.TripID,
+		&i.AnchorType,
+		&i.TripDayID,
+		&i.ScheduleItemID,
+		&i.ExpenseDate,
+		&i.Title,
+		&i.TripPlaceID,
+		&i.PlaceName,
+		&i.PlaceAddress,
+		&i.PlaceType,
+		&i.AmountMinor,
+		&i.Currency,
+		&i.SplitPolicy,
+		&i.PayerParticipantID,
+		&i.PayerDisplayName,
+		&i.Memo,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const updateTripExpense = `-- name: UpdateTripExpense :one
+UPDATE expenses
+SET
+  title = $1,
+  amount_minor = $2,
+  split_policy = $3,
+  payer_participant_id = $4::uuid,
+  payer_display_name = $5,
+  memo = $6,
+  updated_at = now()
+WHERE trip_id = $7::uuid
+  AND id = $8::uuid
+  AND anchor_type = 'trip'
+  AND trip_day_id IS NULL
+  AND schedule_item_id IS NULL
+RETURNING
+  id::text,
+  trip_id::text,
+  anchor_type,
+  COALESCE(trip_day_id::text, '')::text AS trip_day_id,
+  COALESCE(schedule_item_id::text, '')::text AS schedule_item_id,
+  expense_date,
+  title,
+  COALESCE(trip_place_id::text, '')::text AS trip_place_id,
+  COALESCE(place_name, '')::text AS place_name,
+  COALESCE(place_address, '')::text AS place_address,
+  COALESCE(place_type, '')::text AS place_type,
+  amount_minor,
+  currency,
+  split_policy,
+  COALESCE(payer_participant_id::text, '')::text AS payer_participant_id,
+  payer_display_name,
+  memo,
+  created_at
+`
+
+type UpdateTripExpenseParams struct {
+	Title              pgtype.Text
+	AmountMinor        int64
+	SplitPolicy        string
+	PayerParticipantID pgtype.UUID
+	PayerDisplayName   string
+	Memo               pgtype.Text
+	TripID             pgtype.UUID
+	ExpenseID          pgtype.UUID
+}
+
+type UpdateTripExpenseRow struct {
+	ID                 string
+	TripID             string
+	AnchorType         string
+	TripDayID          string
+	ScheduleItemID     string
+	ExpenseDate        pgtype.Date
+	Title              pgtype.Text
+	TripPlaceID        string
+	PlaceName          string
+	PlaceAddress       string
+	PlaceType          string
+	AmountMinor        int64
+	Currency           string
+	SplitPolicy        string
+	PayerParticipantID string
+	PayerDisplayName   string
+	Memo               pgtype.Text
+	CreatedAt          pgtype.Timestamptz
+}
+
+func (q *Queries) UpdateTripExpense(ctx context.Context, arg UpdateTripExpenseParams) (UpdateTripExpenseRow, error) {
+	row := q.db.QueryRow(ctx, updateTripExpense,
+		arg.Title,
+		arg.AmountMinor,
+		arg.SplitPolicy,
+		arg.PayerParticipantID,
+		arg.PayerDisplayName,
+		arg.Memo,
+		arg.TripID,
+		arg.ExpenseID,
+	)
+	var i UpdateTripExpenseRow
 	err := row.Scan(
 		&i.ID,
 		&i.TripID,

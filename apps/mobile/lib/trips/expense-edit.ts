@@ -49,6 +49,7 @@ export type ExpenseEditViewModel = {
   amountLabel: string;
   currency: SupportedCurrency;
   showTitleField: boolean;
+  showPlaceField: boolean;
   titlePlaceholder: string;
   currencyLabel: string;
   payerOptions: ExpenseEditPayerOption[];
@@ -69,7 +70,7 @@ export function buildExpenseEditViewModel({
 }: {
   amountInput: string;
   expense: Expense;
-  itinerary: GetDayScheduleItemsResponse;
+  itinerary: GetDayScheduleItemsResponse | null;
   memoInput: string;
   participants: TripParticipantListItem[];
   selectedItemId: string | null;
@@ -80,13 +81,16 @@ export function buildExpenseEditViewModel({
     ? buildDefaultEqualSplitPreview({ amountMinor: parsedAmount.amountMinor, currency: expense.currency, participants })
     : [];
 
+  const isTripLevel = itinerary === null;
+
   return {
     title: '지출 수정',
-    dayLabel: formatTripDayLabel(itinerary.day.dayOrder),
+    dayLabel: isTripLevel ? '여행 전체' : formatTripDayLabel(itinerary.day.dayOrder),
     formattedDate: formatTripDayDate(expense.expenseDate),
     amountLabel: formatMoney(expense.amountMinor, expense.currency),
     currency: expense.currency,
-    showTitleField: selectedItemId === null || expense.title !== null,
+    showTitleField: isTripLevel || selectedItemId === null || expense.title !== null,
+    showPlaceField: !isTripLevel,
     titlePlaceholder: selectedItemId === null ? '예: 항공권, 숙소 예약금' : '선택 입력',
     currencyLabel: currencyLabel(expense.currency),
     payerOptions: participants.map((participant) => ({
@@ -94,10 +98,12 @@ export function buildExpenseEditViewModel({
       displayName: participant.displayName.trim() || '이름 없음',
       selected: participant.participantId === selectedPayerParticipantId,
     })),
-    placeOptions: [
-      noPlaceOption(selectedItemId),
-      ...orderedItems(getScheduleItems(itinerary)).map((item) => placeOption(item, selectedItemId)),
-    ],
+    placeOptions: isTripLevel
+      ? []
+      : [
+          noPlaceOption(selectedItemId),
+          ...orderedItems(getScheduleItems(itinerary)).map((item) => placeOption(item, selectedItemId)),
+        ],
     splitPreviewRows,
     splitPreviewMessage:
       parsedAmount?.ok && participants.length === 0 ? '참여자 정보를 불러오지 못해 분할을 계산할 수 없어요.' : null,

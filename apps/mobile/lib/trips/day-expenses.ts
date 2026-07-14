@@ -47,6 +47,10 @@ export function buildExpenseEditRoute(tripId: string, tripDayId: string, expense
   return `/trips/${tripId}/days/${tripDayId}/expenses/${expenseId}/edit` as Href;
 }
 
+export function buildTripExpenseEditRoute(tripId: string, expenseId: string): Href {
+  return `/trips/${tripId}/expenses/${expenseId}/edit` as Href;
+}
+
 export function buildDayExpensesViewModel({
   expenses,
   tripId,

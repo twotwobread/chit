@@ -467,6 +467,49 @@ func (r *fakeRepository) GetExpenseByTripDayAndID(_ context.Context, tripID stri
 	return Expense{}, false, nil
 }
 
+func (r *fakeRepository) GetTripExpenseByID(_ context.Context, tripID string, expenseID string) (Expense, bool, error) {
+	r.expenseLookupTripID = tripID
+	r.expenseLookupExpenseID = expenseID
+	if r.expenseFound {
+		return r.expense, true, nil
+	}
+	return Expense{}, false, nil
+}
+
+func (r *fakeRepository) UpdateTripExpense(_ context.Context, record UpdateExpenseRecord) (Expense, error) {
+	r.updatedExpenseRecord = record
+	r.updatedExpenseCalled = true
+	if r.updateExpenseErr != nil {
+		return Expense{}, r.updateExpenseErr
+	}
+	if r.updatedExpense.ID != "" {
+		return r.updatedExpense, nil
+	}
+	payerID := record.PayerParticipantID
+	displayTitle := "지출"
+	if record.Title != nil && strings.TrimSpace(*record.Title) != "" {
+		displayTitle = *record.Title
+	}
+	return Expense{
+		ID:             record.ExpenseID,
+		TripID:         record.TripID,
+		AnchorType:     "trip",
+		TripDayID:      nil,
+		ScheduleItemID: nil,
+		ExpenseDate:    "2026-06-12",
+		Title:          record.Title,
+		DisplayTitle:   displayTitle,
+		Place:          nil,
+		AmountMinor:    record.AmountMinor,
+		Currency:       r.trip.DefaultCurrency,
+		Payer:          ExpenseParticipantDisplay{ParticipantID: &payerID, DisplayName: "민수", Source: ExpenseDisplaySourceLive},
+		Memo:           record.Memo,
+		SplitPolicy:    record.SplitPolicy,
+		Splits:         []ExpenseSplit{{Participant: ExpenseParticipantDisplay{ParticipantID: &payerID, DisplayName: "민수", Source: ExpenseDisplaySourceLive}, AmountMinor: record.AmountMinor}},
+		CreatedAt:      time.Date(2026, 6, 12, 12, 0, 0, 0, time.UTC),
+	}, nil
+}
+
 func (r *fakeRepository) UpdateExpense(_ context.Context, record UpdateExpenseRecord) (Expense, error) {
 	r.updatedExpenseRecord = record
 	r.updatedExpenseCalled = true
@@ -516,6 +559,16 @@ func (r *fakeRepository) UpdateExpense(_ context.Context, record UpdateExpenseRe
 func (r *fakeRepository) DeleteExpenseByTripDayAndID(_ context.Context, tripID string, tripDayID string, expenseID string) (bool, error) {
 	r.deletedExpenseTripID = tripID
 	r.deletedExpenseTripDayID = tripDayID
+	r.deletedExpenseID = expenseID
+	r.deletedExpenseCalled = true
+	if r.deleteExpenseErr != nil {
+		return false, r.deleteExpenseErr
+	}
+	return r.deletedExpenseOK, nil
+}
+
+func (r *fakeRepository) DeleteTripExpenseByID(_ context.Context, tripID string, expenseID string) (bool, error) {
+	r.deletedExpenseTripID = tripID
 	r.deletedExpenseID = expenseID
 	r.deletedExpenseCalled = true
 	if r.deleteExpenseErr != nil {

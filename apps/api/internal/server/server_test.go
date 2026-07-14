@@ -2481,6 +2481,133 @@ func TestCreateTripExpenseHandlerCreatesTripLevelExpense(t *testing.T) {
 	}
 }
 
+func TestGetUpdateDeleteTripExpenseHandlers(t *testing.T) {
+	backend := newFakeAuthBackend()
+	ownerToken := loginTestUser(t, backend)
+	tripID := createTestTrip(t, backend, ownerToken)
+	member := tripdomain.Participant{
+		ID:          testUUID(2222),
+		TripID:      tripID,
+		UserID:      "user-2",
+		Role:        tripdomain.RoleMember,
+		DisplayName: "지영",
+		JoinedAt:    time.Date(2026, 6, 22, 15, 0, 0, 0, time.UTC),
+	}
+	backend.participants[tripID] = append(backend.participants[tripID], member)
+	ownerParticipantID := backend.participants[tripID][0].ID
+
+	createBody := []byte(fmt.Sprintf(`{
+		"title":"항공권",
+		"expenseDate":"2026-06-12",
+		"tripDayId":null,
+		"scheduleItemId":null,
+		"amountMinor":650000,
+		"payerParticipantId":%q,
+		"splitPolicy":"equal",
+		"participantIds":[%q,%q],
+		"memo":"사전 결제"
+	}`, ownerParticipantID, ownerParticipantID, member.ID))
+	createRecorder := httptest.NewRecorder()
+	createRequest := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/expenses", bytes.NewReader(createBody))
+	createRequest.Header.Set("Content-Type", "application/json")
+	createRequest.Header.Set("Authorization", "Bearer "+ownerToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(createRecorder, createRequest)
+	if createRecorder.Code != http.StatusCreated {
+		t.Fatalf("expected create trip expense status %d, got %d with body %s", http.StatusCreated, createRecorder.Code, createRecorder.Body.String())
+	}
+	var created struct {
+		Expense struct {
+			ID string `json:"id"`
+		} `json:"expense"`
+	}
+	if err := json.NewDecoder(createRecorder.Body).Decode(&created); err != nil {
+		t.Fatalf("decode create response: %v", err)
+	}
+
+	getRecorder := httptest.NewRecorder()
+	getRequest := httptest.NewRequest(http.MethodGet, "/trips/"+tripID+"/expenses/"+created.Expense.ID, nil)
+	getRequest.Header.Set("Authorization", "Bearer "+ownerToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(getRecorder, getRequest)
+	if getRecorder.Code != http.StatusOK {
+		t.Fatalf("expected get trip expense status %d, got %d with body %s", http.StatusOK, getRecorder.Code, getRecorder.Body.String())
+	}
+	var got struct {
+		Expense struct {
+			ID           string  `json:"id"`
+			AnchorType   string  `json:"anchorType"`
+			TripDayID    *string `json:"tripDayId"`
+			DisplayTitle string  `json:"displayTitle"`
+			Memo         *string `json:"memo"`
+		} `json:"expense"`
+	}
+	if err := json.NewDecoder(getRecorder.Body).Decode(&got); err != nil {
+		t.Fatalf("decode get response: %v", err)
+	}
+	if got.Expense.ID != created.Expense.ID || got.Expense.AnchorType != "trip" || got.Expense.TripDayID != nil || got.Expense.DisplayTitle != "항공권" || got.Expense.Memo == nil || *got.Expense.Memo != "사전 결제" {
+		t.Fatalf("unexpected get trip expense response: %#v", got.Expense)
+	}
+
+	patchBody := []byte(fmt.Sprintf(`{
+		"title":"숙소 예약금",
+		"amountMinor":700000,
+		"payerParticipantId":%q,
+		"splitPolicy":"manual",
+		"splits":[{"participantId":%q,"amountMinor":350000},{"participantId":%q,"amountMinor":350000}],
+		"memo":" 변경 ",
+		"scheduleItemId":null
+	}`, member.ID, ownerParticipantID, member.ID))
+	patchRecorder := httptest.NewRecorder()
+	patchRequest := httptest.NewRequest(http.MethodPatch, "/trips/"+tripID+"/expenses/"+created.Expense.ID, bytes.NewReader(patchBody))
+	patchRequest.Header.Set("Content-Type", "application/json")
+	patchRequest.Header.Set("Authorization", "Bearer "+ownerToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(patchRecorder, patchRequest)
+	if patchRecorder.Code != http.StatusOK {
+		t.Fatalf("expected patch trip expense status %d, got %d with body %s", http.StatusOK, patchRecorder.Code, patchRecorder.Body.String())
+	}
+	var patched struct {
+		Expense struct {
+			AnchorType     string  `json:"anchorType"`
+			TripDayID      *string `json:"tripDayId"`
+			ScheduleItemID *string `json:"scheduleItemId"`
+			Title          *string `json:"title"`
+			DisplayTitle   string  `json:"displayTitle"`
+			AmountMinor    int64   `json:"amountMinor"`
+			Memo           *string `json:"memo"`
+			Place          *struct {
+				Name string `json:"name"`
+			} `json:"place"`
+			Payer struct {
+				ParticipantID string `json:"participantId"`
+			} `json:"payer"`
+			Splits []struct {
+				AmountMinor int64 `json:"amountMinor"`
+			} `json:"splits"`
+		} `json:"expense"`
+	}
+	if err := json.NewDecoder(patchRecorder.Body).Decode(&patched); err != nil {
+		t.Fatalf("decode patch response: %v", err)
+	}
+	if patched.Expense.AnchorType != "trip" || patched.Expense.TripDayID != nil || patched.Expense.ScheduleItemID != nil || patched.Expense.Title == nil || *patched.Expense.Title != "숙소 예약금" || patched.Expense.DisplayTitle != "숙소 예약금" || patched.Expense.AmountMinor != 700000 || patched.Expense.Memo == nil || *patched.Expense.Memo != "변경" || patched.Expense.Place != nil || patched.Expense.Payer.ParticipantID != member.ID || len(patched.Expense.Splits) != 2 || patched.Expense.Splits[0].AmountMinor != 350000 || patched.Expense.Splits[1].AmountMinor != 350000 {
+		t.Fatalf("unexpected patch trip expense response: %#v", patched.Expense)
+	}
+
+	deleteRecorder := httptest.NewRecorder()
+	deleteRequest := httptest.NewRequest(http.MethodDelete, "/trips/"+tripID+"/expenses/"+created.Expense.ID, nil)
+	deleteRequest.Header.Set("Authorization", "Bearer "+ownerToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(deleteRecorder, deleteRequest)
+	if deleteRecorder.Code != http.StatusNoContent {
+		t.Fatalf("expected delete trip expense status %d, got %d with body %s", http.StatusNoContent, deleteRecorder.Code, deleteRecorder.Body.String())
+	}
+
+	missingRecorder := httptest.NewRecorder()
+	missingRequest := httptest.NewRequest(http.MethodGet, "/trips/"+tripID+"/expenses/"+created.Expense.ID, nil)
+	missingRequest.Header.Set("Authorization", "Bearer "+ownerToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(missingRecorder, missingRequest)
+	if missingRecorder.Code != http.StatusNotFound {
+		t.Fatalf("expected missing trip expense status %d, got %d with body %s", http.StatusNotFound, missingRecorder.Code, missingRecorder.Body.String())
+	}
+}
+
 func TestCreateQuickExpenseHandler(t *testing.T) {
 	backend := newFakeAuthBackend()
 	ownerToken := loginTestUser(t, backend)
@@ -4559,37 +4686,38 @@ func TestReadyReturnsServiceUnavailable(t *testing.T) {
 
 type fakeAuthBackend struct {
 	fakeReadiness
-	users            map[string]auth.User
-	identityUser     map[string]string
-	sessions         map[string]auth.Session
-	deletedUsers     map[string]bool
-	trips            map[string]tripdomain.Trip
-	participants     map[string][]tripdomain.Participant
-	tripPlaces       map[string]tripdomain.TripPlaceSummary
-	googleTripPlaces map[string]string
-	placeBookmarks   map[string]placedomain.TripPlaceBookmark
-	dayLodgingPlaces map[string]tripdomain.TripPlaceSummary
-	dayScheduleItems map[string][]tripdomain.ScheduleItem
-	tripExpenses     map[string][]tripdomain.DayExpenseListItem
-	dayExpenses      map[string][]tripdomain.DayExpenseListItem
-	tripInvites      map[string]tripdomain.TripInvite
-	flights          map[string]flightdomain.FlightDetail
-	personalDetails  map[string]flightdomain.PersonalDetail
-	reorderErr       error
-	arrivalErr       error
-	skipErr          error
-	restoreErr       error
-	listedTrips      []tripdomain.ListItem
-	listTripsUserID  string
-	nextUser         int
-	nextSession      int
-	nextTrip         int
-	nextInvite       int
-	nextPlace        int
-	nextScheduleItem int
-	nextExpense      int
-	nextFlight       int
-	nextPersonal     int
+	users             map[string]auth.User
+	identityUser      map[string]string
+	sessions          map[string]auth.Session
+	deletedUsers      map[string]bool
+	trips             map[string]tripdomain.Trip
+	participants      map[string][]tripdomain.Participant
+	tripPlaces        map[string]tripdomain.TripPlaceSummary
+	googleTripPlaces  map[string]string
+	placeBookmarks    map[string]placedomain.TripPlaceBookmark
+	dayLodgingPlaces  map[string]tripdomain.TripPlaceSummary
+	dayScheduleItems  map[string][]tripdomain.ScheduleItem
+	tripExpenses      map[string][]tripdomain.DayExpenseListItem
+	tripExpenseDetail map[string]tripdomain.Expense
+	dayExpenses       map[string][]tripdomain.DayExpenseListItem
+	tripInvites       map[string]tripdomain.TripInvite
+	flights           map[string]flightdomain.FlightDetail
+	personalDetails   map[string]flightdomain.PersonalDetail
+	reorderErr        error
+	arrivalErr        error
+	skipErr           error
+	restoreErr        error
+	listedTrips       []tripdomain.ListItem
+	listTripsUserID   string
+	nextUser          int
+	nextSession       int
+	nextTrip          int
+	nextInvite        int
+	nextPlace         int
+	nextScheduleItem  int
+	nextExpense       int
+	nextFlight        int
+	nextPersonal      int
 }
 
 func (b *fakeAuthBackend) TripToday() time.Time {
@@ -4775,23 +4903,24 @@ func createTestScheduleItem(t *testing.T, backend *fakeAuthBackend, _ string, tr
 
 func newFakeAuthBackend() *fakeAuthBackend {
 	return &fakeAuthBackend{
-		fakeReadiness:    fakeReadiness{schema: "initialized"},
-		users:            map[string]auth.User{},
-		identityUser:     map[string]string{},
-		sessions:         map[string]auth.Session{},
-		deletedUsers:     map[string]bool{},
-		trips:            map[string]tripdomain.Trip{},
-		participants:     map[string][]tripdomain.Participant{},
-		tripPlaces:       map[string]tripdomain.TripPlaceSummary{},
-		googleTripPlaces: map[string]string{},
-		placeBookmarks:   map[string]placedomain.TripPlaceBookmark{},
-		dayLodgingPlaces: map[string]tripdomain.TripPlaceSummary{},
-		dayScheduleItems: map[string][]tripdomain.ScheduleItem{},
-		tripExpenses:     map[string][]tripdomain.DayExpenseListItem{},
-		dayExpenses:      map[string][]tripdomain.DayExpenseListItem{},
-		tripInvites:      map[string]tripdomain.TripInvite{},
-		flights:          map[string]flightdomain.FlightDetail{},
-		personalDetails:  map[string]flightdomain.PersonalDetail{},
+		fakeReadiness:     fakeReadiness{schema: "initialized"},
+		users:             map[string]auth.User{},
+		identityUser:      map[string]string{},
+		sessions:          map[string]auth.Session{},
+		deletedUsers:      map[string]bool{},
+		trips:             map[string]tripdomain.Trip{},
+		participants:      map[string][]tripdomain.Participant{},
+		tripPlaces:        map[string]tripdomain.TripPlaceSummary{},
+		googleTripPlaces:  map[string]string{},
+		placeBookmarks:    map[string]placedomain.TripPlaceBookmark{},
+		dayLodgingPlaces:  map[string]tripdomain.TripPlaceSummary{},
+		dayScheduleItems:  map[string][]tripdomain.ScheduleItem{},
+		tripExpenses:      map[string][]tripdomain.DayExpenseListItem{},
+		tripExpenseDetail: map[string]tripdomain.Expense{},
+		dayExpenses:       map[string][]tripdomain.DayExpenseListItem{},
+		tripInvites:       map[string]tripdomain.TripInvite{},
+		flights:           map[string]flightdomain.FlightDetail{},
+		personalDetails:   map[string]flightdomain.PersonalDetail{},
 	}
 }
 
@@ -5439,6 +5568,126 @@ func (b *fakeAuthBackend) GetExpenseByTripDayAndID(_ context.Context, tripID str
 	return tripdomain.Expense{}, false, nil
 }
 
+func (b *fakeAuthBackend) GetTripExpenseByID(_ context.Context, tripID string, expenseID string) (tripdomain.Expense, bool, error) {
+	expense, ok := b.tripExpenseDetail[tripID+":"+expenseID]
+	if !ok {
+		return tripdomain.Expense{}, false, nil
+	}
+	return expense, true, nil
+}
+
+func (b *fakeAuthBackend) UpdateTripExpense(_ context.Context, record tripdomain.UpdateExpenseRecord) (tripdomain.Expense, error) {
+	foundTrip, ok := b.trips[record.TripID]
+	if !ok {
+		return tripdomain.Expense{}, tripdomain.ErrNotFound
+	}
+
+	expenseIndex := -1
+	for index, expense := range b.tripExpenses[record.TripID] {
+		if expense.ID == record.ExpenseID {
+			expenseIndex = index
+			break
+		}
+	}
+	if expenseIndex < 0 {
+		return tripdomain.Expense{}, tripdomain.ErrNotFound
+	}
+	existingDetail, ok := b.tripExpenseDetail[record.TripID+":"+record.ExpenseID]
+	if !ok {
+		return tripdomain.Expense{}, tripdomain.ErrNotFound
+	}
+
+	var payer tripdomain.Participant
+	for _, participant := range b.participants[record.TripID] {
+		if participant.ID == record.PayerParticipantID {
+			payer = participant
+			break
+		}
+	}
+	if payer.ID == "" {
+		return tripdomain.Expense{}, tripdomain.ErrNotFound
+	}
+
+	allParticipants := make([]tripdomain.ExpenseSplitParticipant, 0, len(b.participants[record.TripID]))
+	for _, participant := range b.participants[record.TripID] {
+		allParticipants = append(allParticipants, tripdomain.ExpenseSplitParticipant{
+			ParticipantID: participant.ID,
+			DisplayName:   participant.DisplayName,
+			JoinedAt:      participant.JoinedAt,
+		})
+	}
+	splitRecords, err := tripdomain.BuildExpenseSplitRecords(record.AmountMinor, record.SplitPolicy, allParticipants, record.ParticipantIDs, record.ManualSplits)
+	if err != nil {
+		return tripdomain.Expense{}, err
+	}
+
+	payerID := payer.ID
+	payerDisplay := tripdomain.ExpenseParticipantDisplay{ParticipantID: &payerID, DisplayName: tripdomain.NormalizeParticipantDisplayName(payer.DisplayName), Source: tripdomain.ExpenseDisplaySourceLive}
+	splits := make([]tripdomain.ExpenseSplit, 0, len(splitRecords))
+	daySplits := make([]tripdomain.DayExpenseSplitListItem, 0, len(splitRecords))
+	for _, splitRecord := range splitRecords {
+		participantID := splitRecord.ParticipantID
+		participantDisplay := tripdomain.ExpenseParticipantDisplay{ParticipantID: &participantID, DisplayName: splitRecord.ParticipantDisplayName, Source: tripdomain.ExpenseDisplaySourceLive}
+		splits = append(splits, tripdomain.ExpenseSplit{Participant: participantDisplay, AmountMinor: splitRecord.AmountMinor})
+		daySplits = append(daySplits, tripdomain.DayExpenseSplitListItem{SplitOrder: splitRecord.SplitOrder, Participant: participantDisplay, AmountMinor: splitRecord.AmountMinor})
+	}
+
+	displayTitle := firstNonEmptyStringPtr(record.Title, "지출")
+	updatedTripExpense := tripdomain.DayExpenseListItem{
+		ID:             record.ExpenseID,
+		AnchorType:     "trip",
+		TripDayID:      nil,
+		ScheduleItemID: nil,
+		ExpenseDate:    existingDetail.ExpenseDate,
+		DisplayTitle:   displayTitle,
+		Place:          nil,
+		AmountMinor:    record.AmountMinor,
+		Currency:       foundTrip.DefaultCurrency,
+		Payer:          payerDisplay,
+		SplitPolicy:    record.SplitPolicy,
+		Splits:         daySplits,
+		CreatedAt:      existingDetail.CreatedAt,
+	}
+	b.tripExpenses[record.TripID][expenseIndex] = updatedTripExpense
+
+	updatedDetail := tripdomain.Expense{
+		ID:             record.ExpenseID,
+		TripID:         record.TripID,
+		AnchorType:     "trip",
+		TripDayID:      nil,
+		ScheduleItemID: nil,
+		ExpenseDate:    existingDetail.ExpenseDate,
+		Title:          record.Title,
+		DisplayTitle:   displayTitle,
+		Place:          nil,
+		AmountMinor:    record.AmountMinor,
+		Currency:       foundTrip.DefaultCurrency,
+		Payer:          payerDisplay,
+		Memo:           record.Memo,
+		SplitPolicy:    record.SplitPolicy,
+		Splits:         splits,
+		CreatedAt:      existingDetail.CreatedAt,
+	}
+	b.tripExpenseDetail[record.TripID+":"+record.ExpenseID] = updatedDetail
+	return updatedDetail, nil
+}
+
+func (b *fakeAuthBackend) DeleteTripExpenseByID(_ context.Context, tripID string, expenseID string) (bool, error) {
+	expenseIndex := -1
+	for index, expense := range b.tripExpenses[tripID] {
+		if expense.ID == expenseID {
+			expenseIndex = index
+			break
+		}
+	}
+	if expenseIndex < 0 {
+		return false, nil
+	}
+	b.tripExpenses[tripID] = append(b.tripExpenses[tripID][:expenseIndex], b.tripExpenses[tripID][expenseIndex+1:]...)
+	delete(b.tripExpenseDetail, tripID+":"+expenseID)
+	return true, nil
+}
+
 func (b *fakeAuthBackend) UpdateExpense(_ context.Context, record tripdomain.UpdateExpenseRecord) (tripdomain.Expense, error) {
 	foundTrip, ok := b.trips[record.TripID]
 	if !ok {
@@ -5803,13 +6052,7 @@ func (b *fakeAuthBackend) CreateTripExpense(_ context.Context, record tripdomain
 		Splits:         daySplits,
 		CreatedAt:      createdAt,
 	}
-	if anchorType == "trip" {
-		b.tripExpenses[record.TripID] = append(b.tripExpenses[record.TripID], dayExpense)
-	} else if tripDayID != nil {
-		b.dayExpenses[record.TripID+":"+*tripDayID] = append(b.dayExpenses[record.TripID+":"+*tripDayID], dayExpense)
-	}
-
-	return tripdomain.CreateTripExpenseResult{Expense: tripdomain.Expense{
+	createdDetail := tripdomain.Expense{
 		ID:             expenseID,
 		TripID:         record.TripID,
 		AnchorType:     anchorType,
@@ -5826,7 +6069,15 @@ func (b *fakeAuthBackend) CreateTripExpense(_ context.Context, record tripdomain
 		SplitPolicy:    record.SplitPolicy,
 		Splits:         splits,
 		CreatedAt:      createdAt,
-	}}, nil
+	}
+	if anchorType == "trip" {
+		b.tripExpenses[record.TripID] = append(b.tripExpenses[record.TripID], dayExpense)
+		b.tripExpenseDetail[record.TripID+":"+expenseID] = createdDetail
+	} else if tripDayID != nil {
+		b.dayExpenses[record.TripID+":"+*tripDayID] = append(b.dayExpenses[record.TripID+":"+*tripDayID], dayExpense)
+	}
+
+	return tripdomain.CreateTripExpenseResult{Expense: createdDetail}, nil
 }
 
 func firstNonEmptyStringPtr(value *string, fallback string) string {

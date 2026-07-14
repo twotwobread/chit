@@ -412,6 +412,69 @@ func (s apiServer) CreateTripExpense(w http.ResponseWriter, r *http.Request, tri
 	writeJSON(w, http.StatusCreated, createTripExpenseResponseToOpenAPI(result))
 }
 
+func (s apiServer) GetTripExpense(w http.ResponseWriter, r *http.Request, tripId string, expenseId string) {
+	if s.auth == nil || s.trips == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "trip expense detail is not configured", nil)
+		return
+	}
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+	result, err := s.trips.GetTripExpense(r.Context(), authContext.UserID, tripId, expenseId)
+	if err != nil {
+		writeDayExpenseMutationError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, getExpenseResponseToOpenAPI(result))
+}
+
+func (s apiServer) UpdateTripExpense(w http.ResponseWriter, r *http.Request, tripId string, expenseId string) {
+	if s.auth == nil || s.trips == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "trip expense update is not configured", nil)
+		return
+	}
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+	var body openapi.UpdateTripExpenseJSONRequestBody
+	if !decodeJSON(w, r, &body) {
+		return
+	}
+	result, err := s.trips.UpdateTripExpense(r.Context(), authContext.UserID, tripId, expenseId, trip.UpdateExpenseInput{
+		AmountMinor:        body.AmountMinor,
+		PayerParticipantID: body.PayerParticipantId,
+		SplitPolicy:        string(body.SplitPolicy),
+		ParticipantIDs:     optionalStringSlice(body.ParticipantIds),
+		ManualSplits:       manualExpenseSplitsFromOpenAPI(body.Splits),
+		Memo:               body.Memo,
+		Title:              body.Title,
+		ScheduleItemID:     body.ScheduleItemId,
+	})
+	if err != nil {
+		writeDayExpenseMutationError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, updateExpenseResponseToOpenAPI(result))
+}
+
+func (s apiServer) DeleteTripExpense(w http.ResponseWriter, r *http.Request, tripId string, expenseId string) {
+	if s.auth == nil || s.trips == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "trip expense deletion is not configured", nil)
+		return
+	}
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+	if err := s.trips.DeleteTripExpense(r.Context(), authContext.UserID, tripId, expenseId); err != nil {
+		writeDayExpenseMutationError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (s apiServer) GetDayExpense(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, expenseId string) {
 	if s.auth == nil || s.trips == nil {
 		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "day expense detail is not configured", nil)

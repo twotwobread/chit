@@ -83,6 +83,7 @@ test('builds edit view model with selected payer, place clear option, and split 
   assert.equal(viewModel.formattedDate, '2026.07.10');
   assert.equal(viewModel.amountLabel, '1,200엔');
   assert.equal(viewModel.showTitleField, false);
+  assert.equal(viewModel.showPlaceField, true);
   assert.deepEqual(
     viewModel.placeOptions.map((option) => [option.itemId, option.selected]),
     [
@@ -102,6 +103,35 @@ test('builds edit view model with selected payer, place clear option, and split 
     viewModel.splitPreviewRows.map((row) => row.amountMinor),
     [501, 500],
   );
+});
+
+test('builds trip-level edit view model without day-specific place selection', () => {
+  const viewModel = buildExpenseEditViewModel({
+    amountInput: '650000',
+    expense: expense({
+      anchorType: 'trip',
+      tripDayId: null,
+      scheduleItemId: null,
+      expenseDate: '2026-06-12',
+      title: '항공권',
+      displayTitle: '항공권',
+      place: null,
+      amountMinor: 650000,
+      currency: 'KRW',
+    }),
+    itinerary: null,
+    memoInput: '',
+    participants,
+    selectedItemId: null,
+    selectedPayerParticipantId: 'participant-a',
+  });
+
+  assert.equal(viewModel.dayLabel, '여행 전체');
+  assert.equal(viewModel.formattedDate, '2026.06.12');
+  assert.equal(viewModel.amountLabel, '650,000원');
+  assert.equal(viewModel.showTitleField, true);
+  assert.equal(viewModel.showPlaceField, false);
+  assert.deepEqual(viewModel.placeOptions, []);
 });
 
 test('builds initial amount input from the stored currency', () => {

@@ -11,6 +11,7 @@ export type TripHiddenRouteKind =
   | 'flights'
   | 'flightNew'
   | 'flightDetail'
+  | 'tripExpenseEdit'
   | 'day'
   | 'dayPlaceSearch'
   | 'dayPlaceNew'
@@ -22,6 +23,7 @@ export type TripRouteFallbackInput =
   | { kind: 'edit'; tripId: string }
   | { kind: 'participants'; tripId: string }
   | { kind: 'flights' | 'flightNew' | 'flightDetail'; tripId: string }
+  | { kind: 'tripExpenseEdit'; tripId: string }
   | { kind: 'day'; tripId: string }
   | { kind: 'dayPlaceSearch' | 'dayPlaceNew' | 'dayQuickExpense'; tripId: string; tripDayId: string };
 
@@ -108,6 +110,8 @@ export function tripFallbackPath(input: TripRouteFallbackInput): Href {
     case 'flightNew':
     case 'flightDetail':
       return tripFlightsPath(input.tripId);
+    case 'tripExpenseEdit':
+      return tripSettlePath(input.tripId);
     case 'day':
       return tripItineraryPath(input.tripId);
     case 'dayPlaceSearch':
@@ -141,6 +145,11 @@ export function tripFallbackPathForPathname(pathname: string, tripId: string): H
   }
   if (normalizedPathname.startsWith(`/trips/${tripId}/flights/`)) {
     return tripFallbackPath({ kind: 'flightDetail', tripId });
+  }
+
+  const tripExpenseRoutePrefix = `/trips/${tripId}/expenses/`;
+  if (normalizedPathname.startsWith(tripExpenseRoutePrefix)) {
+    return tripFallbackPath({ kind: 'tripExpenseEdit', tripId });
   }
 
   const dayRoutePrefix = `/trips/${tripId}/days/`;

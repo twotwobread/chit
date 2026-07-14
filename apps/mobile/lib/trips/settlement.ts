@@ -11,7 +11,7 @@ import type {
 
 import type { DayChip } from '../trip-ui/DayChips';
 
-import { type DayExpenseRowViewModel, buildDayExpensesViewModel } from './day-expenses';
+import { type DayExpenseRowViewModel, buildDayExpensesViewModel, buildTripExpenseEditRoute } from './day-expenses';
 import { formatTripDayDate, formatTripDayLabel } from './days';
 import { buildQuickExpenseRoute, formatMoney } from './quick-expense';
 
@@ -108,6 +108,7 @@ export function buildSettlementExpenseHistoryViewModel({
         isTripSection,
         row,
         sectionDate: isTripSection ? null : dayInput.day.date,
+        tripId,
       }),
     );
     const expenseCount = rows.length;
@@ -173,11 +174,13 @@ function compactSettlementExpenseRow({
   isTripSection,
   row,
   sectionDate,
+  tripId,
 }: {
   expense: DayExpenseListItem | undefined;
   isTripSection: boolean;
   row: DayExpenseRowViewModel;
   sectionDate: string | null;
+  tripId: string;
 }): DayExpenseRowViewModel {
   if (!expense) {
     return row;
@@ -196,7 +199,7 @@ function compactSettlementExpenseRow({
     splitLabel: dateLabel ? `${splitLabel} · ${dateLabel}` : splitLabel,
     detailLine,
     accessibilityLabel: `${row.placeName} ${row.amountLabel}. ${detailLine}`,
-    editRoute: isTripSection ? null : row.editRoute,
+    editRoute: isTripSection ? buildTripExpenseEditRoute(tripId, expense.id) : row.editRoute,
   };
 }
 

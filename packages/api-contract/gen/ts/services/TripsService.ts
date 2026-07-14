@@ -292,6 +292,95 @@ export class TripsService {
         });
     }
     /**
+     * Get a trip-level expense
+     * Returns a trip-level expense created without a related Day or schedule item. Day and schedule-item expenses are fetched through the day-scoped expense endpoint.
+     * @param tripId
+     * @param expenseId
+     * @returns GetExpenseResponse Trip-level expense detail.
+     * @throws ApiError
+     */
+    public static getTripExpense(
+        tripId: string,
+        expenseId: string,
+    ): CancelablePromise<GetExpenseResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/trips/{tripId}/expenses/{expenseId}',
+            path: {
+                'tripId': tripId,
+                'expenseId': expenseId,
+            },
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                403: `Forbidden.`,
+                404: `Trip or trip-level expense not found.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
+     * Update a trip-level expense
+     * Updates amount, payer, memo, title, and split information for a trip-level expense. Day and schedule-item expenses use the day-scoped endpoint.
+     * @param tripId
+     * @param expenseId
+     * @param requestBody
+     * @returns UpdateExpenseResponse Trip-level expense updated.
+     * @throws ApiError
+     */
+    public static updateTripExpense(
+        tripId: string,
+        expenseId: string,
+        requestBody: UpdateExpenseRequest,
+    ): CancelablePromise<UpdateExpenseResponse> {
+        return __request(OpenAPI, {
+            method: 'PATCH',
+            url: '/trips/{tripId}/expenses/{expenseId}',
+            path: {
+                'tripId': tripId,
+                'expenseId': expenseId,
+            },
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                403: `Forbidden.`,
+                404: `Trip, trip-level expense, payer, or split participant not found.`,
+                409: `Participant state changed during update.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
+     * Delete a trip-level expense
+     * Deletes a trip-level expense. Day and schedule-item expenses use the day-scoped endpoint.
+     * @param tripId
+     * @param expenseId
+     * @returns void
+     * @throws ApiError
+     */
+    public static deleteTripExpense(
+        tripId: string,
+        expenseId: string,
+    ): CancelablePromise<void> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/trips/{tripId}/expenses/{expenseId}',
+            path: {
+                'tripId': tripId,
+                'expenseId': expenseId,
+            },
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                403: `Forbidden.`,
+                404: `Trip or trip-level expense not found.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
      * List trip participants
      * Returns the current accepted participants for a trip. Only authenticated current trip participants can access the list.
      * @param tripId

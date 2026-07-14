@@ -360,6 +360,7 @@ export default function TripLayout() {
             <Stack.Screen name="flights/index" />
             <Stack.Screen name="flights/new" />
             <Stack.Screen name="flights/[flightId]" />
+            <Stack.Screen name="expenses/[expenseId]/edit" />
             <Stack.Screen name="days/[date]/place-search" />
             <Stack.Screen name="days/[date]/places/new" />
             <Stack.Screen name="days/[date]/expenses/quick" />
