@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { DestinationSearchResult, SupportedCurrency, TripDestinationInput } from '@i-um/api-contract';
 
@@ -9,6 +10,7 @@ import { Card, PrimaryButton, SecondaryButton, theme } from '../../lib/design';
 import {
   addTripDestination,
   buildCreateTripDestinations,
+  buildDestinationSearchContentTopPadding,
   destinationCountryMismatchConfirmation,
   destinationKey,
   destinationSearchSubmitState,
@@ -309,6 +311,7 @@ function DestinationSearchFlow({
   results,
   searched,
 }: DestinationSearchFlowProps) {
+  const insets = useSafeAreaInsets();
   const selectedKeys = new Set(destinations.map(destinationKey));
   const status = destinationSelectionStatus(destinations);
   const searchSubmitState = destinationSearchSubmitState(query, loading);
@@ -344,7 +347,14 @@ function DestinationSearchFlow({
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.searchContent} keyboardShouldPersistTaps="handled" style={styles.scroll}>
+    <ScrollView
+      contentContainerStyle={[
+        styles.searchContent,
+        { paddingTop: buildDestinationSearchContentTopPadding(insets.top) },
+      ]}
+      keyboardShouldPersistTaps="handled"
+      style={styles.scroll}
+    >
       <View style={styles.searchHeader}>
         <Text style={styles.title}>도시 검색</Text>
         <SecondaryButton label="완료" onPress={onDone} />
