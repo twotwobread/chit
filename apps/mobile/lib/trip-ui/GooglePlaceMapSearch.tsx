@@ -116,6 +116,7 @@ type GooglePlaceSearchBottomSheetProps = {
   bottomInset?: number;
   children?: ReactNode;
   containerStyle?: StyleProp<ViewStyle>;
+  enableDynamicSizing?: boolean;
   enablePanDownToClose?: boolean;
   handleComponent?: (() => ReactNode) | null;
   index: number;
@@ -913,6 +914,7 @@ export function GooglePlaceMapSearch({
         backgroundStyle={styles.sheetBackground}
         bottomInset={0}
         containerStyle={styles.sheetContainer}
+        enableDynamicSizing={false}
         enablePanDownToClose={false}
         handleComponent={renderSheetHandle}
         index={sheetIndex}
