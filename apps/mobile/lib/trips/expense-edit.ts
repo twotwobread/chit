@@ -22,6 +22,7 @@ import {
 } from './quick-expense';
 
 export type ExpenseEditFormErrors = {
+  title?: string;
   amount?: string;
   memo?: string;
   payer?: string;
@@ -47,6 +48,8 @@ export type ExpenseEditViewModel = {
   formattedDate: string;
   amountLabel: string;
   currency: SupportedCurrency;
+  showTitleField: boolean;
+  titlePlaceholder: string;
   currencyLabel: string;
   payerOptions: ExpenseEditPayerOption[];
   placeOptions: ExpenseEditPlaceOption[];
@@ -83,6 +86,8 @@ export function buildExpenseEditViewModel({
     formattedDate: formatTripDayDate(expense.expenseDate),
     amountLabel: formatMoney(expense.amountMinor, expense.currency),
     currency: expense.currency,
+    showTitleField: selectedItemId === null || expense.title !== null,
+    titlePlaceholder: selectedItemId === null ? '예: 항공권, 숙소 예약금' : '선택 입력',
     currencyLabel: currencyLabel(expense.currency),
     payerOptions: participants.map((participant) => ({
       participantId: participant.participantId,
@@ -117,6 +122,7 @@ export function buildUpdateExpenseRequest({
   scheduleItemId,
   memoInput,
   payerParticipantId,
+  titleInput,
 }: {
   amountInput: string;
   currency: SupportedCurrency;
@@ -126,6 +132,7 @@ export function buildUpdateExpenseRequest({
   scheduleItemId: string | null;
   memoInput: string;
   payerParticipantId: string | null;
+  titleInput?: string;
 }): { ok: true; request: UpdateExpenseRequest } | { ok: false; errors: ExpenseEditFormErrors } {
   const errors: ExpenseEditFormErrors = {};
   const parsedAmount = parseAmountMinor(amountInput, currency);
@@ -145,6 +152,10 @@ export function buildUpdateExpenseRequest({
       errors.participants = manualSummary.validationMessage ?? '분할 금액의 합계가 총 지출 금액과 같아야 해요.';
     }
   }
+  const title = titleInput?.trim();
+  if (title !== undefined && [...title].length > 120) {
+    errors.title = '지출명은 120자 이내로 입력해주세요.';
+  }
   const memo = memoInput.trim();
   if ([...memo].length > 240) {
     errors.memo = '메모는 240자 이내로 입력해주세요.';
@@ -163,6 +174,7 @@ export function buildUpdateExpenseRequest({
         splitPolicy,
         participantIds,
         memo: memo === '' ? null : memo,
+        ...(titleInput !== undefined ? { title: title === '' ? null : title } : {}),
         scheduleItemId,
       },
     };
@@ -183,6 +195,7 @@ export function buildUpdateExpenseRequest({
       splitPolicy,
       splits: manualSummary.requestSplits,
       memo: memo === '' ? null : memo,
+      ...(titleInput !== undefined ? { title: title === '' ? null : title } : {}),
       scheduleItemId,
     },
   };

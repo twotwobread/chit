@@ -2,6 +2,8 @@ import {
   TripsService,
   type CreateQuickExpenseRequest,
   type CreateQuickExpenseResponse,
+  type CreateTripExpenseRequest,
+  type CreateTripExpenseResponse,
   type GetExpenseResponse,
   type ListDayExpensesResponse,
   type ListTripExpensesResponse,
@@ -42,4 +44,11 @@ export async function createQuickExpense(
   request: CreateQuickExpenseRequest,
 ): Promise<CreateQuickExpenseResponse> {
   return runAuthenticatedRequest(() => TripsService.createQuickExpense(tripId, date, request));
+}
+
+export async function createTripExpense(
+  tripId: string,
+  request: CreateTripExpenseRequest,
+): Promise<CreateTripExpenseResponse> {
+  return runAuthenticatedRequest(() => TripsService.createTripExpense(tripId, request));
 }

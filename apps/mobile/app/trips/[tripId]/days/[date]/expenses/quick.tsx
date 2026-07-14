@@ -9,7 +9,9 @@ export default function QuickExpenseScreen() {
   const {
     amountInput,
     backToDay,
+    clearTripDay,
     errors,
+    expenseDateInput,
     formMessage,
     goToLogin,
     load,
@@ -28,9 +30,12 @@ export default function QuickExpenseScreen() {
     splitPolicy,
     state,
     submit,
+    titleInput,
     toggleSplitParticipant,
     updateAmountInput,
+    updateExpenseDateInput,
     updateManualSplitInput,
+    updateTitleInput,
     viewModel,
   } = useQuickExpenseController();
 
@@ -56,8 +61,11 @@ export default function QuickExpenseScreen() {
         <QuickExpenseForm
           amountInput={amountInput}
           errors={errors}
+          expenseDateInput={expenseDateInput}
           formMessage={formMessage}
+          mode={state.mode}
           onBack={backToDay}
+          onClearTripDay={clearTripDay}
           onSelectItem={selectItem}
           onSelectPayer={selectPayer}
           onSelectSplitPolicy={selectSplitPolicy}
@@ -65,8 +73,10 @@ export default function QuickExpenseScreen() {
           onSubmit={() => void submit()}
           onToggleSplitParticipant={toggleSplitParticipant}
           onUpdateAmount={updateAmountInput}
+          onUpdateExpenseDate={updateExpenseDateInput}
           onUpdateMemo={setMemoInput}
           onUpdateManualSplitInput={updateManualSplitInput}
+          onUpdateTitle={updateTitleInput}
           payerParticipantId={payerParticipantId}
           saving={saving}
           selectedItemId={selectedItemId}
@@ -74,6 +84,7 @@ export default function QuickExpenseScreen() {
           splitPolicy={splitPolicy}
           manualSplitInputs={manualSplitInputs}
           memoInput={memoInput}
+          titleInput={titleInput}
           tripName={state.tripName}
           viewModel={viewModel}
         />

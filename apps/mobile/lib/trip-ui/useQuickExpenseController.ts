@@ -8,7 +8,7 @@ import {
 } from '@i-um/api-contract';
 
 import { apiErrorStatus, clearStoredSessionOnAuthError, isApiStatus } from '../auth/errors';
-import { createQuickExpense, updateExpense } from '../trips/expense-api';
+import { createQuickExpense, createTripExpense, updateExpense } from '../trips/expense-api';
 import { getTripDayItinerary, listTripScheduleItems } from '../trips/itinerary-api';
 import { listTripParticipants } from '../trips/trip-api';
 import { getScheduleItems } from '../trips/day-itinerary';
@@ -17,15 +17,15 @@ import { useTripShellState } from '../trips/trip-shell-context';
 import { buildTripItinerariesFromTripScheduleItems } from '../trips/trip-map';
 import {
   buildCreateQuickExpenseRequest,
+  buildCreateTripExpenseRequest,
   buildDefaultSplitParticipantIds,
   buildQuickExpenseManualSplitInputsFromRows,
   buildQuickExpenseMemoUpdateRequest,
   buildQuickExpenseViewModel,
   buildSavedEqualSplitSummary,
   quickExpenseFailureMessage,
-  resolveInitialQuickExpenseItemId,
-  resolveInitialQuickExpenseItemIdFromItineraries,
   resolveQuickExpenseItemDayId,
+  resolveTodayQuickExpenseInitialItemId,
   resolveQuickExpenseReturnPath,
   toggleQuickExpenseSplitParticipant,
   type QuickExpenseFormErrors,
@@ -34,6 +34,7 @@ import {
   type QuickExpenseSplitPolicy,
   type QuickExpenseViewModel,
 } from '../trips/quick-expense';
+import { localDateString } from '../trips/status';
 
 export type QuickExpenseState =
   | { status: 'loading' }
@@ -44,6 +45,7 @@ export type QuickExpenseState =
       itinerary: GetDayScheduleItemsResponse;
       itineraries: GetDayScheduleItemsResponse[];
       participants: TripParticipantListItem[];
+      mode: 'today' | 'settlement';
       shouldChooseItem: boolean;
     }
   | { status: 'auth' }
@@ -70,6 +72,8 @@ export function useQuickExpenseController() {
   const shellState = useTripShellState();
 
   const [state, setState] = useState<QuickExpenseState>({ status: 'loading' });
+  const [titleInput, setTitleInput] = useState('');
+  const [expenseDateInput, setExpenseDateInput] = useState(localDateString());
   const [amountInput, setAmountInput] = useState('');
   const [memoInput, setMemoInput] = useState('');
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
@@ -125,12 +129,16 @@ export function useQuickExpenseController() {
         setState({ status: 'invalid' });
         return;
       }
+      const isSettlementMode = returnTo === 'settle';
       const scheduleItems = itineraries.flatMap((candidate) => getScheduleItems(candidate));
-      const selectedItemId =
-        returnTo === 'settle'
-          ? resolveInitialQuickExpenseItemIdFromItineraries(itineraries, routeItemId)
-          : resolveInitialQuickExpenseItemId(scheduleItems, routeItemId);
-      const initialTripDayId = resolveQuickExpenseItemDayId(itineraries, selectedItemId) ?? itinerary.day.id;
+      const selectedItemId = isSettlementMode
+        ? routeItemId && scheduleItems.some((item) => item.id === routeItemId)
+          ? routeItemId
+          : null
+        : resolveTodayQuickExpenseInitialItemId(scheduleItems, routeItemId);
+      const initialTripDayId = isSettlementMode
+        ? resolveQuickExpenseItemDayId(itineraries, selectedItemId)
+        : (resolveQuickExpenseItemDayId(itineraries, selectedItemId) ?? itinerary.day.id);
       const participants = participantsResponse.participants;
       setSelectedItemId(selectedItemId);
       setSelectedTripDayId(initialTripDayId);
@@ -138,6 +146,8 @@ export function useQuickExpenseController() {
       setSelectedSplitParticipantIds(buildDefaultSplitParticipantIds(participants));
       setSplitPolicy('equal');
       setManualSplitInputs([]);
+      setTitleInput('');
+      setExpenseDateInput(localDateString());
       setAmountInput('');
       setMemoInput('');
       setState({
@@ -146,8 +156,9 @@ export function useQuickExpenseController() {
         currency: tripDetail.trip.defaultCurrency,
         itinerary,
         itineraries,
+        mode: isSettlementMode ? 'settlement' : 'today',
         participants,
-        shouldChooseItem: selectedItemId === null,
+        shouldChooseItem: !isSettlementMode && selectedItemId === null,
       });
     } catch (error) {
       if (await handleAuthError(error)) {
@@ -170,6 +181,18 @@ export function useQuickExpenseController() {
     }, [load]),
   );
 
+  const updateTitleInput = (value: string) => {
+    setTitleInput(value);
+    setErrors((current) => ({ ...current, title: undefined }));
+    setFormMessage(null);
+  };
+
+  const updateExpenseDateInput = (value: string) => {
+    setExpenseDateInput(value);
+    setErrors((current) => ({ ...current, expenseDate: undefined }));
+    setFormMessage(null);
+  };
+
   const updateAmountInput = (value: string) => {
     setAmountInput(value);
     setErrors((current) => ({ ...current, amount: undefined }));
@@ -187,6 +210,13 @@ export function useQuickExpenseController() {
 
   const selectTripDay = (tripDayId: string) => {
     setSelectedTripDayId(tripDayId);
+    setSelectedItemId(null);
+    setErrors((current) => ({ ...current, item: undefined }));
+    setFormMessage(null);
+  };
+
+  const clearTripDay = () => {
+    setSelectedTripDayId(null);
     setSelectedItemId(null);
     setErrors((current) => ({ ...current, item: undefined }));
     setFormMessage(null);
@@ -239,30 +269,15 @@ export function useQuickExpenseController() {
     const activeManualSplitInputs = manualSplitInputs.filter((input) =>
       selectedSplitParticipantIds.includes(input.participantId),
     );
-    const validation = buildCreateQuickExpenseRequest({
-      amountInput,
-      currency: state.currency,
-      scheduleItemId: selectedItemId,
-      splitPolicy,
-      participantIds: selectedSplitParticipantIds,
-      manualSplitInputs: activeManualSplitInputs,
-      payerParticipantId,
-    });
-    if (!validation.ok) {
-      setErrors(validation.errors);
-      return;
-    }
 
     setSaving(true);
     setFormMessage(null);
     setErrors({});
     try {
-      const expenseTripDayId = resolveQuickExpenseItemDayId(state.itineraries, selectedItemId) ?? date;
-      const response = await createQuickExpense(tripId, expenseTripDayId, validation.request);
-      const memoUpdateRequest = buildQuickExpenseMemoUpdateRequest({ createRequest: validation.request, memoInput });
-      if (memoUpdateRequest) {
-        await updateExpense(tripId, expenseTripDayId, response.expense.id, memoUpdateRequest);
-      }
+      const response =
+        state.mode === 'settlement'
+          ? await submitSettlementExpense({ activeManualSplitInputs, state })
+          : await submitTodayQuickExpense({ activeManualSplitInputs, state });
       setSavedSummary(
         buildSavedEqualSplitSummary({
           amountMinor: response.expense.amountMinor,
@@ -271,6 +286,9 @@ export function useQuickExpenseController() {
         }),
       );
     } catch (error) {
+      if (error instanceof QuickExpenseValidationAbort) {
+        return;
+      }
       if (await handleAuthError(error)) {
         return;
       }
@@ -287,6 +305,63 @@ export function useQuickExpenseController() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const submitSettlementExpense = async ({
+    activeManualSplitInputs,
+    state,
+  }: {
+    activeManualSplitInputs: QuickExpenseManualSplitInput[];
+    state: Extract<QuickExpenseState, { status: 'success' }>;
+  }) => {
+    const validation = buildCreateTripExpenseRequest({
+      titleInput,
+      expenseDate: expenseDateInput,
+      amountInput,
+      currency: state.currency,
+      selectedTripDayId,
+      scheduleItemId: selectedItemId,
+      splitPolicy,
+      participantIds: selectedSplitParticipantIds,
+      manualSplitInputs: activeManualSplitInputs,
+      payerParticipantId,
+      memoInput,
+    });
+    if (!validation.ok) {
+      setErrors(validation.errors);
+      throw new QuickExpenseValidationAbort();
+    }
+    return createTripExpense(tripId!, validation.request);
+  };
+
+  const submitTodayQuickExpense = async ({
+    activeManualSplitInputs,
+    state,
+  }: {
+    activeManualSplitInputs: QuickExpenseManualSplitInput[];
+    state: Extract<QuickExpenseState, { status: 'success' }>;
+  }) => {
+    const validation = buildCreateQuickExpenseRequest({
+      amountInput,
+      currency: state.currency,
+      scheduleItemId: selectedItemId,
+      splitPolicy,
+      participantIds: selectedSplitParticipantIds,
+      manualSplitInputs: activeManualSplitInputs,
+      payerParticipantId,
+    });
+    if (!validation.ok) {
+      setErrors(validation.errors);
+      throw new QuickExpenseValidationAbort();
+    }
+
+    const expenseTripDayId = resolveQuickExpenseItemDayId(state.itineraries, selectedItemId) ?? date!;
+    const response = await createQuickExpense(tripId!, expenseTripDayId, validation.request);
+    const memoUpdateRequest = buildQuickExpenseMemoUpdateRequest({ createRequest: validation.request, memoInput });
+    if (memoUpdateRequest) {
+      await updateExpense(tripId!, expenseTripDayId, response.expense.id, memoUpdateRequest);
+    }
+    return response;
   };
 
   const backToDay = () => {
@@ -319,7 +394,9 @@ export function useQuickExpenseController() {
   return {
     amountInput,
     backToDay,
+    clearTripDay,
     errors,
+    expenseDateInput,
     formMessage,
     goToLogin,
     load,
@@ -339,12 +416,17 @@ export function useQuickExpenseController() {
     splitPolicy,
     state,
     submit,
+    titleInput,
     toggleSplitParticipant,
     updateAmountInput,
+    updateExpenseDateInput,
     updateManualSplitInput,
+    updateTitleInput,
     viewModel,
   };
 }
+
+class QuickExpenseValidationAbort extends Error {}
 
 function quickExpenseShellFailureState(status: 'auth' | 'notFound' | 'error'): QuickExpenseState {
   if (status === 'notFound') {

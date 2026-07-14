@@ -13,6 +13,7 @@ import equalSplitCases from '../../../../packages/api-contract/fixtures/equal-sp
 
 import {
   buildCreateQuickExpenseRequest,
+  buildCreateTripExpenseRequest,
   buildDefaultEqualSplitPreview,
   buildQuickExpenseMemoUpdateRequest,
   buildQuickExpenseManualSplitInputsFromRows,
@@ -27,6 +28,7 @@ import {
   resolveInitialQuickExpenseItemId,
   resolveInitialQuickExpenseItemIdFromItineraries,
   resolveQuickExpenseItemDayId,
+  resolveTodayQuickExpenseInitialItemId,
   parseQuickExpenseRoute,
   resolveQuickExpenseReturnPath,
   resolveQuickExpenseSheetInitialSplitMode,
@@ -115,6 +117,25 @@ test('falls back to the first pending item when no valid preferred item exists',
   assert.equal(resolved, 'item-current');
 });
 
+test('today quick expense defaults to the latest arrived place before the pending item', () => {
+  const resolved = resolveTodayQuickExpenseInitialItemId([
+    item({ id: 'item-arrived-first', itemOrder: 1, arrivedAt: '2026-07-10T09:00:00Z' }),
+    item({ id: 'item-arrived-latest', itemOrder: 2, arrivedAt: '2026-07-10T10:00:00Z' }),
+    item({ id: 'item-pending', itemOrder: 3 }),
+  ]);
+
+  assert.equal(resolved, 'item-arrived-latest');
+});
+
+test('today quick expense falls back to pending item when nothing has arrived', () => {
+  const resolved = resolveTodayQuickExpenseInitialItemId([
+    item({ id: 'item-skipped', itemOrder: 1, skippedAt: '2026-07-10T09:00:00Z' } as Partial<ScheduleItem>),
+    item({ id: 'item-pending', itemOrder: 2 }),
+  ]);
+
+  assert.equal(resolved, 'item-pending');
+});
+
 test('does not default quick expense to a skipped schedule item', () => {
   const resolved = resolveInitialQuickExpenseItemId([
     item({ id: 'item-skipped', itemOrder: 1, skippedAt: '2026-07-10T00:30:00Z' } as Partial<ScheduleItem>),
@@ -197,6 +218,37 @@ test('builds settlement day tabs and filters schedule options to the selected da
     [['item-b', 'day-2', '2일차', '2']],
   );
   assert.equal(viewModel.selectedItem?.tripDayId, 'day-2');
+});
+
+test('settlement view model defaults to no related day and shows all schedules', () => {
+  const viewModel = buildQuickExpenseViewModel({
+    currency: 'JPY',
+    itinerary: itinerary([item({ id: 'item-a', itemOrder: 1 })], { id: 'day-1', dayOrder: 1 }),
+    itineraries: [
+      itinerary([item({ id: 'item-a', itemOrder: 1 })], { id: 'day-1', dayOrder: 1 }),
+      itinerary([item({ id: 'item-b', itemOrder: 1 })], { id: 'day-2', date: '2026-07-11', dayOrder: 2 }),
+    ],
+    participants: [participant({ participantId: 'participant-a' })],
+    selectedItemId: null,
+    selectedTripDayId: null,
+    shouldChooseItem: false,
+  });
+
+  assert.equal(viewModel.selectedTripDayId, null);
+  assert.deepEqual(
+    viewModel.dayOptions.map((option) => [option.tripDayId, option.selected]),
+    [
+      ['day-1', false],
+      ['day-2', false],
+    ],
+  );
+  assert.deepEqual(
+    viewModel.itemOptions.map((option) => [option.itemId, option.tripDayId, option.dayLabel]),
+    [
+      ['item-a', 'day-1', '1일차'],
+      ['item-b', 'day-2', '2일차'],
+    ],
+  );
 });
 
 test('derives the selected settlement day from the selected schedule item', () => {
@@ -610,6 +662,130 @@ test('builds memo update request after quick expense creation and skips blank me
     },
   );
   assert.equal(buildQuickExpenseMemoUpdateRequest({ createRequest: createValidation.request, memoInput: '   ' }), null);
+});
+
+test('builds trip-level general expense request when no related context is selected', () => {
+  assert.deepEqual(
+    buildCreateTripExpenseRequest({
+      titleInput: ' 항공권 ',
+      expenseDate: '2026-06-12',
+      amountInput: '650,000',
+      currency: 'KRW',
+      selectedTripDayId: null,
+      scheduleItemId: null,
+      splitPolicy: 'equal',
+      participantIds: ['participant-a', 'participant-b'],
+      manualSplitInputs: [],
+      payerParticipantId: 'payer-a',
+      memoInput: '  사전 결제  ',
+    }),
+    {
+      ok: true,
+      request: {
+        title: '항공권',
+        expenseDate: '2026-06-12',
+        tripDayId: null,
+        scheduleItemId: null,
+        amountMinor: 650000,
+        payerParticipantId: 'payer-a',
+        splitPolicy: 'equal',
+        participantIds: ['participant-a', 'participant-b'],
+        memo: '사전 결제',
+      },
+    },
+  );
+});
+
+test('builds day-level general expense request when only related day is selected', () => {
+  assert.deepEqual(
+    buildCreateTripExpenseRequest({
+      titleInput: '렌트비',
+      expenseDate: '2026-06-30',
+      amountInput: '120000',
+      currency: 'KRW',
+      selectedTripDayId: 'day-2',
+      scheduleItemId: null,
+      splitPolicy: 'equal',
+      participantIds: ['participant-a'],
+      manualSplitInputs: [],
+      payerParticipantId: 'payer-a',
+      memoInput: '',
+    }),
+    {
+      ok: true,
+      request: {
+        title: '렌트비',
+        expenseDate: '2026-06-30',
+        tripDayId: 'day-2',
+        scheduleItemId: null,
+        amountMinor: 120000,
+        payerParticipantId: 'payer-a',
+        splitPolicy: 'equal',
+        participantIds: ['participant-a'],
+        memo: null,
+      },
+    },
+  );
+});
+
+test('builds schedule-item general expense request without requiring a title', () => {
+  assert.deepEqual(
+    buildCreateTripExpenseRequest({
+      titleInput: '   ',
+      expenseDate: '2026-06-12',
+      amountInput: '1000',
+      currency: 'JPY',
+      selectedTripDayId: 'day-1',
+      scheduleItemId: 'item-a',
+      splitPolicy: 'equal',
+      participantIds: ['participant-a'],
+      manualSplitInputs: [],
+      payerParticipantId: 'payer-a',
+      memoInput: '',
+    }),
+    {
+      ok: true,
+      request: {
+        title: null,
+        expenseDate: '2026-06-12',
+        tripDayId: 'day-1',
+        scheduleItemId: 'item-a',
+        amountMinor: 1000,
+        payerParticipantId: 'payer-a',
+        splitPolicy: 'equal',
+        participantIds: ['participant-a'],
+        memo: null,
+      },
+    },
+  );
+});
+
+test('validates title and payment date for general expense requests', () => {
+  assert.deepEqual(
+    buildCreateTripExpenseRequest({
+      titleInput: '',
+      expenseDate: 'bad-date',
+      amountInput: '0',
+      currency: 'KRW',
+      selectedTripDayId: null,
+      scheduleItemId: null,
+      splitPolicy: 'equal',
+      participantIds: [],
+      manualSplitInputs: [],
+      payerParticipantId: null,
+      memoInput: '',
+    }),
+    {
+      ok: false,
+      errors: {
+        title: '지출명을 입력해주세요.',
+        expenseDate: '결제일자를 선택해주세요.',
+        amount: '금액을 1 이상 입력해주세요.',
+        payer: '결제자를 선택해주세요.',
+        participants: '분할할 사람을 1명 이상 선택해주세요.',
+      },
+    },
+  );
 });
 
 test('builds manual quick expense request only when split sum matches total', () => {

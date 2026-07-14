@@ -17,7 +17,7 @@ export type DayExpenseRowViewModel = {
   detailLine: string;
   category: ExpenseCategory;
   accessibilityLabel: string;
-  editRoute: Href;
+  editRoute: Href | null;
 };
 
 export type DayExpensesViewModel =

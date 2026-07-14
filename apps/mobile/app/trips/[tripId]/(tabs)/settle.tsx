@@ -338,20 +338,23 @@ function ExpenseHistoryContent({
           </View>
         ) : (
           <View style={styles.expenseRowList}>
-            {section.rows.map((row, index) => (
-              <ExpenseRow
-                accessibilityLabel={row.accessibilityLabel}
-                amount={row.amountMinor}
-                category={row.category}
-                currency={row.currency}
-                first={index === 0}
-                key={row.id}
-                onPress={() => router.push(row.editRoute)}
-                payerLabel={row.payerLabel}
-                splitLabel={row.splitLabel}
-                title={row.placeName}
-              />
-            ))}
+            {section.rows.map((row, index) => {
+              const editRoute = row.editRoute;
+              return (
+                <ExpenseRow
+                  accessibilityLabel={row.accessibilityLabel}
+                  amount={row.amountMinor}
+                  category={row.category}
+                  currency={row.currency}
+                  first={index === 0}
+                  key={row.id}
+                  onPress={editRoute ? () => router.push(editRoute) : undefined}
+                  payerLabel={row.payerLabel}
+                  splitLabel={row.splitLabel}
+                  title={row.placeName}
+                />
+              );
+            })}
           </View>
         )}
       </View>

@@ -50,6 +50,7 @@ export function useExpenseEditController() {
   const expenseId = Array.isArray(expenseIdParam) ? expenseIdParam[0] : expenseIdParam;
 
   const [state, setState] = useState<ExpenseEditState>({ status: 'loading' });
+  const [titleInput, setTitleInput] = useState('');
   const [amountInput, setAmountInput] = useState('');
   const [memoInput, setMemoInput] = useState('');
   const [payerParticipantId, setPayerParticipantId] = useState<string | null>(null);
@@ -90,6 +91,7 @@ export function useExpenseEditController() {
       const expense = expenseResponse.expense;
       const participantIDs = new Set(participantsResponse.participants.map((participant) => participant.participantId));
       const itemIDs = new Set(itinerary.scheduleItems.map((item) => item.id));
+      setTitleInput(expense.title ?? '');
       setAmountInput(buildExpenseEditInitialAmountInput(expense));
       setMemoInput(expense.memo ?? '');
       setPayerParticipantId(
@@ -135,6 +137,7 @@ export function useExpenseEditController() {
       participantIds: buildExpenseEditParticipantIds(state.participants),
       manualSplitInputs,
       scheduleItemId: selectedItemId,
+      titleInput,
     });
     if (!validation.ok) {
       setErrors(validation.errors);
@@ -169,6 +172,7 @@ export function useExpenseEditController() {
     selectedItemId,
     splitPolicy,
     state,
+    titleInput,
     tripId,
   ]);
 
@@ -246,9 +250,11 @@ export function useExpenseEditController() {
     setPayerParticipantId,
     setSelectedItemId,
     setSplitPolicy,
+    setTitleInput,
     splitPolicy,
     state,
     submitSave,
+    titleInput,
     updateManualSplitInput,
     viewModel,
   };

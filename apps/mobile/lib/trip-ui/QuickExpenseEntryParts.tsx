@@ -4,8 +4,11 @@ import { Pressable, Text, TextInput, View } from 'react-native';
 import { type SupportedCurrency } from '@i-um/api-contract';
 
 import { Card, PrimaryButton, SecondaryButton, theme } from '../design';
+import { dateFromString, isValidDate, monthStringFromDate } from '../trips/date';
+import { TripDateFieldButton, TripDatePicker } from '../trips/date-picker';
 import {
   buildCreateQuickExpenseRequest,
+  buildCreateTripExpenseRequest,
   buildQuickExpenseManualSplitSummary,
   formatMoney,
   type QuickExpenseFormErrors,
@@ -20,8 +23,11 @@ import { styles } from './QuickExpenseEntryStyles';
 export function QuickExpenseForm({
   amountInput,
   errors,
+  expenseDateInput,
   formMessage,
+  mode,
   onBack,
+  onClearTripDay,
   onSelectItem,
   onSelectPayer,
   onSelectSplitPolicy,
@@ -29,8 +35,10 @@ export function QuickExpenseForm({
   onSubmit,
   onToggleSplitParticipant,
   onUpdateAmount,
+  onUpdateExpenseDate,
   onUpdateMemo,
   onUpdateManualSplitInput,
+  onUpdateTitle,
   payerParticipantId,
   saving,
   selectedItemId,
@@ -38,13 +46,17 @@ export function QuickExpenseForm({
   splitPolicy,
   manualSplitInputs,
   memoInput,
+  titleInput,
   tripName,
   viewModel,
 }: {
   amountInput: string;
   errors: QuickExpenseFormErrors;
+  expenseDateInput: string;
   formMessage: string | null;
+  mode: 'today' | 'settlement';
   onBack: () => void;
+  onClearTripDay: () => void;
   onSelectItem: (itemId: string) => void;
   onSelectPayer: (participantId: string) => void;
   onSelectSplitPolicy: (
@@ -55,8 +67,10 @@ export function QuickExpenseForm({
   onSubmit: () => void;
   onToggleSplitParticipant: (participantId: string) => void;
   onUpdateAmount: (value: string) => void;
+  onUpdateExpenseDate: (value: string) => void;
   onUpdateMemo: (value: string) => void;
   onUpdateManualSplitInput: (participantId: string, amount: string) => void;
+  onUpdateTitle: (value: string) => void;
   payerParticipantId: string | null;
   saving: boolean;
   selectedItemId: string | null;
@@ -64,39 +78,70 @@ export function QuickExpenseForm({
   splitPolicy: QuickExpenseSplitPolicy;
   manualSplitInputs: QuickExpenseManualSplitInput[];
   memoInput: string;
+  titleInput: string;
   tripName: string;
   viewModel: QuickExpenseViewModel;
 }) {
   const activeManualSplitInputs = manualSplitInputs.filter((input) =>
     selectedSplitParticipantIds.includes(input.participantId),
   );
-  const validation = buildCreateQuickExpenseRequest({
-    amountInput,
-    currency: viewModel.currency,
-    scheduleItemId: selectedItemId,
-    splitPolicy,
-    participantIds: selectedSplitParticipantIds,
-    manualSplitInputs: activeManualSplitInputs,
-    payerParticipantId,
-  });
+  const validation =
+    mode === 'settlement'
+      ? buildCreateTripExpenseRequest({
+          titleInput,
+          expenseDate: expenseDateInput,
+          amountInput,
+          currency: viewModel.currency,
+          selectedTripDayId: viewModel.selectedTripDayId,
+          scheduleItemId: selectedItemId,
+          splitPolicy,
+          participantIds: selectedSplitParticipantIds,
+          manualSplitInputs: activeManualSplitInputs,
+          payerParticipantId,
+          memoInput,
+        })
+      : buildCreateQuickExpenseRequest({
+          amountInput,
+          currency: viewModel.currency,
+          scheduleItemId: selectedItemId,
+          splitPolicy,
+          participantIds: selectedSplitParticipantIds,
+          manualSplitInputs: activeManualSplitInputs,
+          payerParticipantId,
+        });
   const canSubmit = validation.ok && !saving && !viewModel.emptyMessage;
   const selectedPayerOptions = viewModel.payerOptions.map((option) => ({
     ...option,
     selected: option.participantId === payerParticipantId,
   }));
   const [itemSelectorExpanded, setItemSelectorExpanded] = useState(false);
+  const [paymentDatePickerOpen, setPaymentDatePickerOpen] = useState(false);
+  const [paymentCalendarMonth, setPaymentCalendarMonth] = useState(() => monthStringFromDate(new Date()));
   const selectItem = (itemId: string) => {
     onSelectItem(itemId);
     setItemSelectorExpanded(false);
   };
   const showDayContext = viewModel.dayLabel === '전체 일정';
-  const showDayTabs = viewModel.dayOptions.length > 1;
+  const showDayTabs = mode === 'settlement' ? viewModel.dayOptions.length > 0 : viewModel.dayOptions.length > 1;
+  const showAllScheduleContext = showDayContext && viewModel.selectedTripDayId === null;
   const selectedItemTitle = viewModel.selectedItem
     ? `${showDayContext ? `${viewModel.selectedItem.dayLabel} · ` : ''}${viewModel.selectedItem.placeName}`
-    : '일정을 선택해주세요.';
+    : mode === 'settlement'
+      ? '일정 선택 안 함'
+      : '일정을 선택해주세요.';
   const selectTripDay = (tripDayId: string) => {
     onSelectTripDay(tripDayId);
     setItemSelectorExpanded(false);
+  };
+  const openPaymentDatePicker = () => {
+    setPaymentCalendarMonth(
+      monthStringFromDate(isValidDate(expenseDateInput) ? dateFromString(expenseDateInput) : new Date()),
+    );
+    setPaymentDatePickerOpen(true);
+  };
+  const selectPaymentDate = (date: string) => {
+    onUpdateExpenseDate(date);
+    setPaymentDatePickerOpen(false);
   };
 
   return (
@@ -116,9 +161,62 @@ export function QuickExpenseForm({
 
       {viewModel.helper ? <Text style={styles.helper}>{viewModel.helper}</Text> : null}
 
+      {mode === 'settlement' ? (
+        <>
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>지출명</Text>
+            <TextInput
+              accessibilityLabel="지출명"
+              editable={!saving}
+              onChangeText={onUpdateTitle}
+              placeholder={selectedItemId ? '선택 입력' : '예: 항공권, 숙소 예약금'}
+              placeholderTextColor={theme.color.textFaint}
+              style={styles.input}
+              value={titleInput}
+            />
+            {errors.title ? <Text style={styles.errorMessage}>{errors.title}</Text> : null}
+          </View>
+
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>결제일자</Text>
+            <TripDateFieldButton
+              disabled={saving}
+              onPress={openPaymentDatePicker}
+              placeholder="결제일자 선택"
+              value={expenseDateInput}
+            />
+            {paymentDatePickerOpen ? (
+              <TripDatePicker
+                helperText="실제 결제된 날짜를 선택해주세요. 여행 기간 밖 날짜도 선택할 수 있어요."
+                label="결제일자"
+                month={paymentCalendarMonth}
+                onClose={() => setPaymentDatePickerOpen(false)}
+                onMonthChange={setPaymentCalendarMonth}
+                onSelect={selectPaymentDate}
+                selectedDate={expenseDateInput}
+              />
+            ) : null}
+            {errors.expenseDate ? <Text style={styles.errorMessage}>{errors.expenseDate}</Text> : null}
+          </View>
+        </>
+      ) : null}
+
       {showDayTabs ? (
         <View style={styles.fieldGroup}>
-          <Text style={styles.label}>일차 선택</Text>
+          <Text style={styles.label}>{mode === 'settlement' ? '관련 여행일' : '일차 선택'}</Text>
+          {mode === 'settlement' ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ selected: viewModel.selectedTripDayId === null }}
+              disabled={saving}
+              onPress={onClearTripDay}
+              style={[styles.payerChip, viewModel.selectedTripDayId === null ? styles.optionCardSelected : null]}
+            >
+              <Text style={viewModel.selectedTripDayId === null ? styles.payerChipTextSelected : styles.payerChipText}>
+                선택 안 함
+              </Text>
+            </Pressable>
+          ) : null}
           <DayChips
             days={viewModel.dayOptions.map((option) => ({
               id: option.tripDayId,
@@ -134,7 +232,7 @@ export function QuickExpenseForm({
 
       {viewModel.showItemSelector && viewModel.itemOptions.length > 0 ? (
         <View style={styles.fieldGroup}>
-          <Text style={styles.label}>연결할 일정</Text>
+          <Text style={styles.label}>{mode === 'settlement' ? '관련 일정' : '연결할 일정'}</Text>
           <Pressable
             accessibilityRole="button"
             accessibilityState={{ expanded: itemSelectorExpanded }}
@@ -175,7 +273,11 @@ export function QuickExpenseForm({
                     ]}
                   >
                     <View style={styles.placeMetaRow}>
-                      {showDayContext && !showDayTabs ? <Text style={styles.dayBadge}>{option.dayLabel}</Text> : null}
+                      {showAllScheduleContext ? (
+                        <Text style={styles.dayBadge}>
+                          {option.dayLabel} · {option.formattedDate}
+                        </Text>
+                      ) : null}
                       <Text style={styles.orderBadge}>{option.orderLabel}</Text>
                       <Text style={styles.placeType}>{option.placeTypeLabel}</Text>
                     </View>
@@ -326,7 +428,7 @@ export function QuickExpenseForm({
         loadingLabel="저장 중..."
         onPress={onSubmit}
       />
-      <SecondaryButton disabled={saving} label="오늘로 돌아가기" onPress={onBack} />
+      <SecondaryButton disabled={saving} label="돌아가기" onPress={onBack} />
     </Card>
   );
 }

@@ -29,9 +29,11 @@ export function ExpenseEditForm({
   onPlaceChange,
   onSave,
   onSplitPolicyChange,
+  onTitleChange,
   onUpdateManualSplitInput,
   saving,
   splitPolicy,
+  titleInput,
   manualSplitInputs,
   viewModel,
 }: {
@@ -47,9 +49,11 @@ export function ExpenseEditForm({
   onPlaceChange: (value: string | null) => void;
   onSave: () => void;
   onSplitPolicyChange: (value: QuickExpenseSplitPolicy) => void;
+  onTitleChange: (value: string) => void;
   onUpdateManualSplitInput: (participantId: string, amount: string) => void;
   saving: boolean;
   splitPolicy: QuickExpenseSplitPolicy;
+  titleInput: string;
   manualSplitInputs: QuickExpenseManualSplitInput[];
   viewModel: ExpenseEditViewModel;
 }) {
@@ -64,6 +68,7 @@ export function ExpenseEditForm({
     scheduleItemId: selectedScheduleItemId,
     memoInput,
     payerParticipantId: selectedPayerParticipantId,
+    titleInput,
   });
   const canSave = saveValidation.ok && !saving && !deleting;
 
@@ -73,6 +78,21 @@ export function ExpenseEditForm({
         <Text style={styles.sectionTitle}>{viewModel.dayLabel}</Text>
         <Text style={styles.message}>{viewModel.formattedDate}</Text>
       </View>
+
+      {viewModel.showTitleField ? (
+        <View style={styles.fieldGroup}>
+          <Text style={styles.label}>지출명</Text>
+          <TextInput
+            accessibilityLabel="지출명"
+            onChangeText={onTitleChange}
+            placeholder={viewModel.titlePlaceholder}
+            placeholderTextColor={theme.color.textFaint}
+            style={[styles.input, errors.title ? styles.inputError : null]}
+            value={titleInput}
+          />
+          {errors.title ? <Text style={styles.validationText}>{errors.title}</Text> : null}
+        </View>
+      ) : null}
 
       <View style={styles.fieldGroup}>
         <Text style={styles.label}>금액</Text>

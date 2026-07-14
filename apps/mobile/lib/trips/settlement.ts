@@ -27,6 +27,8 @@ export function buildSettlementExpenseEntryRouteForDays(tripId: string, days: Tr
   return entryDay ? buildSettlementExpenseEntryRoute(tripId, entryDay.id) : null;
 }
 
+const tripExpenseSectionId = '__trip_expenses__';
+
 export type SettlementExpenseHistoryDayInput = {
   day: TripDay;
   expenses: DayExpenseListItem[];
@@ -37,7 +39,15 @@ export function buildSettlementExpenseHistoryDayInputs(
   response: ListTripExpensesResponse,
 ): SettlementExpenseHistoryDayInput[] {
   const expensesByDayId = new Map(response.days.map((day) => [day.tripDayId, day.expenses]));
-  return days.map((day) => ({ day, expenses: expensesByDayId.get(day.id) ?? [] }));
+  const tripExpenseSection: SettlementExpenseHistoryDayInput | null =
+    response.tripExpenses.length > 0
+      ? {
+          day: { id: tripExpenseSectionId, date: '', dayOrder: 0, lodgingPlace: null },
+          expenses: response.tripExpenses,
+        }
+      : null;
+  const daySections = days.map((day) => ({ day, expenses: expensesByDayId.get(day.id) ?? [] }));
+  return tripExpenseSection ? [tripExpenseSection, ...daySections] : daySections;
 }
 
 export type SettlementExpenseHistoryDaySectionViewModel = {
@@ -85,22 +95,45 @@ export function buildSettlementExpenseHistoryViewModel({
   today?: string | null;
 }): SettlementExpenseHistoryViewModel {
   const sections = days.map((dayInput): SettlementExpenseHistoryDaySectionViewModel => {
+    const isTripSection = dayInput.day.id === tripExpenseSectionId;
     const dayExpenses = buildDayExpensesViewModel({
       date: dayInput.day.id,
       expenses: dayInput.expenses,
       tripId,
     });
-    const rows = dayExpenses.status === 'success' ? dayExpenses.rows : [];
+    const baseRows = dayExpenses.status === 'success' ? dayExpenses.rows : [];
+    const rows = baseRows.map((row, index) =>
+      compactSettlementExpenseRow({
+        expense: dayInput.expenses[index],
+        isTripSection,
+        row,
+        sectionDate: isTripSection ? null : dayInput.day.date,
+      }),
+    );
     const expenseCount = rows.length;
 
     return {
       dayId: dayInput.day.id,
-      title: formatTripDayLabel(dayInput.day.dayOrder),
-      helper: `${formatTripDayDate(dayInput.day.date)} · ${expenseCount > 0 ? `${expenseCount}건` : '지출 없음'}`,
+      title: isTripSection ? '여행 전체' : formatTripDayLabel(dayInput.day.dayOrder),
+      helper: isTripSection
+        ? expenseCount > 0
+          ? `${expenseCount}건`
+          : '지출 없음'
+        : `${formatTripDayDate(dayInput.day.date)} · ${expenseCount > 0 ? `${expenseCount}건` : '지출 없음'}`,
       expenseCount,
       rows,
-      emptyTitle: expenseCount === 0 ? '이 일차에 등록된 지출이 없어요.' : null,
-      emptyHelper: expenseCount === 0 ? '다른 일차를 선택하거나 지출을 등록해 주세요.' : null,
+      emptyTitle:
+        expenseCount === 0
+          ? isTripSection
+            ? '여행 전체에 등록된 지출이 없어요.'
+            : '이 일차에 등록된 지출이 없어요.'
+          : null,
+      emptyHelper:
+        expenseCount === 0
+          ? isTripSection
+            ? '항공권이나 예약금처럼 Day와 무관한 지출을 등록해 주세요.'
+            : '다른 일차를 선택하거나 지출을 등록해 주세요.'
+          : null,
     };
   });
 
@@ -127,12 +160,55 @@ export function buildSettlementExpenseHistoryViewModel({
     dayChips: sections.map((section, index) => ({
       id: section.dayId,
       label: section.title,
-      dateLabel: formatTripDayDate(days[index].day.date),
+      dateLabel: days[index].day.id === tripExpenseSectionId ? undefined : formatTripDayDate(days[index].day.date),
       statusLabel: section.expenseCount > 0 ? `${section.expenseCount}건` : '지출 없음',
     })),
     selectedDayId: selectedSection.dayId,
     selectedSection,
   };
+}
+
+function compactSettlementExpenseRow({
+  expense,
+  isTripSection,
+  row,
+  sectionDate,
+}: {
+  expense: DayExpenseListItem | undefined;
+  isTripSection: boolean;
+  row: DayExpenseRowViewModel;
+  sectionDate: string | null;
+}): DayExpenseRowViewModel {
+  if (!expense) {
+    return row;
+  }
+
+  const payerLabel = `${normalizeDisplayName(expense.payer.displayName)} 결제`;
+  const splitLabel = compactSplitLabel(expense.splits.length);
+  const dateLabel =
+    isTripSection || expense.expenseDate !== sectionDate ? formatTripDayDate(expense.expenseDate) : null;
+  const metaParts = [payerLabel, splitLabel, dateLabel].filter((part): part is string => Boolean(part));
+  const detailLine = metaParts.join(' · ');
+
+  return {
+    ...row,
+    payerLabel,
+    splitLabel: dateLabel ? `${splitLabel} · ${dateLabel}` : splitLabel,
+    detailLine,
+    accessibilityLabel: `${row.placeName} ${row.amountLabel}. ${detailLine}`,
+    editRoute: isTripSection ? null : row.editRoute,
+  };
+}
+
+function compactSplitLabel(splitCount: number): string {
+  if (splitCount < 1) {
+    return '분할 정보 없음';
+  }
+  return `${splitCount}명 분할`;
+}
+
+function normalizeDisplayName(value: string): string {
+  return value.trim() || '여행자';
 }
 
 function resolveSelectedExpenseHistorySection({
@@ -151,7 +227,9 @@ function resolveSelectedExpenseHistorySection({
     return selected;
   }
 
-  const todayIndex = today ? days.findIndex((dayInput) => dayInput.day.date === today) : -1;
+  const todayIndex = today
+    ? days.findIndex((dayInput) => dayInput.day.id !== tripExpenseSectionId && dayInput.day.date === today)
+    : -1;
   if (todayIndex >= 0) {
     return sections[todayIndex];
   }
