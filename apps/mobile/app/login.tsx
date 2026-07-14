@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import type { AuthProvider } from '@i-um/api-contract';
 
 import { loginWithOAuth, MobileAuthError } from '../lib/auth/client';
+import { createLoginAttemptGate } from '../lib/auth/login-attempt';
 import { getOAuthCredential, getVisibleOAuthProviderConfigs } from '../lib/auth/oauth';
 import { theme } from '../lib/design';
 import {
@@ -24,6 +25,7 @@ export default function LoginScreen() {
   const [state, setState] = useState<LoginState>({ status: 'idle' });
   const [subtitle] = useState(() => getLoginSubtitleForInviteHandoff());
   const consumedHandoffRef = useRef(false);
+  const loginAttemptGateRef = useRef(createLoginAttemptGate());
 
   useEffect(() => {
     return () => {
@@ -34,16 +36,20 @@ export default function LoginScreen() {
   }, []);
 
   const login = async (provider: AuthProvider) => {
-    setState({ status: 'loading', provider });
-    try {
-      const credential = await getOAuthCredential(provider);
-      await loginWithOAuth(provider, credential);
-      const redirectPath = consumeInviteLoginRedirectPath();
-      consumedHandoffRef.current = true;
-      router.replace(redirectPath);
-    } catch (error) {
-      setState(errorState(error));
-    }
+    const attempt = loginAttemptGateRef.current.run(async () => {
+      setState({ status: 'loading', provider });
+      try {
+        const credential = await getOAuthCredential(provider);
+        await loginWithOAuth(provider, credential);
+        const redirectPath = consumeInviteLoginRedirectPath();
+        consumedHandoffRef.current = true;
+        router.replace(redirectPath);
+      } catch (error) {
+        setState(errorState(error));
+      }
+    });
+
+    await attempt;
   };
 
   const isLoading = state.status === 'loading';

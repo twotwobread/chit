@@ -5,6 +5,7 @@
     "scheme": "ium",
     "version": "0.1.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "plugins": [
@@ -23,12 +24,17 @@
     ],
     "ios": {
       "bundleIdentifier": "com.twotwobread.ium.staging",
+      "icon": "./assets/icon.png",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
-      "package": "com.twotwobread.ium"
+      "package": "com.twotwobread.ium",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#F8F5EF"
+      }
     },
     "experiments": {
       "typedRoutes": true

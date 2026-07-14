@@ -11,6 +11,9 @@
     "db:migrate": "pnpm --filter @i-um/api db:migrate",
     "db:rollback": "pnpm --filter @i-um/api db:rollback",
     "db:status": "pnpm --filter @i-um/api db:status",
+    "deploy": "node scripts/deploy.mjs",
+    "deploy:stage": "node scripts/deploy.mjs stage",
+    "test:deploy": "node --test scripts/*.test.mjs",
     "verify:generated": "tmp=$(mktemp) && find apps/api/internal/openapi apps/api/internal/db packages/api-contract/gen/ts -type f | sort | xargs shasum > \"$tmp\" && pnpm generate && find apps/api/internal/openapi apps/api/internal/db packages/api-contract/gen/ts -type f | sort | xargs shasum | diff -u \"$tmp\" -",
     "harness:sync": "node .harness/scripts/sync-adapters.mjs",
     "harness:validate": "node .harness/scripts/validate-harness.mjs",
@@ -21,7 +24,7 @@
     "lint": "pnpm --filter @i-um/api lint && pnpm --filter @i-um/mobile lint",
     "format": "pnpm --filter @i-um/api format && pnpm --filter @i-um/mobile format",
     "format:check": "pnpm --filter @i-um/api format:check && pnpm --filter @i-um/mobile format:check",
-    "verify": "pnpm verify:generated && pnpm lint && pnpm format:check && pnpm --filter @i-um/api test && pnpm --filter @i-um/api build && pnpm --filter @i-um/mobile test && pnpm --filter @i-um/mobile typecheck"
+    "verify": "pnpm verify:generated && pnpm test:deploy && pnpm lint && pnpm format:check && pnpm --filter @i-um/api test && pnpm --filter @i-um/api build && pnpm --filter @i-um/mobile test && pnpm --filter @i-um/mobile typecheck"
   },
   "devDependencies": {
     "yaml": "^2.9.0"
