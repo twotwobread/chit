@@ -987,7 +987,7 @@ paths:
     get:
       operationId: listTripExpenses
       summary: List expenses for a trip
-      description: Returns read-only expense rows grouped by trip day in one request, ordered by day then newest expense first.
+      description: Returns read-only expense rows grouped by trip context in one request. Trip-level rows are returned separately, and day rows are ordered by day then newest expense first.
       tags:
         - Trips
       security:
@@ -1000,7 +1000,7 @@ paths:
             type: string
       responses:
         '200':
-          description: Trip expenses grouped by trip day.
+          description: Trip expenses grouped by trip context.
           content:
             application/json:
               schema:
@@ -1025,6 +1025,69 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Trip not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      operationId: createTripExpense
+      summary: Create a general trip expense
+      description: Creates a trip-level, Day-level, or schedule-item expense from settlement entry. Payment date is independent from related context.
+      tags:
+        - Trips
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTripExpenseRequest'
+      responses:
+        '201':
+          description: Expense created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateTripExpenseResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip, Day, schedule item, payer, or split participant not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Participant or schedule state changed during creation.
           content:
             application/json:
               schema:
@@ -4164,8 +4227,14 @@ components:
       type: object
       additionalProperties: false
       required:
+        - tripExpenses
         - days
       properties:
+        tripExpenses:
+          type: array
+          items:
+            $ref: '#/components/schemas/DayExpenseListItem'
+          description: Trip-level expenses with no related Day or schedule item.
         days:
           type: array
           items:
@@ -4303,11 +4372,79 @@ components:
           nullable: true
           maxLength: 240
           description: Optional memo. Empty strings are normalized to null by the server.
+        title:
+          type: string
+          nullable: true
+          maxLength: 120
+          description: Optional display title for general expenses. Empty strings are normalized to null by the server.
         scheduleItemId:
           type: string
           nullable: true
           description: Same-day schedule item to link, or null to clear the linked place.
     UpdateExpenseResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - expense
+      properties:
+        expense:
+          $ref: '#/components/schemas/Expense'
+    CreateTripExpenseRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - title
+        - expenseDate
+        - tripDayId
+        - scheduleItemId
+        - amountMinor
+        - payerParticipantId
+        - splitPolicy
+        - memo
+      properties:
+        title:
+          type: string
+          nullable: true
+          maxLength: 120
+          description: Optional display title. Required when no schedule item is selected.
+        expenseDate:
+          type: string
+          format: date
+          description: Actual payment/business date. It may be outside the trip range.
+        tripDayId:
+          type: string
+          nullable: true
+          description: Optional related Day. If scheduleItemId is present, the server derives and validates the Day from the schedule item.
+        scheduleItemId:
+          type: string
+          nullable: true
+          description: Optional related schedule item.
+        amountMinor:
+          type: integer
+          format: int64
+          minimum: 1
+        payerParticipantId:
+          type: string
+        splitPolicy:
+          $ref: '#/components/schemas/ExpenseSplitPolicy'
+        participantIds:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+          description: Required only when splitPolicy is equal. Must be omitted for manual.
+        splits:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/ManualExpenseSplitInput'
+          description: Required only when splitPolicy is manual. Must be omitted for equal.
+        memo:
+          type: string
+          nullable: true
+          maxLength: 240
+    CreateTripExpenseResponse:
       type: object
       additionalProperties: false
       required:
@@ -4368,6 +4505,7 @@ components:
         - tripDayId
         - scheduleItemId
         - expenseDate
+        - title
         - displayTitle
         - place
         - amountMinor
@@ -4394,6 +4532,11 @@ components:
         expenseDate:
           type: string
           format: date
+        title:
+          type: string
+          nullable: true
+          maxLength: 120
+          description: Optional stored title supplied by the user for general expenses.
         displayTitle:
           type: string
           minLength: 1

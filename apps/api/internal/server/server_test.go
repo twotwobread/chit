@@ -2409,6 +2409,78 @@ func TestCreateManualScheduleItemRequiresAuth(t *testing.T) {
 	}
 }
 
+func TestCreateTripExpenseHandlerCreatesTripLevelExpense(t *testing.T) {
+	backend := newFakeAuthBackend()
+	ownerToken := loginTestUser(t, backend)
+	tripID := createTestTrip(t, backend, ownerToken)
+	payerID := backend.participants[tripID][0].ID
+
+	requestBody := []byte(fmt.Sprintf(`{
+		"title":" 항공권 ",
+		"expenseDate":"2026-06-12",
+		"tripDayId":null,
+		"scheduleItemId":null,
+		"amountMinor":650000,
+		"payerParticipantId":%q,
+		"splitPolicy":"equal",
+		"participantIds":[%q],
+		"memo":" 사전 결제 "
+	}`, payerID, payerID))
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/expenses", bytes.NewReader(requestBody))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", "Bearer "+ownerToken)
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusCreated, recorder.Code, recorder.Body.String())
+	}
+	var createBody struct {
+		Expense struct {
+			TripID       string  `json:"tripId"`
+			AnchorType   string  `json:"anchorType"`
+			TripDayID    *string `json:"tripDayId"`
+			Title        *string `json:"title"`
+			DisplayTitle string  `json:"displayTitle"`
+			ExpenseDate  string  `json:"expenseDate"`
+			AmountMinor  int64   `json:"amountMinor"`
+			Memo         *string `json:"memo"`
+		} `json:"expense"`
+	}
+	if err := json.NewDecoder(recorder.Body).Decode(&createBody); err != nil {
+		t.Fatalf("decode create response: %v", err)
+	}
+	if createBody.Expense.TripID != tripID || createBody.Expense.AnchorType != "trip" || createBody.Expense.TripDayID != nil {
+		t.Fatalf("unexpected trip-level create response: %#v", createBody.Expense)
+	}
+	if createBody.Expense.Title == nil || *createBody.Expense.Title != "항공권" || createBody.Expense.DisplayTitle != "항공권" || createBody.Expense.ExpenseDate != "2026-06-12" || createBody.Expense.AmountMinor != 650000 || createBody.Expense.Memo == nil || *createBody.Expense.Memo != "사전 결제" {
+		t.Fatalf("unexpected create response fields: %#v", createBody.Expense)
+	}
+
+	listRecorder := httptest.NewRecorder()
+	listRequest := httptest.NewRequest(http.MethodGet, "/trips/"+tripID+"/expenses", nil)
+	listRequest.Header.Set("Authorization", "Bearer "+ownerToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(listRecorder, listRequest)
+	if listRecorder.Code != http.StatusOK {
+		t.Fatalf("expected list status %d, got %d with body %s", http.StatusOK, listRecorder.Code, listRecorder.Body.String())
+	}
+	var listBody struct {
+		TripExpenses []struct {
+			AnchorType   string  `json:"anchorType"`
+			Title        *string `json:"title"`
+			DisplayTitle string  `json:"displayTitle"`
+		} `json:"tripExpenses"`
+		Days []interface{} `json:"days"`
+	}
+	if err := json.NewDecoder(listRecorder.Body).Decode(&listBody); err != nil {
+		t.Fatalf("decode list response: %v", err)
+	}
+	if len(listBody.TripExpenses) != 1 || listBody.TripExpenses[0].AnchorType != "trip" || listBody.TripExpenses[0].Title != nil || listBody.TripExpenses[0].DisplayTitle != "항공권" || len(listBody.Days) != 0 {
+		t.Fatalf("unexpected list response: %#v", listBody)
+	}
+}
+
 func TestCreateQuickExpenseHandler(t *testing.T) {
 	backend := newFakeAuthBackend()
 	ownerToken := loginTestUser(t, backend)
@@ -4498,6 +4570,7 @@ type fakeAuthBackend struct {
 	placeBookmarks   map[string]placedomain.TripPlaceBookmark
 	dayLodgingPlaces map[string]tripdomain.TripPlaceSummary
 	dayScheduleItems map[string][]tripdomain.ScheduleItem
+	tripExpenses     map[string][]tripdomain.DayExpenseListItem
 	dayExpenses      map[string][]tripdomain.DayExpenseListItem
 	tripInvites      map[string]tripdomain.TripInvite
 	flights          map[string]flightdomain.FlightDetail
@@ -4714,6 +4787,7 @@ func newFakeAuthBackend() *fakeAuthBackend {
 		placeBookmarks:   map[string]placedomain.TripPlaceBookmark{},
 		dayLodgingPlaces: map[string]tripdomain.TripPlaceSummary{},
 		dayScheduleItems: map[string][]tripdomain.ScheduleItem{},
+		tripExpenses:     map[string][]tripdomain.DayExpenseListItem{},
 		dayExpenses:      map[string][]tripdomain.DayExpenseListItem{},
 		tripInvites:      map[string]tripdomain.TripInvite{},
 		flights:          map[string]flightdomain.FlightDetail{},
@@ -5253,7 +5327,15 @@ func (b *fakeAuthBackend) ListDayExpensesByTripDay(_ context.Context, tripID str
 	return expenses, nil
 }
 
-func (b *fakeAuthBackend) ListTripExpenses(_ context.Context, tripID string) ([]tripdomain.TripExpenseDayListItem, error) {
+func (b *fakeAuthBackend) ListTripExpenses(_ context.Context, tripID string) (tripdomain.ListTripExpensesResult, error) {
+	tripExpenses := append([]tripdomain.DayExpenseListItem(nil), b.tripExpenses[tripID]...)
+	sort.SliceStable(tripExpenses, func(left, right int) bool {
+		if tripExpenses[left].CreatedAt.Equal(tripExpenses[right].CreatedAt) {
+			return tripExpenses[left].ID > tripExpenses[right].ID
+		}
+		return tripExpenses[left].CreatedAt.After(tripExpenses[right].CreatedAt)
+	})
+
 	prefix := tripID + ":"
 	days := make([]tripdomain.TripExpenseDayListItem, 0)
 	for key, dayExpenses := range b.dayExpenses {
@@ -5271,7 +5353,7 @@ func (b *fakeAuthBackend) ListTripExpenses(_ context.Context, tripID string) ([]
 		days = append(days, tripdomain.TripExpenseDayListItem{TripDayID: tripDayID, Expenses: expenses})
 	}
 	sort.SliceStable(days, func(left, right int) bool { return days[left].TripDayID < days[right].TripDayID })
-	return days, nil
+	return tripdomain.ListTripExpensesResult{TripExpenses: tripExpenses, Days: days}, nil
 }
 
 func (b *fakeAuthBackend) GetTripSettlementInput(_ context.Context, tripID string) (tripdomain.SettlementInput, error) {
@@ -5285,6 +5367,27 @@ func (b *fakeAuthBackend) GetTripSettlementInput(_ context.Context, tripID strin
 	}
 
 	expenses := make([]tripdomain.SettlementExpenseInput, 0)
+	for _, tripExpense := range b.tripExpenses[tripID] {
+		splits := make([]tripdomain.SettlementSplitInput, 0, len(tripExpense.Splits))
+		for _, split := range tripExpense.Splits {
+			splits = append(splits, tripdomain.SettlementSplitInput{
+				ParticipantID:   copyStringPtr(split.Participant.ParticipantID),
+				DisplayName:     split.Participant.DisplayName,
+				ParticipantLive: split.Participant.ParticipantID != nil,
+				AmountMinor:     split.AmountMinor,
+				SplitOrder:      split.SplitOrder,
+			})
+		}
+		expenses = append(expenses, tripdomain.SettlementExpenseInput{
+			ExpenseID:            tripExpense.ID,
+			Currency:             tripExpense.Currency,
+			AmountMinor:          tripExpense.AmountMinor,
+			PayerParticipantID:   copyStringPtr(tripExpense.Payer.ParticipantID),
+			PayerDisplayName:     tripExpense.Payer.DisplayName,
+			PayerParticipantLive: tripExpense.Payer.ParticipantID != nil,
+			Splits:               splits,
+		})
+	}
 	prefix := tripID + ":"
 	for key, dayExpenses := range b.dayExpenses {
 		if !strings.HasPrefix(key, prefix) {
@@ -5597,6 +5700,140 @@ func (b *fakeAuthBackend) CreateQuickExpense(_ context.Context, record tripdomai
 		Splits:         splits,
 		CreatedAt:      createdAt,
 	}}, nil
+}
+
+func (b *fakeAuthBackend) CreateTripExpense(_ context.Context, record tripdomain.CreateTripExpenseRecord) (tripdomain.CreateTripExpenseResult, error) {
+	foundTrip, ok := b.trips[record.TripID]
+	if !ok {
+		return tripdomain.CreateTripExpenseResult{}, tripdomain.ErrNotFound
+	}
+
+	var payer tripdomain.Participant
+	for _, participant := range b.participants[record.TripID] {
+		if participant.ID == record.PayerParticipantID {
+			payer = participant
+			break
+		}
+	}
+	if payer.ID == "" {
+		return tripdomain.CreateTripExpenseResult{}, tripdomain.ErrNotFound
+	}
+
+	anchorType := "trip"
+	tripDayID := record.TripDayID
+	scheduleItemID := record.ScheduleItemID
+	var placeDisplay *tripdomain.ExpensePlaceDisplay
+	displayTitle := firstNonEmptyStringPtr(record.Title, "지출")
+	if record.ScheduleItemID != nil {
+		var foundItem tripdomain.ScheduleItem
+		var foundTripDayID string
+		prefix := record.TripID + ":"
+		for key, items := range b.dayScheduleItems {
+			if !strings.HasPrefix(key, prefix) {
+				continue
+			}
+			for _, item := range items {
+				if item.ID == *record.ScheduleItemID {
+					foundItem = item
+					foundTripDayID = strings.TrimPrefix(key, prefix)
+					break
+				}
+			}
+			if foundItem.ID != "" {
+				break
+			}
+		}
+		if foundItem.ID == "" {
+			return tripdomain.CreateTripExpenseResult{}, tripdomain.ErrNotFound
+		}
+		if record.TripDayID != nil && *record.TripDayID != foundTripDayID {
+			return tripdomain.CreateTripExpenseResult{}, tripdomain.ErrValidation
+		}
+		anchorType = "schedule_item"
+		tripDayID = &foundTripDayID
+		scheduleItemID = &foundItem.ID
+		tripPlaceID := foundItem.Place.ID
+		placeAddress := foundItem.Place.Address
+		placeType := foundItem.Place.PlaceType
+		placeDisplay = &tripdomain.ExpensePlaceDisplay{TripPlaceID: &tripPlaceID, Name: foundItem.Place.Name, Address: &placeAddress, PlaceType: &placeType, Source: tripdomain.ExpenseDisplaySourceLive}
+		displayTitle = firstNonEmptyStringPtr(record.Title, foundItem.Place.Name)
+	} else if record.TripDayID != nil {
+		anchorType = "trip_day"
+	}
+
+	allParticipants := make([]tripdomain.ExpenseSplitParticipant, 0, len(b.participants[record.TripID]))
+	for _, participant := range b.participants[record.TripID] {
+		allParticipants = append(allParticipants, tripdomain.ExpenseSplitParticipant{
+			ParticipantID: participant.ID,
+			DisplayName:   participant.DisplayName,
+			JoinedAt:      participant.JoinedAt,
+		})
+	}
+	splitRecords, err := tripdomain.BuildExpenseSplitRecords(record.AmountMinor, record.SplitPolicy, allParticipants, record.ParticipantIDs, record.ManualSplits)
+	if err != nil {
+		return tripdomain.CreateTripExpenseResult{}, err
+	}
+
+	splits := make([]tripdomain.ExpenseSplit, 0, len(splitRecords))
+	daySplits := make([]tripdomain.DayExpenseSplitListItem, 0, len(splitRecords))
+	for _, splitRecord := range splitRecords {
+		participantID := splitRecord.ParticipantID
+		participantDisplay := tripdomain.ExpenseParticipantDisplay{ParticipantID: &participantID, DisplayName: splitRecord.ParticipantDisplayName, Source: tripdomain.ExpenseDisplaySourceLive}
+		splits = append(splits, tripdomain.ExpenseSplit{Participant: participantDisplay, AmountMinor: splitRecord.AmountMinor})
+		daySplits = append(daySplits, tripdomain.DayExpenseSplitListItem{SplitOrder: splitRecord.SplitOrder, Participant: participantDisplay, AmountMinor: splitRecord.AmountMinor})
+	}
+
+	b.nextExpense++
+	expenseID := testUUID(9000 + b.nextExpense)
+	createdAt := time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC).Add(time.Duration(b.nextExpense) * time.Minute)
+	payerParticipantID := payer.ID
+	payerDisplay := tripdomain.ExpenseParticipantDisplay{ParticipantID: &payerParticipantID, DisplayName: tripdomain.NormalizeParticipantDisplayName(payer.DisplayName), Source: tripdomain.ExpenseDisplaySourceLive}
+	dayExpense := tripdomain.DayExpenseListItem{
+		ID:             expenseID,
+		AnchorType:     anchorType,
+		TripDayID:      tripDayID,
+		ScheduleItemID: scheduleItemID,
+		ExpenseDate:    record.ExpenseDate.Format("2006-01-02"),
+		DisplayTitle:   displayTitle,
+		Place:          placeDisplay,
+		AmountMinor:    record.AmountMinor,
+		Currency:       foundTrip.DefaultCurrency,
+		Payer:          payerDisplay,
+		SplitPolicy:    record.SplitPolicy,
+		Splits:         daySplits,
+		CreatedAt:      createdAt,
+	}
+	if anchorType == "trip" {
+		b.tripExpenses[record.TripID] = append(b.tripExpenses[record.TripID], dayExpense)
+	} else if tripDayID != nil {
+		b.dayExpenses[record.TripID+":"+*tripDayID] = append(b.dayExpenses[record.TripID+":"+*tripDayID], dayExpense)
+	}
+
+	return tripdomain.CreateTripExpenseResult{Expense: tripdomain.Expense{
+		ID:             expenseID,
+		TripID:         record.TripID,
+		AnchorType:     anchorType,
+		TripDayID:      tripDayID,
+		ScheduleItemID: scheduleItemID,
+		ExpenseDate:    dayExpense.ExpenseDate,
+		Title:          record.Title,
+		DisplayTitle:   displayTitle,
+		Place:          placeDisplay,
+		AmountMinor:    record.AmountMinor,
+		Currency:       foundTrip.DefaultCurrency,
+		Payer:          payerDisplay,
+		Memo:           record.Memo,
+		SplitPolicy:    record.SplitPolicy,
+		Splits:         splits,
+		CreatedAt:      createdAt,
+	}}, nil
+}
+
+func firstNonEmptyStringPtr(value *string, fallback string) string {
+	if value == nil || strings.TrimSpace(*value) == "" {
+		return fallback
+	}
+	return *value
 }
 
 func (b *fakeAuthBackend) CreateManualScheduleItem(_ context.Context, record tripdomain.CreateManualScheduleItemRecord) (tripdomain.ScheduleItem, error) {

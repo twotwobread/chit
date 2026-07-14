@@ -51,6 +51,7 @@ type Expense struct {
 	TripDayID          pgtype.UUID
 	ScheduleItemID     pgtype.UUID
 	ExpenseDate        pgtype.Date
+	Title              pgtype.Text
 	TripPlaceID        pgtype.UUID
 	PlaceName          pgtype.Text
 	PlaceAddress       pgtype.Text

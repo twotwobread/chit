@@ -296,6 +296,10 @@ func createQuickExpenseResponseToOpenAPI(result trip.CreateQuickExpenseResult) o
 	return openapi.CreateQuickExpenseResponse{Expense: expenseToOpenAPI(result.Expense)}
 }
 
+func createTripExpenseResponseToOpenAPI(result trip.CreateTripExpenseResult) openapi.CreateTripExpenseResponse {
+	return openapi.CreateTripExpenseResponse{Expense: expenseToOpenAPI(result.Expense)}
+}
+
 func listDayExpensesResponseToOpenAPI(result trip.ListDayExpensesResult) openapi.ListDayExpensesResponse {
 	expenses := make([]openapi.DayExpenseListItem, 0, len(result.Expenses))
 	for _, expense := range result.Expenses {
@@ -306,6 +310,11 @@ func listDayExpensesResponseToOpenAPI(result trip.ListDayExpensesResult) openapi
 }
 
 func listTripExpensesResponseToOpenAPI(result trip.ListTripExpensesResult) openapi.ListTripExpensesResponse {
+	tripExpenses := make([]openapi.DayExpenseListItem, 0, len(result.TripExpenses))
+	for _, expense := range result.TripExpenses {
+		tripExpenses = append(tripExpenses, dayExpenseListItemToOpenAPI(expense))
+	}
+
 	days := make([]openapi.TripExpenseDayListItem, 0, len(result.Days))
 	for _, day := range result.Days {
 		expenses := make([]openapi.DayExpenseListItem, 0, len(day.Expenses))
@@ -314,7 +323,7 @@ func listTripExpensesResponseToOpenAPI(result trip.ListTripExpensesResult) opena
 		}
 		days = append(days, openapi.TripExpenseDayListItem{TripDayId: day.TripDayID, Expenses: expenses})
 	}
-	return openapi.ListTripExpensesResponse{Days: days}
+	return openapi.ListTripExpensesResponse{TripExpenses: tripExpenses, Days: days}
 }
 
 func dayExpenseListItemToOpenAPI(expense trip.DayExpenseListItem) openapi.DayExpenseListItem {
@@ -358,6 +367,7 @@ func expenseToOpenAPI(expense trip.Expense) openapi.Expense {
 		TripDayId:      expense.TripDayID,
 		ScheduleItemId: expense.ScheduleItemID,
 		ExpenseDate:    dateToOpenAPI(expense.ExpenseDate),
+		Title:          expense.Title,
 		DisplayTitle:   expense.DisplayTitle,
 		Place:          expensePlaceDisplayToOpenAPI(expense.Place),
 		AmountMinor:    expense.AmountMinor,

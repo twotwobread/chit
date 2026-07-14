@@ -27,6 +27,27 @@ WHERE si.trip_id = sqlc.arg(trip_id)::uuid
   AND si.id = sqlc.arg(schedule_item_id)::uuid
   AND si.deleted_at IS NULL;
 
+-- name: GetTripExpenseScheduleItem :one
+SELECT
+  si.id::text AS schedule_item_id,
+  si.trip_day_id::text AS trip_day_id,
+  td.date AS trip_day_date,
+  tp.id::text AS trip_place_id,
+  tp.name AS place_name,
+  tp.place_type,
+  tp.address AS place_address
+FROM schedule_items si
+JOIN trip_days td
+  ON td.id = si.trip_day_id
+ AND td.trip_id = si.trip_id
+ AND td.deleted_at IS NULL
+JOIN trip_places tp
+  ON tp.id = si.trip_place_id
+ AND tp.trip_id = si.trip_id
+WHERE si.trip_id = sqlc.arg(trip_id)::uuid
+  AND si.id = sqlc.arg(schedule_item_id)::uuid
+  AND si.deleted_at IS NULL;
+
 -- name: GetQuickExpensePayerParticipant :one
 SELECT
   id::text,
@@ -52,6 +73,7 @@ INSERT INTO expenses (
   trip_day_id,
   schedule_item_id,
   expense_date,
+  title,
   trip_place_id,
   place_name,
   place_address,
@@ -61,6 +83,7 @@ INSERT INTO expenses (
   split_policy,
   payer_participant_id,
   payer_display_name,
+  memo,
   created_by
 ) VALUES (
   sqlc.arg(trip_id)::uuid,
@@ -68,6 +91,7 @@ INSERT INTO expenses (
   sqlc.narg(trip_day_id)::uuid,
   sqlc.narg(schedule_item_id)::uuid,
   sqlc.arg(expense_date),
+  sqlc.narg(title),
   sqlc.narg(trip_place_id)::uuid,
   sqlc.narg(place_name),
   sqlc.narg(place_address),
@@ -77,6 +101,7 @@ INSERT INTO expenses (
   sqlc.arg(split_policy),
   sqlc.arg(payer_participant_id)::uuid,
   sqlc.arg(payer_display_name),
+  sqlc.narg(memo),
   sqlc.arg(created_by)::uuid
 )
 RETURNING
@@ -86,6 +111,7 @@ RETURNING
   COALESCE(trip_day_id::text, '')::text AS trip_day_id,
   COALESCE(schedule_item_id::text, '')::text AS schedule_item_id,
   expense_date,
+  title,
   COALESCE(trip_place_id::text, '')::text AS trip_place_id,
   COALESCE(place_name, '')::text AS place_name,
   COALESCE(place_address, '')::text AS place_address,
@@ -95,6 +121,7 @@ RETURNING
   split_policy,
   COALESCE(payer_participant_id::text, '')::text AS payer_participant_id,
   payer_display_name,
+  memo,
   created_at;
 
 -- name: ListDayExpensesByTripDay :many
@@ -104,7 +131,7 @@ SELECT
   COALESCE(e.trip_day_id::text, '')::text AS trip_day_id,
   COALESCE(e.schedule_item_id::text, '')::text AS schedule_item_id,
   e.expense_date,
-  COALESCE(live_place.name, e.place_name, '지출')::text AS display_title,
+  COALESCE(e.title, live_place.name, e.place_name, '지출')::text AS display_title,
   COALESCE(live_place.id::text, e.trip_place_id::text, '')::text AS trip_place_id,
   COALESCE(live_place.name, e.place_name, '')::text AS place_name,
   COALESCE(live_place.address, e.place_address, '')::text AS place_address,
@@ -149,7 +176,7 @@ SELECT
   COALESCE(e.trip_day_id::text, '')::text AS trip_day_id,
   COALESCE(e.schedule_item_id::text, '')::text AS schedule_item_id,
   e.expense_date,
-  COALESCE(live_place.name, e.place_name, '지출')::text AS display_title,
+  COALESCE(e.title, live_place.name, e.place_name, '지출')::text AS display_title,
   COALESCE(live_place.id::text, e.trip_place_id::text, '')::text AS trip_place_id,
   COALESCE(live_place.name, e.place_name, '')::text AS place_name,
   COALESCE(live_place.address, e.place_address, '')::text AS place_address,
@@ -183,8 +210,12 @@ LEFT JOIN trip_participants payer
   ON payer.id = e.payer_participant_id
  AND payer.trip_id = e.trip_id
 WHERE e.trip_id = sqlc.arg(trip_id)::uuid
-  AND e.anchor_type IN ('trip_day', 'schedule_item')
-ORDER BY e.trip_day_id ASC, e.created_at DESC, e.id DESC;
+  AND e.anchor_type IN ('trip', 'trip_day', 'schedule_item')
+ORDER BY
+  CASE WHEN e.anchor_type = 'trip' THEN 0 ELSE 1 END ASC,
+  e.trip_day_id ASC NULLS FIRST,
+  e.created_at DESC,
+  e.id DESC;
 
 -- name: ListDayExpenseSplitsByExpenseIDs :many
 SELECT
@@ -286,7 +317,8 @@ SELECT
   COALESCE(e.trip_day_id::text, '')::text AS trip_day_id,
   COALESCE(e.schedule_item_id::text, '')::text AS schedule_item_id,
   e.expense_date,
-  COALESCE(live_place.name, e.place_name, '지출')::text AS display_title,
+  e.title,
+  COALESCE(e.title, live_place.name, e.place_name, '지출')::text AS display_title,
   COALESCE(live_place.id::text, e.trip_place_id::text, '')::text AS trip_place_id,
   COALESCE(live_place.name, e.place_name, '')::text AS place_name,
   COALESCE(live_place.address, e.place_address, '')::text AS place_address,
@@ -353,6 +385,7 @@ SET
   place_name = sqlc.narg(place_name),
   place_address = sqlc.narg(place_address),
   place_type = sqlc.narg(place_type),
+  title = COALESCE(sqlc.narg(title), title),
   amount_minor = sqlc.arg(amount_minor),
   split_policy = sqlc.arg(split_policy),
   payer_participant_id = sqlc.arg(payer_participant_id)::uuid,
@@ -370,6 +403,7 @@ RETURNING
   COALESCE(trip_day_id::text, '')::text AS trip_day_id,
   COALESCE(schedule_item_id::text, '')::text AS schedule_item_id,
   expense_date,
+  title,
   COALESCE(trip_place_id::text, '')::text AS trip_place_id,
   COALESCE(place_name, '')::text AS place_name,
   COALESCE(place_address, '')::text AS place_address,

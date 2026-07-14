@@ -85,6 +85,7 @@ type fakeRepository struct {
 	listedDayExpensesDate        string
 	listDayExpensesCalled        bool
 	listDayExpensesErr           error
+	tripExpenses                 []DayExpenseListItem
 	tripExpenseDays              []TripExpenseDayListItem
 	listedTripExpensesTripID     string
 	listTripExpensesCalled       bool
@@ -116,6 +117,10 @@ type fakeRepository struct {
 	quickExpenseCalled           bool
 	quickExpenseResult           CreateQuickExpenseResult
 	quickExpenseErr              error
+	tripExpenseRecord            CreateTripExpenseRecord
+	tripExpenseCalled            bool
+	tripExpenseResult            CreateTripExpenseResult
+	tripExpenseErr               error
 	createdManualRecords         []CreateManualScheduleItemRecord
 	createdManualItem            ScheduleItem
 	createManualErr              error
@@ -411,16 +416,16 @@ func (r *fakeRepository) ListDayExpensesByTripDay(_ context.Context, tripID stri
 	return []DayExpenseListItem{}, nil
 }
 
-func (r *fakeRepository) ListTripExpenses(_ context.Context, tripID string) ([]TripExpenseDayListItem, error) {
+func (r *fakeRepository) ListTripExpenses(_ context.Context, tripID string) (ListTripExpensesResult, error) {
 	r.listedTripExpensesTripID = tripID
 	r.listTripExpensesCalled = true
 	if r.listTripExpensesErr != nil {
-		return nil, r.listTripExpensesErr
+		return ListTripExpensesResult{}, r.listTripExpensesErr
 	}
-	if r.tripExpenseDays != nil {
-		return r.tripExpenseDays, nil
-	}
-	return []TripExpenseDayListItem{}, nil
+	return ListTripExpensesResult{
+		TripExpenses: append([]DayExpenseListItem(nil), r.tripExpenses...),
+		Days:         append([]TripExpenseDayListItem(nil), r.tripExpenseDays...),
+	}, nil
 }
 
 func (r *fakeRepository) GetTripSettlementInput(_ context.Context, tripID string) (SettlementInput, error) {
@@ -550,6 +555,42 @@ func (r *fakeRepository) CreateQuickExpense(_ context.Context, record CreateQuic
 		Splits:         []ExpenseSplit{{Participant: ExpenseParticipantDisplay{ParticipantID: &payerID, DisplayName: "민수", Source: ExpenseDisplaySourceLive}, AmountMinor: record.AmountMinor}},
 		CreatedAt:      time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC),
 	}}, nil
+}
+
+func (r *fakeRepository) CreateTripExpense(_ context.Context, record CreateTripExpenseRecord) (CreateTripExpenseResult, error) {
+	r.tripExpenseRecord = record
+	r.tripExpenseCalled = true
+	if r.tripExpenseErr != nil {
+		return CreateTripExpenseResult{}, r.tripExpenseErr
+	}
+	if r.tripExpenseResult.Expense.ID != "" {
+		return r.tripExpenseResult, nil
+	}
+	payerID := record.PayerParticipantID
+	return CreateTripExpenseResult{Expense: Expense{
+		ID:             testUUID(9002),
+		TripID:         record.TripID,
+		AnchorType:     "trip",
+		TripDayID:      record.TripDayID,
+		ScheduleItemID: record.ScheduleItemID,
+		ExpenseDate:    record.ExpenseDate.Format(dateLayout),
+		Title:          record.Title,
+		DisplayTitle:   firstStringPtr(record.Title, "지출"),
+		AmountMinor:    record.AmountMinor,
+		Currency:       r.trip.DefaultCurrency,
+		Payer:          ExpenseParticipantDisplay{ParticipantID: &payerID, DisplayName: "민수", Source: ExpenseDisplaySourceLive},
+		Memo:           record.Memo,
+		SplitPolicy:    record.SplitPolicy,
+		Splits:         []ExpenseSplit{{Participant: ExpenseParticipantDisplay{ParticipantID: &payerID, DisplayName: "민수", Source: ExpenseDisplaySourceLive}, AmountMinor: record.AmountMinor}},
+		CreatedAt:      time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC),
+	}}, nil
+}
+
+func firstStringPtr(value *string, fallback string) string {
+	if value == nil || *value == "" {
+		return fallback
+	}
+	return *value
 }
 
 func (r *fakeRepository) CreateManualScheduleItem(_ context.Context, record CreateManualScheduleItemRecord) (ScheduleItem, error) {
@@ -1801,6 +1842,117 @@ func TestServiceCreateQuickExpenseManualSplit(t *testing.T) {
 	}
 	if len(repo.quickExpenseRecord.ManualSplits) != 2 || repo.quickExpenseRecord.ManualSplits[0].ParticipantID != participantA || repo.quickExpenseRecord.ManualSplits[0].AmountMinor != 300 || repo.quickExpenseRecord.ManualSplits[1].ParticipantID != participantB || repo.quickExpenseRecord.ManualSplits[1].AmountMinor != 700 {
 		t.Fatalf("unexpected manual split records: %#v", repo.quickExpenseRecord.ManualSplits)
+	}
+}
+
+func TestServiceCreateTripExpenseMapsTripDayScheduleAnchors(t *testing.T) {
+	payerID := testUUID(2001)
+	splitParticipantID := testUUID(2002)
+	dayID := testUUID(7101)
+	itemID := testUUID(7201)
+	validTrip := Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13", DefaultCurrency: "JPY"}
+
+	t.Run("trip-level keeps payment date independent from trip days", func(t *testing.T) {
+		repo := &fakeRepository{trip: validTrip, tripFound: true, isParticipant: true}
+		_, err := newTestService(repo).CreateTripExpense(context.Background(), "user-1", testTripID, CreateTripExpenseInput{
+			Title:              stringPtr(" 항공권 "),
+			ExpenseDate:        "2026-06-12",
+			AmountMinor:        650000,
+			PayerParticipantID: payerID,
+			SplitPolicy:        ExpenseSplitPolicyEqual,
+			ParticipantIDs:     []string{strings.ToUpper(splitParticipantID)},
+			Memo:               stringPtr("  사전 결제  "),
+		})
+		if err != nil {
+			t.Fatalf("CreateTripExpense returned error: %v", err)
+		}
+		if !repo.tripExpenseCalled {
+			t.Fatal("expected repository trip expense creation to be called")
+		}
+		if repo.tripExpenseRecord.TripID != testTripID || repo.tripExpenseRecord.CreatedBy != "user-1" || repo.tripExpenseRecord.TripDayID != nil || repo.tripExpenseRecord.ScheduleItemID != nil {
+			t.Fatalf("unexpected trip-level record: %#v", repo.tripExpenseRecord)
+		}
+		if repo.tripExpenseRecord.Title == nil || *repo.tripExpenseRecord.Title != "항공권" || repo.tripExpenseRecord.Memo == nil || *repo.tripExpenseRecord.Memo != "사전 결제" {
+			t.Fatalf("expected normalized title/memo, got title=%#v memo=%#v", repo.tripExpenseRecord.Title, repo.tripExpenseRecord.Memo)
+		}
+		if repo.tripExpenseRecord.ExpenseDate.Format(dateLayout) != "2026-06-12" {
+			t.Fatalf("expected independent payment date, got %s", repo.tripExpenseRecord.ExpenseDate.Format(dateLayout))
+		}
+		if len(repo.tripExpenseRecord.ParticipantIDs) != 1 || repo.tripExpenseRecord.ParticipantIDs[0] != splitParticipantID {
+			t.Fatalf("expected normalized participants, got %#v", repo.tripExpenseRecord.ParticipantIDs)
+		}
+	})
+
+	t.Run("day and schedule context remain optional anchors", func(t *testing.T) {
+		repo := &fakeRepository{trip: validTrip, tripFound: true, isParticipant: true}
+		_, err := newTestService(repo).CreateTripExpense(context.Background(), "user-1", testTripID, CreateTripExpenseInput{
+			Title:              stringPtr("렌트비"),
+			ExpenseDate:        "2026-06-30",
+			TripDayID:          &dayID,
+			AmountMinor:        120000,
+			PayerParticipantID: payerID,
+			SplitPolicy:        ExpenseSplitPolicyEqual,
+			ParticipantIDs:     []string{splitParticipantID},
+		})
+		if err != nil {
+			t.Fatalf("day-level CreateTripExpense returned error: %v", err)
+		}
+		if repo.tripExpenseRecord.TripDayID == nil || *repo.tripExpenseRecord.TripDayID != dayID || repo.tripExpenseRecord.ScheduleItemID != nil {
+			t.Fatalf("unexpected day-level record: %#v", repo.tripExpenseRecord)
+		}
+
+		repo = &fakeRepository{trip: validTrip, tripFound: true, isParticipant: true}
+		_, err = newTestService(repo).CreateTripExpense(context.Background(), "user-1", testTripID, CreateTripExpenseInput{
+			Title:              stringPtr("   "),
+			ExpenseDate:        "2026-06-12",
+			TripDayID:          &dayID,
+			ScheduleItemID:     &itemID,
+			AmountMinor:        1000,
+			PayerParticipantID: payerID,
+			SplitPolicy:        ExpenseSplitPolicyEqual,
+			ParticipantIDs:     []string{splitParticipantID},
+		})
+		if err != nil {
+			t.Fatalf("schedule-level CreateTripExpense returned error: %v", err)
+		}
+		if repo.tripExpenseRecord.Title != nil || repo.tripExpenseRecord.TripDayID == nil || *repo.tripExpenseRecord.TripDayID != dayID || repo.tripExpenseRecord.ScheduleItemID == nil || *repo.tripExpenseRecord.ScheduleItemID != itemID {
+			t.Fatalf("unexpected schedule-level record: %#v", repo.tripExpenseRecord)
+		}
+	})
+}
+
+func TestServiceCreateTripExpenseValidation(t *testing.T) {
+	payerID := testUUID(2001)
+	splitParticipantID := testUUID(2002)
+	validTrip := Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13", DefaultCurrency: "JPY"}
+	validInput := func() CreateTripExpenseInput {
+		return CreateTripExpenseInput{Title: stringPtr("항공권"), ExpenseDate: "2026-06-12", AmountMinor: 1000, PayerParticipantID: payerID, SplitPolicy: ExpenseSplitPolicyEqual, ParticipantIDs: []string{splitParticipantID}}
+	}
+	tests := []struct {
+		name   string
+		repo   *fakeRepository
+		userID string
+		tripID string
+		input  CreateTripExpenseInput
+		want   error
+	}{
+		{name: "requires auth", repo: &fakeRepository{}, userID: " ", tripID: testTripID, input: validInput(), want: ErrUnauthorized},
+		{name: "invalid trip id", repo: &fakeRepository{}, userID: "user-1", tripID: "not-a-uuid", input: validInput(), want: ErrValidation},
+		{name: "missing title without schedule", repo: &fakeRepository{trip: validTrip, tripFound: true, isParticipant: true}, userID: "user-1", tripID: testTripID, input: CreateTripExpenseInput{ExpenseDate: "2026-06-12", AmountMinor: 1000, PayerParticipantID: payerID, SplitPolicy: ExpenseSplitPolicyEqual, ParticipantIDs: []string{splitParticipantID}}, want: ErrValidation},
+		{name: "invalid payment date", repo: &fakeRepository{trip: validTrip, tripFound: true, isParticipant: true}, userID: "user-1", tripID: testTripID, input: CreateTripExpenseInput{Title: stringPtr("항공권"), ExpenseDate: "2026-13-12", AmountMinor: 1000, PayerParticipantID: payerID, SplitPolicy: ExpenseSplitPolicyEqual, ParticipantIDs: []string{splitParticipantID}}, want: ErrValidation},
+		{name: "missing trip", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, input: validInput(), want: ErrNotFound},
+		{name: "forbidden", repo: &fakeRepository{trip: validTrip, tripFound: true}, userID: "user-1", tripID: testTripID, input: validInput(), want: ErrForbidden},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := newTestService(tt.repo).CreateTripExpense(context.Background(), tt.userID, tt.tripID, tt.input)
+			if !errors.Is(err, tt.want) {
+				t.Fatalf("expected %v, got %v", tt.want, err)
+			}
+			if tt.want != nil && tt.repo.tripExpenseCalled {
+				t.Fatal("expected invalid request not to call repository")
+			}
+		})
 	}
 }
 

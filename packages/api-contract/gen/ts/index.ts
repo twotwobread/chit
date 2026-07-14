@@ -28,6 +28,8 @@ export type { CreateManualScheduleItemResponse } from './models/CreateManualSche
 export type { CreateQuickExpenseRequest } from './models/CreateQuickExpenseRequest';
 export type { CreateQuickExpenseResponse } from './models/CreateQuickExpenseResponse';
 export type { CreateRoutePreviewRequest } from './models/CreateRoutePreviewRequest';
+export type { CreateTripExpenseRequest } from './models/CreateTripExpenseRequest';
+export type { CreateTripExpenseResponse } from './models/CreateTripExpenseResponse';
 export type { CreateTripFlightRequest } from './models/CreateTripFlightRequest';
 export type { CreateTripFlightResponse } from './models/CreateTripFlightResponse';
 export type { CreateTripInviteResponse } from './models/CreateTripInviteResponse';

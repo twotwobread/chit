@@ -376,6 +376,42 @@ func (s apiServer) ListTripExpenses(w http.ResponseWriter, r *http.Request, trip
 	writeJSON(w, http.StatusOK, listTripExpensesResponseToOpenAPI(result))
 }
 
+func (s apiServer) CreateTripExpense(w http.ResponseWriter, r *http.Request, tripId string) {
+	if s.auth == nil || s.trips == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "trip expense creation is not configured", nil)
+		return
+	}
+
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	var body openapi.CreateTripExpenseJSONRequestBody
+	if !decodeJSON(w, r, &body) {
+		return
+	}
+
+	result, err := s.trips.CreateTripExpense(r.Context(), authContext.UserID, tripId, trip.CreateTripExpenseInput{
+		Title:              body.Title,
+		ExpenseDate:        body.ExpenseDate.Time.Format("2006-01-02"),
+		TripDayID:          body.TripDayId,
+		ScheduleItemID:     body.ScheduleItemId,
+		AmountMinor:        body.AmountMinor,
+		PayerParticipantID: body.PayerParticipantId,
+		SplitPolicy:        string(body.SplitPolicy),
+		ParticipantIDs:     optionalStringSlice(body.ParticipantIds),
+		ManualSplits:       manualExpenseSplitsFromOpenAPI(body.Splits),
+		Memo:               body.Memo,
+	})
+	if err != nil {
+		writeQuickExpenseError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, createTripExpenseResponseToOpenAPI(result))
+}
+
 func (s apiServer) GetDayExpense(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, expenseId string) {
 	if s.auth == nil || s.trips == nil {
 		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "day expense detail is not configured", nil)
@@ -413,6 +449,7 @@ func (s apiServer) UpdateExpense(w http.ResponseWriter, r *http.Request, tripId 
 		ParticipantIDs:     optionalStringSlice(body.ParticipantIds),
 		ManualSplits:       manualExpenseSplitsFromOpenAPI(body.Splits),
 		Memo:               body.Memo,
+		Title:              body.Title,
 		ScheduleItemID:     body.ScheduleItemId,
 	})
 	if err != nil {
