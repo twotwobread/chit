@@ -17,6 +17,7 @@ const (
 	googlePlacesAPIBaseURL     = "https://places.googleapis.com/v1"
 	googlePlacesSearchTextURL  = googlePlacesAPIBaseURL + "/places:searchText"
 	googlePlacesDetailsBaseURL = googlePlacesAPIBaseURL + "/places"
+	googlePlacesLanguageCode   = "ko"
 )
 
 type GoogleProvider struct {
@@ -52,7 +53,7 @@ func (p *GoogleProvider) Search(ctx context.Context, input ProviderSearchInput) 
 	requestBody := map[string]interface{}{
 		"textQuery":      input.Query,
 		"maxResultCount": input.Limit,
-		"languageCode":   "ko",
+		"languageCode":   googlePlacesLanguageCode,
 	}
 	if input.LocationBias != nil {
 		requestBody["locationBias"] = map[string]interface{}{
@@ -141,7 +142,7 @@ func (p *GoogleProvider) SearchDestinations(ctx context.Context, input ProviderD
 	requestBody := map[string]interface{}{
 		"textQuery":      input.Query,
 		"maxResultCount": input.Limit,
-		"languageCode":   "ko",
+		"languageCode":   googlePlacesLanguageCode,
 	}
 	body, err := json.Marshal(requestBody)
 	if err != nil {
@@ -278,9 +279,7 @@ func (p *GoogleProvider) Details(ctx context.Context, input ProviderDetailsInput
 	if err != nil {
 		return GooglePlaceDetails{}, err
 	}
-	query := request.URL.Query()
-	query.Set("languageCode", "ko")
-	request.URL.RawQuery = query.Encode()
+	setGooglePlacesLanguageQuery(request)
 	request.Header.Set("X-Goog-Api-Key", p.apiKey)
 	request.Header.Set("X-Goog-FieldMask", "id,displayName,formattedAddress,location,primaryType,types")
 
@@ -327,9 +326,7 @@ func (p *GoogleProvider) Description(ctx context.Context, input ProviderDescript
 	if err != nil {
 		return GooglePlaceDescription{}, err
 	}
-	query := request.URL.Query()
-	query.Set("languageCode", "ko")
-	request.URL.RawQuery = query.Encode()
+	setGooglePlacesLanguageQuery(request)
 	request.Header.Set("X-Goog-Api-Key", p.apiKey)
 	request.Header.Set("X-Goog-FieldMask", "id,displayName,formattedAddress,editorialSummary,generativeSummary")
 
@@ -432,6 +429,12 @@ func googlePhotoAttributions(input []googlePhotoAttribution) []PhotoAttribution 
 func googlePlacePhotoMediaBaseURL(detailsBaseURL string) string {
 	base := strings.TrimRight(strings.TrimSpace(detailsBaseURL), "/")
 	return strings.TrimSuffix(base, "/places")
+}
+
+func setGooglePlacesLanguageQuery(request *http.Request) {
+	query := request.URL.Query()
+	query.Set("languageCode", googlePlacesLanguageCode)
+	request.URL.RawQuery = query.Encode()
 }
 
 func firstNonEmptyString(values ...string) string {
