@@ -232,4 +232,30 @@ Generated artifact가 current source와 drift되거나, regenerated artifact가 
 
 ## Staging / Internal Deployment
 
-Staging/internal deployment is agent-owned workflow context. Use `/skill:i-um-staging-deploy` when the task explicitly asks for Cloud Run staging deploy, EAS internal build, staging smoke verification, DB migration on staging, or rollback.
+Staging/internal deployment uses `.env.stage` as the local source for deployment inputs. Copy the example file and replace placeholder secret values locally:
+
+```bash
+cp .env.stage.example .env.stage
+```
+
+Run the full staging flow for real Apple/Kakao login, API deploy, DB migration, smoke checks, EAS preview env sync, and the default iOS internal build. If `.env.stage` leaves `INVITE_BASE_URL` / `EXPO_PUBLIC_INVITE_LINK_HOST` blank, the deploy script uses the Cloud Run URL/host for demo invite links instead of assuming a purchased domain:
+
+```bash
+pnpm run deploy stage
+# or
+pnpm deploy:stage
+```
+
+`pnpm deploy stage` is not used because `deploy` is a built-in pnpm command.
+
+Useful scoped runs:
+
+```bash
+pnpm run deploy stage --dry-run
+pnpm run deploy stage --only api
+pnpm run deploy stage --only mobile --platform ios
+pnpm run deploy stage --only mobile --platform android
+pnpm run deploy stage --only eas-env
+```
+
+Do not commit `.env.stage` or paste its secret values into chat, issues, git, or logs. Boarding pass image upload/opening requires `BOARDING_PASS_GCS_BUCKET`, `BOARDING_PASS_GCS_SIGNING_ACCESS_ID`, and `BOARDING_PASS_GCS_SIGNING_PRIVATE_KEY`; the bucket must grant the Cloud Run runtime service account object read/write/delete access.

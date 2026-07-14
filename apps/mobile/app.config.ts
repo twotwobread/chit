@@ -1,9 +1,9 @@
 import type { ConfigContext, ExpoConfig } from 'expo/config';
 
-import appJson from './app.json';
+import appJson from './app.json' with { type: 'json' };
 
 const kakaoNativeAppKey = process.env.EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY?.trim();
-const inviteLinkHost = process.env.EXPO_PUBLIC_INVITE_LINK_HOST?.trim() || 'invite.i-um.app';
+const inviteLinkHost = process.env.EXPO_PUBLIC_INVITE_LINK_HOST?.trim();
 const usesRealProviderAuth = process.env.EXPO_PUBLIC_AUTH_DEV_MODE !== 'true';
 const isPreviewBuild = process.env.EAS_BUILD_PROFILE === 'preview';
 
@@ -46,7 +46,9 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     plugins,
     ios: {
       ...iosConfig,
-      associatedDomains: unique([...(iosConfig.associatedDomains ?? []), `applinks:${inviteLinkHost}`]),
+      associatedDomains: inviteLinkHost
+        ? unique([...(iosConfig.associatedDomains ?? []), `applinks:${inviteLinkHost}`])
+        : iosConfig.associatedDomains,
       infoPlist: {
         ...iosConfig.infoPlist,
         ...(kakaoNativeAppKey ? { KAKAO_APP_SCHEME: `kakao${kakaoNativeAppKey}` } : {}),
@@ -56,12 +58,16 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       ...androidConfig,
       intentFilters: [
         ...(androidConfig.intentFilters ?? []),
-        {
-          action: 'VIEW',
-          autoVerify: true,
-          data: [{ scheme: 'https', host: inviteLinkHost, pathPrefix: '/invite' }],
-          category: ['BROWSABLE', 'DEFAULT'],
-        },
+        ...(inviteLinkHost
+          ? [
+              {
+                action: 'VIEW',
+                autoVerify: true,
+                data: [{ scheme: 'https', host: inviteLinkHost, pathPrefix: '/invite' }],
+                category: ['BROWSABLE', 'DEFAULT'],
+              },
+            ]
+          : []),
       ],
     },
   };
