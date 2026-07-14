@@ -3,6 +3,7 @@ import { Share, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import type { Href } from 'expo-router';
+import KakaoShareLink from 'react-native-kakao-share-link';
 
 import { SecondaryButton, theme } from '../../../../lib/design';
 import { DayChips } from '../../../../lib/trip-ui/DayChips';
@@ -16,6 +17,7 @@ import { beginStaleWhileRevalidate, resolveStaleWhileRevalidateFailure } from '.
 import {
   buildSettlementExpenseEntryRouteForDays,
   buildSettlementExpenseHistoryDayInputs,
+  buildKakaoSettlementRequestTemplate,
   buildSettlementExpenseHistoryViewModel,
   buildSettlementRequestMessage,
   buildSettlementTransferViewModel,
@@ -24,7 +26,6 @@ import {
   type SettlementBalanceDirection,
   type SettlementExpenseHistoryDayInput,
   type SettlementExpenseHistoryFailureViewModel,
-  type SettlementNoTransferNoticeViewModel,
   type SettlementTransferFailureViewModel,
   type SettlementTransferViewModel,
 } from '../../../../lib/trips/settlement';
@@ -191,40 +192,8 @@ function SettlementContent({
   tripName: string;
   viewModel: SettlementTransferViewModel;
 }) {
-  if (viewModel.status === 'empty') {
-    return (
-      <View style={styles.successStack}>
-        <TripStateCard helper={viewModel.helper} title={viewModel.title} />
-        <ExpenseHistoryContent
-          expenseHistory={expenseHistory}
-          onRetry={onRetryExpenseHistory}
-          onSelectDay={onSelectExpenseDay}
-          selectedDayId={selectedExpenseDayId}
-          today={today}
-          tripId={tripId}
-        />
-      </View>
-    );
-  }
-
   return (
     <View style={styles.successStack}>
-      <TripListCard>
-        <View style={styles.summary}>
-          <Text style={styles.summaryTitle}>{viewModel.summaryTitle}</Text>
-          <Text style={styles.summaryHelper}>{viewModel.summaryHelper}</Text>
-        </View>
-      </TripListCard>
-
-      <ExpenseHistoryContent
-        expenseHistory={expenseHistory}
-        onRetry={onRetryExpenseHistory}
-        onSelectDay={onSelectExpenseDay}
-        selectedDayId={selectedExpenseDayId}
-        today={today}
-        tripId={tripId}
-      />
-
       {viewModel.balanceSections.map((section) => (
         <TripListCard key={`balance-${section.currency}`}>
           <View style={styles.sectionHeader}>
@@ -253,7 +222,14 @@ function SettlementContent({
         </TripListCard>
       ))}
 
-      {viewModel.noTransferNotice ? <NoTransferNoticeCard notice={viewModel.noTransferNotice} /> : null}
+      <ExpenseHistoryContent
+        expenseHistory={expenseHistory}
+        onRetry={onRetryExpenseHistory}
+        onSelectDay={onSelectExpenseDay}
+        selectedDayId={selectedExpenseDayId}
+        today={today}
+        tripId={tripId}
+      />
 
       {viewModel.sections.map((section) => (
         <TripListCard key={`transfer-${section.currency}`}>
@@ -370,11 +346,31 @@ function SettlementRequestButton({
   viewModel: SettlementTransferViewModel;
 }) {
   const message = buildSettlementRequestMessage(viewModel, tripName);
-  if (!message) {
-    return null;
-  }
+  const disabled = viewModel.requestAction.disabled || !message;
 
-  return <SecondaryButton label="정산 요청하기" onPress={() => void Share.share({ message })} />;
+  return (
+    <SecondaryButton
+      accessibilityLabel={
+        disabled ? '보낼 정산 내역이 없어 정산 요청을 보낼 수 없어요.' : viewModel.requestAction.label
+      }
+      disabled={disabled}
+      label={viewModel.requestAction.label}
+      onPress={() => {
+        if (!message) {
+          return;
+        }
+        void shareSettlementRequest(message);
+      }}
+    />
+  );
+}
+
+async function shareSettlementRequest(message: string) {
+  try {
+    await KakaoShareLink.sendText(buildKakaoSettlementRequestTemplate(message));
+  } catch {
+    await Share.share({ message });
+  }
 }
 
 function BalanceMetric({
@@ -391,24 +387,6 @@ function BalanceMetric({
       <Text style={styles.balanceMetricLabel}>{label}</Text>
       <Text style={[styles.balanceMetricValue, direction ? netAmountStyle(direction) : null]}>{value}</Text>
     </View>
-  );
-}
-
-function NoTransferNoticeCard({ notice }: { notice: SettlementNoTransferNoticeViewModel }) {
-  const primaryAction = notice.primaryAction;
-  return (
-    <TripStateCard
-      helper={notice.helper}
-      primaryAction={
-        primaryAction
-          ? {
-              label: primaryAction.label,
-              onPress: () => router.push(primaryAction.route as Href),
-            }
-          : undefined
-      }
-      title={notice.title}
-    />
   );
 }
 
@@ -612,23 +590,6 @@ const styles = StyleSheet.create({
     gap: theme.space[4],
     maxWidth: theme.layout.cardMaxW,
     width: '100%',
-  },
-  summary: {
-    gap: theme.space[1],
-    paddingHorizontal: theme.space[1],
-    paddingVertical: theme.space[4],
-  },
-  summaryHelper: {
-    color: theme.color.textMuted,
-    fontFamily: theme.font.family.regular,
-    fontSize: theme.font.size.body,
-    lineHeight: theme.font.size.body * theme.font.leading.normal,
-  },
-  summaryTitle: {
-    color: theme.color.textStrong,
-    fontFamily: theme.font.family.bold,
-    fontSize: theme.font.size.subhead,
-    fontWeight: theme.font.weight.bold,
   },
   transferList: {
     gap: theme.space[3],
