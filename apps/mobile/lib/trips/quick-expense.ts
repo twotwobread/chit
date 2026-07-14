@@ -2,6 +2,7 @@ import type { Href } from 'expo-router';
 
 import type {
   CreateQuickExpenseRequest,
+  CreateTripExpenseRequest,
   UpdateExpenseRequest,
   ScheduleItem,
   ExpenseSplit,
@@ -20,6 +21,8 @@ import { formatTripDayDate, formatTripDayLabel } from './days';
 import { tripItineraryDayPath, tripSettlePath } from './routes';
 
 export type QuickExpenseFormErrors = {
+  title?: string;
+  expenseDate?: string;
   amount?: string;
   item?: string;
   payer?: string;
@@ -179,6 +182,25 @@ export function resolveInitialQuickExpenseItemId(
   return resolveInitialQuickExpenseItemIdFromOrderedItems(orderedItems(items), preferredItemId);
 }
 
+export function resolveTodayQuickExpenseInitialItemId(
+  items: ScheduleItem[],
+  preferredItemId?: string | null,
+): string | null {
+  const ordered = orderedItems(items);
+  if (preferredItemId && ordered.some((item) => item.id === preferredItemId)) {
+    return preferredItemId;
+  }
+
+  const latestArrivedItem = ordered
+    .filter((item) => item.arrivedAt !== null)
+    .sort((left, right) => {
+      const arrivedDiff = timestampValue(right.arrivedAt) - timestampValue(left.arrivedAt);
+      return arrivedDiff !== 0 ? arrivedDiff : right.itemOrder - left.itemOrder;
+    })[0];
+
+  return latestArrivedItem?.id ?? resolveInitialQuickExpenseItemIdFromOrderedItems(ordered);
+}
+
 export function resolveInitialQuickExpenseItemIdFromItineraries(
   itineraries: GetDayScheduleItemsResponse[],
   preferredItemId?: string | null,
@@ -301,10 +323,12 @@ export function buildQuickExpenseViewModel({
   const isAllDayMode = itineraryList.length > 1;
   const selectedItemFromAllDays = allItemOptions.find((item) => item.selected) ?? null;
   const activeTripDayId = isAllDayMode
-    ? (selectedTripDayId ?? selectedItemFromAllDays?.tripDayId ?? itineraryList[0]?.day.id ?? null)
+    ? (selectedTripDayId ?? selectedItemFromAllDays?.tripDayId ?? null)
     : itinerary.day.id;
   const itemOptions = isAllDayMode
-    ? allItemOptions.filter((option) => option.tripDayId === activeTripDayId)
+    ? activeTripDayId
+      ? allItemOptions.filter((option) => option.tripDayId === activeTripDayId)
+      : allItemOptions
     : allItemOptions;
   const selectedItem = itemOptions.find((item) => item.selected) ?? null;
   const dayOptions = isAllDayMode
@@ -313,11 +337,10 @@ export function buildQuickExpenseViewModel({
         dayLabel: formatTripDayLabel(optionItinerary.day.dayOrder),
         formattedDate: formatTripDayDate(optionItinerary.day.date),
         itemCount: getScheduleItems(optionItinerary).length,
-        selected: optionItinerary.day.id === activeTripDayId,
+        selected: activeTripDayId !== null && optionItinerary.day.id === activeTripDayId,
       }))
     : [];
   const showItemSelector = itemOptions.length > 0;
-  const hasAnyItemOptions = allItemOptions.length > 0;
   const selectedParticipantSet = new Set(selectedSplitParticipantIds ?? buildDefaultSplitParticipantIds(participants));
   const selectedParticipants = participants.filter((participant) =>
     selectedParticipantSet.has(participant.participantId),
@@ -365,9 +388,7 @@ export function buildQuickExpenseViewModel({
     emptyMessage:
       itemOptions.length === 0
         ? isAllDayMode
-          ? hasAnyItemOptions
-            ? '선택한 일차에 등록된 일정이 없어 다른 일차를 선택해주세요.'
-            : '여행 일정에 등록된 일정이 없어 지출을 저장할 수 없어요.'
+          ? null
           : '오늘 일정에 등록된 일정이 없어 지출을 저장할 수 없어요.'
         : null,
   };
@@ -600,31 +621,25 @@ export function buildCreateQuickExpenseRequest({
   manualSplitInputs: QuickExpenseManualSplitInput[];
   payerParticipantId: string | null;
 }): { ok: true; request: CreateQuickExpenseRequest } | { ok: false; errors: QuickExpenseFormErrors } {
-  const errors: QuickExpenseFormErrors = {};
-  const parsedAmount = parseAmountMinor(amountInput, currency);
-  if (!parsedAmount.ok) {
-    errors.amount = parsedAmount.message;
-  }
+  const validation = validateExpenseAmountPayerAndSplits({
+    amountInput,
+    currency,
+    splitPolicy,
+    participantIds,
+    manualSplitInputs,
+    payerParticipantId,
+  });
   if (!scheduleItemId) {
-    errors.item = '지출을 연결할 일정을 선택해주세요.';
-  }
-  if (!payerParticipantId) {
-    errors.payer = '결제자를 선택해주세요.';
+    validation.errors.item = '지출을 연결할 일정을 선택해주세요.';
   }
 
-  if (splitPolicy === 'equal') {
-    if (participantIds.length === 0) {
-      errors.participants = '분할할 사람을 1명 이상 선택해주세요.';
-    }
-  } else {
-    const manualSummary = buildQuickExpenseManualSplitSummary({ amountInput, currency, manualSplitInputs });
-    if (!manualSummary.canSubmit) {
-      errors.participants = manualSummary.validationMessage ?? '분할 금액의 합계가 총 지출 금액과 같아야 해요.';
-    }
-  }
-
-  if (Object.keys(errors).length > 0 || !parsedAmount.ok || !scheduleItemId || !payerParticipantId) {
-    return { ok: false, errors };
+  if (
+    Object.keys(validation.errors).length > 0 ||
+    !validation.parsedAmount.ok ||
+    !payerParticipantId ||
+    !scheduleItemId
+  ) {
+    return { ok: false, errors: validation.errors };
   }
 
   if (splitPolicy === 'equal') {
@@ -632,7 +647,7 @@ export function buildCreateQuickExpenseRequest({
       ok: true,
       request: {
         scheduleItemId,
-        amountMinor: parsedAmount.amountMinor,
+        amountMinor: validation.parsedAmount.amountMinor,
         payerParticipantId,
         splitPolicy,
         participantIds,
@@ -640,21 +655,90 @@ export function buildCreateQuickExpenseRequest({
     };
   }
 
-  const manualSummary = buildQuickExpenseManualSplitSummary({ amountInput, currency, manualSplitInputs });
-  if (!manualSummary.canSubmit) {
-    return {
-      ok: false,
-      errors: { participants: manualSummary.validationMessage ?? '분할 금액의 합계가 총 지출 금액과 같아야 해요.' },
-    };
-  }
   return {
     ok: true,
     request: {
       scheduleItemId,
-      amountMinor: parsedAmount.amountMinor,
+      amountMinor: validation.parsedAmount.amountMinor,
       payerParticipantId,
       splitPolicy,
-      splits: manualSummary.requestSplits,
+      splits: validation.manualSummary.requestSplits,
+    },
+  };
+}
+
+export function buildCreateTripExpenseRequest({
+  titleInput,
+  expenseDate,
+  amountInput,
+  currency,
+  selectedTripDayId,
+  scheduleItemId,
+  splitPolicy,
+  participantIds,
+  manualSplitInputs,
+  payerParticipantId,
+  memoInput,
+}: {
+  titleInput: string;
+  expenseDate: string;
+  amountInput: string;
+  currency: SupportedCurrency;
+  selectedTripDayId: string | null;
+  scheduleItemId: string | null;
+  splitPolicy: QuickExpenseSplitPolicy;
+  participantIds: string[];
+  manualSplitInputs: QuickExpenseManualSplitInput[];
+  payerParticipantId: string | null;
+  memoInput: string;
+}): { ok: true; request: CreateTripExpenseRequest } | { ok: false; errors: QuickExpenseFormErrors } {
+  const validation = validateExpenseAmountPayerAndSplits({
+    amountInput,
+    currency,
+    splitPolicy,
+    participantIds,
+    manualSplitInputs,
+    payerParticipantId,
+  });
+  const title = titleInput.trim();
+  if (title === '' && !scheduleItemId) {
+    validation.errors.title = '지출명을 입력해주세요.';
+  }
+  if (!isDateOnlyString(expenseDate)) {
+    validation.errors.expenseDate = '결제일자를 선택해주세요.';
+  }
+
+  if (Object.keys(validation.errors).length > 0 || !validation.parsedAmount.ok || !payerParticipantId) {
+    return { ok: false, errors: validation.errors };
+  }
+
+  const memo = memoInput.trim();
+  const baseRequest = {
+    title: title === '' ? null : title,
+    expenseDate,
+    tripDayId: selectedTripDayId,
+    scheduleItemId,
+    amountMinor: validation.parsedAmount.amountMinor,
+    payerParticipantId,
+    splitPolicy,
+    memo: memo === '' ? null : memo,
+  };
+
+  if (splitPolicy === 'equal') {
+    return {
+      ok: true,
+      request: {
+        ...baseRequest,
+        participantIds,
+      },
+    };
+  }
+
+  return {
+    ok: true,
+    request: {
+      ...baseRequest,
+      splits: validation.manualSummary.requestSplits,
     },
   };
 }
@@ -757,6 +841,62 @@ function compareParticipantsForSplit(left: TripParticipantListItem, right: TripP
 function joinedAtTime(value: string): number {
   const parsed = Date.parse(value);
   return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+function timestampValue(value: string | null | undefined): number {
+  if (!value) {
+    return 0;
+  }
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+function isDateOnlyString(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false;
+  }
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}
+
+function validateExpenseAmountPayerAndSplits({
+  amountInput,
+  currency,
+  splitPolicy,
+  participantIds,
+  manualSplitInputs,
+  payerParticipantId,
+}: {
+  amountInput: string;
+  currency: SupportedCurrency;
+  splitPolicy: QuickExpenseSplitPolicy;
+  participantIds: string[];
+  manualSplitInputs: QuickExpenseManualSplitInput[];
+  payerParticipantId: string | null;
+}): {
+  errors: QuickExpenseFormErrors;
+  parsedAmount: ReturnType<typeof parseAmountMinor>;
+  manualSummary: QuickExpenseManualSplitSummary;
+} {
+  const errors: QuickExpenseFormErrors = {};
+  const parsedAmount = parseAmountMinor(amountInput, currency);
+  if (!parsedAmount.ok) {
+    errors.amount = parsedAmount.message;
+  }
+  if (!payerParticipantId) {
+    errors.payer = '결제자를 선택해주세요.';
+  }
+
+  const manualSummary = buildQuickExpenseManualSplitSummary({ amountInput, currency, manualSplitInputs });
+  if (splitPolicy === 'equal') {
+    if (participantIds.length === 0) {
+      errors.participants = '분할할 사람을 1명 이상 선택해주세요.';
+    }
+  } else if (!manualSummary.canSubmit) {
+    errors.participants = manualSummary.validationMessage ?? '분할 금액의 합계가 총 지출 금액과 같아야 해요.';
+  }
+
+  return { errors, parsedAmount, manualSummary };
 }
 
 function normalizeParticipantDisplayName(value: string): string {

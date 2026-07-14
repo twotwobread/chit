@@ -84,6 +84,19 @@ type CreateQuickExpenseInput struct {
 	ManualSplits       []ManualExpenseSplitInput
 }
 
+type CreateTripExpenseInput struct {
+	Title              *string
+	ExpenseDate        string
+	TripDayID          *string
+	ScheduleItemID     *string
+	AmountMinor        int64
+	PayerParticipantID string
+	SplitPolicy        string
+	ParticipantIDs     []string
+	ManualSplits       []ManualExpenseSplitInput
+	Memo               *string
+}
+
 type UpdateExpenseInput struct {
 	AmountMinor        int64
 	PayerParticipantID string
@@ -91,6 +104,7 @@ type UpdateExpenseInput struct {
 	ParticipantIDs     []string
 	ManualSplits       []ManualExpenseSplitInput
 	Memo               *string
+	Title              *string
 	ScheduleItemID     *string
 }
 
@@ -222,6 +236,21 @@ type CreateQuickExpenseRecord struct {
 	CreatedBy          string
 }
 
+type CreateTripExpenseRecord struct {
+	TripID             string
+	Title              *string
+	ExpenseDate        time.Time
+	TripDayID          *string
+	ScheduleItemID     *string
+	AmountMinor        int64
+	PayerParticipantID string
+	SplitPolicy        string
+	ParticipantIDs     []string
+	ManualSplits       []ManualExpenseSplitInput
+	Memo               *string
+	CreatedBy          string
+}
+
 type UpdateExpenseRecord struct {
 	TripID             string
 	TripDayID          string
@@ -232,6 +261,7 @@ type UpdateExpenseRecord struct {
 	ParticipantIDs     []string
 	ManualSplits       []ManualExpenseSplitInput
 	Memo               *string
+	Title              *string
 	ScheduleItemID     *string
 }
 
@@ -497,6 +527,7 @@ type Expense struct {
 	TripDayID      *string
 	ScheduleItemID *string
 	ExpenseDate    string
+	Title          *string
 	DisplayTitle   string
 	Place          *ExpensePlaceDisplay
 	AmountMinor    int64
@@ -517,6 +548,10 @@ type UpdateExpenseResult struct {
 }
 
 type CreateQuickExpenseResult struct {
+	Expense Expense
+}
+
+type CreateTripExpenseResult struct {
 	Expense Expense
 }
 
@@ -552,7 +587,8 @@ type TripExpenseDayListItem struct {
 }
 
 type ListTripExpensesResult struct {
-	Days []TripExpenseDayListItem
+	TripExpenses []DayExpenseListItem
+	Days         []TripExpenseDayListItem
 }
 
 type DayLodgingPlace struct {
@@ -692,12 +728,13 @@ type Repository interface {
 	ListScheduleItemsByTripDay(ctx context.Context, tripID string, tripDayID string) ([]ScheduleItem, error)
 	ListTripScheduleItems(ctx context.Context, tripID string) ([]TripScheduleItemsDayListItem, error)
 	ListDayExpensesByTripDay(ctx context.Context, tripID string, tripDayID string) ([]DayExpenseListItem, error)
-	ListTripExpenses(ctx context.Context, tripID string) ([]TripExpenseDayListItem, error)
+	ListTripExpenses(ctx context.Context, tripID string) (ListTripExpensesResult, error)
 	GetTripSettlementInput(ctx context.Context, tripID string) (SettlementInput, error)
 	GetExpenseByTripDayAndID(ctx context.Context, tripID string, tripDayID string, expenseID string) (Expense, bool, error)
 	UpdateExpense(ctx context.Context, record UpdateExpenseRecord) (Expense, error)
 	DeleteExpenseByTripDayAndID(ctx context.Context, tripID string, tripDayID string, expenseID string) (bool, error)
 	CreateQuickExpense(ctx context.Context, record CreateQuickExpenseRecord) (CreateQuickExpenseResult, error)
+	CreateTripExpense(ctx context.Context, record CreateTripExpenseRecord) (CreateTripExpenseResult, error)
 	CreateManualScheduleItem(ctx context.Context, record CreateManualScheduleItemRecord) (ScheduleItem, error)
 	GetScheduleItemByTripDayAndID(ctx context.Context, tripID string, tripDayID string, itemID string) (ScheduleItem, bool, error)
 	ReorderScheduleItems(ctx context.Context, record ReorderScheduleItemsRecord) ([]ScheduleItem, error)

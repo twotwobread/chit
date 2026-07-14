@@ -315,6 +315,39 @@ type CreateRoutePreviewRequest struct {
 	Origin GeoPoint          `json:"origin"`
 }
 
+// CreateTripExpenseRequest defines model for CreateTripExpenseRequest.
+type CreateTripExpenseRequest struct {
+	AmountMinor int64 `json:"amountMinor"`
+
+	// ExpenseDate Actual payment/business date. It may be outside the trip range.
+	ExpenseDate openapi_types.Date `json:"expenseDate"`
+	Memo        *string            `json:"memo"`
+
+	// ParticipantIds Required only when splitPolicy is equal. Must be omitted for manual.
+	ParticipantIds     *[]string `json:"participantIds,omitempty"`
+	PayerParticipantId string    `json:"payerParticipantId"`
+
+	// ScheduleItemId Optional related schedule item.
+	ScheduleItemId *string `json:"scheduleItemId"`
+
+	// SplitPolicy Persisted split policy for current quick expenses.
+	SplitPolicy ExpenseSplitPolicy `json:"splitPolicy"`
+
+	// Splits Required only when splitPolicy is manual. Must be omitted for equal.
+	Splits *[]ManualExpenseSplitInput `json:"splits,omitempty"`
+
+	// Title Optional display title. Required when no schedule item is selected.
+	Title *string `json:"title"`
+
+	// TripDayId Optional related Day. If scheduleItemId is present, the server derives and validates the Day from the schedule item.
+	TripDayId *string `json:"tripDayId"`
+}
+
+// CreateTripExpenseResponse defines model for CreateTripExpenseResponse.
+type CreateTripExpenseResponse struct {
+	Expense Expense `json:"expense"`
+}
+
 // CreateTripFlightRequest defines model for CreateTripFlightRequest.
 type CreateTripFlightRequest struct {
 	Arrival   FlightEndpointInput `json:"arrival"`
@@ -429,8 +462,11 @@ type Expense struct {
 	// SplitPolicy Persisted split policy for current quick expenses.
 	SplitPolicy ExpenseSplitPolicy `json:"splitPolicy"`
 	Splits      []ExpenseSplit     `json:"splits"`
-	TripDayId   *string            `json:"tripDayId"`
-	TripId      string             `json:"tripId"`
+
+	// Title Optional stored title supplied by the user for general expenses.
+	Title     *string `json:"title"`
+	TripDayId *string `json:"tripDayId"`
+	TripId    string  `json:"tripId"`
 }
 
 // ExpenseAnchorType defines model for ExpenseAnchorType.
@@ -662,6 +698,9 @@ type ListDayExpensesResponse struct {
 // ListTripExpensesResponse defines model for ListTripExpensesResponse.
 type ListTripExpensesResponse struct {
 	Days []TripExpenseDayListItem `json:"days"`
+
+	// TripExpenses Trip-level expenses with no related Day or schedule item.
+	TripExpenses []DayExpenseListItem `json:"tripExpenses"`
 }
 
 // ListTripFlightsResponse defines model for ListTripFlightsResponse.
@@ -1167,6 +1206,9 @@ type UpdateExpenseRequest struct {
 
 	// Splits Required only when splitPolicy is manual. Must be omitted for equal.
 	Splits *[]ManualExpenseSplitInput `json:"splits,omitempty"`
+
+	// Title Optional display title for general expenses. Empty strings are normalized to null by the server.
+	Title *string `json:"title"`
 }
 
 // UpdateExpenseResponse defines model for UpdateExpenseResponse.
@@ -1317,6 +1359,9 @@ type UpdateScheduleItemJSONRequestBody = UpdateScheduleItemRequest
 // CreateRoutePreviewJSONRequestBody defines body for CreateRoutePreview for application/json ContentType.
 type CreateRoutePreviewJSONRequestBody = CreateRoutePreviewRequest
 
+// CreateTripExpenseJSONRequestBody defines body for CreateTripExpense for application/json ContentType.
+type CreateTripExpenseJSONRequestBody = CreateTripExpenseRequest
+
 // CreateTripFlightJSONRequestBody defines body for CreateTripFlight for application/json ContentType.
 type CreateTripFlightJSONRequestBody = CreateTripFlightRequest
 
@@ -1451,6 +1496,9 @@ type ServerInterface interface {
 	// List expenses for a trip
 	// (GET /trips/{tripId}/expenses)
 	ListTripExpenses(w http.ResponseWriter, r *http.Request, tripId string)
+	// Create a general trip expense
+	// (POST /trips/{tripId}/expenses)
+	CreateTripExpense(w http.ResponseWriter, r *http.Request, tripId string)
 	// List trip flights
 	// (GET /trips/{tripId}/flights)
 	ListTripFlights(w http.ResponseWriter, r *http.Request, tripId string)
@@ -1748,6 +1796,12 @@ func (_ Unimplemented) MarkScheduleItemSkipped(w http.ResponseWriter, r *http.Re
 // List expenses for a trip
 // (GET /trips/{tripId}/expenses)
 func (_ Unimplemented) ListTripExpenses(w http.ResponseWriter, r *http.Request, tripId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Create a general trip expense
+// (POST /trips/{tripId}/expenses)
+func (_ Unimplemented) CreateTripExpense(w http.ResponseWriter, r *http.Request, tripId string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -3335,6 +3389,37 @@ func (siw *ServerInterfaceWrapper) ListTripExpenses(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
+// CreateTripExpense operation middleware
+func (siw *ServerInterfaceWrapper) CreateTripExpense(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateTripExpense(w, r, tripId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListTripFlights operation middleware
 func (siw *ServerInterfaceWrapper) ListTripFlights(w http.ResponseWriter, r *http.Request) {
 
@@ -4129,6 +4214,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/trips/{tripId}/expenses", wrapper.ListTripExpenses)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/trips/{tripId}/expenses", wrapper.CreateTripExpense)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/trips/{tripId}/flights", wrapper.ListTripFlights)

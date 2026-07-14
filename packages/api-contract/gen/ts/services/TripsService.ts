@@ -9,6 +9,8 @@ import type { CreateManualScheduleItemResponse } from '../models/CreateManualSch
 import type { CreateQuickExpenseRequest } from '../models/CreateQuickExpenseRequest';
 import type { CreateQuickExpenseResponse } from '../models/CreateQuickExpenseResponse';
 import type { CreateRoutePreviewRequest } from '../models/CreateRoutePreviewRequest';
+import type { CreateTripExpenseRequest } from '../models/CreateTripExpenseRequest';
+import type { CreateTripExpenseResponse } from '../models/CreateTripExpenseResponse';
 import type { CreateTripInviteResponse } from '../models/CreateTripInviteResponse';
 import type { CreateTripRequest } from '../models/CreateTripRequest';
 import type { CreateTripResponse } from '../models/CreateTripResponse';
@@ -236,9 +238,9 @@ export class TripsService {
     }
     /**
      * List expenses for a trip
-     * Returns read-only expense rows grouped by trip day in one request, ordered by day then newest expense first.
+     * Returns read-only expense rows grouped by trip context in one request. Trip-level rows are returned separately, and day rows are ordered by day then newest expense first.
      * @param tripId
-     * @returns ListTripExpensesResponse Trip expenses grouped by trip day.
+     * @returns ListTripExpensesResponse Trip expenses grouped by trip context.
      * @throws ApiError
      */
     public static listTripExpenses(
@@ -255,6 +257,36 @@ export class TripsService {
                 401: `Unauthorized.`,
                 403: `Forbidden.`,
                 404: `Trip not found.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
+     * Create a general trip expense
+     * Creates a trip-level, Day-level, or schedule-item expense from settlement entry. Payment date is independent from related context.
+     * @param tripId
+     * @param requestBody
+     * @returns CreateTripExpenseResponse Expense created.
+     * @throws ApiError
+     */
+    public static createTripExpense(
+        tripId: string,
+        requestBody: CreateTripExpenseRequest,
+    ): CancelablePromise<CreateTripExpenseResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/trips/{tripId}/expenses',
+            path: {
+                'tripId': tripId,
+            },
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                403: `Forbidden.`,
+                404: `Trip, Day, schedule item, payer, or split participant not found.`,
+                409: `Participant or schedule state changed during creation.`,
                 500: `Unexpected server error.`,
             },
         });

@@ -51,7 +51,8 @@ SELECT
   COALESCE(e.trip_day_id::text, '')::text AS trip_day_id,
   COALESCE(e.schedule_item_id::text, '')::text AS schedule_item_id,
   e.expense_date,
-  COALESCE(live_place.name, e.place_name, '지출')::text AS display_title,
+  e.title,
+  COALESCE(e.title, live_place.name, e.place_name, '지출')::text AS display_title,
   COALESCE(live_place.id::text, e.trip_place_id::text, '')::text AS trip_place_id,
   COALESCE(live_place.name, e.place_name, '')::text AS place_name,
   COALESCE(live_place.address, e.place_address, '')::text AS place_address,
@@ -104,6 +105,7 @@ type GetExpenseByTripDayAndIDRow struct {
 	TripDayID          string
 	ScheduleItemID     string
 	ExpenseDate        pgtype.Date
+	Title              pgtype.Text
 	DisplayTitle       string
 	TripPlaceID        string
 	PlaceName          string
@@ -130,6 +132,7 @@ func (q *Queries) GetExpenseByTripDayAndID(ctx context.Context, arg GetExpenseBy
 		&i.TripDayID,
 		&i.ScheduleItemID,
 		&i.ExpenseDate,
+		&i.Title,
 		&i.DisplayTitle,
 		&i.TripPlaceID,
 		&i.PlaceName,
@@ -250,6 +253,58 @@ func (q *Queries) GetTripDefaultCurrencyForQuickExpense(ctx context.Context, tri
 	return i, err
 }
 
+const getTripExpenseScheduleItem = `-- name: GetTripExpenseScheduleItem :one
+SELECT
+  si.id::text AS schedule_item_id,
+  si.trip_day_id::text AS trip_day_id,
+  td.date AS trip_day_date,
+  tp.id::text AS trip_place_id,
+  tp.name AS place_name,
+  tp.place_type,
+  tp.address AS place_address
+FROM schedule_items si
+JOIN trip_days td
+  ON td.id = si.trip_day_id
+ AND td.trip_id = si.trip_id
+ AND td.deleted_at IS NULL
+JOIN trip_places tp
+  ON tp.id = si.trip_place_id
+ AND tp.trip_id = si.trip_id
+WHERE si.trip_id = $1::uuid
+  AND si.id = $2::uuid
+  AND si.deleted_at IS NULL
+`
+
+type GetTripExpenseScheduleItemParams struct {
+	TripID         pgtype.UUID
+	ScheduleItemID pgtype.UUID
+}
+
+type GetTripExpenseScheduleItemRow struct {
+	ScheduleItemID string
+	TripDayID      string
+	TripDayDate    pgtype.Date
+	TripPlaceID    string
+	PlaceName      string
+	PlaceType      string
+	PlaceAddress   string
+}
+
+func (q *Queries) GetTripExpenseScheduleItem(ctx context.Context, arg GetTripExpenseScheduleItemParams) (GetTripExpenseScheduleItemRow, error) {
+	row := q.db.QueryRow(ctx, getTripExpenseScheduleItem, arg.TripID, arg.ScheduleItemID)
+	var i GetTripExpenseScheduleItemRow
+	err := row.Scan(
+		&i.ScheduleItemID,
+		&i.TripDayID,
+		&i.TripDayDate,
+		&i.TripPlaceID,
+		&i.PlaceName,
+		&i.PlaceType,
+		&i.PlaceAddress,
+	)
+	return i, err
+}
+
 const insertExpense = `-- name: InsertExpense :one
 INSERT INTO expenses (
   trip_id,
@@ -257,6 +312,7 @@ INSERT INTO expenses (
   trip_day_id,
   schedule_item_id,
   expense_date,
+  title,
   trip_place_id,
   place_name,
   place_address,
@@ -266,6 +322,7 @@ INSERT INTO expenses (
   split_policy,
   payer_participant_id,
   payer_display_name,
+  memo,
   created_by
 ) VALUES (
   $1::uuid,
@@ -273,16 +330,18 @@ INSERT INTO expenses (
   $3::uuid,
   $4::uuid,
   $5,
-  $6::uuid,
-  $7,
+  $6,
+  $7::uuid,
   $8,
   $9,
   $10,
   $11,
   $12,
-  $13::uuid,
-  $14,
-  $15::uuid
+  $13,
+  $14::uuid,
+  $15,
+  $16,
+  $17::uuid
 )
 RETURNING
   id::text,
@@ -291,6 +350,7 @@ RETURNING
   COALESCE(trip_day_id::text, '')::text AS trip_day_id,
   COALESCE(schedule_item_id::text, '')::text AS schedule_item_id,
   expense_date,
+  title,
   COALESCE(trip_place_id::text, '')::text AS trip_place_id,
   COALESCE(place_name, '')::text AS place_name,
   COALESCE(place_address, '')::text AS place_address,
@@ -300,6 +360,7 @@ RETURNING
   split_policy,
   COALESCE(payer_participant_id::text, '')::text AS payer_participant_id,
   payer_display_name,
+  memo,
   created_at
 `
 
@@ -309,6 +370,7 @@ type InsertExpenseParams struct {
 	TripDayID          pgtype.UUID
 	ScheduleItemID     pgtype.UUID
 	ExpenseDate        pgtype.Date
+	Title              pgtype.Text
 	TripPlaceID        pgtype.UUID
 	PlaceName          pgtype.Text
 	PlaceAddress       pgtype.Text
@@ -318,6 +380,7 @@ type InsertExpenseParams struct {
 	SplitPolicy        string
 	PayerParticipantID pgtype.UUID
 	PayerDisplayName   string
+	Memo               pgtype.Text
 	CreatedBy          pgtype.UUID
 }
 
@@ -328,6 +391,7 @@ type InsertExpenseRow struct {
 	TripDayID          string
 	ScheduleItemID     string
 	ExpenseDate        pgtype.Date
+	Title              pgtype.Text
 	TripPlaceID        string
 	PlaceName          string
 	PlaceAddress       string
@@ -337,6 +401,7 @@ type InsertExpenseRow struct {
 	SplitPolicy        string
 	PayerParticipantID string
 	PayerDisplayName   string
+	Memo               pgtype.Text
 	CreatedAt          pgtype.Timestamptz
 }
 
@@ -347,6 +412,7 @@ func (q *Queries) InsertExpense(ctx context.Context, arg InsertExpenseParams) (I
 		arg.TripDayID,
 		arg.ScheduleItemID,
 		arg.ExpenseDate,
+		arg.Title,
 		arg.TripPlaceID,
 		arg.PlaceName,
 		arg.PlaceAddress,
@@ -356,6 +422,7 @@ func (q *Queries) InsertExpense(ctx context.Context, arg InsertExpenseParams) (I
 		arg.SplitPolicy,
 		arg.PayerParticipantID,
 		arg.PayerDisplayName,
+		arg.Memo,
 		arg.CreatedBy,
 	)
 	var i InsertExpenseRow
@@ -366,6 +433,7 @@ func (q *Queries) InsertExpense(ctx context.Context, arg InsertExpenseParams) (I
 		&i.TripDayID,
 		&i.ScheduleItemID,
 		&i.ExpenseDate,
+		&i.Title,
 		&i.TripPlaceID,
 		&i.PlaceName,
 		&i.PlaceAddress,
@@ -375,6 +443,7 @@ func (q *Queries) InsertExpense(ctx context.Context, arg InsertExpenseParams) (I
 		&i.SplitPolicy,
 		&i.PayerParticipantID,
 		&i.PayerDisplayName,
+		&i.Memo,
 		&i.CreatedAt,
 	)
 	return i, err
@@ -504,7 +573,7 @@ SELECT
   COALESCE(e.trip_day_id::text, '')::text AS trip_day_id,
   COALESCE(e.schedule_item_id::text, '')::text AS schedule_item_id,
   e.expense_date,
-  COALESCE(live_place.name, e.place_name, '지출')::text AS display_title,
+  COALESCE(e.title, live_place.name, e.place_name, '지출')::text AS display_title,
   COALESCE(live_place.id::text, e.trip_place_id::text, '')::text AS trip_place_id,
   COALESCE(live_place.name, e.place_name, '')::text AS place_name,
   COALESCE(live_place.address, e.place_address, '')::text AS place_address,
@@ -933,7 +1002,7 @@ SELECT
   COALESCE(e.trip_day_id::text, '')::text AS trip_day_id,
   COALESCE(e.schedule_item_id::text, '')::text AS schedule_item_id,
   e.expense_date,
-  COALESCE(live_place.name, e.place_name, '지출')::text AS display_title,
+  COALESCE(e.title, live_place.name, e.place_name, '지출')::text AS display_title,
   COALESCE(live_place.id::text, e.trip_place_id::text, '')::text AS trip_place_id,
   COALESCE(live_place.name, e.place_name, '')::text AS place_name,
   COALESCE(live_place.address, e.place_address, '')::text AS place_address,
@@ -967,8 +1036,12 @@ LEFT JOIN trip_participants payer
   ON payer.id = e.payer_participant_id
  AND payer.trip_id = e.trip_id
 WHERE e.trip_id = $1::uuid
-  AND e.anchor_type IN ('trip_day', 'schedule_item')
-ORDER BY e.trip_day_id ASC, e.created_at DESC, e.id DESC
+  AND e.anchor_type IN ('trip', 'trip_day', 'schedule_item')
+ORDER BY
+  CASE WHEN e.anchor_type = 'trip' THEN 0 ELSE 1 END ASC,
+  e.trip_day_id ASC NULLS FIRST,
+  e.created_at DESC,
+  e.id DESC
 `
 
 type ListTripExpensesByTripRow struct {
@@ -1040,15 +1113,16 @@ SET
   place_name = $4,
   place_address = $5,
   place_type = $6,
-  amount_minor = $7,
-  split_policy = $8,
-  payer_participant_id = $9::uuid,
-  payer_display_name = $10,
-  memo = $11,
+  title = COALESCE($7, title),
+  amount_minor = $8,
+  split_policy = $9,
+  payer_participant_id = $10::uuid,
+  payer_display_name = $11,
+  memo = $12,
   updated_at = now()
-WHERE trip_id = $12::uuid
-  AND trip_day_id = $13::uuid
-  AND id = $14::uuid
+WHERE trip_id = $13::uuid
+  AND trip_day_id = $14::uuid
+  AND id = $15::uuid
   AND anchor_type IN ('trip_day', 'schedule_item')
 RETURNING
   id::text,
@@ -1057,6 +1131,7 @@ RETURNING
   COALESCE(trip_day_id::text, '')::text AS trip_day_id,
   COALESCE(schedule_item_id::text, '')::text AS schedule_item_id,
   expense_date,
+  title,
   COALESCE(trip_place_id::text, '')::text AS trip_place_id,
   COALESCE(place_name, '')::text AS place_name,
   COALESCE(place_address, '')::text AS place_address,
@@ -1077,6 +1152,7 @@ type UpdateExpenseParams struct {
 	PlaceName          pgtype.Text
 	PlaceAddress       pgtype.Text
 	PlaceType          pgtype.Text
+	Title              pgtype.Text
 	AmountMinor        int64
 	SplitPolicy        string
 	PayerParticipantID pgtype.UUID
@@ -1094,6 +1170,7 @@ type UpdateExpenseRow struct {
 	TripDayID          string
 	ScheduleItemID     string
 	ExpenseDate        pgtype.Date
+	Title              pgtype.Text
 	TripPlaceID        string
 	PlaceName          string
 	PlaceAddress       string
@@ -1115,6 +1192,7 @@ func (q *Queries) UpdateExpense(ctx context.Context, arg UpdateExpenseParams) (U
 		arg.PlaceName,
 		arg.PlaceAddress,
 		arg.PlaceType,
+		arg.Title,
 		arg.AmountMinor,
 		arg.SplitPolicy,
 		arg.PayerParticipantID,
@@ -1132,6 +1210,7 @@ func (q *Queries) UpdateExpense(ctx context.Context, arg UpdateExpenseParams) (U
 		&i.TripDayID,
 		&i.ScheduleItemID,
 		&i.ExpenseDate,
+		&i.Title,
 		&i.TripPlaceID,
 		&i.PlaceName,
 		&i.PlaceAddress,

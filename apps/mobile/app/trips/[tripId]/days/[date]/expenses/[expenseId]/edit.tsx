@@ -22,9 +22,11 @@ export default function ExpenseEditScreen() {
     setPayerParticipantId,
     setSelectedItemId,
     setSplitPolicy,
+    setTitleInput,
     splitPolicy,
     state,
     submitSave,
+    titleInput,
     updateManualSplitInput,
     viewModel,
   } = useExpenseEditController();
@@ -78,9 +80,11 @@ export default function ExpenseEditScreen() {
           onPlaceChange={setSelectedItemId}
           onSave={() => void submitSave()}
           onSplitPolicyChange={setSplitPolicy}
+          onTitleChange={setTitleInput}
           onUpdateManualSplitInput={updateManualSplitInput}
           saving={saving}
           splitPolicy={splitPolicy}
+          titleInput={titleInput}
           manualSplitInputs={manualSplitInputs}
           viewModel={viewModel}
         />

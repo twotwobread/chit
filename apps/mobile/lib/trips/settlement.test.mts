@@ -98,13 +98,28 @@ test('builds settlement expense entry route from today or the first trip day', (
   assert.equal(buildSettlementExpenseEntryRouteForDays('trip-a', [], '2026-07-20'), null);
 });
 
-test('builds settlement expense history day inputs from a single trip-level expense response', () => {
+test('builds settlement expense history inputs with a trip-level section first', () => {
   const days = [tripDay({ id: 'day-a', dayOrder: 2 }), tripDay({ id: 'day-b', dayOrder: 1, date: '2026-07-09' })];
   const response: ListTripExpensesResponse = {
+    tripExpenses: [
+      dayExpense({
+        id: 'expense-trip',
+        anchorType: 'trip',
+        tripDayId: null,
+        scheduleItemId: null,
+        expenseDate: '2026-06-12',
+        displayTitle: '항공권',
+        place: null,
+      }),
+    ],
     days: [{ tripDayId: 'day-a', expenses: [dayExpense({ id: 'expense-a', tripDayId: 'day-a' })] }],
   };
 
-  assert.deepEqual(buildSettlementExpenseHistoryDayInputs(days, response), [
+  const inputs = buildSettlementExpenseHistoryDayInputs(days, response);
+  assert.equal(inputs[0].day.dayOrder, 0);
+  assert.equal(inputs[0].day.date, '');
+  assert.deepEqual(inputs[0].expenses, response.tripExpenses);
+  assert.deepEqual(inputs.slice(1), [
     { day: days[0], expenses: response.days[0].expenses },
     { day: days[1], expenses: [] },
   ]);
@@ -164,8 +179,77 @@ test('builds day-tabbed settlement expense history with selected-day editable ro
     ['day-3', '3일차', '2026.07.12 · 1건', 1],
   );
   assert.deepEqual(
-    viewModel.selectedSection.rows.map((row) => [row.id, row.amountLabel, row.editRoute]),
-    [['expense-krw', '18,500원', '/trips/trip-a/days/day-3/expenses/expense-krw/edit']],
+    viewModel.selectedSection.rows.map((row) => [
+      row.id,
+      row.amountLabel,
+      row.payerLabel,
+      row.splitLabel,
+      row.detailLine,
+      row.editRoute,
+    ]),
+    [
+      [
+        'expense-krw',
+        '18,500원',
+        '유나 결제',
+        '1명 분할',
+        '유나 결제 · 1명 분할',
+        '/trips/trip-a/days/day-3/expenses/expense-krw/edit',
+      ],
+    ],
+  );
+});
+
+test('builds compact trip-level settlement expense rows under 여행 전체', () => {
+  const viewModel = buildSettlementExpenseHistoryViewModel({
+    tripId: 'trip-a',
+    selectedDayId: '__trip_expenses__',
+    days: [
+      {
+        day: tripDay({ id: '__trip_expenses__', date: '', dayOrder: 0 }),
+        expenses: [
+          dayExpense({
+            id: 'expense-flight',
+            anchorType: 'trip',
+            tripDayId: null,
+            scheduleItemId: null,
+            expenseDate: '2026-06-12',
+            displayTitle: '항공권',
+            place: null,
+            amountMinor: 650000,
+            currency: 'KRW',
+            payer: participant('민수', 'payer-a'),
+            splits: [
+              { splitOrder: 1, participant: participant('민수', 'payer-a'), amountMinor: 325000 },
+              { splitOrder: 2, participant: participant('지영', 'participant-b'), amountMinor: 325000 },
+            ],
+          }),
+        ],
+      },
+      { day: tripDay({ id: 'day-1', date: '2026-07-10', dayOrder: 1 }), expenses: [] },
+    ],
+  });
+
+  assert.equal(viewModel.status, 'success');
+  if (viewModel.status !== 'success') {
+    return;
+  }
+  assert.equal(viewModel.selectedSection.title, '여행 전체');
+  assert.deepEqual(viewModel.dayChips[0], {
+    id: '__trip_expenses__',
+    label: '여행 전체',
+    dateLabel: undefined,
+    statusLabel: '1건',
+  });
+  assert.deepEqual(
+    viewModel.selectedSection.rows.map((row) => [
+      row.placeName,
+      row.amountLabel,
+      row.payerLabel,
+      row.splitLabel,
+      row.editRoute,
+    ]),
+    [['항공권', '650,000원', '민수 결제', '2명 분할 · 2026.06.12', null]],
   );
 });
 

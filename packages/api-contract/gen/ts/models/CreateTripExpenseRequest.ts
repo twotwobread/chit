@@ -4,11 +4,24 @@
 /* eslint-disable */
 import type { ExpenseSplitPolicy } from './ExpenseSplitPolicy';
 import type { ManualExpenseSplitInput } from './ManualExpenseSplitInput';
-export type UpdateExpenseRequest = {
-    amountMinor: number;
+export type CreateTripExpenseRequest = {
     /**
-     * Required current trip participant who paid the expense.
+     * Optional display title. Required when no schedule item is selected.
      */
+    title: string | null;
+    /**
+     * Actual payment/business date. It may be outside the trip range.
+     */
+    expenseDate: string;
+    /**
+     * Optional related Day. If scheduleItemId is present, the server derives and validates the Day from the schedule item.
+     */
+    tripDayId: string | null;
+    /**
+     * Optional related schedule item.
+     */
+    scheduleItemId: string | null;
+    amountMinor: number;
     payerParticipantId: string;
     splitPolicy: ExpenseSplitPolicy;
     /**
@@ -19,16 +32,5 @@ export type UpdateExpenseRequest = {
      * Required only when splitPolicy is manual. Must be omitted for equal.
      */
     splits?: Array<ManualExpenseSplitInput>;
-    /**
-     * Optional memo. Empty strings are normalized to null by the server.
-     */
     memo: string | null;
-    /**
-     * Optional display title for general expenses. Empty strings are normalized to null by the server.
-     */
-    title?: string | null;
-    /**
-     * Same-day schedule item to link, or null to clear the linked place.
-     */
-    scheduleItemId: string | null;
 };

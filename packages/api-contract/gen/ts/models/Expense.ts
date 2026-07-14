@@ -19,6 +19,10 @@ export type Expense = {
     scheduleItemId: string | null;
     expenseDate: string;
     /**
+     * Optional stored title supplied by the user for general expenses.
+     */
+    title: string | null;
+    /**
      * User-facing title resolved by the server.
      */
     displayTitle: string;

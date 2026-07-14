@@ -21,6 +21,7 @@ function expense(overrides: Partial<Expense> = {}): Expense {
     tripDayId: 'day-a',
     scheduleItemId: 'item-a',
     expenseDate: '2026-07-10',
+    title: null,
     displayTitle: '도톤보리',
     place: { tripPlaceId: 'place-a', name: '도톤보리', address: 'Dotonbori', placeType: 'food', source: 'live' },
     amountMinor: 1200,
@@ -81,6 +82,7 @@ test('builds edit view model with selected payer, place clear option, and split 
   assert.equal(viewModel.title, '지출 수정');
   assert.equal(viewModel.formattedDate, '2026.07.10');
   assert.equal(viewModel.amountLabel, '1,200엔');
+  assert.equal(viewModel.showTitleField, false);
   assert.deepEqual(
     viewModel.placeOptions.map((option) => [option.itemId, option.selected]),
     [
@@ -105,6 +107,32 @@ test('builds edit view model with selected payer, place clear option, and split 
 test('builds initial amount input from the stored currency', () => {
   assert.equal(buildExpenseEditInitialAmountInput(expense({ amountMinor: 1200, currency: 'JPY' })), '1200');
   assert.equal(buildExpenseEditInitialAmountInput(expense({ amountMinor: 1234, currency: 'USD' })), '12.34');
+});
+
+test('shows title field for no-place or titled expenses', () => {
+  const noPlaceViewModel = buildExpenseEditViewModel({
+    amountInput: '1000',
+    expense: expense({ title: '항공권', scheduleItemId: null, place: null }),
+    itinerary: itinerary(),
+    memoInput: '',
+    participants,
+    selectedItemId: null,
+    selectedPayerParticipantId: 'participant-a',
+  });
+  const titledScheduleViewModel = buildExpenseEditViewModel({
+    amountInput: '1000',
+    expense: expense({ title: '예약금' }),
+    itinerary: itinerary(),
+    memoInput: '',
+    participants,
+    selectedItemId: 'item-a',
+    selectedPayerParticipantId: 'participant-a',
+  });
+
+  assert.equal(noPlaceViewModel.showTitleField, true);
+  assert.equal(noPlaceViewModel.titlePlaceholder, '예: 항공권, 숙소 예약금');
+  assert.equal(titledScheduleViewModel.showTitleField, true);
+  assert.equal(titledScheduleViewModel.titlePlaceholder, '선택 입력');
 });
 
 test('builds update expense request with trimmed memo and nullable place', () => {
@@ -133,6 +161,50 @@ test('builds update expense request with trimmed memo and nullable place', () =>
   });
 });
 
+test('builds update expense request with nullable general expense title', () => {
+  const result = buildUpdateExpenseRequest({
+    amountInput: '2,500',
+    currency: 'JPY',
+    splitPolicy: 'equal',
+    participantIds: buildExpenseEditParticipantIds(participants),
+    manualSplitInputs: [],
+    payerParticipantId: 'participant-a',
+    memoInput: '',
+    scheduleItemId: null,
+    titleInput: '  항공권  ',
+  });
+
+  assert.equal(result.ok, true);
+  if (!result.ok) {
+    return;
+  }
+  assert.deepEqual(result.request, {
+    amountMinor: 2500,
+    payerParticipantId: 'participant-a',
+    splitPolicy: 'equal',
+    participantIds: ['participant-a', 'participant-b'],
+    memo: null,
+    title: '항공권',
+    scheduleItemId: null,
+  });
+
+  const clearedTitleResult = buildUpdateExpenseRequest({
+    amountInput: '2,500',
+    currency: 'JPY',
+    splitPolicy: 'equal',
+    participantIds: buildExpenseEditParticipantIds(participants),
+    manualSplitInputs: [],
+    payerParticipantId: 'participant-a',
+    memoInput: '',
+    scheduleItemId: null,
+    titleInput: '   ',
+  });
+  assert.equal(clearedTitleResult.ok, true);
+  if (clearedTitleResult.ok) {
+    assert.equal(clearedTitleResult.request.title, null);
+  }
+});
+
 test('validates update expense request', () => {
   const longMemo = '가'.repeat(241);
   const result = buildUpdateExpenseRequest({
@@ -144,6 +216,7 @@ test('validates update expense request', () => {
     payerParticipantId: null,
     memoInput: longMemo,
     scheduleItemId: 'item-a',
+    titleInput: '가'.repeat(121),
   });
 
   assert.equal(result.ok, false);
@@ -151,6 +224,7 @@ test('validates update expense request', () => {
     return;
   }
   assert.deepEqual(result.errors, {
+    title: '지출명은 120자 이내로 입력해주세요.',
     amount: '금액을 0보다 크게 입력해주세요.',
     payer: '결제자를 선택해주세요.',
     participants: '분할할 사람을 1명 이상 선택해주세요.',

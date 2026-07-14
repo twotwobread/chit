@@ -639,11 +639,11 @@ func (s *Service) ListTripExpenses(ctx context.Context, userID string, tripID st
 		return ListTripExpensesResult{}, ErrForbidden
 	}
 
-	days, err := s.repo.ListTripExpenses(ctx, tripID)
+	result, err := s.repo.ListTripExpenses(ctx, tripID)
 	if err != nil {
 		return ListTripExpensesResult{}, err
 	}
-	return ListTripExpensesResult{Days: days}, nil
+	return result, nil
 }
 
 func (s *Service) GetDayExpense(ctx context.Context, userID string, tripID string, tripDayID string, expenseID string) (GetExpenseResult, error) {
@@ -687,6 +687,10 @@ func (s *Service) UpdateExpense(ctx context.Context, userID string, tripID strin
 	if err != nil {
 		return UpdateExpenseResult{}, err
 	}
+	title, err := normalizeExpenseTitle(input.Title, false)
+	if err != nil {
+		return UpdateExpenseResult{}, err
+	}
 	if _, err := s.activeTripDay(ctx, userID, tripID, tripDayID); err != nil {
 		return UpdateExpenseResult{}, err
 	}
@@ -701,6 +705,7 @@ func (s *Service) UpdateExpense(ctx context.Context, userID string, tripID strin
 		ParticipantIDs:     participantIDs,
 		ManualSplits:       manualSplits,
 		Memo:               memo,
+		Title:              title,
 		ScheduleItemID:     scheduleItemID,
 	})
 	if err != nil {
@@ -752,6 +757,112 @@ func (s *Service) CreateQuickExpense(ctx context.Context, userID string, tripID 
 		ManualSplits:       manualSplits,
 		CreatedBy:          userID,
 	})
+}
+
+func (s *Service) CreateTripExpense(ctx context.Context, userID string, tripID string, input CreateTripExpenseInput) (CreateTripExpenseResult, error) {
+	if strings.TrimSpace(userID) == "" {
+		return CreateTripExpenseResult{}, ErrUnauthorized
+	}
+	tripID = strings.TrimSpace(tripID)
+	if !isUUID(tripID) {
+		return CreateTripExpenseResult{}, ErrValidation
+	}
+
+	payerParticipantID := strings.TrimSpace(input.PayerParticipantID)
+	if !isUUID(payerParticipantID) || input.AmountMinor < 1 {
+		return CreateTripExpenseResult{}, ErrValidation
+	}
+	expenseDate, err := parseDate(input.ExpenseDate)
+	if err != nil {
+		return CreateTripExpenseResult{}, ErrValidation
+	}
+
+	var tripDayID *string
+	if input.TripDayID != nil {
+		trimmedTripDayID := strings.TrimSpace(*input.TripDayID)
+		if !isUUID(trimmedTripDayID) {
+			return CreateTripExpenseResult{}, ErrValidation
+		}
+		tripDayID = &trimmedTripDayID
+	}
+	var scheduleItemID *string
+	if input.ScheduleItemID != nil {
+		trimmedScheduleItemID := strings.TrimSpace(*input.ScheduleItemID)
+		if !isUUID(trimmedScheduleItemID) {
+			return CreateTripExpenseResult{}, ErrValidation
+		}
+		scheduleItemID = &trimmedScheduleItemID
+	}
+
+	title, err := normalizeExpenseTitle(input.Title, scheduleItemID == nil)
+	if err != nil {
+		return CreateTripExpenseResult{}, err
+	}
+	memo, err := normalizeExpenseMemo(input.Memo)
+	if err != nil {
+		return CreateTripExpenseResult{}, err
+	}
+	splitPolicy, participantIDs, manualSplits, err := normalizeExpenseSplitInput(input.SplitPolicy, input.ParticipantIDs, input.ManualSplits, input.AmountMinor)
+	if err != nil {
+		return CreateTripExpenseResult{}, err
+	}
+
+	_, ok, err := s.repo.GetTripByID(ctx, tripID)
+	if err != nil {
+		return CreateTripExpenseResult{}, err
+	}
+	if !ok {
+		return CreateTripExpenseResult{}, ErrNotFound
+	}
+	isParticipant, err := s.repo.IsTripParticipant(ctx, tripID, userID)
+	if err != nil {
+		return CreateTripExpenseResult{}, err
+	}
+	if !isParticipant {
+		return CreateTripExpenseResult{}, ErrForbidden
+	}
+	if tripDayID != nil && scheduleItemID == nil {
+		if _, ok, err := s.repo.GetActiveTripDayByTripAndID(ctx, tripID, *tripDayID); err != nil {
+			return CreateTripExpenseResult{}, err
+		} else if !ok {
+			return CreateTripExpenseResult{}, ErrNotFound
+		}
+	}
+
+	return s.repo.CreateTripExpense(ctx, CreateTripExpenseRecord{
+		TripID:             tripID,
+		Title:              title,
+		ExpenseDate:        expenseDate,
+		TripDayID:          tripDayID,
+		ScheduleItemID:     scheduleItemID,
+		AmountMinor:        input.AmountMinor,
+		PayerParticipantID: payerParticipantID,
+		SplitPolicy:        splitPolicy,
+		ParticipantIDs:     participantIDs,
+		ManualSplits:       manualSplits,
+		Memo:               memo,
+		CreatedBy:          userID,
+	})
+}
+
+func normalizeExpenseTitle(value *string, required bool) (*string, error) {
+	if value == nil {
+		if required {
+			return nil, ErrValidation
+		}
+		return nil, nil
+	}
+	title := strings.TrimSpace(*value)
+	if title == "" {
+		if required {
+			return nil, ErrValidation
+		}
+		return nil, nil
+	}
+	if len([]rune(title)) > 120 {
+		return nil, ErrValidation
+	}
+	return &title, nil
 }
 
 func normalizeExpenseMemo(value *string) (*string, error) {
