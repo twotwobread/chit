@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import type { AuthProvider, OAuthCredential } from '@i-um/api-contract';
@@ -135,4 +136,11 @@ test('dev OAuth credential is explicit per supported provider and does not call 
     displayName: 'Apple Dev User',
   });
   assert.equal(adapterCalls, 0);
+});
+
+test('default OAuth env uses direct Expo public env reads so dev login is bundled', () => {
+  const source = readFileSync(new URL('./oauth.ts', import.meta.url), 'utf8');
+
+  assert.match(source, /process\.env\.EXPO_PUBLIC_AUTH_DEV_MODE/);
+  assert.doesNotMatch(source, /options\.env\s*\?\?\s*process\.env/);
 });

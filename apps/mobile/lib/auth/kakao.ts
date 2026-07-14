@@ -25,7 +25,7 @@ const FALLBACK_ERROR_CODES = new Set([
 
 export async function getKakaoNativeCredential(
   loadSdk: LoadKakaoNativeSdk = loadKakaoNativeSdk,
-  env: KakaoNativeEnv = process.env,
+  env: KakaoNativeEnv = getDefaultKakaoNativeEnv(),
 ): Promise<OAuthCredential> {
   getKakaoNativeAppKey(env);
 
@@ -47,8 +47,14 @@ export async function clearKakaoNativeSession(loadSdk: LoadKakaoNativeSdk = load
   }
 }
 
-export function getKakaoNativeScheme(env: KakaoNativeEnv = process.env): string {
+export function getKakaoNativeScheme(env: KakaoNativeEnv = getDefaultKakaoNativeEnv()): string {
   return `kakao${getKakaoNativeAppKey(env)}`;
+}
+
+function getDefaultKakaoNativeEnv(): KakaoNativeEnv {
+  return {
+    EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY: process.env.EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY,
+  };
 }
 
 function getKakaoNativeAppKey(env: KakaoNativeEnv): string {
