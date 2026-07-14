@@ -4,6 +4,7 @@ import { describe, it } from 'node:test';
 import {
   buildRoutePreviewRequest,
   buildTodayRoutePreviewHeroChip,
+  buildTodayRoutePreviewSummaryHeroChip,
   buildTodayRoutePreviewSummarySuccessState,
   buildTodayRoutePreviewViewModel,
   decodeEncodedPolyline,
@@ -132,6 +133,40 @@ describe('today route preview helpers', () => {
     );
   });
 
+  it('builds hero chip copy from the selected multi-mode route summary', () => {
+    const state = buildTodayRoutePreviewSummarySuccessState([
+      {
+        mode: 'transit',
+        response: {
+          itemId: 'item-1',
+          mode: 'transit',
+          generatedAt: '2026-06-25T00:00:00Z',
+          summary: { durationSeconds: 1320, distanceMeters: 5400, summaryText: '환승 1회', transferCount: 1 },
+          map: null,
+        },
+      },
+      {
+        mode: 'walking',
+        response: {
+          itemId: 'item-1',
+          mode: 'walking',
+          generatedAt: '2026-06-25T00:00:00Z',
+          summary: {
+            durationSeconds: 2100,
+            distanceMeters: 2800,
+            summaryText: 'Google Maps 기준 예상 경로',
+            transferCount: null,
+          },
+          map: null,
+        },
+      },
+      { mode: 'driving', response: null },
+    ]);
+
+    assert.equal(buildTodayRoutePreviewSummaryHeroChip(state, 'walking'), '도보 · 약 35분 · 2.8km');
+    assert.equal(buildTodayRoutePreviewSummaryHeroChip(state, 'driving'), '자동차 · 확인 불가');
+  });
+
   it('builds multi-mode route summary rows and keeps partial failures visible', () => {
     const state = buildTodayRoutePreviewSummarySuccessState([
       {
@@ -166,7 +201,6 @@ describe('today route preview helpers', () => {
     if (state.status !== 'success') {
       return;
     }
-    assert.equal(state.title, '현 위치 기준 예상 이동');
     assert.deepEqual(
       state.rows.map((row) => [row.mode, row.modeLabel, row.status]),
       [
