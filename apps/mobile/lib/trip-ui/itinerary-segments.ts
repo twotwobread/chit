@@ -17,36 +17,25 @@ export type ItineraryTimelineItem = {
 };
 
 export type ItineraryTimelineSegment =
-  | { kind: 'anchor'; item: ItineraryTimelineItem }
-  | { kind: 'untimed'; id: string; items: ItineraryTimelineItem[] };
+  | { kind: 'anchor'; id: string; item: ItineraryTimelineItem }
+  | { kind: 'untimed'; id: string; item: ItineraryTimelineItem };
 
 export function buildItinerarySegments(items: ItineraryTimelineItem[]): ItineraryTimelineSegment[] {
-  const segments: ItineraryTimelineSegment[] = [];
-  let untimedRun: ItineraryTimelineItem[] = [];
-  let runIndex = 0;
+  return items.map(
+    (item): ItineraryTimelineSegment => ({
+      kind: item.startTime ? 'anchor' : 'untimed',
+      id: item.id,
+      item,
+    }),
+  );
+}
 
-  const flushUntimedRun = () => {
-    if (untimedRun.length === 0) {
-      return;
-    }
-
-    segments.push({ kind: 'untimed', id: `untimed-${runIndex}`, items: untimedRun });
-    runIndex += 1;
-    untimedRun = [];
-  };
-
-  for (const item of items) {
-    if (item.startTime) {
-      flushUntimedRun();
-      segments.push({ kind: 'anchor', item });
-      continue;
-    }
-
-    untimedRun.push(item);
+export function itineraryTimeLabel(startTime?: string | null, endTime?: string | null): string {
+  if (!startTime) {
+    return '시간 미정';
   }
 
-  flushUntimedRun();
-  return segments;
+  return endTime ? `${startTime} – ${endTime}` : `${startTime} – 종료 미정`;
 }
 
 export function itineraryDurationLabel(startTime: string, endTime?: string | null): string | null {
