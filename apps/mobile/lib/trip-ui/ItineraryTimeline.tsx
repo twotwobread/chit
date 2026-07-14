@@ -282,12 +282,13 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.bold,
   },
   timelineMarkerTextTimed: {
-    color: theme.color.green[600],
+    color: theme.color.onPrimary,
   },
   timelineMarkerTextUntimed: {
     color: theme.color.textMuted,
   },
   timelineMarkerTimed: {
+    backgroundColor: theme.color.green[600],
     borderColor: theme.color.green[600],
     borderStyle: 'solid',
   },
