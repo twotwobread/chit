@@ -14,6 +14,7 @@ import {
   idleGooglePlaceAddState,
   type GooglePlaceAddViewState,
   type GooglePlaceSearchRowViewModel,
+  type GooglePlaceTripDestination,
 } from '../places/google-search';
 import { getTripDayItinerary } from '../trips/itinerary-api';
 import { beginStaleWhileRevalidate, resolveStaleWhileRevalidateFailure } from '../trips/stale-refresh';
@@ -57,6 +58,7 @@ export type TripMapState =
       routePolylines: RouteMapPolyline[];
       selectedDayId: string;
       selectedRouteLayerChipId: TripMapRouteLayerChipId | null;
+      tripDestinations: GooglePlaceTripDestination[];
       selectedRoutePlaceId: string | null;
       scheduleMarkerDetail: TripMapScheduleMarkerDetail | null;
       viewModel: DayItineraryViewModel;
@@ -134,6 +136,7 @@ export function useTripMapController() {
           selectedDayId: selectedDay.id,
           selectedRouteLayerChipId: tripMapRouteLayerChipId(routeLayer),
           selectedRoutePlaceId,
+          tripDestinations: detail.trip.destinations,
           scheduleMarkerDetail: buildTripMapScheduleMarkerDetail(viewModel, selectedRoutePlaceId),
           viewModel,
         });
