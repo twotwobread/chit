@@ -82,23 +82,8 @@ export function NextPlaceHeroCard({
       {navigationAvailable ? (
         <>
           {showRoutePreview ? (
-            <View style={styles.routeBox}>
-              <View style={styles.routeCanvas}>
-                <View style={[styles.routeDot, styles.routeDotStart]} />
-                <View style={styles.routeLine} />
-                <View style={[styles.routeDot, styles.routeDotEnd]} />
-                <View style={styles.routeChip}>
-                  <Text style={styles.routeChipText}>{routeChip ?? ROUTE_FALLBACK_COPY}</Text>
-                </View>
-              </View>
-              <Pressable
-                accessibilityRole="button"
-                onPress={onNavigate}
-                style={({ pressed }) => [styles.routeHandoff, pressed ? styles.pressedDark : null]}
-              >
-                <Text style={styles.routeHandoffText}>상세 안내는 길찾기에서 이어져요</Text>
-                <Text style={styles.routeHandoffCta}>길찾기 ›</Text>
-              </Pressable>
+            <View style={styles.routeSummary}>
+              <Text style={styles.routeChipText}>{routeChip ?? ROUTE_FALLBACK_COPY}</Text>
             </View>
           ) : null}
 
@@ -264,23 +249,11 @@ const styles = StyleSheet.create({
   pressedDark: {
     opacity: 0.72,
   },
-  routeBox: {
-    borderColor: theme.color.green[800],
-    borderRadius: theme.radius.lg,
-    borderWidth: 1,
-    marginTop: theme.space[3],
-    overflow: 'hidden',
-  },
-  routeCanvas: {
-    backgroundColor: theme.color.green[50],
-    height: 120,
-    justifyContent: 'flex-start',
-    padding: theme.space[3],
-  },
-  routeChip: {
+  routeSummary: {
     alignSelf: 'center',
     backgroundColor: theme.color.surface,
     borderRadius: theme.radius.pill,
+    marginTop: theme.space[3],
     maxWidth: '100%',
     paddingHorizontal: theme.space[3],
     paddingVertical: theme.space[2],
@@ -292,53 +265,6 @@ const styles = StyleSheet.create({
     fontSize: theme.font.size.subhead,
     fontWeight: theme.font.weight.bold,
     textAlign: 'center',
-  },
-  routeDot: {
-    backgroundColor: theme.color.primary,
-    borderColor: theme.color.surface,
-    borderRadius: 7,
-    borderWidth: 2,
-    height: 14,
-    position: 'absolute',
-    width: 14,
-    zIndex: 1,
-  },
-  routeDotEnd: {
-    bottom: theme.space[4],
-    right: theme.space[8],
-  },
-  routeDotStart: {
-    left: theme.space[8],
-    top: theme.space[8],
-  },
-  routeHandoff: {
-    alignItems: 'center',
-    backgroundColor: theme.color.green[800],
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: theme.space[4],
-    paddingVertical: theme.space[3],
-  },
-  routeHandoffCta: {
-    color: theme.color.onPrimary,
-    fontFamily: theme.font.family.bold,
-    fontSize: theme.font.size.caption,
-    fontWeight: theme.font.weight.bold,
-  },
-  routeHandoffText: {
-    color: theme.color.green[100],
-    fontFamily: theme.font.family.regular,
-    fontSize: theme.font.size.caption,
-  },
-  routeLine: {
-    backgroundColor: theme.color.green[300],
-    borderRadius: theme.radius.pill,
-    bottom: theme.space[6],
-    height: 4,
-    left: theme.space[9],
-    position: 'absolute',
-    right: theme.space[9],
-    transform: [{ rotate: '-14deg' }],
   },
   subAction: {
     alignItems: 'center',
