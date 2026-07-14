@@ -9,6 +9,7 @@ import type {
 } from '@i-um/api-contract';
 
 import {
+  buildKakaoSettlementRequestTemplate,
   buildSettlementExpenseEntryRoute,
   buildSettlementExpenseEntryRouteForDays,
   buildSettlementExpenseHistoryDayInputs,
@@ -403,7 +404,9 @@ test('builds transfer sections from authoritative API response without client so
 
   assert.equal(viewModel.status, 'success');
   assert.equal(viewModel.totalTransferCount, 3);
-  assert.equal(viewModel.summaryTitle, '총 3건을 보내면 정산이 맞아요.');
+  assert.equal('summaryTitle' in viewModel, false);
+  assert.equal('noTransferNotice' in viewModel, false);
+  assert.deepEqual(viewModel.requestAction, { disabled: false, label: '정산 요청하기' });
   assert.deepEqual(
     viewModel.sections.map((section) => [section.currency, section.title, section.transferCount]),
     [
@@ -638,36 +641,31 @@ test('keeps balance summaries visible when there are no suggested transfers', ()
   assert.equal(viewModel.totalTransferCount, 0);
   assert.equal(viewModel.sections.length, 0);
   assert.equal(viewModel.balanceSections.length, 1);
-  assert.equal(viewModel.summaryTitle, '정산 현황');
-  assert.deepEqual(viewModel.noTransferNotice, {
-    helper: '모든 지출이 이미 맞춰졌거나 아직 정산할 지출이 없어요.',
-    primaryAction: null,
-    title: '보낼 정산이 없어요.',
-  });
+  assert.equal('summaryTitle' in viewModel, false);
+  assert.equal('noTransferNotice' in viewModel, false);
+  assert.deepEqual(viewModel.requestAction, { disabled: true, label: '정산 요청하기' });
 });
 
-test('builds no-transfer state with optional today route action', () => {
+test('builds empty settlement without no-transfer copy and with disabled request action', () => {
   const emptySettlement = {
     tripId: 'trip-1',
     defaultCurrency: 'JPY',
     currencySummaries: [],
   } satisfies GetTripSettlementResponse;
 
-  assert.deepEqual(buildSettlementTransferViewModel({ settlement: emptySettlement }), {
-    helper: '모든 지출이 이미 맞춰졌거나 아직 정산할 지출이 없어요.',
-    primaryAction: null,
-    status: 'empty',
-    title: '보낼 정산이 없어요.',
+  const viewModel = buildSettlementTransferViewModel({
+    settlement: emptySettlement,
+    todayRoute: '/trips/trip-1/days/2026-07-10',
   });
-  assert.deepEqual(
-    buildSettlementTransferViewModel({ settlement: emptySettlement, todayRoute: '/trips/trip-1/days/2026-07-10' }),
-    {
-      helper: '모든 지출이 이미 맞춰졌거나 아직 정산할 지출이 없어요.',
-      primaryAction: null,
-      status: 'empty',
-      title: '보낼 정산이 없어요.',
-    },
-  );
+
+  assert.equal(viewModel.status, 'success');
+  assert.equal(viewModel.totalTransferCount, 0);
+  assert.equal(viewModel.balanceSections.length, 0);
+  assert.equal(viewModel.sections.length, 0);
+  assert.equal('title' in viewModel, false);
+  assert.equal('helper' in viewModel, false);
+  assert.deepEqual(viewModel.requestAction, { disabled: true, label: '정산 요청하기' });
+  assert.equal(buildSettlementRequestMessage(viewModel, '오사카 여행'), null);
 });
 
 test('builds settlement request message from suggested transfers', () => {
@@ -697,6 +695,16 @@ test('builds settlement request message from suggested transfers', () => {
     buildSettlementRequestMessage(viewModel, '오사카 여행'),
     '[i-um] 오사카 여행 정산 요청\n유나님 → 민수님 18,500원\n확인 후 송금 부탁드려요.',
   );
+});
+
+test('builds Kakao settlement request template from the same share message', () => {
+  const template = buildKakaoSettlementRequestTemplate(
+    '[i-um] 오사카 여행 정산 요청\n유나님 → 민수님 18,500원\n확인 후 송금 부탁드려요.',
+  );
+
+  assert.equal(template.text, '[i-um] 오사카 여행 정산 요청\n유나님 → 민수님 18,500원\n확인 후 송금 부탁드려요.');
+  assert.equal(template.link.webUrl, 'https://i-um.app');
+  assert.equal(template.link.mobileWebUrl, 'https://i-um.app');
 });
 
 test('maps settlement transfer API failures to user-facing states', () => {

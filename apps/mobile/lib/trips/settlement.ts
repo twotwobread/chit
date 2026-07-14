@@ -1,4 +1,5 @@
 import type { Href } from 'expo-router';
+import type { TextTemplateType } from 'react-native-kakao-share-link';
 
 import type {
   DayExpenseListItem,
@@ -283,10 +284,9 @@ export type SettlementBalanceCurrencySectionViewModel = {
   rows: SettlementBalanceRowViewModel[];
 };
 
-export type SettlementNoTransferNoticeViewModel = {
-  title: string;
-  helper: string;
-  primaryAction: { label: string; route: string } | null;
+export type SettlementRequestActionViewModel = {
+  label: string;
+  disabled: boolean;
 };
 
 export type SettlementCurrencyRuleMode = 'single' | 'separate';
@@ -298,20 +298,14 @@ export type SettlementCurrencyRuleNoticeViewModel = {
   currencies: SupportedCurrency[];
 };
 
-export type SettlementTransferViewModel =
-  | {
-      status: 'success';
-      summaryTitle: string;
-      summaryHelper: string;
-      totalTransferCount: number;
-      currencyRuleNotice: SettlementCurrencyRuleNoticeViewModel;
-      balanceSections: SettlementBalanceCurrencySectionViewModel[];
-      sections: SettlementTransferCurrencySectionViewModel[];
-      noTransferNotice: SettlementNoTransferNoticeViewModel | null;
-    }
-  | ({
-      status: 'empty';
-    } & SettlementNoTransferNoticeViewModel);
+export type SettlementTransferViewModel = {
+  status: 'success';
+  totalTransferCount: number;
+  currencyRuleNotice: SettlementCurrencyRuleNoticeViewModel;
+  balanceSections: SettlementBalanceCurrencySectionViewModel[];
+  sections: SettlementTransferCurrencySectionViewModel[];
+  requestAction: SettlementRequestActionViewModel;
+};
 
 export type SettlementTransferFailureViewModel =
   | { status: 'auth' }
@@ -326,7 +320,6 @@ export function getAuthoritativeSettlementCurrencySummaries(
 
 export function buildSettlementTransferViewModel({
   settlement,
-  todayRoute,
 }: {
   settlement: GetTripSettlementResponse;
   todayRoute?: string | null;
@@ -396,23 +389,17 @@ export function buildSettlementTransferViewModel({
   });
 
   const totalTransferCount = sections.reduce((total, section) => total + section.transferCount, 0);
-  const noTransferNotice = totalTransferCount === 0 ? buildNoTransferNotice(todayRoute) : null;
-  if (balanceSections.length === 0 && totalTransferCount === 0) {
-    return {
-      status: 'empty',
-      ...buildNoTransferNotice(todayRoute),
-    };
-  }
 
   return {
     status: 'success',
-    summaryTitle: totalTransferCount > 0 ? `총 ${totalTransferCount}건을 보내면 정산이 맞아요.` : '정산 현황',
-    summaryHelper: totalTransferCount > 0 ? '서버가 계산한 최종 송금 안내예요.' : '서버가 계산한 사람별 요약이에요.',
     totalTransferCount,
     currencyRuleNotice: buildCurrencyRuleNotice(visibleCurrencies),
     balanceSections,
     sections,
-    noTransferNotice,
+    requestAction: {
+      disabled: totalTransferCount === 0,
+      label: '정산 요청하기',
+    },
   };
 }
 
@@ -432,14 +419,6 @@ function buildCurrencyRuleNotice(currencies: SupportedCurrency[]): SettlementCur
     title: '통화별로 따로 정산해요.',
     helper: `환율 변환 없이 ${currencies.join(', ')} 금액을 각각 계산해 보여줘요.`,
     currencies,
-  };
-}
-
-function buildNoTransferNotice(_todayRoute?: string | null): SettlementNoTransferNoticeViewModel {
-  return {
-    title: '보낼 정산이 없어요.',
-    helper: '모든 지출이 이미 맞춰졌거나 아직 정산할 지출이 없어요.',
-    primaryAction: null,
   };
 }
 
@@ -467,7 +446,7 @@ export function buildSettlementRequestMessage(
   viewModel: SettlementTransferViewModel,
   tripName = '여행',
 ): string | null {
-  if (viewModel.status !== 'success' || viewModel.sections.length === 0) {
+  if (viewModel.sections.length === 0) {
     return null;
   }
 
@@ -479,6 +458,16 @@ export function buildSettlementRequestMessage(
   }
 
   return [`[i-um] ${tripName} 정산 요청`, ...lines, '확인 후 송금 부탁드려요.'].join('\n');
+}
+
+export function buildKakaoSettlementRequestTemplate(message: string): TextTemplateType {
+  return {
+    text: message,
+    link: {
+      mobileWebUrl: 'https://i-um.app',
+      webUrl: 'https://i-um.app',
+    },
+  };
 }
 
 export function settlementTransferFailureState(error: unknown): SettlementTransferFailureViewModel {
