@@ -8,7 +8,7 @@ import type {
 } from '@i-um/api-contract';
 
 import { getPlaceTypeLabel, getScheduleItems, type PlaceBackedScheduleItem } from './day-itinerary';
-import { formatTripDayDate } from './days';
+import { formatTripDayDate, formatTripDayLabel } from './days';
 import {
   buildDefaultEqualSplitPreview,
   buildDefaultSplitParticipantIds,
@@ -79,7 +79,7 @@ export function buildExpenseEditViewModel({
 
   return {
     title: '지출 수정',
-    dayLabel: `Day ${itinerary.day.dayOrder}`,
+    dayLabel: formatTripDayLabel(itinerary.day.dayOrder),
     formattedDate: formatTripDayDate(expense.expenseDate),
     amountLabel: formatMoney(expense.amountMinor, expense.currency),
     currency: expense.currency,

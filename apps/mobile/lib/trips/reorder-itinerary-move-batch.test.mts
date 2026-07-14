@@ -12,7 +12,7 @@ describe('reorder itinerary move batch generation', () => {
   it('builds an ordered move batch from the original order, final order, and item versions', () => {
     const viewModel: DayItineraryViewModel = {
       status: 'success',
-      dayLabel: 'Day 1',
+      dayLabel: '1일차',
       formattedDate: '2026.07.10',
       items: [
         {

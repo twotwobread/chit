@@ -13,7 +13,7 @@ test('buildItineraryTimelineItems maps selected day rows to timeline presentatio
   assert.deepEqual(
     buildItineraryTimelineItems({
       status: 'success',
-      dayLabel: 'Day 2',
+      dayLabel: '2일차',
       formattedDate: '2026.07.11',
       items: [
         {
@@ -77,14 +77,14 @@ test('buildItineraryTimelineItems maps selected day rows to timeline presentatio
 });
 
 test('itinerary tab empty and detail CTA copy is stable', () => {
-  assert.equal(ITINERARY_TAB_EMPTY_TITLE, '이 Day에 등록된 일정이 없어요.');
+  assert.equal(ITINERARY_TAB_EMPTY_TITLE, '이 일차에 등록된 일정이 없어요.');
   assert.equal(ITINERARY_TAB_EMPTY_HELPER, '일정 추가에서 방문할 장소를 검색해 주세요.');
   assert.equal(ITINERARY_TAB_ADD_CTA_LABEL, '일정 추가');
   assert.equal(ITINERARY_TAB_REORDER_CTA_LABEL, '순서 변경');
   assert.deepEqual(
     buildItineraryTimelineItems({
       status: 'empty',
-      dayLabel: 'Day 1',
+      dayLabel: '1일차',
       formattedDate: '2026.07.10',
       title: 'empty',
       helper: 'helper',

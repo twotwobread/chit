@@ -1,7 +1,7 @@
 import type { GetDayScheduleItemsResponse, ScheduleItem, TripPlaceSummary, TripPlaceType } from '@i-um/api-contract';
 
 import { theme } from '../design/theme';
-import { formatTripDayDate } from './days';
+import { formatTripDayDate, formatTripDayLabel } from './days';
 
 export type PlaceBackedScheduleItem = ScheduleItem;
 
@@ -56,7 +56,7 @@ export function getPlaceTypeLabel(placeType: TripPlaceType): string {
 }
 
 export function buildDayItineraryViewModel(response: GetDayScheduleItemsResponse): DayItineraryViewModel {
-  const dayLabel = `Day ${response.day.dayOrder}`;
+  const dayLabel = formatTripDayLabel(response.day.dayOrder);
   const formattedDate = formatTripDayDate(response.day.date);
   const scheduleItems = getScheduleItems(response);
 

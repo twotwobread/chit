@@ -98,7 +98,7 @@ test('builds a bottom-sheet detail for a selected Day route marker', () => {
     buildTripMapScheduleMarkerDetail(
       {
         status: 'success',
-        dayLabel: 'Day 2',
+        dayLabel: '2일차',
         formattedDate: '7월 11일',
         lodgingPlace: null,
         items: [
@@ -122,7 +122,7 @@ test('builds a bottom-sheet detail for a selected Day route marker', () => {
     {
       id: 'item-1',
       title: '간사이공항 도착',
-      subtitle: 'Day 2 · 1번째 일정',
+      subtitle: '2일차 · 1번째 일정',
       categoryLabel: '교통',
       address: 'Kansai International Airport',
       timeLabel: '09:30–11:00',
@@ -150,8 +150,8 @@ test('builds ordered day chips from trip days', () => {
       day({ id: 'day-1', dayOrder: 1, date: '2026-07-10' }),
     ]),
     [
-      { id: 'day-1', label: 'Day 1', dateLabel: '2026.07.10' },
-      { id: 'day-2', label: 'Day 2', dateLabel: '2026.07.11' },
+      { id: 'day-1', label: '1일차', dateLabel: '2026.07.10' },
+      { id: 'day-2', label: '2일차', dateLabel: '2026.07.11' },
     ],
   );
 });
@@ -166,11 +166,11 @@ test('builds route layer chips with an all toggle and day color dots', () => {
   assert.equal(chips[0]?.label, '전체');
   assert.equal(chips[0]?.legendColor, undefined);
   assert.equal(chips[1]?.id, 'day:day-1');
-  assert.equal(chips[1]?.label, 'Day 1');
+  assert.equal(chips[1]?.label, '1일차');
   assert.equal(chips[1]?.dateLabel, '2026.07.10');
   assert.equal(chips[1]?.legendColor, theme.color.green[600]);
   assert.equal(chips[2]?.id, 'day:day-2');
-  assert.equal(chips[2]?.label, 'Day 2');
+  assert.equal(chips[2]?.label, '2일차');
   assert.equal(chips[2]?.dateLabel, '2026.07.11');
   assert.equal(chips[2]?.legendColor, theme.color.blue[600]);
 });

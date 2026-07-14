@@ -67,7 +67,7 @@ describe('today route preview helpers', () => {
     assert.equal(viewModel.distanceLabel, '5.4km');
     assert.equal(viewModel.modeLabel, '대중교통');
     assert.equal(viewModel.summaryText, '환승 1회');
-    assert.equal(viewModel.detailActionLabel, 'Google Maps에서 자세히');
+    assert.equal(viewModel.detailActionLabel, '구글 지도에서 자세히');
     assert.deepEqual(viewModel.map?.coordinates, [
       { latitude: 38.5, longitude: -120.2 },
       { latitude: 40.7, longitude: -120.95 },
@@ -86,7 +86,7 @@ describe('today route preview helpers', () => {
           modeLabel: '대중교통',
           summaryText: '환승 1회',
           map: null,
-          detailActionLabel: 'Google Maps에서 자세히',
+          detailActionLabel: '구글 지도에서 자세히',
         },
       }),
       '대중교통 · 약 22분 · 5.4km',
@@ -101,7 +101,7 @@ describe('today route preview helpers', () => {
           modeLabel: '대중교통',
           summaryText: '환승 1회',
           map: null,
-          detailActionLabel: 'Google Maps에서 자세히',
+          detailActionLabel: '구글 지도에서 자세히',
         },
       }),
       '대중교통 · 약 22분',
@@ -125,7 +125,7 @@ describe('today route preview helpers', () => {
           modeLabel: '대중교통',
           summaryText: '환승 1회',
           map: null,
-          detailActionLabel: 'Google Maps에서 자세히',
+          detailActionLabel: '구글 지도에서 자세히',
         },
       }),
       '경로 정보를 준비 중이에요',

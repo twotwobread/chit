@@ -22,14 +22,14 @@ describe('reorder itinerary helpers', () => {
   it('hides the reorder action for empty and single-place states', () => {
     const emptyViewModel: DayItineraryViewModel = {
       status: 'empty',
-      dayLabel: 'Day 1',
+      dayLabel: '1일차',
       formattedDate: '2026.07.10',
       title: '아직 등록된 일정이 없어요.',
       helper: '일정 추가를 눌러 방문할 장소를 등록해보세요.',
     };
     const singlePlaceViewModel: DayItineraryViewModel = {
       status: 'success',
-      dayLabel: 'Day 1',
+      dayLabel: '1일차',
       formattedDate: '2026.07.10',
       items: [
         {
@@ -53,7 +53,7 @@ describe('reorder itinerary helpers', () => {
   it('enables the reorder action and builds an edit draft for 2+ places', () => {
     const viewModel: DayItineraryViewModel = {
       status: 'success',
-      dayLabel: 'Day 1',
+      dayLabel: '1일차',
       formattedDate: '2026.07.10',
       items: [
         {
@@ -131,7 +131,7 @@ describe('reorder itinerary helpers', () => {
   it('reorders the draft, enables save, and builds sequential move operations', () => {
     const viewModel: DayItineraryViewModel = {
       status: 'success',
-      dayLabel: 'Day 1',
+      dayLabel: '1일차',
       formattedDate: '2026.07.10',
       items: [
         {
@@ -198,7 +198,7 @@ describe('reorder itinerary helpers', () => {
   it('keeps drag-only changes local and persists only after explicit save', async () => {
     const viewModel: DayItineraryViewModel = {
       status: 'success',
-      dayLabel: 'Day 1',
+      dayLabel: '1일차',
       formattedDate: '2026.07.10',
       items: [
         {
@@ -261,7 +261,7 @@ describe('reorder itinerary helpers', () => {
   it('keeps save disabled and avoids building a request when the final order returns to the original order', () => {
     const viewModel: DayItineraryViewModel = {
       status: 'success',
-      dayLabel: 'Day 1',
+      dayLabel: '1일차',
       formattedDate: '2026.07.10',
       items: [
         {
@@ -310,7 +310,7 @@ describe('reorder itinerary helpers', () => {
   it('skips persistence when save is attempted without any reorder changes', async () => {
     const viewModel: DayItineraryViewModel = {
       status: 'success',
-      dayLabel: 'Day 1',
+      dayLabel: '1일차',
       formattedDate: '2026.07.10',
       items: [
         {
@@ -392,7 +392,7 @@ describe('reorder itinerary helpers', () => {
       reorderState: { status: 'idle' },
       itinerary: {
         status: 'success',
-        dayLabel: 'Day 1',
+        dayLabel: '1일차',
         formattedDate: '2026.07.10',
         lodgingPlace: null,
         items: [

@@ -12,10 +12,14 @@ export function formatTripDayDate(value: string): string {
   return value.replace(/-/g, '.');
 }
 
+export function formatTripDayLabel(dayOrder: number): string {
+  return `${dayOrder}일차`;
+}
+
 export function buildTripDayViewModels(days: TripDay[]): TripDayViewModel[] {
   return days.map((day) => ({
     ...day,
-    dayLabel: `Day ${day.dayOrder}`,
+    dayLabel: formatTripDayLabel(day.dayOrder),
     formattedDate: formatTripDayDate(day.date),
     lodgingSummary: buildTripDayLodgingSummary(day),
   }));

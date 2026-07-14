@@ -234,6 +234,9 @@ func TestGoogleProviderDescription(t *testing.T) {
 		if got := r.Header.Get("X-Goog-FieldMask"); got != "id,displayName,formattedAddress,editorialSummary,generativeSummary" {
 			t.Fatalf("unexpected field mask %q", got)
 		}
+		if got := r.URL.Query().Get("languageCode"); got != "ko" {
+			t.Fatalf("expected Korean language code, got %q", got)
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{
@@ -299,6 +302,9 @@ func TestGoogleProviderDetails(t *testing.T) {
 		}
 		if got := r.Header.Get("X-Goog-FieldMask"); got != "id,displayName,formattedAddress,location,primaryType,types" {
 			t.Fatalf("unexpected field mask %q", got)
+		}
+		if got := r.URL.Query().Get("languageCode"); got != "ko" {
+			t.Fatalf("expected Korean language code, got %q", got)
 		}
 
 		w.Header().Set("Content-Type", "application/json")

@@ -15,7 +15,7 @@ export const googlePlaceSearchMinBiasRadiusMeters = 1000;
 export const googlePlaceSearchMaxBiasRadiusMeters = 50000;
 export const duplicateDayPlaceConfirmationCode = 'DUPLICATE_DAY_PLACE_CONFIRMATION_REQUIRED';
 export const duplicateDayPlaceConfirmationMessage =
-  '이미 이 Day에 추가된 장소입니다. 같은 장소를 한 번 더 일정에 추가할까요?';
+  '이미 이 일차에 추가된 장소입니다. 같은 장소를 한 번 더 일정에 추가할까요?';
 export const googlePlaceAddFailureMessage = '장소를 추가할 수 없어요. 다시 검색한 뒤 시도해 주세요.';
 export const googlePlaceSearchDefaultSheetTopInset =
   theme.space[4] + theme.layout.controlHSm + theme.space[2] + theme.space[6];
@@ -402,7 +402,7 @@ export function buildGooglePlaceExplorationDetail(
   return {
     ...result,
     description: details?.description?.trim() || undefined,
-    mapSearchLabel: 'Google Maps',
+    mapSearchLabel: '구글 지도에서 보기',
     mapUrl: result.googleMapsUri || buildGoogleMapsSearchUrl(result.placeName, result.address),
   };
 }
@@ -746,7 +746,7 @@ export function buildGooglePlaceDetailsErrorState(googlePlaceId: string): Google
   return {
     status: 'error',
     googlePlaceId,
-    message: '장소 설명을 불러오지 못했어요. Google Maps에서 자세한 정보를 확인해 주세요.',
+    message: '장소 설명을 불러오지 못했어요. 구글 지도에서 자세한 정보를 확인해 주세요.',
   };
 }
 

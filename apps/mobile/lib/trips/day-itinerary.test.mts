@@ -46,7 +46,7 @@ describe('day itinerary helpers', () => {
 
     assert.deepEqual(buildDayItineraryViewModel(response), {
       status: 'success',
-      dayLabel: 'Day 1',
+      dayLabel: '1일차',
       formattedDate: '2026.07.10',
       lodgingPlace: { id: 'place-1', name: '우메다 공중정원', placeType: 'sights', address: 'Umeda' },
       items: [
@@ -121,7 +121,7 @@ describe('day itinerary helpers', () => {
 
     assert.deepEqual(buildDayItineraryViewModel(response), {
       status: 'empty',
-      dayLabel: 'Day 1',
+      dayLabel: '1일차',
       formattedDate: '2026.07.10',
       lodgingPlace: null,
       title: '아직 등록된 일정이 없어요.',

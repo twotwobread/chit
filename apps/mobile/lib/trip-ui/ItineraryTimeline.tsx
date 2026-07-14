@@ -26,7 +26,7 @@ export type ItineraryTimelineProps = {
 };
 
 export function ItineraryTimeline({
-  emptyHelper = 'Day를 선택하거나 장소를 추가하면 일정이 여기에 보여요.',
+  emptyHelper = '일차를 선택하거나 장소를 추가하면 일정이 여기에 보여요.',
   emptyTitle = '아직 등록된 일정이 없어요',
   getItemAccessibilityLabel,
   items,

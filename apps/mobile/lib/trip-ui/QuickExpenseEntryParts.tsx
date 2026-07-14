@@ -118,7 +118,7 @@ export function QuickExpenseForm({
 
       {showDayTabs ? (
         <View style={styles.fieldGroup}>
-          <Text style={styles.label}>Day 선택</Text>
+          <Text style={styles.label}>일차 선택</Text>
           <DayChips
             days={viewModel.dayOptions.map((option) => ({
               id: option.tripDayId,

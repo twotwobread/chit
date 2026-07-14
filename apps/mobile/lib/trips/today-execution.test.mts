@@ -179,7 +179,7 @@ test('builds an empty-itinerary Today state with current day context and day iti
   assert.deepEqual(viewModel, {
     status: 'emptyItinerary',
     tripName: '오사카 3박 4일',
-    dayLabel: 'Day 1',
+    dayLabel: '1일차',
     formattedDate: '2026.07.10',
     title: '오늘 일정에 아직 장소가 없어요.',
     helper: '오늘 일정 화면에서 첫 장소를 추가해보세요.',
@@ -312,7 +312,7 @@ test('maps the first ordered itinerary item to the next place without exposing s
   assert.deepEqual(viewModel, {
     status: 'success',
     tripName: '오사카 3박 4일',
-    dayLabel: 'Day 1',
+    dayLabel: '1일차',
     formattedDate: '2026.07.10',
     nextPlace: {
       itemId: 'item-next',
@@ -525,7 +525,7 @@ test('builds a completed Today state when every itinerary item is arrived', () =
   assert.deepEqual(viewModel, {
     status: 'completed',
     tripName: '오사카 3박 4일',
-    dayLabel: 'Day 1',
+    dayLabel: '1일차',
     formattedDate: '2026.07.10',
     title: '오늘 일정을 모두 완료했어요.',
     helper: '오늘 일정 화면에서 장소를 확인할 수 있어요.',
@@ -569,7 +569,7 @@ test('builds a recover-needed state when all non-arrived items are skipped', () 
   assert.deepEqual(viewModel, {
     status: 'recoverNeeded',
     tripName: '오사카 3박 4일',
-    dayLabel: 'Day 1',
+    dayLabel: '1일차',
     formattedDate: '2026.07.10',
     title: '진행할 장소가 없어요.',
     helper: '스킵한 장소를 복구하면 다시 진행할 수 있어요.',

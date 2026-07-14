@@ -58,7 +58,7 @@ export function NextPlaceHeroCard({
 }: NextPlaceHeroCardProps) {
   return (
     <View style={styles.card}>
-      <Text style={styles.overline}>NEXT · 다음 장소</Text>
+      <Text style={styles.overline}>다음 장소</Text>
 
       <View style={styles.head}>
         <PlacePin order={place.order} size={44} type={place.type} />

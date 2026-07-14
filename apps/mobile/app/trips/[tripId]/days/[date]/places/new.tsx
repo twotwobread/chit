@@ -162,7 +162,7 @@ export default function NewPlaceScheduleDetailScreen() {
           return;
         }
         if (error.status === 409 && isDuplicateDayPlaceConfirmationError(error.body)) {
-          setDuplicateConfirmation('이미 이 Day에 추가된 장소입니다. 같은 장소를 한 번 더 일정에 추가할까요?');
+          setDuplicateConfirmation('이미 이 일차에 추가된 장소입니다. 같은 장소를 한 번 더 일정에 추가할까요?');
           return;
         }
         setFailure(placeScheduleFailureMessage(error.status));
