@@ -9,6 +9,7 @@ import {
   type NativeSyntheticEvent,
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ApiError } from '@i-um/api-contract';
 
@@ -17,6 +18,7 @@ import { clearStoredSession, readStoredSession } from '../lib/auth/session';
 import { Card, PrimaryButton, SecondaryButton, theme } from '../lib/design';
 import { ActiveTripCard, PastTripRow, UpcomingTripRow } from '../lib/home-ui/TripCards';
 import { BottomMenu } from '../lib/navigation/BottomMenu';
+import { getRootScreenContentTopPadding } from '../lib/navigation/root-screen-layout';
 import { listMyTrips } from '../lib/trips/trip-api';
 import {
   buildHomeRootRefreshFailureViewModel,
@@ -31,6 +33,7 @@ import {
 import { consumeExplicitHomeIntent } from '../lib/trips/home-intent';
 
 export default function HomeScreen() {
+  const insets = useSafeAreaInsets();
   const explicitHomeVisitRef = useRef(false);
   const [state, setState] = useState<HomeRootViewModel>(() => buildHomeRootViewModel({ status: 'loading' }));
 
@@ -82,7 +85,10 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.content} style={styles.scroll}>
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingTop: getRootScreenContentTopPadding(insets.top) }]}
+        style={styles.scroll}
+      >
         <HomeScreenContent state={state} onRetry={load} />
       </ScrollView>
 

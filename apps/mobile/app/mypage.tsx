@@ -1,9 +1,11 @@
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ProfileCard, SettingRow, SettingsList } from '../lib/account-ui/AccountRows';
 import { theme } from '../lib/design';
 import { BottomMenu } from '../lib/navigation/BottomMenu';
+import { getRootScreenContentTopPadding } from '../lib/navigation/root-screen-layout';
 import {
   AppInfoLegalRows,
   displayName,
@@ -16,6 +18,7 @@ import { styles } from '../lib/trip-ui/MyPageStyles';
 import { useMyPageController } from '../lib/trip-ui/useMyPageController';
 
 export default function MyPageScreen() {
+  const insets = useSafeAreaInsets();
   const {
     isLoggingOut,
     legalLinkState,
@@ -31,7 +34,10 @@ export default function MyPageScreen() {
 
   return (
     <View style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.content} style={styles.scroll}>
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingTop: getRootScreenContentTopPadding(insets.top) }]}
+        style={styles.scroll}
+      >
         <View style={styles.header}>
           <Text style={styles.title}>마이페이지</Text>
           <Text style={styles.subtitle}>내 정보와 여행을 한곳에서 확인해요.</Text>
