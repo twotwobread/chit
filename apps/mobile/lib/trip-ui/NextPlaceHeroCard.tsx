@@ -278,9 +278,10 @@ const styles = StyleSheet.create({
     padding: theme.space[3],
   },
   routeChip: {
-    alignSelf: 'flex-start',
+    alignSelf: 'center',
     backgroundColor: theme.color.surface,
     borderRadius: theme.radius.pill,
+    maxWidth: '100%',
     paddingHorizontal: theme.space[3],
     paddingVertical: theme.space[2],
     ...theme.shadow.xs,
@@ -288,8 +289,9 @@ const styles = StyleSheet.create({
   routeChipText: {
     color: theme.color.textStrong,
     fontFamily: theme.font.family.bold,
-    fontSize: theme.font.size.caption,
+    fontSize: theme.font.size.subhead,
     fontWeight: theme.font.weight.bold,
+    textAlign: 'center',
   },
   routeDot: {
     backgroundColor: theme.color.primary,

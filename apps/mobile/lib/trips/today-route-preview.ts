@@ -51,8 +51,6 @@ export type TodayRoutePreviewSummaryState =
   | TodayRoutePreviewNonSuccessState
   | {
       status: 'success';
-      title: '현 위치 기준 예상 이동';
-      helper: string;
       rows: TodayRoutePreviewModeSummaryRow[];
     };
 
@@ -159,8 +157,6 @@ export function buildTodayRoutePreviewSummarySuccessState(
 
   return {
     status: 'success',
-    title: '현 위치 기준 예상 이동',
-    helper: '실제 경로와 소요 시간은 구글 지도에서 확인해주세요.',
     rows,
   };
 }
@@ -181,6 +177,36 @@ export function buildTodayRoutePreviewHeroChip(state: TodayRoutePreviewState): s
   }
 
   return distanceLabel ? `${modeLabel} · ${durationLabel} · ${distanceLabel}` : `${modeLabel} · ${durationLabel}`;
+}
+
+export function buildTodayRoutePreviewSummaryHeroChip(
+  state: TodayRoutePreviewSummaryState,
+  selectedMode?: TravelMode | null,
+): string {
+  if (state.status === 'permissionNeeded' || state.status === 'unsupported' || state.status === 'unavailable') {
+    return state.title;
+  }
+  if (state.status === 'loading') {
+    return state.message || todayRoutePreviewHeroChipFallbackCopy;
+  }
+  if (state.status !== 'success') {
+    return todayRoutePreviewHeroChipFallbackCopy;
+  }
+
+  const selectedRow = selectedMode ? state.rows.find((row) => row.mode === selectedMode) : null;
+  const row = selectedRow ?? state.rows.find((candidate) => candidate.status === 'success') ?? state.rows[0];
+  if (!row) {
+    return todayRoutePreviewHeroChipFallbackCopy;
+  }
+
+  if (row.status === 'unavailable') {
+    return `${row.modeLabel} · ${row.message}`;
+  }
+
+  const distanceLabel = row.distanceLabel.trim();
+  return distanceLabel
+    ? `${row.modeLabel} · ${row.durationLabel} · ${distanceLabel}`
+    : `${row.modeLabel} · ${row.durationLabel}`;
 }
 
 export function todayRoutePreviewCacheKey({

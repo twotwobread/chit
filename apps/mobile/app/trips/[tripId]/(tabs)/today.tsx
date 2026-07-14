@@ -6,7 +6,6 @@ import { Card, ListRow, PrimaryButton, SecondaryButton, theme } from '../../../.
 import { BottomSheet } from '../../../../lib/trip-ui/BottomSheet';
 import { NextPlaceHeroCard } from '../../../../lib/trip-ui/NextPlaceHeroCard';
 import { QuickExpenseForm, type QuickExpenseSubmitPayload } from '../../../../lib/trip-ui/QuickExpenseForm';
-import { TodayRouteSummaryCard } from '../../../../lib/trip-ui/TodayRouteSummaryCard';
 import { TodaySpendCard } from '../../../../lib/trip-ui/TodaySpendCard';
 import { TripScreen, TripStateCard } from '../../../../lib/trip-ui/TripScreenScaffold';
 import { openTodayFlightBoardingPass, type TodayFlightCardViewModel } from '../../../../lib/flights/today';
@@ -19,7 +18,10 @@ import {
   type TodayRestoreAction,
   type TodaySkippedPlacesSectionViewModel,
 } from '../../../../lib/trips/today-execution';
-import { type TodayRoutePreviewSummaryState } from '../../../../lib/trips/today-route-preview';
+import {
+  buildTodayRoutePreviewSummaryHeroChip,
+  type TodayRoutePreviewSummaryState,
+} from '../../../../lib/trips/today-route-preview';
 import { type TodaySpendSummaryViewModel } from '../../../../lib/trips/today-spend';
 import {
   type TripTabUnavailableViewModel,
@@ -204,7 +206,10 @@ function TodayReadyContent({
             type: viewModel.nextPlace.placeType,
           }}
           skipDisabled={pendingItemId === viewModel.skipAction.itemId}
-          showRoutePreview={false}
+          routeChip={buildTodayRoutePreviewSummaryHeroChip(
+            routePreviewState,
+            viewModel.nextPlace.navigationAction.travelMode,
+          )}
           skipLabel={pendingItemId === viewModel.skipAction.itemId ? '처리 중...' : viewModel.skipAction.label}
           travelMode={
             viewModel.nextPlace.navigationAction.label
@@ -212,13 +217,6 @@ function TodayReadyContent({
               : ''
           }
           travelOptions={travelModeDisplayOptions}
-        />
-      ) : null}
-
-      {viewModel.status === 'success' ? (
-        <TodayRouteSummaryCard
-          selectedMode={viewModel.nextPlace.navigationAction.travelMode}
-          state={routePreviewState}
         />
       ) : null}
 
