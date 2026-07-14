@@ -5225,6 +5225,21 @@ func (b *fakeAuthBackend) ListScheduleItemsByTripDay(_ context.Context, tripID s
 	return b.dayScheduleItems[tripID+":"+date], nil
 }
 
+func (b *fakeAuthBackend) ListTripScheduleItems(_ context.Context, tripID string) ([]tripdomain.TripScheduleItemsDayListItem, error) {
+	prefix := tripID + ":"
+	days := make([]tripdomain.TripScheduleItemsDayListItem, 0)
+	for key, items := range b.dayScheduleItems {
+		if !strings.HasPrefix(key, prefix) {
+			continue
+		}
+		tripDayID := strings.TrimPrefix(key, prefix)
+		b.markDayScheduleLodging(tripID, tripDayID)
+		days = append(days, tripdomain.TripScheduleItemsDayListItem{TripDayID: tripDayID, Items: append([]tripdomain.ScheduleItem(nil), items...)})
+	}
+	sort.SliceStable(days, func(left, right int) bool { return days[left].TripDayID < days[right].TripDayID })
+	return days, nil
+}
+
 func (b *fakeAuthBackend) ListDayExpensesByTripDay(_ context.Context, tripID string, date string) ([]tripdomain.DayExpenseListItem, error) {
 	expenses := append([]tripdomain.DayExpenseListItem(nil), b.dayExpenses[tripID+":"+date]...)
 	sort.SliceStable(expenses, func(left, right int) bool {
@@ -5234,6 +5249,27 @@ func (b *fakeAuthBackend) ListDayExpensesByTripDay(_ context.Context, tripID str
 		return expenses[left].CreatedAt.After(expenses[right].CreatedAt)
 	})
 	return expenses, nil
+}
+
+func (b *fakeAuthBackend) ListTripExpenses(_ context.Context, tripID string) ([]tripdomain.TripExpenseDayListItem, error) {
+	prefix := tripID + ":"
+	days := make([]tripdomain.TripExpenseDayListItem, 0)
+	for key, dayExpenses := range b.dayExpenses {
+		if !strings.HasPrefix(key, prefix) {
+			continue
+		}
+		tripDayID := strings.TrimPrefix(key, prefix)
+		expenses := append([]tripdomain.DayExpenseListItem(nil), dayExpenses...)
+		sort.SliceStable(expenses, func(left, right int) bool {
+			if expenses[left].CreatedAt.Equal(expenses[right].CreatedAt) {
+				return expenses[left].ID > expenses[right].ID
+			}
+			return expenses[left].CreatedAt.After(expenses[right].CreatedAt)
+		})
+		days = append(days, tripdomain.TripExpenseDayListItem{TripDayID: tripDayID, Expenses: expenses})
+	}
+	sort.SliceStable(days, func(left, right int) bool { return days[left].TripDayID < days[right].TripDayID })
+	return days, nil
 }
 
 func (b *fakeAuthBackend) GetTripSettlementInput(_ context.Context, tripID string) (tripdomain.SettlementInput, error) {

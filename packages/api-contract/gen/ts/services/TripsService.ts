@@ -17,8 +17,10 @@ import type { GetExpenseResponse } from '../models/GetExpenseResponse';
 import type { GetTripDetailResponse } from '../models/GetTripDetailResponse';
 import type { GetTripSettlementResponse } from '../models/GetTripSettlementResponse';
 import type { ListDayExpensesResponse } from '../models/ListDayExpensesResponse';
+import type { ListTripExpensesResponse } from '../models/ListTripExpensesResponse';
 import type { ListTripParticipantsResponse } from '../models/ListTripParticipantsResponse';
 import type { ListTripPlacesResponse } from '../models/ListTripPlacesResponse';
+import type { ListTripScheduleItemsResponse } from '../models/ListTripScheduleItemsResponse';
 import type { ListTripsResponse } from '../models/ListTripsResponse';
 import type { MarkScheduleItemArrivedResponse } from '../models/MarkScheduleItemArrivedResponse';
 import type { MarkScheduleItemSkippedResponse } from '../models/MarkScheduleItemSkippedResponse';
@@ -233,6 +235,31 @@ export class TripsService {
         });
     }
     /**
+     * List expenses for a trip
+     * Returns read-only expense rows grouped by trip day in one request, ordered by day then newest expense first.
+     * @param tripId
+     * @returns ListTripExpensesResponse Trip expenses grouped by trip day.
+     * @throws ApiError
+     */
+    public static listTripExpenses(
+        tripId: string,
+    ): CancelablePromise<ListTripExpensesResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/trips/{tripId}/expenses',
+            path: {
+                'tripId': tripId,
+            },
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                403: `Forbidden.`,
+                404: `Trip not found.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
      * List trip participants
      * Returns the current accepted participants for a trip. Only authenticated current trip participants can access the list.
      * @param tripId
@@ -298,6 +325,31 @@ export class TripsService {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/trips/{tripId}/places',
+            path: {
+                'tripId': tripId,
+            },
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                403: `Forbidden.`,
+                404: `Trip not found.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
+     * List schedule items for a trip
+     * Returns read-only schedule items grouped by trip day in one request.
+     * @param tripId
+     * @returns ListTripScheduleItemsResponse Trip schedule items grouped by trip day.
+     * @throws ApiError
+     */
+    public static listTripScheduleItems(
+        tripId: string,
+    ): CancelablePromise<ListTripScheduleItemsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/trips/{tripId}/schedule-items',
             path: {
                 'tripId': tripId,
             },

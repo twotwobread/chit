@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"reflect"
 	"testing"
 	"time"
 
@@ -201,6 +202,14 @@ func TestTripSettlementInputUsesLiveAndFallbackParticipantSnapshots(t *testing.T
 	}
 	if len(expense.Splits) != 1 || expense.Splits[0].ParticipantID == nil || *expense.Splits[0].ParticipantID != ownerParticipantID || !expense.Splits[0].ParticipantLive || expense.Splits[0].AmountMinor != 700 {
 		t.Fatalf("unexpected split input: %#v", expense.Splits)
+	}
+
+	batchInputs, err := store.GetTripSettlementInputs(ctx, []string{tripID})
+	if err != nil {
+		t.Fatalf("GetTripSettlementInputs returned error: %v", err)
+	}
+	if !reflect.DeepEqual(batchInputs[tripID], input) {
+		t.Fatalf("expected batch settlement input to match single input, batch=%#v single=%#v", batchInputs[tripID], input)
 	}
 }
 

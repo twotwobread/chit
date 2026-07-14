@@ -9,9 +9,12 @@ import {
 
 import { apiErrorStatus, clearStoredSessionOnAuthError, isApiStatus } from '../auth/errors';
 import { createQuickExpense, updateExpense } from '../trips/expense-api';
-import { getTripDayItinerary } from '../trips/itinerary-api';
-import { getTripDetail, listTripParticipants } from '../trips/trip-api';
+import { getTripDayItinerary, listTripScheduleItems } from '../trips/itinerary-api';
+import { listTripParticipants } from '../trips/trip-api';
 import { getScheduleItems } from '../trips/day-itinerary';
+import { resolveTripShellDetail } from '../trips/trip-shell-detail';
+import { useTripShellState } from '../trips/trip-shell-context';
+import { buildTripItinerariesFromTripScheduleItems } from '../trips/trip-map';
 import {
   buildCreateQuickExpenseRequest,
   buildDefaultSplitParticipantIds,
@@ -64,6 +67,7 @@ export function useQuickExpenseController() {
   const date = Array.isArray(dateParam) ? dateParam[0] : dateParam;
   const routeItemId = Array.isArray(itemIdParam) ? itemIdParam[0] : itemIdParam;
   const returnTo = Array.isArray(returnToParam) ? returnToParam[0] : returnToParam;
+  const shellState = useTripShellState();
 
   const [state, setState] = useState<QuickExpenseState>({ status: 'loading' });
   const [amountInput, setAmountInput] = useState('');
@@ -99,18 +103,22 @@ export function useQuickExpenseController() {
     setErrors({});
     setFormMessage(null);
     setSavedSummary(null);
+
+    const shellDetail = resolveTripShellDetail(shellState, tripId);
+    if (shellDetail.status === 'pending') {
+      return;
+    }
+    if (shellDetail.status !== 'success') {
+      setState(quickExpenseShellFailureState(shellDetail.status));
+      return;
+    }
+
     try {
-      const [tripDetail, participantsResponse] = await Promise.all([
-        getTripDetail(tripId),
-        listTripParticipants(tripId),
-      ]);
+      const participantsResponse = await listTripParticipants(tripId);
+      const tripDetail = shellDetail.detail;
       const itineraries =
         returnTo === 'settle'
-          ? await Promise.all(
-              [...tripDetail.days]
-                .sort((left, right) => left.dayOrder - right.dayOrder)
-                .map((day) => getTripDayItinerary(tripId, day.id)),
-            )
+          ? buildTripItinerariesFromTripScheduleItems(tripDetail.days, await listTripScheduleItems(tripId))
           : [await getTripDayItinerary(tripId, date)];
       const itinerary = itineraries.find((candidate) => candidate.day.id === date) ?? itineraries[0];
       if (!itinerary) {
@@ -154,7 +162,7 @@ export function useQuickExpenseController() {
         message: quickExpenseFailureMessage(apiErrorStatus(error)),
       });
     }
-  }, [date, handleAuthError, returnTo, routeItemId, tripId]);
+  }, [date, handleAuthError, returnTo, routeItemId, shellState, tripId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -336,4 +344,14 @@ export function useQuickExpenseController() {
     updateManualSplitInput,
     viewModel,
   };
+}
+
+function quickExpenseShellFailureState(status: 'auth' | 'notFound' | 'error'): QuickExpenseState {
+  if (status === 'notFound') {
+    return { status: 'notFound', message: quickExpenseFailureMessage(404) };
+  }
+  if (status === 'error') {
+    return { status: 'error', message: quickExpenseFailureMessage() };
+  }
+  return { status };
 }

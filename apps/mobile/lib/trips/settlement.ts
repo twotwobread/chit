@@ -3,6 +3,7 @@ import type { Href } from 'expo-router';
 import type {
   DayExpenseListItem,
   GetTripSettlementResponse,
+  ListTripExpensesResponse,
   SettlementCurrencySummary as ApiSettlementCurrencySummary,
   SupportedCurrency,
   TripDay,
@@ -30,6 +31,14 @@ export type SettlementExpenseHistoryDayInput = {
   day: TripDay;
   expenses: DayExpenseListItem[];
 };
+
+export function buildSettlementExpenseHistoryDayInputs(
+  days: TripDay[],
+  response: ListTripExpensesResponse,
+): SettlementExpenseHistoryDayInput[] {
+  const expensesByDayId = new Map(response.days.map((day) => [day.tripDayId, day.expenses]));
+  return days.map((day) => ({ day, expenses: expensesByDayId.get(day.id) ?? [] }));
+}
 
 export type SettlementExpenseHistoryDaySectionViewModel = {
   dayId: string;

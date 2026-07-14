@@ -25,6 +25,14 @@ type Service struct {
 	inviteBaseURL       string
 }
 
+type tripSettlementInputsRepository interface {
+	GetTripSettlementInputs(ctx context.Context, tripIDs []string) (map[string]SettlementInput, error)
+}
+
+type tripParticipantSummaryRepository interface {
+	GetTripParticipantSummary(ctx context.Context, tripID string) (ParticipantSummary, error)
+}
+
 type ServiceOption func(*Service)
 
 func WithInviteBaseURL(value string) ServiceOption {
@@ -128,6 +136,11 @@ func (s *Service) GetMySettlementSummary(ctx context.Context, userID string) (Ge
 		return GetMySettlementSummaryResult{}, err
 	}
 
+	settlementInputs, err := s.getTripSettlementInputs(ctx, trips)
+	if err != nil {
+		return GetMySettlementSummaryResult{}, err
+	}
+
 	result := GetMySettlementSummaryResult{Trips: []MySettlementTripSummary{}}
 	for _, listItem := range trips {
 		participantID := strings.TrimSpace(listItem.ParticipantID)
@@ -135,11 +148,7 @@ func (s *Service) GetMySettlementSummary(ctx context.Context, userID string) (Ge
 			return GetMySettlementSummaryResult{}, ErrSettlementSummaryUnavailable
 		}
 
-		input, err := s.repo.GetTripSettlementInput(ctx, listItem.ID)
-		if err != nil {
-			return GetMySettlementSummaryResult{}, err
-		}
-		settlement, err := BuildTripSettlement(listItem.ID, listItem.DefaultCurrency, input)
+		settlement, err := BuildTripSettlement(listItem.ID, listItem.DefaultCurrency, settlementInputs[listItem.ID])
 		if err != nil {
 			if errors.Is(err, ErrSettlementDataInconsistent) {
 				return GetMySettlementSummaryResult{}, ErrSettlementSummaryUnavailable
@@ -172,6 +181,27 @@ func (s *Service) GetMySettlementSummary(ctx context.Context, userID string) (Ge
 	}
 
 	return result, nil
+}
+
+func (s *Service) getTripSettlementInputs(ctx context.Context, trips []ListItem) (map[string]SettlementInput, error) {
+	tripIDs := make([]string, 0, len(trips))
+	for _, listItem := range trips {
+		tripIDs = append(tripIDs, listItem.ID)
+	}
+
+	if batchRepo, ok := s.repo.(tripSettlementInputsRepository); ok {
+		return batchRepo.GetTripSettlementInputs(ctx, tripIDs)
+	}
+
+	inputs := make(map[string]SettlementInput, len(tripIDs))
+	for _, tripID := range tripIDs {
+		input, err := s.repo.GetTripSettlementInput(ctx, tripID)
+		if err != nil {
+			return nil, err
+		}
+		inputs[tripID] = input
+	}
+	return inputs, nil
 }
 
 func mySettlementCurrencySummary(currency string, netMinor int64) MySettlementCurrencySummary {
@@ -410,17 +440,9 @@ func (s *Service) GetDetail(ctx context.Context, userID string, tripID string) (
 		return GetDetailResult{}, ErrForbidden
 	}
 
-	totalCount, err := s.repo.CountTripParticipants(ctx, tripID)
+	participantSummary, err := s.getTripParticipantSummary(ctx, tripID)
 	if err != nil {
 		return GetDetailResult{}, err
-	}
-
-	previewNames, err := s.repo.ListTripParticipantPreviewNames(ctx, tripID)
-	if err != nil {
-		return GetDetailResult{}, err
-	}
-	for index, name := range previewNames {
-		previewNames[index] = participantDisplayName(name)
 	}
 
 	days, err := s.repo.ListActiveTripDaysByTrip(ctx, tripID)
@@ -428,20 +450,42 @@ func (s *Service) GetDetail(ctx context.Context, userID string, tripID string) (
 		return GetDetailResult{}, err
 	}
 
-	overflowCount := totalCount - len(previewNames)
-	if overflowCount < 0 {
-		overflowCount = 0
+	return GetDetailResult{
+		Trip:               foundTrip,
+		ParticipantSummary: participantSummary,
+		Days:               days,
+	}, nil
+}
+
+func (s *Service) getTripParticipantSummary(ctx context.Context, tripID string) (ParticipantSummary, error) {
+	var summary ParticipantSummary
+	if summaryRepo, ok := s.repo.(tripParticipantSummaryRepository); ok {
+		var err error
+		summary, err = summaryRepo.GetTripParticipantSummary(ctx, tripID)
+		if err != nil {
+			return ParticipantSummary{}, err
+		}
+	} else {
+		totalCount, err := s.repo.CountTripParticipants(ctx, tripID)
+		if err != nil {
+			return ParticipantSummary{}, err
+		}
+
+		previewNames, err := s.repo.ListTripParticipantPreviewNames(ctx, tripID)
+		if err != nil {
+			return ParticipantSummary{}, err
+		}
+		summary = ParticipantSummary{TotalCount: totalCount, PreviewNames: previewNames}
 	}
 
-	return GetDetailResult{
-		Trip: foundTrip,
-		ParticipantSummary: ParticipantSummary{
-			TotalCount:    totalCount,
-			PreviewNames:  previewNames,
-			OverflowCount: overflowCount,
-		},
-		Days: days,
-	}, nil
+	for index, name := range summary.PreviewNames {
+		summary.PreviewNames[index] = participantDisplayName(name)
+	}
+	summary.OverflowCount = summary.TotalCount - len(summary.PreviewNames)
+	if summary.OverflowCount < 0 {
+		summary.OverflowCount = 0
+	}
+	return summary, nil
 }
 
 func (s *Service) ListParticipants(ctx context.Context, userID string, tripID string) ([]ParticipantListItem, error) {
@@ -527,6 +571,37 @@ func (s *Service) GetDayScheduleItems(ctx context.Context, userID string, tripID
 	return GetDayScheduleItemsResult{Day: day, Items: items}, nil
 }
 
+func (s *Service) ListTripScheduleItems(ctx context.Context, userID string, tripID string) (ListTripScheduleItemsResult, error) {
+	if strings.TrimSpace(userID) == "" {
+		return ListTripScheduleItemsResult{}, ErrUnauthorized
+	}
+	tripID = strings.TrimSpace(tripID)
+	if !isUUID(tripID) {
+		return ListTripScheduleItemsResult{}, ErrValidation
+	}
+
+	_, ok, err := s.repo.GetTripByID(ctx, tripID)
+	if err != nil {
+		return ListTripScheduleItemsResult{}, err
+	}
+	if !ok {
+		return ListTripScheduleItemsResult{}, ErrNotFound
+	}
+	isParticipant, err := s.repo.IsTripParticipant(ctx, tripID, userID)
+	if err != nil {
+		return ListTripScheduleItemsResult{}, err
+	}
+	if !isParticipant {
+		return ListTripScheduleItemsResult{}, ErrForbidden
+	}
+
+	days, err := s.repo.ListTripScheduleItems(ctx, tripID)
+	if err != nil {
+		return ListTripScheduleItemsResult{}, err
+	}
+	return ListTripScheduleItemsResult{Days: days}, nil
+}
+
 func (s *Service) ListDayExpenses(ctx context.Context, userID string, tripID string, tripDayID string) (ListDayExpensesResult, error) {
 	if _, err := s.activeTripDay(ctx, userID, tripID, tripDayID); err != nil {
 		return ListDayExpensesResult{}, err
@@ -538,6 +613,37 @@ func (s *Service) ListDayExpenses(ctx context.Context, userID string, tripID str
 	}
 
 	return ListDayExpensesResult{Expenses: expenses}, nil
+}
+
+func (s *Service) ListTripExpenses(ctx context.Context, userID string, tripID string) (ListTripExpensesResult, error) {
+	if strings.TrimSpace(userID) == "" {
+		return ListTripExpensesResult{}, ErrUnauthorized
+	}
+	tripID = strings.TrimSpace(tripID)
+	if !isUUID(tripID) {
+		return ListTripExpensesResult{}, ErrValidation
+	}
+
+	_, ok, err := s.repo.GetTripByID(ctx, tripID)
+	if err != nil {
+		return ListTripExpensesResult{}, err
+	}
+	if !ok {
+		return ListTripExpensesResult{}, ErrNotFound
+	}
+	isParticipant, err := s.repo.IsTripParticipant(ctx, tripID, userID)
+	if err != nil {
+		return ListTripExpensesResult{}, err
+	}
+	if !isParticipant {
+		return ListTripExpensesResult{}, ErrForbidden
+	}
+
+	days, err := s.repo.ListTripExpenses(ctx, tripID)
+	if err != nil {
+		return ListTripExpensesResult{}, err
+	}
+	return ListTripExpensesResult{Days: days}, nil
 }
 
 func (s *Service) GetDayExpense(ctx context.Context, userID string, tripID string, tripDayID string, expenseID string) (GetExpenseResult, error) {

@@ -1,4 +1,9 @@
-import type { GetDayScheduleItemsResponse, ScheduleItem, TripDay } from '@i-um/api-contract';
+import type {
+  GetDayScheduleItemsResponse,
+  ListTripScheduleItemsResponse,
+  ScheduleItem,
+  TripDay,
+} from '@i-um/api-contract';
 
 import { theme } from '../design/theme';
 import { buildGooglePlaceSearchRegionFromDestination, type GooglePlaceTripDestination } from '../places/google-search';
@@ -111,6 +116,14 @@ export function toggleTripMapRouteLayer(
     return { kind: 'all' };
   }
   return { dayId: chipId.slice('day:'.length), kind: 'day' };
+}
+
+export function buildTripItinerariesFromTripScheduleItems(
+  days: TripDay[],
+  response: ListTripScheduleItemsResponse,
+): GetDayScheduleItemsResponse[] {
+  const scheduleItemsByDayId = new Map(response.days.map((day) => [day.tripDayId, day.scheduleItems]));
+  return days.map((day) => ({ day, scheduleItems: scheduleItemsByDayId.get(day.id) ?? [] }));
 }
 
 export function buildTripMapDayRoutes(itineraries: GetDayScheduleItemsResponse[]): TripMapDayRoute[] {

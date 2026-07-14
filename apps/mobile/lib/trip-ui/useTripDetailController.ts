@@ -6,7 +6,9 @@ import { type GetTripDetailResponse, type TripParticipantListItem } from '@i-um/
 import { isApiStatus, isMobileAuthSessionError } from '../auth/errors';
 import { getStoredSession } from '../auth/session';
 import { beginStaleWhileRevalidate, resolveStaleWhileRevalidateFailure } from '../trips/stale-refresh';
-import { getTripDetail, listTripParticipants } from '../trips/trip-api';
+import { resolveTripShellDetail } from '../trips/trip-shell-detail';
+import { useTripShellState } from '../trips/trip-shell-context';
+import { listTripParticipants } from '../trips/trip-api';
 
 export type TripDetailState =
   | { status: 'loading' }
@@ -24,6 +26,7 @@ export type TripDetailState =
 export function useTripDetailController() {
   const { tripId: tripIdParam } = useLocalSearchParams<{ tripId?: string | string[] }>();
   const tripId = Array.isArray(tripIdParam) ? tripIdParam[0] : tripIdParam;
+  const shellState = useTripShellState();
   const [state, setState] = useState<TripDetailState>({ status: 'loading' });
 
   const load = useCallback(async () => {
@@ -33,9 +36,18 @@ export function useTripDetailController() {
     }
 
     setState((current) => beginStaleWhileRevalidate(current, { status: 'loading' }, ['success']));
+    const shellDetail = resolveTripShellDetail(shellState, tripId);
+    if (shellDetail.status === 'pending') {
+      return;
+    }
+    if (shellDetail.status !== 'success') {
+      setState(tripDetailShellFailureState(shellDetail.status));
+      return;
+    }
+
     try {
-      const [detail, participantsResult, session] = await Promise.all([
-        getTripDetail(tripId),
+      const detail = shellDetail.detail;
+      const [participantsResult, session] = await Promise.all([
         listTripParticipants(tripId).then(
           (response) => ({ status: 'fulfilled' as const, participants: response.participants }),
           () => ({ status: 'rejected' as const, participants: [] as TripParticipantListItem[] }),
@@ -58,7 +70,7 @@ export function useTripDetailController() {
         }),
       );
     }
-  }, [tripId]);
+  }, [shellState, tripId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -80,6 +92,10 @@ export function useTripDetailController() {
     load,
     state,
   };
+}
+
+function tripDetailShellFailureState(status: 'auth' | 'notFound' | 'error'): TripDetailState {
+  return { status };
 }
 
 function tripDetailFailureState(error: unknown): TripDetailState {

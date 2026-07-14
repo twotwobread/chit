@@ -1,11 +1,17 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import type { DayExpenseListItem, GetTripSettlementResponse, TripDay } from '@i-um/api-contract';
+import type {
+  DayExpenseListItem,
+  GetTripSettlementResponse,
+  ListTripExpensesResponse,
+  TripDay,
+} from '@i-um/api-contract';
 
 import {
   buildSettlementExpenseEntryRoute,
   buildSettlementExpenseEntryRouteForDays,
+  buildSettlementExpenseHistoryDayInputs,
   buildSettlementExpenseHistoryViewModel,
   buildSettlementRequestMessage,
   buildSettlementTransferViewModel,
@@ -90,6 +96,18 @@ test('builds settlement expense entry route from today or the first trip day', (
     '/trips/trip-a/days/day-1/expenses/quick?returnTo=settle',
   );
   assert.equal(buildSettlementExpenseEntryRouteForDays('trip-a', [], '2026-07-20'), null);
+});
+
+test('builds settlement expense history day inputs from a single trip-level expense response', () => {
+  const days = [tripDay({ id: 'day-a', dayOrder: 2 }), tripDay({ id: 'day-b', dayOrder: 1, date: '2026-07-09' })];
+  const response: ListTripExpensesResponse = {
+    days: [{ tripDayId: 'day-a', expenses: [dayExpense({ id: 'expense-a', tripDayId: 'day-a' })] }],
+  };
+
+  assert.deepEqual(buildSettlementExpenseHistoryDayInputs(days, response), [
+    { day: days[0], expenses: response.days[0].expenses },
+    { day: days[1], expenses: [] },
+  ]);
 });
 
 test('builds day-tabbed settlement expense history with selected-day editable rows', () => {

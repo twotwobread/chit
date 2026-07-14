@@ -6,9 +6,11 @@ import KakaoShareLink from 'react-native-kakao-share-link';
 
 import { ApiError } from '@i-um/api-contract';
 
-import { getMeWithRefresh, MobileAuthError } from '../auth/client';
+import { getStoredAuthUser, MobileAuthError } from '../auth/client';
 import { apiErrorCode } from '../auth/errors';
-import { createTripInvite, getTripDetail, listTripParticipants, removeTripParticipant } from '../trips/trip-api';
+import { resolveTripShellDetail } from '../trips/trip-shell-detail';
+import { useTripShellState } from '../trips/trip-shell-context';
+import { createTripInvite, listTripParticipants, removeTripParticipant } from '../trips/trip-api';
 import {
   buildFallbackShareContent,
   buildInviteCopyText,
@@ -55,6 +57,7 @@ export type ShareBusyState = 'none' | 'copy' | 'kakao' | 'fallback';
 export function useParticipantsController() {
   const { tripId: tripIdParam } = useLocalSearchParams<{ tripId?: string | string[] }>();
   const tripId = Array.isArray(tripIdParam) ? tripIdParam[0] : tripIdParam;
+  const shellState = useTripShellState();
   const [state, setState] = useState<ParticipantsState>({ status: 'loading' });
   const [inviteState, setInviteState] = useState<InviteState>({ status: 'idle' });
   const [removeState, setRemoveState] = useState<RemoveState>({ status: 'idle' });
@@ -71,13 +74,23 @@ export function useParticipantsController() {
     setInviteState({ status: 'idle' });
     setRemoveState({ status: 'idle' });
     setShareMessage(null);
+
+    const shellDetail = resolveTripShellDetail(shellState, tripId);
+    if (shellDetail.status === 'pending') {
+      return;
+    }
+    if (shellDetail.status !== 'success') {
+      setFailureState(setState, participantShellFailureStatus(shellDetail.status));
+      return;
+    }
+
     try {
-      const [currentUser, participantsResponse, tripDetail] = await Promise.all([
-        getMeWithRefresh(),
+      const [currentUser, participantsResponse] = await Promise.all([
+        getStoredAuthUser(),
         listTripParticipants(tripId),
-        getTripDetail(tripId),
       ]);
-      const canManageParticipants = canCreateTripInvite(tripDetail, currentUser.user.id);
+      const tripDetail = shellDetail.detail;
+      const canManageParticipants = canCreateTripInvite(tripDetail, currentUser.id);
       setState({
         status: 'success',
         viewModel: buildParticipantListViewModel(participantsResponse.participants, {
@@ -97,7 +110,7 @@ export function useParticipantsController() {
       }
       setState({ status: 'error' });
     }
-  }, [tripId]);
+  }, [shellState, tripId]);
 
   const createInvite = useCallback(async () => {
     if (!tripId) {
@@ -232,6 +245,10 @@ export function useParticipantsController() {
     shareToKakao,
     state,
   };
+}
+
+function participantShellFailureStatus(status: 'auth' | 'notFound' | 'error'): ParticipantListFailureStatus {
+  return status;
 }
 
 function setFailureState(setState: (state: ParticipantsState) => void, status: ParticipantListFailureStatus) {

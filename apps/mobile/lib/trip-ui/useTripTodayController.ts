@@ -28,7 +28,7 @@ import {
   markScheduleItemSkipped,
   restoreScheduleItem,
 } from '../trips/itinerary-api';
-import { getTripDetail, listTripParticipants } from '../trips/trip-api';
+import { listTripParticipants } from '../trips/trip-api';
 import { openTodayNavigationDestination } from '../trips/today-navigation';
 import { buildTodaySpendSummaryViewModel, type TodaySpendSummaryViewModel } from '../trips/today-spend';
 import {
@@ -66,6 +66,8 @@ import {
 } from '../trips/trip-tabs';
 import { readStoredTravelMode, saveSelectedTravelMode, travelModeFromDisplayLabel } from '../trips/travel-mode';
 import { localDateString } from '../trips/status';
+import { resolveTripShellDetail } from '../trips/trip-shell-detail';
+import { useTripShellState } from '../trips/trip-shell-context';
 
 export type TripTodayState =
   | { status: 'loading' }
@@ -101,6 +103,7 @@ export type QuickExpenseOverlayState =
 export function useTripTodayController() {
   const { tripId: tripIdParam } = useLocalSearchParams<{ tripId?: string | string[] }>();
   const tripId = Array.isArray(tripIdParam) ? tripIdParam[0] : tripIdParam;
+  const shellState = useTripShellState();
   const [state, setState] = useState<TripTodayState>({ status: 'loading' });
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [pendingItemId, setPendingItemId] = useState<string | null>(null);
@@ -117,9 +120,19 @@ export function useTripTodayController() {
     setPendingItemId(null);
     setRouteChip(todayRoutePreviewHeroChipFallbackCopy);
     setState({ status: 'loading' });
+
+    const shellDetail = resolveTripShellDetail(shellState, tripId);
+    if (shellDetail.status === 'pending') {
+      return;
+    }
+    if (shellDetail.status !== 'success') {
+      setState(todayShellFailureState(shellDetail.status));
+      return;
+    }
+
     try {
-      const [detail, storedTravelMode, flightsResult] = await Promise.all([
-        getTripDetail(tripId),
+      const detail = shellDetail.detail;
+      const [storedTravelMode, flightsResult] = await Promise.all([
         readStoredTravelMode(),
         listTripFlights(tripId).catch(() => null),
       ]);
@@ -177,7 +190,7 @@ export function useTripTodayController() {
     } catch (error) {
       setState(todayFailureState(error));
     }
-  }, [tripId]);
+  }, [shellState, tripId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -237,42 +250,49 @@ export function useTripTodayController() {
     };
   }, [state, tripId]);
 
-  const openQuickExpenseOverlay = useCallback(async (target: QuickExpenseRouteTarget) => {
-    setActionMessage(null);
-    setQuickExpenseState({ status: 'loading', target });
-    try {
-      const [tripDetail, itinerary, participantsResponse] = await Promise.all([
-        getTripDetail(target.tripId),
-        getTripDayItinerary(target.tripId, target.date),
-        listTripParticipants(target.tripId),
-      ]);
-      const selectedItemId = resolveInitialQuickExpenseItemId(itinerary.scheduleItems, target.itemId);
-      const participants = participantsResponse.participants;
-      setQuickExpenseState({
-        status: 'ready',
-        target,
-        tripName: tripDetail.trip.name.trim() || '여행',
-        currency: tripDetail.trip.defaultCurrency,
-        itinerary,
-        participants,
-        selectedItemId,
-        payerParticipantId: participants.length === 1 ? participants[0].participantId : null,
-        selectedSplitParticipantIds: buildDefaultSplitParticipantIds(participants),
-        errorMessage: null,
-      });
-    } catch (error) {
-      if (await clearStoredSessionOnAnyMobileAuthOrApiAuthError(error)) {
-        setQuickExpenseState({ status: 'idle' });
-        setState({ status: 'auth' });
-        return;
+  const openQuickExpenseOverlay = useCallback(
+    async (target: QuickExpenseRouteTarget) => {
+      setActionMessage(null);
+      setQuickExpenseState({ status: 'loading', target });
+      try {
+        const shellDetail = resolveTripShellDetail(shellState, target.tripId);
+        if (shellDetail.status !== 'success') {
+          throw new Error('trip detail is not ready');
+        }
+        const [itinerary, participantsResponse] = await Promise.all([
+          getTripDayItinerary(target.tripId, target.date),
+          listTripParticipants(target.tripId),
+        ]);
+        const tripDetail = shellDetail.detail;
+        const selectedItemId = resolveInitialQuickExpenseItemId(itinerary.scheduleItems, target.itemId);
+        const participants = participantsResponse.participants;
+        setQuickExpenseState({
+          status: 'ready',
+          target,
+          tripName: tripDetail.trip.name.trim() || '여행',
+          currency: tripDetail.trip.defaultCurrency,
+          itinerary,
+          participants,
+          selectedItemId,
+          payerParticipantId: participants.length === 1 ? participants[0].participantId : null,
+          selectedSplitParticipantIds: buildDefaultSplitParticipantIds(participants),
+          errorMessage: null,
+        });
+      } catch (error) {
+        if (await clearStoredSessionOnAnyMobileAuthOrApiAuthError(error)) {
+          setQuickExpenseState({ status: 'idle' });
+          setState({ status: 'auth' });
+          return;
+        }
+        setQuickExpenseState({
+          status: 'error',
+          target,
+          message: quickExpenseFailureMessage(apiErrorStatus(error)),
+        });
       }
-      setQuickExpenseState({
-        status: 'error',
-        target,
-        message: quickExpenseFailureMessage(apiErrorStatus(error)),
-      });
-    }
-  }, []);
+    },
+    [shellState],
+  );
 
   const closeQuickExpenseOverlay = useCallback(() => {
     setQuickExpenseState({ status: 'idle' });
@@ -489,4 +509,8 @@ function todayFailureState(error: unknown): TripTodayState {
     return { status: 'notFound' };
   }
   return { status: 'error' };
+}
+
+function todayShellFailureState(status: 'auth' | 'notFound' | 'error'): TripTodayState {
+  return { status };
 }

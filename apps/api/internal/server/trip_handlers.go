@@ -316,6 +316,26 @@ func (s apiServer) GetDayScheduleItems(w http.ResponseWriter, r *http.Request, t
 	writeJSON(w, http.StatusOK, getDayScheduleResponseToOpenAPI(result))
 }
 
+func (s apiServer) ListTripScheduleItems(w http.ResponseWriter, r *http.Request, tripId string) {
+	if s.auth == nil || s.trips == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "trip schedule is not configured", nil)
+		return
+	}
+
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	result, err := s.trips.ListTripScheduleItems(r.Context(), authContext.UserID, tripId)
+	if err != nil {
+		writeTripDayScheduleError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, listTripScheduleItemsResponseToOpenAPI(result))
+}
+
 func (s apiServer) ListDayExpenses(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string) {
 	if s.auth == nil || s.trips == nil {
 		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "day expense listing is not configured", nil)
@@ -334,6 +354,26 @@ func (s apiServer) ListDayExpenses(w http.ResponseWriter, r *http.Request, tripI
 	}
 
 	writeJSON(w, http.StatusOK, listDayExpensesResponseToOpenAPI(result))
+}
+
+func (s apiServer) ListTripExpenses(w http.ResponseWriter, r *http.Request, tripId string) {
+	if s.auth == nil || s.trips == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "trip expense listing is not configured", nil)
+		return
+	}
+
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	result, err := s.trips.ListTripExpenses(r.Context(), authContext.UserID, tripId)
+	if err != nil {
+		writeDayExpenseListError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, listTripExpensesResponseToOpenAPI(result))
 }
 
 func (s apiServer) GetDayExpense(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, expenseId string) {

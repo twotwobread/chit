@@ -34,121 +34,137 @@ type equalSplitFixtureSplit struct {
 }
 
 type fakeRepository struct {
-	creator                  Creator
-	creatorFound             bool
-	created                  CreateRecord
-	trip                     Trip
-	tripFound                bool
-	isParticipant            bool
-	isOwner                  bool
-	participantCount         int
-	previewNames             []string
-	listParticipants         []ParticipantListItem
-	listParticipantsTripID   string
-	listed                   []ListItem
-	listedUserID             string
-	dayLodgingPlaces         []DayLodgingPlace
-	dayLodgingPlace          TripPlaceSummary
-	dayLodgingFound          bool
-	dayLodgingLookupTrip     string
-	dayLodgingLookupDate     string
-	tripPlaceSummary         TripPlaceSummary
-	tripPlaceFound           bool
-	tripPlaces               []TripPlaceSummary
-	tripPlaceLookupTripID    string
-	tripPlaceLookupID        string
-	listTripPlacesTripID     string
-	manualDayLodgingRecord   CreateManualDayLodgingPlaceRecord
-	manualDayLodgingCalled   bool
-	manualDayLodgingPlace    TripPlaceSummary
-	setDayLodgingRecord      SetDayLodgingPlaceRecord
-	setDayLodgingCalled      bool
-	setDayLodgingPlace       TripPlaceSummary
-	setDayLodgingErr         error
-	deletedDayLodgingTrip    string
-	deletedDayLodgingDate    string
-	deletedDayLodgingCall    bool
-	dayScheduleItems         []ScheduleItem
-	listedScheduleTripID     string
-	listedScheduleDate       string
-	dayExpenses              []DayExpenseListItem
-	listedDayExpensesTripID  string
-	listedDayExpensesDate    string
-	listDayExpensesCalled    bool
-	listDayExpensesErr       error
-	settlementData           SettlementInput
-	settlementDataByTrip     map[string]SettlementInput
-	settlementDataTripID     string
-	settlementDataCalled     bool
-	settlementDataErr        error
-	expense                  Expense
-	expenseFound             bool
-	expenseLookupTripID      string
-	expenseLookupTripDayID   string
-	expenseLookupExpenseID   string
-	updatedExpenseRecord     UpdateExpenseRecord
-	updatedExpenseCalled     bool
-	updatedExpense           Expense
-	updateExpenseErr         error
-	deletedExpenseTripID     string
-	deletedExpenseTripDayID  string
-	deletedExpenseID         string
-	deletedExpenseCalled     bool
-	deletedExpenseOK         bool
-	deleteExpenseErr         error
-	quickExpenseRecord       CreateQuickExpenseRecord
-	quickExpenseCalled       bool
-	quickExpenseResult       CreateQuickExpenseResult
-	quickExpenseErr          error
-	createdManualRecords     []CreateManualScheduleItemRecord
-	createdManualItem        ScheduleItem
-	createManualErr          error
-	dayItem                  ScheduleItem
-	dayItemFound             bool
-	dayItemLookupTripID      string
-	dayItemLookupDate        string
-	dayItemLookupItemID      string
-	reorderedRecord          ReorderScheduleItemsRecord
-	reorderedCalled          bool
-	reorderedItems           []ScheduleItem
-	reorderErr               error
-	markedArrivedRecord      MarkScheduleItemArrivedRecord
-	markedArrivedCalled      bool
-	markedArrivedResult      MarkScheduleItemArrivedMutationResult
-	markedArrivedErr         error
-	markedSkippedRecord      MarkScheduleItemSkippedRecord
-	markedSkippedCalled      bool
-	markedSkippedResult      MarkScheduleItemSkippedMutationResult
-	markedSkippedErr         error
-	restoredDayItemRecord    RestoreScheduleItemRecord
-	restoredDayItemCalled    bool
-	restoredDayItemResult    RestoreScheduleItemMutationResult
-	restoredDayItemErr       error
-	updatedDayItemRecord     UpdateScheduleItemRecord
-	updatedDayItemCalled     bool
-	updatedDayItem           ScheduleItem
-	deletedDayItemTripID     string
-	deletedDayItemDate       string
-	deletedDayItemID         string
-	deletedDayItemCalled     bool
-	deletedDayItemOK         bool
-	updated                  UpdateRecord
-	updatedCalled            bool
-	deletedID                string
-	deletedCalled            bool
-	deleteOK                 bool
-	deletedParticipantTripID string
-	deletedParticipantID     string
-	deletedParticipantCalled bool
-	deleteParticipantOK      bool
-	inviteRecord             CreateTripInviteRecord
-	inviteRecords            []CreateTripInviteRecord
-	inviteResult             CreateTripInviteResult
-	inviteErr                error
-	inviteErrs               []error
-	acceptInviteRecord       AcceptTripInviteRecord
-	acceptInviteResult       AcceptTripInviteResult
-	acceptInviteErr          error
+	creator                      Creator
+	creatorFound                 bool
+	created                      CreateRecord
+	trip                         Trip
+	tripFound                    bool
+	isParticipant                bool
+	isOwner                      bool
+	participantCount             int
+	previewNames                 []string
+	countParticipantsCalled      bool
+	previewNamesCalled           bool
+	participantSummaryCalled     bool
+	participantSummaryErr        error
+	listParticipants             []ParticipantListItem
+	listParticipantsTripID       string
+	listed                       []ListItem
+	listedUserID                 string
+	dayLodgingPlaces             []DayLodgingPlace
+	dayLodgingPlace              TripPlaceSummary
+	dayLodgingFound              bool
+	dayLodgingLookupTrip         string
+	dayLodgingLookupDate         string
+	tripPlaceSummary             TripPlaceSummary
+	tripPlaceFound               bool
+	tripPlaces                   []TripPlaceSummary
+	tripPlaceLookupTripID        string
+	tripPlaceLookupID            string
+	listTripPlacesTripID         string
+	manualDayLodgingRecord       CreateManualDayLodgingPlaceRecord
+	manualDayLodgingCalled       bool
+	manualDayLodgingPlace        TripPlaceSummary
+	setDayLodgingRecord          SetDayLodgingPlaceRecord
+	setDayLodgingCalled          bool
+	setDayLodgingPlace           TripPlaceSummary
+	setDayLodgingErr             error
+	deletedDayLodgingTrip        string
+	deletedDayLodgingDate        string
+	deletedDayLodgingCall        bool
+	dayScheduleItems             []ScheduleItem
+	listedScheduleTripID         string
+	listedScheduleDate           string
+	listScheduleItemsCalled      bool
+	tripScheduleItemDays         []TripScheduleItemsDayListItem
+	listedTripScheduleTripID     string
+	listTripScheduleItemsCalled  bool
+	listTripScheduleItemsErr     error
+	dayExpenses                  []DayExpenseListItem
+	listedDayExpensesTripID      string
+	listedDayExpensesDate        string
+	listDayExpensesCalled        bool
+	listDayExpensesErr           error
+	tripExpenseDays              []TripExpenseDayListItem
+	listedTripExpensesTripID     string
+	listTripExpensesCalled       bool
+	listTripExpensesErr          error
+	settlementData               SettlementInput
+	settlementDataByTrip         map[string]SettlementInput
+	settlementDataTripID         string
+	settlementDataCalled         bool
+	settlementDataErr            error
+	settlementInputsByTripCalled bool
+	settlementInputsByTripIDs    []string
+	settlementInputsByTripErr    error
+	expense                      Expense
+	expenseFound                 bool
+	expenseLookupTripID          string
+	expenseLookupTripDayID       string
+	expenseLookupExpenseID       string
+	updatedExpenseRecord         UpdateExpenseRecord
+	updatedExpenseCalled         bool
+	updatedExpense               Expense
+	updateExpenseErr             error
+	deletedExpenseTripID         string
+	deletedExpenseTripDayID      string
+	deletedExpenseID             string
+	deletedExpenseCalled         bool
+	deletedExpenseOK             bool
+	deleteExpenseErr             error
+	quickExpenseRecord           CreateQuickExpenseRecord
+	quickExpenseCalled           bool
+	quickExpenseResult           CreateQuickExpenseResult
+	quickExpenseErr              error
+	createdManualRecords         []CreateManualScheduleItemRecord
+	createdManualItem            ScheduleItem
+	createManualErr              error
+	dayItem                      ScheduleItem
+	dayItemFound                 bool
+	dayItemLookupTripID          string
+	dayItemLookupDate            string
+	dayItemLookupItemID          string
+	reorderedRecord              ReorderScheduleItemsRecord
+	reorderedCalled              bool
+	reorderedItems               []ScheduleItem
+	reorderErr                   error
+	markedArrivedRecord          MarkScheduleItemArrivedRecord
+	markedArrivedCalled          bool
+	markedArrivedResult          MarkScheduleItemArrivedMutationResult
+	markedArrivedErr             error
+	markedSkippedRecord          MarkScheduleItemSkippedRecord
+	markedSkippedCalled          bool
+	markedSkippedResult          MarkScheduleItemSkippedMutationResult
+	markedSkippedErr             error
+	restoredDayItemRecord        RestoreScheduleItemRecord
+	restoredDayItemCalled        bool
+	restoredDayItemResult        RestoreScheduleItemMutationResult
+	restoredDayItemErr           error
+	updatedDayItemRecord         UpdateScheduleItemRecord
+	updatedDayItemCalled         bool
+	updatedDayItem               ScheduleItem
+	deletedDayItemTripID         string
+	deletedDayItemDate           string
+	deletedDayItemID             string
+	deletedDayItemCalled         bool
+	deletedDayItemOK             bool
+	updated                      UpdateRecord
+	updatedCalled                bool
+	deletedID                    string
+	deletedCalled                bool
+	deleteOK                     bool
+	deletedParticipantTripID     string
+	deletedParticipantID         string
+	deletedParticipantCalled     bool
+	deleteParticipantOK          bool
+	inviteRecord                 CreateTripInviteRecord
+	inviteRecords                []CreateTripInviteRecord
+	inviteResult                 CreateTripInviteResult
+	inviteErr                    error
+	inviteErrs                   []error
+	acceptInviteRecord           AcceptTripInviteRecord
+	acceptInviteResult           AcceptTripInviteResult
+	acceptInviteErr              error
 }
 
 func (r *fakeRepository) GetCreator(context.Context, string) (Creator, bool, error) {
@@ -261,11 +277,21 @@ func (r *fakeRepository) AcceptTripInvite(_ context.Context, record AcceptTripIn
 }
 
 func (r *fakeRepository) CountTripParticipants(context.Context, string) (int, error) {
+	r.countParticipantsCalled = true
 	return r.participantCount, nil
 }
 
 func (r *fakeRepository) ListTripParticipantPreviewNames(context.Context, string) ([]string, error) {
+	r.previewNamesCalled = true
 	return r.previewNames, nil
+}
+
+func (r *fakeRepository) GetTripParticipantSummary(context.Context, string) (ParticipantSummary, error) {
+	r.participantSummaryCalled = true
+	if r.participantSummaryErr != nil {
+		return ParticipantSummary{}, r.participantSummaryErr
+	}
+	return ParticipantSummary{TotalCount: r.participantCount, PreviewNames: r.previewNames}, nil
 }
 
 func (r *fakeRepository) ListTripParticipants(_ context.Context, tripID string) ([]ParticipantListItem, error) {
@@ -356,7 +382,20 @@ func (r *fakeRepository) DeleteDayLodgingPlace(_ context.Context, tripID string,
 func (r *fakeRepository) ListScheduleItemsByTripDay(_ context.Context, tripID string, date string) ([]ScheduleItem, error) {
 	r.listedScheduleTripID = tripID
 	r.listedScheduleDate = date
+	r.listScheduleItemsCalled = true
 	return r.dayScheduleItems, nil
+}
+
+func (r *fakeRepository) ListTripScheduleItems(_ context.Context, tripID string) ([]TripScheduleItemsDayListItem, error) {
+	r.listedTripScheduleTripID = tripID
+	r.listTripScheduleItemsCalled = true
+	if r.listTripScheduleItemsErr != nil {
+		return nil, r.listTripScheduleItemsErr
+	}
+	if r.tripScheduleItemDays != nil {
+		return r.tripScheduleItemDays, nil
+	}
+	return []TripScheduleItemsDayListItem{}, nil
 }
 
 func (r *fakeRepository) ListDayExpensesByTripDay(_ context.Context, tripID string, date string) ([]DayExpenseListItem, error) {
@@ -372,6 +411,18 @@ func (r *fakeRepository) ListDayExpensesByTripDay(_ context.Context, tripID stri
 	return []DayExpenseListItem{}, nil
 }
 
+func (r *fakeRepository) ListTripExpenses(_ context.Context, tripID string) ([]TripExpenseDayListItem, error) {
+	r.listedTripExpensesTripID = tripID
+	r.listTripExpensesCalled = true
+	if r.listTripExpensesErr != nil {
+		return nil, r.listTripExpensesErr
+	}
+	if r.tripExpenseDays != nil {
+		return r.tripExpenseDays, nil
+	}
+	return []TripExpenseDayListItem{}, nil
+}
+
 func (r *fakeRepository) GetTripSettlementInput(_ context.Context, tripID string) (SettlementInput, error) {
 	r.settlementDataTripID = tripID
 	r.settlementDataCalled = true
@@ -382,6 +433,23 @@ func (r *fakeRepository) GetTripSettlementInput(_ context.Context, tripID string
 		return r.settlementDataByTrip[tripID], nil
 	}
 	return r.settlementData, nil
+}
+
+func (r *fakeRepository) GetTripSettlementInputs(_ context.Context, tripIDs []string) (map[string]SettlementInput, error) {
+	r.settlementInputsByTripCalled = true
+	r.settlementInputsByTripIDs = append([]string(nil), tripIDs...)
+	if r.settlementInputsByTripErr != nil {
+		return nil, r.settlementInputsByTripErr
+	}
+	inputs := make(map[string]SettlementInput, len(tripIDs))
+	for _, tripID := range tripIDs {
+		if r.settlementDataByTrip != nil {
+			inputs[tripID] = r.settlementDataByTrip[tripID]
+			continue
+		}
+		inputs[tripID] = r.settlementData
+	}
+	return inputs, nil
 }
 
 func (r *fakeRepository) GetExpenseByTripDayAndID(_ context.Context, tripID string, tripDayID string, expenseID string) (Expense, bool, error) {
@@ -1020,6 +1088,12 @@ func TestServiceGetDetail(t *testing.T) {
 	if result.Trip.Name != "오사카 3박 4일" {
 		t.Fatalf("expected trip detail, got %#v", result.Trip)
 	}
+	if !repo.participantSummaryCalled {
+		t.Fatal("expected participant summary batch lookup to be used")
+	}
+	if repo.countParticipantsCalled || repo.previewNamesCalled {
+		t.Fatal("expected separate participant count/preview lookups not to be used")
+	}
 	if result.ParticipantSummary.TotalCount != 4 {
 		t.Fatalf("expected total count 4, got %d", result.ParticipantSummary.TotalCount)
 	}
@@ -1443,6 +1517,35 @@ func TestServiceGetDayScheduleItemsOutOfRange(t *testing.T) {
 	}
 }
 
+func TestServiceListTripScheduleItemsUsesBatchRepository(t *testing.T) {
+	repo := &fakeRepository{
+		trip:          Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"},
+		tripFound:     true,
+		isParticipant: true,
+		tripScheduleItemDays: []TripScheduleItemsDayListItem{
+			{
+				TripDayID: testUUID(9201),
+				Items:     []ScheduleItem{{ID: testUUID(9202), ItemOrder: 1, Version: 1, ItemType: ScheduleItemTypePlace}},
+			},
+		},
+	}
+	service := newTestService(repo)
+
+	result, err := service.ListTripScheduleItems(context.Background(), "user-1", testTripID)
+	if err != nil {
+		t.Fatalf("ListTripScheduleItems returned error: %v", err)
+	}
+	if !repo.listTripScheduleItemsCalled || repo.listedTripScheduleTripID != testTripID {
+		t.Fatalf("expected batch schedule repository call, got trip=%q called=%v", repo.listedTripScheduleTripID, repo.listTripScheduleItemsCalled)
+	}
+	if repo.listScheduleItemsCalled {
+		t.Fatal("expected day schedule repository call not to be used")
+	}
+	if len(result.Days) != 1 || result.Days[0].TripDayID != testUUID(9201) || len(result.Days[0].Items) != 1 || result.Days[0].Items[0].ID != testUUID(9202) {
+		t.Fatalf("unexpected trip schedule result: %#v", result)
+	}
+}
+
 func TestServiceListDayExpenses(t *testing.T) {
 	createdAt := time.Date(2026, 7, 10, 12, 30, 0, 0, time.UTC)
 	repo := &fakeRepository{
@@ -1477,6 +1580,36 @@ func TestServiceListDayExpenses(t *testing.T) {
 	}
 	if len(result.Expenses) != 1 || result.Expenses[0].ID != testUUID(9002) || result.Expenses[0].Place == nil || result.Expenses[0].Place.Name != "라멘" || result.Expenses[0].Payer.DisplayName != "민수" || len(result.Expenses[0].Splits) != 2 || !result.Expenses[0].CreatedAt.Equal(createdAt) {
 		t.Fatalf("unexpected day expense result: %#v", result)
+	}
+}
+
+func TestServiceListTripExpensesUsesBatchRepository(t *testing.T) {
+	createdAt := time.Date(2026, 7, 10, 12, 30, 0, 0, time.UTC)
+	repo := &fakeRepository{
+		trip:          Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"},
+		tripFound:     true,
+		isParticipant: true,
+		tripExpenseDays: []TripExpenseDayListItem{
+			{
+				TripDayID: testUUID(9101),
+				Expenses:  []DayExpenseListItem{{ID: testUUID(9102), DisplayTitle: "라멘", CreatedAt: createdAt}},
+			},
+		},
+	}
+	service := newTestService(repo)
+
+	result, err := service.ListTripExpenses(context.Background(), "user-1", testTripID)
+	if err != nil {
+		t.Fatalf("ListTripExpenses returned error: %v", err)
+	}
+	if !repo.listTripExpensesCalled || repo.listedTripExpensesTripID != testTripID {
+		t.Fatalf("expected batch repository call, got trip=%q called=%v", repo.listedTripExpensesTripID, repo.listTripExpensesCalled)
+	}
+	if repo.listDayExpensesCalled {
+		t.Fatal("expected day expense repository call not to be used")
+	}
+	if len(result.Days) != 1 || result.Days[0].TripDayID != testUUID(9101) || len(result.Days[0].Expenses) != 1 || !result.Days[0].Expenses[0].CreatedAt.Equal(createdAt) {
+		t.Fatalf("unexpected trip expense result: %#v", result)
 	}
 }
 
@@ -2662,6 +2795,15 @@ func TestServiceGetMySettlementSummaryFiltersCurrentUserNonZeroBalances(t *testi
 	}
 	if repo.listedUserID != "user-1" {
 		t.Fatalf("expected listed user user-1, got %q", repo.listedUserID)
+	}
+	if !repo.settlementInputsByTripCalled {
+		t.Fatal("expected batch settlement input lookup to be used")
+	}
+	if repo.settlementDataCalled {
+		t.Fatal("expected per-trip settlement input lookup not to be used")
+	}
+	if len(repo.settlementInputsByTripIDs) != 3 || repo.settlementInputsByTripIDs[0] != testUUID(1001) || repo.settlementInputsByTripIDs[2] != testUUID(1003) {
+		t.Fatalf("unexpected batch settlement trip ids: %#v", repo.settlementInputsByTripIDs)
 	}
 	if len(result.Trips) != 2 {
 		t.Fatalf("expected two non-zero trip summaries, got %#v", result.Trips)

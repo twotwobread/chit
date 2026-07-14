@@ -16,9 +16,10 @@ import {
   type GooglePlaceSearchRowViewModel,
   type GooglePlaceTripDestination,
 } from '../places/google-search';
-import { getTripDayItinerary } from '../trips/itinerary-api';
+import { listTripScheduleItems } from '../trips/itinerary-api';
 import { beginStaleWhileRevalidate, resolveStaleWhileRevalidateFailure } from '../trips/stale-refresh';
-import { getTripDetail } from '../trips/trip-api';
+import { resolveTripShellDetail } from '../trips/trip-shell-detail';
+import { useTripShellState } from '../trips/trip-shell-context';
 import { buildDayItineraryViewModel, type DayItineraryViewModel } from '../trips/day-itinerary';
 import {
   dayItineraryMapActionFailureState,
@@ -27,6 +28,7 @@ import {
 } from '../trips/day-itinerary-map-actions';
 import { localDateString } from '../trips/status';
 import {
+  buildTripItinerariesFromTripScheduleItems,
   buildTripMapDayRoutes,
   buildTripMapRouteLayerChips,
   buildTripMapRouteLayerViewModel,
@@ -71,6 +73,7 @@ export type TripMapState =
 export function useTripMapController() {
   const { tripId: tripIdParam } = useLocalSearchParams<{ tripId?: string | string[] }>();
   const tripId = Array.isArray(tripIdParam) ? tripIdParam[0] : tripIdParam;
+  const shellState = useTripShellState();
   const routeLayerRef = useRef<TripMapRouteLayerSelection>(emptyTripMapRouteLayerSelection);
   const selectedDayIdRef = useRef<string | null>(null);
   const bookmarkLayerVisibleRef = useRef(true);
@@ -88,8 +91,18 @@ export function useTripMapController() {
 
       setFeedback(null);
       setState((current) => beginStaleWhileRevalidate(current, { status: 'loading' }, ['success', 'unavailable']));
+
+      const shellDetail = resolveTripShellDetail(shellState, tripId);
+      if (shellDetail.status === 'pending') {
+        return;
+      }
+      if (shellDetail.status !== 'success') {
+        setState(mapShellFailureState(shellDetail.status));
+        return;
+      }
+
       try {
-        const detail = await getTripDetail(tripId);
+        const detail = shellDetail.detail;
         const selectedDay = resolveTripMapSelectedDay({
           days: detail.days,
           preferredDayId,
@@ -101,15 +114,11 @@ export function useTripMapController() {
           return;
         }
 
-        const [itineraries, bookmarkResponse] = await Promise.all([
-          Promise.all(
-            detail.days
-              .slice()
-              .sort((left, right) => left.dayOrder - right.dayOrder)
-              .map((day) => getTripDayItinerary(tripId, day.id)),
-          ),
+        const [scheduleResponse, bookmarkResponse] = await Promise.all([
+          listTripScheduleItems(tripId),
           listTripPlaceBookmarks(tripId),
         ]);
+        const itineraries = buildTripItinerariesFromTripScheduleItems(detail.days, scheduleResponse);
         const dayRoutes = buildTripMapDayRoutes(itineraries);
         const routeLayer = resolveAvailableRouteLayer(routeLayerRef.current, dayRoutes);
         const routeViewModel = buildTripMapRouteLayerViewModel(dayRoutes, routeLayer);
@@ -150,7 +159,7 @@ export function useTripMapController() {
         );
       }
     },
-    [tripId],
+    [shellState, tripId],
   );
 
   useFocusEffect(
@@ -351,4 +360,8 @@ function mapFailureState(error: unknown): TripMapState {
     return { status: 'notFound' };
   }
   return { status: 'error' };
+}
+
+function mapShellFailureState(status: 'auth' | 'notFound' | 'error'): TripMapState {
+  return { status };
 }

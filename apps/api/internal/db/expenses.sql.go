@@ -734,6 +734,49 @@ func (q *Queries) ListSettlementParticipantsByTrip(ctx context.Context, tripID p
 	return items, nil
 }
 
+const listSettlementParticipantsByTrips = `-- name: ListSettlementParticipantsByTrips :many
+SELECT
+  trip_id::text,
+  id::text,
+  display_name,
+  joined_at
+FROM trip_participants
+WHERE trip_id = ANY($1::uuid[])
+ORDER BY trip_id ASC, joined_at ASC, id ASC
+`
+
+type ListSettlementParticipantsByTripsRow struct {
+	TripID      string
+	ID          string
+	DisplayName string
+	JoinedAt    pgtype.Timestamptz
+}
+
+func (q *Queries) ListSettlementParticipantsByTrips(ctx context.Context, tripIds []pgtype.UUID) ([]ListSettlementParticipantsByTripsRow, error) {
+	rows, err := q.db.Query(ctx, listSettlementParticipantsByTrips, tripIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListSettlementParticipantsByTripsRow
+	for rows.Next() {
+		var i ListSettlementParticipantsByTripsRow
+		if err := rows.Scan(
+			&i.TripID,
+			&i.ID,
+			&i.DisplayName,
+			&i.JoinedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listSettlementRowsByTrip = `-- name: ListSettlementRowsByTrip :many
 SELECT
   e.id::text AS expense_id,
@@ -796,6 +839,187 @@ func (q *Queries) ListSettlementRowsByTrip(ctx context.Context, tripID pgtype.UU
 			&i.SplitParticipantDisplayName,
 			&i.SplitParticipantLive,
 			&i.SplitAmountMinor,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listSettlementRowsByTrips = `-- name: ListSettlementRowsByTrips :many
+SELECT
+  e.trip_id::text AS trip_id,
+  e.id::text AS expense_id,
+  e.currency,
+  e.amount_minor AS expense_amount_minor,
+  COALESCE(payer.id::text, '')::text AS payer_participant_id,
+  COALESCE(payer.display_name, e.payer_display_name, '여행자')::text AS payer_display_name,
+  (payer.id IS NOT NULL)::boolean AS payer_participant_live,
+  COALESCE(es.split_order, 0)::integer AS split_order,
+  COALESCE(split_participant.id::text, '')::text AS split_participant_id,
+  COALESCE(split_participant.display_name, es.participant_display_name, '여행자')::text AS split_participant_display_name,
+  (split_participant.id IS NOT NULL)::boolean AS split_participant_live,
+  COALESCE(es.amount_minor, 0)::bigint AS split_amount_minor
+FROM expenses e
+LEFT JOIN trip_participants payer
+  ON payer.id = e.payer_participant_id
+ AND payer.trip_id = e.trip_id
+LEFT JOIN expense_splits es
+  ON es.expense_id = e.id
+LEFT JOIN trip_participants split_participant
+  ON split_participant.id = es.participant_id
+ AND split_participant.trip_id = e.trip_id
+WHERE e.trip_id = ANY($1::uuid[])
+  AND e.anchor_type IN ('trip', 'trip_day', 'schedule_item')
+ORDER BY e.trip_id ASC, e.currency ASC, e.created_at ASC, e.id ASC, es.split_order ASC
+`
+
+type ListSettlementRowsByTripsRow struct {
+	TripID                      string
+	ExpenseID                   string
+	Currency                    string
+	ExpenseAmountMinor          int64
+	PayerParticipantID          string
+	PayerDisplayName            string
+	PayerParticipantLive        bool
+	SplitOrder                  int32
+	SplitParticipantID          string
+	SplitParticipantDisplayName string
+	SplitParticipantLive        bool
+	SplitAmountMinor            int64
+}
+
+func (q *Queries) ListSettlementRowsByTrips(ctx context.Context, tripIds []pgtype.UUID) ([]ListSettlementRowsByTripsRow, error) {
+	rows, err := q.db.Query(ctx, listSettlementRowsByTrips, tripIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListSettlementRowsByTripsRow
+	for rows.Next() {
+		var i ListSettlementRowsByTripsRow
+		if err := rows.Scan(
+			&i.TripID,
+			&i.ExpenseID,
+			&i.Currency,
+			&i.ExpenseAmountMinor,
+			&i.PayerParticipantID,
+			&i.PayerDisplayName,
+			&i.PayerParticipantLive,
+			&i.SplitOrder,
+			&i.SplitParticipantID,
+			&i.SplitParticipantDisplayName,
+			&i.SplitParticipantLive,
+			&i.SplitAmountMinor,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listTripExpensesByTrip = `-- name: ListTripExpensesByTrip :many
+SELECT
+  e.id::text AS id,
+  e.anchor_type,
+  COALESCE(e.trip_day_id::text, '')::text AS trip_day_id,
+  COALESCE(e.schedule_item_id::text, '')::text AS schedule_item_id,
+  e.expense_date,
+  COALESCE(live_place.name, e.place_name, '지출')::text AS display_title,
+  COALESCE(live_place.id::text, e.trip_place_id::text, '')::text AS trip_place_id,
+  COALESCE(live_place.name, e.place_name, '')::text AS place_name,
+  COALESCE(live_place.address, e.place_address, '')::text AS place_address,
+  COALESCE(live_place.place_type, e.place_type, '')::text AS place_type,
+  CASE
+    WHEN live_place.id IS NOT NULL THEN 'live'
+    WHEN e.place_name IS NOT NULL THEN 'fallback'
+    ELSE ''
+  END::text AS place_source,
+  e.amount_minor,
+  e.currency,
+  COALESCE(payer.id::text, e.payer_participant_id::text, '')::text AS payer_participant_id,
+  COALESCE(payer.display_name, e.payer_display_name, '여행자')::text AS payer_display_name,
+  CASE
+    WHEN payer.id IS NOT NULL THEN 'live'
+    ELSE 'fallback'
+  END::text AS payer_source,
+  e.split_policy,
+  e.created_at
+FROM expenses e
+LEFT JOIN schedule_items si
+  ON e.anchor_type = 'schedule_item'
+ AND si.id = e.schedule_item_id
+ AND si.trip_day_id = e.trip_day_id
+ AND si.trip_id = e.trip_id
+ AND si.deleted_at IS NULL
+LEFT JOIN trip_places live_place
+  ON live_place.id = si.trip_place_id
+ AND live_place.trip_id = e.trip_id
+LEFT JOIN trip_participants payer
+  ON payer.id = e.payer_participant_id
+ AND payer.trip_id = e.trip_id
+WHERE e.trip_id = $1::uuid
+  AND e.anchor_type IN ('trip_day', 'schedule_item')
+ORDER BY e.trip_day_id ASC, e.created_at DESC, e.id DESC
+`
+
+type ListTripExpensesByTripRow struct {
+	ID                 string
+	AnchorType         string
+	TripDayID          string
+	ScheduleItemID     string
+	ExpenseDate        pgtype.Date
+	DisplayTitle       string
+	TripPlaceID        string
+	PlaceName          string
+	PlaceAddress       string
+	PlaceType          string
+	PlaceSource        string
+	AmountMinor        int64
+	Currency           string
+	PayerParticipantID string
+	PayerDisplayName   string
+	PayerSource        string
+	SplitPolicy        string
+	CreatedAt          pgtype.Timestamptz
+}
+
+func (q *Queries) ListTripExpensesByTrip(ctx context.Context, tripID pgtype.UUID) ([]ListTripExpensesByTripRow, error) {
+	rows, err := q.db.Query(ctx, listTripExpensesByTrip, tripID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListTripExpensesByTripRow
+	for rows.Next() {
+		var i ListTripExpensesByTripRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.AnchorType,
+			&i.TripDayID,
+			&i.ScheduleItemID,
+			&i.ExpenseDate,
+			&i.DisplayTitle,
+			&i.TripPlaceID,
+			&i.PlaceName,
+			&i.PlaceAddress,
+			&i.PlaceType,
+			&i.PlaceSource,
+			&i.AmountMinor,
+			&i.Currency,
+			&i.PayerParticipantID,
+			&i.PayerDisplayName,
+			&i.PayerSource,
+			&i.SplitPolicy,
+			&i.CreatedAt,
 		); err != nil {
 			return nil, err
 		}

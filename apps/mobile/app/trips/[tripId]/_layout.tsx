@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ApiError, type TripListItem } from '@i-um/api-contract';
 
-import { getMeWithRefresh, MobileAuthError } from '../../../lib/auth/client';
+import { getStoredAuthUser, MobileAuthError } from '../../../lib/auth/client';
 import { theme } from '../../../lib/design';
 import { AppBar } from '../../../lib/trip-ui/AppBar';
 import { CompanionsSheet } from '../../../lib/trip-ui/CompanionsSheet';
@@ -20,6 +20,7 @@ import {
   removeTripParticipant,
 } from '../../../lib/trips/trip-api';
 import { markExplicitHomeIntent } from '../../../lib/trips/home-intent';
+import { resolveTripShellDetail } from '../../../lib/trips/trip-shell-detail';
 import {
   buildFallbackShareContent,
   buildInviteCopyText,
@@ -136,18 +137,26 @@ export default function TripLayout() {
     setCompanionsFeedback(null);
     setRemovingCompanionId(null);
 
+    const shellDetail = resolveTripShellDetail(shellState, tripId);
+    if (shellDetail.status === 'pending') {
+      return;
+    }
+    if (shellDetail.status !== 'success') {
+      setCompanionsState(companionFailureState(companionShellFailureStatus(shellDetail.status)));
+      return;
+    }
+
     try {
-      const shellDetail = shellState.status === 'success' && shellState.tripId === tripId ? shellState.detail : null;
-      const [currentUser, participantsResponse, detail] = await Promise.all([
-        getMeWithRefresh(),
+      const [currentUser, participantsResponse] = await Promise.all([
+        getStoredAuthUser(),
         listTripParticipants(tripId),
-        shellDetail ? Promise.resolve(shellDetail) : getTripDetail(tripId),
       ]);
-      const canManage = canCreateTripInvite(detail, currentUser.user.id);
+      const detail = shellDetail.detail;
+      const canManage = canCreateTripInvite(detail, currentUser.id);
       setCompanionsState({
         status: 'success',
         canManage,
-        currentUserId: currentUser.user.id,
+        currentUserId: currentUser.id,
         tripName: detail.trip.name.trim() || '여행',
         viewModel: buildParticipantListViewModel(participantsResponse.participants, {
           canRemoveMembers: canManage,
@@ -412,6 +421,12 @@ function shellFailureState(tripId: string, error: unknown): TripShellState {
     }
   }
   return { status: 'error', tripId };
+}
+
+function companionShellFailureStatus(
+  status: 'auth' | 'notFound' | 'error',
+): Exclude<CompanionsState['status'], 'idle' | 'loading' | 'success'> {
+  return status;
 }
 
 function companionFailureState(

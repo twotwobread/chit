@@ -531,6 +531,14 @@ func (s *Store) ListTripParticipantPreviewNames(ctx context.Context, tripID stri
 	return s.queries.ListTripParticipantPreviewByTripID(ctx, mustUUID(tripID))
 }
 
+func (s *Store) GetTripParticipantSummary(ctx context.Context, tripID string) (trip.ParticipantSummary, error) {
+	row, err := s.queries.GetTripParticipantSummaryByTripID(ctx, mustUUID(tripID))
+	if err != nil {
+		return trip.ParticipantSummary{}, err
+	}
+	return trip.ParticipantSummary{TotalCount: int(row.TotalCount), PreviewNames: row.PreviewNames}, nil
+}
+
 func (s *Store) ListTripParticipants(ctx context.Context, tripID string) ([]trip.ParticipantListItem, error) {
 	rows, err := s.queries.ListTripParticipantsByTripID(ctx, mustUUID(tripID))
 	if err != nil {
@@ -827,6 +835,41 @@ func (s *Store) ListScheduleItemsByTripDay(ctx context.Context, tripID string, t
 	return mapScheduleItems(rows), nil
 }
 
+func (s *Store) ListTripScheduleItems(ctx context.Context, tripID string) ([]trip.TripScheduleItemsDayListItem, error) {
+	rows, err := s.queries.ListTripScheduleItemsByTrip(ctx, mustUUID(tripID))
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return []trip.TripScheduleItemsDayListItem{}, nil
+	}
+
+	dayIndexByID := make(map[string]int, len(rows))
+	days := make([]trip.TripScheduleItemsDayListItem, 0)
+	for _, row := range rows {
+		dayIndex, ok := dayIndexByID[row.TripDayID]
+		if !ok {
+			days = append(days, trip.TripScheduleItemsDayListItem{TripDayID: row.TripDayID, Items: []trip.ScheduleItem{}})
+			dayIndex = len(days) - 1
+			dayIndexByID[row.TripDayID] = dayIndex
+		}
+		days[dayIndex].Items = append(days[dayIndex].Items, trip.ScheduleItem{
+			ID:            row.ID,
+			ItemOrder:     len(days[dayIndex].Items) + 1,
+			Version:       int(row.Version),
+			ItemType:      trip.ScheduleItemTypePlace,
+			IsLodging:     boolFromSQL(row.IsLodging),
+			StartTime:     timeTextPtrFromSQL(row.StartTime),
+			EndTime:       timeTextPtrFromSQL(row.EndTime),
+			ArrivedAt:     timePtrFromTimestamptz(row.ArrivedAt),
+			SkippedAt:     timePtrFromTimestamptz(row.SkippedAt),
+			Place:         tripPlaceSummaryFromNullable(row.TripPlaceID, row.PlaceName, row.PlaceType, row.Address, row.Provider, row.GooglePlaceID, row.Latitude, row.Longitude),
+			PlaceSchedule: placeScheduleItemDetails(row.PlaceTitle, row.PlaceMemo, row.PlaceName.String),
+		})
+	}
+	return days, nil
+}
+
 func (s *Store) ListDayExpensesByTripDay(ctx context.Context, tripID string, tripDayID string) ([]trip.DayExpenseListItem, error) {
 	expenseRows, err := s.queries.ListDayExpensesByTripDay(ctx, db.ListDayExpensesByTripDayParams{
 		TripID:    mustUUID(tripID),
@@ -866,9 +909,76 @@ func (s *Store) ListDayExpensesByTripDay(ctx context.Context, tripID string, tri
 	if err != nil {
 		return nil, err
 	}
+	appendDayExpenseSplits(expenses, expenseIndexByID, splitRows)
+	return expenses, nil
+}
+
+func (s *Store) ListTripExpenses(ctx context.Context, tripID string) ([]trip.TripExpenseDayListItem, error) {
+	expenseRows, err := s.queries.ListTripExpensesByTrip(ctx, mustUUID(tripID))
+	if err != nil {
+		return nil, err
+	}
+	if len(expenseRows) == 0 {
+		return []trip.TripExpenseDayListItem{}, nil
+	}
+
+	expenseIDs := make([]pgtype.UUID, 0, len(expenseRows))
+	type expenseLocation struct {
+		dayIndex     int
+		expenseIndex int
+	}
+	expenseLocationByID := make(map[string]expenseLocation, len(expenseRows))
+	dayIndexByID := make(map[string]int, len(expenseRows))
+	days := make([]trip.TripExpenseDayListItem, 0)
+	for _, expenseRow := range expenseRows {
+		tripDayID := expenseRow.TripDayID
+		dayIndex, ok := dayIndexByID[tripDayID]
+		if !ok {
+			days = append(days, trip.TripExpenseDayListItem{TripDayID: tripDayID, Expenses: []trip.DayExpenseListItem{}})
+			dayIndex = len(days) - 1
+			dayIndexByID[tripDayID] = dayIndex
+		}
+		expenseIDs = append(expenseIDs, mustUUID(expenseRow.ID))
+		expenseLocationByID[expenseRow.ID] = expenseLocation{dayIndex: dayIndex, expenseIndex: len(days[dayIndex].Expenses)}
+		days[dayIndex].Expenses = append(days[dayIndex].Expenses, trip.DayExpenseListItem{
+			ID:             expenseRow.ID,
+			AnchorType:     expenseRow.AnchorType,
+			TripDayID:      optionalString(expenseRow.TripDayID),
+			ScheduleItemID: optionalString(expenseRow.ScheduleItemID),
+			ExpenseDate:    dateString(expenseRow.ExpenseDate),
+			DisplayTitle:   expenseRow.DisplayTitle,
+			Place:          expensePlaceDisplay(expenseRow.TripPlaceID, expenseRow.PlaceName, expenseRow.PlaceAddress, expenseRow.PlaceType, expenseRow.PlaceSource),
+			AmountMinor:    expenseRow.AmountMinor,
+			Currency:       expenseRow.Currency,
+			Payer:          expenseParticipantDisplay(expenseRow.PayerParticipantID, expenseRow.PayerDisplayName, expenseRow.PayerSource),
+			SplitPolicy:    expenseRow.SplitPolicy,
+			Splits:         []trip.DayExpenseSplitListItem{},
+			CreatedAt:      expenseRow.CreatedAt.Time,
+		})
+	}
+
+	splitRows, err := s.queries.ListDayExpenseSplitsByExpenseIDs(ctx, expenseIDs)
+	if err != nil {
+		return nil, err
+	}
+	for _, splitRow := range splitRows {
+		location, ok := expenseLocationByID[splitRow.ExpenseID]
+		if !ok || location.dayIndex >= len(days) || location.expenseIndex >= len(days[location.dayIndex].Expenses) {
+			continue
+		}
+		days[location.dayIndex].Expenses[location.expenseIndex].Splits = append(days[location.dayIndex].Expenses[location.expenseIndex].Splits, trip.DayExpenseSplitListItem{
+			SplitOrder:  int(splitRow.SplitOrder),
+			Participant: expenseParticipantDisplay(splitRow.ParticipantID, splitRow.ParticipantDisplayName, splitRow.ParticipantSource),
+			AmountMinor: splitRow.AmountMinor,
+		})
+	}
+	return days, nil
+}
+
+func appendDayExpenseSplits(expenses []trip.DayExpenseListItem, expenseIndexByID map[string]int, splitRows []db.ListDayExpenseSplitsByExpenseIDsRow) {
 	for _, splitRow := range splitRows {
 		expenseIndex, ok := expenseIndexByID[splitRow.ExpenseID]
-		if !ok {
+		if !ok || expenseIndex >= len(expenses) {
 			continue
 		}
 		expenses[expenseIndex].Splits = append(expenses[expenseIndex].Splits, trip.DayExpenseSplitListItem{
@@ -877,7 +987,6 @@ func (s *Store) ListDayExpensesByTripDay(ctx context.Context, tripID string, tri
 			AmountMinor: splitRow.AmountMinor,
 		})
 	}
-	return expenses, nil
 }
 
 func (s *Store) GetTripSettlementInput(ctx context.Context, tripID string) (trip.SettlementInput, error) {
@@ -928,6 +1037,79 @@ func (s *Store) GetTripSettlementInput(ctx context.Context, tripID string) (trip
 	}
 
 	return trip.SettlementInput{Participants: participants, Expenses: expenses}, nil
+}
+
+func (s *Store) GetTripSettlementInputs(ctx context.Context, tripIDs []string) (map[string]trip.SettlementInput, error) {
+	inputByTripID := make(map[string]*trip.SettlementInput, len(tripIDs))
+	tripUUIDs := make([]pgtype.UUID, 0, len(tripIDs))
+	for _, tripID := range tripIDs {
+		if _, ok := inputByTripID[tripID]; ok {
+			continue
+		}
+		inputByTripID[tripID] = &trip.SettlementInput{Participants: []trip.SettlementParticipantInput{}, Expenses: []trip.SettlementExpenseInput{}}
+		tripUUIDs = append(tripUUIDs, mustUUID(tripID))
+	}
+	if len(tripUUIDs) == 0 {
+		return map[string]trip.SettlementInput{}, nil
+	}
+
+	participantRows, err := s.queries.ListSettlementParticipantsByTrips(ctx, tripUUIDs)
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range participantRows {
+		input, ok := inputByTripID[row.TripID]
+		if !ok {
+			continue
+		}
+		input.Participants = append(input.Participants, trip.SettlementParticipantInput{
+			ParticipantID: row.ID,
+			DisplayName:   row.DisplayName,
+			JoinedAt:      row.JoinedAt.Time,
+		})
+	}
+
+	settlementRows, err := s.queries.ListSettlementRowsByTrips(ctx, tripUUIDs)
+	if err != nil {
+		return nil, err
+	}
+	expenseIndexByKey := make(map[string]int, len(settlementRows))
+	for _, row := range settlementRows {
+		input, ok := inputByTripID[row.TripID]
+		if !ok {
+			continue
+		}
+		expenseKey := row.TripID + ":" + row.ExpenseID
+		expenseIndex, ok := expenseIndexByKey[expenseKey]
+		if !ok {
+			input.Expenses = append(input.Expenses, trip.SettlementExpenseInput{
+				ExpenseID:            row.ExpenseID,
+				Currency:             row.Currency,
+				AmountMinor:          row.ExpenseAmountMinor,
+				PayerParticipantID:   optionalString(row.PayerParticipantID),
+				PayerDisplayName:     row.PayerDisplayName,
+				PayerParticipantLive: row.PayerParticipantLive,
+				Splits:               []trip.SettlementSplitInput{},
+			})
+			expenseIndex = len(input.Expenses) - 1
+			expenseIndexByKey[expenseKey] = expenseIndex
+		}
+		if row.SplitOrder > 0 {
+			input.Expenses[expenseIndex].Splits = append(input.Expenses[expenseIndex].Splits, trip.SettlementSplitInput{
+				ParticipantID:   optionalString(row.SplitParticipantID),
+				DisplayName:     row.SplitParticipantDisplayName,
+				ParticipantLive: row.SplitParticipantLive,
+				AmountMinor:     row.SplitAmountMinor,
+				SplitOrder:      int(row.SplitOrder),
+			})
+		}
+	}
+
+	inputs := make(map[string]trip.SettlementInput, len(inputByTripID))
+	for tripID, input := range inputByTripID {
+		inputs[tripID] = *input
+	}
+	return inputs, nil
 }
 
 func (s *Store) GetExpenseByTripDayAndID(ctx context.Context, tripID string, tripDayID string, expenseID string) (trip.Expense, bool, error) {

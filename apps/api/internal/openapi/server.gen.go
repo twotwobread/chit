@@ -650,6 +650,11 @@ type ListDayExpensesResponse struct {
 	Expenses []DayExpenseListItem `json:"expenses"`
 }
 
+// ListTripExpensesResponse defines model for ListTripExpensesResponse.
+type ListTripExpensesResponse struct {
+	Days []TripExpenseDayListItem `json:"days"`
+}
+
 // ListTripFlightsResponse defines model for ListTripFlightsResponse.
 type ListTripFlightsResponse struct {
 	Flights []FlightSummary `json:"flights"`
@@ -668,6 +673,11 @@ type ListTripPlaceBookmarksResponse struct {
 // ListTripPlacesResponse defines model for ListTripPlacesResponse.
 type ListTripPlacesResponse struct {
 	Places []TripPlaceSummary `json:"places"`
+}
+
+// ListTripScheduleItemsResponse defines model for ListTripScheduleItemsResponse.
+type ListTripScheduleItemsResponse struct {
+	Days []TripScheduleItemsDayListItem `json:"days"`
 }
 
 // ListTripsResponse defines model for ListTripsResponse.
@@ -1036,6 +1046,12 @@ type TripDestinationInput struct {
 	RadiusMeters    int                 `json:"radiusMeters"`
 }
 
+// TripExpenseDayListItem defines model for TripExpenseDayListItem.
+type TripExpenseDayListItem struct {
+	Expenses  []DayExpenseListItem `json:"expenses"`
+	TripDayId string               `json:"tripDayId"`
+}
+
 // TripInvite defines model for TripInvite.
 type TripInvite struct {
 	// CreatedAt UTC ISO 8601 timestamp.
@@ -1114,6 +1130,12 @@ type TripPlaceSummary struct {
 
 // TripPlaceType defines model for TripPlaceType.
 type TripPlaceType string
+
+// TripScheduleItemsDayListItem defines model for TripScheduleItemsDayListItem.
+type TripScheduleItemsDayListItem struct {
+	ScheduleItems []ScheduleItem `json:"scheduleItems"`
+	TripDayId     string         `json:"tripDayId"`
+}
 
 // UpdateExpenseRequest defines model for UpdateExpenseRequest.
 type UpdateExpenseRequest struct {
@@ -1417,6 +1439,9 @@ type ServerInterface interface {
 	// Mark a trip day schedule item skipped
 	// (POST /trips/{tripId}/days/{tripDayId}/schedule-items/{scheduleItemId}/skip)
 	MarkScheduleItemSkipped(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, scheduleItemId string)
+	// List expenses for a trip
+	// (GET /trips/{tripId}/expenses)
+	ListTripExpenses(w http.ResponseWriter, r *http.Request, tripId string)
 	// List trip flights
 	// (GET /trips/{tripId}/flights)
 	ListTripFlights(w http.ResponseWriter, r *http.Request, tripId string)
@@ -1459,6 +1484,9 @@ type ServerInterface interface {
 	// List trip places
 	// (GET /trips/{tripId}/places)
 	ListTripPlaces(w http.ResponseWriter, r *http.Request, tripId string)
+	// List schedule items for a trip
+	// (GET /trips/{tripId}/schedule-items)
+	ListTripScheduleItems(w http.ResponseWriter, r *http.Request, tripId string)
 	// Get trip settlement calculation
 	// (GET /trips/{tripId}/settlement)
 	GetTripSettlement(w http.ResponseWriter, r *http.Request, tripId string)
@@ -1708,6 +1736,12 @@ func (_ Unimplemented) MarkScheduleItemSkipped(w http.ResponseWriter, r *http.Re
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// List expenses for a trip
+// (GET /trips/{tripId}/expenses)
+func (_ Unimplemented) ListTripExpenses(w http.ResponseWriter, r *http.Request, tripId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // List trip flights
 // (GET /trips/{tripId}/flights)
 func (_ Unimplemented) ListTripFlights(w http.ResponseWriter, r *http.Request, tripId string) {
@@ -1789,6 +1823,12 @@ func (_ Unimplemented) DeleteTripPlaceBookmark(w http.ResponseWriter, r *http.Re
 // List trip places
 // (GET /trips/{tripId}/places)
 func (_ Unimplemented) ListTripPlaces(w http.ResponseWriter, r *http.Request, tripId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// List schedule items for a trip
+// (GET /trips/{tripId}/schedule-items)
+func (_ Unimplemented) ListTripScheduleItems(w http.ResponseWriter, r *http.Request, tripId string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -3255,6 +3295,37 @@ func (siw *ServerInterfaceWrapper) MarkScheduleItemSkipped(w http.ResponseWriter
 	handler.ServeHTTP(w, r)
 }
 
+// ListTripExpenses operation middleware
+func (siw *ServerInterfaceWrapper) ListTripExpenses(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListTripExpenses(w, r, tripId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListTripFlights operation middleware
 func (siw *ServerInterfaceWrapper) ListTripFlights(w http.ResponseWriter, r *http.Request) {
 
@@ -3752,6 +3823,37 @@ func (siw *ServerInterfaceWrapper) ListTripPlaces(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
+// ListTripScheduleItems operation middleware
+func (siw *ServerInterfaceWrapper) ListTripScheduleItems(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListTripScheduleItems(w, r, tripId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetTripSettlement operation middleware
 func (siw *ServerInterfaceWrapper) GetTripSettlement(w http.ResponseWriter, r *http.Request) {
 
@@ -4017,6 +4119,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/trips/{tripId}/days/{tripDayId}/schedule-items/{scheduleItemId}/skip", wrapper.MarkScheduleItemSkipped)
 	})
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/trips/{tripId}/expenses", wrapper.ListTripExpenses)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/trips/{tripId}/flights", wrapper.ListTripFlights)
 	})
 	r.Group(func(r chi.Router) {
@@ -4057,6 +4162,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/trips/{tripId}/places", wrapper.ListTripPlaces)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/trips/{tripId}/schedule-items", wrapper.ListTripScheduleItems)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/trips/{tripId}/settlement", wrapper.GetTripSettlement)

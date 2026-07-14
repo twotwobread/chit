@@ -10,12 +10,12 @@ import { ExpenseRow } from '../../../../lib/trip-ui/ExpenseRow';
 import { TransferRow } from '../../../../lib/trip-ui/TransferRow';
 import { TripRootFab } from '../../../../lib/trip-ui/TripRootFab';
 import { TripListCard, TripScreen, TripStateCard } from '../../../../lib/trip-ui/TripScreenScaffold';
-import { listDayExpenses } from '../../../../lib/trips/expense-api';
+import { listTripExpenses } from '../../../../lib/trips/expense-api';
 import { getTripSettlement } from '../../../../lib/trips/settlement-api';
 import { beginStaleWhileRevalidate, resolveStaleWhileRevalidateFailure } from '../../../../lib/trips/stale-refresh';
-import { getTripDetail } from '../../../../lib/trips/trip-api';
 import {
   buildSettlementExpenseEntryRouteForDays,
+  buildSettlementExpenseHistoryDayInputs,
   buildSettlementExpenseHistoryViewModel,
   buildSettlementRequestMessage,
   buildSettlementTransferViewModel,
@@ -29,6 +29,8 @@ import {
   type SettlementTransferViewModel,
 } from '../../../../lib/trips/settlement';
 import { localDateString } from '../../../../lib/trips/status';
+import { resolveTripShellDetail } from '../../../../lib/trips/trip-shell-detail';
+import { useTripShellState } from '../../../../lib/trips/trip-shell-context';
 import { buildTripRootFabLayout, shouldShowTripRootFab } from '../../../../lib/trips/trip-root-fab-layout';
 
 type SettlementExpenseHistoryState =
@@ -51,6 +53,7 @@ type TripSettleState =
 export default function TripSettleTabScreen() {
   const { tripId: tripIdParam } = useLocalSearchParams<{ tripId?: string | string[] }>();
   const tripId = Array.isArray(tripIdParam) ? tripIdParam[0] : tripIdParam;
+  const shellState = useTripShellState();
   const [selectedExpenseDayId, setSelectedExpenseDayId] = useState<string | null>(null);
   const [state, setState] = useState<TripSettleState>({ status: 'loading' });
   const insets = useSafeAreaInsets();
@@ -62,21 +65,27 @@ export default function TripSettleTabScreen() {
     }
 
     setState((current) => beginStaleWhileRevalidate(current, { status: 'loading' }, ['settlement']));
+
+    const shellDetail = resolveTripShellDetail(shellState, tripId);
+    if (shellDetail.status === 'pending') {
+      return;
+    }
+    if (shellDetail.status !== 'success') {
+      setState(settleShellFailureState(shellDetail.status));
+      return;
+    }
+
     try {
-      const [detail, settlement] = await Promise.all([getTripDetail(tripId), getTripSettlement(tripId)]);
+      const detail = shellDetail.detail;
+      const settlement = await getTripSettlement(tripId);
       const expenseEntryRoute = buildSettlementExpenseEntryRouteForDays(tripId, detail.days, localDateString());
       let expenseHistory: SettlementExpenseHistoryState;
 
       try {
-        const days = await Promise.all(
-          detail.days.map(async (day) => ({
-            day,
-            expenses: (await listDayExpenses(tripId, day.id)).expenses,
-          })),
-        );
+        const expensesResponse = await listTripExpenses(tripId);
         expenseHistory = {
           status: 'ready',
-          days,
+          days: buildSettlementExpenseHistoryDayInputs(detail.days, expensesResponse),
         };
       } catch {
         expenseHistory = { status: 'error', error: settlementExpenseHistoryFailureState() };
@@ -98,7 +107,7 @@ export default function TripSettleTabScreen() {
         }),
       );
     }
-  }, [tripId]);
+  }, [shellState, tripId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -408,6 +417,21 @@ function netAmountStyle(direction: SettlementBalanceDirection) {
     return styles.balanceMetricValueSend;
   }
   return styles.balanceMetricValueSettled;
+}
+
+function settleShellFailureState(status: 'auth' | 'notFound' | 'error'): TripSettleState {
+  if (status === 'error') {
+    return {
+      status: 'error',
+      error: {
+        status: 'error',
+        title: '정산을 불러오지 못했어요.',
+        helper: '잠시 후 다시 시도해주세요.',
+        actionLabel: '다시 시도',
+      },
+    };
+  }
+  return { status };
 }
 
 function settleFailureState(error: unknown): TripSettleState {

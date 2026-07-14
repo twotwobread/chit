@@ -1075,6 +1075,40 @@ func (q *Queries) GetTripParticipantRole(ctx context.Context, arg GetTripPartici
 	return role, err
 }
 
+const getTripParticipantSummaryByTripID = `-- name: GetTripParticipantSummaryByTripID :one
+WITH ordered_participants AS (
+  SELECT
+    display_name,
+    row_number() OVER (
+      ORDER BY
+        CASE WHEN role = 'owner' THEN 0 ELSE 1 END,
+        joined_at ASC,
+        id ASC
+    ) AS preview_order
+  FROM trip_participants
+  WHERE trip_id = $1::uuid
+)
+SELECT
+  count(*)::int AS total_count,
+  COALESCE(
+    array_agg(display_name ORDER BY preview_order) FILTER (WHERE preview_order <= 3),
+    ARRAY[]::text[]
+  )::text[] AS preview_names
+FROM ordered_participants
+`
+
+type GetTripParticipantSummaryByTripIDRow struct {
+	TotalCount   int32
+	PreviewNames []string
+}
+
+func (q *Queries) GetTripParticipantSummaryByTripID(ctx context.Context, tripID pgtype.UUID) (GetTripParticipantSummaryByTripIDRow, error) {
+	row := q.db.QueryRow(ctx, getTripParticipantSummaryByTripID, tripID)
+	var i GetTripParticipantSummaryByTripIDRow
+	err := row.Scan(&i.TotalCount, &i.PreviewNames)
+	return i, err
+}
+
 const getTripPlaceSummaryByTripAndPlace = `-- name: GetTripPlaceSummaryByTripAndPlace :one
 SELECT
   id::text AS id,
@@ -1544,6 +1578,102 @@ func (q *Queries) ListTripPlacesByTrip(ctx context.Context, tripID pgtype.UUID) 
 		if err := rows.Scan(
 			&i.ID,
 			&i.Name,
+			&i.PlaceType,
+			&i.Address,
+			&i.Provider,
+			&i.GooglePlaceID,
+			&i.Latitude,
+			&i.Longitude,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listTripScheduleItemsByTrip = `-- name: ListTripScheduleItemsByTrip :many
+SELECT
+  si.trip_day_id::text AS trip_day_id,
+  si.id::text AS id,
+  si.item_order,
+  si.version,
+  si.start_time,
+  si.end_time,
+  si.place_title,
+  si.place_memo,
+  si.arrived_at,
+  si.skipped_at,
+  COALESCE(td.lodging_trip_place_id = si.trip_place_id, false) AS is_lodging,
+  COALESCE(tp.id::text, '')::text AS trip_place_id,
+  tp.name AS place_name,
+  tp.place_type,
+  tp.address,
+  tp.provider,
+  tp.google_place_id,
+  tp.latitude,
+  tp.longitude
+FROM schedule_items si
+JOIN trip_days td
+  ON td.id = si.trip_day_id
+ AND td.trip_id = si.trip_id
+ AND td.deleted_at IS NULL
+LEFT JOIN trip_places tp
+  ON tp.id = si.trip_place_id
+ AND tp.trip_id = si.trip_id
+WHERE si.trip_id = $1::uuid
+  AND si.deleted_at IS NULL
+ORDER BY si.trip_day_id ASC, si.rank ASC, si.id ASC
+`
+
+type ListTripScheduleItemsByTripRow struct {
+	TripDayID     string
+	ID            string
+	ItemOrder     int32
+	Version       int32
+	StartTime     pgtype.Time
+	EndTime       pgtype.Time
+	PlaceTitle    pgtype.Text
+	PlaceMemo     pgtype.Text
+	ArrivedAt     pgtype.Timestamptz
+	SkippedAt     pgtype.Timestamptz
+	IsLodging     interface{}
+	TripPlaceID   string
+	PlaceName     pgtype.Text
+	PlaceType     pgtype.Text
+	Address       pgtype.Text
+	Provider      pgtype.Text
+	GooglePlaceID pgtype.Text
+	Latitude      pgtype.Float8
+	Longitude     pgtype.Float8
+}
+
+func (q *Queries) ListTripScheduleItemsByTrip(ctx context.Context, tripID pgtype.UUID) ([]ListTripScheduleItemsByTripRow, error) {
+	rows, err := q.db.Query(ctx, listTripScheduleItemsByTrip, tripID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListTripScheduleItemsByTripRow
+	for rows.Next() {
+		var i ListTripScheduleItemsByTripRow
+		if err := rows.Scan(
+			&i.TripDayID,
+			&i.ID,
+			&i.ItemOrder,
+			&i.Version,
+			&i.StartTime,
+			&i.EndTime,
+			&i.PlaceTitle,
+			&i.PlaceMemo,
+			&i.ArrivedAt,
+			&i.SkippedAt,
+			&i.IsLodging,
+			&i.TripPlaceID,
+			&i.PlaceName,
 			&i.PlaceType,
 			&i.Address,
 			&i.Provider,
