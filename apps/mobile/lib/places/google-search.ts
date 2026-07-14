@@ -17,6 +17,8 @@ export const duplicateDayPlaceConfirmationCode = 'DUPLICATE_DAY_PLACE_CONFIRMATI
 export const duplicateDayPlaceConfirmationMessage =
   '이미 이 Day에 추가된 장소입니다. 같은 장소를 한 번 더 일정에 추가할까요?';
 export const googlePlaceAddFailureMessage = '장소를 추가할 수 없어요. 다시 검색한 뒤 시도해 주세요.';
+export const googlePlaceSearchDefaultSheetTopInset =
+  theme.space[4] + theme.layout.controlHSm + theme.space[2] + theme.space[6];
 
 export type GooglePlaceSearchStatus = 'initial' | 'minQuery' | 'loading' | 'empty' | 'error' | 'notFound' | 'success';
 
@@ -589,6 +591,10 @@ export function shouldShowGooglePlaceRegionSearchAction(
   return sheetState === 'minimized' && regionDirty && !isBusy && canSearchGooglePlaces(query);
 }
 
+export function resolveGooglePlaceSearchSheetTopInset(topInset?: number): number {
+  return Math.max(googlePlaceSearchDefaultSheetTopInset, Math.max(0, topInset ?? 0));
+}
+
 export function buildGooglePlaceSearchSheetMetrics(
   windowHeight: number,
   bottomInset = 0,
@@ -598,7 +604,10 @@ export function buildGooglePlaceSearchSheetMetrics(
   const safeBottomInset = Math.max(0, bottomInset);
   const minimizedBaseHeight = Math.max(1, options.minimizedBaseHeight ?? 56);
   const minimizedHeight = Math.round(minimizedBaseHeight + safeBottomInset);
-  const maxSheetHeight = Math.max(minimizedHeight, Math.round(safeWindowHeight - Math.max(0, options.topInset ?? 0)));
+  const maxSheetHeight = Math.max(
+    minimizedHeight,
+    Math.round(safeWindowHeight - resolveGooglePlaceSearchSheetTopInset(options.topInset)),
+  );
   const expandedHeight = Math.round(clampNumber(safeWindowHeight * 0.56, minimizedHeight, maxSheetHeight));
   const fullHeight = Math.round(clampNumber(safeWindowHeight * 0.76, expandedHeight, maxSheetHeight));
   return {

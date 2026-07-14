@@ -38,10 +38,12 @@ import {
   getGooglePlaceTypeHint,
   googlePlaceAddFailureMessage,
   googlePlaceSearchDefaultLimit,
+  googlePlaceSearchDefaultSheetTopInset,
   googlePlaceSearchLoadingState,
   resolveGooglePlaceSearchSelectionAfterResultsClose,
   resolveGooglePlaceSearchSheetContentState,
   resolveGooglePlaceSearchSheetState,
+  resolveGooglePlaceSearchSheetTopInset,
   shouldNavigateBackFromGooglePlaceDetailGesture,
   shouldRenderGooglePlaceBookmarkDetail,
   shouldRenderGooglePlaceSearchResults,
@@ -757,6 +759,25 @@ describe('google place search helpers', () => {
     });
 
     assert.deepEqual(buildGooglePlaceSearchSheetSnapPoints(metrics), [64, 448, 560]);
+  });
+
+  it('keeps focused full search sheet below the shared Day-chip reserved inset', () => {
+    assert.equal(
+      googlePlaceSearchDefaultSheetTopInset,
+      theme.space[4] + theme.layout.controlHSm + theme.space[2] + theme.space[6],
+    );
+    assert.equal(
+      resolveGooglePlaceSearchSheetTopInset(theme.space[4] + theme.layout.controlHSm + theme.space[4]),
+      googlePlaceSearchDefaultSheetTopInset,
+    );
+    assert.equal(resolveGooglePlaceSearchSheetTopInset(120), 120);
+
+    const metrics = buildGooglePlaceSearchSheetMetrics(280, 0, {
+      minimizedBaseHeight: 40,
+      topInset: theme.space[4] + theme.layout.controlHSm + theme.space[4],
+    });
+
+    assert.deepEqual(buildGooglePlaceSearchSheetSnapPoints(metrics), [40, 157, 208]);
   });
 
   it('builds a current-location marker after locating the user', () => {
