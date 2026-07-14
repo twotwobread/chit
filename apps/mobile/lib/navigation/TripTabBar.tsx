@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { theme } from '../design';
 import { isTripRootTab, tripTabPath } from '../trips/routes';
+import { SELECTED_NAV_TAB_SURFACE_STYLE } from './tab-selection';
 
 type TripTabRoute = {
   key: string;
@@ -69,7 +70,7 @@ export function TripTabBar({ navigation, state }: TripTabBarProps) {
                 navigation.navigate(route.name);
               }
             }}
-            style={({ pressed }) => [styles.item, pressed ? styles.pressed : null]}
+            style={({ pressed }) => [styles.item, focused ? styles.itemActive : null, pressed ? styles.pressed : null]}
           >
             <Icon
               color={focused ? theme.color.primary : theme.color.textFaint}
@@ -95,9 +96,12 @@ const styles = StyleSheet.create({
   },
   item: {
     alignItems: 'center',
+    borderRadius: theme.radius.pill,
     flex: 1,
     gap: theme.space[1] + 2,
+    marginHorizontal: theme.space[2],
     minHeight: theme.layout.tapMin,
+    justifyContent: 'center',
   },
   label: {
     color: theme.color.textFaint,
@@ -105,6 +109,7 @@ const styles = StyleSheet.create({
     fontSize: theme.font.size.micro,
     fontWeight: theme.font.weight.semibold,
   },
+  itemActive: SELECTED_NAV_TAB_SURFACE_STYLE,
   labelActive: {
     color: theme.color.primary,
     fontFamily: theme.font.family.bold,
