@@ -11,24 +11,21 @@ import {
   type UpsertMyFlightPersonalDetailResponse,
 } from '@i-um/api-contract';
 
-import { getMeWithRefresh } from '../auth/client';
+import { runAuthenticatedRequest } from '../auth/client';
 
 export async function listTripFlights(tripId: string): Promise<ListTripFlightsResponse> {
-  await getMeWithRefresh();
-  return FlightsService.listTripFlights(tripId);
+  return runAuthenticatedRequest(() => FlightsService.listTripFlights(tripId));
 }
 
 export async function createTripFlight(
   tripId: string,
   request: CreateTripFlightRequest,
 ): Promise<CreateTripFlightResponse> {
-  await getMeWithRefresh();
-  return FlightsService.createTripFlight(tripId, request);
+  return runAuthenticatedRequest(() => FlightsService.createTripFlight(tripId, request));
 }
 
 export async function getTripFlight(tripId: string, flightId: string): Promise<GetTripFlightResponse> {
-  await getMeWithRefresh();
-  return FlightsService.getTripFlight(tripId, flightId);
+  return runAuthenticatedRequest(() => FlightsService.getTripFlight(tripId, flightId));
 }
 
 export async function upsertMyFlightPersonalDetail(
@@ -36,16 +33,14 @@ export async function upsertMyFlightPersonalDetail(
   flightId: string,
   request: UpsertMyFlightPersonalDetailRequest,
 ): Promise<UpsertMyFlightPersonalDetailResponse> {
-  await getMeWithRefresh();
-  return FlightsService.upsertMyFlightPersonalDetail(tripId, flightId, request);
+  return runAuthenticatedRequest(() => FlightsService.upsertMyFlightPersonalDetail(tripId, flightId, request));
 }
 
 export async function openMyFlightBoardingPass(
   tripId: string,
   flightId: string,
 ): Promise<OpenMyFlightBoardingPassResponse> {
-  await getMeWithRefresh();
-  return FlightsService.openMyFlightBoardingPass(tripId, flightId);
+  return runAuthenticatedRequest(() => FlightsService.openMyFlightBoardingPass(tripId, flightId));
 }
 
 export class FlightUploadError extends Error {
@@ -69,30 +64,30 @@ export async function uploadMyFlightBoardingPassBinary({
   uri: string;
   contentType: string;
 }): Promise<UploadMyFlightBoardingPassResponse> {
-  await getMeWithRefresh();
-  const token = typeof OpenAPI.TOKEN === 'string' ? OpenAPI.TOKEN : undefined;
-  if (!token) {
-    throw new FlightUploadError(401, 'missing access token');
-  }
-  const blob = await (await fetch(uri)).blob();
-  const response = await fetch(
-    `${OpenAPI.BASE}/trips/${encodeURIComponent(tripId)}/flights/${encodeURIComponent(flightId)}/my-detail/boarding-pass`,
-    {
-      method: 'PUT',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': contentType,
+  return runAuthenticatedRequest(async () => {
+    const token = typeof OpenAPI.TOKEN === 'string' ? OpenAPI.TOKEN : undefined;
+    if (!token) {
+      throw new FlightUploadError(401, 'missing access token');
+    }
+    const blob = await (await fetch(uri)).blob();
+    const response = await fetch(
+      `${OpenAPI.BASE}/trips/${encodeURIComponent(tripId)}/flights/${encodeURIComponent(flightId)}/my-detail/boarding-pass`,
+      {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': contentType,
+        },
+        body: blob,
       },
-      body: blob,
-    },
-  );
-  if (!response.ok) {
-    throw new FlightUploadError(response.status, await response.text().catch(() => 'upload failed'));
-  }
-  return (await response.json()) as UploadMyFlightBoardingPassResponse;
+    );
+    if (!response.ok) {
+      throw new FlightUploadError(response.status, await response.text().catch(() => 'upload failed'));
+    }
+    return (await response.json()) as UploadMyFlightBoardingPassResponse;
+  });
 }
 
 export async function deleteMyFlightBoardingPass(tripId: string, flightId: string): Promise<void> {
-  await getMeWithRefresh();
-  return FlightsService.deleteMyFlightBoardingPass(tripId, flightId);
+  return runAuthenticatedRequest(() => FlightsService.deleteMyFlightBoardingPass(tripId, flightId));
 }

@@ -14,59 +14,48 @@ import {
   type UpdateTripResponse,
 } from '@i-um/api-contract';
 
-import { getMeWithRefresh } from '../auth/client';
+import { runAuthenticatedRequest } from '../auth/client';
 
 export async function createTrip(request: CreateTripRequest): Promise<CreateTripResponse> {
-  await getMeWithRefresh();
-  return TripsService.createTrip(request);
+  return runAuthenticatedRequest(() => TripsService.createTrip(request));
 }
 
 export async function searchDestinations(query: string, limit = 10): Promise<SearchDestinationsResponse> {
-  await getMeWithRefresh();
-  return DestinationsService.searchDestinations(query, limit);
+  return runAuthenticatedRequest(() => DestinationsService.searchDestinations(query, limit));
 }
 
 export async function getTripDetail(tripId: string): Promise<GetTripDetailResponse> {
-  await getMeWithRefresh();
-  return TripsService.getTripDetail(tripId);
+  return runAuthenticatedRequest(() => TripsService.getTripDetail(tripId));
 }
 
 export async function listTripParticipants(tripId: string): Promise<ListTripParticipantsResponse> {
-  await getMeWithRefresh();
-  return TripsService.listTripParticipants(tripId);
+  return runAuthenticatedRequest(() => TripsService.listTripParticipants(tripId));
 }
 
 export async function listTripPlaces(tripId: string): Promise<ListTripPlacesResponse> {
-  await getMeWithRefresh();
-  return TripsService.listTripPlaces(tripId);
+  return runAuthenticatedRequest(() => TripsService.listTripPlaces(tripId));
 }
 
 export async function removeTripParticipant(tripId: string, participantId: string): Promise<void> {
-  await getMeWithRefresh();
-  return TripsService.removeTripParticipant(tripId, participantId);
+  return runAuthenticatedRequest(() => TripsService.removeTripParticipant(tripId, participantId));
 }
 
 export async function createTripInvite(tripId: string): Promise<CreateTripInviteResponse> {
-  await getMeWithRefresh();
-  return TripsService.createTripInvite(tripId);
+  return runAuthenticatedRequest(() => TripsService.createTripInvite(tripId));
 }
 
 export async function acceptTripInvite(token: string): Promise<AcceptTripInviteResponse> {
-  await getMeWithRefresh();
-  return TripsService.acceptTripInvite(token);
+  return runAuthenticatedRequest(() => TripsService.acceptTripInvite(token));
 }
 
 export async function updateTrip(tripId: string, request: UpdateTripRequest): Promise<UpdateTripResponse> {
-  await getMeWithRefresh();
-  return TripsService.updateTrip(tripId, request);
+  return runAuthenticatedRequest(() => TripsService.updateTrip(tripId, request));
 }
 
 export async function deleteTrip(tripId: string): Promise<void> {
-  await getMeWithRefresh();
-  return TripsService.deleteTrip(tripId);
+  return runAuthenticatedRequest(() => TripsService.deleteTrip(tripId));
 }
 
 export async function listMyTrips(): Promise<ListTripsResponse> {
-  await getMeWithRefresh();
-  return TripsService.listTrips();
+  return runAuthenticatedRequest(() => TripsService.listTrips());
 }

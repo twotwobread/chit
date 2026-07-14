@@ -6,8 +6,10 @@ import type { AuthLoginResponse, AuthMeResponse, AuthRefreshResponse } from '@i-
 import {
   deleteAccountWithRefresh,
   getMeWithRefresh,
+  getStoredAuthUser,
   logoutCurrentSession,
   MobileAuthError,
+  runAuthenticatedRequest,
   updateDisplayNameWithRefresh,
   type AuthClientDeps,
 } from './client.ts';
@@ -268,6 +270,141 @@ test('shares one in-flight refresh across concurrent current-user restore caller
   assert.deepEqual(second, me);
   assert.equal(refreshCalls, 1);
   assert.equal(getMeCalls, 2);
+});
+
+test('runAuthenticatedRequest uses stored access token without loading current user first', async () => {
+  const { deps, calls } = createDeps({
+    getMe: async () => {
+      throw new Error('getMe must not be called');
+    },
+  });
+
+  const result = await runAuthenticatedRequest(async () => {
+    calls.push('operation');
+    return 'ok';
+  }, deps);
+
+  assert.equal(result, 'ok');
+  assert.deepEqual(calls, ['configure:old-access-token', 'operation']);
+});
+
+test('runAuthenticatedRequest refreshes once after unauthorized operation and retries with rotated token', async () => {
+  let operationCalls = 0;
+  const { deps, calls, getStored } = createDeps({
+    getMe: async () => {
+      throw new Error('getMe must not be called');
+    },
+  });
+
+  const result = await runAuthenticatedRequest(async () => {
+    operationCalls += 1;
+    calls.push(`operation:${operationCalls}`);
+    if (operationCalls === 1) {
+      throw apiError('UNAUTHORIZED');
+    }
+    return 'ok';
+  }, deps);
+
+  assert.equal(result, 'ok');
+  assert.equal(operationCalls, 2);
+  assert.equal(getStored()?.tokens.refreshToken, 'new-refresh-token');
+  assert.deepEqual(calls, [
+    'configure:old-access-token',
+    'operation:1',
+    'configure:',
+    'save:new-access-token',
+    'configure:new-access-token',
+    'operation:2',
+  ]);
+});
+
+test('runAuthenticatedRequest preserves non-auth operation errors', async () => {
+  const forbidden = apiError('FORBIDDEN', 403);
+  const { deps, calls } = createDeps({
+    refreshToken: async () => {
+      throw new Error('refreshToken must not be called');
+    },
+  });
+
+  await assert.rejects(
+    () =>
+      runAuthenticatedRequest(async () => {
+        calls.push('operation');
+        throw forbidden;
+      }, deps),
+    (error) => error === forbidden,
+  );
+  assert.deepEqual(calls, ['configure:old-access-token', 'operation']);
+});
+
+test('runAuthenticatedRequest shares one refresh across concurrent unauthorized operations', async () => {
+  let refreshCalls = 0;
+  let refreshRelease: (() => void) | null = null;
+  const refreshStarted = new Promise<void>((resolve) => {
+    refreshRelease = resolve;
+  });
+  const { deps, calls } = createDeps({
+    getMe: async () => {
+      throw new Error('getMe must not be called');
+    },
+    refreshToken: async () => {
+      refreshCalls += 1;
+      await refreshStarted;
+      return refreshResponse;
+    },
+  });
+
+  const operation = async () => {
+    const latestConfigureCall = calls.filter((call) => call.startsWith('configure:')).at(-1);
+    if (latestConfigureCall !== 'configure:new-access-token') {
+      throw apiError('UNAUTHORIZED');
+    }
+    return 'ok';
+  };
+
+  const first = runAuthenticatedRequest(operation, deps);
+  const second = runAuthenticatedRequest(operation, deps);
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  refreshRelease?.();
+
+  assert.deepEqual(await Promise.all([first, second]), ['ok', 'ok']);
+  assert.equal(refreshCalls, 1);
+});
+
+test('getStoredAuthUser returns the stored user without loading current user first', async () => {
+  const { deps, calls } = createDeps({
+    getMe: async () => {
+      throw new Error('getMe must not be called');
+    },
+    refreshToken: async () => {
+      throw new Error('refreshToken must not be called');
+    },
+  });
+
+  assert.deepEqual(await getStoredAuthUser(deps), user);
+  assert.deepEqual(calls, []);
+});
+
+test('getStoredAuthUser maps missing local session to unauthorized without auth API calls', async () => {
+  const { deps, calls } = createDeps({
+    readResult: { status: 'missing' },
+    getMe: async () => {
+      throw new Error('getMe must not be called');
+    },
+    refreshToken: async () => {
+      throw new Error('refreshToken must not be called');
+    },
+  });
+
+  await assert.rejects(
+    () => getStoredAuthUser(deps),
+    (error) => {
+      assert.ok(error instanceof MobileAuthError);
+      assert.equal(error.code, 'UNAUTHORIZED');
+      return true;
+    },
+  );
+  assert.deepEqual(calls, []);
 });
 
 test('updates display name with a valid stored access token and saves returned user', async () => {

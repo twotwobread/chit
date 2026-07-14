@@ -236,6 +236,18 @@ func getDayScheduleResponseToOpenAPI(result trip.GetDayScheduleItemsResult) open
 	}
 }
 
+func listTripScheduleItemsResponseToOpenAPI(result trip.ListTripScheduleItemsResult) openapi.ListTripScheduleItemsResponse {
+	days := make([]openapi.TripScheduleItemsDayListItem, 0, len(result.Days))
+	for _, day := range result.Days {
+		items := make([]openapi.ScheduleItem, 0, len(day.Items))
+		for _, item := range day.Items {
+			items = append(items, dayScheduleItemToOpenAPI(item))
+		}
+		days = append(days, openapi.TripScheduleItemsDayListItem{TripDayId: day.TripDayID, ScheduleItems: items})
+	}
+	return openapi.ListTripScheduleItemsResponse{Days: days}
+}
+
 func listTripPlacesResponseToOpenAPI(result trip.ListTripPlacesResult) openapi.ListTripPlacesResponse {
 	places := make([]openapi.TripPlaceSummary, 0, len(result.Places))
 	for _, place := range result.Places {
@@ -287,32 +299,48 @@ func createQuickExpenseResponseToOpenAPI(result trip.CreateQuickExpenseResult) o
 func listDayExpensesResponseToOpenAPI(result trip.ListDayExpensesResult) openapi.ListDayExpensesResponse {
 	expenses := make([]openapi.DayExpenseListItem, 0, len(result.Expenses))
 	for _, expense := range result.Expenses {
-		splits := make([]openapi.DayExpenseSplitListItem, 0, len(expense.Splits))
-		for _, split := range expense.Splits {
-			splits = append(splits, openapi.DayExpenseSplitListItem{
-				SplitOrder:  split.SplitOrder,
-				Participant: expenseParticipantDisplayToOpenAPI(split.Participant),
-				AmountMinor: split.AmountMinor,
-			})
-		}
-		expenses = append(expenses, openapi.DayExpenseListItem{
-			Id:             expense.ID,
-			AnchorType:     openapi.ExpenseAnchorType(expense.AnchorType),
-			TripDayId:      expense.TripDayID,
-			ScheduleItemId: expense.ScheduleItemID,
-			ExpenseDate:    dateToOpenAPI(expense.ExpenseDate),
-			DisplayTitle:   expense.DisplayTitle,
-			Place:          expensePlaceDisplayToOpenAPI(expense.Place),
-			AmountMinor:    expense.AmountMinor,
-			Currency:       openapi.SupportedCurrency(expense.Currency),
-			Payer:          expenseParticipantDisplayToOpenAPI(expense.Payer),
-			SplitPolicy:    openapi.ExpenseSplitPolicy(expense.SplitPolicy),
-			Splits:         splits,
-			CreatedAt:      expense.CreatedAt.UTC(),
-		})
+		expenses = append(expenses, dayExpenseListItemToOpenAPI(expense))
 	}
 
 	return openapi.ListDayExpensesResponse{Expenses: expenses}
+}
+
+func listTripExpensesResponseToOpenAPI(result trip.ListTripExpensesResult) openapi.ListTripExpensesResponse {
+	days := make([]openapi.TripExpenseDayListItem, 0, len(result.Days))
+	for _, day := range result.Days {
+		expenses := make([]openapi.DayExpenseListItem, 0, len(day.Expenses))
+		for _, expense := range day.Expenses {
+			expenses = append(expenses, dayExpenseListItemToOpenAPI(expense))
+		}
+		days = append(days, openapi.TripExpenseDayListItem{TripDayId: day.TripDayID, Expenses: expenses})
+	}
+	return openapi.ListTripExpensesResponse{Days: days}
+}
+
+func dayExpenseListItemToOpenAPI(expense trip.DayExpenseListItem) openapi.DayExpenseListItem {
+	splits := make([]openapi.DayExpenseSplitListItem, 0, len(expense.Splits))
+	for _, split := range expense.Splits {
+		splits = append(splits, openapi.DayExpenseSplitListItem{
+			SplitOrder:  split.SplitOrder,
+			Participant: expenseParticipantDisplayToOpenAPI(split.Participant),
+			AmountMinor: split.AmountMinor,
+		})
+	}
+	return openapi.DayExpenseListItem{
+		Id:             expense.ID,
+		AnchorType:     openapi.ExpenseAnchorType(expense.AnchorType),
+		TripDayId:      expense.TripDayID,
+		ScheduleItemId: expense.ScheduleItemID,
+		ExpenseDate:    dateToOpenAPI(expense.ExpenseDate),
+		DisplayTitle:   expense.DisplayTitle,
+		Place:          expensePlaceDisplayToOpenAPI(expense.Place),
+		AmountMinor:    expense.AmountMinor,
+		Currency:       openapi.SupportedCurrency(expense.Currency),
+		Payer:          expenseParticipantDisplayToOpenAPI(expense.Payer),
+		SplitPolicy:    openapi.ExpenseSplitPolicy(expense.SplitPolicy),
+		Splits:         splits,
+		CreatedAt:      expense.CreatedAt.UTC(),
+	}
 }
 
 func expenseToOpenAPI(expense trip.Expense) openapi.Expense {

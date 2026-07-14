@@ -7,9 +7,11 @@ import { ApiError } from '@i-um/api-contract';
 import { MobileAuthError } from '../../../lib/auth/client';
 import { getStoredSession } from '../../../lib/auth/session';
 import { Card, PrimaryButton, SecondaryButton, theme } from '../../../lib/design';
-import { getTripDetail, updateTrip } from '../../../lib/trips/trip-api';
+import { updateTrip } from '../../../lib/trips/trip-api';
 import { dateFromString, monthStringFromDate, todayString } from '../../../lib/trips/date';
 import { tripDetailPath } from '../../../lib/trips/routes';
+import { resolveTripShellDetail } from '../../../lib/trips/trip-shell-detail';
+import { useTripShellState } from '../../../lib/trips/trip-shell-context';
 import { TripDateFieldButton, TripDatePicker, TripFormField } from '../../../lib/trips/date-picker';
 import {
   buildUpdateTripRequest,
@@ -27,6 +29,7 @@ const yearOptionRadius = 5;
 export default function EditTripScreen() {
   const { tripId: tripIdParam } = useLocalSearchParams<{ tripId?: string | string[] }>();
   const tripId = Array.isArray(tripIdParam) ? tripIdParam[0] : tripIdParam;
+  const shellState = useTripShellState();
   const [loadState, setLoadState] = useState<LoadState>('loading');
   const [original, setOriginal] = useState<TripBasicInfoForm | null>(null);
   const [form, setForm] = useState<TripBasicInfoForm | null>(null);
@@ -43,8 +46,18 @@ export default function EditTripScreen() {
 
     setLoadState('loading');
     setSaveError(null);
+
+    const shellDetail = resolveTripShellDetail(shellState, tripId);
+    if (shellDetail.status === 'pending') {
+      return;
+    }
+    if (shellDetail.status !== 'success') {
+      setLoadState(editTripShellFailureState(shellDetail.status));
+      return;
+    }
+
     try {
-      const detail = await getTripDetail(tripId);
+      const detail = shellDetail.detail;
       const session = await getStoredSession();
       if (session?.user.id !== detail.trip.createdBy) {
         setLoadState('notFound');
@@ -74,7 +87,7 @@ export default function EditTripScreen() {
       }
       setLoadState('error');
     }
-  }, [tripId]);
+  }, [shellState, tripId]);
 
   useEffect(() => {
     void load();
@@ -287,6 +300,10 @@ export default function EditTripScreen() {
       ) : null}
     </ScrollView>
   );
+}
+
+function editTripShellFailureState(status: 'auth' | 'notFound' | 'error'): LoadState {
+  return status;
 }
 
 const styles = StyleSheet.create({

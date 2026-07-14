@@ -394,6 +394,15 @@ type GetDayScheduleItemsResult struct {
 	Items []ScheduleItem
 }
 
+type TripScheduleItemsDayListItem struct {
+	TripDayID string
+	Items     []ScheduleItem
+}
+
+type ListTripScheduleItemsResult struct {
+	Days []TripScheduleItemsDayListItem
+}
+
 type SetDayLodgingPlaceResult struct {
 	Day          TripDay
 	LodgingPlace TripPlaceSummary
@@ -537,6 +546,15 @@ type ListDayExpensesResult struct {
 	Expenses []DayExpenseListItem
 }
 
+type TripExpenseDayListItem struct {
+	TripDayID string
+	Expenses  []DayExpenseListItem
+}
+
+type ListTripExpensesResult struct {
+	Days []TripExpenseDayListItem
+}
+
 type DayLodgingPlace struct {
 	Date  string
 	Place TripPlaceSummary
@@ -672,7 +690,9 @@ type Repository interface {
 	CreateManualDayLodgingPlace(ctx context.Context, record CreateManualDayLodgingPlaceRecord) (TripPlaceSummary, error)
 	DeleteDayLodgingPlace(ctx context.Context, tripID string, tripDayID string) error
 	ListScheduleItemsByTripDay(ctx context.Context, tripID string, tripDayID string) ([]ScheduleItem, error)
+	ListTripScheduleItems(ctx context.Context, tripID string) ([]TripScheduleItemsDayListItem, error)
 	ListDayExpensesByTripDay(ctx context.Context, tripID string, tripDayID string) ([]DayExpenseListItem, error)
+	ListTripExpenses(ctx context.Context, tripID string) ([]TripExpenseDayListItem, error)
 	GetTripSettlementInput(ctx context.Context, tripID string) (SettlementInput, error)
 	GetExpenseByTripDayAndID(ctx context.Context, tripID string, tripDayID string, expenseID string) (Expense, bool, error)
 	UpdateExpense(ctx context.Context, record UpdateExpenseRecord) (Expense, error)

@@ -114,10 +114,10 @@ export function useMyPageController() {
         return;
       }
 
-      const me = await getMeWithRefresh();
-      setState({ status: 'ready', me });
       void loadSettlementSummary();
       void loadTrips();
+      const me = await getMeWithRefresh();
+      setState({ status: 'ready', me });
     } catch (error) {
       if (await handleAuthError(error)) {
         return;

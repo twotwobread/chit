@@ -983,6 +983,58 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /trips/{tripId}/expenses:
+    get:
+      operationId: listTripExpenses
+      summary: List expenses for a trip
+      description: Returns read-only expense rows grouped by trip day in one request, ordered by day then newest expense first.
+      tags:
+        - Trips
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Trip expenses grouped by trip day.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListTripExpensesResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /trips/{tripId}/participants:
     get:
       operationId: listTripParticipants
@@ -1110,6 +1162,58 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ListTripPlacesResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /trips/{tripId}/schedule-items:
+    get:
+      operationId: listTripScheduleItems
+      summary: List schedule items for a trip
+      description: Returns read-only schedule items grouped by trip day in one request.
+      tags:
+        - Trips
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Trip schedule items grouped by trip day.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListTripScheduleItemsResponse'
         '400':
           description: Validation error.
           content:
@@ -4003,6 +4107,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ScheduleItem'
+    TripScheduleItemsDayListItem:
+      type: object
+      additionalProperties: false
+      required:
+        - tripDayId
+        - scheduleItems
+      properties:
+        tripDayId:
+          type: string
+        scheduleItems:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScheduleItem'
+    ListTripScheduleItemsResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - days
+      properties:
+        days:
+          type: array
+          items:
+            $ref: '#/components/schemas/TripScheduleItemsDayListItem'
     ListDayExpensesResponse:
       type: object
       additionalProperties: false
@@ -4013,6 +4140,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/DayExpenseListItem'
+    TripExpenseDayListItem:
+      type: object
+      additionalProperties: false
+      required:
+        - tripDayId
+        - expenses
+      properties:
+        tripDayId:
+          type: string
+        expenses:
+          type: array
+          items:
+            $ref: '#/components/schemas/DayExpenseListItem'
+    ListTripExpensesResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - days
+      properties:
+        days:
+          type: array
+          items:
+            $ref: '#/components/schemas/TripExpenseDayListItem'
     DayExpenseListItem:
       type: object
       additionalProperties: false

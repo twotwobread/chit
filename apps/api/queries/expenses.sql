@@ -142,6 +142,50 @@ WHERE e.trip_id = sqlc.arg(trip_id)::uuid
   AND e.anchor_type IN ('trip_day', 'schedule_item')
 ORDER BY e.created_at DESC, e.id DESC;
 
+-- name: ListTripExpensesByTrip :many
+SELECT
+  e.id::text AS id,
+  e.anchor_type,
+  COALESCE(e.trip_day_id::text, '')::text AS trip_day_id,
+  COALESCE(e.schedule_item_id::text, '')::text AS schedule_item_id,
+  e.expense_date,
+  COALESCE(live_place.name, e.place_name, '지출')::text AS display_title,
+  COALESCE(live_place.id::text, e.trip_place_id::text, '')::text AS trip_place_id,
+  COALESCE(live_place.name, e.place_name, '')::text AS place_name,
+  COALESCE(live_place.address, e.place_address, '')::text AS place_address,
+  COALESCE(live_place.place_type, e.place_type, '')::text AS place_type,
+  CASE
+    WHEN live_place.id IS NOT NULL THEN 'live'
+    WHEN e.place_name IS NOT NULL THEN 'fallback'
+    ELSE ''
+  END::text AS place_source,
+  e.amount_minor,
+  e.currency,
+  COALESCE(payer.id::text, e.payer_participant_id::text, '')::text AS payer_participant_id,
+  COALESCE(payer.display_name, e.payer_display_name, '여행자')::text AS payer_display_name,
+  CASE
+    WHEN payer.id IS NOT NULL THEN 'live'
+    ELSE 'fallback'
+  END::text AS payer_source,
+  e.split_policy,
+  e.created_at
+FROM expenses e
+LEFT JOIN schedule_items si
+  ON e.anchor_type = 'schedule_item'
+ AND si.id = e.schedule_item_id
+ AND si.trip_day_id = e.trip_day_id
+ AND si.trip_id = e.trip_id
+ AND si.deleted_at IS NULL
+LEFT JOIN trip_places live_place
+  ON live_place.id = si.trip_place_id
+ AND live_place.trip_id = e.trip_id
+LEFT JOIN trip_participants payer
+  ON payer.id = e.payer_participant_id
+ AND payer.trip_id = e.trip_id
+WHERE e.trip_id = sqlc.arg(trip_id)::uuid
+  AND e.anchor_type IN ('trip_day', 'schedule_item')
+ORDER BY e.trip_day_id ASC, e.created_at DESC, e.id DESC;
+
 -- name: ListDayExpenseSplitsByExpenseIDs :many
 SELECT
   es.expense_id::text AS expense_id,
@@ -171,6 +215,16 @@ FROM trip_participants
 WHERE trip_id = sqlc.arg(trip_id)::uuid
 ORDER BY joined_at ASC, id ASC;
 
+-- name: ListSettlementParticipantsByTrips :many
+SELECT
+  trip_id::text,
+  id::text,
+  display_name,
+  joined_at
+FROM trip_participants
+WHERE trip_id = ANY(sqlc.arg(trip_ids)::uuid[])
+ORDER BY trip_id ASC, joined_at ASC, id ASC;
+
 -- name: ListSettlementRowsByTrip :many
 SELECT
   e.id::text AS expense_id,
@@ -196,6 +250,33 @@ LEFT JOIN trip_participants split_participant
 WHERE e.trip_id = sqlc.arg(trip_id)::uuid
   AND e.anchor_type IN ('trip', 'trip_day', 'schedule_item')
 ORDER BY e.currency ASC, e.created_at ASC, e.id ASC, es.split_order ASC;
+
+-- name: ListSettlementRowsByTrips :many
+SELECT
+  e.trip_id::text AS trip_id,
+  e.id::text AS expense_id,
+  e.currency,
+  e.amount_minor AS expense_amount_minor,
+  COALESCE(payer.id::text, '')::text AS payer_participant_id,
+  COALESCE(payer.display_name, e.payer_display_name, '여행자')::text AS payer_display_name,
+  (payer.id IS NOT NULL)::boolean AS payer_participant_live,
+  COALESCE(es.split_order, 0)::integer AS split_order,
+  COALESCE(split_participant.id::text, '')::text AS split_participant_id,
+  COALESCE(split_participant.display_name, es.participant_display_name, '여행자')::text AS split_participant_display_name,
+  (split_participant.id IS NOT NULL)::boolean AS split_participant_live,
+  COALESCE(es.amount_minor, 0)::bigint AS split_amount_minor
+FROM expenses e
+LEFT JOIN trip_participants payer
+  ON payer.id = e.payer_participant_id
+ AND payer.trip_id = e.trip_id
+LEFT JOIN expense_splits es
+  ON es.expense_id = e.id
+LEFT JOIN trip_participants split_participant
+  ON split_participant.id = es.participant_id
+ AND split_participant.trip_id = e.trip_id
+WHERE e.trip_id = ANY(sqlc.arg(trip_ids)::uuid[])
+  AND e.anchor_type IN ('trip', 'trip_day', 'schedule_item')
+ORDER BY e.trip_id ASC, e.currency ASC, e.created_at ASC, e.id ASC, es.split_order ASC;
 
 -- name: GetExpenseByTripDayAndID :one
 SELECT

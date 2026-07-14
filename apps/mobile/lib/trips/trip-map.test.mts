@@ -1,13 +1,20 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import type { GetDayScheduleItemsResponse, ScheduleItem, TripDay, TripPlaceType } from '@i-um/api-contract';
+import type {
+  GetDayScheduleItemsResponse,
+  ListTripScheduleItemsResponse,
+  ScheduleItem,
+  TripDay,
+  TripPlaceType,
+} from '@i-um/api-contract';
 
 import { theme } from '../design/theme';
 import { buildGooglePlaceSearchRegionFromDestination, type GooglePlaceTripDestination } from '../places/google-search';
 import { buildRouteWaypointMarkerChrome, buildRouteWaypointMarkerStyle } from './route-map-marker';
 import {
   buildRouteMapPlaces,
+  buildTripItinerariesFromTripScheduleItems,
   buildTripMapDayChips,
   buildTripMapScheduleMarkerDetail,
   buildTripMapDayRoutes,
@@ -122,6 +129,18 @@ test('builds a bottom-sheet detail for a selected Day route marker', () => {
       memo: '입국 후 라피트 탑승',
     },
   );
+});
+
+test('builds trip itineraries from a single trip-level schedule response', () => {
+  const days = [day({ id: 'day-a', dayOrder: 2 }), day({ id: 'day-b', dayOrder: 1, date: '2026-07-09' })];
+  const response: ListTripScheduleItemsResponse = {
+    days: [{ tripDayId: 'day-a', scheduleItems: [item({ id: 'item-a' })] }],
+  };
+
+  assert.deepEqual(buildTripItinerariesFromTripScheduleItems(days, response), [
+    { day: days[0], scheduleItems: response.days[0].scheduleItems },
+    { day: days[1], scheduleItems: [] },
+  ]);
 });
 
 test('builds ordered day chips from trip days', () => {

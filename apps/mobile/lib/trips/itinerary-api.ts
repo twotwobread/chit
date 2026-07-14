@@ -5,6 +5,7 @@ import {
   type CreateManualScheduleItemResponse,
   type CreateRoutePreviewRequest,
   type GetDayScheduleItemsResponse,
+  type ListTripScheduleItemsResponse,
   type MarkScheduleItemArrivedResponse,
   type MarkScheduleItemSkippedResponse,
   type ReorderScheduleItemsRequest,
@@ -17,11 +18,14 @@ import {
   type UpdateScheduleItemResponse,
 } from '@i-um/api-contract';
 
-import { getMeWithRefresh } from '../auth/client';
+import { runAuthenticatedRequest } from '../auth/client';
 
 export async function getTripDayItinerary(tripId: string, tripDayId: string): Promise<GetDayScheduleItemsResponse> {
-  await getMeWithRefresh();
-  return TripsService.getDayScheduleItems(tripId, tripDayId);
+  return runAuthenticatedRequest(() => TripsService.getDayScheduleItems(tripId, tripDayId));
+}
+
+export async function listTripScheduleItems(tripId: string): Promise<ListTripScheduleItemsResponse> {
+  return runAuthenticatedRequest(() => TripsService.listTripScheduleItems(tripId));
 }
 
 export async function createManualScheduleItem(
@@ -29,8 +33,7 @@ export async function createManualScheduleItem(
   date: string,
   request: CreateManualScheduleItemRequest,
 ): Promise<CreateManualScheduleItemResponse> {
-  await getMeWithRefresh();
-  return TripsService.createManualScheduleItem(tripId, date, request);
+  return runAuthenticatedRequest(() => TripsService.createManualScheduleItem(tripId, date, request));
 }
 
 export async function setDayLodgingPlace(
@@ -38,8 +41,7 @@ export async function setDayLodgingPlace(
   date: string,
   request: SetDayLodgingPlaceRequest,
 ): Promise<SetDayLodgingPlaceResponse> {
-  await getMeWithRefresh();
-  return TripsService.setDayLodgingPlace(tripId, date, request);
+  return runAuthenticatedRequest(() => TripsService.setDayLodgingPlace(tripId, date, request));
 }
 
 export async function createManualDayLodgingPlace(
@@ -47,13 +49,11 @@ export async function createManualDayLodgingPlace(
   date: string,
   request: CreateManualDayLodgingPlaceRequest,
 ): Promise<SetDayLodgingPlaceResponse> {
-  await getMeWithRefresh();
-  return TripsService.createManualDayLodgingPlace(tripId, date, request);
+  return runAuthenticatedRequest(() => TripsService.createManualDayLodgingPlace(tripId, date, request));
 }
 
 export async function clearDayLodgingPlace(tripId: string, date: string): Promise<void> {
-  await getMeWithRefresh();
-  return TripsService.clearDayLodgingPlace(tripId, date);
+  return runAuthenticatedRequest(() => TripsService.clearDayLodgingPlace(tripId, date));
 }
 
 export async function reorderScheduleItems(
@@ -61,8 +61,7 @@ export async function reorderScheduleItems(
   date: string,
   request: ReorderScheduleItemsRequest,
 ): Promise<ReorderScheduleItemsResponse> {
-  await getMeWithRefresh();
-  return TripsService.reorderScheduleItems(tripId, date, request);
+  return runAuthenticatedRequest(() => TripsService.reorderScheduleItems(tripId, date, request));
 }
 
 export async function markScheduleItemArrived(
@@ -70,8 +69,7 @@ export async function markScheduleItemArrived(
   date: string,
   itemId: string,
 ): Promise<MarkScheduleItemArrivedResponse> {
-  await getMeWithRefresh();
-  return TripsService.markScheduleItemArrived(tripId, date, itemId);
+  return runAuthenticatedRequest(() => TripsService.markScheduleItemArrived(tripId, date, itemId));
 }
 
 export async function markScheduleItemSkipped(
@@ -79,8 +77,7 @@ export async function markScheduleItemSkipped(
   date: string,
   itemId: string,
 ): Promise<MarkScheduleItemSkippedResponse> {
-  await getMeWithRefresh();
-  return TripsService.markScheduleItemSkipped(tripId, date, itemId);
+  return runAuthenticatedRequest(() => TripsService.markScheduleItemSkipped(tripId, date, itemId));
 }
 
 export async function restoreScheduleItem(
@@ -88,8 +85,7 @@ export async function restoreScheduleItem(
   date: string,
   itemId: string,
 ): Promise<RestoreScheduleItemResponse> {
-  await getMeWithRefresh();
-  return TripsService.restoreScheduleItem(tripId, date, itemId);
+  return runAuthenticatedRequest(() => TripsService.restoreScheduleItem(tripId, date, itemId));
 }
 
 export async function createRoutePreview(
@@ -98,8 +94,7 @@ export async function createRoutePreview(
   itemId: string,
   request: CreateRoutePreviewRequest,
 ): Promise<RoutePreviewResponse> {
-  await getMeWithRefresh();
-  return TripsService.createRoutePreview(tripId, date, itemId, request);
+  return runAuthenticatedRequest(() => TripsService.createRoutePreview(tripId, date, itemId, request));
 }
 
 export async function updateScheduleItem(
@@ -108,11 +103,9 @@ export async function updateScheduleItem(
   itemId: string,
   request: UpdateScheduleItemRequest,
 ): Promise<UpdateScheduleItemResponse> {
-  await getMeWithRefresh();
-  return TripsService.updateScheduleItem(tripId, date, itemId, request);
+  return runAuthenticatedRequest(() => TripsService.updateScheduleItem(tripId, date, itemId, request));
 }
 
 export async function deleteScheduleItem(tripId: string, date: string, itemId: string): Promise<void> {
-  await getMeWithRefresh();
-  return TripsService.deleteScheduleItem(tripId, date, itemId);
+  return runAuthenticatedRequest(() => TripsService.deleteScheduleItem(tripId, date, itemId));
 }

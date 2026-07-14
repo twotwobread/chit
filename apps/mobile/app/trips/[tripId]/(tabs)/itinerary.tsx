@@ -1,15 +1,14 @@
 import { useCallback, useRef, useState } from 'react';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 
-import { ApiError, type TripDay } from '@i-um/api-contract';
-
-import { MobileAuthError } from '../../../../lib/auth/client';
+import type { TripDay } from '@i-um/api-contract';
 import { DayChips } from '../../../../lib/trip-ui/DayChips';
 import { DayItineraryEditor } from '../../../../lib/trip-ui/DayItineraryEditor';
 import { TripScreen, TripStateCard } from '../../../../lib/trip-ui/TripScreenScaffold';
-import { getTripDetail } from '../../../../lib/trips/trip-api';
 import { tripDetailPath } from '../../../../lib/trips/routes';
 import { localDateString } from '../../../../lib/trips/status';
+import { resolveTripShellDetail } from '../../../../lib/trips/trip-shell-detail';
+import { useTripShellState } from '../../../../lib/trips/trip-shell-context';
 import { buildTripMapDayChips, resolveTripMapSelectedDay } from '../../../../lib/trips/trip-map';
 
 type ItineraryState =
@@ -31,6 +30,7 @@ export default function TripItineraryTabScreen() {
   }>();
   const tripId = Array.isArray(tripIdParam) ? tripIdParam[0] : tripIdParam;
   const routeDayId = Array.isArray(dayIdParam) ? dayIdParam[0] : dayIdParam;
+  const shellState = useTripShellState();
   const selectedDayIdRef = useRef<string | null>(null);
   const [state, setState] = useState<ItineraryState>({ status: 'loading' });
 
@@ -42,31 +42,36 @@ export default function TripItineraryTabScreen() {
       }
 
       setState({ status: 'loading' });
-      try {
-        const detail = await getTripDetail(tripId);
-        const selectedDay = resolveTripMapSelectedDay({
-          days: detail.days,
-          preferredDayId,
-          today: localDateString(),
-        });
-
-        if (!selectedDay) {
-          selectedDayIdRef.current = null;
-          setState({ status: 'emptyDays', tripId });
-          return;
-        }
-
-        selectedDayIdRef.current = selectedDay.id;
-        setState({
-          status: 'success',
-          dayChips: buildTripMapDayChips(detail.days),
-          selectedDay,
-        });
-      } catch (error) {
-        setState(itineraryFailureState(error));
+      const shellDetail = resolveTripShellDetail(shellState, tripId);
+      if (shellDetail.status === 'pending') {
+        return;
       }
+      if (shellDetail.status !== 'success') {
+        setState(itineraryShellFailureState(shellDetail.status));
+        return;
+      }
+
+      const detail = shellDetail.detail;
+      const selectedDay = resolveTripMapSelectedDay({
+        days: detail.days,
+        preferredDayId,
+        today: localDateString(),
+      });
+
+      if (!selectedDay) {
+        selectedDayIdRef.current = null;
+        setState({ status: 'emptyDays', tripId });
+        return;
+      }
+
+      selectedDayIdRef.current = selectedDay.id;
+      setState({
+        status: 'success',
+        dayChips: buildTripMapDayChips(detail.days),
+        selectedDay,
+      });
     },
-    [routeDayId, tripId],
+    [routeDayId, shellState, tripId],
   );
 
   useFocusEffect(
@@ -133,17 +138,6 @@ function EmptyDaysState({ tripId }: { tripId: string }) {
   );
 }
 
-function itineraryFailureState(error: unknown): ItineraryState {
-  if (error instanceof MobileAuthError && (error.code === 'UNAUTHORIZED' || error.code === 'INVALID_REFRESH_TOKEN')) {
-    return { status: 'auth' };
-  }
-  if (error instanceof ApiError) {
-    if (error.status === 401) {
-      return { status: 'auth' };
-    }
-    if (error.status === 400 || error.status === 403 || error.status === 404) {
-      return { status: 'notFound' };
-    }
-  }
-  return { status: 'error' };
+function itineraryShellFailureState(status: 'auth' | 'notFound' | 'error'): ItineraryState {
+  return { status };
 }
