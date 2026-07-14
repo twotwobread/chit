@@ -40,6 +40,7 @@ export default function TripMapTabScreen() {
         selectedDayId={state.selectedDayId}
         selectedRouteLayerChipId={state.selectedRouteLayerChipId}
         selectedRoutePlaceId={state.selectedRoutePlaceId}
+        tripDestinations={state.tripDestinations}
         tripId={tripId ?? ''}
       />
     );

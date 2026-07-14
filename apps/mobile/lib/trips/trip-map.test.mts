@@ -4,6 +4,7 @@ import test from 'node:test';
 import type { GetDayScheduleItemsResponse, ScheduleItem, TripDay, TripPlaceType } from '@i-um/api-contract';
 
 import { theme } from '../design/theme';
+import { buildGooglePlaceSearchRegionFromDestination, type GooglePlaceTripDestination } from '../places/google-search';
 import { buildRouteWaypointMarkerChrome, buildRouteWaypointMarkerStyle } from './route-map-marker';
 import {
   buildRouteMapPlaces,
@@ -394,6 +395,21 @@ test('builds an initial region from visible route map places', () => {
   );
 
   assert.equal(buildTripMapInitialRegion([{ id: 'missing', name: '좌표 없음', order: 1, type: 'etc' }]), null);
+});
+
+test('falls back to the trip destination region when the map has no visible route places', () => {
+  const osaka: GooglePlaceTripDestination = {
+    displayName: '오사카, 일본',
+    id: 'destination-osaka',
+    latitude: 34.6937,
+    longitude: 135.5023,
+    radiusMeters: 5000,
+  };
+
+  assert.deepEqual(
+    buildTripMapInitialRegion([{ id: 'missing', name: '좌표 없음', order: 1, type: 'etc' }], [osaka]),
+    buildGooglePlaceSearchRegionFromDestination(osaka),
+  );
 });
 
 test('builds route map places from valid routable items while preserving duplicates and statuses', () => {

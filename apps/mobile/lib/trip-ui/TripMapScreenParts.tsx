@@ -4,7 +4,11 @@ import { Pressable, Text, View } from 'react-native';
 import { Heart } from 'lucide-react-native';
 
 import { theme } from '../design';
-import { type GooglePlaceAddViewState, type GooglePlaceSearchRowViewModel } from '../places/google-search';
+import {
+  type GooglePlaceAddViewState,
+  type GooglePlaceSearchRowViewModel,
+  type GooglePlaceTripDestination,
+} from '../places/google-search';
 import { type DayItineraryMapActionFeedback } from '../trips/day-itinerary-map-actions';
 import {
   buildTripMapInitialRegion,
@@ -40,6 +44,7 @@ export function MapContent({
   selectedDayId,
   selectedRouteLayerChipId,
   selectedRoutePlaceId,
+  tripDestinations,
   tripId,
 }: {
   bookmarkActionState: GooglePlaceAddViewState;
@@ -52,6 +57,7 @@ export function MapContent({
   routeNotice: TripMapRouteNotice | null;
   selectedDayId: string;
   selectedRouteLayerChipId: TripMapRouteLayerChipId | null;
+  tripDestinations: GooglePlaceTripDestination[];
   feedback: DayItineraryMapActionFeedback | null;
   scheduleMarkerDetail: TripMapScheduleMarkerDetail | null;
   selectedRoutePlaceId: string | null;
@@ -62,7 +68,10 @@ export function MapContent({
   onToggleBookmarkLayer: () => void;
   onToggleRouteLayer: (chipId: TripMapRouteLayerChipId) => void;
 }) {
-  const initialRegion = useMemo(() => buildTripMapInitialRegion(mapPlaces), [mapPlaces]);
+  const initialRegion = useMemo(
+    () => buildTripMapInitialRegion(mapPlaces, tripDestinations),
+    [mapPlaces, tripDestinations],
+  );
   const layout = buildTripMapSearchLayout();
   const showDayChipsOverlay = layout.dayChipsPlacement === 'mapOverlay';
   const mapStyle = layout.screenMode === 'fullScreen' ? styles.mapSearchFullScreen : styles.mapSearch;
@@ -89,6 +98,7 @@ export function MapContent({
         selectedRoutePlaceId={selectedRoutePlaceId}
         sheetTopInset={sheetTopInset}
         style={mapStyle}
+        tripDestinations={tripDestinations}
         tripId={tripId}
       />
       {showDayChipsOverlay ? (

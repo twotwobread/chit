@@ -1,6 +1,7 @@
 import type { GetDayScheduleItemsResponse, ScheduleItem, TripDay } from '@i-um/api-contract';
 
 import { theme } from '../design/theme';
+import { buildGooglePlaceSearchRegionFromDestination, type GooglePlaceTripDestination } from '../places/google-search';
 import type { DayChip } from '../trip-ui/DayChips';
 import type { RouteMapPlace, RouteMapPolyline } from '../trip-ui/RouteMap';
 import { getScheduleItems, type DayItineraryViewModel } from './day-itinerary';
@@ -197,13 +198,16 @@ export type TripMapInitialRegion = {
   longitudeDelta: number;
 };
 
-export function buildTripMapInitialRegion(places: RouteMapPlace[]): TripMapInitialRegion | null {
+export function buildTripMapInitialRegion(
+  places: RouteMapPlace[],
+  tripDestinations: GooglePlaceTripDestination[] = [],
+): TripMapInitialRegion | null {
   const validPlaces = places.filter(
     (place): place is RouteMapPlace & { latitude: number; longitude: number } =>
       Number.isFinite(place.latitude) && Number.isFinite(place.longitude),
   );
   if (validPlaces.length === 0) {
-    return null;
+    return buildTripMapDestinationInitialRegion(tripDestinations);
   }
 
   const latitudes = validPlaces.map((place) => place.latitude);
@@ -313,6 +317,18 @@ function buildTripMapRouteNotice(
       helper: '장소가 2개 이상이면 일정 순서대로 동선을 연결해요.',
       title: '연결할 장소가 부족해요',
     };
+  }
+  return null;
+}
+
+function buildTripMapDestinationInitialRegion(
+  tripDestinations: GooglePlaceTripDestination[],
+): TripMapInitialRegion | null {
+  for (const destination of tripDestinations) {
+    const region = buildGooglePlaceSearchRegionFromDestination(destination);
+    if (region) {
+      return region;
+    }
   }
   return null;
 }
