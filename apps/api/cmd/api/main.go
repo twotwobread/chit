@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	_ "time/tzdata" // embed IANA timezone data for minimal Cloud Run runtimes
 
 	"github.com/twotwobread/i-um/apps/api/internal/flight"
 	"github.com/twotwobread/i-um/apps/api/internal/server"
