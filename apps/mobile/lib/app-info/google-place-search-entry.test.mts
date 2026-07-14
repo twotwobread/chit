@@ -17,4 +17,12 @@ describe('google place search native module entry setup', () => {
   it('disables native bottom-sheet dynamic sizing so the minimized map search handle can mount without content height', () => {
     assert.match(mapSearchSource, /enableDynamicSizing=\{false\}/);
   });
+
+  it('passes the reserved top inset to the native bottom sheet so focused search stays below map overlays', () => {
+    assert.match(
+      mapSearchSource,
+      /const resolvedSheetTopInset = resolveGooglePlaceSearchSheetTopInset\(sheetTopInset\);/,
+    );
+    assert.match(mapSearchSource, /topInset=\{resolvedSheetTopInset\}/);
+  });
 });

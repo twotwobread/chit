@@ -83,6 +83,7 @@ import {
   normalizeGooglePlaceSearchQuery,
   resolveGooglePlaceSearchSelectionAfterResultsClose,
   resolveGooglePlaceSearchSheetState,
+  resolveGooglePlaceSearchSheetTopInset,
   shouldRenderGooglePlaceBookmarkDetail,
   shouldRenderGooglePlaceSearchResults,
   shouldShowGooglePlaceCurrentLocationButton,
@@ -122,6 +123,7 @@ type GooglePlaceSearchBottomSheetProps = {
   index: number;
   keyboardBehavior?: string;
   onChange?: (index: number) => void;
+  topInset?: number;
   snapPoints: number[];
   style?: StyleProp<ViewStyle>;
 };
@@ -382,13 +384,14 @@ export function GooglePlaceMapSearch({
   const showRegionSearch = shouldShowGooglePlaceRegionSearchAction(query, regionDirty, isBusy, sheetState);
   const showCurrentLocation = shouldShowGooglePlaceCurrentLocationButton(sheetState);
   const sheetMetricHeight = containerHeight ?? window.height;
+  const resolvedSheetTopInset = resolveGooglePlaceSearchSheetTopInset(sheetTopInset);
   const sheetMetrics = useMemo(
     () =>
       buildGooglePlaceSearchSheetMetrics(sheetMetricHeight, insets.bottom, {
         minimizedBaseHeight: minimizedSheetBaseHeight,
-        topInset: sheetTopInset,
+        topInset: resolvedSheetTopInset,
       }),
-    [insets.bottom, minimizedSheetBaseHeight, sheetMetricHeight, sheetTopInset],
+    [insets.bottom, minimizedSheetBaseHeight, resolvedSheetTopInset, sheetMetricHeight],
   );
   const sheetSnapPoints = useMemo(() => buildGooglePlaceSearchSheetSnapPoints(sheetMetrics), [sheetMetrics]);
   const sheetIndex = buildGooglePlaceSearchSheetIndex(sheetState);
@@ -923,6 +926,7 @@ export function GooglePlaceMapSearch({
         ref={bottomSheetRef}
         snapPoints={sheetSnapPoints}
         style={styles.sheet}
+        topInset={resolvedSheetTopInset}
       >
         {sheetState !== 'minimized' ? (
           <GooglePlaceBottomSheetScrollView
