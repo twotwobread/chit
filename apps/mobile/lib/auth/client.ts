@@ -5,6 +5,7 @@ import {
   type AuthMeResponse,
   type AuthProvider,
   type AuthRefreshResponse,
+  type AuthUser,
   type OAuthCredential,
 } from '@i-um/api-contract';
 
@@ -63,6 +64,7 @@ const defaultAuthClientDeps: AuthClientDeps = {
 };
 
 let meWithRefreshInFlight: Promise<AuthMeResponse> | null = null;
+let refreshSessionInFlight: Promise<AuthRefreshResponse> | null = null;
 let deleteAccountInFlight: Promise<void> | null = null;
 let logoutInFlight: Promise<void> | null = null;
 
@@ -127,6 +129,14 @@ export function getMeWithRefresh(deps: AuthClientDeps = defaultAuthClientDeps): 
   return promise;
 }
 
+export async function getStoredAuthUser(deps: AuthClientDeps = defaultAuthClientDeps): Promise<AuthUser> {
+  const result = await deps.readStoredSession();
+  if (result.status !== 'ready') {
+    throw new MobileAuthError('UNAUTHORIZED', 'session is required');
+  }
+  return result.session.user;
+}
+
 async function getMeWithRefreshOnce(deps: AuthClientDeps): Promise<AuthMeResponse> {
   const session = await requireSession(deps);
   deps.configureApi(session.tokens.accessToken);
@@ -149,6 +159,37 @@ async function getMeWithRefreshOnce(deps: AuthClientDeps): Promise<AuthMeRespons
       await bestEffortClearStoredSession(deps);
     }
     throw toMobileAuthError(error);
+  }
+}
+
+export async function runAuthenticatedRequest<T>(
+  operation: () => Promise<T>,
+  deps: AuthClientDeps = defaultAuthClientDeps,
+): Promise<T> {
+  const session = await requireSession(deps);
+  deps.configureApi(session.tokens.accessToken);
+
+  try {
+    return await operation();
+  } catch (error) {
+    if (getErrorCode(error) !== 'UNAUTHORIZED') {
+      throw error;
+    }
+  }
+
+  const refreshed = await refreshStoredSession(session.tokens.refreshToken, deps, session);
+  deps.configureApi(refreshed.tokens.accessToken);
+
+  try {
+    return await operation();
+  } catch (error) {
+    const code = getErrorCode(error);
+    if (code === 'INVALID_REFRESH_TOKEN' || code === 'UNAUTHORIZED') {
+      await bestEffortClearStoredSession(deps);
+      deps.configureApi();
+      throw toMobileAuthError(error);
+    }
+    throw error;
   }
 }
 
@@ -185,9 +226,27 @@ export async function updateDisplayNameWithRefresh(
   }
 }
 
-export async function refreshStoredSession(
+export function refreshStoredSession(
   refreshToken: string,
   deps: AuthClientDeps = defaultAuthClientDeps,
+  existingSession?: StoredSession,
+): Promise<AuthRefreshResponse> {
+  if (refreshSessionInFlight) {
+    return refreshSessionInFlight;
+  }
+
+  const promise = refreshStoredSessionOnce(refreshToken, deps, existingSession).finally(() => {
+    if (refreshSessionInFlight === promise) {
+      refreshSessionInFlight = null;
+    }
+  });
+  refreshSessionInFlight = promise;
+  return promise;
+}
+
+async function refreshStoredSessionOnce(
+  refreshToken: string,
+  deps: AuthClientDeps,
   existingSession?: StoredSession,
 ): Promise<AuthRefreshResponse> {
   deps.configureApi();
