@@ -93,7 +93,10 @@ test('Kakao installed-app callback carries the invite token back to the invite r
   assert.deepEqual(kakaoPayload.buttons?.[0]?.link.iosExecutionParams, expectedExecutionParams);
   assert.deepEqual(kakaoPayload.buttons?.[0]?.link.androidExecutionParams, expectedExecutionParams);
   assert.equal(toKakaoInviteRedirectPath({ inviteToken: validInviteToken }), `/invite/${validInviteToken}`);
-  assert.equal(toKakaoInviteRedirectPath({ inviteToken: [validInviteToken, 'ignored'] }), `/invite/${validInviteToken}`);
+  assert.equal(
+    toKakaoInviteRedirectPath({ inviteToken: [validInviteToken, 'ignored'] }),
+    `/invite/${validInviteToken}`,
+  );
   assert.equal(toKakaoInviteRedirectPath({ inviteToken: 'short' }), null);
 });
 
