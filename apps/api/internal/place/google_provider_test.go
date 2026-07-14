@@ -228,13 +228,18 @@ func TestGoogleProviderDescription(t *testing.T) {
 		if got := r.Header.Get("X-Goog-Api-Key"); got != "test-key" {
 			t.Fatalf("expected api key header, got %q", got)
 		}
-		if got := r.Header.Get("X-Goog-FieldMask"); got != "id,editorialSummary,generativeSummary" {
+		if got := r.URL.Query().Get("languageCode"); got != "ko" {
+			t.Fatalf("expected Korean languageCode, got %q", got)
+		}
+		if got := r.Header.Get("X-Goog-FieldMask"); got != "id,displayName,formattedAddress,editorialSummary,generativeSummary" {
 			t.Fatalf("unexpected field mask %q", got)
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{
 			"id":"google-1",
+			"displayName":{"text":"우메다 스카이 빌딩"},
+			"formattedAddress":"일본 오사카부 오사카시 기타구 오요도나카 1초메 1-88",
 			"editorialSummary":{"text":"공중정원 전망대로 유명한 오사카 대표 명소입니다."}
 		}`))
 	}))
@@ -245,7 +250,7 @@ func TestGoogleProviderDescription(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Description returned error: %v", err)
 	}
-	if description.GooglePlaceID != "google-1" || description.Description != "공중정원 전망대로 유명한 오사카 대표 명소입니다." {
+	if description.GooglePlaceID != "google-1" || description.DisplayName != "우메다 스카이 빌딩" || description.FormattedAddress != "일본 오사카부 오사카시 기타구 오요도나카 1초메 1-88" || description.Description != "공중정원 전망대로 유명한 오사카 대표 명소입니다." {
 		t.Fatalf("unexpected description %#v", description)
 	}
 }
@@ -289,6 +294,9 @@ func TestGoogleProviderDetails(t *testing.T) {
 		if got := r.Header.Get("X-Goog-Api-Key"); got != "test-key" {
 			t.Fatalf("expected api key header, got %q", got)
 		}
+		if got := r.URL.Query().Get("languageCode"); got != "ko" {
+			t.Fatalf("expected Korean languageCode, got %q", got)
+		}
 		if got := r.Header.Get("X-Goog-FieldMask"); got != "id,displayName,formattedAddress,location,primaryType,types" {
 			t.Fatalf("unexpected field mask %q", got)
 		}
@@ -297,7 +305,7 @@ func TestGoogleProviderDetails(t *testing.T) {
 		_, _ = w.Write([]byte(`{
 			"id":"google-1",
 			"displayName":{"text":"도톤보리"},
-			"formattedAddress":"Osaka",
+			"formattedAddress":"일본 오사카부 오사카시 주오구 도톤보리",
 			"location":{"latitude":34.6687,"longitude":135.5013},
 			"primaryType":"tourist_attraction",
 			"types":["tourist_attraction","point_of_interest"]
@@ -311,7 +319,7 @@ func TestGoogleProviderDetails(t *testing.T) {
 		t.Fatalf("Details returned error: %v", err)
 	}
 
-	if details.GooglePlaceID != "google-1" || details.DisplayName != "도톤보리" || details.FormattedAddress != "Osaka" || details.PrimaryType != "tourist_attraction" {
+	if details.GooglePlaceID != "google-1" || details.DisplayName != "도톤보리" || details.FormattedAddress != "일본 오사카부 오사카시 주오구 도톤보리" || details.PrimaryType != "tourist_attraction" {
 		t.Fatalf("unexpected details %#v", details)
 	}
 	if details.Latitude != 34.6687 || details.Longitude != 135.5013 || len(details.Types) != 2 {

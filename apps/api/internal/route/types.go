@@ -57,6 +57,7 @@ type ProviderPreviewResult struct {
 
 type PreviewInput struct {
 	Origin GeoPoint
+	Mode   string
 }
 
 type PreviewSummary struct {

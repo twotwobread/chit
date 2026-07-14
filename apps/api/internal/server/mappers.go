@@ -480,7 +480,7 @@ func restoreScheduleItemResponseToOpenAPI(result trip.RestoreScheduleItemResult)
 func routePreviewResponseToOpenAPI(result route.PreviewResult) openapi.RoutePreviewResponse {
 	return openapi.RoutePreviewResponse{
 		ScheduleItemId: result.ItemID,
-		Mode:           openapi.Transit,
+		Mode:           openapi.RoutePreviewMode(result.Mode),
 		Summary:        routePreviewSummaryToOpenAPI(result.Summary),
 		Map:            routePreviewMapToOpenAPI(result.Map),
 		GeneratedAt:    result.GeneratedAt.UTC(),
@@ -595,6 +595,12 @@ func searchPhotoToOpenAPI(photo place.SearchResultPhoto) *openapi.GooglePlaceSea
 
 func googlePlaceDetailsResponseToOpenAPI(result place.GooglePlaceDescription) openapi.GooglePlaceDetailsResponse {
 	mapped := openapi.GooglePlaceDetailsResponse{GooglePlaceId: result.GooglePlaceID}
+	if result.DisplayName != "" {
+		mapped.DisplayName = &result.DisplayName
+	}
+	if result.FormattedAddress != "" {
+		mapped.FormattedAddress = &result.FormattedAddress
+	}
 	if result.Description != "" {
 		mapped.Description = &result.Description
 	}

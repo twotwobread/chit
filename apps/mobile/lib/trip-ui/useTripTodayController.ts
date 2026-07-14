@@ -20,6 +20,7 @@ import {
 } from '../auth/errors';
 import { listTripFlights } from '../flights/flight-api';
 import { buildTodayFlightCard, type TodayFlightCardViewModel } from '../flights/today';
+import { getGooglePlaceDetails } from '../places/client';
 import { createQuickExpense, listDayExpenses, updateExpense } from '../trips/expense-api';
 import {
   createRoutePreview,
@@ -43,15 +44,16 @@ import {
 } from '../trips/quick-expense';
 import {
   buildRoutePreviewRequest,
-  buildTodayRoutePreviewHeroChip,
+  buildTodayRoutePreviewSummarySuccessState,
   routePreviewEligibility,
-  todayRoutePreviewHeroChipFallbackCopy,
+  todayRoutePreviewLoadingState,
+  todayRoutePreviewModes,
   todayRoutePreviewPermissionNeededState,
-  todayRoutePreviewSuccessState,
-  todayRoutePreviewUnavailableState,
   todayRoutePreviewUnsupportedState,
+  type TodayRoutePreviewSummaryState,
 } from '../trips/today-route-preview';
 import {
+  applyLocalizedTodayNextPlaceDisplay,
   applyTravelModeToTodayViewModel,
   buildTodayExecutionViewModel,
   type TodayAction,
@@ -108,7 +110,7 @@ export function useTripTodayController() {
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [pendingItemId, setPendingItemId] = useState<string | null>(null);
   const [quickExpenseState, setQuickExpenseState] = useState<QuickExpenseOverlayState>({ status: 'idle' });
-  const [routeChip, setRouteChip] = useState(todayRoutePreviewHeroChipFallbackCopy);
+  const [routePreviewState, setRoutePreviewState] = useState<TodayRoutePreviewSummaryState>({ status: 'idle' });
 
   const load = useCallback(async () => {
     if (!tripId) {
@@ -118,7 +120,7 @@ export function useTripTodayController() {
 
     setActionMessage(null);
     setPendingItemId(null);
-    setRouteChip(todayRoutePreviewHeroChipFallbackCopy);
+    setRoutePreviewState({ status: 'idle' });
     setState({ status: 'loading' });
 
     const shellDetail = resolveTripShellDetail(shellState, tripId);
@@ -198,48 +200,66 @@ export function useTripTodayController() {
     }, [load]),
   );
 
+  const routePreviewTarget = state.status === 'ready' && state.viewModel.status === 'success' ? state.viewModel : null;
+  const routePreviewTripDayId = routePreviewTarget?.arrivalAction.date ?? null;
+  const routePreviewItemId = routePreviewTarget?.nextPlace.itemId ?? null;
+  const routePreviewRoutablePlace = routePreviewTarget?.nextPlace.routablePlace ?? null;
+  const routePreviewGooglePlaceId = routePreviewRoutablePlace?.googlePlaceId ?? null;
+
   useEffect(() => {
-    if (!tripId || state.status !== 'ready' || state.viewModel.status !== 'success') {
-      setRouteChip(todayRoutePreviewHeroChipFallbackCopy);
+    if (!tripId || !routePreviewTripDayId || !routePreviewItemId) {
+      setRoutePreviewState({ status: 'idle' });
       return;
     }
 
-    const successViewModel = state.viewModel;
     const destination = {
-      itemId: successViewModel.nextPlace.itemId,
-      routablePlace: successViewModel.nextPlace.routablePlace,
+      itemId: routePreviewItemId,
+      routablePlace: routePreviewRoutablePlace,
     };
     if (routePreviewEligibility(destination) === 'unsupported' || !destination.routablePlace) {
-      setRouteChip(buildTodayRoutePreviewHeroChip(todayRoutePreviewUnsupportedState()));
+      setRoutePreviewState(todayRoutePreviewUnsupportedState());
       return;
     }
 
     let cancelled = false;
     const loadRoutePreview = async () => {
+      setRoutePreviewState(todayRoutePreviewLoadingState());
       try {
         const permission = await Location.requestForegroundPermissionsAsync();
         if (permission.status !== Location.PermissionStatus.GRANTED) {
           if (!cancelled) {
-            setRouteChip(buildTodayRoutePreviewHeroChip(todayRoutePreviewPermissionNeededState()));
+            setRoutePreviewState(todayRoutePreviewPermissionNeededState());
           }
           return;
         }
         const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-        const response = await createRoutePreview(
-          tripId,
-          successViewModel.arrivalAction.date,
-          successViewModel.nextPlace.itemId,
-          buildRoutePreviewRequest({
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
+        const origin = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        };
+        const results = await Promise.all(
+          todayRoutePreviewModes.map(async (mode) => {
+            try {
+              const response = await createRoutePreview(
+                tripId,
+                routePreviewTripDayId,
+                routePreviewItemId,
+                buildRoutePreviewRequest(origin, mode),
+              );
+              return { mode, response };
+            } catch {
+              return { mode, response: null };
+            }
           }),
         );
         if (!cancelled) {
-          setRouteChip(buildTodayRoutePreviewHeroChip(todayRoutePreviewSuccessState(response)));
+          setRoutePreviewState(buildTodayRoutePreviewSummarySuccessState(results));
         }
       } catch {
         if (!cancelled) {
-          setRouteChip(buildTodayRoutePreviewHeroChip(todayRoutePreviewUnavailableState()));
+          setRoutePreviewState(
+            buildTodayRoutePreviewSummarySuccessState(todayRoutePreviewModes.map((mode) => ({ mode, response: null }))),
+          );
         }
       }
     };
@@ -248,7 +268,45 @@ export function useTripTodayController() {
     return () => {
       cancelled = true;
     };
-  }, [state, tripId]);
+  }, [routePreviewItemId, routePreviewRoutablePlace, routePreviewTripDayId, tripId]);
+
+  useEffect(() => {
+    if (!tripId || !routePreviewTripDayId || !routePreviewItemId || !routePreviewGooglePlaceId) {
+      return;
+    }
+
+    let cancelled = false;
+    const loadLocalizedPlace = async () => {
+      try {
+        const details = await getGooglePlaceDetails(tripId, routePreviewTripDayId, routePreviewGooglePlaceId);
+        if (cancelled) {
+          return;
+        }
+        setState((current) => {
+          if (current.status !== 'ready' || current.viewModel.status !== 'success') {
+            return current;
+          }
+          if (current.viewModel.nextPlace.itemId !== routePreviewItemId) {
+            return current;
+          }
+          return {
+            ...current,
+            viewModel: applyLocalizedTodayNextPlaceDisplay(current.viewModel, {
+              displayName: details.displayName,
+              formattedAddress: details.formattedAddress,
+            }),
+          };
+        });
+      } catch {
+        // Stored place copy remains the fallback when localized Google details are unavailable.
+      }
+    };
+
+    void loadLocalizedPlace();
+    return () => {
+      cancelled = true;
+    };
+  }, [routePreviewGooglePlaceId, routePreviewItemId, routePreviewTripDayId, tripId]);
 
   const openQuickExpenseOverlay = useCallback(
     async (target: QuickExpenseRouteTarget) => {
@@ -480,7 +538,7 @@ export function useTripTodayController() {
     openQuickExpenseOverlay,
     pendingItemId,
     quickExpenseState,
-    routeChip,
+    routePreviewState,
     runAction,
     state,
     submitQuickExpenseOverlay,

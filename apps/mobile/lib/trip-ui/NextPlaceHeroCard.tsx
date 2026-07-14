@@ -19,6 +19,7 @@ export type NextPlaceHeroCardProps = {
   onTravelMode: (value: string) => void;
   routeChip?: string;
   navigationAvailable?: boolean;
+  showRoutePreview?: boolean;
   onNavigate: () => void;
   onArrive: () => void;
   arriveDisabled?: boolean;
@@ -49,6 +50,7 @@ export function NextPlaceHeroCard({
   onTravelMode,
   place,
   routeChip,
+  showRoutePreview = true,
   skipDisabled = false,
   skipLabel = '건너뛰기',
   travelMode,
@@ -79,24 +81,26 @@ export function NextPlaceHeroCard({
 
       {navigationAvailable ? (
         <>
-          <View style={styles.routeBox}>
-            <View style={styles.routeCanvas}>
-              <View style={[styles.routeDot, styles.routeDotStart]} />
-              <View style={styles.routeLine} />
-              <View style={[styles.routeDot, styles.routeDotEnd]} />
-              <View style={styles.routeChip}>
-                <Text style={styles.routeChipText}>{routeChip ?? ROUTE_FALLBACK_COPY}</Text>
+          {showRoutePreview ? (
+            <View style={styles.routeBox}>
+              <View style={styles.routeCanvas}>
+                <View style={[styles.routeDot, styles.routeDotStart]} />
+                <View style={styles.routeLine} />
+                <View style={[styles.routeDot, styles.routeDotEnd]} />
+                <View style={styles.routeChip}>
+                  <Text style={styles.routeChipText}>{routeChip ?? ROUTE_FALLBACK_COPY}</Text>
+                </View>
               </View>
+              <Pressable
+                accessibilityRole="button"
+                onPress={onNavigate}
+                style={({ pressed }) => [styles.routeHandoff, pressed ? styles.pressedDark : null]}
+              >
+                <Text style={styles.routeHandoffText}>상세 안내는 길찾기에서 이어져요</Text>
+                <Text style={styles.routeHandoffCta}>길찾기 ›</Text>
+              </Pressable>
             </View>
-            <Pressable
-              accessibilityRole="button"
-              onPress={onNavigate}
-              style={({ pressed }) => [styles.routeHandoff, pressed ? styles.pressedDark : null]}
-            >
-              <Text style={styles.routeHandoffText}>상세 안내는 길찾기에서 이어져요</Text>
-              <Text style={styles.routeHandoffCta}>길찾기 ›</Text>
-            </Pressable>
-          </View>
+          ) : null}
 
           <View style={styles.toggleWrap}>
             <SegmentedControl dark onChange={onTravelMode} options={travelOptions} value={travelMode} />

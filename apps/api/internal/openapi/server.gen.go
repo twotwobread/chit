@@ -111,9 +111,11 @@ const (
 	RoutablePlaceProviderGoogle RoutablePlaceProvider = "google"
 )
 
-// Defines values for RoutePreviewResponseMode.
+// Defines values for RoutePreviewMode.
 const (
-	Transit RoutePreviewResponseMode = "transit"
+	Driving RoutePreviewMode = "driving"
+	Transit RoutePreviewMode = "transit"
+	Walking RoutePreviewMode = "walking"
 )
 
 // Defines values for ScheduleItemType.
@@ -309,7 +311,8 @@ type CreateQuickExpenseResponse struct {
 
 // CreateRoutePreviewRequest defines model for CreateRoutePreviewRequest.
 type CreateRoutePreviewRequest struct {
-	Origin GeoPoint `json:"origin"`
+	Mode   *RoutePreviewMode `json:"mode,omitempty"`
+	Origin GeoPoint          `json:"origin"`
 }
 
 // CreateTripFlightRequest defines model for CreateTripFlightRequest.
@@ -590,8 +593,14 @@ type GetTripSettlementResponse struct {
 // GooglePlaceDetailsResponse defines model for GooglePlaceDetailsResponse.
 type GooglePlaceDetailsResponse struct {
 	// Description Selected-only provider summary when available.
-	Description   *string `json:"description,omitempty"`
-	GooglePlaceId string  `json:"googlePlaceId"`
+	Description *string `json:"description,omitempty"`
+
+	// DisplayName Localized Google display name when available.
+	DisplayName *string `json:"displayName,omitempty"`
+
+	// FormattedAddress Localized Google formatted address when available.
+	FormattedAddress *string `json:"formattedAddress,omitempty"`
+	GooglePlaceId    string  `json:"googlePlaceId"`
 }
 
 // GooglePlacePhotoAttribution defines model for GooglePlacePhotoAttribution.
@@ -888,17 +897,17 @@ type RoutePreviewMap struct {
 	Origin          GeoPoint  `json:"origin"`
 }
 
+// RoutePreviewMode defines model for RoutePreviewMode.
+type RoutePreviewMode string
+
 // RoutePreviewResponse defines model for RoutePreviewResponse.
 type RoutePreviewResponse struct {
-	GeneratedAt    time.Time                `json:"generatedAt"`
-	Map            *RoutePreviewMap         `json:"map"`
-	Mode           RoutePreviewResponseMode `json:"mode"`
-	ScheduleItemId string                   `json:"scheduleItemId"`
-	Summary        RoutePreviewSummary      `json:"summary"`
+	GeneratedAt    time.Time           `json:"generatedAt"`
+	Map            *RoutePreviewMap    `json:"map"`
+	Mode           RoutePreviewMode    `json:"mode"`
+	ScheduleItemId string              `json:"scheduleItemId"`
+	Summary        RoutePreviewSummary `json:"summary"`
 }
-
-// RoutePreviewResponseMode defines model for RoutePreviewResponse.Mode.
-type RoutePreviewResponseMode string
 
 // RoutePreviewSummary defines model for RoutePreviewSummary.
 type RoutePreviewSummary struct {

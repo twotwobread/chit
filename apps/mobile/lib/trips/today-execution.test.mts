@@ -10,6 +10,7 @@ import type {
 } from '@i-um/api-contract';
 
 import {
+  applyLocalizedTodayNextPlaceDisplay,
   applyTravelModeToTodayViewModel,
   buildTodayExecutionViewModel,
   buildTodayNoOngoingTripViewModel,
@@ -361,6 +362,37 @@ test('maps the first ordered itinerary item to the next place without exposing s
   assert.equal('remainingSection' in viewModel, false);
   assert.equal(JSON.stringify(viewModel).includes('호텔 니코 오사카'), false);
   assert.equal(JSON.stringify(viewModel).includes('오사카성'), false);
+});
+
+test('applies localized next-place display to Today copy and navigation destination', () => {
+  const viewModel = buildTodayExecutionViewModel({
+    selectedTrip: trip({ id: 'trip-current' }),
+    tripDetail: tripDetail(),
+    itinerary: itinerary({ items: [item({})] }),
+    today: '2026-07-10',
+    ongoingTripCount: 1,
+    travelMode: 'transit',
+  });
+  assert.equal(viewModel.status, 'success');
+  if (viewModel.status !== 'success') {
+    return;
+  }
+
+  const updated = applyLocalizedTodayNextPlaceDisplay(viewModel, {
+    displayName: '우메다 스카이 빌딩',
+    formattedAddress: '일본 오사카부 오사카시 기타구 오요도나카 1초메 1-88',
+  });
+
+  assert.equal(updated.status, 'success');
+  if (updated.status !== 'success') {
+    return;
+  }
+  assert.equal(updated.nextPlace.placeName, '우메다 스카이 빌딩');
+  assert.equal(updated.nextPlace.address, '일본 오사카부 오사카시 기타구 오요도나카 1초메 1-88');
+  assert.deepEqual(updated.nextPlace.navigationAction.destination, {
+    placeName: '우메다 스카이 빌딩',
+    address: '일본 오사카부 오사카시 기타구 오요도나카 1초메 1-88',
+  });
 });
 
 test('threads the selected travel mode into Today navigation and selector state', () => {

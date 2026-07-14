@@ -98,6 +98,7 @@ export type { ReorderScheduleItemsResponse } from './models/ReorderScheduleItems
 export type { RestoreScheduleItemResponse } from './models/RestoreScheduleItemResponse';
 export type { RoutablePlace } from './models/RoutablePlace';
 export type { RoutePreviewMap } from './models/RoutePreviewMap';
+export type { RoutePreviewMode } from './models/RoutePreviewMode';
 export type { RoutePreviewResponse } from './models/RoutePreviewResponse';
 export type { RoutePreviewSummary } from './models/RoutePreviewSummary';
 export type { ScheduleItem } from './models/ScheduleItem';

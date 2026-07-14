@@ -99,6 +99,36 @@ func TestServiceCreatePreviewSuccess(t *testing.T) {
 	}
 }
 
+func TestServiceCreatePreviewUsesRequestedMode(t *testing.T) {
+	provider := &fakeProvider{result: ProviderPreviewResult{DurationSeconds: 900, DistanceMeters: 1200}}
+	service := NewService(&fakeRepository{
+		trip:        trip.Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-12"},
+		tripFound:   true,
+		participant: true,
+		items: []trip.ScheduleItem{{
+			ID: testItemID,
+			Place: trip.TripPlaceSummary{RoutablePlace: &trip.RoutablePlace{
+				Provider: "google", GooglePlaceID: "google-1", Latitude: 37.5665, Longitude: 126.978,
+			}},
+		}},
+	}, provider)
+
+	result, err := service.CreatePreview(context.Background(), "user-1", testTripID, "2026-07-10", testItemID, PreviewInput{
+		Origin: GeoPoint{Latitude: 37.5, Longitude: 127.0},
+		Mode:   walkingMode,
+	})
+	if err != nil {
+		t.Fatalf("CreatePreview returned error: %v", err)
+	}
+
+	if provider.input.Mode != walkingMode {
+		t.Fatalf("expected walking mode to reach provider, got %q", provider.input.Mode)
+	}
+	if result.Mode != walkingMode {
+		t.Fatalf("expected walking response mode, got %q", result.Mode)
+	}
+}
+
 func TestServiceCreatePreviewUnsupportedManualPlace(t *testing.T) {
 	service := NewService(&fakeRepository{
 		trip:        trip.Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-12"},

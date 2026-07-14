@@ -330,6 +330,37 @@ export function buildTodayExecutionViewModel({
   };
 }
 
+export function applyLocalizedTodayNextPlaceDisplay(
+  viewModel: TodayExecutionViewModel,
+  localized: { displayName?: string | null; formattedAddress?: string | null } | null,
+): TodayExecutionViewModel {
+  if (viewModel.status !== 'success' || !localized) {
+    return viewModel;
+  }
+
+  const placeName = localized.displayName?.trim() || viewModel.nextPlace.placeName;
+  const address = localized.formattedAddress?.trim() || viewModel.nextPlace.address;
+  if (placeName === viewModel.nextPlace.placeName && address === viewModel.nextPlace.address) {
+    return viewModel;
+  }
+
+  return {
+    ...viewModel,
+    nextPlace: {
+      ...viewModel.nextPlace,
+      placeName,
+      address,
+      navigationAction: {
+        ...viewModel.nextPlace.navigationAction,
+        destination: {
+          placeName,
+          address,
+        },
+      },
+    },
+  };
+}
+
 export function applyTravelModeToTodayViewModel(
   viewModel: TodayExecutionViewModel,
   travelMode: TravelMode,
