@@ -103,6 +103,12 @@ export type GooglePlaceSearchMapRegion = {
   longitudeDelta: number;
 };
 
+export type GooglePlaceSearchResultsRegionOptions = {
+  viewportHeight?: number;
+  coveredBottomHeight?: number;
+  verticalPadding?: number;
+};
+
 export type GooglePlaceSearchBias = {
   latitude: number;
   longitude: number;
@@ -459,6 +465,7 @@ export function buildGooglePlaceSearchMarkerViewModels(
 export function buildGooglePlaceSearchResultsRegion(
   results: GooglePlaceSearchRowViewModel[],
   fallback: GooglePlaceSearchMapRegion = defaultGooglePlaceSearchMapRegion,
+  options: GooglePlaceSearchResultsRegionOptions = {},
 ): GooglePlaceSearchMapRegion {
   const points = results.filter(
     (result): result is GooglePlaceSearchRowViewModel & { latitude: number; longitude: number } =>
@@ -474,13 +481,38 @@ export function buildGooglePlaceSearchResultsRegion(
   const maxLatitude = Math.max(...latitudes);
   const minLongitude = Math.min(...longitudes);
   const maxLongitude = Math.max(...longitudes);
+  const baseLatitudeDelta = Math.max((maxLatitude - minLatitude) * 1.8, 0.01);
+  const verticalFit = buildGooglePlaceSearchResultsVerticalFit(baseLatitudeDelta, options);
 
   return {
-    latitude: roundCoordinate((minLatitude + maxLatitude) / 2),
+    latitude: roundCoordinate((minLatitude + maxLatitude) / 2 - verticalFit.centerOffset),
     longitude: roundCoordinate((minLongitude + maxLongitude) / 2),
-    latitudeDelta: roundDelta(Math.max((maxLatitude - minLatitude) * 1.8, 0.01)),
+    latitudeDelta: roundDelta(verticalFit.latitudeDelta),
     longitudeDelta: roundDelta(Math.max((maxLongitude - minLongitude) * 1.8, 0.01)),
   };
+}
+
+function buildGooglePlaceSearchResultsVerticalFit(
+  latitudeDelta: number,
+  options: GooglePlaceSearchResultsRegionOptions,
+): { latitudeDelta: number; centerOffset: number } {
+  const viewportHeight = options.viewportHeight ?? 0;
+  if (!Number.isFinite(viewportHeight) || viewportHeight <= 0) {
+    return { centerOffset: 0, latitudeDelta };
+  }
+
+  const coveredBottomHeight = clampNumber(options.coveredBottomHeight ?? 0, 0, viewportHeight);
+  if (coveredBottomHeight <= 0) {
+    return { centerOffset: 0, latitudeDelta };
+  }
+
+  const verticalPadding = Math.max(0, options.verticalPadding ?? 0);
+  const visibleHeight = Math.max(1, viewportHeight - coveredBottomHeight);
+  const visibleInnerHeight = Math.max(1, visibleHeight - verticalPadding * 2);
+  const visibleFraction = clampNumber(visibleInnerHeight / viewportHeight, 0.1, 1);
+  const fittedLatitudeDelta = latitudeDelta / visibleFraction;
+  const centerOffset = fittedLatitudeDelta * (coveredBottomHeight / (2 * viewportHeight));
+  return { centerOffset, latitudeDelta: fittedLatitudeDelta };
 }
 
 export function buildGooglePlaceSelectedMapRegion(
