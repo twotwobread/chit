@@ -1,4 +1,6 @@
-import type { RoutePreviewResponse, RoutablePlace } from '@i-um/api-contract';
+import type { CreateRoutePreviewRequest, RoutePreviewResponse, RoutablePlace } from '@i-um/api-contract';
+
+import { travelModeDisplayLabel, travelModes, type TravelMode } from './travel-mode';
 
 export type TodayRoutePreviewOrigin = {
   latitude: number;
@@ -22,11 +24,44 @@ export type TodayRoutePreviewViewModel = {
   itemId: string;
   durationLabel: string;
   distanceLabel: string;
-  modeLabel: '대중교통';
+  modeLabel: string;
   summaryText: string;
   map: TodayRoutePreviewMapViewModel | null;
   detailActionLabel: 'Google Maps에서 자세히';
 };
+
+export type TodayRoutePreviewModeSummaryRow =
+  | {
+      status: 'success';
+      mode: TravelMode;
+      modeLabel: string;
+      durationLabel: string;
+      distanceLabel: string;
+    }
+  | {
+      status: 'unavailable';
+      mode: TravelMode;
+      modeLabel: string;
+      message: '확인 불가';
+    };
+
+export type TodayRoutePreviewNonSuccessState = Exclude<TodayRoutePreviewState, { status: 'success' }>;
+
+export type TodayRoutePreviewSummaryState =
+  | TodayRoutePreviewNonSuccessState
+  | {
+      status: 'success';
+      title: '현 위치 기준 예상 이동';
+      helper: string;
+      rows: TodayRoutePreviewModeSummaryRow[];
+    };
+
+export type TodayRoutePreviewModeLoadResult = {
+  mode: TravelMode;
+  response: RoutePreviewResponse | null;
+};
+
+export const todayRoutePreviewModes = travelModes;
 
 export type TodayRoutePreviewMapViewModel = {
   origin: TodayRoutePreviewOrigin;
@@ -40,27 +75,35 @@ export type TodayRoutePreviewMapViewModel = {
 
 export const todayRoutePreviewHeroChipFallbackCopy = '경로 정보를 준비 중이에요';
 
-export const todayRoutePreviewLoadingState = (): TodayRoutePreviewState => ({
+export const todayRoutePreviewLoadingState = (): Extract<TodayRoutePreviewNonSuccessState, { status: 'loading' }> => ({
   status: 'loading',
   message: '경로 미리보기를 준비하고 있어요.',
 });
 
-export const todayRoutePreviewPermissionNeededState = (): TodayRoutePreviewState => ({
+export const todayRoutePreviewPermissionNeededState = (): Extract<
+  TodayRoutePreviewNonSuccessState,
+  { status: 'permissionNeeded' }
+> => ({
   status: 'permissionNeeded',
   title: '현재 위치 권한이 필요해요.',
   helper: '권한을 허용하면 다음 장소까지의 예상 경로를 볼 수 있어요.',
   retryLabel: '다시 시도',
 });
 
-export const todayRoutePreviewUnsupportedState = (): TodayRoutePreviewState => ({
+export const todayRoutePreviewUnsupportedState = (): Extract<
+  TodayRoutePreviewNonSuccessState,
+  { status: 'unsupported' }
+> => ({
   status: 'unsupported',
   title: '정확한 지도 장소가 필요해요.',
   helper: 'Google 장소로 추가된 일정에서 경로 미리보기를 볼 수 있어요.',
 });
 
-export const todayRoutePreviewUnavailableState = (): TodayRoutePreviewState => ({
+export const todayRoutePreviewUnavailableState = (
+  title: string = '경로 미리보기를 불러올 수 없어요.',
+): Extract<TodayRoutePreviewNonSuccessState, { status: 'unavailable' }> => ({
   status: 'unavailable',
-  title: '경로 미리보기를 불러올 수 없어요.',
+  title,
   helper: '잠시 후 다시 시도하거나 Google Maps에서 자세히 확인해주세요.',
   retryLabel: '다시 시도',
 });
@@ -69,16 +112,19 @@ export function routePreviewEligibility(destination: TodayRoutePreviewDestinatio
   return destination.routablePlace ? 'eligible' : 'unsupported';
 }
 
-export function buildRoutePreviewRequest(origin: TodayRoutePreviewOrigin): { origin: TodayRoutePreviewOrigin } {
-  return { origin };
+export function buildRoutePreviewRequest(
+  origin: TodayRoutePreviewOrigin,
+  mode?: TravelMode,
+): CreateRoutePreviewRequest {
+  return mode ? { origin, mode } : { origin };
 }
 
 export function buildTodayRoutePreviewViewModel(response: RoutePreviewResponse): TodayRoutePreviewViewModel {
   return {
-    itemId: response.scheduleItemId,
+    itemId: response.scheduleItemId ?? (response as unknown as { itemId?: string }).itemId ?? '',
     durationLabel: formatDuration(response.summary.durationSeconds),
     distanceLabel: formatDistance(response.summary.distanceMeters),
-    modeLabel: '대중교통',
+    modeLabel: routeModeLabel(response.mode),
     summaryText: response.summary.summaryText || '환승 정보 없음',
     map: response.map ? buildMapViewModel(response.map) : null,
     detailActionLabel: 'Google Maps에서 자세히',
@@ -87,6 +133,36 @@ export function buildTodayRoutePreviewViewModel(response: RoutePreviewResponse):
 
 export function todayRoutePreviewSuccessState(response: RoutePreviewResponse): TodayRoutePreviewState {
   return { status: 'success', viewModel: buildTodayRoutePreviewViewModel(response) };
+}
+
+export function buildTodayRoutePreviewSummarySuccessState(
+  results: TodayRoutePreviewModeLoadResult[],
+): TodayRoutePreviewSummaryState {
+  const rows = results.map((result): TodayRoutePreviewModeSummaryRow => {
+    const modeLabel = travelModeDisplayLabel(result.mode);
+    if (!result.response) {
+      return { status: 'unavailable', mode: result.mode, modeLabel, message: '확인 불가' };
+    }
+    const viewModel = buildTodayRoutePreviewViewModel(result.response);
+    return {
+      status: 'success',
+      mode: result.mode,
+      modeLabel,
+      durationLabel: viewModel.durationLabel,
+      distanceLabel: viewModel.distanceLabel,
+    };
+  });
+
+  if (!rows.some((row) => row.status === 'success')) {
+    return todayRoutePreviewUnavailableState('예상 소요 시간을 불러올 수 없어요.');
+  }
+
+  return {
+    status: 'success',
+    title: '현 위치 기준 예상 이동',
+    helper: '실제 경로와 소요 시간은 Google Maps에서 확인해주세요.',
+    rows,
+  };
 }
 
 export function buildTodayRoutePreviewHeroChip(state: TodayRoutePreviewState): string {
@@ -174,6 +250,17 @@ function decodePolylineValue(encoded: string, startIndex: number): { delta: numb
 
   const delta = result & 1 ? ~(result >> 1) : result >> 1;
   return { delta, nextIndex: index };
+}
+
+function routeModeLabel(mode: RoutePreviewResponse['mode']): string {
+  if (isTravelMode(mode)) {
+    return travelModeDisplayLabel(mode);
+  }
+  return travelModeDisplayLabel('transit');
+}
+
+function isTravelMode(mode: unknown): mode is TravelMode {
+  return typeof mode === 'string' && travelModes.includes(mode as TravelMode);
 }
 
 function formatDuration(seconds: number): string {
