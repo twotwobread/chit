@@ -92,6 +92,7 @@ const enabledHotelNavigationAction = {
       placeName: '호텔 니코 오사카',
       address: '1 Chome-3-3 Nishi-Shinsaibashi, Chuo Ward, Osaka',
     },
+    provider: 'googleMaps' as const,
     travelMode: 'transit' as const,
   },
 };
@@ -261,9 +262,109 @@ test('keeps next-place and lodging navigation when the next place is the lodging
       placeName: '호텔 니코 오사카',
       address: '1 Chome-3-3 Nishi-Shinsaibashi, Chuo Ward, Osaka',
     },
+    provider: 'googleMaps',
     travelMode: 'transit',
   });
   assert.deepEqual(viewModel.lodgingNavigationAction, enabledHotelNavigationAction);
+});
+
+test('uses Naver Maps provider and coordinates for Korea-only Today navigation actions', () => {
+  const jejuAirportRoutablePlace = {
+    provider: 'google' as const,
+    googlePlaceId: 'google-place-jeju-airport',
+    latitude: 33.506,
+    longitude: 126.493,
+  };
+  const jejuHotelRoutablePlace = {
+    provider: 'google' as const,
+    googlePlaceId: 'google-place-jeju-hotel',
+    latitude: 33.499,
+    longitude: 126.531,
+  };
+  const jejuHotel = {
+    id: 'place-jeju-hotel',
+    name: '제주 시내 호텔',
+    placeType: 'lodging' as const,
+    address: '제주시 중앙로 1',
+    routablePlace: jejuHotelRoutablePlace,
+  };
+  const koreaTrip = tripDetail();
+  const viewModel = buildTodayExecutionViewModel({
+    selectedTrip: trip({ id: 'trip-current', name: '제주 여행', defaultCurrency: 'KRW' }),
+    tripDetail: {
+      ...koreaTrip,
+      trip: {
+        ...koreaTrip.trip,
+        name: '제주 여행',
+        defaultCurrency: 'KRW',
+        destinations: [
+          {
+            id: 'destination-jeju',
+            tripId: 'trip-current',
+            cityName: '제주',
+            countryName: '대한민국',
+            countryCode: 'KR',
+            displayName: '제주, 대한민국',
+            latitude: 33.4996,
+            longitude: 126.5312,
+            radiusMeters: 50000,
+            provider: 'google',
+            providerPlaceId: 'google-city-jeju',
+            sortOrder: 0,
+          },
+        ],
+      },
+      days: [day({ lodgingPlace: jejuHotel })],
+    },
+    itinerary: itinerary({
+      day: day({ lodgingPlace: jejuHotel }),
+      items: [
+        item({
+          id: 'item-jeju-airport',
+          place: {
+            id: 'place-jeju-airport',
+            name: '제주공항',
+            placeType: 'transport',
+            address: '제주시 공항로 2',
+            routablePlace: jejuAirportRoutablePlace,
+          },
+        }),
+      ],
+    }),
+    today: '2026-07-10',
+    ongoingTripCount: 1,
+    travelMode: 'driving',
+  });
+
+  assert.equal(viewModel.status, 'success');
+  if (viewModel.status !== 'success') {
+    return;
+  }
+
+  assert.deepEqual(viewModel.nextPlace.navigationAction, {
+    kind: 'navigate',
+    label: '길찾기',
+    destination: {
+      placeName: '제주공항',
+      address: '제주시 공항로 2',
+      latitude: 33.506,
+      longitude: 126.493,
+    },
+    provider: 'naverMaps',
+    travelMode: 'driving',
+  });
+  assert.deepEqual(viewModel.lodgingNavigationAction.action, {
+    kind: 'navigate',
+    label: '숙소로 이동',
+    destination: {
+      placeName: '제주 시내 호텔',
+      address: '제주시 중앙로 1',
+      latitude: 33.499,
+      longitude: 126.531,
+    },
+    provider: 'naverMaps',
+    travelMode: 'driving',
+  });
 });
 
 test('maps the first ordered itinerary item to the next place without exposing subsequent places on Today', () => {
@@ -330,6 +431,7 @@ test('maps the first ordered itinerary item to the next place without exposing s
           placeName: '도톤보리',
           address: '1 Chome Dotonbori, Chuo Ward, Osaka',
         },
+        provider: 'googleMaps',
         travelMode: 'transit',
       },
       travelModeSelector: buildTravelModeSelectorViewModel('transit'),
@@ -467,6 +569,7 @@ test('selects the first pending itinerary item without exposing later pending pl
       placeName: '도톤보리',
       address: 'Dotonbori',
     },
+    provider: 'googleMaps',
     travelMode: 'transit',
   });
   assert.deepEqual(viewModel.nextPlace.travelModeSelector, buildTravelModeSelectorViewModel('transit'));

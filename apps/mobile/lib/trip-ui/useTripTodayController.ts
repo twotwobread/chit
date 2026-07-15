@@ -472,6 +472,7 @@ export function useTripTodayController() {
           destination: action.destination,
           launcher: Linking,
           platform: Platform.OS,
+          provider: action.provider,
           travelMode: action.travelMode,
         });
         if (result.status === 'failed') {

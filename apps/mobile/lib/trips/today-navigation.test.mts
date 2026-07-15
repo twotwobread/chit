@@ -5,7 +5,10 @@ import {
   buildGoogleMapsDestinationQuery,
   buildGoogleMapsDirectionsUrl,
   buildGoogleMapsInstallUrl,
+  buildNaverMapsDirectionsUrl,
+  buildNaverMapsInstallUrl,
   openTodayNavigationDestination,
+  resolveTodayNavigationProvider,
   todayNavigationFailureMessage,
 } from './today-navigation';
 
@@ -65,9 +68,43 @@ describe('today navigation helpers', () => {
     );
   });
 
-  it('builds platform Google Maps install URLs', () => {
+  it('resolves Naver Maps only for Korea-only trip destinations', () => {
+    assert.equal(resolveTodayNavigationProvider([{ countryCode: 'KR' }]), 'naverMaps');
+    assert.equal(resolveTodayNavigationProvider([{ countryCode: ' kr ' }, { countryCode: 'KR' }]), 'naverMaps');
+    assert.equal(resolveTodayNavigationProvider([{ countryCode: 'JP' }]), 'googleMaps');
+    assert.equal(resolveTodayNavigationProvider([{ countryCode: 'KR' }, { countryCode: 'JP' }]), 'googleMaps');
+    assert.equal(resolveTodayNavigationProvider([{ countryCode: '' }]), 'googleMaps');
+    assert.equal(resolveTodayNavigationProvider([]), 'googleMaps');
+  });
+
+  it('builds Naver Maps route URLs from destination coordinates and selected mode', () => {
+    const destination = {
+      placeName: '제주공항',
+      address: '제주시 공항로 2',
+      latitude: 33.506,
+      longitude: 126.493,
+    };
+
+    assert.equal(
+      buildNaverMapsDirectionsUrl(destination, 'transit'),
+      'nmap://route/public?dlat=33.506&dlng=126.493&dname=%EC%A0%9C%EC%A3%BC%EA%B3%B5%ED%95%AD&appname=com.twotwobread.ium',
+    );
+    assert.equal(
+      buildNaverMapsDirectionsUrl(destination, 'walking'),
+      'nmap://route/walk?dlat=33.506&dlng=126.493&dname=%EC%A0%9C%EC%A3%BC%EA%B3%B5%ED%95%AD&appname=com.twotwobread.ium',
+    );
+    assert.equal(
+      buildNaverMapsDirectionsUrl(destination, 'driving'),
+      'nmap://route/car?dlat=33.506&dlng=126.493&dname=%EC%A0%9C%EC%A3%BC%EA%B3%B5%ED%95%AD&appname=com.twotwobread.ium',
+    );
+    assert.equal(buildNaverMapsDirectionsUrl({ placeName: '제주공항', address: '제주시 공항로 2' }, 'driving'), null);
+  });
+
+  it('builds platform map install URLs', () => {
     assert.equal(buildGoogleMapsInstallUrl('ios'), 'itms-apps://apps.apple.com/app/google-maps/id585027354');
     assert.equal(buildGoogleMapsInstallUrl('android'), 'market://details?id=com.google.android.apps.maps');
+    assert.equal(buildNaverMapsInstallUrl('ios'), 'itms-apps://apps.apple.com/app/id311867728');
+    assert.equal(buildNaverMapsInstallUrl('android'), 'market://details?id=com.nhn.android.nmap');
   });
 
   it('opens directions first and does not open the store when Google Maps succeeds', async () => {
@@ -92,6 +129,57 @@ describe('today navigation helpers', () => {
     ]);
   });
 
+  it('opens Naver Maps directions for a Korean trip provider when coordinates exist', async () => {
+    const opened: string[] = [];
+    const result = await openTodayNavigationDestination({
+      destination: {
+        placeName: '제주공항',
+        address: '제주시 공항로 2',
+        latitude: 33.506,
+        longitude: 126.493,
+      },
+      platform: 'ios',
+      launcher: {
+        openURL: async (url) => {
+          opened.push(url);
+        },
+      },
+      provider: 'naverMaps',
+      travelMode: 'driving',
+    });
+
+    assert.deepEqual(result, {
+      status: 'openedDirections',
+      url: 'nmap://route/car?dlat=33.506&dlng=126.493&dname=%EC%A0%9C%EC%A3%BC%EA%B3%B5%ED%95%AD&appname=com.twotwobread.ium',
+    });
+    assert.deepEqual(opened, [
+      'nmap://route/car?dlat=33.506&dlng=126.493&dname=%EC%A0%9C%EC%A3%BC%EA%B3%B5%ED%95%AD&appname=com.twotwobread.ium',
+    ]);
+  });
+
+  it('falls back to Google Maps directions when Naver Maps is requested without coordinates', async () => {
+    const opened: string[] = [];
+    const result = await openTodayNavigationDestination({
+      destination: { placeName: '제주공항', address: '제주시 공항로 2' },
+      platform: 'ios',
+      launcher: {
+        openURL: async (url) => {
+          opened.push(url);
+        },
+      },
+      provider: 'naverMaps',
+      travelMode: 'driving',
+    });
+
+    assert.deepEqual(result, {
+      status: 'openedDirections',
+      url: 'comgooglemaps://?daddr=%EC%A0%9C%EC%A3%BC%EA%B3%B5%ED%95%AD%20%EC%A0%9C%EC%A3%BC%EC%8B%9C%20%EA%B3%B5%ED%95%AD%EB%A1%9C%202&directionsmode=driving',
+    });
+    assert.deepEqual(opened, [
+      'comgooglemaps://?daddr=%EC%A0%9C%EC%A3%BC%EA%B3%B5%ED%95%AD%20%EC%A0%9C%EC%A3%BC%EC%8B%9C%20%EA%B3%B5%ED%95%AD%EB%A1%9C%202&directionsmode=driving',
+    ]);
+  });
+
   it('opens the platform install page when Google Maps cannot be opened', async () => {
     const opened: string[] = [];
     const result = await openTodayNavigationDestination({
@@ -111,6 +199,35 @@ describe('today navigation helpers', () => {
     assert.deepEqual(opened, [
       'google.navigation:q=%EB%8F%84%ED%86%A4%EB%B3%B4%EB%A6%AC%20Dotonbori',
       'market://details?id=com.google.android.apps.maps',
+    ]);
+  });
+
+  it('opens the Naver Maps install page when Naver Maps cannot be opened', async () => {
+    const opened: string[] = [];
+    const result = await openTodayNavigationDestination({
+      destination: {
+        placeName: '제주공항',
+        address: '제주시 공항로 2',
+        latitude: 33.506,
+        longitude: 126.493,
+      },
+      platform: 'android',
+      launcher: {
+        openURL: async (url) => {
+          opened.push(url);
+          if (url.startsWith('nmap://')) {
+            throw new Error('Naver Maps unavailable');
+          }
+        },
+      },
+      provider: 'naverMaps',
+      travelMode: 'transit',
+    });
+
+    assert.deepEqual(result, { status: 'openedInstall', url: 'market://details?id=com.nhn.android.nmap' });
+    assert.deepEqual(opened, [
+      'nmap://route/public?dlat=33.506&dlng=126.493&dname=%EC%A0%9C%EC%A3%BC%EA%B3%B5%ED%95%AD&appname=com.twotwobread.ium',
+      'market://details?id=com.nhn.android.nmap',
     ]);
   });
 
