@@ -77,6 +77,7 @@ import {
   buildGooglePlaceCurrentLocationBiasSource,
   buildGooglePlaceSelectedBiasSource,
   buildGooglePlaceSelectedMapRegion,
+  canBookmarkGooglePlaceSearchResult,
   canSearchGooglePlaces,
   clearGooglePlaceSearchResultsState,
   defaultGooglePlaceSearchMapRegion,
@@ -789,7 +790,9 @@ export function GooglePlaceMapSearch({
 
   const handleResultPrimaryAction = (result: GooglePlaceSearchRowViewModel) => {
     if (actionMode === 'bookmark') {
-      onBookmarkSelectResult?.(result);
+      if (canBookmarkGooglePlaceSearchResult(result, bookmarkResults)) {
+        onBookmarkSelectResult?.(result);
+      }
       return;
     }
     onPrimaryAction?.(result, false);
@@ -1154,6 +1157,7 @@ export function GooglePlaceMapSearch({
                   <PlaceResultCard
                     actionView={buildGooglePlaceSearchResultActionView({
                       addState: actionState,
+                      bookmarkResults,
                       mode: actionMode,
                       result: item,
                     })}
@@ -1251,6 +1255,7 @@ function PlaceResultCard({
   const actionButtonLabel = actionView.primaryAction?.isLoading
     ? actionView.primaryAction.loadingLabel
     : actionView.primaryAction?.label;
+  const isPrimaryActionDisabled = isBusy || actionView.primaryAction?.disabled === true;
 
   return (
     <View
@@ -1300,9 +1305,14 @@ function PlaceResultCard({
             {actionView.primaryAction ? (
               <Pressable
                 accessibilityRole="button"
-                disabled={isBusy}
+                accessibilityState={{ disabled: isPrimaryActionDisabled }}
+                disabled={isPrimaryActionDisabled}
                 onPress={onPrimaryAction}
-                style={[styles.primaryButton, styles.inlineActionButton, isBusy ? styles.primaryButtonDisabled : null]}
+                style={[
+                  styles.primaryButton,
+                  styles.inlineActionButton,
+                  isPrimaryActionDisabled ? styles.primaryButtonDisabled : null,
+                ]}
               >
                 {actionView.primaryAction.isLoading ? <ActivityIndicator color={theme.color.onPrimary} /> : null}
                 <Text style={styles.primaryButtonText}>{actionButtonLabel}</Text>

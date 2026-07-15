@@ -203,7 +203,7 @@ export type GooglePlaceSearchResultActionMode =
   | 'bookmark';
 
 export type GooglePlaceSearchResultActionView = {
-  primaryAction: { label: string; loadingLabel: string; isLoading: boolean } | null;
+  primaryAction: { label: string; loadingLabel: string; isLoading: boolean; disabled?: boolean } | null;
   favoriteAction: null;
   duplicateConfirmation: { message: string; confirmLabel: string; cancelLabel: string; isLoading: boolean } | null;
   errorMessage: string | null;
@@ -273,6 +273,20 @@ export function shouldRenderGooglePlaceBookmarkDetail(
   return selectionSource === 'bookmark' && Boolean(selectedResult?.bookmarkId);
 }
 
+export function resolveGooglePlaceSearchResultBookmark(
+  result: GooglePlaceSearchRowViewModel,
+  bookmarkResults: GooglePlaceSearchRowViewModel[],
+): GooglePlaceSearchRowViewModel | null {
+  return bookmarkResults.find((bookmark) => bookmark.id === result.id) ?? null;
+}
+
+export function canBookmarkGooglePlaceSearchResult(
+  result: GooglePlaceSearchRowViewModel,
+  bookmarkResults: GooglePlaceSearchRowViewModel[],
+): boolean {
+  return !resolveGooglePlaceSearchResultBookmark(result, bookmarkResults);
+}
+
 export function resolveGooglePlaceSearchSelectionAfterResultsClose(
   selectedResult: GooglePlaceSearchRowViewModel | null,
   bookmarkResults: GooglePlaceSearchRowViewModel[],
@@ -280,7 +294,7 @@ export function resolveGooglePlaceSearchSelectionAfterResultsClose(
   if (!selectedResult) {
     return null;
   }
-  return bookmarkResults.find((bookmark) => bookmark.id === selectedResult.id) ?? null;
+  return resolveGooglePlaceSearchResultBookmark(selectedResult, bookmarkResults);
 }
 
 export function googlePlaceSearchLoadingState(): GooglePlaceSearchViewState {
@@ -305,12 +319,14 @@ export function errorGooglePlaceAddState(): GooglePlaceAddViewState {
 
 export function buildGooglePlaceSearchResultActionView({
   addState,
+  bookmarkResults = [],
   mode,
   result,
 }: {
   mode: GooglePlaceSearchResultActionMode;
   result: GooglePlaceSearchRowViewModel;
   addState: GooglePlaceAddViewState;
+  bookmarkResults?: GooglePlaceSearchRowViewModel[];
 }): GooglePlaceSearchResultActionView {
   if (mode === 'exploreOnly') {
     return {
@@ -321,8 +337,10 @@ export function buildGooglePlaceSearchResultActionView({
     };
   }
 
-  const label =
-    mode === 'scheduleSelect'
+  const isAlreadyBookmarked = mode === 'bookmark' && !canBookmarkGooglePlaceSearchResult(result, bookmarkResults);
+  const label = isAlreadyBookmarked
+    ? '이미 찜한 장소입니다.'
+    : mode === 'scheduleSelect'
       ? '이 장소 선택'
       : mode === 'lodgingRegister'
         ? '숙소로 등록'
@@ -352,7 +370,7 @@ export function buildGooglePlaceSearchResultActionView({
     duplicateConfirmation,
     errorMessage: addState.status === 'error' ? addState.message : null,
     favoriteAction: null,
-    primaryAction: { isLoading, label, loadingLabel },
+    primaryAction: { isLoading, label, loadingLabel, ...(isAlreadyBookmarked ? { disabled: true } : {}) },
   };
 }
 
