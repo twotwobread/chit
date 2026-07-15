@@ -29,6 +29,7 @@ function expense(overrides: Partial<Expense> = {}): Expense {
     payer: { participantId: 'participant-a', displayName: '민수', source: 'live' },
     memo: '라멘',
     splitPolicy: 'equal',
+    includeInSettlement: true,
     splits: [
       { participant: { participantId: 'participant-a', displayName: '민수', source: 'live' }, amountMinor: 1200 },
     ],
@@ -189,6 +190,26 @@ test('builds update expense request with trimmed memo and nullable place', () =>
     memo: '저녁 식사',
     scheduleItemId: null,
   });
+});
+
+test('builds update expense request with an explicit settlement exclusion flag', () => {
+  const result = buildUpdateExpenseRequest({
+    amountInput: '2,500',
+    currency: 'JPY',
+    splitPolicy: 'equal',
+    participantIds: buildExpenseEditParticipantIds(participants),
+    manualSplitInputs: [],
+    payerParticipantId: 'participant-a',
+    memoInput: '현장 정산',
+    scheduleItemId: null,
+    includeInSettlement: false,
+  });
+
+  assert.equal(result.ok, true);
+  if (!result.ok) {
+    return;
+  }
+  assert.equal(result.request.includeInSettlement, false);
 });
 
 test('builds update expense request with nullable general expense title', () => {

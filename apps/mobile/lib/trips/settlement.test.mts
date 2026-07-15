@@ -66,6 +66,7 @@ function dayExpense(overrides: Partial<DayExpenseListItem> = {}): DayExpenseList
     currency: 'JPY',
     payer: participant('민수', 'payer-a'),
     splitPolicy: 'equal',
+    includeInSettlement: true,
     splits: [
       { splitOrder: 1, participant: participant('민수', 'payer-a'), amountMinor: 600 },
       { splitOrder: 2, participant: participant('지영', 'participant-b'), amountMinor: 600 },
@@ -199,6 +200,28 @@ test('builds day-tabbed settlement expense history with selected-day editable ro
       ],
     ],
   );
+});
+
+test('keeps excluded expenses in history with an on-site settled marker', () => {
+  const viewModel = buildSettlementExpenseHistoryViewModel({
+    tripId: 'trip-a',
+    selectedDayId: 'day-1',
+    days: [
+      {
+        day: tripDay({ id: 'day-1', date: '2026-07-10', dayOrder: 1 }),
+        expenses: [dayExpense({ includeInSettlement: false })],
+      },
+    ],
+  });
+
+  assert.equal(viewModel.status, 'success');
+  if (viewModel.status !== 'success') {
+    return;
+  }
+  assert.equal(viewModel.helper, '총 1건의 지출을 확인하고 수정할 수 있어요.');
+  assert.equal(viewModel.selectedSection.rows[0].settlementLabel, '현장 정산 완료');
+  assert.equal(viewModel.selectedSection.rows[0].detailLine, '민수 결제 · 2명 분할 · 현장 정산 완료');
+  assert.equal(viewModel.selectedSection.rows[0].splitLabel, '2명 분할');
 });
 
 test('builds compact trip-level settlement expense rows under 여행 전체', () => {
@@ -741,6 +764,25 @@ test('computes deterministic paid share and net balances with integer remainder 
     { name: '지영', netAmount: 168, paidAmount: 1001, participantId: 'b', shareAmount: 833 },
     { name: '유나', netAmount: -333, paidAmount: 0, participantId: 'c', shareAmount: 333 },
   ]);
+});
+
+test('omits includeInSettlement false expenses from local settlement calculations', () => {
+  const balances = computeSettlementBalances({
+    expenses: [
+      { amount: 900, payerParticipantId: 'a', includeInSettlement: true },
+      { amount: 600, payerParticipantId: 'b', includeInSettlement: false },
+    ],
+    participants,
+  });
+
+  assert.deepEqual(
+    balances.map((balance) => [balance.participantId, balance.paidAmount, balance.shareAmount, balance.netAmount]),
+    [
+      ['a', 900, 300, 600],
+      ['b', 0, 300, -300],
+      ['c', 0, 300, -300],
+    ],
+  );
 });
 
 test('suggests deterministic transfers from debtors to creditors', () => {

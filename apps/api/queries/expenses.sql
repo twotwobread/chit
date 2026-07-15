@@ -84,6 +84,7 @@ INSERT INTO expenses (
   payer_participant_id,
   payer_display_name,
   memo,
+  include_in_settlement,
   created_by
 ) VALUES (
   sqlc.arg(trip_id)::uuid,
@@ -102,6 +103,7 @@ INSERT INTO expenses (
   sqlc.arg(payer_participant_id)::uuid,
   sqlc.arg(payer_display_name),
   sqlc.narg(memo),
+  sqlc.arg(include_in_settlement),
   sqlc.arg(created_by)::uuid
 )
 RETURNING
@@ -122,6 +124,7 @@ RETURNING
   COALESCE(payer_participant_id::text, '')::text AS payer_participant_id,
   payer_display_name,
   memo,
+  include_in_settlement,
   created_at;
 
 -- name: ListDayExpensesByTripDay :many
@@ -150,6 +153,7 @@ SELECT
     ELSE 'fallback'
   END::text AS payer_source,
   e.split_policy,
+  e.include_in_settlement,
   e.created_at
 FROM expenses e
 LEFT JOIN schedule_items si
@@ -195,6 +199,7 @@ SELECT
     ELSE 'fallback'
   END::text AS payer_source,
   e.split_policy,
+  e.include_in_settlement,
   e.created_at
 FROM expenses e
 LEFT JOIN schedule_items si
@@ -280,6 +285,7 @@ LEFT JOIN trip_participants split_participant
  AND split_participant.trip_id = e.trip_id
 WHERE e.trip_id = sqlc.arg(trip_id)::uuid
   AND e.anchor_type IN ('trip', 'trip_day', 'schedule_item')
+  AND e.include_in_settlement = true
 ORDER BY e.currency ASC, e.created_at ASC, e.id ASC, es.split_order ASC;
 
 -- name: ListSettlementRowsByTrips :many
@@ -307,6 +313,7 @@ LEFT JOIN trip_participants split_participant
  AND split_participant.trip_id = e.trip_id
 WHERE e.trip_id = ANY(sqlc.arg(trip_ids)::uuid[])
   AND e.anchor_type IN ('trip', 'trip_day', 'schedule_item')
+  AND e.include_in_settlement = true
 ORDER BY e.trip_id ASC, e.currency ASC, e.created_at ASC, e.id ASC, es.split_order ASC;
 
 -- name: GetExpenseByTripDayAndID :one
@@ -338,6 +345,7 @@ SELECT
   END::text AS payer_source,
   e.memo,
   e.split_policy,
+  e.include_in_settlement,
   e.created_at
 FROM expenses e
 LEFT JOIN schedule_items si
@@ -385,6 +393,7 @@ SELECT
   END::text AS payer_source,
   e.memo,
   e.split_policy,
+  e.include_in_settlement,
   e.created_at
 FROM expenses e
 LEFT JOIN trip_participants payer
@@ -430,6 +439,7 @@ SET
   payer_participant_id = sqlc.arg(payer_participant_id)::uuid,
   payer_display_name = sqlc.arg(payer_display_name),
   memo = sqlc.narg(memo),
+  include_in_settlement = COALESCE(sqlc.narg(include_in_settlement), include_in_settlement),
   updated_at = now()
 WHERE trip_id = sqlc.arg(trip_id)::uuid
   AND trip_day_id = sqlc.arg(trip_day_id)::uuid
@@ -453,6 +463,7 @@ RETURNING
   COALESCE(payer_participant_id::text, '')::text AS payer_participant_id,
   payer_display_name,
   memo,
+  include_in_settlement,
   created_at;
 
 -- name: UpdateTripExpense :one
@@ -464,6 +475,7 @@ SET
   payer_participant_id = sqlc.arg(payer_participant_id)::uuid,
   payer_display_name = sqlc.arg(payer_display_name),
   memo = sqlc.narg(memo),
+  include_in_settlement = COALESCE(sqlc.narg(include_in_settlement), include_in_settlement),
   updated_at = now()
 WHERE trip_id = sqlc.arg(trip_id)::uuid
   AND id = sqlc.arg(expense_id)::uuid
@@ -488,6 +500,7 @@ RETURNING
   COALESCE(payer_participant_id::text, '')::text AS payer_participant_id,
   payer_display_name,
   memo,
+  include_in_settlement,
   created_at;
 
 -- name: DeleteExpenseSplitsByExpenseID :exec

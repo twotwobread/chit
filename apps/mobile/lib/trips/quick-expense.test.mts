@@ -19,6 +19,7 @@ import {
   buildQuickExpenseManualSplitInputsFromRows,
   buildQuickExpenseManualSplitSummary,
   buildDefaultSplitParticipantIds,
+  buildExpensePaymentSplitSummaryLabel,
   buildQuickExpenseRoute,
   buildQuickExpenseViewModel,
   buildSavedEqualSplitSummary,
@@ -33,6 +34,7 @@ import {
   resolveQuickExpenseReturnPath,
   resolveQuickExpenseSheetInitialSplitMode,
   selectQuickExpenseSheetSplitMode,
+  settlementStatusSummaryLabel,
   toggleQuickExpenseSplitParticipant,
 } from './quick-expense.ts';
 
@@ -179,6 +181,47 @@ test('resolves the trip day for a selected quick expense item across multiple da
 
   assert.equal(resolveQuickExpenseItemDayId(itineraries, 'item-b'), 'day-2');
   assert.equal(resolveQuickExpenseItemDayId(itineraries, 'missing'), null);
+});
+
+test('builds compact payment split summary labels', () => {
+  const summaryParticipants = [
+    participant({ participantId: 'participant-a', displayName: '민수' }),
+    participant({ participantId: 'participant-b', displayName: '지영' }),
+    participant({ participantId: 'participant-c', displayName: '유나' }),
+  ];
+
+  assert.equal(
+    buildExpensePaymentSplitSummaryLabel({
+      payerParticipantId: 'participant-a',
+      participants: summaryParticipants,
+      selectedParticipantIds: ['participant-a', 'participant-b', 'participant-c'],
+      splitPolicy: 'equal',
+    }),
+    '민수 결제 · 전체 1/N',
+  );
+  assert.equal(
+    buildExpensePaymentSplitSummaryLabel({
+      payerParticipantId: 'participant-b',
+      participants: summaryParticipants,
+      selectedParticipantIds: ['participant-a', 'participant-c'],
+      splitPolicy: 'equal',
+    }),
+    '지영 결제 · 민수, 유나 1/N',
+  );
+  assert.equal(
+    buildExpensePaymentSplitSummaryLabel({
+      payerParticipantId: null,
+      participants: summaryParticipants,
+      selectedParticipantIds: [],
+      splitPolicy: 'manual',
+    }),
+    '결제자 선택 필요 · 직접 분할',
+  );
+});
+
+test('builds settlement status summary labels', () => {
+  assert.equal(settlementStatusSummaryLabel(true), '최종 정산에 포함');
+  assert.equal(settlementStatusSummaryLabel(false), '현장 정산 완료');
 });
 
 test('builds settlement day tabs and filters schedule options to the selected day', () => {
@@ -634,6 +677,32 @@ test('builds create quick expense request and validation errors', () => {
   );
 });
 
+test('builds create quick expense request with an explicit settlement exclusion flag', () => {
+  assert.deepEqual(
+    buildCreateQuickExpenseRequest({
+      amountInput: '18,500',
+      currency: 'KRW',
+      scheduleItemId: 'item-a',
+      splitPolicy: 'equal',
+      participantIds: ['participant-b'],
+      manualSplitInputs: [],
+      payerParticipantId: 'participant-a',
+      includeInSettlement: false,
+    }),
+    {
+      ok: true,
+      request: {
+        scheduleItemId: 'item-a',
+        amountMinor: 18500,
+        payerParticipantId: 'participant-a',
+        splitPolicy: 'equal',
+        participantIds: ['participant-b'],
+        includeInSettlement: false,
+      },
+    },
+  );
+});
+
 test('builds memo update request after quick expense creation and skips blank memo', () => {
   const createValidation = buildCreateQuickExpenseRequest({
     amountInput: '18,500',
@@ -643,6 +712,7 @@ test('builds memo update request after quick expense creation and skips blank me
     participantIds: ['participant-b'],
     manualSplitInputs: [],
     payerParticipantId: 'participant-a',
+    includeInSettlement: false,
   });
 
   assert.equal(createValidation.ok, true);
@@ -659,6 +729,7 @@ test('builds memo update request after quick expense creation and skips blank me
       participantIds: ['participant-b'],
       memo: '저녁 회식',
       scheduleItemId: 'item-a',
+      includeInSettlement: false,
     },
   );
   assert.equal(buildQuickExpenseMemoUpdateRequest({ createRequest: createValidation.request, memoInput: '   ' }), null);
@@ -691,6 +762,40 @@ test('builds trip-level general expense request when no related context is selec
         splitPolicy: 'equal',
         participantIds: ['participant-a', 'participant-b'],
         memo: '사전 결제',
+      },
+    },
+  );
+});
+
+test('builds trip-level general expense request with an explicit settlement exclusion flag', () => {
+  assert.deepEqual(
+    buildCreateTripExpenseRequest({
+      titleInput: '현장 결제',
+      expenseDate: '2026-06-12',
+      amountInput: '10,000',
+      currency: 'KRW',
+      selectedTripDayId: null,
+      scheduleItemId: null,
+      splitPolicy: 'equal',
+      participantIds: ['participant-a', 'participant-b'],
+      manualSplitInputs: [],
+      payerParticipantId: 'payer-a',
+      memoInput: '',
+      includeInSettlement: false,
+    }),
+    {
+      ok: true,
+      request: {
+        title: '현장 결제',
+        expenseDate: '2026-06-12',
+        tripDayId: null,
+        scheduleItemId: null,
+        amountMinor: 10000,
+        payerParticipantId: 'payer-a',
+        splitPolicy: 'equal',
+        participantIds: ['participant-a', 'participant-b'],
+        memo: null,
+        includeInSettlement: false,
       },
     },
   );

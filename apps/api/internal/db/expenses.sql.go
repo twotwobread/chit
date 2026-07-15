@@ -94,6 +94,7 @@ SELECT
   END::text AS payer_source,
   e.memo,
   e.split_policy,
+  e.include_in_settlement,
   e.created_at
 FROM expenses e
 LEFT JOIN schedule_items si
@@ -121,27 +122,28 @@ type GetExpenseByTripDayAndIDParams struct {
 }
 
 type GetExpenseByTripDayAndIDRow struct {
-	ID                 string
-	TripID             string
-	AnchorType         string
-	TripDayID          string
-	ScheduleItemID     string
-	ExpenseDate        pgtype.Date
-	Title              pgtype.Text
-	DisplayTitle       string
-	TripPlaceID        string
-	PlaceName          string
-	PlaceAddress       string
-	PlaceType          string
-	PlaceSource        string
-	AmountMinor        int64
-	Currency           string
-	PayerParticipantID string
-	PayerDisplayName   string
-	PayerSource        string
-	Memo               pgtype.Text
-	SplitPolicy        string
-	CreatedAt          pgtype.Timestamptz
+	ID                  string
+	TripID              string
+	AnchorType          string
+	TripDayID           string
+	ScheduleItemID      string
+	ExpenseDate         pgtype.Date
+	Title               pgtype.Text
+	DisplayTitle        string
+	TripPlaceID         string
+	PlaceName           string
+	PlaceAddress        string
+	PlaceType           string
+	PlaceSource         string
+	AmountMinor         int64
+	Currency            string
+	PayerParticipantID  string
+	PayerDisplayName    string
+	PayerSource         string
+	Memo                pgtype.Text
+	SplitPolicy         string
+	IncludeInSettlement bool
+	CreatedAt           pgtype.Timestamptz
 }
 
 func (q *Queries) GetExpenseByTripDayAndID(ctx context.Context, arg GetExpenseByTripDayAndIDParams) (GetExpenseByTripDayAndIDRow, error) {
@@ -168,6 +170,7 @@ func (q *Queries) GetExpenseByTripDayAndID(ctx context.Context, arg GetExpenseBy
 		&i.PayerSource,
 		&i.Memo,
 		&i.SplitPolicy,
+		&i.IncludeInSettlement,
 		&i.CreatedAt,
 	)
 	return i, err
@@ -303,6 +306,7 @@ SELECT
   END::text AS payer_source,
   e.memo,
   e.split_policy,
+  e.include_in_settlement,
   e.created_at
 FROM expenses e
 LEFT JOIN trip_participants payer
@@ -321,27 +325,28 @@ type GetTripExpenseByIDParams struct {
 }
 
 type GetTripExpenseByIDRow struct {
-	ID                 string
-	TripID             string
-	AnchorType         string
-	TripDayID          string
-	ScheduleItemID     string
-	ExpenseDate        pgtype.Date
-	Title              pgtype.Text
-	DisplayTitle       string
-	TripPlaceID        string
-	PlaceName          string
-	PlaceAddress       string
-	PlaceType          string
-	PlaceSource        string
-	AmountMinor        int64
-	Currency           string
-	PayerParticipantID string
-	PayerDisplayName   string
-	PayerSource        string
-	Memo               pgtype.Text
-	SplitPolicy        string
-	CreatedAt          pgtype.Timestamptz
+	ID                  string
+	TripID              string
+	AnchorType          string
+	TripDayID           string
+	ScheduleItemID      string
+	ExpenseDate         pgtype.Date
+	Title               pgtype.Text
+	DisplayTitle        string
+	TripPlaceID         string
+	PlaceName           string
+	PlaceAddress        string
+	PlaceType           string
+	PlaceSource         string
+	AmountMinor         int64
+	Currency            string
+	PayerParticipantID  string
+	PayerDisplayName    string
+	PayerSource         string
+	Memo                pgtype.Text
+	SplitPolicy         string
+	IncludeInSettlement bool
+	CreatedAt           pgtype.Timestamptz
 }
 
 func (q *Queries) GetTripExpenseByID(ctx context.Context, arg GetTripExpenseByIDParams) (GetTripExpenseByIDRow, error) {
@@ -368,6 +373,7 @@ func (q *Queries) GetTripExpenseByID(ctx context.Context, arg GetTripExpenseByID
 		&i.PayerSource,
 		&i.Memo,
 		&i.SplitPolicy,
+		&i.IncludeInSettlement,
 		&i.CreatedAt,
 	)
 	return i, err
@@ -443,6 +449,7 @@ INSERT INTO expenses (
   payer_participant_id,
   payer_display_name,
   memo,
+  include_in_settlement,
   created_by
 ) VALUES (
   $1::uuid,
@@ -461,7 +468,8 @@ INSERT INTO expenses (
   $14::uuid,
   $15,
   $16,
-  $17::uuid
+  $17,
+  $18::uuid
 )
 RETURNING
   id::text,
@@ -481,48 +489,51 @@ RETURNING
   COALESCE(payer_participant_id::text, '')::text AS payer_participant_id,
   payer_display_name,
   memo,
+  include_in_settlement,
   created_at
 `
 
 type InsertExpenseParams struct {
-	TripID             pgtype.UUID
-	AnchorType         string
-	TripDayID          pgtype.UUID
-	ScheduleItemID     pgtype.UUID
-	ExpenseDate        pgtype.Date
-	Title              pgtype.Text
-	TripPlaceID        pgtype.UUID
-	PlaceName          pgtype.Text
-	PlaceAddress       pgtype.Text
-	PlaceType          pgtype.Text
-	AmountMinor        int64
-	Currency           string
-	SplitPolicy        string
-	PayerParticipantID pgtype.UUID
-	PayerDisplayName   string
-	Memo               pgtype.Text
-	CreatedBy          pgtype.UUID
+	TripID              pgtype.UUID
+	AnchorType          string
+	TripDayID           pgtype.UUID
+	ScheduleItemID      pgtype.UUID
+	ExpenseDate         pgtype.Date
+	Title               pgtype.Text
+	TripPlaceID         pgtype.UUID
+	PlaceName           pgtype.Text
+	PlaceAddress        pgtype.Text
+	PlaceType           pgtype.Text
+	AmountMinor         int64
+	Currency            string
+	SplitPolicy         string
+	PayerParticipantID  pgtype.UUID
+	PayerDisplayName    string
+	Memo                pgtype.Text
+	IncludeInSettlement bool
+	CreatedBy           pgtype.UUID
 }
 
 type InsertExpenseRow struct {
-	ID                 string
-	TripID             string
-	AnchorType         string
-	TripDayID          string
-	ScheduleItemID     string
-	ExpenseDate        pgtype.Date
-	Title              pgtype.Text
-	TripPlaceID        string
-	PlaceName          string
-	PlaceAddress       string
-	PlaceType          string
-	AmountMinor        int64
-	Currency           string
-	SplitPolicy        string
-	PayerParticipantID string
-	PayerDisplayName   string
-	Memo               pgtype.Text
-	CreatedAt          pgtype.Timestamptz
+	ID                  string
+	TripID              string
+	AnchorType          string
+	TripDayID           string
+	ScheduleItemID      string
+	ExpenseDate         pgtype.Date
+	Title               pgtype.Text
+	TripPlaceID         string
+	PlaceName           string
+	PlaceAddress        string
+	PlaceType           string
+	AmountMinor         int64
+	Currency            string
+	SplitPolicy         string
+	PayerParticipantID  string
+	PayerDisplayName    string
+	Memo                pgtype.Text
+	IncludeInSettlement bool
+	CreatedAt           pgtype.Timestamptz
 }
 
 func (q *Queries) InsertExpense(ctx context.Context, arg InsertExpenseParams) (InsertExpenseRow, error) {
@@ -543,6 +554,7 @@ func (q *Queries) InsertExpense(ctx context.Context, arg InsertExpenseParams) (I
 		arg.PayerParticipantID,
 		arg.PayerDisplayName,
 		arg.Memo,
+		arg.IncludeInSettlement,
 		arg.CreatedBy,
 	)
 	var i InsertExpenseRow
@@ -564,6 +576,7 @@ func (q *Queries) InsertExpense(ctx context.Context, arg InsertExpenseParams) (I
 		&i.PayerParticipantID,
 		&i.PayerDisplayName,
 		&i.Memo,
+		&i.IncludeInSettlement,
 		&i.CreatedAt,
 	)
 	return i, err
@@ -712,6 +725,7 @@ SELECT
     ELSE 'fallback'
   END::text AS payer_source,
   e.split_policy,
+  e.include_in_settlement,
   e.created_at
 FROM expenses e
 LEFT JOIN schedule_items si
@@ -738,24 +752,25 @@ type ListDayExpensesByTripDayParams struct {
 }
 
 type ListDayExpensesByTripDayRow struct {
-	ID                 string
-	AnchorType         string
-	TripDayID          string
-	ScheduleItemID     string
-	ExpenseDate        pgtype.Date
-	DisplayTitle       string
-	TripPlaceID        string
-	PlaceName          string
-	PlaceAddress       string
-	PlaceType          string
-	PlaceSource        string
-	AmountMinor        int64
-	Currency           string
-	PayerParticipantID string
-	PayerDisplayName   string
-	PayerSource        string
-	SplitPolicy        string
-	CreatedAt          pgtype.Timestamptz
+	ID                  string
+	AnchorType          string
+	TripDayID           string
+	ScheduleItemID      string
+	ExpenseDate         pgtype.Date
+	DisplayTitle        string
+	TripPlaceID         string
+	PlaceName           string
+	PlaceAddress        string
+	PlaceType           string
+	PlaceSource         string
+	AmountMinor         int64
+	Currency            string
+	PayerParticipantID  string
+	PayerDisplayName    string
+	PayerSource         string
+	SplitPolicy         string
+	IncludeInSettlement bool
+	CreatedAt           pgtype.Timestamptz
 }
 
 func (q *Queries) ListDayExpensesByTripDay(ctx context.Context, arg ListDayExpensesByTripDayParams) ([]ListDayExpensesByTripDayRow, error) {
@@ -785,6 +800,7 @@ func (q *Queries) ListDayExpensesByTripDay(ctx context.Context, arg ListDayExpen
 			&i.PayerDisplayName,
 			&i.PayerSource,
 			&i.SplitPolicy,
+			&i.IncludeInSettlement,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -990,6 +1006,7 @@ LEFT JOIN trip_participants split_participant
  AND split_participant.trip_id = e.trip_id
 WHERE e.trip_id = $1::uuid
   AND e.anchor_type IN ('trip', 'trip_day', 'schedule_item')
+  AND e.include_in_settlement = true
 ORDER BY e.currency ASC, e.created_at ASC, e.id ASC, es.split_order ASC
 `
 
@@ -1064,6 +1081,7 @@ LEFT JOIN trip_participants split_participant
  AND split_participant.trip_id = e.trip_id
 WHERE e.trip_id = ANY($1::uuid[])
   AND e.anchor_type IN ('trip', 'trip_day', 'schedule_item')
+  AND e.include_in_settlement = true
 ORDER BY e.trip_id ASC, e.currency ASC, e.created_at ASC, e.id ASC, es.split_order ASC
 `
 
@@ -1141,6 +1159,7 @@ SELECT
     ELSE 'fallback'
   END::text AS payer_source,
   e.split_policy,
+  e.include_in_settlement,
   e.created_at
 FROM expenses e
 LEFT JOIN schedule_items si
@@ -1165,24 +1184,25 @@ ORDER BY
 `
 
 type ListTripExpensesByTripRow struct {
-	ID                 string
-	AnchorType         string
-	TripDayID          string
-	ScheduleItemID     string
-	ExpenseDate        pgtype.Date
-	DisplayTitle       string
-	TripPlaceID        string
-	PlaceName          string
-	PlaceAddress       string
-	PlaceType          string
-	PlaceSource        string
-	AmountMinor        int64
-	Currency           string
-	PayerParticipantID string
-	PayerDisplayName   string
-	PayerSource        string
-	SplitPolicy        string
-	CreatedAt          pgtype.Timestamptz
+	ID                  string
+	AnchorType          string
+	TripDayID           string
+	ScheduleItemID      string
+	ExpenseDate         pgtype.Date
+	DisplayTitle        string
+	TripPlaceID         string
+	PlaceName           string
+	PlaceAddress        string
+	PlaceType           string
+	PlaceSource         string
+	AmountMinor         int64
+	Currency            string
+	PayerParticipantID  string
+	PayerDisplayName    string
+	PayerSource         string
+	SplitPolicy         string
+	IncludeInSettlement bool
+	CreatedAt           pgtype.Timestamptz
 }
 
 func (q *Queries) ListTripExpensesByTrip(ctx context.Context, tripID pgtype.UUID) ([]ListTripExpensesByTripRow, error) {
@@ -1212,6 +1232,7 @@ func (q *Queries) ListTripExpensesByTrip(ctx context.Context, tripID pgtype.UUID
 			&i.PayerDisplayName,
 			&i.PayerSource,
 			&i.SplitPolicy,
+			&i.IncludeInSettlement,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -1239,10 +1260,11 @@ SET
   payer_participant_id = $10::uuid,
   payer_display_name = $11,
   memo = $12,
+  include_in_settlement = COALESCE($13, include_in_settlement),
   updated_at = now()
-WHERE trip_id = $13::uuid
-  AND trip_day_id = $14::uuid
-  AND id = $15::uuid
+WHERE trip_id = $14::uuid
+  AND trip_day_id = $15::uuid
+  AND id = $16::uuid
   AND anchor_type IN ('trip_day', 'schedule_item')
 RETURNING
   id::text,
@@ -1262,46 +1284,49 @@ RETURNING
   COALESCE(payer_participant_id::text, '')::text AS payer_participant_id,
   payer_display_name,
   memo,
+  include_in_settlement,
   created_at
 `
 
 type UpdateExpenseParams struct {
-	AnchorType         string
-	ScheduleItemID     pgtype.UUID
-	TripPlaceID        pgtype.UUID
-	PlaceName          pgtype.Text
-	PlaceAddress       pgtype.Text
-	PlaceType          pgtype.Text
-	Title              pgtype.Text
-	AmountMinor        int64
-	SplitPolicy        string
-	PayerParticipantID pgtype.UUID
-	PayerDisplayName   string
-	Memo               pgtype.Text
-	TripID             pgtype.UUID
-	TripDayID          pgtype.UUID
-	ExpenseID          pgtype.UUID
+	AnchorType          string
+	ScheduleItemID      pgtype.UUID
+	TripPlaceID         pgtype.UUID
+	PlaceName           pgtype.Text
+	PlaceAddress        pgtype.Text
+	PlaceType           pgtype.Text
+	Title               pgtype.Text
+	AmountMinor         int64
+	SplitPolicy         string
+	PayerParticipantID  pgtype.UUID
+	PayerDisplayName    string
+	Memo                pgtype.Text
+	IncludeInSettlement pgtype.Bool
+	TripID              pgtype.UUID
+	TripDayID           pgtype.UUID
+	ExpenseID           pgtype.UUID
 }
 
 type UpdateExpenseRow struct {
-	ID                 string
-	TripID             string
-	AnchorType         string
-	TripDayID          string
-	ScheduleItemID     string
-	ExpenseDate        pgtype.Date
-	Title              pgtype.Text
-	TripPlaceID        string
-	PlaceName          string
-	PlaceAddress       string
-	PlaceType          string
-	AmountMinor        int64
-	Currency           string
-	SplitPolicy        string
-	PayerParticipantID string
-	PayerDisplayName   string
-	Memo               pgtype.Text
-	CreatedAt          pgtype.Timestamptz
+	ID                  string
+	TripID              string
+	AnchorType          string
+	TripDayID           string
+	ScheduleItemID      string
+	ExpenseDate         pgtype.Date
+	Title               pgtype.Text
+	TripPlaceID         string
+	PlaceName           string
+	PlaceAddress        string
+	PlaceType           string
+	AmountMinor         int64
+	Currency            string
+	SplitPolicy         string
+	PayerParticipantID  string
+	PayerDisplayName    string
+	Memo                pgtype.Text
+	IncludeInSettlement bool
+	CreatedAt           pgtype.Timestamptz
 }
 
 func (q *Queries) UpdateExpense(ctx context.Context, arg UpdateExpenseParams) (UpdateExpenseRow, error) {
@@ -1318,6 +1343,7 @@ func (q *Queries) UpdateExpense(ctx context.Context, arg UpdateExpenseParams) (U
 		arg.PayerParticipantID,
 		arg.PayerDisplayName,
 		arg.Memo,
+		arg.IncludeInSettlement,
 		arg.TripID,
 		arg.TripDayID,
 		arg.ExpenseID,
@@ -1341,6 +1367,7 @@ func (q *Queries) UpdateExpense(ctx context.Context, arg UpdateExpenseParams) (U
 		&i.PayerParticipantID,
 		&i.PayerDisplayName,
 		&i.Memo,
+		&i.IncludeInSettlement,
 		&i.CreatedAt,
 	)
 	return i, err
@@ -1355,9 +1382,10 @@ SET
   payer_participant_id = $4::uuid,
   payer_display_name = $5,
   memo = $6,
+  include_in_settlement = COALESCE($7, include_in_settlement),
   updated_at = now()
-WHERE trip_id = $7::uuid
-  AND id = $8::uuid
+WHERE trip_id = $8::uuid
+  AND id = $9::uuid
   AND anchor_type = 'trip'
   AND trip_day_id IS NULL
   AND schedule_item_id IS NULL
@@ -1379,39 +1407,42 @@ RETURNING
   COALESCE(payer_participant_id::text, '')::text AS payer_participant_id,
   payer_display_name,
   memo,
+  include_in_settlement,
   created_at
 `
 
 type UpdateTripExpenseParams struct {
-	Title              pgtype.Text
-	AmountMinor        int64
-	SplitPolicy        string
-	PayerParticipantID pgtype.UUID
-	PayerDisplayName   string
-	Memo               pgtype.Text
-	TripID             pgtype.UUID
-	ExpenseID          pgtype.UUID
+	Title               pgtype.Text
+	AmountMinor         int64
+	SplitPolicy         string
+	PayerParticipantID  pgtype.UUID
+	PayerDisplayName    string
+	Memo                pgtype.Text
+	IncludeInSettlement pgtype.Bool
+	TripID              pgtype.UUID
+	ExpenseID           pgtype.UUID
 }
 
 type UpdateTripExpenseRow struct {
-	ID                 string
-	TripID             string
-	AnchorType         string
-	TripDayID          string
-	ScheduleItemID     string
-	ExpenseDate        pgtype.Date
-	Title              pgtype.Text
-	TripPlaceID        string
-	PlaceName          string
-	PlaceAddress       string
-	PlaceType          string
-	AmountMinor        int64
-	Currency           string
-	SplitPolicy        string
-	PayerParticipantID string
-	PayerDisplayName   string
-	Memo               pgtype.Text
-	CreatedAt          pgtype.Timestamptz
+	ID                  string
+	TripID              string
+	AnchorType          string
+	TripDayID           string
+	ScheduleItemID      string
+	ExpenseDate         pgtype.Date
+	Title               pgtype.Text
+	TripPlaceID         string
+	PlaceName           string
+	PlaceAddress        string
+	PlaceType           string
+	AmountMinor         int64
+	Currency            string
+	SplitPolicy         string
+	PayerParticipantID  string
+	PayerDisplayName    string
+	Memo                pgtype.Text
+	IncludeInSettlement bool
+	CreatedAt           pgtype.Timestamptz
 }
 
 func (q *Queries) UpdateTripExpense(ctx context.Context, arg UpdateTripExpenseParams) (UpdateTripExpenseRow, error) {
@@ -1422,6 +1453,7 @@ func (q *Queries) UpdateTripExpense(ctx context.Context, arg UpdateTripExpensePa
 		arg.PayerParticipantID,
 		arg.PayerDisplayName,
 		arg.Memo,
+		arg.IncludeInSettlement,
 		arg.TripID,
 		arg.ExpenseID,
 	)
@@ -1444,6 +1476,7 @@ func (q *Queries) UpdateTripExpense(ctx context.Context, arg UpdateTripExpensePa
 		&i.PayerParticipantID,
 		&i.PayerDisplayName,
 		&i.Memo,
+		&i.IncludeInSettlement,
 		&i.CreatedAt,
 	)
 	return i, err

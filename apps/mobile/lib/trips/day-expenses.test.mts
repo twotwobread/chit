@@ -27,6 +27,7 @@ function expense(overrides: Partial<DayExpenseListItem> = {}): DayExpenseListIte
     currency: 'JPY',
     payer: participant('민수', 'payer-a'),
     splitPolicy: 'equal',
+    includeInSettlement: true,
     splits: [
       { splitOrder: 1, participant: participant('민수', 'payer-a'), amountMinor: 600 },
       { splitOrder: 2, participant: participant('지영', 'participant-b'), amountMinor: 600 },
@@ -58,6 +59,7 @@ test('builds compact read-only day expense rows from canonical API display data'
       payerLabel: '결제 민수',
       splitLabel: '분담 민수 600엔 · 지영 600엔',
       detailLine: '결제 민수 · 분담 민수 600엔 · 지영 600엔',
+      settlementLabel: null,
       category: 'food',
       accessibilityLabel: '도톤보리 1,200엔. 결제 민수 · 분담 민수 600엔 · 지영 600엔',
       editRoute: '/trips/trip-a/days/2026-07-10/expenses/expense-a/edit',
@@ -79,6 +81,25 @@ test('preserves API newest-first expense order in the view model', () => {
   assert.deepEqual(
     viewModel.rows.map((row) => row.id),
     ['newer', 'older'],
+  );
+});
+
+test('marks settlement-excluded expenses while keeping them in history totals', () => {
+  const viewModel = buildDayExpensesViewModel({
+    tripId: 'trip-a',
+    date: '2026-07-10',
+    expenses: [expense({ includeInSettlement: false })],
+  });
+
+  assert.equal(viewModel.status, 'success');
+  if (viewModel.status !== 'success') {
+    return;
+  }
+  assert.equal(viewModel.rows[0].settlementLabel, '현장 정산 완료');
+  assert.equal(viewModel.rows[0].detailLine, '결제 민수 · 분담 민수 600엔 · 지영 600엔 · 현장 정산 완료');
+  assert.equal(
+    viewModel.rows[0].accessibilityLabel,
+    '도톤보리 1,200엔. 결제 민수 · 분담 민수 600엔 · 지영 600엔 · 현장 정산 완료',
   );
 });
 

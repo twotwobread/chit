@@ -26,4 +26,8 @@ export type CreateQuickExpenseRequest = {
      * Required only when splitPolicy is manual. Must be omitted for equal.
      */
     splits?: Array<ManualExpenseSplitInput>;
+    /**
+     * Whether to include the expense in final settlement calculations. Defaults to true when omitted.
+     */
+    includeInSettlement?: boolean;
 };

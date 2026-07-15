@@ -189,9 +189,12 @@ function compactSettlementExpenseRow({
 
   const payerLabel = `${normalizeDisplayName(expense.payer.displayName)} 결제`;
   const splitLabel = compactSplitLabel(expense.splits.length);
+  const settlementLabel = expense.includeInSettlement ? null : '현장 정산 완료';
   const dateLabel =
     isTripSection || expense.expenseDate !== sectionDate ? formatTripDayDate(expense.expenseDate) : null;
-  const metaParts = [payerLabel, splitLabel, dateLabel].filter((part): part is string => Boolean(part));
+  const metaParts = [payerLabel, splitLabel, dateLabel, settlementLabel].filter((part): part is string =>
+    Boolean(part),
+  );
   const detailLine = metaParts.join(' · ');
 
   return {
@@ -199,6 +202,7 @@ function compactSettlementExpenseRow({
     payerLabel,
     splitLabel: dateLabel ? `${splitLabel} · ${dateLabel}` : splitLabel,
     detailLine,
+    settlementLabel,
     accessibilityLabel: `${row.placeName} ${row.amountLabel}. ${detailLine}`,
     editRoute: isTripSection ? buildTripExpenseEditRoute(tripId, expense.id) : row.editRoute,
   };
@@ -533,6 +537,7 @@ export type SettlementExpense = {
   amount: number;
   payerParticipantId: string;
   splitParticipantIds?: string[];
+  includeInSettlement?: boolean;
 };
 
 export type SettlementBalance = {
@@ -567,6 +572,10 @@ export function computeSettlementBalances({
   const indexById = new Map(balances.map((balance, index) => [balance.participantId, index]));
 
   for (const expense of expenses) {
+    if (expense.includeInSettlement === false) {
+      continue;
+    }
+
     const payerIndex = indexById.get(expense.payerParticipantId);
     if (payerIndex != null) {
       balances[payerIndex].paidAmount += normalizeAmount(expense.amount);

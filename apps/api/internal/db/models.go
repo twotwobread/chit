@@ -45,26 +45,27 @@ type AuthSession struct {
 }
 
 type Expense struct {
-	ID                 pgtype.UUID
-	TripID             pgtype.UUID
-	AnchorType         string
-	TripDayID          pgtype.UUID
-	ScheduleItemID     pgtype.UUID
-	ExpenseDate        pgtype.Date
-	Title              pgtype.Text
-	TripPlaceID        pgtype.UUID
-	PlaceName          pgtype.Text
-	PlaceAddress       pgtype.Text
-	PlaceType          pgtype.Text
-	AmountMinor        int64
-	Currency           string
-	SplitPolicy        string
-	PayerParticipantID pgtype.UUID
-	PayerDisplayName   string
-	Memo               pgtype.Text
-	CreatedBy          pgtype.UUID
-	CreatedAt          pgtype.Timestamptz
-	UpdatedAt          pgtype.Timestamptz
+	ID                  pgtype.UUID
+	TripID              pgtype.UUID
+	AnchorType          string
+	TripDayID           pgtype.UUID
+	ScheduleItemID      pgtype.UUID
+	ExpenseDate         pgtype.Date
+	Title               pgtype.Text
+	TripPlaceID         pgtype.UUID
+	PlaceName           pgtype.Text
+	PlaceAddress        pgtype.Text
+	PlaceType           pgtype.Text
+	AmountMinor         int64
+	Currency            string
+	SplitPolicy         string
+	PayerParticipantID  pgtype.UUID
+	PayerDisplayName    string
+	Memo                pgtype.Text
+	IncludeInSettlement bool
+	CreatedBy           pgtype.UUID
+	CreatedAt           pgtype.Timestamptz
+	UpdatedAt           pgtype.Timestamptz
 }
 
 type ExpenseSplit struct {

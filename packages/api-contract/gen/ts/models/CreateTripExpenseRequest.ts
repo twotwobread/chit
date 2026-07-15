@@ -33,4 +33,8 @@ export type CreateTripExpenseRequest = {
      */
     splits?: Array<ManualExpenseSplitInput>;
     memo: string | null;
+    /**
+     * Whether to include the expense in final settlement calculations. Defaults to true when omitted.
+     */
+    includeInSettlement?: boolean;
 };

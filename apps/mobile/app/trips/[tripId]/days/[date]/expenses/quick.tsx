@@ -14,6 +14,7 @@ export default function QuickExpenseScreen() {
     expenseDateInput,
     formMessage,
     goToLogin,
+    includeInSettlement,
     load,
     manualSplitInputs,
     memoInput,
@@ -31,6 +32,7 @@ export default function QuickExpenseScreen() {
     state,
     submit,
     titleInput,
+    toggleIncludeInSettlement,
     toggleSplitParticipant,
     updateAmountInput,
     updateExpenseDateInput,
@@ -63,6 +65,7 @@ export default function QuickExpenseScreen() {
           errors={errors}
           expenseDateInput={expenseDateInput}
           formMessage={formMessage}
+          includeInSettlement={includeInSettlement}
           mode={state.mode}
           onBack={backToDay}
           onClearTripDay={clearTripDay}
@@ -71,6 +74,7 @@ export default function QuickExpenseScreen() {
           onSelectSplitPolicy={selectSplitPolicy}
           onSelectTripDay={selectTripDay}
           onSubmit={() => void submit()}
+          onToggleIncludeInSettlement={toggleIncludeInSettlement}
           onToggleSplitParticipant={toggleSplitParticipant}
           onUpdateAmount={updateAmountInput}
           onUpdateExpenseDate={updateExpenseDateInput}

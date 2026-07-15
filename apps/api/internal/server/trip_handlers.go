@@ -393,16 +393,17 @@ func (s apiServer) CreateTripExpense(w http.ResponseWriter, r *http.Request, tri
 	}
 
 	result, err := s.trips.CreateTripExpense(r.Context(), authContext.UserID, tripId, trip.CreateTripExpenseInput{
-		Title:              body.Title,
-		ExpenseDate:        body.ExpenseDate.Time.Format("2006-01-02"),
-		TripDayID:          body.TripDayId,
-		ScheduleItemID:     body.ScheduleItemId,
-		AmountMinor:        body.AmountMinor,
-		PayerParticipantID: body.PayerParticipantId,
-		SplitPolicy:        string(body.SplitPolicy),
-		ParticipantIDs:     optionalStringSlice(body.ParticipantIds),
-		ManualSplits:       manualExpenseSplitsFromOpenAPI(body.Splits),
-		Memo:               body.Memo,
+		Title:               body.Title,
+		ExpenseDate:         body.ExpenseDate.Time.Format("2006-01-02"),
+		TripDayID:           body.TripDayId,
+		ScheduleItemID:      body.ScheduleItemId,
+		AmountMinor:         body.AmountMinor,
+		PayerParticipantID:  body.PayerParticipantId,
+		SplitPolicy:         string(body.SplitPolicy),
+		ParticipantIDs:      optionalStringSlice(body.ParticipantIds),
+		ManualSplits:        manualExpenseSplitsFromOpenAPI(body.Splits),
+		Memo:                body.Memo,
+		IncludeInSettlement: body.IncludeInSettlement,
 	})
 	if err != nil {
 		writeQuickExpenseError(w, err)
@@ -443,14 +444,15 @@ func (s apiServer) UpdateTripExpense(w http.ResponseWriter, r *http.Request, tri
 		return
 	}
 	result, err := s.trips.UpdateTripExpense(r.Context(), authContext.UserID, tripId, expenseId, trip.UpdateExpenseInput{
-		AmountMinor:        body.AmountMinor,
-		PayerParticipantID: body.PayerParticipantId,
-		SplitPolicy:        string(body.SplitPolicy),
-		ParticipantIDs:     optionalStringSlice(body.ParticipantIds),
-		ManualSplits:       manualExpenseSplitsFromOpenAPI(body.Splits),
-		Memo:               body.Memo,
-		Title:              body.Title,
-		ScheduleItemID:     body.ScheduleItemId,
+		AmountMinor:         body.AmountMinor,
+		PayerParticipantID:  body.PayerParticipantId,
+		SplitPolicy:         string(body.SplitPolicy),
+		ParticipantIDs:      optionalStringSlice(body.ParticipantIds),
+		ManualSplits:        manualExpenseSplitsFromOpenAPI(body.Splits),
+		Memo:                body.Memo,
+		Title:               body.Title,
+		ScheduleItemID:      body.ScheduleItemId,
+		IncludeInSettlement: body.IncludeInSettlement,
 	})
 	if err != nil {
 		writeDayExpenseMutationError(w, err)
@@ -506,14 +508,15 @@ func (s apiServer) UpdateExpense(w http.ResponseWriter, r *http.Request, tripId 
 		return
 	}
 	result, err := s.trips.UpdateExpense(r.Context(), authContext.UserID, tripId, tripDayId, expenseId, trip.UpdateExpenseInput{
-		AmountMinor:        body.AmountMinor,
-		PayerParticipantID: body.PayerParticipantId,
-		SplitPolicy:        string(body.SplitPolicy),
-		ParticipantIDs:     optionalStringSlice(body.ParticipantIds),
-		ManualSplits:       manualExpenseSplitsFromOpenAPI(body.Splits),
-		Memo:               body.Memo,
-		Title:              body.Title,
-		ScheduleItemID:     body.ScheduleItemId,
+		AmountMinor:         body.AmountMinor,
+		PayerParticipantID:  body.PayerParticipantId,
+		SplitPolicy:         string(body.SplitPolicy),
+		ParticipantIDs:      optionalStringSlice(body.ParticipantIds),
+		ManualSplits:        manualExpenseSplitsFromOpenAPI(body.Splits),
+		Memo:                body.Memo,
+		Title:               body.Title,
+		ScheduleItemID:      body.ScheduleItemId,
+		IncludeInSettlement: body.IncludeInSettlement,
 	})
 	if err != nil {
 		writeDayExpenseMutationError(w, err)
@@ -555,12 +558,13 @@ func (s apiServer) CreateQuickExpense(w http.ResponseWriter, r *http.Request, tr
 	}
 
 	result, err := s.trips.CreateQuickExpense(r.Context(), authContext.UserID, tripId, tripDayId, trip.CreateQuickExpenseInput{
-		ScheduleItemID:     body.ScheduleItemId,
-		AmountMinor:        body.AmountMinor,
-		PayerParticipantID: body.PayerParticipantId,
-		SplitPolicy:        string(body.SplitPolicy),
-		ParticipantIDs:     optionalStringSlice(body.ParticipantIds),
-		ManualSplits:       manualExpenseSplitsFromOpenAPI(body.Splits),
+		ScheduleItemID:      body.ScheduleItemId,
+		AmountMinor:         body.AmountMinor,
+		PayerParticipantID:  body.PayerParticipantId,
+		SplitPolicy:         string(body.SplitPolicy),
+		ParticipantIDs:      optionalStringSlice(body.ParticipantIds),
+		ManualSplits:        manualExpenseSplitsFromOpenAPI(body.Splits),
+		IncludeInSettlement: body.IncludeInSettlement,
 	})
 	if err != nil {
 		writeQuickExpenseError(w, err)

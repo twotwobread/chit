@@ -363,12 +363,14 @@ export function useTripTodayController() {
       memoInput,
       payerParticipantId,
       splitParticipantIds,
+      includeInSettlement,
     }: {
       amount: number;
       itemId: string;
       memoInput: string;
       payerParticipantId: string;
       splitParticipantIds: string[];
+      includeInSettlement: boolean;
     }) => {
       if (quickExpenseState.status !== 'ready' || quickExpenseState.target.tripId !== tripId) {
         return;
@@ -382,6 +384,7 @@ export function useTripTodayController() {
         participantIds: splitParticipantIds,
         manualSplitInputs: [],
         payerParticipantId,
+        includeInSettlement,
       });
       if (!validation.ok) {
         setQuickExpenseState((current) =>

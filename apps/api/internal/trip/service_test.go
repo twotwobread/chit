@@ -495,22 +495,23 @@ func (r *fakeRepository) UpdateTripExpense(_ context.Context, record UpdateExpen
 		displayTitle = *record.Title
 	}
 	return Expense{
-		ID:             record.ExpenseID,
-		TripID:         record.TripID,
-		AnchorType:     "trip",
-		TripDayID:      nil,
-		ScheduleItemID: nil,
-		ExpenseDate:    "2026-06-12",
-		Title:          record.Title,
-		DisplayTitle:   displayTitle,
-		Place:          nil,
-		AmountMinor:    record.AmountMinor,
-		Currency:       r.trip.DefaultCurrency,
-		Payer:          ExpenseParticipantDisplay{ParticipantID: &payerID, DisplayName: "민수", Source: ExpenseDisplaySourceLive},
-		Memo:           record.Memo,
-		SplitPolicy:    record.SplitPolicy,
-		Splits:         []ExpenseSplit{{Participant: ExpenseParticipantDisplay{ParticipantID: &payerID, DisplayName: "민수", Source: ExpenseDisplaySourceLive}, AmountMinor: record.AmountMinor}},
-		CreatedAt:      time.Date(2026, 6, 12, 12, 0, 0, 0, time.UTC),
+		ID:                  record.ExpenseID,
+		TripID:              record.TripID,
+		AnchorType:          "trip",
+		TripDayID:           nil,
+		ScheduleItemID:      nil,
+		ExpenseDate:         "2026-06-12",
+		Title:               record.Title,
+		DisplayTitle:        displayTitle,
+		Place:               nil,
+		AmountMinor:         record.AmountMinor,
+		Currency:            r.trip.DefaultCurrency,
+		Payer:               ExpenseParticipantDisplay{ParticipantID: &payerID, DisplayName: "민수", Source: ExpenseDisplaySourceLive},
+		Memo:                record.Memo,
+		SplitPolicy:         record.SplitPolicy,
+		Splits:              []ExpenseSplit{{Participant: ExpenseParticipantDisplay{ParticipantID: &payerID, DisplayName: "민수", Source: ExpenseDisplaySourceLive}, AmountMinor: record.AmountMinor}},
+		IncludeInSettlement: includeInSettlementFromOptional(record.IncludeInSettlement, true),
+		CreatedAt:           time.Date(2026, 6, 12, 12, 0, 0, 0, time.UTC),
 	}, nil
 }
 
@@ -542,21 +543,22 @@ func (r *fakeRepository) UpdateExpense(_ context.Context, record UpdateExpenseRe
 	}
 	payerID := record.PayerParticipantID
 	return Expense{
-		ID:             record.ExpenseID,
-		TripID:         record.TripID,
-		AnchorType:     anchorType,
-		TripDayID:      &record.TripDayID,
-		ScheduleItemID: scheduleItemID,
-		ExpenseDate:    "2026-07-10",
-		DisplayTitle:   placeName,
-		Place:          &ExpensePlaceDisplay{TripPlaceID: &placeID, Name: placeName, Address: &placeAddress, PlaceType: &placeType, Source: placeSource},
-		AmountMinor:    record.AmountMinor,
-		Currency:       r.trip.DefaultCurrency,
-		Payer:          ExpenseParticipantDisplay{ParticipantID: &payerID, DisplayName: "민수", Source: ExpenseDisplaySourceLive},
-		Memo:           record.Memo,
-		SplitPolicy:    record.SplitPolicy,
-		Splits:         []ExpenseSplit{{Participant: ExpenseParticipantDisplay{ParticipantID: &payerID, DisplayName: "민수", Source: ExpenseDisplaySourceLive}, AmountMinor: record.AmountMinor}},
-		CreatedAt:      time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC),
+		ID:                  record.ExpenseID,
+		TripID:              record.TripID,
+		AnchorType:          anchorType,
+		TripDayID:           &record.TripDayID,
+		ScheduleItemID:      scheduleItemID,
+		ExpenseDate:         "2026-07-10",
+		DisplayTitle:        placeName,
+		Place:               &ExpensePlaceDisplay{TripPlaceID: &placeID, Name: placeName, Address: &placeAddress, PlaceType: &placeType, Source: placeSource},
+		AmountMinor:         record.AmountMinor,
+		Currency:            r.trip.DefaultCurrency,
+		Payer:               ExpenseParticipantDisplay{ParticipantID: &payerID, DisplayName: "민수", Source: ExpenseDisplaySourceLive},
+		Memo:                record.Memo,
+		SplitPolicy:         record.SplitPolicy,
+		Splits:              []ExpenseSplit{{Participant: ExpenseParticipantDisplay{ParticipantID: &payerID, DisplayName: "민수", Source: ExpenseDisplaySourceLive}, AmountMinor: record.AmountMinor}},
+		IncludeInSettlement: includeInSettlementFromOptional(record.IncludeInSettlement, true),
+		CreatedAt:           time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC),
 	}, nil
 }
 
@@ -597,20 +599,21 @@ func (r *fakeRepository) CreateQuickExpense(_ context.Context, record CreateQuic
 	placeAddress := "Dotonbori"
 	placeType := "food"
 	return CreateQuickExpenseResult{Expense: Expense{
-		ID:             testUUID(9001),
-		TripID:         record.TripID,
-		AnchorType:     "schedule_item",
-		TripDayID:      &tripDayID,
-		ScheduleItemID: &itemID,
-		ExpenseDate:    "2026-07-10",
-		DisplayTitle:   "도톤보리",
-		Place:          &ExpensePlaceDisplay{TripPlaceID: &placeID, Name: "도톤보리", Address: &placeAddress, PlaceType: &placeType, Source: ExpenseDisplaySourceLive},
-		AmountMinor:    record.AmountMinor,
-		Currency:       r.trip.DefaultCurrency,
-		Payer:          ExpenseParticipantDisplay{ParticipantID: &payerID, DisplayName: "민수", Source: ExpenseDisplaySourceLive},
-		SplitPolicy:    record.SplitPolicy,
-		Splits:         []ExpenseSplit{{Participant: ExpenseParticipantDisplay{ParticipantID: &payerID, DisplayName: "민수", Source: ExpenseDisplaySourceLive}, AmountMinor: record.AmountMinor}},
-		CreatedAt:      time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC),
+		ID:                  testUUID(9001),
+		TripID:              record.TripID,
+		AnchorType:          "schedule_item",
+		TripDayID:           &tripDayID,
+		ScheduleItemID:      &itemID,
+		ExpenseDate:         "2026-07-10",
+		DisplayTitle:        "도톤보리",
+		Place:               &ExpensePlaceDisplay{TripPlaceID: &placeID, Name: "도톤보리", Address: &placeAddress, PlaceType: &placeType, Source: ExpenseDisplaySourceLive},
+		AmountMinor:         record.AmountMinor,
+		Currency:            r.trip.DefaultCurrency,
+		Payer:               ExpenseParticipantDisplay{ParticipantID: &payerID, DisplayName: "민수", Source: ExpenseDisplaySourceLive},
+		SplitPolicy:         record.SplitPolicy,
+		Splits:              []ExpenseSplit{{Participant: ExpenseParticipantDisplay{ParticipantID: &payerID, DisplayName: "민수", Source: ExpenseDisplaySourceLive}, AmountMinor: record.AmountMinor}},
+		IncludeInSettlement: record.IncludeInSettlement,
+		CreatedAt:           time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC),
 	}}, nil
 }
 
@@ -625,22 +628,30 @@ func (r *fakeRepository) CreateTripExpense(_ context.Context, record CreateTripE
 	}
 	payerID := record.PayerParticipantID
 	return CreateTripExpenseResult{Expense: Expense{
-		ID:             testUUID(9002),
-		TripID:         record.TripID,
-		AnchorType:     "trip",
-		TripDayID:      record.TripDayID,
-		ScheduleItemID: record.ScheduleItemID,
-		ExpenseDate:    record.ExpenseDate.Format(dateLayout),
-		Title:          record.Title,
-		DisplayTitle:   firstStringPtr(record.Title, "지출"),
-		AmountMinor:    record.AmountMinor,
-		Currency:       r.trip.DefaultCurrency,
-		Payer:          ExpenseParticipantDisplay{ParticipantID: &payerID, DisplayName: "민수", Source: ExpenseDisplaySourceLive},
-		Memo:           record.Memo,
-		SplitPolicy:    record.SplitPolicy,
-		Splits:         []ExpenseSplit{{Participant: ExpenseParticipantDisplay{ParticipantID: &payerID, DisplayName: "민수", Source: ExpenseDisplaySourceLive}, AmountMinor: record.AmountMinor}},
-		CreatedAt:      time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC),
+		ID:                  testUUID(9002),
+		TripID:              record.TripID,
+		AnchorType:          "trip",
+		TripDayID:           record.TripDayID,
+		ScheduleItemID:      record.ScheduleItemID,
+		ExpenseDate:         record.ExpenseDate.Format(dateLayout),
+		Title:               record.Title,
+		DisplayTitle:        firstStringPtr(record.Title, "지출"),
+		AmountMinor:         record.AmountMinor,
+		Currency:            r.trip.DefaultCurrency,
+		Payer:               ExpenseParticipantDisplay{ParticipantID: &payerID, DisplayName: "민수", Source: ExpenseDisplaySourceLive},
+		Memo:                record.Memo,
+		SplitPolicy:         record.SplitPolicy,
+		Splits:              []ExpenseSplit{{Participant: ExpenseParticipantDisplay{ParticipantID: &payerID, DisplayName: "민수", Source: ExpenseDisplaySourceLive}, AmountMinor: record.AmountMinor}},
+		IncludeInSettlement: record.IncludeInSettlement,
+		CreatedAt:           time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC),
 	}}, nil
+}
+
+func includeInSettlementFromOptional(value *bool, fallback bool) bool {
+	if value == nil {
+		return fallback
+	}
+	return *value
 }
 
 func firstStringPtr(value *string, fallback string) string {
@@ -1785,9 +1796,10 @@ func TestServiceUpdateExpenseManualSplit(t *testing.T) {
 	service := newTestService(repo)
 
 	_, err := service.UpdateExpense(context.Background(), "user-1", testTripID, "2026-07-11", expenseID, UpdateExpenseInput{
-		AmountMinor:        1200,
-		PayerParticipantID: payerID,
-		SplitPolicy:        ExpenseSplitPolicyManual,
+		AmountMinor:         1200,
+		PayerParticipantID:  payerID,
+		SplitPolicy:         ExpenseSplitPolicyManual,
+		IncludeInSettlement: boolPtr(false),
 		ManualSplits: []ManualExpenseSplitInput{
 			{ParticipantID: strings.ToUpper(participantA), AmountMinor: 500},
 			{ParticipantID: participantB, AmountMinor: 700},
@@ -1802,6 +1814,9 @@ func TestServiceUpdateExpenseManualSplit(t *testing.T) {
 	}
 	if repo.updatedExpenseRecord.SplitPolicy != ExpenseSplitPolicyManual || len(repo.updatedExpenseRecord.ParticipantIDs) != 0 {
 		t.Fatalf("unexpected update split policy record: %#v", repo.updatedExpenseRecord)
+	}
+	if repo.updatedExpenseRecord.IncludeInSettlement == nil || *repo.updatedExpenseRecord.IncludeInSettlement {
+		t.Fatalf("expected update record to mark expense excluded from settlement, got %#v", repo.updatedExpenseRecord.IncludeInSettlement)
 	}
 	if len(repo.updatedExpenseRecord.ManualSplits) != 2 || repo.updatedExpenseRecord.ManualSplits[0].ParticipantID != participantA || repo.updatedExpenseRecord.ManualSplits[0].AmountMinor != 500 || repo.updatedExpenseRecord.ManualSplits[1].ParticipantID != participantB || repo.updatedExpenseRecord.ManualSplits[1].AmountMinor != 700 {
 		t.Fatalf("unexpected manual update split records: %#v", repo.updatedExpenseRecord.ManualSplits)
@@ -1863,14 +1878,44 @@ func TestServiceCreateQuickExpense(t *testing.T) {
 	if !repo.quickExpenseCalled {
 		t.Fatal("expected repository quick expense creation to be called")
 	}
-	if repo.quickExpenseRecord.TripID != testTripID || repo.quickExpenseRecord.TripDayID != "2026-07-11" || repo.quickExpenseRecord.ScheduleItemID != itemID || repo.quickExpenseRecord.PayerParticipantID != payerID || repo.quickExpenseRecord.AmountMinor != 1001 || repo.quickExpenseRecord.SplitPolicy != ExpenseSplitPolicyEqual || repo.quickExpenseRecord.CreatedBy != "user-1" {
+	if repo.quickExpenseRecord.TripID != testTripID || repo.quickExpenseRecord.TripDayID != "2026-07-11" || repo.quickExpenseRecord.ScheduleItemID != itemID || repo.quickExpenseRecord.PayerParticipantID != payerID || repo.quickExpenseRecord.AmountMinor != 1001 || repo.quickExpenseRecord.SplitPolicy != ExpenseSplitPolicyEqual || repo.quickExpenseRecord.CreatedBy != "user-1" || !repo.quickExpenseRecord.IncludeInSettlement {
 		t.Fatalf("unexpected quick expense record: %#v", repo.quickExpenseRecord)
 	}
 	if len(repo.quickExpenseRecord.ParticipantIDs) != 1 || repo.quickExpenseRecord.ParticipantIDs[0] != splitParticipantID {
 		t.Fatalf("expected payer-excluded one-person split target, got %#v", repo.quickExpenseRecord.ParticipantIDs)
 	}
-	if result.Expense.ID == "" || result.Expense.AmountMinor != 1001 || result.Expense.Currency != "JPY" || result.Expense.ScheduleItemID == nil || *result.Expense.ScheduleItemID != itemID {
+	if result.Expense.ID == "" || result.Expense.AmountMinor != 1001 || result.Expense.Currency != "JPY" || result.Expense.ScheduleItemID == nil || *result.Expense.ScheduleItemID != itemID || !result.Expense.IncludeInSettlement {
 		t.Fatalf("unexpected quick expense result: %#v", result.Expense)
+	}
+}
+
+func TestServiceCreateQuickExpenseCanExcludeFromSettlement(t *testing.T) {
+	payerID := testUUID(2001)
+	splitParticipantID := testUUID(2002)
+	itemID := testUUID(7001)
+	repo := &fakeRepository{
+		trip:          Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13", DefaultCurrency: "JPY"},
+		tripFound:     true,
+		isParticipant: true,
+	}
+
+	result, err := newTestService(repo).CreateQuickExpense(context.Background(), "user-1", testTripID, "2026-07-11", CreateQuickExpenseInput{
+		ScheduleItemID:      itemID,
+		AmountMinor:         1001,
+		PayerParticipantID:  payerID,
+		SplitPolicy:         ExpenseSplitPolicyEqual,
+		ParticipantIDs:      []string{splitParticipantID},
+		IncludeInSettlement: boolPtr(false),
+	})
+	if err != nil {
+		t.Fatalf("CreateQuickExpense returned error: %v", err)
+	}
+
+	if repo.quickExpenseRecord.IncludeInSettlement {
+		t.Fatalf("expected quick expense record excluded from settlement, got %#v", repo.quickExpenseRecord)
+	}
+	if result.Expense.IncludeInSettlement {
+		t.Fatalf("expected quick expense result excluded from settlement, got %#v", result.Expense)
 	}
 }
 
@@ -1938,7 +1983,7 @@ func TestServiceCreateTripExpenseMapsTripDayScheduleAnchors(t *testing.T) {
 		if !repo.tripExpenseCalled {
 			t.Fatal("expected repository trip expense creation to be called")
 		}
-		if repo.tripExpenseRecord.TripID != testTripID || repo.tripExpenseRecord.CreatedBy != "user-1" || repo.tripExpenseRecord.TripDayID != nil || repo.tripExpenseRecord.ScheduleItemID != nil {
+		if repo.tripExpenseRecord.TripID != testTripID || repo.tripExpenseRecord.CreatedBy != "user-1" || repo.tripExpenseRecord.TripDayID != nil || repo.tripExpenseRecord.ScheduleItemID != nil || !repo.tripExpenseRecord.IncludeInSettlement {
 			t.Fatalf("unexpected trip-level record: %#v", repo.tripExpenseRecord)
 		}
 		if repo.tripExpenseRecord.Title == nil || *repo.tripExpenseRecord.Title != "항공권" || repo.tripExpenseRecord.Memo == nil || *repo.tripExpenseRecord.Memo != "사전 결제" {
@@ -1955,18 +2000,19 @@ func TestServiceCreateTripExpenseMapsTripDayScheduleAnchors(t *testing.T) {
 	t.Run("day and schedule context remain optional anchors", func(t *testing.T) {
 		repo := &fakeRepository{trip: validTrip, tripFound: true, isParticipant: true}
 		_, err := newTestService(repo).CreateTripExpense(context.Background(), "user-1", testTripID, CreateTripExpenseInput{
-			Title:              stringPtr("렌트비"),
-			ExpenseDate:        "2026-06-30",
-			TripDayID:          &dayID,
-			AmountMinor:        120000,
-			PayerParticipantID: payerID,
-			SplitPolicy:        ExpenseSplitPolicyEqual,
-			ParticipantIDs:     []string{splitParticipantID},
+			Title:               stringPtr("렌트비"),
+			ExpenseDate:         "2026-06-30",
+			TripDayID:           &dayID,
+			AmountMinor:         120000,
+			PayerParticipantID:  payerID,
+			SplitPolicy:         ExpenseSplitPolicyEqual,
+			ParticipantIDs:      []string{splitParticipantID},
+			IncludeInSettlement: boolPtr(false),
 		})
 		if err != nil {
 			t.Fatalf("day-level CreateTripExpense returned error: %v", err)
 		}
-		if repo.tripExpenseRecord.TripDayID == nil || *repo.tripExpenseRecord.TripDayID != dayID || repo.tripExpenseRecord.ScheduleItemID != nil {
+		if repo.tripExpenseRecord.TripDayID == nil || *repo.tripExpenseRecord.TripDayID != dayID || repo.tripExpenseRecord.ScheduleItemID != nil || repo.tripExpenseRecord.IncludeInSettlement {
 			t.Fatalf("unexpected day-level record: %#v", repo.tripExpenseRecord)
 		}
 
@@ -3456,6 +3502,10 @@ func testUUID(value int) string {
 }
 
 func stringPtr(value string) *string {
+	return &value
+}
+
+func boolPtr(value bool) *bool {
 	return &value
 }
 

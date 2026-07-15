@@ -326,6 +326,7 @@ function ExpenseHistoryContent({
                   key={row.id}
                   onPress={editRoute ? () => router.push(editRoute) : undefined}
                   payerLabel={row.payerLabel}
+                  settlementLabel={row.settlementLabel}
                   splitLabel={row.splitLabel}
                   title={row.placeName}
                 />

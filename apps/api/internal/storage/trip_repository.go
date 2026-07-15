@@ -889,19 +889,20 @@ func (s *Store) ListDayExpensesByTripDay(ctx context.Context, tripID string, tri
 		expenseIDs = append(expenseIDs, mustUUID(expenseRow.ID))
 		expenseIndexByID[expenseRow.ID] = len(expenses)
 		expenses = append(expenses, trip.DayExpenseListItem{
-			ID:             expenseRow.ID,
-			AnchorType:     expenseRow.AnchorType,
-			TripDayID:      optionalString(expenseRow.TripDayID),
-			ScheduleItemID: optionalString(expenseRow.ScheduleItemID),
-			ExpenseDate:    dateString(expenseRow.ExpenseDate),
-			DisplayTitle:   expenseRow.DisplayTitle,
-			Place:          expensePlaceDisplay(expenseRow.TripPlaceID, expenseRow.PlaceName, expenseRow.PlaceAddress, expenseRow.PlaceType, expenseRow.PlaceSource),
-			AmountMinor:    expenseRow.AmountMinor,
-			Currency:       expenseRow.Currency,
-			Payer:          expenseParticipantDisplay(expenseRow.PayerParticipantID, expenseRow.PayerDisplayName, expenseRow.PayerSource),
-			SplitPolicy:    expenseRow.SplitPolicy,
-			Splits:         []trip.DayExpenseSplitListItem{},
-			CreatedAt:      expenseRow.CreatedAt.Time,
+			ID:                  expenseRow.ID,
+			AnchorType:          expenseRow.AnchorType,
+			TripDayID:           optionalString(expenseRow.TripDayID),
+			ScheduleItemID:      optionalString(expenseRow.ScheduleItemID),
+			ExpenseDate:         dateString(expenseRow.ExpenseDate),
+			DisplayTitle:        expenseRow.DisplayTitle,
+			Place:               expensePlaceDisplay(expenseRow.TripPlaceID, expenseRow.PlaceName, expenseRow.PlaceAddress, expenseRow.PlaceType, expenseRow.PlaceSource),
+			AmountMinor:         expenseRow.AmountMinor,
+			Currency:            expenseRow.Currency,
+			Payer:               expenseParticipantDisplay(expenseRow.PayerParticipantID, expenseRow.PayerDisplayName, expenseRow.PayerSource),
+			SplitPolicy:         expenseRow.SplitPolicy,
+			Splits:              []trip.DayExpenseSplitListItem{},
+			IncludeInSettlement: expenseRow.IncludeInSettlement,
+			CreatedAt:           expenseRow.CreatedAt.Time,
 		})
 	}
 
@@ -934,19 +935,20 @@ func (s *Store) ListTripExpenses(ctx context.Context, tripID string) (trip.ListT
 	for _, expenseRow := range expenseRows {
 		expenseIDs = append(expenseIDs, mustUUID(expenseRow.ID))
 		expense := trip.DayExpenseListItem{
-			ID:             expenseRow.ID,
-			AnchorType:     expenseRow.AnchorType,
-			TripDayID:      optionalString(expenseRow.TripDayID),
-			ScheduleItemID: optionalString(expenseRow.ScheduleItemID),
-			ExpenseDate:    dateString(expenseRow.ExpenseDate),
-			DisplayTitle:   expenseRow.DisplayTitle,
-			Place:          expensePlaceDisplay(expenseRow.TripPlaceID, expenseRow.PlaceName, expenseRow.PlaceAddress, expenseRow.PlaceType, expenseRow.PlaceSource),
-			AmountMinor:    expenseRow.AmountMinor,
-			Currency:       expenseRow.Currency,
-			Payer:          expenseParticipantDisplay(expenseRow.PayerParticipantID, expenseRow.PayerDisplayName, expenseRow.PayerSource),
-			SplitPolicy:    expenseRow.SplitPolicy,
-			Splits:         []trip.DayExpenseSplitListItem{},
-			CreatedAt:      expenseRow.CreatedAt.Time,
+			ID:                  expenseRow.ID,
+			AnchorType:          expenseRow.AnchorType,
+			TripDayID:           optionalString(expenseRow.TripDayID),
+			ScheduleItemID:      optionalString(expenseRow.ScheduleItemID),
+			ExpenseDate:         dateString(expenseRow.ExpenseDate),
+			DisplayTitle:        expenseRow.DisplayTitle,
+			Place:               expensePlaceDisplay(expenseRow.TripPlaceID, expenseRow.PlaceName, expenseRow.PlaceAddress, expenseRow.PlaceType, expenseRow.PlaceSource),
+			AmountMinor:         expenseRow.AmountMinor,
+			Currency:            expenseRow.Currency,
+			Payer:               expenseParticipantDisplay(expenseRow.PayerParticipantID, expenseRow.PayerDisplayName, expenseRow.PayerSource),
+			SplitPolicy:         expenseRow.SplitPolicy,
+			Splits:              []trip.DayExpenseSplitListItem{},
+			IncludeInSettlement: expenseRow.IncludeInSettlement,
+			CreatedAt:           expenseRow.CreatedAt.Time,
 		}
 		if expenseRow.AnchorType == "trip" {
 			expenseLocationByID[expenseRow.ID] = expenseLocation{tripLevel: true, expenseIndex: len(result.TripExpenses)}
@@ -1244,21 +1246,22 @@ func (s *Store) UpdateExpense(ctx context.Context, record trip.UpdateExpenseReco
 	}
 
 	updatedRow, err := qtx.UpdateExpense(ctx, db.UpdateExpenseParams{
-		AnchorType:         anchorType,
-		ScheduleItemID:     scheduleItemID,
-		TripPlaceID:        tripPlaceID,
-		PlaceName:          placeName,
-		PlaceAddress:       placeAddress,
-		PlaceType:          placeType,
-		Title:              nullableText(record.Title),
-		AmountMinor:        record.AmountMinor,
-		SplitPolicy:        record.SplitPolicy,
-		PayerParticipantID: mustUUID(payerRow.ID),
-		PayerDisplayName:   trip.NormalizeParticipantDisplayName(payerRow.DisplayName),
-		Memo:               nullableText(record.Memo),
-		TripID:             mustUUID(record.TripID),
-		TripDayID:          mustUUID(record.TripDayID),
-		ExpenseID:          mustUUID(record.ExpenseID),
+		AnchorType:          anchorType,
+		ScheduleItemID:      scheduleItemID,
+		TripPlaceID:         tripPlaceID,
+		PlaceName:           placeName,
+		PlaceAddress:        placeAddress,
+		PlaceType:           placeType,
+		Title:               nullableText(record.Title),
+		AmountMinor:         record.AmountMinor,
+		SplitPolicy:         record.SplitPolicy,
+		PayerParticipantID:  mustUUID(payerRow.ID),
+		PayerDisplayName:    trip.NormalizeParticipantDisplayName(payerRow.DisplayName),
+		Memo:                nullableText(record.Memo),
+		IncludeInSettlement: nullableBool(record.IncludeInSettlement),
+		TripID:              mustUUID(record.TripID),
+		TripDayID:           mustUUID(record.TripDayID),
+		ExpenseID:           mustUUID(record.ExpenseID),
 	})
 	if isForeignKeyViolation(err) {
 		return trip.Expense{}, trip.ErrConflict
@@ -1350,14 +1353,15 @@ func (s *Store) UpdateTripExpense(ctx context.Context, record trip.UpdateExpense
 	}
 
 	updatedRow, err := qtx.UpdateTripExpense(ctx, db.UpdateTripExpenseParams{
-		Title:              nullableText(record.Title),
-		AmountMinor:        record.AmountMinor,
-		SplitPolicy:        record.SplitPolicy,
-		PayerParticipantID: mustUUID(payerRow.ID),
-		PayerDisplayName:   trip.NormalizeParticipantDisplayName(payerRow.DisplayName),
-		Memo:               nullableText(record.Memo),
-		TripID:             mustUUID(record.TripID),
-		ExpenseID:          mustUUID(record.ExpenseID),
+		Title:               nullableText(record.Title),
+		AmountMinor:         record.AmountMinor,
+		SplitPolicy:         record.SplitPolicy,
+		PayerParticipantID:  mustUUID(payerRow.ID),
+		PayerDisplayName:    trip.NormalizeParticipantDisplayName(payerRow.DisplayName),
+		Memo:                nullableText(record.Memo),
+		IncludeInSettlement: nullableBool(record.IncludeInSettlement),
+		TripID:              mustUUID(record.TripID),
+		ExpenseID:           mustUUID(record.ExpenseID),
 	})
 	if isForeignKeyViolation(err) {
 		return trip.Expense{}, trip.ErrConflict
@@ -1489,23 +1493,24 @@ func (s *Store) CreateQuickExpense(ctx context.Context, record trip.CreateQuickE
 	}
 
 	expenseRow, err := qtx.InsertExpense(ctx, db.InsertExpenseParams{
-		TripID:             mustUUID(record.TripID),
-		AnchorType:         "schedule_item",
-		TripDayID:          mustUUID(itemRow.TripDayID),
-		ScheduleItemID:     mustUUID(itemRow.ScheduleItemID),
-		ExpenseDate:        itemRow.TripDayDate,
-		TripPlaceID:        mustUUID(itemRow.TripPlaceID),
-		PlaceName:          textValue(itemRow.PlaceName),
-		PlaceAddress:       textValue(itemRow.PlaceAddress),
-		PlaceType:          textValue(itemRow.PlaceType),
-		Title:              pgtype.Text{},
-		AmountMinor:        record.AmountMinor,
-		Currency:           tripRow.DefaultCurrency,
-		SplitPolicy:        record.SplitPolicy,
-		PayerParticipantID: mustUUID(payerRow.ID),
-		PayerDisplayName:   trip.NormalizeParticipantDisplayName(payerRow.DisplayName),
-		Memo:               pgtype.Text{},
-		CreatedBy:          mustUUID(record.CreatedBy),
+		TripID:              mustUUID(record.TripID),
+		AnchorType:          "schedule_item",
+		TripDayID:           mustUUID(itemRow.TripDayID),
+		ScheduleItemID:      mustUUID(itemRow.ScheduleItemID),
+		ExpenseDate:         itemRow.TripDayDate,
+		TripPlaceID:         mustUUID(itemRow.TripPlaceID),
+		PlaceName:           textValue(itemRow.PlaceName),
+		PlaceAddress:        textValue(itemRow.PlaceAddress),
+		PlaceType:           textValue(itemRow.PlaceType),
+		Title:               pgtype.Text{},
+		AmountMinor:         record.AmountMinor,
+		Currency:            tripRow.DefaultCurrency,
+		SplitPolicy:         record.SplitPolicy,
+		PayerParticipantID:  mustUUID(payerRow.ID),
+		PayerDisplayName:    trip.NormalizeParticipantDisplayName(payerRow.DisplayName),
+		Memo:                pgtype.Text{},
+		IncludeInSettlement: record.IncludeInSettlement,
+		CreatedBy:           mustUUID(record.CreatedBy),
 	})
 	if isForeignKeyViolation(err) {
 		return trip.CreateQuickExpenseResult{}, trip.ErrConflict
@@ -1541,22 +1546,23 @@ func (s *Store) CreateQuickExpense(ctx context.Context, record trip.CreateQuickE
 	}
 
 	return trip.CreateQuickExpenseResult{Expense: trip.Expense{
-		ID:             expenseRow.ID,
-		TripID:         expenseRow.TripID,
-		AnchorType:     expenseRow.AnchorType,
-		TripDayID:      optionalString(expenseRow.TripDayID),
-		ScheduleItemID: optionalString(expenseRow.ScheduleItemID),
-		ExpenseDate:    dateString(expenseRow.ExpenseDate),
-		Title:          textPtr(expenseRow.Title),
-		DisplayTitle:   expenseDisplayTitle(expenseRow.Title, expenseRow.PlaceName),
-		Place:          expensePlaceDisplay(expenseRow.TripPlaceID, expenseRow.PlaceName, expenseRow.PlaceAddress, expenseRow.PlaceType, trip.ExpenseDisplaySourceLive),
-		AmountMinor:    expenseRow.AmountMinor,
-		Currency:       expenseRow.Currency,
-		Payer:          expenseParticipantDisplay(expenseRow.PayerParticipantID, expenseRow.PayerDisplayName, trip.ExpenseDisplaySourceLive),
-		Memo:           textPtr(expenseRow.Memo),
-		SplitPolicy:    expenseRow.SplitPolicy,
-		Splits:         splits,
-		CreatedAt:      expenseRow.CreatedAt.Time,
+		ID:                  expenseRow.ID,
+		TripID:              expenseRow.TripID,
+		AnchorType:          expenseRow.AnchorType,
+		TripDayID:           optionalString(expenseRow.TripDayID),
+		ScheduleItemID:      optionalString(expenseRow.ScheduleItemID),
+		ExpenseDate:         dateString(expenseRow.ExpenseDate),
+		Title:               textPtr(expenseRow.Title),
+		DisplayTitle:        expenseDisplayTitle(expenseRow.Title, expenseRow.PlaceName),
+		Place:               expensePlaceDisplay(expenseRow.TripPlaceID, expenseRow.PlaceName, expenseRow.PlaceAddress, expenseRow.PlaceType, trip.ExpenseDisplaySourceLive),
+		AmountMinor:         expenseRow.AmountMinor,
+		Currency:            expenseRow.Currency,
+		Payer:               expenseParticipantDisplay(expenseRow.PayerParticipantID, expenseRow.PayerDisplayName, trip.ExpenseDisplaySourceLive),
+		Memo:                textPtr(expenseRow.Memo),
+		SplitPolicy:         expenseRow.SplitPolicy,
+		Splits:              splits,
+		IncludeInSettlement: expenseRow.IncludeInSettlement,
+		CreatedAt:           expenseRow.CreatedAt.Time,
 	}}, nil
 }
 
@@ -1640,23 +1646,24 @@ func (s *Store) CreateTripExpense(ctx context.Context, record trip.CreateTripExp
 	}
 
 	expenseRow, err := qtx.InsertExpense(ctx, db.InsertExpenseParams{
-		TripID:             mustUUID(record.TripID),
-		AnchorType:         anchorType,
-		TripDayID:          tripDayID,
-		ScheduleItemID:     scheduleItemID,
-		ExpenseDate:        dateValue(record.ExpenseDate),
-		Title:              nullableText(record.Title),
-		TripPlaceID:        tripPlaceID,
-		PlaceName:          placeName,
-		PlaceAddress:       placeAddress,
-		PlaceType:          placeType,
-		AmountMinor:        record.AmountMinor,
-		Currency:           tripRow.DefaultCurrency,
-		SplitPolicy:        record.SplitPolicy,
-		PayerParticipantID: mustUUID(payerRow.ID),
-		PayerDisplayName:   trip.NormalizeParticipantDisplayName(payerRow.DisplayName),
-		Memo:               nullableText(record.Memo),
-		CreatedBy:          mustUUID(record.CreatedBy),
+		TripID:              mustUUID(record.TripID),
+		AnchorType:          anchorType,
+		TripDayID:           tripDayID,
+		ScheduleItemID:      scheduleItemID,
+		ExpenseDate:         dateValue(record.ExpenseDate),
+		Title:               nullableText(record.Title),
+		TripPlaceID:         tripPlaceID,
+		PlaceName:           placeName,
+		PlaceAddress:        placeAddress,
+		PlaceType:           placeType,
+		AmountMinor:         record.AmountMinor,
+		Currency:            tripRow.DefaultCurrency,
+		SplitPolicy:         record.SplitPolicy,
+		PayerParticipantID:  mustUUID(payerRow.ID),
+		PayerDisplayName:    trip.NormalizeParticipantDisplayName(payerRow.DisplayName),
+		Memo:                nullableText(record.Memo),
+		IncludeInSettlement: record.IncludeInSettlement,
+		CreatedBy:           mustUUID(record.CreatedBy),
 	})
 	if isForeignKeyViolation(err) {
 		return trip.CreateTripExpenseResult{}, trip.ErrConflict
@@ -3081,43 +3088,45 @@ func (s *Store) listExpenseSplits(ctx context.Context, queries *db.Queries, expe
 
 func expenseFromGetRow(row db.GetExpenseByTripDayAndIDRow) trip.Expense {
 	return trip.Expense{
-		ID:             row.ID,
-		TripID:         row.TripID,
-		AnchorType:     row.AnchorType,
-		TripDayID:      optionalString(row.TripDayID),
-		ScheduleItemID: optionalString(row.ScheduleItemID),
-		ExpenseDate:    dateString(row.ExpenseDate),
-		Title:          textPtr(row.Title),
-		DisplayTitle:   row.DisplayTitle,
-		Place:          expensePlaceDisplay(row.TripPlaceID, row.PlaceName, row.PlaceAddress, row.PlaceType, row.PlaceSource),
-		AmountMinor:    row.AmountMinor,
-		Currency:       row.Currency,
-		Payer:          expenseParticipantDisplay(row.PayerParticipantID, row.PayerDisplayName, row.PayerSource),
-		Memo:           textPtr(row.Memo),
-		SplitPolicy:    row.SplitPolicy,
-		Splits:         []trip.ExpenseSplit{},
-		CreatedAt:      row.CreatedAt.Time,
+		ID:                  row.ID,
+		TripID:              row.TripID,
+		AnchorType:          row.AnchorType,
+		TripDayID:           optionalString(row.TripDayID),
+		ScheduleItemID:      optionalString(row.ScheduleItemID),
+		ExpenseDate:         dateString(row.ExpenseDate),
+		Title:               textPtr(row.Title),
+		DisplayTitle:        row.DisplayTitle,
+		Place:               expensePlaceDisplay(row.TripPlaceID, row.PlaceName, row.PlaceAddress, row.PlaceType, row.PlaceSource),
+		AmountMinor:         row.AmountMinor,
+		Currency:            row.Currency,
+		Payer:               expenseParticipantDisplay(row.PayerParticipantID, row.PayerDisplayName, row.PayerSource),
+		Memo:                textPtr(row.Memo),
+		SplitPolicy:         row.SplitPolicy,
+		Splits:              []trip.ExpenseSplit{},
+		IncludeInSettlement: row.IncludeInSettlement,
+		CreatedAt:           row.CreatedAt.Time,
 	}
 }
 
 func expenseFromTripGetRow(row db.GetTripExpenseByIDRow) trip.Expense {
 	return trip.Expense{
-		ID:             row.ID,
-		TripID:         row.TripID,
-		AnchorType:     row.AnchorType,
-		TripDayID:      optionalString(row.TripDayID),
-		ScheduleItemID: optionalString(row.ScheduleItemID),
-		ExpenseDate:    dateString(row.ExpenseDate),
-		Title:          textPtr(row.Title),
-		DisplayTitle:   row.DisplayTitle,
-		Place:          expensePlaceDisplay(row.TripPlaceID, row.PlaceName, row.PlaceAddress, row.PlaceType, row.PlaceSource),
-		AmountMinor:    row.AmountMinor,
-		Currency:       row.Currency,
-		Payer:          expenseParticipantDisplay(row.PayerParticipantID, row.PayerDisplayName, row.PayerSource),
-		Memo:           textPtr(row.Memo),
-		SplitPolicy:    row.SplitPolicy,
-		Splits:         []trip.ExpenseSplit{},
-		CreatedAt:      row.CreatedAt.Time,
+		ID:                  row.ID,
+		TripID:              row.TripID,
+		AnchorType:          row.AnchorType,
+		TripDayID:           optionalString(row.TripDayID),
+		ScheduleItemID:      optionalString(row.ScheduleItemID),
+		ExpenseDate:         dateString(row.ExpenseDate),
+		Title:               textPtr(row.Title),
+		DisplayTitle:        row.DisplayTitle,
+		Place:               expensePlaceDisplay(row.TripPlaceID, row.PlaceName, row.PlaceAddress, row.PlaceType, row.PlaceSource),
+		AmountMinor:         row.AmountMinor,
+		Currency:            row.Currency,
+		Payer:               expenseParticipantDisplay(row.PayerParticipantID, row.PayerDisplayName, row.PayerSource),
+		Memo:                textPtr(row.Memo),
+		SplitPolicy:         row.SplitPolicy,
+		Splits:              []trip.ExpenseSplit{},
+		IncludeInSettlement: row.IncludeInSettlement,
+		CreatedAt:           row.CreatedAt.Time,
 	}
 }
 
@@ -3127,22 +3136,23 @@ func expenseFromUpdateRow(row db.UpdateExpenseRow) trip.Expense {
 		placeSource = trip.ExpenseDisplaySourceFallback
 	}
 	return trip.Expense{
-		ID:             row.ID,
-		TripID:         row.TripID,
-		AnchorType:     row.AnchorType,
-		TripDayID:      optionalString(row.TripDayID),
-		ScheduleItemID: optionalString(row.ScheduleItemID),
-		ExpenseDate:    dateString(row.ExpenseDate),
-		Title:          textPtr(row.Title),
-		DisplayTitle:   expenseDisplayTitle(row.Title, row.PlaceName),
-		Place:          expensePlaceDisplay(row.TripPlaceID, row.PlaceName, row.PlaceAddress, row.PlaceType, placeSource),
-		AmountMinor:    row.AmountMinor,
-		Currency:       row.Currency,
-		Payer:          expenseParticipantDisplay(row.PayerParticipantID, row.PayerDisplayName, trip.ExpenseDisplaySourceLive),
-		Memo:           textPtr(row.Memo),
-		SplitPolicy:    row.SplitPolicy,
-		Splits:         []trip.ExpenseSplit{},
-		CreatedAt:      row.CreatedAt.Time,
+		ID:                  row.ID,
+		TripID:              row.TripID,
+		AnchorType:          row.AnchorType,
+		TripDayID:           optionalString(row.TripDayID),
+		ScheduleItemID:      optionalString(row.ScheduleItemID),
+		ExpenseDate:         dateString(row.ExpenseDate),
+		Title:               textPtr(row.Title),
+		DisplayTitle:        expenseDisplayTitle(row.Title, row.PlaceName),
+		Place:               expensePlaceDisplay(row.TripPlaceID, row.PlaceName, row.PlaceAddress, row.PlaceType, placeSource),
+		AmountMinor:         row.AmountMinor,
+		Currency:            row.Currency,
+		Payer:               expenseParticipantDisplay(row.PayerParticipantID, row.PayerDisplayName, trip.ExpenseDisplaySourceLive),
+		Memo:                textPtr(row.Memo),
+		SplitPolicy:         row.SplitPolicy,
+		Splits:              []trip.ExpenseSplit{},
+		IncludeInSettlement: row.IncludeInSettlement,
+		CreatedAt:           row.CreatedAt.Time,
 	}
 }
 
@@ -3152,43 +3162,45 @@ func expenseFromUpdateTripRow(row db.UpdateTripExpenseRow) trip.Expense {
 		placeSource = trip.ExpenseDisplaySourceFallback
 	}
 	return trip.Expense{
-		ID:             row.ID,
-		TripID:         row.TripID,
-		AnchorType:     row.AnchorType,
-		TripDayID:      optionalString(row.TripDayID),
-		ScheduleItemID: optionalString(row.ScheduleItemID),
-		ExpenseDate:    dateString(row.ExpenseDate),
-		Title:          textPtr(row.Title),
-		DisplayTitle:   expenseDisplayTitle(row.Title, row.PlaceName),
-		Place:          expensePlaceDisplay(row.TripPlaceID, row.PlaceName, row.PlaceAddress, row.PlaceType, placeSource),
-		AmountMinor:    row.AmountMinor,
-		Currency:       row.Currency,
-		Payer:          expenseParticipantDisplay(row.PayerParticipantID, row.PayerDisplayName, trip.ExpenseDisplaySourceLive),
-		Memo:           textPtr(row.Memo),
-		SplitPolicy:    row.SplitPolicy,
-		Splits:         []trip.ExpenseSplit{},
-		CreatedAt:      row.CreatedAt.Time,
+		ID:                  row.ID,
+		TripID:              row.TripID,
+		AnchorType:          row.AnchorType,
+		TripDayID:           optionalString(row.TripDayID),
+		ScheduleItemID:      optionalString(row.ScheduleItemID),
+		ExpenseDate:         dateString(row.ExpenseDate),
+		Title:               textPtr(row.Title),
+		DisplayTitle:        expenseDisplayTitle(row.Title, row.PlaceName),
+		Place:               expensePlaceDisplay(row.TripPlaceID, row.PlaceName, row.PlaceAddress, row.PlaceType, placeSource),
+		AmountMinor:         row.AmountMinor,
+		Currency:            row.Currency,
+		Payer:               expenseParticipantDisplay(row.PayerParticipantID, row.PayerDisplayName, trip.ExpenseDisplaySourceLive),
+		Memo:                textPtr(row.Memo),
+		SplitPolicy:         row.SplitPolicy,
+		Splits:              []trip.ExpenseSplit{},
+		IncludeInSettlement: row.IncludeInSettlement,
+		CreatedAt:           row.CreatedAt.Time,
 	}
 }
 
 func expenseFromInsertRow(row db.InsertExpenseRow, splits []trip.ExpenseSplit, placeSource string) trip.Expense {
 	return trip.Expense{
-		ID:             row.ID,
-		TripID:         row.TripID,
-		AnchorType:     row.AnchorType,
-		TripDayID:      optionalString(row.TripDayID),
-		ScheduleItemID: optionalString(row.ScheduleItemID),
-		ExpenseDate:    dateString(row.ExpenseDate),
-		Title:          textPtr(row.Title),
-		DisplayTitle:   expenseDisplayTitle(row.Title, row.PlaceName),
-		Place:          expensePlaceDisplay(row.TripPlaceID, row.PlaceName, row.PlaceAddress, row.PlaceType, placeSource),
-		AmountMinor:    row.AmountMinor,
-		Currency:       row.Currency,
-		Payer:          expenseParticipantDisplay(row.PayerParticipantID, row.PayerDisplayName, trip.ExpenseDisplaySourceLive),
-		Memo:           textPtr(row.Memo),
-		SplitPolicy:    row.SplitPolicy,
-		Splits:         splits,
-		CreatedAt:      row.CreatedAt.Time,
+		ID:                  row.ID,
+		TripID:              row.TripID,
+		AnchorType:          row.AnchorType,
+		TripDayID:           optionalString(row.TripDayID),
+		ScheduleItemID:      optionalString(row.ScheduleItemID),
+		ExpenseDate:         dateString(row.ExpenseDate),
+		Title:               textPtr(row.Title),
+		DisplayTitle:        expenseDisplayTitle(row.Title, row.PlaceName),
+		Place:               expensePlaceDisplay(row.TripPlaceID, row.PlaceName, row.PlaceAddress, row.PlaceType, placeSource),
+		AmountMinor:         row.AmountMinor,
+		Currency:            row.Currency,
+		Payer:               expenseParticipantDisplay(row.PayerParticipantID, row.PayerDisplayName, trip.ExpenseDisplaySourceLive),
+		Memo:                textPtr(row.Memo),
+		SplitPolicy:         row.SplitPolicy,
+		Splits:              splits,
+		IncludeInSettlement: row.IncludeInSettlement,
+		CreatedAt:           row.CreatedAt.Time,
 	}
 }
 
@@ -3242,6 +3254,13 @@ func float8Value(value float64) pgtype.Float8 {
 
 func dateValue(value time.Time) pgtype.Date {
 	return pgtype.Date{Time: value, Valid: true}
+}
+
+func nullableBool(value *bool) pgtype.Bool {
+	if value == nil {
+		return pgtype.Bool{}
+	}
+	return pgtype.Bool{Bool: *value, Valid: true}
 }
 
 func dateString(value pgtype.Date) string {

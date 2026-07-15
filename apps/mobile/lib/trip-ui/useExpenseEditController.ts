@@ -64,6 +64,7 @@ export function useExpenseEditController() {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [splitPolicy, setSplitPolicy] = useState<QuickExpenseSplitPolicy>('equal');
   const [manualSplitInputs, setManualSplitInputs] = useState<QuickExpenseManualSplitInput[]>([]);
+  const [includeInSettlement, setIncludeInSettlement] = useState(true);
   const [errors, setErrors] = useState<ExpenseEditFormErrors>({});
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -110,6 +111,7 @@ export function useExpenseEditController() {
       );
       setSelectedItemId(expense.scheduleItemId && itemIDs.has(expense.scheduleItemId) ? expense.scheduleItemId : null);
       setSplitPolicy(expense.splitPolicy === 'manual' ? 'manual' : 'equal');
+      setIncludeInSettlement(expense.includeInSettlement);
       setManualSplitInputs(
         buildExpenseEditInitialManualSplitInputs(expense, expense.currency, participantsResponse.participants),
       );
@@ -152,6 +154,7 @@ export function useExpenseEditController() {
       manualSplitInputs,
       scheduleItemId: isTripLevel ? null : selectedItemId,
       titleInput,
+      includeInSettlement,
     });
     if (!validation.ok) {
       setErrors(validation.errors);
@@ -184,6 +187,7 @@ export function useExpenseEditController() {
     deleting,
     expenseId,
     handleAuthError,
+    includeInSettlement,
     manualSplitInputs,
     memoInput,
     payerParticipantId,
@@ -270,11 +274,13 @@ export function useExpenseEditController() {
     errors,
     formMessage,
     goBack,
+    includeInSettlement,
     load,
     manualSplitInputs,
     memoInput,
     saving,
     setAmountInput,
+    setIncludeInSettlement,
     setMemoInput,
     setPayerParticipantId,
     setSelectedItemId,
