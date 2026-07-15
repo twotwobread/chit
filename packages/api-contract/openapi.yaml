@@ -533,6 +533,137 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+    put:
+      operationId: updateTripFlight
+      summary: Update trip flight shared details
+      description: Updates shared flight metadata for an existing trip flight. Any current trip participant can update these shared fields. Personal reservation and boarding-pass details are not changed.
+      tags:
+        - Flights
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: flightId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTripFlightRequest'
+      responses:
+        '200':
+          description: Flight updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateTripFlightResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden; current user is not a current trip participant.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip or flight not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /trips/{tripId}/flights/{flightId}/passengers:
+    post:
+      operationId: addTripFlightPassengers
+      summary: Add passengers to a trip flight
+      description: Adds current trip participants to an existing shared flight. This changes passenger membership only and does not create personal reservation or boarding-pass details.
+      tags:
+        - Flights
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: flightId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddTripFlightPassengersRequest'
+      responses:
+        '200':
+          description: Passengers added.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AddTripFlightPassengersResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden; current user is not a current trip participant.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip or flight not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Duplicate passenger or stale participant state.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /trips/{tripId}/flights/{flightId}/my-detail:
     put:
       operationId: upsertMyFlightPersonalDetail
@@ -3881,6 +4012,57 @@ components:
           items:
             type: string
     CreateTripFlightResponse:
+      type: object
+      required:
+        - flight
+      additionalProperties: false
+      properties:
+        flight:
+          $ref: '#/components/schemas/FlightDetail'
+    UpdateTripFlightRequest:
+      type: object
+      required:
+        - displayTitle
+        - flightNumber
+        - departure
+        - arrival
+      additionalProperties: false
+      properties:
+        displayTitle:
+          type: string
+          minLength: 1
+          maxLength: 80
+          description: Server trims leading/trailing whitespace.
+        flightNumber:
+          type: string
+          nullable: true
+          maxLength: 20
+          description: Optional flight number. Blank strings are stored as null.
+        departure:
+          $ref: '#/components/schemas/FlightEndpointInput'
+        arrival:
+          $ref: '#/components/schemas/FlightEndpointInput'
+    UpdateTripFlightResponse:
+      type: object
+      required:
+        - flight
+      additionalProperties: false
+      properties:
+        flight:
+          $ref: '#/components/schemas/FlightDetail'
+    AddTripFlightPassengersRequest:
+      type: object
+      required:
+        - passengerParticipantIds
+      additionalProperties: false
+      properties:
+        passengerParticipantIds:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+    AddTripFlightPassengersResponse:
       type: object
       required:
         - flight

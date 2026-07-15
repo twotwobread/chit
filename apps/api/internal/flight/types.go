@@ -10,6 +10,7 @@ var (
 	ErrUnauthorized         = errors.New("unauthorized")
 	ErrForbidden            = errors.New("forbidden")
 	ErrNotFound             = errors.New("not found")
+	ErrConflict             = errors.New("conflict")
 	ErrUploadTooLarge       = errors.New("upload too large")
 	ErrUnsupportedMediaType = errors.New("unsupported media type")
 	ErrStorageUnavailable   = errors.New("storage unavailable")
@@ -28,6 +29,17 @@ type CreateFlightInput struct {
 	FlightNumber *string
 	Departure    FlightEndpointInput
 	Arrival      FlightEndpointInput
+	PassengerIDs []string
+}
+
+type UpdateFlightInput struct {
+	DisplayTitle string
+	FlightNumber *string
+	Departure    FlightEndpointInput
+	Arrival      FlightEndpointInput
+}
+
+type AddPassengersInput struct {
 	PassengerIDs []string
 }
 
@@ -114,6 +126,23 @@ type CreateFlightRecord struct {
 	Departure       FlightEndpoint
 	Arrival         FlightEndpoint
 	PassengerIDs    []string
+}
+
+type UpdateFlightRecord struct {
+	TripID          string
+	FlightID        string
+	UpdatedByUserID string
+	DisplayTitle    string
+	FlightNumber    *string
+	Departure       FlightEndpoint
+	Arrival         FlightEndpoint
+}
+
+type AddPassengersRecord struct {
+	TripID        string
+	FlightID      string
+	AddedByUserID string
+	PassengerIDs  []string
 }
 
 type UpsertPersonalDetailRecord struct {

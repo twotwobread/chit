@@ -55,6 +55,47 @@ RETURNING
   created_at,
   updated_at;
 
+-- name: UpdateFlight :one
+UPDATE flights
+SET
+  flight_number = sqlc.narg(flight_number),
+  display_title = sqlc.arg(display_title),
+  departure_airport_text = sqlc.arg(departure_airport_text),
+  departure_airport_code = sqlc.narg(departure_airport_code),
+  departure_local_date = sqlc.arg(departure_local_date),
+  departure_local_time = sqlc.arg(departure_local_time),
+  departure_time_zone = sqlc.arg(departure_time_zone),
+  departure_at = sqlc.arg(departure_at),
+  arrival_airport_text = sqlc.arg(arrival_airport_text),
+  arrival_airport_code = sqlc.narg(arrival_airport_code),
+  arrival_local_date = sqlc.arg(arrival_local_date),
+  arrival_local_time = sqlc.arg(arrival_local_time),
+  arrival_time_zone = sqlc.arg(arrival_time_zone),
+  arrival_at = sqlc.arg(arrival_at),
+  updated_at = now()
+WHERE trip_id = sqlc.arg(trip_id)::uuid
+  AND id = sqlc.arg(flight_id)::uuid
+RETURNING
+  id::text,
+  trip_id::text,
+  flight_number,
+  display_title,
+  departure_airport_text,
+  departure_airport_code,
+  departure_local_date,
+  departure_local_time,
+  departure_time_zone,
+  departure_at,
+  arrival_airport_text,
+  arrival_airport_code,
+  arrival_local_date,
+  arrival_local_time,
+  arrival_time_zone,
+  arrival_at,
+  created_by_user_id::text,
+  created_at,
+  updated_at;
+
 -- name: CreateFlightPassenger :one
 INSERT INTO flight_passengers (
   flight_id,

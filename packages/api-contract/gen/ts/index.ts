@@ -8,6 +8,8 @@ export { OpenAPI } from './core/OpenAPI';
 export type { OpenAPIConfig } from './core/OpenAPI';
 
 export type { AcceptTripInviteResponse } from './models/AcceptTripInviteResponse';
+export type { AddTripFlightPassengersRequest } from './models/AddTripFlightPassengersRequest';
+export type { AddTripFlightPassengersResponse } from './models/AddTripFlightPassengersResponse';
 export type { AuthLinkResponse } from './models/AuthLinkResponse';
 export type { AuthLoginResponse } from './models/AuthLoginResponse';
 export type { AuthLogoutResponse } from './models/AuthLogoutResponse';
@@ -137,6 +139,8 @@ export type { UpdateExpenseResponse } from './models/UpdateExpenseResponse';
 export type { UpdateMeRequest } from './models/UpdateMeRequest';
 export type { UpdateScheduleItemRequest } from './models/UpdateScheduleItemRequest';
 export type { UpdateScheduleItemResponse } from './models/UpdateScheduleItemResponse';
+export type { UpdateTripFlightRequest } from './models/UpdateTripFlightRequest';
+export type { UpdateTripFlightResponse } from './models/UpdateTripFlightResponse';
 export type { UpdateTripRequest } from './models/UpdateTripRequest';
 export type { UpdateTripResponse } from './models/UpdateTripResponse';
 export type { UploadMyFlightBoardingPassResponse } from './models/UploadMyFlightBoardingPassResponse';
