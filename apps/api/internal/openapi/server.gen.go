@@ -772,6 +772,28 @@ type MetadataReadinessCheckSchema string
 // MetadataReadinessCheckStatus defines model for MetadataReadinessCheck.Status.
 type MetadataReadinessCheckStatus string
 
+// MoveScheduleItemToDayRequest defines model for MoveScheduleItemToDayRequest.
+type MoveScheduleItemToDayRequest struct {
+	// ClientVersion The schedule item's optimistic locking version observed by the client.
+	ClientVersion int `json:"clientVersion"`
+
+	// TargetTripDayId Target active trip Day id. Must belong to the same trip and differ from the source Day.
+	TargetTripDayId string `json:"targetTripDayId"`
+}
+
+// MoveScheduleItemToDayResponse defines model for MoveScheduleItemToDayResponse.
+type MoveScheduleItemToDayResponse struct {
+	MovedScheduleItem ScheduleItem `json:"movedScheduleItem"`
+	SourceDay         TripDay      `json:"sourceDay"`
+
+	// SourceScheduleItems Latest source Day schedule items after the move, ordered by rank.
+	SourceScheduleItems []ScheduleItem `json:"sourceScheduleItems"`
+	TargetDay           TripDay        `json:"targetDay"`
+
+	// TargetScheduleItems Latest target Day schedule items after the move, ordered by rank.
+	TargetScheduleItems []ScheduleItem `json:"targetScheduleItems"`
+}
+
 // MyFlightPersonalDetail defines model for MyFlightPersonalDetail.
 type MyFlightPersonalDetail struct {
 	BoardingPass FlightBoardingPassSummary `json:"boardingPass"`
@@ -1356,6 +1378,9 @@ type ReorderScheduleItemsJSONRequestBody = ReorderScheduleItemsRequest
 // UpdateScheduleItemJSONRequestBody defines body for UpdateScheduleItem for application/json ContentType.
 type UpdateScheduleItemJSONRequestBody = UpdateScheduleItemRequest
 
+// MoveScheduleItemToDayJSONRequestBody defines body for MoveScheduleItemToDay for application/json ContentType.
+type MoveScheduleItemToDayJSONRequestBody = MoveScheduleItemToDayRequest
+
 // CreateRoutePreviewJSONRequestBody defines body for CreateRoutePreview for application/json ContentType.
 type CreateRoutePreviewJSONRequestBody = CreateRoutePreviewRequest
 
@@ -1487,6 +1512,9 @@ type ServerInterface interface {
 	// Mark a trip day schedule item arrived
 	// (POST /trips/{tripId}/days/{tripDayId}/schedule-items/{scheduleItemId}/arrive)
 	MarkScheduleItemArrived(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, scheduleItemId string)
+	// Move a schedule item to another trip day
+	// (POST /trips/{tripId}/days/{tripDayId}/schedule-items/{scheduleItemId}/move)
+	MoveScheduleItemToDay(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, scheduleItemId string)
 	// Restore a skipped trip day schedule item
 	// (POST /trips/{tripId}/days/{tripDayId}/schedule-items/{scheduleItemId}/restore)
 	RestoreScheduleItem(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, scheduleItemId string)
@@ -1784,6 +1812,12 @@ func (_ Unimplemented) UpdateScheduleItem(w http.ResponseWriter, r *http.Request
 // Mark a trip day schedule item arrived
 // (POST /trips/{tripId}/days/{tripDayId}/schedule-items/{scheduleItemId}/arrive)
 func (_ Unimplemented) MarkScheduleItemArrived(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, scheduleItemId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Move a schedule item to another trip day
+// (POST /trips/{tripId}/days/{tripDayId}/schedule-items/{scheduleItemId}/move)
+func (_ Unimplemented) MoveScheduleItemToDay(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, scheduleItemId string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -3241,6 +3275,55 @@ func (siw *ServerInterfaceWrapper) MarkScheduleItemArrived(w http.ResponseWriter
 	handler.ServeHTTP(w, r)
 }
 
+// MoveScheduleItemToDay operation middleware
+func (siw *ServerInterfaceWrapper) MoveScheduleItemToDay(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "tripDayId" -------------
+	var tripDayId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripDayId", chi.URLParam(r, "tripDayId"), &tripDayId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripDayId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "scheduleItemId" -------------
+	var scheduleItemId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "scheduleItemId", chi.URLParam(r, "scheduleItemId"), &scheduleItemId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "scheduleItemId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.MoveScheduleItemToDay(w, r, tripId, tripDayId, scheduleItemId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // RestoreScheduleItem operation middleware
 func (siw *ServerInterfaceWrapper) RestoreScheduleItem(w http.ResponseWriter, r *http.Request) {
 
@@ -4352,6 +4435,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/trips/{tripId}/days/{tripDayId}/schedule-items/{scheduleItemId}/arrive", wrapper.MarkScheduleItemArrived)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/trips/{tripId}/days/{tripDayId}/schedule-items/{scheduleItemId}/move", wrapper.MoveScheduleItemToDay)
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/trips/{tripId}/days/{tripDayId}/schedule-items/{scheduleItemId}/restore", wrapper.RestoreScheduleItem)

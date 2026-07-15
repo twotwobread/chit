@@ -3293,6 +3293,70 @@ func TestUpdateScheduleItemHandler(t *testing.T) {
 	}
 }
 
+func TestMoveScheduleItemToDaySuccess(t *testing.T) {
+	backend := newFakeAuthBackend()
+	ownerToken := loginTestUser(t, backend)
+	tripID := createTestTrip(t, backend, ownerToken)
+	moving := createTestScheduleItem(t, backend, ownerToken, tripID, "2026-07-11", `{"name":"우메다","address":"Umeda","placeType":"sights"}`)
+	createTestScheduleItem(t, backend, ownerToken, tripID, "2026-07-12", `{"name":"도톤보리","address":"Dotonbori","placeType":"food"}`)
+
+	recorder := httptest.NewRecorder()
+	path := fmt.Sprintf("/trips/%s/days/2026-07-11/schedule-items/%s/move", tripID, moving.ID)
+	request := httptest.NewRequest(http.MethodPost, path, bytes.NewReader([]byte(`{"targetTripDayId":"2026-07-12","clientVersion":1}`)))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", "Bearer "+ownerToken)
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusOK, recorder.Code, recorder.Body.String())
+	}
+	var body struct {
+		MovedScheduleItem struct {
+			ID        string `json:"id"`
+			ItemOrder int    `json:"itemOrder"`
+		} `json:"movedScheduleItem"`
+		SourceScheduleItems []struct {
+			ID string `json:"id"`
+		} `json:"sourceScheduleItems"`
+		TargetScheduleItems []struct {
+			ID string `json:"id"`
+		} `json:"targetScheduleItems"`
+	}
+	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+		t.Fatalf("decode move response: %v", err)
+	}
+	if body.MovedScheduleItem.ID != moving.ID || body.MovedScheduleItem.ItemOrder != 2 {
+		t.Fatalf("unexpected moved schedule item: %#v", body.MovedScheduleItem)
+	}
+	if len(body.SourceScheduleItems) != 0 {
+		t.Fatalf("expected source day to be empty, got %#v", body.SourceScheduleItems)
+	}
+	if len(body.TargetScheduleItems) != 2 || body.TargetScheduleItems[1].ID != moving.ID {
+		t.Fatalf("expected moved item appended to target response, got %#v", body.TargetScheduleItems)
+	}
+}
+
+func TestMoveScheduleItemToDayConflict(t *testing.T) {
+	backend := newFakeAuthBackend()
+	ownerToken := loginTestUser(t, backend)
+	tripID := createTestTrip(t, backend, ownerToken)
+	moving := createTestScheduleItem(t, backend, ownerToken, tripID, "2026-07-11", `{"name":"우메다","address":"Umeda","placeType":"sights"}`)
+	backend.moveErr = tripdomain.ErrConflict
+
+	recorder := httptest.NewRecorder()
+	path := fmt.Sprintf("/trips/%s/days/2026-07-11/schedule-items/%s/move", tripID, moving.ID)
+	request := httptest.NewRequest(http.MethodPost, path, bytes.NewReader([]byte(`{"targetTripDayId":"2026-07-12","clientVersion":1}`)))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", "Bearer "+ownerToken)
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusConflict {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusConflict, recorder.Code, recorder.Body.String())
+	}
+}
+
 func TestReorderScheduleItemsRequiresAuth(t *testing.T) {
 	backend := newFakeAuthBackend()
 	recorder := httptest.NewRecorder()
@@ -4704,6 +4768,7 @@ type fakeAuthBackend struct {
 	flights           map[string]flightdomain.FlightDetail
 	personalDetails   map[string]flightdomain.PersonalDetail
 	reorderErr        error
+	moveErr           error
 	arrivalErr        error
 	skipErr           error
 	restoreErr        error
@@ -6195,6 +6260,41 @@ func (b *fakeAuthBackend) ReorderScheduleItems(_ context.Context, record tripdom
 		return nil, b.reorderErr
 	}
 	return b.dayScheduleItems[record.TripID+":"+record.TripDayID], nil
+}
+
+func (b *fakeAuthBackend) MoveScheduleItemToDay(_ context.Context, record tripdomain.MoveScheduleItemToDayRecord) (tripdomain.MoveScheduleItemToDayMutationResult, error) {
+	if b.moveErr != nil {
+		return tripdomain.MoveScheduleItemToDayMutationResult{}, b.moveErr
+	}
+	sourceKey := record.TripID + ":" + record.SourceTripDayID
+	targetKey := record.TripID + ":" + record.TargetTripDayID
+	sourceItems := b.dayScheduleItems[sourceKey]
+	moveIndex := -1
+	for index, item := range sourceItems {
+		if item.ID == record.ScheduleItemID {
+			moveIndex = index
+			break
+		}
+	}
+	if moveIndex < 0 || sourceItems[moveIndex].Version != record.ClientVersion {
+		return tripdomain.MoveScheduleItemToDayMutationResult{}, tripdomain.ErrConflict
+	}
+
+	movedItem := sourceItems[moveIndex]
+	sourceItems = append(sourceItems[:moveIndex], sourceItems[moveIndex+1:]...)
+	for index := range sourceItems {
+		sourceItems[index].ItemOrder = index + 1
+	}
+	movedItem.Version++
+	movedItem.ArrivedAt = nil
+	movedItem.SkippedAt = nil
+	targetItems := append([]tripdomain.ScheduleItem{}, b.dayScheduleItems[targetKey]...)
+	movedItem.ItemOrder = len(targetItems) + 1
+	targetItems = append(targetItems, movedItem)
+
+	b.dayScheduleItems[sourceKey] = sourceItems
+	b.dayScheduleItems[targetKey] = targetItems
+	return tripdomain.MoveScheduleItemToDayMutationResult{MovedItem: movedItem, SourceItems: sourceItems, TargetItems: targetItems}, nil
 }
 
 func (b *fakeAuthBackend) MarkScheduleItemArrived(_ context.Context, record tripdomain.MarkScheduleItemArrivedRecord) (tripdomain.MarkScheduleItemArrivedMutationResult, error) {

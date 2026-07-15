@@ -2,6 +2,7 @@ import type { Dispatch, SetStateAction } from 'react';
 
 import type { DayItineraryRowViewModel, DayItineraryViewModel } from '../trips/day-itinerary';
 import type { DayItineraryDeleteFocusTarget, DayItineraryEditFormValues } from '../trips/day-itinerary-edit';
+import type { DayItineraryMoveTargetOption } from '../trips/move-itinerary';
 import type {
   DayItineraryContentFocusRequest,
   DayItineraryLodgingPickerState,
@@ -24,6 +25,21 @@ export type DeleteState = { status: 'idle' } | DeletePlaceConfirmationState;
 
 export type ReorderState = DayItineraryReorderState;
 
+export type MoveState =
+  | { status: 'idle' }
+  | {
+      status: 'pickingTarget';
+      item: DayItineraryRowViewModel;
+      targetOptions: DayItineraryMoveTargetOption[];
+      error?: { title: string; helper: string };
+    }
+  | {
+      status: 'saving';
+      item: DayItineraryRowViewModel;
+      targetOptions: DayItineraryMoveTargetOption[];
+      targetTripDayId: string;
+    };
+
 export type LodgingState = DayItineraryLodgingState;
 
 export type LodgingPlacePickerState = DayItineraryLodgingPickerState;
@@ -36,6 +52,7 @@ export type DayItineraryControllerSetters = {
   setLodgingState: Dispatch<SetStateAction<LodgingState>>;
   setReorderFeedback: Dispatch<SetStateAction<string | null>>;
   setReorderState: Dispatch<SetStateAction<ReorderState>>;
+  setMoveState: Dispatch<SetStateAction<MoveState>>;
 };
 
 export type DayItineraryControllerState = {
@@ -46,6 +63,7 @@ export type DayItineraryControllerState = {
   lodgingState: LodgingState;
   reorderFeedback: string | null;
   reorderState: ReorderState;
+  moveState: MoveState;
   state: DayItineraryState;
 };
 

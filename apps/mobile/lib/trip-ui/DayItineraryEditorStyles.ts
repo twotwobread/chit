@@ -376,6 +376,11 @@ export const styles = StyleSheet.create({
     fontSize: theme.font.size.caption,
     fontWeight: theme.font.weight.semibold,
   },
+  swipeActionGroup: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
   swipeDeleteButton: {
     alignItems: 'center',
     alignSelf: 'stretch',
@@ -384,6 +389,14 @@ export const styles = StyleSheet.create({
   },
   swipeDeleteButtonPressed: {
     opacity: 0.82,
+  },
+  swipeMoveIconButton: {
+    alignItems: 'center',
+    backgroundColor: theme.color.primary,
+    borderRadius: theme.radius.pill,
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
   },
   swipeDeleteIconButton: {
     alignItems: 'center',

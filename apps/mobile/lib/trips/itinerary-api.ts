@@ -8,6 +8,8 @@ import {
   type ListTripScheduleItemsResponse,
   type MarkScheduleItemArrivedResponse,
   type MarkScheduleItemSkippedResponse,
+  type MoveScheduleItemToDayRequest,
+  type MoveScheduleItemToDayResponse,
   type ReorderScheduleItemsRequest,
   type ReorderScheduleItemsResponse,
   type RestoreScheduleItemResponse,
@@ -62,6 +64,15 @@ export async function reorderScheduleItems(
   request: ReorderScheduleItemsRequest,
 ): Promise<ReorderScheduleItemsResponse> {
   return runAuthenticatedRequest(() => TripsService.reorderScheduleItems(tripId, date, request));
+}
+
+export async function moveScheduleItemToDay(
+  tripId: string,
+  date: string,
+  itemId: string,
+  request: MoveScheduleItemToDayRequest,
+): Promise<MoveScheduleItemToDayResponse> {
+  return runAuthenticatedRequest(() => TripsService.moveScheduleItemToDay(tripId, date, itemId, request));
 }
 
 export async function markScheduleItemArrived(

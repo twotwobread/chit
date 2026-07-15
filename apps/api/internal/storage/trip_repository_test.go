@@ -1416,6 +1416,92 @@ func TestReorderScheduleItemsAppliesMovesSequentiallyAndReturnsLatestOrder(t *te
 	}
 }
 
+func TestMoveScheduleItemToDayAppendsToTargetResetsStatusAndReanchorsExpenses(t *testing.T) {
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("DATABASE_URL is required for storage integration test")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	store, err := Open(ctx, databaseURL)
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer store.Close()
+
+	fixture := createMoveScheduleItemFixture(t, ctx, store, "F309 단일 이동 성공")
+
+	result, err := store.MoveScheduleItemToDay(ctx, trip.MoveScheduleItemToDayRecord{
+		TripID:          fixture.tripID,
+		SourceTripDayID: fixture.sourceDayID,
+		TargetTripDayID: fixture.targetDayID,
+		ScheduleItemID:  fixture.movedItemID,
+		ClientVersion:   7,
+	})
+	if err != nil {
+		t.Fatalf("MoveScheduleItemToDay returned error: %v", err)
+	}
+
+	if result.MovedItem.ID != fixture.movedItemID || result.MovedItem.Version != 8 {
+		t.Fatalf("unexpected moved item result: %#v", result.MovedItem)
+	}
+	if result.MovedItem.ArrivedAt != nil || result.MovedItem.SkippedAt != nil {
+		t.Fatalf("expected moved item status reset, got arrived=%v skipped=%v", result.MovedItem.ArrivedAt, result.MovedItem.SkippedAt)
+	}
+	if result.MovedItem.Place.ID != fixture.movedPlaceID || result.MovedItem.PlaceSchedule == nil || result.MovedItem.PlaceSchedule.Title != "수영" || result.MovedItem.PlaceSchedule.Memo == nil || *result.MovedItem.PlaceSchedule.Memo != "수건 챙기기" {
+		t.Fatalf("expected moved item place/title/memo preserved, got %#v", result.MovedItem)
+	}
+	if result.MovedItem.StartTime == nil || *result.MovedItem.StartTime != "09:30" || result.MovedItem.EndTime == nil || *result.MovedItem.EndTime != "11:00" {
+		t.Fatalf("expected moved item time preserved, got start=%v end=%v", result.MovedItem.StartTime, result.MovedItem.EndTime)
+	}
+
+	if len(result.SourceItems) != 1 || result.SourceItems[0].ID != fixture.sourceRemainingItemID || result.SourceItems[0].ItemOrder != 1 {
+		t.Fatalf("unexpected source snapshot after move: %#v", result.SourceItems)
+	}
+	if len(result.TargetItems) != 2 || result.TargetItems[0].ID != fixture.targetExistingItemID || result.TargetItems[1].ID != fixture.movedItemID || result.TargetItems[1].ItemOrder != 2 {
+		t.Fatalf("unexpected target snapshot after move: %#v", result.TargetItems)
+	}
+
+	assertScheduleItemAnchor(t, ctx, store, fixture.movedItemID, fixture.targetDayID, 8, true)
+	assertExpenseAnchor(t, ctx, store, fixture.scheduleExpenseID, fixture.targetDayID, fixture.movedItemID, "2026-07-01")
+	assertExpenseAnchor(t, ctx, store, fixture.dayExpenseID, fixture.sourceDayID, "", "2026-07-11")
+	assertExpenseAnchor(t, ctx, store, fixture.tripExpenseID, "", "", "2026-07-09")
+}
+
+func TestMoveScheduleItemToDayRejectsStaleVersionWithoutChangingData(t *testing.T) {
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("DATABASE_URL is required for storage integration test")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	store, err := Open(ctx, databaseURL)
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer store.Close()
+
+	fixture := createMoveScheduleItemFixture(t, ctx, store, "F309 단일 이동 stale")
+
+	_, err = store.MoveScheduleItemToDay(ctx, trip.MoveScheduleItemToDayRecord{
+		TripID:          fixture.tripID,
+		SourceTripDayID: fixture.sourceDayID,
+		TargetTripDayID: fixture.targetDayID,
+		ScheduleItemID:  fixture.movedItemID,
+		ClientVersion:   6,
+	})
+	if !errors.Is(err, trip.ErrConflict) {
+		t.Fatalf("expected stale version conflict, got %v", err)
+	}
+
+	assertScheduleItemAnchor(t, ctx, store, fixture.movedItemID, fixture.sourceDayID, 7, false)
+	assertExpenseAnchor(t, ctx, store, fixture.scheduleExpenseID, fixture.sourceDayID, fixture.movedItemID, "2026-07-01")
+}
+
 func TestReorderScheduleItemsRejectsStaleMovedItemVersionWithoutChangingData(t *testing.T) {
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
@@ -2963,6 +3049,153 @@ func TestListTripParticipantsOrdersOwnerFirstThenJoinedAt(t *testing.T) {
 	}
 	if participants[0].DisplayName != "주최자" || participants[0].Role != trip.RoleOwner {
 		t.Fatalf("unexpected owner mapping: %#v", participants[0])
+	}
+}
+
+type moveScheduleItemFixture struct {
+	tripID                string
+	sourceDayID           string
+	targetDayID           string
+	movedItemID           string
+	movedPlaceID          string
+	sourceRemainingItemID string
+	targetExistingItemID  string
+	scheduleExpenseID     string
+	dayExpenseID          string
+	tripExpenseID         string
+}
+
+func createMoveScheduleItemFixture(t *testing.T, ctx context.Context, store *Store, label string) moveScheduleItemFixture {
+	t.Helper()
+
+	userID := insertTripRepositoryTestUser(t, ctx, store, label+" 사용자")
+	t.Cleanup(func() { _, _ = store.pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1::uuid`, userID) })
+	tripID := insertTripRepositoryTestTrip(t, ctx, store, label+" 여행", userID)
+	t.Cleanup(func() { _, _ = store.pool.Exec(context.Background(), `DELETE FROM trips WHERE id = $1::uuid`, tripID) })
+	participantID := insertTripRepositoryTestParticipant(t, ctx, store, tripID, userID, trip.RoleOwner, "주최자")
+	sourceDayID := tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-11")
+	targetDayID := tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-12")
+
+	movedPlaceID := insertTripRepositoryTestPlace(t, ctx, store, tripID, label+" 수영장", "food")
+	sourceRemainingPlaceID := insertTripRepositoryTestPlace(t, ctx, store, tripID, label+" 오사카성", "sights")
+	targetExistingPlaceID := insertTripRepositoryTestPlace(t, ctx, store, tripID, label+" 도톤보리", "food")
+
+	movedItemID := insertTripRepositoryTestScheduleItem(t, ctx, store, tripID, sourceDayID, movedPlaceID, "수영", "수건 챙기기", "09:30", "11:00", 1, "0000000000000001024", 7, true)
+	sourceRemainingItemID := insertTripRepositoryTestScheduleItem(t, ctx, store, tripID, sourceDayID, sourceRemainingPlaceID, "오사카성", "", "", "", 2, "0000000000000002048", 1, false)
+	targetExistingItemID := insertTripRepositoryTestScheduleItem(t, ctx, store, tripID, targetDayID, targetExistingPlaceID, "도톤보리", "", "", "", 1, "0000000000000001024", 2, false)
+
+	scheduleExpenseID := insertTripRepositoryTestExpense(t, ctx, store, tripID, sourceDayID, movedItemID, participantID, userID, "schedule_item", "2026-07-01")
+	dayExpenseID := insertTripRepositoryTestExpense(t, ctx, store, tripID, sourceDayID, "", participantID, userID, "trip_day", "2026-07-11")
+	tripExpenseID := insertTripRepositoryTestExpense(t, ctx, store, tripID, "", "", participantID, userID, "trip", "2026-07-09")
+
+	return moveScheduleItemFixture{
+		tripID:                tripID,
+		sourceDayID:           sourceDayID,
+		targetDayID:           targetDayID,
+		movedItemID:           movedItemID,
+		movedPlaceID:          movedPlaceID,
+		sourceRemainingItemID: sourceRemainingItemID,
+		targetExistingItemID:  targetExistingItemID,
+		scheduleExpenseID:     scheduleExpenseID,
+		dayExpenseID:          dayExpenseID,
+		tripExpenseID:         tripExpenseID,
+	}
+}
+
+func insertTripRepositoryTestPlace(t *testing.T, ctx context.Context, store *Store, tripID string, name string, placeType string) string {
+	t.Helper()
+	var placeID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO trip_places (trip_id, name, address, place_type)
+		VALUES ($1::uuid, $2, $3, $4)
+		RETURNING id::text
+	`, tripID, name, name+" 주소", placeType).Scan(&placeID); err != nil {
+		t.Fatalf("insert trip place %q: %v", name, err)
+	}
+	return placeID
+}
+
+func insertTripRepositoryTestScheduleItem(t *testing.T, ctx context.Context, store *Store, tripID string, tripDayID string, placeID string, title string, memo string, startTime string, endTime string, itemOrder int, rank string, version int, arrived bool) string {
+	t.Helper()
+	var itemID string
+	arrivedSQL := "NULL"
+	if arrived {
+		arrivedSQL = "'2026-07-11T09:40:00Z'"
+	}
+	memoValue := interface{}(nil)
+	if memo != "" {
+		memoValue = memo
+	}
+	startValue := interface{}(nil)
+	if startTime != "" {
+		startValue = startTime
+	}
+	endValue := interface{}(nil)
+	if endTime != "" {
+		endValue = endTime
+	}
+	query := fmt.Sprintf(`
+		INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, place_title, place_memo, start_time, end_time, item_order, rank, version, arrived_at)
+		VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6::time, $7::time, $8, $9, $10, %s::timestamptz)
+		RETURNING id::text
+	`, arrivedSQL)
+	if err := store.pool.QueryRow(ctx, query, tripID, tripDayID, placeID, title, memoValue, startValue, endValue, itemOrder, rank, version).Scan(&itemID); err != nil {
+		t.Fatalf("insert schedule item %q: %v", title, err)
+	}
+	return itemID
+}
+
+func insertTripRepositoryTestExpense(t *testing.T, ctx context.Context, store *Store, tripID string, tripDayID string, scheduleItemID string, payerParticipantID string, createdBy string, anchorType string, expenseDate string) string {
+	t.Helper()
+	var expenseID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO expenses (trip_id, anchor_type, trip_day_id, schedule_item_id, expense_date, amount_minor, currency, split_policy, payer_participant_id, payer_display_name, created_by)
+		VALUES ($1::uuid, $2, NULLIF($3, '')::uuid, NULLIF($4, '')::uuid, $5::date, 1200, 'JPY', 'equal', $6::uuid, '주최자', $7::uuid)
+		RETURNING id::text
+	`, tripID, anchorType, tripDayID, scheduleItemID, expenseDate, payerParticipantID, createdBy).Scan(&expenseID); err != nil {
+		t.Fatalf("insert %s expense: %v", anchorType, err)
+	}
+	return expenseID
+}
+
+func assertScheduleItemAnchor(t *testing.T, ctx context.Context, store *Store, itemID string, wantTripDayID string, wantVersion int, wantStatusReset bool) {
+	t.Helper()
+	var tripDayID string
+	var version int
+	var arrivedSet bool
+	var skippedSet bool
+	if err := store.pool.QueryRow(ctx, `
+		SELECT trip_day_id::text, version, arrived_at IS NOT NULL, skipped_at IS NOT NULL
+		FROM schedule_items
+		WHERE id = $1::uuid
+	`, itemID).Scan(&tripDayID, &version, &arrivedSet, &skippedSet); err != nil {
+		t.Fatalf("query schedule item anchor: %v", err)
+	}
+	if tripDayID != wantTripDayID || version != wantVersion {
+		t.Fatalf("unexpected schedule item anchor/version: day=%q version=%d", tripDayID, version)
+	}
+	if wantStatusReset && (arrivedSet || skippedSet) {
+		t.Fatalf("expected schedule item status reset, arrived=%v skipped=%v", arrivedSet, skippedSet)
+	}
+	if !wantStatusReset && !arrivedSet {
+		t.Fatalf("expected original arrived status to remain set")
+	}
+}
+
+func assertExpenseAnchor(t *testing.T, ctx context.Context, store *Store, expenseID string, wantTripDayID string, wantScheduleItemID string, wantExpenseDate string) {
+	t.Helper()
+	var tripDayID string
+	var scheduleItemID string
+	var expenseDate string
+	if err := store.pool.QueryRow(ctx, `
+		SELECT COALESCE(trip_day_id::text, ''), COALESCE(schedule_item_id::text, ''), expense_date::text
+		FROM expenses
+		WHERE id = $1::uuid
+	`, expenseID).Scan(&tripDayID, &scheduleItemID, &expenseDate); err != nil {
+		t.Fatalf("query expense anchor: %v", err)
+	}
+	if tripDayID != wantTripDayID || scheduleItemID != wantScheduleItemID || expenseDate != wantExpenseDate {
+		t.Fatalf("unexpected expense anchor/date: day=%q item=%q date=%q", tripDayID, scheduleItemID, expenseDate)
 	}
 }
 

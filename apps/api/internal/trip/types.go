@@ -193,6 +193,19 @@ type ReorderScheduleItemsRecord struct {
 	Moves     []ReorderDayScheduleMoveRecord
 }
 
+type MoveScheduleItemToDayInput struct {
+	TargetTripDayID string
+	ClientVersion   int
+}
+
+type MoveScheduleItemToDayRecord struct {
+	TripID          string
+	SourceTripDayID string
+	TargetTripDayID string
+	ScheduleItemID  string
+	ClientVersion   int
+}
+
 type MarkScheduleItemArrivedRecord struct {
 	TripID    string
 	TripDayID string
@@ -459,6 +472,20 @@ type UpdateScheduleItemResult struct {
 type ReorderScheduleItemsResult struct {
 	Day   TripDay
 	Items []ScheduleItem
+}
+
+type MoveScheduleItemToDayMutationResult struct {
+	MovedItem   ScheduleItem
+	SourceItems []ScheduleItem
+	TargetItems []ScheduleItem
+}
+
+type MoveScheduleItemToDayResult struct {
+	SourceDay   TripDay
+	SourceItems []ScheduleItem
+	TargetDay   TripDay
+	TargetItems []ScheduleItem
+	MovedItem   ScheduleItem
 }
 
 type MarkScheduleItemArrivedMutationResult struct {
@@ -741,6 +768,7 @@ type Repository interface {
 	CreateManualScheduleItem(ctx context.Context, record CreateManualScheduleItemRecord) (ScheduleItem, error)
 	GetScheduleItemByTripDayAndID(ctx context.Context, tripID string, tripDayID string, itemID string) (ScheduleItem, bool, error)
 	ReorderScheduleItems(ctx context.Context, record ReorderScheduleItemsRecord) ([]ScheduleItem, error)
+	MoveScheduleItemToDay(ctx context.Context, record MoveScheduleItemToDayRecord) (MoveScheduleItemToDayMutationResult, error)
 	MarkScheduleItemArrived(ctx context.Context, record MarkScheduleItemArrivedRecord) (MarkScheduleItemArrivedMutationResult, error)
 	MarkScheduleItemSkipped(ctx context.Context, record MarkScheduleItemSkippedRecord) (MarkScheduleItemSkippedMutationResult, error)
 	RestoreScheduleItem(ctx context.Context, record RestoreScheduleItemRecord) (RestoreScheduleItemMutationResult, error)

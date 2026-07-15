@@ -24,6 +24,7 @@ export type ItineraryTimelineProps = {
   onItemNameRef?: (item: ItineraryTimelineItem, node: Text | null) => void;
   renderActions?: (item: ItineraryTimelineItem) => ReactNode;
   renderSwipeAction?: (item: ItineraryTimelineItem) => ReactNode;
+  swipeActionWidth?: number;
 };
 
 export function ItineraryTimeline({
@@ -36,6 +37,7 @@ export function ItineraryTimeline({
   onPressLodgingBadge,
   renderActions,
   renderSwipeAction,
+  swipeActionWidth,
 }: ItineraryTimelineProps) {
   if (items.length === 0) {
     return (
@@ -60,6 +62,7 @@ export function ItineraryTimeline({
           onPressLodgingBadge={onPressLodgingBadge}
           renderActions={renderActions}
           renderSwipeAction={renderSwipeAction}
+          swipeActionWidth={swipeActionWidth}
         />
       ))}
     </View>
@@ -77,6 +80,7 @@ function TimelineRow({
   onPressLodgingBadge,
   renderActions,
   renderSwipeAction,
+  swipeActionWidth,
 }: {
   item: ItineraryTimelineItem;
   markerTone: TimelineMarkerTone;
@@ -86,6 +90,7 @@ function TimelineRow({
   onItemNameRef?: (item: ItineraryTimelineItem, node: Text | null) => void;
   renderActions?: (item: ItineraryTimelineItem) => ReactNode;
   renderSwipeAction?: (item: ItineraryTimelineItem) => ReactNode;
+  swipeActionWidth?: number;
 }) {
   const duration = markerTone === 'timed' ? itineraryDurationLabel(item.startTime ?? '', item.endTime) : null;
   const done = item.status === 'done' || item.status === 'skipped';
@@ -115,6 +120,7 @@ function TimelineRow({
           onPressLodgingBadge={onPressLodgingBadge}
           renderActions={renderActions}
           renderSwipeAction={renderSwipeAction}
+          swipeActionWidth={swipeActionWidth}
         />
       </View>
     </View>
@@ -167,6 +173,7 @@ function TimelineCard({
   onPressLodgingBadge,
   renderActions,
   renderSwipeAction,
+  swipeActionWidth,
 }: {
   done: boolean;
   item: ItineraryTimelineItem;
@@ -176,6 +183,7 @@ function TimelineCard({
   onItemNameRef?: (item: ItineraryTimelineItem, node: Text | null) => void;
   renderActions?: (item: ItineraryTimelineItem) => ReactNode;
   renderSwipeAction?: (item: ItineraryTimelineItem) => ReactNode;
+  swipeActionWidth?: number;
 }) {
   const actions = renderActions?.(item);
   const swipeAction = renderSwipeAction?.(item);
@@ -237,7 +245,7 @@ function TimelineCard({
   }
 
   return (
-    <SwipeActionRow renderRightAction={() => swipeAction} style={styles.swipeRowSpacing}>
+    <SwipeActionRow actionWidth={swipeActionWidth} renderRightAction={() => swipeAction} style={styles.swipeRowSpacing}>
       {card}
     </SwipeActionRow>
   );

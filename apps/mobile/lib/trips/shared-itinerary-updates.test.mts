@@ -24,6 +24,7 @@ function baseLocalState(
     reorderStatus: 'idle',
     editStatus: 'idle',
     deleteStatus: 'idle',
+    moveStatus: 'idle',
     lodgingStatus: 'idle',
     lodgingPickerStatus: 'idle',
     ...overrides,
@@ -135,6 +136,8 @@ describe('shared itinerary update helpers', () => {
       baseLocalState({ editStatus: 'saving' }),
       baseLocalState({ deleteStatus: 'confirming' }),
       baseLocalState({ deleteStatus: 'deleting' }),
+      baseLocalState({ moveStatus: 'pickingTarget' }),
+      baseLocalState({ moveStatus: 'saving' }),
       baseLocalState({ lodgingStatus: 'setting' }),
       baseLocalState({ lodgingStatus: 'clearing' }),
       baseLocalState({ lodgingPickerStatus: 'loading' }),
@@ -182,9 +185,11 @@ describe('shared itinerary update helpers', () => {
     assert.equal(isDayItinerarySharedUpdateReloadDisabled(baseLocalState({ reorderStatus: 'editing' })), false);
     assert.equal(isDayItinerarySharedUpdateReloadDisabled(baseLocalState({ editStatus: 'editing' })), false);
     assert.equal(isDayItinerarySharedUpdateReloadDisabled(baseLocalState({ deleteStatus: 'confirming' })), false);
+    assert.equal(isDayItinerarySharedUpdateReloadDisabled(baseLocalState({ moveStatus: 'pickingTarget' })), false);
     assert.equal(isDayItinerarySharedUpdateReloadDisabled(baseLocalState({ reorderStatus: 'saving' })), true);
     assert.equal(isDayItinerarySharedUpdateReloadDisabled(baseLocalState({ editStatus: 'saving' })), true);
     assert.equal(isDayItinerarySharedUpdateReloadDisabled(baseLocalState({ deleteStatus: 'deleting' })), true);
+    assert.equal(isDayItinerarySharedUpdateReloadDisabled(baseLocalState({ moveStatus: 'saving' })), true);
     assert.equal(isDayItinerarySharedUpdateReloadDisabled(baseLocalState({ lodgingStatus: 'setting' })), true);
     assert.equal(isDayItinerarySharedUpdateReloadDisabled(baseLocalState({ lodgingStatus: 'clearing' })), true);
     assert.equal(isDayItinerarySharedUpdateReloadDisabled(baseLocalState({ lodgingPickerStatus: 'selecting' })), false);

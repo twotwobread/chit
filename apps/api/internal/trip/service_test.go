@@ -133,6 +133,10 @@ type fakeRepository struct {
 	reorderedCalled              bool
 	reorderedItems               []ScheduleItem
 	reorderErr                   error
+	movedItemRecord              MoveScheduleItemToDayRecord
+	movedItemCalled              bool
+	movedItemResult              MoveScheduleItemToDayMutationResult
+	movedItemErr                 error
 	markedArrivedRecord          MarkScheduleItemArrivedRecord
 	markedArrivedCalled          bool
 	markedArrivedResult          MarkScheduleItemArrivedMutationResult
@@ -689,6 +693,18 @@ func (r *fakeRepository) ReorderScheduleItems(_ context.Context, record ReorderS
 		return r.reorderedItems, nil
 	}
 	return r.dayScheduleItems, nil
+}
+
+func (r *fakeRepository) MoveScheduleItemToDay(_ context.Context, record MoveScheduleItemToDayRecord) (MoveScheduleItemToDayMutationResult, error) {
+	r.movedItemRecord = record
+	r.movedItemCalled = true
+	if r.movedItemErr != nil {
+		return MoveScheduleItemToDayMutationResult{}, r.movedItemErr
+	}
+	if r.movedItemResult.MovedItem.ID != "" || r.movedItemResult.SourceItems != nil || r.movedItemResult.TargetItems != nil {
+		return r.movedItemResult, nil
+	}
+	return MoveScheduleItemToDayMutationResult{}, nil
 }
 
 func (r *fakeRepository) MarkScheduleItemArrived(_ context.Context, record MarkScheduleItemArrivedRecord) (MarkScheduleItemArrivedMutationResult, error) {
@@ -2715,6 +2731,101 @@ func TestServiceReorderScheduleItemsSuccess(t *testing.T) {
 		if result.Items[index].ID != want.ID || result.Items[index].ItemOrder != want.ItemOrder || result.Items[index].Version != want.Version {
 			t.Fatalf("unexpected reordered result at %d: got %#v want %#v", index, result.Items[index], want)
 		}
+	}
+}
+
+func TestServiceMoveScheduleItemToDayValidation(t *testing.T) {
+	validTrip := Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"}
+	tests := []struct {
+		name        string
+		user        string
+		tripID      string
+		sourceDayID string
+		itemID      string
+		input       MoveScheduleItemToDayInput
+		want        error
+		participant bool
+	}{
+		{name: "missing auth", user: " ", tripID: testTripID, sourceDayID: testUUID(7001), itemID: testUUID(7101), input: MoveScheduleItemToDayInput{TargetTripDayID: testUUID(7002), ClientVersion: 1}, want: ErrUnauthorized, participant: true},
+		{name: "invalid trip id", user: "user-1", tripID: "not-a-uuid", sourceDayID: testUUID(7001), itemID: testUUID(7101), input: MoveScheduleItemToDayInput{TargetTripDayID: testUUID(7002), ClientVersion: 1}, want: ErrValidation, participant: true},
+		{name: "invalid source day id", user: "user-1", tripID: testTripID, sourceDayID: "bad-day", itemID: testUUID(7101), input: MoveScheduleItemToDayInput{TargetTripDayID: testUUID(7002), ClientVersion: 1}, want: ErrValidation, participant: true},
+		{name: "invalid target day id", user: "user-1", tripID: testTripID, sourceDayID: testUUID(7001), itemID: testUUID(7101), input: MoveScheduleItemToDayInput{TargetTripDayID: "bad-day", ClientVersion: 1}, want: ErrValidation, participant: true},
+		{name: "same source and target", user: "user-1", tripID: testTripID, sourceDayID: testUUID(7001), itemID: testUUID(7101), input: MoveScheduleItemToDayInput{TargetTripDayID: testUUID(7001), ClientVersion: 1}, want: ErrValidation, participant: true},
+		{name: "invalid schedule item id", user: "user-1", tripID: testTripID, sourceDayID: testUUID(7001), itemID: "bad-item", input: MoveScheduleItemToDayInput{TargetTripDayID: testUUID(7002), ClientVersion: 1}, want: ErrValidation, participant: true},
+		{name: "invalid client version", user: "user-1", tripID: testTripID, sourceDayID: testUUID(7001), itemID: testUUID(7101), input: MoveScheduleItemToDayInput{TargetTripDayID: testUUID(7002), ClientVersion: 0}, want: ErrValidation, participant: true},
+		{name: "forbidden", user: "user-1", tripID: testTripID, sourceDayID: testUUID(7001), itemID: testUUID(7101), input: MoveScheduleItemToDayInput{TargetTripDayID: testUUID(7002), ClientVersion: 1}, want: ErrForbidden, participant: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := &fakeRepository{trip: validTrip, tripFound: true, isParticipant: tt.participant}
+			service := newTestService(repo)
+			_, err := service.MoveScheduleItemToDay(context.Background(), tt.user, tt.tripID, tt.sourceDayID, tt.itemID, tt.input)
+			if !errors.Is(err, tt.want) {
+				t.Fatalf("expected %v, got %v", tt.want, err)
+			}
+			if repo.movedItemCalled {
+				t.Fatal("expected invalid move not to reach repository")
+			}
+		})
+	}
+}
+
+func TestServiceMoveScheduleItemToDayConflict(t *testing.T) {
+	repo := &fakeRepository{
+		trip:          Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"},
+		tripFound:     true,
+		isParticipant: true,
+		movedItemErr:  ErrConflict,
+	}
+	service := newTestService(repo)
+
+	_, err := service.MoveScheduleItemToDay(context.Background(), "user-1", testTripID, testUUID(7001), testUUID(7101), MoveScheduleItemToDayInput{TargetTripDayID: testUUID(7002), ClientVersion: 3})
+	if !errors.Is(err, ErrConflict) {
+		t.Fatalf("expected conflict, got %v", err)
+	}
+	if !repo.movedItemCalled {
+		t.Fatal("expected repository move to be called")
+	}
+}
+
+func TestServiceMoveScheduleItemToDaySuccess(t *testing.T) {
+	moved := ScheduleItem{ID: testUUID(7101), ItemOrder: 2, Version: 4, Place: TripPlaceSummary{ID: testUUID(8001), Name: "도톤보리", Address: "Dotonbori", PlaceType: "food"}}
+	sourceItems := []ScheduleItem{{ID: testUUID(7102), ItemOrder: 1, Version: 1}}
+	targetItems := []ScheduleItem{{ID: testUUID(7201), ItemOrder: 1, Version: 1}, moved}
+	repo := &fakeRepository{
+		trip:          Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"},
+		tripFound:     true,
+		isParticipant: true,
+		movedItemResult: MoveScheduleItemToDayMutationResult{
+			MovedItem:   moved,
+			SourceItems: sourceItems,
+			TargetItems: targetItems,
+		},
+	}
+	service := newTestService(repo)
+
+	result, err := service.MoveScheduleItemToDay(context.Background(), "user-1", testTripID, testUUID(7001), testUUID(7101), MoveScheduleItemToDayInput{TargetTripDayID: testUUID(7002), ClientVersion: 3})
+	if err != nil {
+		t.Fatalf("MoveScheduleItemToDay returned error: %v", err)
+	}
+	if !repo.movedItemCalled {
+		t.Fatal("expected repository move to be called")
+	}
+	if repo.movedItemRecord.TripID != testTripID || repo.movedItemRecord.SourceTripDayID != testUUID(7001) || repo.movedItemRecord.TargetTripDayID != testUUID(7002) || repo.movedItemRecord.ScheduleItemID != testUUID(7101) || repo.movedItemRecord.ClientVersion != 3 {
+		t.Fatalf("unexpected move record: %#v", repo.movedItemRecord)
+	}
+	if result.SourceDay.ID != testUUID(7001) || result.TargetDay.ID != testUUID(7002) {
+		t.Fatalf("unexpected result days: source=%#v target=%#v", result.SourceDay, result.TargetDay)
+	}
+	if result.MovedItem.ID != moved.ID || result.MovedItem.Version != moved.Version {
+		t.Fatalf("unexpected moved item: %#v", result.MovedItem)
+	}
+	if len(result.SourceItems) != 1 || result.SourceItems[0].ID != sourceItems[0].ID {
+		t.Fatalf("unexpected source snapshot: %#v", result.SourceItems)
+	}
+	if len(result.TargetItems) != 2 || result.TargetItems[1].ID != moved.ID {
+		t.Fatalf("unexpected target snapshot: %#v", result.TargetItems)
 	}
 }
 
