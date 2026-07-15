@@ -167,9 +167,9 @@ test('builds day-tabbed settlement expense history with selected-day editable ro
   assert.equal(viewModel.helper, '총 2건의 지출을 확인하고 수정할 수 있어요.');
   assert.equal(viewModel.selectedDayId, 'day-3');
   assert.deepEqual(viewModel.dayChips, [
-    { id: 'day-1', label: '1일차', dateLabel: '2026.07.10', statusLabel: '1건' },
+    { id: 'day-1', label: '1일차', dateLabel: '2026.07.10', statusLabel: '1건 · 2,000엔' },
     { id: 'day-2', label: '2일차', dateLabel: '2026.07.11', statusLabel: '지출 없음' },
-    { id: 'day-3', label: '3일차', dateLabel: '2026.07.12', statusLabel: '1건' },
+    { id: 'day-3', label: '3일차', dateLabel: '2026.07.12', statusLabel: '1건 · 18,500원' },
   ]);
   assert.deepEqual(
     [
@@ -178,7 +178,7 @@ test('builds day-tabbed settlement expense history with selected-day editable ro
       viewModel.selectedSection.helper,
       viewModel.selectedSection.expenseCount,
     ],
-    ['day-3', '3일차', '2026.07.12 · 1건', 1],
+    ['day-3', '3일차', '2026.07.12 · 1건 · 18,500원', 1],
   );
   assert.deepEqual(
     viewModel.selectedSection.rows.map((row) => [
@@ -202,7 +202,32 @@ test('builds day-tabbed settlement expense history with selected-day editable ro
   );
 });
 
-test('keeps excluded expenses in history with an on-site settled marker', () => {
+test('summarizes multi-currency settlement expense history totals without conversion', () => {
+  const viewModel = buildSettlementExpenseHistoryViewModel({
+    tripId: 'trip-a',
+    selectedDayId: 'day-1',
+    days: [
+      {
+        day: tripDay({ id: 'day-1', date: '2026-07-10', dayOrder: 1 }),
+        expenses: [
+          dayExpense({ id: 'expense-jpy', amountMinor: 12000, currency: 'JPY' }),
+          dayExpense({ id: 'expense-krw', amountMinor: 30000, currency: 'KRW' }),
+        ],
+      },
+    ],
+  });
+
+  assert.equal(viewModel.status, 'success');
+  if (viewModel.status !== 'success') {
+    return;
+  }
+  assert.deepEqual(viewModel.dayChips, [
+    { id: 'day-1', label: '1일차', dateLabel: '2026.07.10', statusLabel: '2건 · 12,000엔 · 30,000원' },
+  ]);
+  assert.equal(viewModel.selectedSection.helper, '2026.07.10 · 2건 · 12,000엔 · 30,000원');
+});
+
+test('keeps excluded expenses in history totals with an on-site settled marker', () => {
   const viewModel = buildSettlementExpenseHistoryViewModel({
     tripId: 'trip-a',
     selectedDayId: 'day-1',
@@ -219,6 +244,8 @@ test('keeps excluded expenses in history with an on-site settled marker', () => 
     return;
   }
   assert.equal(viewModel.helper, '총 1건의 지출을 확인하고 수정할 수 있어요.');
+  assert.equal(viewModel.dayChips[0].statusLabel, '1건 · 1,200엔');
+  assert.equal(viewModel.selectedSection.helper, '2026.07.10 · 1건 · 1,200엔');
   assert.equal(viewModel.selectedSection.rows[0].settlementLabel, '현장 정산 완료');
   assert.equal(viewModel.selectedSection.rows[0].detailLine, '민수 결제 · 2명 분할 · 현장 정산 완료');
   assert.equal(viewModel.selectedSection.rows[0].splitLabel, '2명 분할');
@@ -259,11 +286,12 @@ test('builds compact trip-level settlement expense rows under 여행 전체', ()
     return;
   }
   assert.equal(viewModel.selectedSection.title, '여행 전체');
+  assert.equal(viewModel.selectedSection.helper, '1건 · 650,000원');
   assert.deepEqual(viewModel.dayChips[0], {
     id: '__trip_expenses__',
     label: '여행 전체',
     dateLabel: undefined,
-    statusLabel: '1건',
+    statusLabel: '1건 · 650,000원',
   });
   assert.deepEqual(
     viewModel.selectedSection.rows.map((row) => [

@@ -56,6 +56,7 @@ export type SettlementExpenseHistoryDaySectionViewModel = {
   title: string;
   helper: string;
   expenseCount: number;
+  expenseSummaryLabel: string;
   rows: DayExpenseRowViewModel[];
   emptyTitle: string | null;
   emptyHelper: string | null;
@@ -113,16 +114,14 @@ export function buildSettlementExpenseHistoryViewModel({
       }),
     );
     const expenseCount = rows.length;
+    const expenseSummaryLabel = formatExpenseSummaryLabel(dayInput.expenses.slice(0, expenseCount), expenseCount);
 
     return {
       dayId: dayInput.day.id,
       title: isTripSection ? '여행 전체' : formatTripDayLabel(dayInput.day.dayOrder),
-      helper: isTripSection
-        ? expenseCount > 0
-          ? `${expenseCount}건`
-          : '지출 없음'
-        : `${formatTripDayDate(dayInput.day.date)} · ${expenseCount > 0 ? `${expenseCount}건` : '지출 없음'}`,
+      helper: isTripSection ? expenseSummaryLabel : `${formatTripDayDate(dayInput.day.date)} · ${expenseSummaryLabel}`,
       expenseCount,
+      expenseSummaryLabel,
       rows,
       emptyTitle:
         expenseCount === 0
@@ -163,11 +162,29 @@ export function buildSettlementExpenseHistoryViewModel({
       id: section.dayId,
       label: section.title,
       dateLabel: days[index].day.id === tripExpenseSectionId ? undefined : formatTripDayDate(days[index].day.date),
-      statusLabel: section.expenseCount > 0 ? `${section.expenseCount}건` : '지출 없음',
+      statusLabel: section.expenseSummaryLabel,
     })),
     selectedDayId: selectedSection.dayId,
     selectedSection,
   };
+}
+
+function formatExpenseSummaryLabel(expenses: DayExpenseListItem[], expenseCount: number): string {
+  if (expenseCount === 0) {
+    return '지출 없음';
+  }
+
+  const totalLabel = formatExpenseTotalLabel(expenses);
+  return totalLabel ? `${expenseCount}건 · ${totalLabel}` : `${expenseCount}건`;
+}
+
+function formatExpenseTotalLabel(expenses: DayExpenseListItem[]): string {
+  const totalsByCurrency = new Map<SupportedCurrency, number>();
+  for (const expense of expenses) {
+    totalsByCurrency.set(expense.currency, (totalsByCurrency.get(expense.currency) ?? 0) + expense.amountMinor);
+  }
+
+  return [...totalsByCurrency].map(([currency, amountMinor]) => formatMoney(amountMinor, currency)).join(' · ');
 }
 
 function compactSettlementExpenseRow({
