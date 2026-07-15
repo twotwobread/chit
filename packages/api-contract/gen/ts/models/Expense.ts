@@ -33,5 +33,9 @@ export type Expense = {
     memo: string | null;
     splitPolicy: ExpenseSplitPolicy;
     splits: Array<ExpenseSplit>;
+    /**
+     * Whether this expense is included in final settlement calculations. False means it was settled on-site and remains in history/total spend only.
+     */
+    includeInSettlement: boolean;
     createdAt: string;
 };

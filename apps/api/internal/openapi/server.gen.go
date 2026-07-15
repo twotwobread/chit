@@ -288,6 +288,9 @@ type CreateQuickExpenseRequest struct {
 	// AmountMinor Positive amount in currency minor units.
 	AmountMinor int64 `json:"amountMinor"`
 
+	// IncludeInSettlement Whether to include the expense in final settlement calculations. Defaults to true when omitted.
+	IncludeInSettlement *bool `json:"includeInSettlement,omitempty"`
+
 	// ParticipantIds Required only when splitPolicy is equal. Must be omitted for manual.
 	ParticipantIds *[]string `json:"participantIds,omitempty"`
 
@@ -321,7 +324,10 @@ type CreateTripExpenseRequest struct {
 
 	// ExpenseDate Actual payment/business date. It may be outside the trip range.
 	ExpenseDate openapi_types.Date `json:"expenseDate"`
-	Memo        *string            `json:"memo"`
+
+	// IncludeInSettlement Whether to include the expense in final settlement calculations. Defaults to true when omitted.
+	IncludeInSettlement *bool   `json:"includeInSettlement,omitempty"`
+	Memo                *string `json:"memo"`
 
 	// ParticipantIds Required only when splitPolicy is equal. Must be omitted for manual.
 	ParticipantIds     *[]string `json:"participantIds,omitempty"`
@@ -400,12 +406,15 @@ type DayExpenseListItem struct {
 	Currency    SupportedCurrency `json:"currency"`
 
 	// DisplayTitle User-facing title resolved by the server. For current schedule-item quick expenses this is the linked place/schedule display name or fallback place name.
-	DisplayTitle   string                    `json:"displayTitle"`
-	ExpenseDate    openapi_types.Date        `json:"expenseDate"`
-	Id             string                    `json:"id"`
-	Payer          ExpenseParticipantDisplay `json:"payer"`
-	Place          *ExpensePlaceDisplay      `json:"place"`
-	ScheduleItemId *string                   `json:"scheduleItemId"`
+	DisplayTitle string             `json:"displayTitle"`
+	ExpenseDate  openapi_types.Date `json:"expenseDate"`
+	Id           string             `json:"id"`
+
+	// IncludeInSettlement Whether this expense is included in final settlement calculations. False means it was settled on-site and remains in history/total spend only.
+	IncludeInSettlement bool                      `json:"includeInSettlement"`
+	Payer               ExpenseParticipantDisplay `json:"payer"`
+	Place               *ExpensePlaceDisplay      `json:"place"`
+	ScheduleItemId      *string                   `json:"scheduleItemId"`
 
 	// SplitPolicy Persisted split policy for current quick expenses.
 	SplitPolicy ExpenseSplitPolicy        `json:"splitPolicy"`
@@ -449,12 +458,15 @@ type Expense struct {
 	Currency    SupportedCurrency `json:"currency"`
 
 	// DisplayTitle User-facing title resolved by the server.
-	DisplayTitle string                    `json:"displayTitle"`
-	ExpenseDate  openapi_types.Date        `json:"expenseDate"`
-	Id           string                    `json:"id"`
-	Memo         *string                   `json:"memo"`
-	Payer        ExpenseParticipantDisplay `json:"payer"`
-	Place        *ExpensePlaceDisplay      `json:"place"`
+	DisplayTitle string             `json:"displayTitle"`
+	ExpenseDate  openapi_types.Date `json:"expenseDate"`
+	Id           string             `json:"id"`
+
+	// IncludeInSettlement Whether this expense is included in final settlement calculations. False means it was settled on-site and remains in history/total spend only.
+	IncludeInSettlement bool                      `json:"includeInSettlement"`
+	Memo                *string                   `json:"memo"`
+	Payer               ExpenseParticipantDisplay `json:"payer"`
+	Place               *ExpensePlaceDisplay      `json:"place"`
 
 	// ScheduleItemId Source schedule item. Present for schedule-item expenses; may become null if later detached to trip-level.
 	ScheduleItemId *string `json:"scheduleItemId"`
@@ -1210,6 +1222,9 @@ type TripScheduleItemsDayListItem struct {
 // UpdateExpenseRequest defines model for UpdateExpenseRequest.
 type UpdateExpenseRequest struct {
 	AmountMinor int64 `json:"amountMinor"`
+
+	// IncludeInSettlement When provided, updates whether the expense is included in final settlement calculations. Omit to keep the existing value.
+	IncludeInSettlement *bool `json:"includeInSettlement,omitempty"`
 
 	// Memo Optional memo. Empty strings are normalized to null by the server.
 	Memo *string `json:"memo"`

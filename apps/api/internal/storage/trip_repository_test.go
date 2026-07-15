@@ -182,6 +182,20 @@ func TestTripSettlementInputUsesLiveAndFallbackParticipantSnapshots(t *testing.T
 	`, expenseID, ownerParticipantID); err != nil {
 		t.Fatalf("insert split: %v", err)
 	}
+	var excludedExpenseID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO expenses (trip_id, anchor_type, expense_date, amount_minor, currency, split_policy, payer_participant_id, payer_display_name, include_in_settlement, created_by)
+		VALUES ($1::uuid, 'trip', '2026-07-10', 300, 'JPY', 'manual', $2::uuid, '지영', false, $3::uuid)
+		RETURNING id::text
+	`, tripID, memberParticipantID, ownerUserID).Scan(&excludedExpenseID); err != nil {
+		t.Fatalf("insert excluded expense: %v", err)
+	}
+	if _, err := store.pool.Exec(ctx, `
+		INSERT INTO expense_splits (expense_id, participant_id, participant_display_name, amount_minor, split_order)
+		VALUES ($1::uuid, $2::uuid, '민수', 300, 1)
+	`, excludedExpenseID, ownerParticipantID); err != nil {
+		t.Fatalf("insert excluded split: %v", err)
+	}
 	if _, err := store.pool.Exec(ctx, `DELETE FROM trip_participants WHERE id = $1::uuid`, memberParticipantID); err != nil {
 		t.Fatalf("delete member participant: %v", err)
 	}
@@ -197,6 +211,9 @@ func TestTripSettlementInputUsesLiveAndFallbackParticipantSnapshots(t *testing.T
 		t.Fatalf("expected one expense input, got %#v", input.Expenses)
 	}
 	expense := input.Expenses[0]
+	if expense.ExpenseID == excludedExpenseID {
+		t.Fatalf("expected excluded expense to be omitted from settlement input, got %#v", input.Expenses)
+	}
 	if expense.PayerParticipantID != nil || expense.PayerDisplayName != "지영" || expense.PayerParticipantLive {
 		t.Fatalf("expected fallback payer snapshot, got %#v", expense)
 	}

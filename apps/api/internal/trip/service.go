@@ -712,16 +712,17 @@ func (s *Service) UpdateTripExpense(ctx context.Context, userID string, tripID s
 	}
 
 	expense, err := s.repo.UpdateTripExpense(ctx, UpdateExpenseRecord{
-		TripID:             tripID,
-		ExpenseID:          expenseID,
-		AmountMinor:        input.AmountMinor,
-		PayerParticipantID: payerParticipantID,
-		SplitPolicy:        splitPolicy,
-		ParticipantIDs:     participantIDs,
-		ManualSplits:       manualSplits,
-		Memo:               memo,
-		Title:              title,
-		ScheduleItemID:     nil,
+		TripID:              tripID,
+		ExpenseID:           expenseID,
+		AmountMinor:         input.AmountMinor,
+		PayerParticipantID:  payerParticipantID,
+		SplitPolicy:         splitPolicy,
+		ParticipantIDs:      participantIDs,
+		ManualSplits:        manualSplits,
+		Memo:                memo,
+		Title:               title,
+		ScheduleItemID:      nil,
+		IncludeInSettlement: input.IncludeInSettlement,
 	})
 	if err != nil {
 		return UpdateExpenseResult{}, err
@@ -779,17 +780,18 @@ func (s *Service) UpdateExpense(ctx context.Context, userID string, tripID strin
 	}
 
 	expense, err := s.repo.UpdateExpense(ctx, UpdateExpenseRecord{
-		TripID:             strings.TrimSpace(tripID),
-		TripDayID:          strings.TrimSpace(tripDayID),
-		ExpenseID:          expenseID,
-		AmountMinor:        input.AmountMinor,
-		PayerParticipantID: payerParticipantID,
-		SplitPolicy:        splitPolicy,
-		ParticipantIDs:     participantIDs,
-		ManualSplits:       manualSplits,
-		Memo:               memo,
-		Title:              title,
-		ScheduleItemID:     scheduleItemID,
+		TripID:              strings.TrimSpace(tripID),
+		TripDayID:           strings.TrimSpace(tripDayID),
+		ExpenseID:           expenseID,
+		AmountMinor:         input.AmountMinor,
+		PayerParticipantID:  payerParticipantID,
+		SplitPolicy:         splitPolicy,
+		ParticipantIDs:      participantIDs,
+		ManualSplits:        manualSplits,
+		Memo:                memo,
+		Title:               title,
+		ScheduleItemID:      scheduleItemID,
+		IncludeInSettlement: input.IncludeInSettlement,
 	})
 	if err != nil {
 		return UpdateExpenseResult{}, err
@@ -830,15 +832,16 @@ func (s *Service) CreateQuickExpense(ctx context.Context, userID string, tripID 
 	}
 
 	return s.repo.CreateQuickExpense(ctx, CreateQuickExpenseRecord{
-		TripID:             strings.TrimSpace(tripID),
-		TripDayID:          strings.TrimSpace(tripDayID),
-		ScheduleItemID:     scheduleItemID,
-		AmountMinor:        input.AmountMinor,
-		PayerParticipantID: payerParticipantID,
-		SplitPolicy:        splitPolicy,
-		ParticipantIDs:     participantIDs,
-		ManualSplits:       manualSplits,
-		CreatedBy:          userID,
+		TripID:              strings.TrimSpace(tripID),
+		TripDayID:           strings.TrimSpace(tripDayID),
+		ScheduleItemID:      scheduleItemID,
+		AmountMinor:         input.AmountMinor,
+		PayerParticipantID:  payerParticipantID,
+		SplitPolicy:         splitPolicy,
+		ParticipantIDs:      participantIDs,
+		ManualSplits:        manualSplits,
+		IncludeInSettlement: includeInSettlementDefaultTrue(input.IncludeInSettlement),
+		CreatedBy:           userID,
 	})
 }
 
@@ -913,19 +916,24 @@ func (s *Service) CreateTripExpense(ctx context.Context, userID string, tripID s
 	}
 
 	return s.repo.CreateTripExpense(ctx, CreateTripExpenseRecord{
-		TripID:             tripID,
-		Title:              title,
-		ExpenseDate:        expenseDate,
-		TripDayID:          tripDayID,
-		ScheduleItemID:     scheduleItemID,
-		AmountMinor:        input.AmountMinor,
-		PayerParticipantID: payerParticipantID,
-		SplitPolicy:        splitPolicy,
-		ParticipantIDs:     participantIDs,
-		ManualSplits:       manualSplits,
-		Memo:               memo,
-		CreatedBy:          userID,
+		TripID:              tripID,
+		Title:               title,
+		ExpenseDate:         expenseDate,
+		TripDayID:           tripDayID,
+		ScheduleItemID:      scheduleItemID,
+		AmountMinor:         input.AmountMinor,
+		PayerParticipantID:  payerParticipantID,
+		SplitPolicy:         splitPolicy,
+		ParticipantIDs:      participantIDs,
+		ManualSplits:        manualSplits,
+		Memo:                memo,
+		IncludeInSettlement: includeInSettlementDefaultTrue(input.IncludeInSettlement),
+		CreatedBy:           userID,
 	})
+}
+
+func includeInSettlementDefaultTrue(value *bool) bool {
+	return value == nil || *value
 }
 
 func normalizeExpenseTitle(value *string, required bool) (*string, error) {

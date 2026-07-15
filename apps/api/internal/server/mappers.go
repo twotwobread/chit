@@ -336,19 +336,20 @@ func dayExpenseListItemToOpenAPI(expense trip.DayExpenseListItem) openapi.DayExp
 		})
 	}
 	return openapi.DayExpenseListItem{
-		Id:             expense.ID,
-		AnchorType:     openapi.ExpenseAnchorType(expense.AnchorType),
-		TripDayId:      expense.TripDayID,
-		ScheduleItemId: expense.ScheduleItemID,
-		ExpenseDate:    dateToOpenAPI(expense.ExpenseDate),
-		DisplayTitle:   expense.DisplayTitle,
-		Place:          expensePlaceDisplayToOpenAPI(expense.Place),
-		AmountMinor:    expense.AmountMinor,
-		Currency:       openapi.SupportedCurrency(expense.Currency),
-		Payer:          expenseParticipantDisplayToOpenAPI(expense.Payer),
-		SplitPolicy:    openapi.ExpenseSplitPolicy(expense.SplitPolicy),
-		Splits:         splits,
-		CreatedAt:      expense.CreatedAt.UTC(),
+		Id:                  expense.ID,
+		AnchorType:          openapi.ExpenseAnchorType(expense.AnchorType),
+		TripDayId:           expense.TripDayID,
+		ScheduleItemId:      expense.ScheduleItemID,
+		ExpenseDate:         dateToOpenAPI(expense.ExpenseDate),
+		DisplayTitle:        expense.DisplayTitle,
+		Place:               expensePlaceDisplayToOpenAPI(expense.Place),
+		AmountMinor:         expense.AmountMinor,
+		Currency:            openapi.SupportedCurrency(expense.Currency),
+		Payer:               expenseParticipantDisplayToOpenAPI(expense.Payer),
+		SplitPolicy:         openapi.ExpenseSplitPolicy(expense.SplitPolicy),
+		Splits:              splits,
+		IncludeInSettlement: expense.IncludeInSettlement,
+		CreatedAt:           expense.CreatedAt.UTC(),
 	}
 }
 
@@ -361,22 +362,23 @@ func expenseToOpenAPI(expense trip.Expense) openapi.Expense {
 		})
 	}
 	return openapi.Expense{
-		Id:             expense.ID,
-		TripId:         expense.TripID,
-		AnchorType:     openapi.ExpenseAnchorType(expense.AnchorType),
-		TripDayId:      expense.TripDayID,
-		ScheduleItemId: expense.ScheduleItemID,
-		ExpenseDate:    dateToOpenAPI(expense.ExpenseDate),
-		Title:          expense.Title,
-		DisplayTitle:   expense.DisplayTitle,
-		Place:          expensePlaceDisplayToOpenAPI(expense.Place),
-		AmountMinor:    expense.AmountMinor,
-		Currency:       openapi.SupportedCurrency(expense.Currency),
-		Payer:          expenseParticipantDisplayToOpenAPI(expense.Payer),
-		Memo:           expense.Memo,
-		SplitPolicy:    openapi.ExpenseSplitPolicy(expense.SplitPolicy),
-		Splits:         splits,
-		CreatedAt:      expense.CreatedAt.UTC(),
+		Id:                  expense.ID,
+		TripId:              expense.TripID,
+		AnchorType:          openapi.ExpenseAnchorType(expense.AnchorType),
+		TripDayId:           expense.TripDayID,
+		ScheduleItemId:      expense.ScheduleItemID,
+		ExpenseDate:         dateToOpenAPI(expense.ExpenseDate),
+		Title:               expense.Title,
+		DisplayTitle:        expense.DisplayTitle,
+		Place:               expensePlaceDisplayToOpenAPI(expense.Place),
+		AmountMinor:         expense.AmountMinor,
+		Currency:            openapi.SupportedCurrency(expense.Currency),
+		Payer:               expenseParticipantDisplayToOpenAPI(expense.Payer),
+		Memo:                expense.Memo,
+		SplitPolicy:         openapi.ExpenseSplitPolicy(expense.SplitPolicy),
+		Splits:              splits,
+		IncludeInSettlement: expense.IncludeInSettlement,
+		CreatedAt:           expense.CreatedAt.UTC(),
 	}
 }
 

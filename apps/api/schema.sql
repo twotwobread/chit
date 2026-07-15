@@ -425,6 +425,7 @@ CREATE TABLE expenses (
   payer_participant_id uuid REFERENCES trip_participants(id) ON DELETE SET NULL,
   payer_display_name text NOT NULL,
   memo text,
+  include_in_settlement boolean NOT NULL DEFAULT true,
   created_by uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),

@@ -76,36 +76,39 @@ type CreateManualDayLodgingPlaceInput struct {
 }
 
 type CreateQuickExpenseInput struct {
-	ScheduleItemID     string
-	AmountMinor        int64
-	PayerParticipantID string
-	SplitPolicy        string
-	ParticipantIDs     []string
-	ManualSplits       []ManualExpenseSplitInput
+	ScheduleItemID      string
+	AmountMinor         int64
+	PayerParticipantID  string
+	SplitPolicy         string
+	ParticipantIDs      []string
+	ManualSplits        []ManualExpenseSplitInput
+	IncludeInSettlement *bool
 }
 
 type CreateTripExpenseInput struct {
-	Title              *string
-	ExpenseDate        string
-	TripDayID          *string
-	ScheduleItemID     *string
-	AmountMinor        int64
-	PayerParticipantID string
-	SplitPolicy        string
-	ParticipantIDs     []string
-	ManualSplits       []ManualExpenseSplitInput
-	Memo               *string
+	Title               *string
+	ExpenseDate         string
+	TripDayID           *string
+	ScheduleItemID      *string
+	AmountMinor         int64
+	PayerParticipantID  string
+	SplitPolicy         string
+	ParticipantIDs      []string
+	ManualSplits        []ManualExpenseSplitInput
+	Memo                *string
+	IncludeInSettlement *bool
 }
 
 type UpdateExpenseInput struct {
-	AmountMinor        int64
-	PayerParticipantID string
-	SplitPolicy        string
-	ParticipantIDs     []string
-	ManualSplits       []ManualExpenseSplitInput
-	Memo               *string
-	Title              *string
-	ScheduleItemID     *string
+	AmountMinor         int64
+	PayerParticipantID  string
+	SplitPolicy         string
+	ParticipantIDs      []string
+	ManualSplits        []ManualExpenseSplitInput
+	Memo                *string
+	Title               *string
+	ScheduleItemID      *string
+	IncludeInSettlement *bool
 }
 
 type ManualExpenseSplitInput struct {
@@ -238,44 +241,47 @@ type CreateManualDayLodgingPlaceRecord struct {
 }
 
 type CreateQuickExpenseRecord struct {
-	TripID             string
-	TripDayID          string
-	ScheduleItemID     string
-	AmountMinor        int64
-	PayerParticipantID string
-	SplitPolicy        string
-	ParticipantIDs     []string
-	ManualSplits       []ManualExpenseSplitInput
-	CreatedBy          string
+	TripID              string
+	TripDayID           string
+	ScheduleItemID      string
+	AmountMinor         int64
+	PayerParticipantID  string
+	SplitPolicy         string
+	ParticipantIDs      []string
+	ManualSplits        []ManualExpenseSplitInput
+	IncludeInSettlement bool
+	CreatedBy           string
 }
 
 type CreateTripExpenseRecord struct {
-	TripID             string
-	Title              *string
-	ExpenseDate        time.Time
-	TripDayID          *string
-	ScheduleItemID     *string
-	AmountMinor        int64
-	PayerParticipantID string
-	SplitPolicy        string
-	ParticipantIDs     []string
-	ManualSplits       []ManualExpenseSplitInput
-	Memo               *string
-	CreatedBy          string
+	TripID              string
+	Title               *string
+	ExpenseDate         time.Time
+	TripDayID           *string
+	ScheduleItemID      *string
+	AmountMinor         int64
+	PayerParticipantID  string
+	SplitPolicy         string
+	ParticipantIDs      []string
+	ManualSplits        []ManualExpenseSplitInput
+	Memo                *string
+	IncludeInSettlement bool
+	CreatedBy           string
 }
 
 type UpdateExpenseRecord struct {
-	TripID             string
-	TripDayID          string
-	ExpenseID          string
-	AmountMinor        int64
-	PayerParticipantID string
-	SplitPolicy        string
-	ParticipantIDs     []string
-	ManualSplits       []ManualExpenseSplitInput
-	Memo               *string
-	Title              *string
-	ScheduleItemID     *string
+	TripID              string
+	TripDayID           string
+	ExpenseID           string
+	AmountMinor         int64
+	PayerParticipantID  string
+	SplitPolicy         string
+	ParticipantIDs      []string
+	ManualSplits        []ManualExpenseSplitInput
+	Memo                *string
+	Title               *string
+	ScheduleItemID      *string
+	IncludeInSettlement *bool
 }
 
 type ExpenseSplitParticipant struct {
@@ -548,22 +554,23 @@ type ExpenseSplit struct {
 }
 
 type Expense struct {
-	ID             string
-	TripID         string
-	AnchorType     string
-	TripDayID      *string
-	ScheduleItemID *string
-	ExpenseDate    string
-	Title          *string
-	DisplayTitle   string
-	Place          *ExpensePlaceDisplay
-	AmountMinor    int64
-	Currency       string
-	Payer          ExpenseParticipantDisplay
-	Memo           *string
-	SplitPolicy    string
-	Splits         []ExpenseSplit
-	CreatedAt      time.Time
+	ID                  string
+	TripID              string
+	AnchorType          string
+	TripDayID           *string
+	ScheduleItemID      *string
+	ExpenseDate         string
+	Title               *string
+	DisplayTitle        string
+	Place               *ExpensePlaceDisplay
+	AmountMinor         int64
+	Currency            string
+	Payer               ExpenseParticipantDisplay
+	Memo                *string
+	SplitPolicy         string
+	Splits              []ExpenseSplit
+	IncludeInSettlement bool
+	CreatedAt           time.Time
 }
 
 type GetExpenseResult struct {
@@ -589,19 +596,20 @@ type DayExpenseSplitListItem struct {
 }
 
 type DayExpenseListItem struct {
-	ID             string
-	AnchorType     string
-	TripDayID      *string
-	ScheduleItemID *string
-	ExpenseDate    string
-	DisplayTitle   string
-	Place          *ExpensePlaceDisplay
-	AmountMinor    int64
-	Currency       string
-	Payer          ExpenseParticipantDisplay
-	SplitPolicy    string
-	Splits         []DayExpenseSplitListItem
-	CreatedAt      time.Time
+	ID                  string
+	AnchorType          string
+	TripDayID           *string
+	ScheduleItemID      *string
+	ExpenseDate         string
+	DisplayTitle        string
+	Place               *ExpensePlaceDisplay
+	AmountMinor         int64
+	Currency            string
+	Payer               ExpenseParticipantDisplay
+	SplitPolicy         string
+	Splits              []DayExpenseSplitListItem
+	IncludeInSettlement bool
+	CreatedAt           time.Time
 }
 
 type ListDayExpensesResult struct {

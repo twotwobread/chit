@@ -4507,6 +4507,7 @@ components:
         - payer
         - splitPolicy
         - splits
+        - includeInSettlement
         - createdAt
       properties:
         id:
@@ -4544,6 +4545,9 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/DayExpenseSplitListItem'
+        includeInSettlement:
+          type: boolean
+          description: Whether this expense is included in final settlement calculations. False means it was settled on-site and remains in history/total spend only.
         createdAt:
           type: string
           format: date-time
@@ -4633,6 +4637,9 @@ components:
           type: string
           nullable: true
           description: Same-day schedule item to link, or null to clear the linked place.
+        includeInSettlement:
+          type: boolean
+          description: When provided, updates whether the expense is included in final settlement calculations. Omit to keep the existing value.
     UpdateExpenseResponse:
       type: object
       additionalProperties: false
@@ -4696,6 +4703,9 @@ components:
           type: string
           nullable: true
           maxLength: 240
+        includeInSettlement:
+          type: boolean
+          description: Whether to include the expense in final settlement calculations. Defaults to true when omitted.
     CreateTripExpenseResponse:
       type: object
       additionalProperties: false
@@ -4739,6 +4749,9 @@ components:
           items:
             $ref: '#/components/schemas/ManualExpenseSplitInput'
           description: Required only when splitPolicy is manual. Must be omitted for equal.
+        includeInSettlement:
+          type: boolean
+          description: Whether to include the expense in final settlement calculations. Defaults to true when omitted.
     CreateQuickExpenseResponse:
       type: object
       additionalProperties: false
@@ -4766,6 +4779,7 @@ components:
         - memo
         - splitPolicy
         - splits
+        - includeInSettlement
         - createdAt
       properties:
         id:
@@ -4815,6 +4829,9 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ExpenseSplit'
+        includeInSettlement:
+          type: boolean
+          description: Whether this expense is included in final settlement calculations. False means it was settled on-site and remains in history/total spend only.
         createdAt:
           type: string
           format: date-time

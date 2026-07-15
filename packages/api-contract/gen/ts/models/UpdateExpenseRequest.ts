@@ -31,4 +31,8 @@ export type UpdateExpenseRequest = {
      * Same-day schedule item to link, or null to clear the linked place.
      */
     scheduleItemId: string | null;
+    /**
+     * When provided, updates whether the expense is included in final settlement calculations. Omit to keep the existing value.
+     */
+    includeInSettlement?: boolean;
 };
