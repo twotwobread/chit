@@ -220,9 +220,7 @@ function TodayReadyContent({
         />
       ) : null}
 
-      {viewModel.status === 'emptyItinerary' ||
-      viewModel.status === 'completed' ||
-      viewModel.status === 'recoverNeeded' ? (
+      {viewModel.status === 'emptyItinerary' || viewModel.status === 'recoverNeeded' ? (
         <Card>
           <Text style={styles.eyebrow}>
             {viewModel.dayLabel} · {viewModel.formattedDate}
@@ -230,6 +228,29 @@ function TodayReadyContent({
           <Text style={styles.cardTitle}>{viewModel.title}</Text>
           <Text style={styles.cardHelper}>{viewModel.helper}</Text>
           <PrimaryButton label={viewModel.primaryAction.label} onPress={() => onAction(viewModel.primaryAction)} />
+        </Card>
+      ) : null}
+
+      {viewModel.status === 'completed' ? (
+        <Card>
+          <Text style={styles.eyebrow}>
+            {viewModel.dayLabel} · {viewModel.formattedDate}
+          </Text>
+          <Text style={styles.cardTitle}>{viewModel.title}</Text>
+          <Text style={styles.cardHelper}>{viewModel.helper}</Text>
+          <PrimaryButton label={viewModel.primaryAction.label} onPress={() => onAction(viewModel.primaryAction)} />
+          <SecondaryButton
+            disabled={viewModel.lodgingNavigationAction.disabled}
+            label={viewModel.lodgingNavigationAction.label}
+            onPress={() => {
+              if (viewModel.lodgingNavigationAction.action) {
+                onAction(viewModel.lodgingNavigationAction.action);
+              }
+            }}
+          />
+          {viewModel.lodgingNavigationAction.helper ? (
+            <Text style={styles.cardHelper}>{viewModel.lodgingNavigationAction.helper}</Text>
+          ) : null}
         </Card>
       ) : null}
 
