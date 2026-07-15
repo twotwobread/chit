@@ -82,6 +82,7 @@ export function useQuickExpenseController() {
   const [selectedSplitParticipantIds, setSelectedSplitParticipantIds] = useState<string[]>([]);
   const [splitPolicy, setSplitPolicy] = useState<QuickExpenseSplitPolicy>('equal');
   const [manualSplitInputs, setManualSplitInputs] = useState<QuickExpenseManualSplitInput[]>([]);
+  const [includeInSettlement, setIncludeInSettlement] = useState(true);
   const [errors, setErrors] = useState<QuickExpenseFormErrors>({});
   const [saving, setSaving] = useState(false);
   const [formMessage, setFormMessage] = useState<string | null>(null);
@@ -146,6 +147,7 @@ export function useQuickExpenseController() {
       setSelectedSplitParticipantIds(buildDefaultSplitParticipantIds(participants));
       setSplitPolicy('equal');
       setManualSplitInputs([]);
+      setIncludeInSettlement(true);
       setTitleInput('');
       setExpenseDateInput(localDateString());
       setAmountInput('');
@@ -247,6 +249,11 @@ export function useQuickExpenseController() {
     setFormMessage(null);
   };
 
+  const toggleIncludeInSettlement = () => {
+    setIncludeInSettlement((current) => !current);
+    setFormMessage(null);
+  };
+
   const updateManualSplitInput = (participantId: string, amount: string) => {
     setManualSplitInputs((current) => {
       const index = current.findIndex((split) => split.participantId === participantId);
@@ -326,6 +333,7 @@ export function useQuickExpenseController() {
       manualSplitInputs: activeManualSplitInputs,
       payerParticipantId,
       memoInput,
+      includeInSettlement,
     });
     if (!validation.ok) {
       setErrors(validation.errors);
@@ -349,6 +357,7 @@ export function useQuickExpenseController() {
       participantIds: selectedSplitParticipantIds,
       manualSplitInputs: activeManualSplitInputs,
       payerParticipantId,
+      includeInSettlement,
     });
     if (!validation.ok) {
       setErrors(validation.errors);
@@ -399,6 +408,7 @@ export function useQuickExpenseController() {
     expenseDateInput,
     formMessage,
     goToLogin,
+    includeInSettlement,
     load,
     manualSplitInputs,
     memoInput,
@@ -417,6 +427,7 @@ export function useQuickExpenseController() {
     state,
     submit,
     titleInput,
+    toggleIncludeInSettlement,
     toggleSplitParticipant,
     updateAmountInput,
     updateExpenseDateInput,

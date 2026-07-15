@@ -139,6 +139,45 @@ export const styles = StyleSheet.create({
     fontFamily: theme.font.family.bold,
     fontWeight: theme.font.weight.bold,
   },
+  sheetContent: {
+    gap: theme.space[5],
+  },
+  sheetTitle: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.title,
+    fontWeight: theme.font.weight.bold,
+  },
+  summaryRow: {
+    alignItems: 'center',
+    backgroundColor: theme.color.surfaceSunken,
+    borderColor: theme.color.borderDefault,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: theme.space[3],
+    justifyContent: 'space-between',
+    padding: theme.space[4],
+  },
+  summaryTextColumn: {
+    flex: 1,
+    gap: theme.space[1],
+  },
+  summaryValue: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.subhead,
+    fontWeight: theme.font.weight.bold,
+  },
+  summaryAction: {
+    color: theme.color.primary,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.label,
+    fontWeight: theme.font.weight.bold,
+  },
+  disabled: {
+    opacity: 0.55,
+  },
   fieldGroup: {
     gap: theme.space[3],
   },
@@ -158,6 +197,33 @@ export const styles = StyleSheet.create({
   modeRow: {
     flexDirection: 'row',
     gap: theme.space[3],
+  },
+  toggleCard: {
+    alignItems: 'center',
+    backgroundColor: theme.color.surfaceSunken,
+    borderColor: theme.color.borderDefault,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: theme.space[3],
+    justifyContent: 'space-between',
+    padding: theme.space[4],
+  },
+  toggleTextColumn: {
+    flex: 1,
+    gap: theme.space[1],
+  },
+  toggleState: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.label,
+    fontWeight: theme.font.weight.bold,
+  },
+  toggleStateSelected: {
+    color: theme.color.primary,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.label,
+    fontWeight: theme.font.weight.bold,
   },
   modeChip: {
     alignItems: 'center',

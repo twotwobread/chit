@@ -13,11 +13,13 @@ export default function ExpenseEditScreen() {
     errors,
     formMessage,
     goBack,
+    includeInSettlement,
     load,
     manualSplitInputs,
     memoInput,
     saving,
     setAmountInput,
+    setIncludeInSettlement,
     setMemoInput,
     setPayerParticipantId,
     setSelectedItemId,
@@ -72,11 +74,13 @@ export default function ExpenseEditScreen() {
           deleting={deleting}
           errors={errors}
           formMessage={formMessage}
+          includeInSettlement={includeInSettlement}
           memoInput={memoInput}
           onAmountChange={setAmountInput}
           onDelete={confirmDelete}
           onMemoChange={setMemoInput}
           onPayerChange={setPayerParticipantId}
+          onSettlementIncludeChange={setIncludeInSettlement}
           onPlaceChange={setSelectedItemId}
           onSave={() => void submitSave()}
           onSplitPolicyChange={setSplitPolicy}

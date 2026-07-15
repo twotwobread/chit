@@ -22,6 +22,7 @@ function expense(overrides: Partial<DayExpenseListItem> = {}): DayExpenseListIte
     currency: 'JPY',
     payer: participant('민수', 'payer-a'),
     splitPolicy: 'equal',
+    includeInSettlement: true,
     splits: [],
     createdAt: '2026-07-10T12:00:00Z',
     ...overrides,
@@ -64,6 +65,20 @@ test('sums today spend by currency without converting between currencies', () =>
       actionRoute: '/trips/trip-a/days/2026-07-10/expenses/quick',
     },
   );
+});
+
+test('includes on-site settled expenses in today spend totals', () => {
+  const viewModel = buildTodaySpendSummaryViewModel({
+    actionRoute: '/trips/trip-a/days/2026-07-10/expenses/quick',
+    defaultCurrency: 'JPY',
+    expenses: [
+      expense({ id: 'expense-included', amountMinor: 1200, currency: 'JPY', includeInSettlement: true }),
+      expense({ id: 'expense-excluded', amountMinor: 800, currency: 'JPY', includeInSettlement: false }),
+    ],
+  });
+
+  assert.equal(viewModel.primaryTotal.amountMinor, 2000);
+  assert.equal(viewModel.primaryTotal.amountLabel, '2,000엔');
 });
 
 test('orders multi-currency totals by default currency first, then currency code', () => {

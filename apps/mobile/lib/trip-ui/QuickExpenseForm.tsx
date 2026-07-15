@@ -3,11 +3,14 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { SegmentedControl, theme } from '../design';
 import {
+  buildExpensePaymentSplitSummaryLabel,
   quickExpenseDirectSplitUnavailableMessage,
   resolveQuickExpenseSheetInitialSplitMode,
   selectQuickExpenseSheetSplitMode,
+  settlementStatusSummaryLabel,
   type QuickExpenseSplitPolicy,
 } from '../trips/quick-expense';
+import { BottomSheet } from './BottomSheet';
 
 export type QuickExpenseItemOption = {
   id: string;
@@ -28,6 +31,7 @@ export type QuickExpenseDraft = {
   splitMode: QuickExpenseSplitPolicy;
   splitParticipantIds: string[];
   memoInput: string;
+  includeInSettlement: boolean;
 };
 
 export type QuickExpenseSubmitPayload = {
@@ -37,6 +41,7 @@ export type QuickExpenseSubmitPayload = {
   payerParticipantId: string;
   splitParticipantIds: string[];
   memoInput: string;
+  includeInSettlement: boolean;
 };
 
 export type QuickExpenseFormProps = {
@@ -90,9 +95,11 @@ export function QuickExpenseForm({
     splitMode: defaultSplitMode,
     splitParticipantIds: defaultSplitIds,
     memoInput: initialDraft?.memoInput ?? '',
+    includeInSettlement: initialDraft?.includeInSettlement ?? true,
   });
   const [errors, setErrors] = useState<QuickExpenseErrors>({});
   const [itemSelectorExpanded, setItemSelectorExpanded] = useState(false);
+  const [activeSheet, setActiveSheet] = useState<'split' | 'settlement' | null>(null);
   const splitMode = draft.splitMode;
   const selectedItem = useMemo(
     () => itemOptions.find((item) => item.id === draft.itemId) ?? null,
@@ -158,158 +165,282 @@ export function QuickExpenseForm({
       payerParticipantId: draft.payerParticipantId,
       splitParticipantIds: draft.splitParticipantIds,
       memoInput: draft.memoInput,
+      includeInSettlement: draft.includeInSettlement,
     });
   };
 
+  const paymentSplitSummary = buildExpensePaymentSplitSummaryLabel({
+    payerParticipantId: draft.payerParticipantId,
+    participants: participantOptions.map((participant) => ({
+      participantId: participant.id,
+      displayName: participant.name,
+    })),
+    selectedParticipantIds: draft.splitParticipantIds,
+    splitPolicy: draft.splitMode,
+  });
+  const splitErrorMessage = errors.payer ?? errors.participants;
+  const settlementSummary = settlementStatusSummaryLabel(draft.includeInSettlement);
+
   return (
-    <View style={styles.wrap}>
-      <Text style={styles.label}>금액</Text>
-      <View style={styles.amountField}>
-        <TextInput
-          keyboardType="decimal-pad"
-          onChangeText={(amountInput) => updateDraft({ amountInput })}
-          placeholder="0"
-          placeholderTextColor={theme.color.textFaint}
-          style={styles.amountInput}
-          value={draft.amountInput}
-        />
-        <Text style={styles.currencyLabel}>{currencyLabel(currency)}</Text>
-      </View>
-      {errors.amount ? <Text style={styles.errorText}>{errors.amount}</Text> : null}
-
-      <Text style={styles.label}>연결할 일정</Text>
-      {itemOptions.length === 0 ? (
-        <Text style={styles.helperText}>연결할 일정이 없어요.</Text>
-      ) : (
-        <View style={styles.selectorWrap}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ expanded: itemSelectorExpanded }}
-            onPress={() => setItemSelectorExpanded((expanded) => !expanded)}
-            style={({ pressed }) => [styles.selectorButton, pressed ? styles.pressed : null]}
-          >
-            <View style={styles.selectorTextColumn}>
-              <Text style={styles.selectorTitle}>{selectedItem?.label ?? '일정을 선택해주세요.'}</Text>
-              {selectedItem?.helper ? (
-                <Text numberOfLines={1} style={styles.selectorHelper}>
-                  {selectedItem.helper}
-                </Text>
-              ) : null}
-            </View>
-            <Text style={styles.selectorAction}>{itemSelectorExpanded ? '닫기' : '변경'}</Text>
-          </Pressable>
-          {itemSelectorExpanded ? (
-            <View style={styles.selectorMenu}>
-              {itemOptions.map((item) => {
-                const selected = item.id === draft.itemId;
-                return (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityState={{ selected }}
-                    key={item.id}
-                    onPress={() => selectItem(item.id)}
-                    style={({ pressed }) => [
-                      styles.selectorOption,
-                      selected ? styles.selectorOptionSelected : null,
-                      pressed ? styles.pressed : null,
-                    ]}
-                  >
-                    <Text style={[styles.selectorOptionTitle, selected ? styles.selectorOptionTitleSelected : null]}>
-                      {item.label}
-                    </Text>
-                    {item.helper ? <Text style={styles.selectorHelper}>{item.helper}</Text> : null}
-                  </Pressable>
-                );
-              })}
-            </View>
-          ) : null}
+    <>
+      <View style={styles.wrap}>
+        <Text style={styles.label}>금액</Text>
+        <View style={styles.amountField}>
+          <TextInput
+            keyboardType="decimal-pad"
+            onChangeText={(amountInput) => updateDraft({ amountInput })}
+            placeholder="0"
+            placeholderTextColor={theme.color.textFaint}
+            style={styles.amountInput}
+            value={draft.amountInput}
+          />
+          <Text style={styles.currencyLabel}>{currencyLabel(currency)}</Text>
         </View>
-      )}
-      {errors.item ? <Text style={styles.errorText}>{errors.item}</Text> : null}
+        {errors.amount ? <Text style={styles.errorText}>{errors.amount}</Text> : null}
 
-      <Text style={styles.label}>결제자</Text>
-      <View style={styles.optionList}>
-        {participantOptions.map((participant) => (
-          <ParticipantChip
-            key={participant.id}
-            color={participant.color}
-            label={participant.name}
-            onPress={() => updateDraft({ payerParticipantId: participant.id })}
-            selected={participant.id === draft.payerParticipantId}
-          />
-        ))}
-      </View>
-      {errors.payer ? <Text style={styles.errorText}>{errors.payer}</Text> : null}
+        <Text style={styles.label}>연결할 일정</Text>
+        {itemOptions.length === 0 ? (
+          <Text style={styles.helperText}>연결할 일정이 없어요.</Text>
+        ) : (
+          <View style={styles.selectorWrap}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ expanded: itemSelectorExpanded }}
+              onPress={() => setItemSelectorExpanded((expanded) => !expanded)}
+              style={({ pressed }) => [styles.selectorButton, pressed ? styles.pressed : null]}
+            >
+              <View style={styles.selectorTextColumn}>
+                <Text style={styles.selectorTitle}>{selectedItem?.label ?? '일정을 선택해주세요.'}</Text>
+                {selectedItem?.helper ? (
+                  <Text numberOfLines={1} style={styles.selectorHelper}>
+                    {selectedItem.helper}
+                  </Text>
+                ) : null}
+              </View>
+              <Text style={styles.selectorAction}>{itemSelectorExpanded ? '닫기' : '변경'}</Text>
+            </Pressable>
+            {itemSelectorExpanded ? (
+              <View style={styles.selectorMenu}>
+                {itemOptions.map((item) => {
+                  const selected = item.id === draft.itemId;
+                  return (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityState={{ selected }}
+                      key={item.id}
+                      onPress={() => selectItem(item.id)}
+                      style={({ pressed }) => [
+                        styles.selectorOption,
+                        selected ? styles.selectorOptionSelected : null,
+                        pressed ? styles.pressed : null,
+                      ]}
+                    >
+                      <Text style={[styles.selectorOptionTitle, selected ? styles.selectorOptionTitleSelected : null]}>
+                        {item.label}
+                      </Text>
+                      {item.helper ? <Text style={styles.selectorHelper}>{item.helper}</Text> : null}
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : null}
+          </View>
+        )}
+        {errors.item ? <Text style={styles.errorText}>{errors.item}</Text> : null}
 
-      <Text style={styles.label}>분할</Text>
-      <SegmentedControl
-        disabledOptions={directSplitUnavailableMessage ? [SPLIT_OPTION_LABELS.manual] : []}
-        onChange={(value) => {
-          const nextSplitMode = value === SPLIT_OPTION_LABELS.equal ? 'equal' : 'manual';
-          const selection = selectQuickExpenseSheetSplitMode({
-            currentSplitMode: draft.splitMode,
-            nextSplitMode,
-            participantIds: participantOptions.map((participant) => participant.id),
-            selectedSplitParticipantIds: draft.splitParticipantIds,
-          });
-          if (!selection.ok) {
-            setErrors((current) => ({ ...current, participants: selection.message }));
-            return;
-          }
+        <SummaryActionRow
+          disabled={submitting}
+          onPress={() => setActiveSheet('split')}
+          title="결제/분할"
+          value={paymentSplitSummary}
+        />
+        {splitErrorMessage ? <Text style={styles.errorText}>{splitErrorMessage}</Text> : null}
 
-          updateDraft({ splitMode: selection.splitMode, splitParticipantIds: selection.splitParticipantIds });
-          setErrors((current) => ({ ...current, participants: undefined }));
-        }}
-        options={SPLIT_OPTIONS}
-        value={SPLIT_OPTION_LABELS[splitMode]}
-      />
-      {directSplitUnavailableMessage ? <Text style={styles.helperText}>{directSplitUnavailableMessage}</Text> : null}
-      <View style={styles.optionList}>
-        {participantOptions.map((participant) => (
-          <ParticipantChip
-            key={participant.id}
-            color={participant.color}
-            label={participant.name}
-            onPress={() => toggleSplitParticipant(participant.id)}
-            selected={draft.splitParticipantIds.includes(participant.id)}
-          />
-        ))}
-      </View>
-      {errors.participants ? <Text style={styles.errorText}>{errors.participants}</Text> : null}
+        <SummaryActionRow
+          disabled={submitting}
+          helper={draft.includeInSettlement ? undefined : '내역과 총 사용 금액에는 남고 최종 정산에서는 제외돼요.'}
+          onPress={() => setActiveSheet('settlement')}
+          title="정산 옵션"
+          value={settlementSummary}
+        />
 
-      <Text style={styles.label}>메모</Text>
-      <TextInput
-        multiline
-        onChangeText={(memoInput) => updateDraft({ memoInput })}
-        placeholder="선택 입력"
-        placeholderTextColor={theme.color.textFaint}
-        style={[styles.memoInput, styles.textArea]}
-        textAlignVertical="top"
-        value={draft.memoInput}
-      />
-      {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+        <Text style={styles.label}>메모</Text>
+        <TextInput
+          multiline
+          onChangeText={(memoInput) => updateDraft({ memoInput })}
+          placeholder="선택 입력"
+          placeholderTextColor={theme.color.textFaint}
+          style={[styles.memoInput, styles.textArea]}
+          textAlignVertical="top"
+          value={draft.memoInput}
+        />
+        {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
 
-      <View style={styles.actionRow}>
-        {onCancel ? (
+        <View style={styles.actionRow}>
+          {onCancel ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={onCancel}
+              style={({ pressed }) => [styles.cancel, pressed ? styles.pressed : null]}
+            >
+              <Text style={styles.cancelText}>취소</Text>
+            </Pressable>
+          ) : null}
           <Pressable
             accessibilityRole="button"
-            onPress={onCancel}
-            style={({ pressed }) => [styles.cancel, pressed ? styles.pressed : null]}
+            accessibilityState={{ disabled: submitting }}
+            disabled={submitting}
+            onPress={save}
+            style={({ pressed }) => [styles.save, submitting ? styles.disabled : null, pressed ? styles.pressed : null]}
           >
-            <Text style={styles.cancelText}>취소</Text>
+            <Text style={styles.saveText}>{submitting ? '저장 중' : '저장'}</Text>
           </Pressable>
-        ) : null}
-        <Pressable
-          accessibilityRole="button"
-          accessibilityState={{ disabled: submitting }}
-          disabled={submitting}
-          onPress={save}
-          style={({ pressed }) => [styles.save, submitting ? styles.disabled : null, pressed ? styles.pressed : null]}
-        >
-          <Text style={styles.saveText}>{submitting ? '저장 중' : '저장'}</Text>
-        </Pressable>
+        </View>
       </View>
-    </View>
+
+      <BottomSheet onClose={() => setActiveSheet(null)} scrollable visible={activeSheet === 'split'}>
+        <View style={styles.sheetContent}>
+          <View style={styles.sheetHeader}>
+            <Text style={styles.sheetTitle}>결제/분할 설정</Text>
+            <Text style={styles.helperText}>누가 냈고 누구와 나눌지 설정해요.</Text>
+          </View>
+          <Text style={styles.label}>결제자</Text>
+          <View style={styles.optionList}>
+            {participantOptions.map((participant) => (
+              <ParticipantChip
+                key={participant.id}
+                color={participant.color}
+                label={participant.name}
+                onPress={() => updateDraft({ payerParticipantId: participant.id })}
+                selected={participant.id === draft.payerParticipantId}
+              />
+            ))}
+          </View>
+          {errors.payer ? <Text style={styles.errorText}>{errors.payer}</Text> : null}
+
+          <Text style={styles.label}>분할</Text>
+          <SegmentedControl
+            disabledOptions={directSplitUnavailableMessage ? [SPLIT_OPTION_LABELS.manual] : []}
+            onChange={(value) => {
+              const nextSplitMode = value === SPLIT_OPTION_LABELS.equal ? 'equal' : 'manual';
+              const selection = selectQuickExpenseSheetSplitMode({
+                currentSplitMode: draft.splitMode,
+                nextSplitMode,
+                participantIds: participantOptions.map((participant) => participant.id),
+                selectedSplitParticipantIds: draft.splitParticipantIds,
+              });
+              if (!selection.ok) {
+                setErrors((current) => ({ ...current, participants: selection.message }));
+                return;
+              }
+
+              updateDraft({ splitMode: selection.splitMode, splitParticipantIds: selection.splitParticipantIds });
+              setErrors((current) => ({ ...current, participants: undefined }));
+            }}
+            options={SPLIT_OPTIONS}
+            value={SPLIT_OPTION_LABELS[splitMode]}
+          />
+          {directSplitUnavailableMessage ? (
+            <Text style={styles.helperText}>{directSplitUnavailableMessage}</Text>
+          ) : null}
+          <View style={styles.optionList}>
+            {participantOptions.map((participant) => (
+              <ParticipantChip
+                key={participant.id}
+                color={participant.color}
+                label={participant.name}
+                onPress={() => toggleSplitParticipant(participant.id)}
+                selected={draft.splitParticipantIds.includes(participant.id)}
+              />
+            ))}
+          </View>
+          {errors.participants ? <Text style={styles.errorText}>{errors.participants}</Text> : null}
+          <Pressable accessibilityRole="button" onPress={() => setActiveSheet(null)} style={styles.save}>
+            <Text style={styles.saveText}>적용</Text>
+          </Pressable>
+        </View>
+      </BottomSheet>
+
+      <BottomSheet onClose={() => setActiveSheet(null)} visible={activeSheet === 'settlement'}>
+        <View style={styles.sheetContent}>
+          <View style={styles.sheetHeader}>
+            <Text style={styles.sheetTitle}>정산 옵션</Text>
+            <Text style={styles.helperText}>현장에서 이미 돈을 주고받은 지출인지 선택해요.</Text>
+          </View>
+          <SettlementChoice
+            description="나중에 여행 정산에서 함께 계산할 지출이에요."
+            label="최종 정산에 포함"
+            onPress={() => updateDraft({ includeInSettlement: true })}
+            selected={draft.includeInSettlement}
+          />
+          <SettlementChoice
+            description="이미 돈을 주고받은 지출이에요. 내역과 총 사용 금액에는 남고 최종 정산에서는 제외돼요."
+            label="현장 정산 완료"
+            onPress={() => updateDraft({ includeInSettlement: false })}
+            selected={!draft.includeInSettlement}
+          />
+          <Pressable accessibilityRole="button" onPress={() => setActiveSheet(null)} style={styles.save}>
+            <Text style={styles.saveText}>적용</Text>
+          </Pressable>
+        </View>
+      </BottomSheet>
+    </>
+  );
+}
+
+function SummaryActionRow({
+  disabled,
+  helper,
+  onPress,
+  title,
+  value,
+}: {
+  disabled: boolean;
+  helper?: string;
+  onPress: () => void;
+  title: string;
+  value: string;
+}) {
+  return (
+    <>
+      <Text style={styles.label}>{title}</Text>
+      <Pressable
+        accessibilityRole="button"
+        disabled={disabled}
+        onPress={onPress}
+        style={({ pressed }) => [styles.summaryRow, disabled ? styles.disabled : null, pressed ? styles.pressed : null]}
+      >
+        <View style={styles.summaryTextColumn}>
+          <Text style={styles.summaryValue}>{value}</Text>
+          {helper ? <Text style={styles.helperText}>{helper}</Text> : null}
+        </View>
+        <Text style={styles.summaryAction}>변경</Text>
+      </Pressable>
+    </>
+  );
+}
+
+function SettlementChoice({
+  description,
+  label,
+  onPress,
+  selected,
+}: {
+  description: string;
+  label: string;
+  onPress: () => void;
+  selected: boolean;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="radio"
+      accessibilityState={{ checked: selected }}
+      onPress={onPress}
+      style={[styles.settlementChoice, selected ? styles.toggleCardSelected : null]}
+    >
+      <Text style={styles.selectorTitle}>{label}</Text>
+      <Text style={styles.helperText}>{description}</Text>
+    </Pressable>
   );
 }
 
@@ -513,6 +644,87 @@ const styles = StyleSheet.create({
   },
   selectorWrap: {
     gap: theme.space[2],
+  },
+  sheetContent: {
+    gap: theme.space[4],
+  },
+  sheetHeader: {
+    gap: theme.space[1],
+  },
+  sheetTitle: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.title,
+    fontWeight: theme.font.weight.bold,
+  },
+  summaryRow: {
+    alignItems: 'center',
+    backgroundColor: theme.color.surface,
+    borderColor: theme.color.borderDefault,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1.5,
+    flexDirection: 'row',
+    gap: theme.space[3],
+    justifyContent: 'space-between',
+    paddingHorizontal: theme.space[4],
+    paddingVertical: theme.space[3],
+  },
+  summaryTextColumn: {
+    flex: 1,
+    gap: theme.space[1],
+  },
+  summaryValue: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.subhead,
+    fontWeight: theme.font.weight.bold,
+  },
+  summaryAction: {
+    color: theme.color.primary,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.label,
+    fontWeight: theme.font.weight.bold,
+  },
+  settlementChoice: {
+    backgroundColor: theme.color.surface,
+    borderColor: theme.color.borderDefault,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1.5,
+    gap: theme.space[1],
+    paddingHorizontal: theme.space[4],
+    paddingVertical: theme.space[3],
+  },
+  toggleCard: {
+    alignItems: 'center',
+    backgroundColor: theme.color.surface,
+    borderColor: theme.color.borderDefault,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1.5,
+    flexDirection: 'row',
+    gap: theme.space[3],
+    justifyContent: 'space-between',
+    paddingHorizontal: theme.space[4],
+    paddingVertical: theme.space[3],
+  },
+  toggleCardSelected: {
+    backgroundColor: theme.color.primarySoft,
+    borderColor: theme.color.primary,
+  },
+  toggleTextColumn: {
+    flex: 1,
+    gap: theme.space[1],
+  },
+  toggleState: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.label,
+    fontWeight: theme.font.weight.bold,
+  },
+  toggleStateSelected: {
+    color: theme.color.primary,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.label,
+    fontWeight: theme.font.weight.bold,
   },
   participantChip: {
     alignItems: 'center',

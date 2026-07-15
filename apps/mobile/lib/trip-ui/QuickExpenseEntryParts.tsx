@@ -9,6 +9,7 @@ import { TripDateFieldButton, TripDatePicker } from '../trips/date-picker';
 import {
   buildCreateQuickExpenseRequest,
   buildCreateTripExpenseRequest,
+  buildExpensePaymentSplitSummaryLabel,
   buildQuickExpenseManualSplitSummary,
   formatMoney,
   type QuickExpenseFormErrors,
@@ -16,7 +17,9 @@ import {
   type QuickExpenseSavedSplitSummary,
   type QuickExpenseSplitPolicy,
   type QuickExpenseViewModel,
+  settlementStatusSummaryLabel,
 } from '../trips/quick-expense';
+import { BottomSheet } from './BottomSheet';
 import { DayChips } from './DayChips';
 import { styles } from './QuickExpenseEntryStyles';
 
@@ -25,6 +28,7 @@ export function QuickExpenseForm({
   errors,
   expenseDateInput,
   formMessage,
+  includeInSettlement,
   mode,
   onBack,
   onClearTripDay,
@@ -33,6 +37,7 @@ export function QuickExpenseForm({
   onSelectSplitPolicy,
   onSelectTripDay,
   onSubmit,
+  onToggleIncludeInSettlement,
   onToggleSplitParticipant,
   onUpdateAmount,
   onUpdateExpenseDate,
@@ -54,6 +59,7 @@ export function QuickExpenseForm({
   errors: QuickExpenseFormErrors;
   expenseDateInput: string;
   formMessage: string | null;
+  includeInSettlement: boolean;
   mode: 'today' | 'settlement';
   onBack: () => void;
   onClearTripDay: () => void;
@@ -65,6 +71,7 @@ export function QuickExpenseForm({
   ) => void;
   onSelectTripDay: (tripDayId: string) => void;
   onSubmit: () => void;
+  onToggleIncludeInSettlement: () => void;
   onToggleSplitParticipant: (participantId: string) => void;
   onUpdateAmount: (value: string) => void;
   onUpdateExpenseDate: (value: string) => void;
@@ -99,6 +106,7 @@ export function QuickExpenseForm({
           manualSplitInputs: activeManualSplitInputs,
           payerParticipantId,
           memoInput,
+          includeInSettlement,
         })
       : buildCreateQuickExpenseRequest({
           amountInput,
@@ -108,6 +116,7 @@ export function QuickExpenseForm({
           participantIds: selectedSplitParticipantIds,
           manualSplitInputs: activeManualSplitInputs,
           payerParticipantId,
+          includeInSettlement,
         });
   const canSubmit = validation.ok && !saving && !viewModel.emptyMessage;
   const selectedPayerOptions = viewModel.payerOptions.map((option) => ({
@@ -115,6 +124,7 @@ export function QuickExpenseForm({
     selected: option.participantId === payerParticipantId,
   }));
   const [itemSelectorExpanded, setItemSelectorExpanded] = useState(false);
+  const [activeSheet, setActiveSheet] = useState<'split' | 'settlement' | null>(null);
   const [paymentDatePickerOpen, setPaymentDatePickerOpen] = useState(false);
   const [paymentCalendarMonth, setPaymentCalendarMonth] = useState(() => monthStringFromDate(new Date()));
   const selectItem = (itemId: string) => {
@@ -143,232 +153,248 @@ export function QuickExpenseForm({
     onUpdateExpenseDate(date);
     setPaymentDatePickerOpen(false);
   };
+  const paymentSplitSummary = buildExpensePaymentSplitSummaryLabel({
+    payerParticipantId,
+    participants: viewModel.splitParticipantOptions.map((option) => ({
+      participantId: option.participantId,
+      displayName: option.displayName,
+    })),
+    selectedParticipantIds: selectedSplitParticipantIds,
+    splitPolicy,
+  });
+  const settlementSummary = settlementStatusSummaryLabel(includeInSettlement);
+  const splitErrorMessage =
+    errors.payer ?? errors.participants ?? viewModel.splitParticipantError ?? viewModel.splitPreviewMessage;
 
   return (
-    <Card>
-      <View style={styles.sectionHeader}>
-        <Text style={styles.tripName}>{tripName}</Text>
-        <Text style={styles.dayText}>
-          {viewModel.dayLabel} · {viewModel.formattedDate}
-        </Text>
-      </View>
-
-      {viewModel.emptyMessage ? (
-        <View style={styles.noticeBox}>
-          <Text style={styles.message}>{viewModel.emptyMessage}</Text>
+    <>
+      <Card>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.tripName}>{tripName}</Text>
+          <Text style={styles.dayText}>
+            {viewModel.dayLabel} · {viewModel.formattedDate}
+          </Text>
         </View>
-      ) : null}
 
-      {viewModel.helper ? <Text style={styles.helper}>{viewModel.helper}</Text> : null}
-
-      {mode === 'settlement' ? (
-        <>
-          <View style={styles.fieldGroup}>
-            <Text style={styles.label}>지출명</Text>
-            <TextInput
-              accessibilityLabel="지출명"
-              editable={!saving}
-              onChangeText={onUpdateTitle}
-              placeholder={selectedItemId ? '선택 입력' : '예: 항공권, 숙소 예약금'}
-              placeholderTextColor={theme.color.textFaint}
-              style={styles.input}
-              value={titleInput}
-            />
-            {errors.title ? <Text style={styles.errorMessage}>{errors.title}</Text> : null}
+        {viewModel.emptyMessage ? (
+          <View style={styles.noticeBox}>
+            <Text style={styles.message}>{viewModel.emptyMessage}</Text>
           </View>
+        ) : null}
 
-          <View style={styles.fieldGroup}>
-            <Text style={styles.label}>결제일자</Text>
-            <TripDateFieldButton
-              disabled={saving}
-              onPress={openPaymentDatePicker}
-              placeholder="결제일자 선택"
-              value={expenseDateInput}
-            />
-            {paymentDatePickerOpen ? (
-              <TripDatePicker
-                helperText="실제 결제된 날짜를 선택해주세요. 여행 기간 밖 날짜도 선택할 수 있어요."
-                label="결제일자"
-                month={paymentCalendarMonth}
-                onClose={() => setPaymentDatePickerOpen(false)}
-                onMonthChange={setPaymentCalendarMonth}
-                onSelect={selectPaymentDate}
-                selectedDate={expenseDateInput}
+        {viewModel.helper ? <Text style={styles.helper}>{viewModel.helper}</Text> : null}
+
+        {mode === 'settlement' ? (
+          <>
+            <View style={styles.fieldGroup}>
+              <Text style={styles.label}>지출명</Text>
+              <TextInput
+                accessibilityLabel="지출명"
+                editable={!saving}
+                onChangeText={onUpdateTitle}
+                placeholder={selectedItemId ? '선택 입력' : '예: 항공권, 숙소 예약금'}
+                placeholderTextColor={theme.color.textFaint}
+                style={styles.input}
+                value={titleInput}
               />
-            ) : null}
-            {errors.expenseDate ? <Text style={styles.errorMessage}>{errors.expenseDate}</Text> : null}
-          </View>
-        </>
-      ) : null}
-
-      {showDayTabs ? (
-        <View style={styles.fieldGroup}>
-          <Text style={styles.label}>{mode === 'settlement' ? '관련 여행일' : '일차 선택'}</Text>
-          {mode === 'settlement' ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ selected: viewModel.selectedTripDayId === null }}
-              disabled={saving}
-              onPress={onClearTripDay}
-              style={[styles.payerChip, viewModel.selectedTripDayId === null ? styles.optionCardSelected : null]}
-            >
-              <Text style={viewModel.selectedTripDayId === null ? styles.payerChipTextSelected : styles.payerChipText}>
-                선택 안 함
-              </Text>
-            </Pressable>
-          ) : null}
-          <DayChips
-            days={viewModel.dayOptions.map((option) => ({
-              id: option.tripDayId,
-              label: option.dayLabel,
-              statusLabel: `일정 ${option.itemCount}개`,
-            }))}
-            edgePadding={0}
-            onSelectDay={selectTripDay}
-            selectedDayId={viewModel.selectedTripDayId}
-          />
-        </View>
-      ) : null}
-
-      {viewModel.showItemSelector && viewModel.itemOptions.length > 0 ? (
-        <View style={styles.fieldGroup}>
-          <Text style={styles.label}>{mode === 'settlement' ? '관련 일정' : '연결할 일정'}</Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ expanded: itemSelectorExpanded }}
-            onPress={() => setItemSelectorExpanded((expanded) => !expanded)}
-            style={({ pressed }) => [
-              styles.scheduleSelectorButton,
-              viewModel.selectedItem ? null : styles.scheduleSelectorButtonEmpty,
-              pressed ? styles.pressed : null,
-            ]}
-          >
-            <View style={styles.scheduleSelectorTextColumn}>
-              <Text style={styles.optionTitle}>{selectedItemTitle}</Text>
-              {viewModel.selectedItem?.timeLabel ? (
-                <Text style={styles.timeLabel}>{viewModel.selectedItem.timeLabel}</Text>
-              ) : null}
-              {viewModel.selectedItem?.address ? (
-                <Text numberOfLines={1} style={styles.address}>
-                  {viewModel.selectedItem.address}
-                </Text>
-              ) : null}
+              {errors.title ? <Text style={styles.errorMessage}>{errors.title}</Text> : null}
             </View>
-            <Text style={styles.scheduleSelectorAction}>{itemSelectorExpanded ? '닫기' : '변경'}</Text>
-          </Pressable>
-          {itemSelectorExpanded ? (
-            <View style={styles.scheduleSelectorMenu}>
-              {viewModel.itemOptions.map((option) => {
-                const selected = option.itemId === selectedItemId;
-                return (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityState={{ selected }}
-                    key={option.itemId}
-                    onPress={() => selectItem(option.itemId)}
-                    style={({ pressed }) => [
-                      styles.optionCard,
-                      selected ? styles.optionCardSelected : null,
-                      pressed ? styles.pressed : null,
-                    ]}
-                  >
-                    <View style={styles.placeMetaRow}>
-                      {showAllScheduleContext ? (
-                        <Text style={styles.dayBadge}>
-                          {option.dayLabel} · {option.formattedDate}
-                        </Text>
-                      ) : null}
-                      <Text style={styles.orderBadge}>{option.orderLabel}</Text>
-                      <Text style={styles.placeType}>{option.placeTypeLabel}</Text>
-                    </View>
-                    <Text style={styles.optionTitle}>{option.placeName}</Text>
-                    {option.timeLabel ? <Text style={styles.timeLabel}>{option.timeLabel}</Text> : null}
-                    {option.address ? <Text style={styles.address}>{option.address}</Text> : null}
-                  </Pressable>
-                );
-              })}
+
+            <View style={styles.fieldGroup}>
+              <Text style={styles.label}>결제일자</Text>
+              <TripDateFieldButton
+                disabled={saving}
+                onPress={openPaymentDatePicker}
+                placeholder="결제일자 선택"
+                value={expenseDateInput}
+              />
+              {paymentDatePickerOpen ? (
+                <TripDatePicker
+                  helperText="실제 결제된 날짜를 선택해주세요. 여행 기간 밖 날짜도 선택할 수 있어요."
+                  label="결제일자"
+                  month={paymentCalendarMonth}
+                  onClose={() => setPaymentDatePickerOpen(false)}
+                  onMonthChange={setPaymentCalendarMonth}
+                  onSelect={selectPaymentDate}
+                  selectedDate={expenseDateInput}
+                />
+              ) : null}
+              {errors.expenseDate ? <Text style={styles.errorMessage}>{errors.expenseDate}</Text> : null}
             </View>
-          ) : null}
-          {errors.item ? <Text style={styles.errorMessage}>{errors.item}</Text> : null}
-        </View>
-      ) : null}
+          </>
+        ) : null}
 
-      <View style={styles.fieldGroup}>
-        <Text style={styles.label}>금액</Text>
-        <View style={styles.amountInputBox}>
-          <TextInput
-            accessibilityLabel="금액"
-            editable={!saving && !viewModel.emptyMessage}
-            keyboardType={viewModel.currency === 'KRW' || viewModel.currency === 'JPY' ? 'number-pad' : 'decimal-pad'}
-            onChangeText={onUpdateAmount}
-            placeholder={viewModel.currency === 'KRW' || viewModel.currency === 'JPY' ? '18500' : '12.34'}
-            placeholderTextColor={theme.color.textFaint}
-            style={styles.amountInput}
-            value={amountInput}
-          />
-          <Text style={styles.currencyLabel}>{viewModel.currencyLabel}</Text>
-        </View>
-        {errors.amount ? <Text style={styles.errorMessage}>{errors.amount}</Text> : null}
-      </View>
-
-      <View style={styles.fieldGroup}>
-        <Text style={styles.label}>결제자</Text>
-        <View style={styles.optionList}>
-          {selectedPayerOptions.map((option) => (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ selected: option.selected }}
-              disabled={saving || Boolean(viewModel.emptyMessage)}
-              key={option.participantId}
-              onPress={() => onSelectPayer(option.participantId)}
-              style={[styles.payerChip, option.selected ? styles.optionCardSelected : null]}
-            >
-              <Text style={option.selected ? styles.payerChipTextSelected : styles.payerChipText}>
-                {option.displayName}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-        {errors.payer ? <Text style={styles.errorMessage}>{errors.payer}</Text> : null}
-      </View>
-
-      <View style={styles.fieldGroup}>
-        <Text style={styles.label}>분할 방식</Text>
-        <View style={styles.modeRow}>
-          {(['equal', 'manual'] as const).map((policy) => (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ selected: splitPolicy === policy }}
-              disabled={saving || Boolean(viewModel.emptyMessage)}
-              key={policy}
-              onPress={() => onSelectSplitPolicy(policy, viewModel.splitPreviewRows)}
-              style={[styles.modeChip, splitPolicy === policy ? styles.optionCardSelected : null]}
-            >
-              <Text style={splitPolicy === policy ? styles.payerChipTextSelected : styles.payerChipText}>
-                {policy === 'equal' ? '1/N 분할' : '직접 분할'}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-      </View>
-
-      {splitPolicy === 'equal' ? (
-        <>
+        {showDayTabs ? (
           <View style={styles.fieldGroup}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.label}>분할 대상</Text>
-              <Text style={styles.splitHelper}>
-                체크한 사람에게만 아래 금액으로 나눠져요. 결제자도 제외할 수 있어요.
-              </Text>
-            </View>
+            <Text style={styles.label}>{mode === 'settlement' ? '관련 여행일' : '일차 선택'}</Text>
+            {mode === 'settlement' ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ selected: viewModel.selectedTripDayId === null }}
+                disabled={saving}
+                onPress={onClearTripDay}
+                style={[styles.payerChip, viewModel.selectedTripDayId === null ? styles.optionCardSelected : null]}
+              >
+                <Text
+                  style={viewModel.selectedTripDayId === null ? styles.payerChipTextSelected : styles.payerChipText}
+                >
+                  선택 안 함
+                </Text>
+              </Pressable>
+            ) : null}
+            <DayChips
+              days={viewModel.dayOptions.map((option) => ({
+                id: option.tripDayId,
+                label: option.dayLabel,
+                statusLabel: `일정 ${option.itemCount}개`,
+              }))}
+              edgePadding={0}
+              onSelectDay={selectTripDay}
+              selectedDayId={viewModel.selectedTripDayId}
+            />
+          </View>
+        ) : null}
+
+        {viewModel.showItemSelector && viewModel.itemOptions.length > 0 ? (
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>{mode === 'settlement' ? '관련 일정' : '연결할 일정'}</Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ expanded: itemSelectorExpanded }}
+              onPress={() => setItemSelectorExpanded((expanded) => !expanded)}
+              style={({ pressed }) => [
+                styles.scheduleSelectorButton,
+                viewModel.selectedItem ? null : styles.scheduleSelectorButtonEmpty,
+                pressed ? styles.pressed : null,
+              ]}
+            >
+              <View style={styles.scheduleSelectorTextColumn}>
+                <Text style={styles.optionTitle}>{selectedItemTitle}</Text>
+                {viewModel.selectedItem?.timeLabel ? (
+                  <Text style={styles.timeLabel}>{viewModel.selectedItem.timeLabel}</Text>
+                ) : null}
+                {viewModel.selectedItem?.address ? (
+                  <Text numberOfLines={1} style={styles.address}>
+                    {viewModel.selectedItem.address}
+                  </Text>
+                ) : null}
+              </View>
+              <Text style={styles.scheduleSelectorAction}>{itemSelectorExpanded ? '닫기' : '변경'}</Text>
+            </Pressable>
+            {itemSelectorExpanded ? (
+              <View style={styles.scheduleSelectorMenu}>
+                {viewModel.itemOptions.map((option) => {
+                  const selected = option.itemId === selectedItemId;
+                  return (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityState={{ selected }}
+                      key={option.itemId}
+                      onPress={() => selectItem(option.itemId)}
+                      style={({ pressed }) => [
+                        styles.optionCard,
+                        selected ? styles.optionCardSelected : null,
+                        pressed ? styles.pressed : null,
+                      ]}
+                    >
+                      <View style={styles.placeMetaRow}>
+                        {showAllScheduleContext ? (
+                          <Text style={styles.dayBadge}>
+                            {option.dayLabel} · {option.formattedDate}
+                          </Text>
+                        ) : null}
+                        <Text style={styles.orderBadge}>{option.orderLabel}</Text>
+                        <Text style={styles.placeType}>{option.placeTypeLabel}</Text>
+                      </View>
+                      <Text style={styles.optionTitle}>{option.placeName}</Text>
+                      {option.timeLabel ? <Text style={styles.timeLabel}>{option.timeLabel}</Text> : null}
+                      {option.address ? <Text style={styles.address}>{option.address}</Text> : null}
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : null}
+            {errors.item ? <Text style={styles.errorMessage}>{errors.item}</Text> : null}
+          </View>
+        ) : null}
+
+        <View style={styles.fieldGroup}>
+          <Text style={styles.label}>금액</Text>
+          <View style={styles.amountInputBox}>
+            <TextInput
+              accessibilityLabel="금액"
+              editable={!saving && !viewModel.emptyMessage}
+              keyboardType={viewModel.currency === 'KRW' || viewModel.currency === 'JPY' ? 'number-pad' : 'decimal-pad'}
+              onChangeText={onUpdateAmount}
+              placeholder={viewModel.currency === 'KRW' || viewModel.currency === 'JPY' ? '18500' : '12.34'}
+              placeholderTextColor={theme.color.textFaint}
+              style={styles.amountInput}
+              value={amountInput}
+            />
+            <Text style={styles.currencyLabel}>{viewModel.currencyLabel}</Text>
+          </View>
+          {errors.amount ? <Text style={styles.errorMessage}>{errors.amount}</Text> : null}
+        </View>
+
+        <SummaryActionRow
+          disabled={saving || Boolean(viewModel.emptyMessage)}
+          onPress={() => setActiveSheet('split')}
+          title="결제/분할"
+          value={paymentSplitSummary}
+        />
+        {splitErrorMessage ? <Text style={styles.errorMessage}>{splitErrorMessage}</Text> : null}
+
+        <SummaryActionRow
+          disabled={saving || Boolean(viewModel.emptyMessage)}
+          helper={includeInSettlement ? undefined : '내역과 총 사용 금액에는 남고 최종 정산에서는 제외돼요.'}
+          onPress={() => setActiveSheet('settlement')}
+          title="정산 옵션"
+          value={settlementSummary}
+        />
+
+        <View style={styles.fieldGroup}>
+          <Text style={styles.label}>메모</Text>
+          <TextInput
+            editable={!saving && !viewModel.emptyMessage}
+            multiline
+            onChangeText={onUpdateMemo}
+            placeholder="선택 입력"
+            placeholderTextColor={theme.color.textFaint}
+            style={[styles.input, styles.memoInput]}
+            textAlignVertical="top"
+            value={memoInput}
+          />
+        </View>
+
+        {formMessage ? <Text style={styles.errorMessage}>{formMessage}</Text> : null}
+
+        <PrimaryButton
+          disabled={!canSubmit}
+          label="저장하기"
+          loading={saving}
+          loadingLabel="저장 중..."
+          onPress={onSubmit}
+        />
+        <SecondaryButton disabled={saving} label="돌아가기" onPress={onBack} />
+      </Card>
+
+      <BottomSheet onClose={() => setActiveSheet(null)} scrollable visible={activeSheet === 'split'}>
+        <View style={styles.sheetContent}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sheetTitle}>결제/분할 설정</Text>
+            <Text style={styles.splitHelper}>누가 냈고 누구와 나눌지 설정해요.</Text>
+          </View>
+
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>결제자</Text>
             <View style={styles.optionList}>
-              {viewModel.splitParticipantOptions.map((option) => (
+              {selectedPayerOptions.map((option) => (
                 <Pressable
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked: option.selected }}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: option.selected }}
                   disabled={saving || Boolean(viewModel.emptyMessage)}
                   key={option.participantId}
-                  onPress={() => onToggleSplitParticipant(option.participantId)}
+                  onPress={() => onSelectPayer(option.participantId)}
                   style={[styles.payerChip, option.selected ? styles.optionCardSelected : null]}
                 >
                   <Text style={option.selected ? styles.payerChipTextSelected : styles.payerChipText}>
@@ -377,59 +403,175 @@ export function QuickExpenseForm({
                 </Pressable>
               ))}
             </View>
-            {errors.participants || viewModel.splitParticipantError ? (
-              <Text style={styles.errorMessage}>{errors.participants ?? viewModel.splitParticipantError}</Text>
-            ) : null}
+            {errors.payer ? <Text style={styles.errorMessage}>{errors.payer}</Text> : null}
           </View>
 
-          {viewModel.splitPreviewRows.length > 0 ? (
-            <SplitRowsSection
-              helper="저장하면 선택한 참여자에게 아래 금액으로 나눠져요."
-              rows={viewModel.splitPreviewRows}
-              title="1/N 분할"
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>분할 방식</Text>
+            <View style={styles.modeRow}>
+              {(['equal', 'manual'] as const).map((policy) => (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: splitPolicy === policy }}
+                  disabled={saving || Boolean(viewModel.emptyMessage)}
+                  key={policy}
+                  onPress={() => onSelectSplitPolicy(policy, viewModel.splitPreviewRows)}
+                  style={[styles.modeChip, splitPolicy === policy ? styles.optionCardSelected : null]}
+                >
+                  <Text style={splitPolicy === policy ? styles.payerChipTextSelected : styles.payerChipText}>
+                    {policy === 'equal' ? '1/N 분할' : '직접 분할'}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+
+          {splitPolicy === 'equal' ? (
+            <>
+              <View style={styles.fieldGroup}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.label}>분할 대상</Text>
+                  <Text style={styles.splitHelper}>
+                    체크한 사람에게만 아래 금액으로 나눠져요. 결제자도 제외할 수 있어요.
+                  </Text>
+                </View>
+                <View style={styles.optionList}>
+                  {viewModel.splitParticipantOptions.map((option) => (
+                    <Pressable
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: option.selected }}
+                      disabled={saving || Boolean(viewModel.emptyMessage)}
+                      key={option.participantId}
+                      onPress={() => onToggleSplitParticipant(option.participantId)}
+                      style={[styles.payerChip, option.selected ? styles.optionCardSelected : null]}
+                    >
+                      <Text style={option.selected ? styles.payerChipTextSelected : styles.payerChipText}>
+                        {option.displayName}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+                {errors.participants || viewModel.splitParticipantError ? (
+                  <Text style={styles.errorMessage}>{errors.participants ?? viewModel.splitParticipantError}</Text>
+                ) : null}
+              </View>
+
+              {viewModel.splitPreviewRows.length > 0 ? (
+                <SplitRowsSection
+                  helper="저장하면 선택한 참여자에게 아래 금액으로 나눠져요."
+                  rows={viewModel.splitPreviewRows}
+                  title="예상 분담금"
+                />
+              ) : null}
+            </>
+          ) : (
+            <ManualSplitSection
+              amountInput={amountInput}
+              currency={viewModel.currency}
+              disabled={saving || Boolean(viewModel.emptyMessage)}
+              errorMessage={errors.participants ?? null}
+              manualSplitInputs={manualSplitInputs}
+              onToggleSplitParticipant={onToggleSplitParticipant}
+              onUpdateManualSplitInput={onUpdateManualSplitInput}
+              participants={viewModel.splitParticipantOptions}
             />
+          )}
+
+          {viewModel.splitPreviewMessage ? (
+            <Text style={styles.errorMessage}>{viewModel.splitPreviewMessage}</Text>
           ) : null}
-        </>
-      ) : (
-        <ManualSplitSection
-          amountInput={amountInput}
-          currency={viewModel.currency}
-          disabled={saving || Boolean(viewModel.emptyMessage)}
-          errorMessage={errors.participants ?? null}
-          manualSplitInputs={manualSplitInputs}
-          onToggleSplitParticipant={onToggleSplitParticipant}
-          onUpdateManualSplitInput={onUpdateManualSplitInput}
-          participants={viewModel.splitParticipantOptions}
-        />
-      )}
+          <PrimaryButton label="적용" onPress={() => setActiveSheet(null)} />
+        </View>
+      </BottomSheet>
 
-      {viewModel.splitPreviewMessage ? <Text style={styles.errorMessage}>{viewModel.splitPreviewMessage}</Text> : null}
+      <BottomSheet onClose={() => setActiveSheet(null)} visible={activeSheet === 'settlement'}>
+        <View style={styles.sheetContent}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sheetTitle}>정산 옵션</Text>
+            <Text style={styles.splitHelper}>현장에서 이미 돈을 주고받은 지출인지 선택해요.</Text>
+          </View>
+          <SettlementChoice
+            description="나중에 여행 정산에서 함께 계산할 지출이에요."
+            label="최종 정산에 포함"
+            onPress={() => {
+              if (!includeInSettlement) {
+                onToggleIncludeInSettlement();
+              }
+            }}
+            selected={includeInSettlement}
+          />
+          <SettlementChoice
+            description="이미 돈을 주고받은 지출이에요. 내역과 총 사용 금액에는 남고 최종 정산에서는 제외돼요."
+            label="현장 정산 완료"
+            onPress={() => {
+              if (includeInSettlement) {
+                onToggleIncludeInSettlement();
+              }
+            }}
+            selected={!includeInSettlement}
+          />
+          <PrimaryButton label="적용" onPress={() => setActiveSheet(null)} />
+        </View>
+      </BottomSheet>
+    </>
+  );
+}
 
-      <View style={styles.fieldGroup}>
-        <Text style={styles.label}>메모</Text>
-        <TextInput
-          editable={!saving && !viewModel.emptyMessage}
-          multiline
-          onChangeText={onUpdateMemo}
-          placeholder="선택 입력"
-          placeholderTextColor={theme.color.textFaint}
-          style={[styles.input, styles.memoInput]}
-          textAlignVertical="top"
-          value={memoInput}
-        />
+function SummaryActionRow({
+  disabled,
+  helper,
+  onPress,
+  title,
+  value,
+}: {
+  disabled: boolean;
+  helper?: string;
+  onPress: () => void;
+  title: string;
+  value: string;
+}) {
+  return (
+    <View style={styles.fieldGroup}>
+      <Text style={styles.label}>{title}</Text>
+      <Pressable
+        accessibilityRole="button"
+        disabled={disabled}
+        onPress={onPress}
+        style={({ pressed }) => [styles.summaryRow, disabled ? styles.disabled : null, pressed ? styles.pressed : null]}
+      >
+        <View style={styles.summaryTextColumn}>
+          <Text style={styles.summaryValue}>{value}</Text>
+          {helper ? <Text style={styles.splitHelper}>{helper}</Text> : null}
+        </View>
+        <Text style={styles.summaryAction}>변경</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function SettlementChoice({
+  description,
+  label,
+  onPress,
+  selected,
+}: {
+  description: string;
+  label: string;
+  onPress: () => void;
+  selected: boolean;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="radio"
+      accessibilityState={{ checked: selected }}
+      onPress={onPress}
+      style={[styles.optionCard, selected ? styles.optionCardSelected : null]}
+    >
+      <View style={styles.summaryTextColumn}>
+        <Text style={styles.optionTitle}>{label}</Text>
+        <Text style={styles.splitHelper}>{description}</Text>
       </View>
-
-      {formMessage ? <Text style={styles.errorMessage}>{formMessage}</Text> : null}
-
-      <PrimaryButton
-        disabled={!canSubmit}
-        label="저장하기"
-        loading={saving}
-        loadingLabel="저장 중..."
-        onPress={onSubmit}
-      />
-      <SecondaryButton disabled={saving} label="돌아가기" onPress={onBack} />
-    </Card>
+    </Pressable>
   );
 }
 

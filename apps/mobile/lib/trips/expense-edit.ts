@@ -129,6 +129,7 @@ export function buildUpdateExpenseRequest({
   memoInput,
   payerParticipantId,
   titleInput,
+  includeInSettlement,
 }: {
   amountInput: string;
   currency: SupportedCurrency;
@@ -139,6 +140,7 @@ export function buildUpdateExpenseRequest({
   memoInput: string;
   payerParticipantId: string | null;
   titleInput?: string;
+  includeInSettlement?: boolean;
 }): { ok: true; request: UpdateExpenseRequest } | { ok: false; errors: ExpenseEditFormErrors } {
   const errors: ExpenseEditFormErrors = {};
   const parsedAmount = parseAmountMinor(amountInput, currency);
@@ -182,6 +184,7 @@ export function buildUpdateExpenseRequest({
         memo: memo === '' ? null : memo,
         ...(titleInput !== undefined ? { title: title === '' ? null : title } : {}),
         scheduleItemId,
+        ...(includeInSettlement !== undefined ? { includeInSettlement } : {}),
       },
     };
   }
@@ -203,6 +206,7 @@ export function buildUpdateExpenseRequest({
       memo: memo === '' ? null : memo,
       ...(titleInput !== undefined ? { title: title === '' ? null : title } : {}),
       scheduleItemId,
+      ...(includeInSettlement !== undefined ? { includeInSettlement } : {}),
     },
   };
 }

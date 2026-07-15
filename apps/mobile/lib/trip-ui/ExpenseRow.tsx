@@ -22,6 +22,7 @@ export type ExpenseRowProps = {
   amount: number;
   currency?: 'KRW' | 'JPY' | string;
   needsReview?: boolean;
+  settlementLabel?: string | null;
   onPress?: () => void;
   first?: boolean;
 };
@@ -35,6 +36,7 @@ export function ExpenseRow({
   needsReview = false,
   onPress,
   payerLabel,
+  settlementLabel = null,
   splitLabel = '전체 1/N',
   title,
 }: ExpenseRowProps) {
@@ -45,6 +47,7 @@ export function ExpenseRow({
       currency={currency}
       needsReview={needsReview}
       payerLabel={payerLabel}
+      settlementLabel={settlementLabel}
       splitLabel={splitLabel}
       title={title}
     />
@@ -72,6 +75,7 @@ function ExpenseRowContent({
   currency,
   needsReview,
   payerLabel,
+  settlementLabel,
   splitLabel,
   title,
 }: {
@@ -82,6 +86,7 @@ function ExpenseRowContent({
   amount: number;
   currency: string;
   needsReview: boolean;
+  settlementLabel: string | null;
 }) {
   const categoryMeta = CATEGORY[category] ?? CATEGORY.etc;
 
@@ -98,6 +103,7 @@ function ExpenseRowContent({
           <Text numberOfLines={1} style={styles.meta}>
             {payerLabel} · {splitLabel}
           </Text>
+          {settlementLabel ? <Badge label={settlementLabel} tone="neutral" /> : null}
           {needsReview ? <Badge label="확인 필요" tone="amber" /> : null}
         </View>
       </View>

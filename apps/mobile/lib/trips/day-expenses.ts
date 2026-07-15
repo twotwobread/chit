@@ -15,6 +15,7 @@ export type DayExpenseRowViewModel = {
   payerLabel: string;
   splitLabel: string;
   detailLine: string;
+  settlementLabel: string | null;
   category: ExpenseCategory;
   accessibilityLabel: string;
   editRoute: Href | null;
@@ -79,7 +80,10 @@ export function buildDayExpensesViewModel({
       const amountLabel = formatMoney(expense.amountMinor, expense.currency);
       const payerLabel = `결제 ${normalizeDisplayName(expense.payer.displayName)}`;
       const splitLabel = buildSplitSummary(expense.splits, expense.currency);
-      const detailLine = `${payerLabel} · ${splitLabel}`;
+      const settlementLabel = expense.includeInSettlement ? null : '현장 정산 완료';
+      const detailLine = [payerLabel, splitLabel, settlementLabel]
+        .filter((part): part is string => part !== null)
+        .join(' · ');
 
       return {
         id: expense.id,
@@ -90,6 +94,7 @@ export function buildDayExpensesViewModel({
         payerLabel,
         splitLabel,
         detailLine,
+        settlementLabel,
         category: expenseCategory(expense.place?.placeType),
         accessibilityLabel: `${placeName} ${amountLabel}. ${detailLine}`,
         editRoute: buildExpenseEditRoute(tripId, date, expense.id),

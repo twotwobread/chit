@@ -231,6 +231,58 @@ export function buildDefaultSplitParticipantIds(participants: TripParticipantLis
   return participants.map((participant) => participant.participantId);
 }
 
+export type ExpensePaymentSplitSummaryParticipant = {
+  participantId: string;
+  displayName: string;
+};
+
+export function buildExpensePaymentSplitSummaryLabel({
+  payerParticipantId,
+  participants,
+  selectedParticipantIds,
+  splitPolicy,
+}: {
+  payerParticipantId: string | null;
+  participants: ExpensePaymentSplitSummaryParticipant[];
+  selectedParticipantIds: string[];
+  splitPolicy: QuickExpenseSplitPolicy;
+}): string {
+  const payerLabel = payerParticipantId
+    ? `${normalizeParticipantDisplayName(
+        participants.find((participant) => participant.participantId === payerParticipantId)?.displayName ?? '',
+      )} 결제`
+    : '결제자 선택 필요';
+
+  if (splitPolicy === 'manual') {
+    return `${payerLabel} · 직접 분할`;
+  }
+
+  const participantIds = participants.map((participant) => participant.participantId);
+  const selectedSet = new Set(selectedParticipantIds);
+  const allSelected =
+    participantIds.length > 0 && participantIds.every((participantId) => selectedSet.has(participantId));
+  if (allSelected) {
+    return `${payerLabel} · 전체 1/N`;
+  }
+
+  const selectedNames = participants
+    .filter((participant) => selectedSet.has(participant.participantId))
+    .map((participant) => normalizeParticipantDisplayName(participant.displayName));
+  const splitLabel = selectedNames.length > 0 ? `${compactNameList(selectedNames)} 1/N` : '분할 대상 선택 필요';
+  return `${payerLabel} · ${splitLabel}`;
+}
+
+export function settlementStatusSummaryLabel(includeInSettlement: boolean): string {
+  return includeInSettlement ? '최종 정산에 포함' : '현장 정산 완료';
+}
+
+function compactNameList(names: string[]): string {
+  if (names.length <= 2) {
+    return names.join(', ');
+  }
+  return `${names[0]} 외 ${names.length - 1}명`;
+}
+
 export function toggleQuickExpenseSplitParticipant(selectedParticipantIds: string[], participantId: string): string[] {
   return selectedParticipantIds.includes(participantId)
     ? selectedParticipantIds.filter((selectedParticipantId) => selectedParticipantId !== participantId)
@@ -601,6 +653,9 @@ export function buildQuickExpenseMemoUpdateRequest({
     ...(createRequest.splits ? { splits: createRequest.splits } : {}),
     memo,
     scheduleItemId: createRequest.scheduleItemId,
+    ...(createRequest.includeInSettlement !== undefined
+      ? { includeInSettlement: createRequest.includeInSettlement }
+      : {}),
   };
 }
 
@@ -612,6 +667,7 @@ export function buildCreateQuickExpenseRequest({
   participantIds,
   manualSplitInputs,
   payerParticipantId,
+  includeInSettlement,
 }: {
   amountInput: string;
   currency: SupportedCurrency;
@@ -620,6 +676,7 @@ export function buildCreateQuickExpenseRequest({
   participantIds: string[];
   manualSplitInputs: QuickExpenseManualSplitInput[];
   payerParticipantId: string | null;
+  includeInSettlement?: boolean;
 }): { ok: true; request: CreateQuickExpenseRequest } | { ok: false; errors: QuickExpenseFormErrors } {
   const validation = validateExpenseAmountPayerAndSplits({
     amountInput,
@@ -651,6 +708,7 @@ export function buildCreateQuickExpenseRequest({
         payerParticipantId,
         splitPolicy,
         participantIds,
+        ...(includeInSettlement !== undefined ? { includeInSettlement } : {}),
       },
     };
   }
@@ -663,6 +721,7 @@ export function buildCreateQuickExpenseRequest({
       payerParticipantId,
       splitPolicy,
       splits: validation.manualSummary.requestSplits,
+      ...(includeInSettlement !== undefined ? { includeInSettlement } : {}),
     },
   };
 }
@@ -679,6 +738,7 @@ export function buildCreateTripExpenseRequest({
   manualSplitInputs,
   payerParticipantId,
   memoInput,
+  includeInSettlement,
 }: {
   titleInput: string;
   expenseDate: string;
@@ -691,6 +751,7 @@ export function buildCreateTripExpenseRequest({
   manualSplitInputs: QuickExpenseManualSplitInput[];
   payerParticipantId: string | null;
   memoInput: string;
+  includeInSettlement?: boolean;
 }): { ok: true; request: CreateTripExpenseRequest } | { ok: false; errors: QuickExpenseFormErrors } {
   const validation = validateExpenseAmountPayerAndSplits({
     amountInput,
@@ -722,6 +783,7 @@ export function buildCreateTripExpenseRequest({
     payerParticipantId,
     splitPolicy,
     memo: memo === '' ? null : memo,
+    ...(includeInSettlement !== undefined ? { includeInSettlement } : {}),
   };
 
   if (splitPolicy === 'equal') {
