@@ -1,7 +1,5 @@
 import { useState } from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
-
-import { type SupportedCurrency } from '@i-um/api-contract';
+import { Text, TextInput, View } from 'react-native';
 
 import { Card, PrimaryButton, SecondaryButton, theme } from '../design';
 import { dateFromString, isValidDate, monthStringFromDate } from '../trips/date';
@@ -10,17 +8,21 @@ import {
   buildCreateQuickExpenseRequest,
   buildCreateTripExpenseRequest,
   buildExpensePaymentSplitSummaryLabel,
-  buildQuickExpenseManualSplitSummary,
-  formatMoney,
   type QuickExpenseFormErrors,
   type QuickExpenseManualSplitInput,
   type QuickExpenseSavedSplitSummary,
   type QuickExpenseSplitPolicy,
   type QuickExpenseViewModel,
+  settlementStatusSummaryDetail,
   settlementStatusSummaryLabel,
 } from '../trips/quick-expense';
-import { BottomSheet } from './BottomSheet';
-import { DayChips } from './DayChips';
+import {
+  ExpenseFormScheduleSelector,
+  ExpenseFormSummaryActionRow,
+  ExpensePaymentSplitSheet,
+  ExpenseSettlementOptionSheet,
+  ExpenseSplitRowsSection,
+} from './ExpenseFormSharedParts';
 import { styles } from './QuickExpenseEntryStyles';
 
 export function QuickExpenseForm({
@@ -123,26 +125,12 @@ export function QuickExpenseForm({
     ...option,
     selected: option.participantId === payerParticipantId,
   }));
-  const [itemSelectorExpanded, setItemSelectorExpanded] = useState(false);
   const [activeSheet, setActiveSheet] = useState<'split' | 'settlement' | null>(null);
   const [paymentDatePickerOpen, setPaymentDatePickerOpen] = useState(false);
   const [paymentCalendarMonth, setPaymentCalendarMonth] = useState(() => monthStringFromDate(new Date()));
-  const selectItem = (itemId: string) => {
-    onSelectItem(itemId);
-    setItemSelectorExpanded(false);
-  };
   const showDayContext = viewModel.dayLabel === '전체 일정';
   const showDayTabs = mode === 'settlement' ? viewModel.dayOptions.length > 0 : viewModel.dayOptions.length > 1;
   const showAllScheduleContext = showDayContext && viewModel.selectedTripDayId === null;
-  const selectedItemTitle = viewModel.selectedItem
-    ? `${showDayContext ? `${viewModel.selectedItem.dayLabel} · ` : ''}${viewModel.selectedItem.placeName}`
-    : mode === 'settlement'
-      ? '일정 선택 안 함'
-      : '일정을 선택해주세요.';
-  const selectTripDay = (tripDayId: string) => {
-    onSelectTripDay(tripDayId);
-    setItemSelectorExpanded(false);
-  };
   const openPaymentDatePicker = () => {
     setPaymentCalendarMonth(
       monthStringFromDate(isValidDate(expenseDateInput) ? dateFromString(expenseDateInput) : new Date()),
@@ -163,6 +151,7 @@ export function QuickExpenseForm({
     splitPolicy,
   });
   const settlementSummary = settlementStatusSummaryLabel(includeInSettlement);
+  const settlementDetail = settlementStatusSummaryDetail(includeInSettlement);
   const splitErrorMessage =
     errors.payer ?? errors.participants ?? viewModel.splitParticipantError ?? viewModel.splitPreviewMessage;
 
@@ -224,99 +213,25 @@ export function QuickExpenseForm({
           </>
         ) : null}
 
-        {showDayTabs ? (
-          <View style={styles.fieldGroup}>
-            <Text style={styles.label}>{mode === 'settlement' ? '관련 여행일' : '일차 선택'}</Text>
-            {mode === 'settlement' ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityState={{ selected: viewModel.selectedTripDayId === null }}
-                disabled={saving}
-                onPress={onClearTripDay}
-                style={[styles.payerChip, viewModel.selectedTripDayId === null ? styles.optionCardSelected : null]}
-              >
-                <Text
-                  style={viewModel.selectedTripDayId === null ? styles.payerChipTextSelected : styles.payerChipText}
-                >
-                  선택 안 함
-                </Text>
-              </Pressable>
-            ) : null}
-            <DayChips
-              days={viewModel.dayOptions.map((option) => ({
-                id: option.tripDayId,
-                label: option.dayLabel,
-                statusLabel: `일정 ${option.itemCount}개`,
-              }))}
-              edgePadding={0}
-              onSelectDay={selectTripDay}
-              selectedDayId={viewModel.selectedTripDayId}
-            />
-          </View>
-        ) : null}
-
-        {viewModel.showItemSelector && viewModel.itemOptions.length > 0 ? (
-          <View style={styles.fieldGroup}>
-            <Text style={styles.label}>{mode === 'settlement' ? '관련 일정' : '연결할 일정'}</Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ expanded: itemSelectorExpanded }}
-              onPress={() => setItemSelectorExpanded((expanded) => !expanded)}
-              style={({ pressed }) => [
-                styles.scheduleSelectorButton,
-                viewModel.selectedItem ? null : styles.scheduleSelectorButtonEmpty,
-                pressed ? styles.pressed : null,
-              ]}
-            >
-              <View style={styles.scheduleSelectorTextColumn}>
-                <Text style={styles.optionTitle}>{selectedItemTitle}</Text>
-                {viewModel.selectedItem?.timeLabel ? (
-                  <Text style={styles.timeLabel}>{viewModel.selectedItem.timeLabel}</Text>
-                ) : null}
-                {viewModel.selectedItem?.address ? (
-                  <Text numberOfLines={1} style={styles.address}>
-                    {viewModel.selectedItem.address}
-                  </Text>
-                ) : null}
-              </View>
-              <Text style={styles.scheduleSelectorAction}>{itemSelectorExpanded ? '닫기' : '변경'}</Text>
-            </Pressable>
-            {itemSelectorExpanded ? (
-              <View style={styles.scheduleSelectorMenu}>
-                {viewModel.itemOptions.map((option) => {
-                  const selected = option.itemId === selectedItemId;
-                  return (
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityState={{ selected }}
-                      key={option.itemId}
-                      onPress={() => selectItem(option.itemId)}
-                      style={({ pressed }) => [
-                        styles.optionCard,
-                        selected ? styles.optionCardSelected : null,
-                        pressed ? styles.pressed : null,
-                      ]}
-                    >
-                      <View style={styles.placeMetaRow}>
-                        {showAllScheduleContext ? (
-                          <Text style={styles.dayBadge}>
-                            {option.dayLabel} · {option.formattedDate}
-                          </Text>
-                        ) : null}
-                        <Text style={styles.orderBadge}>{option.orderLabel}</Text>
-                        <Text style={styles.placeType}>{option.placeTypeLabel}</Text>
-                      </View>
-                      <Text style={styles.optionTitle}>{option.placeName}</Text>
-                      {option.timeLabel ? <Text style={styles.timeLabel}>{option.timeLabel}</Text> : null}
-                      {option.address ? <Text style={styles.address}>{option.address}</Text> : null}
-                    </Pressable>
-                  );
-                })}
-              </View>
-            ) : null}
-            {errors.item ? <Text style={styles.errorMessage}>{errors.item}</Text> : null}
-          </View>
-        ) : null}
+        <ExpenseFormScheduleSelector
+          dayLabel={mode === 'settlement' ? '관련 여행일' : '일차 선택'}
+          dayOptions={viewModel.dayOptions}
+          disabled={saving || Boolean(viewModel.emptyMessage)}
+          emptyItemTitle={mode === 'settlement' ? '일정 선택 안 함' : '일정을 선택해주세요.'}
+          errorMessage={errors.item}
+          itemLabel={mode === 'settlement' ? '관련 일정' : '연결할 일정'}
+          itemOptions={viewModel.itemOptions}
+          onClearTripDay={onClearTripDay}
+          onSelectItem={onSelectItem}
+          onSelectTripDay={onSelectTripDay}
+          selectedItem={viewModel.selectedItem}
+          selectedItemId={selectedItemId}
+          selectedTripDayId={viewModel.selectedTripDayId}
+          showAllScheduleContext={showAllScheduleContext}
+          showClearDayOption={mode === 'settlement'}
+          showDayTabs={showDayTabs}
+          showItemSelector={viewModel.showItemSelector}
+        />
 
         <View style={styles.fieldGroup}>
           <Text style={styles.label}>금액</Text>
@@ -336,7 +251,7 @@ export function QuickExpenseForm({
           {errors.amount ? <Text style={styles.errorMessage}>{errors.amount}</Text> : null}
         </View>
 
-        <SummaryActionRow
+        <ExpenseFormSummaryActionRow
           disabled={saving || Boolean(viewModel.emptyMessage)}
           onPress={() => setActiveSheet('split')}
           title="결제/분할"
@@ -344,9 +259,9 @@ export function QuickExpenseForm({
         />
         {splitErrorMessage ? <Text style={styles.errorMessage}>{splitErrorMessage}</Text> : null}
 
-        <SummaryActionRow
+        <ExpenseFormSummaryActionRow
           disabled={saving || Boolean(viewModel.emptyMessage)}
-          helper={includeInSettlement ? undefined : '내역과 총 사용 금액에는 남고 최종 정산에서는 제외돼요.'}
+          helper={settlementDetail}
           onPress={() => setActiveSheet('settlement')}
           title="정산 옵션"
           value={settlementSummary}
@@ -378,200 +293,37 @@ export function QuickExpenseForm({
         <SecondaryButton disabled={saving} label="돌아가기" onPress={onBack} />
       </Card>
 
-      <BottomSheet onClose={() => setActiveSheet(null)} scrollable visible={activeSheet === 'split'}>
-        <View style={styles.sheetContent}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sheetTitle}>결제/분할 설정</Text>
-            <Text style={styles.splitHelper}>누가 냈고 누구와 나눌지 설정해요.</Text>
-          </View>
+      <ExpensePaymentSplitSheet
+        amountInput={amountInput}
+        currency={viewModel.currency}
+        disabled={saving || Boolean(viewModel.emptyMessage)}
+        manualSplitInputs={manualSplitInputs}
+        onClose={() => setActiveSheet(null)}
+        onSelectPayer={onSelectPayer}
+        onSelectSplitPolicy={(policy) => onSelectSplitPolicy(policy, viewModel.splitPreviewRows)}
+        onToggleSplitParticipant={onToggleSplitParticipant}
+        onUpdateManualSplitInput={onUpdateManualSplitInput}
+        participantError={errors.participants ?? viewModel.splitParticipantError}
+        participants={viewModel.splitParticipantOptions}
+        payerError={errors.payer}
+        payerOptions={selectedPayerOptions}
+        splitPolicy={splitPolicy}
+        splitPreviewMessage={viewModel.splitPreviewMessage}
+        splitPreviewRows={viewModel.splitPreviewRows}
+        visible={activeSheet === 'split'}
+      />
 
-          <View style={styles.fieldGroup}>
-            <Text style={styles.label}>결제자</Text>
-            <View style={styles.optionList}>
-              {selectedPayerOptions.map((option) => (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: option.selected }}
-                  disabled={saving || Boolean(viewModel.emptyMessage)}
-                  key={option.participantId}
-                  onPress={() => onSelectPayer(option.participantId)}
-                  style={[styles.payerChip, option.selected ? styles.optionCardSelected : null]}
-                >
-                  <Text style={option.selected ? styles.payerChipTextSelected : styles.payerChipText}>
-                    {option.displayName}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-            {errors.payer ? <Text style={styles.errorMessage}>{errors.payer}</Text> : null}
-          </View>
-
-          <View style={styles.fieldGroup}>
-            <Text style={styles.label}>분할 방식</Text>
-            <View style={styles.modeRow}>
-              {(['equal', 'manual'] as const).map((policy) => (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: splitPolicy === policy }}
-                  disabled={saving || Boolean(viewModel.emptyMessage)}
-                  key={policy}
-                  onPress={() => onSelectSplitPolicy(policy, viewModel.splitPreviewRows)}
-                  style={[styles.modeChip, splitPolicy === policy ? styles.optionCardSelected : null]}
-                >
-                  <Text style={splitPolicy === policy ? styles.payerChipTextSelected : styles.payerChipText}>
-                    {policy === 'equal' ? '1/N 분할' : '직접 분할'}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
-
-          {splitPolicy === 'equal' ? (
-            <>
-              <View style={styles.fieldGroup}>
-                <View style={styles.sectionHeader}>
-                  <Text style={styles.label}>분할 대상</Text>
-                  <Text style={styles.splitHelper}>
-                    체크한 사람에게만 아래 금액으로 나눠져요. 결제자도 제외할 수 있어요.
-                  </Text>
-                </View>
-                <View style={styles.optionList}>
-                  {viewModel.splitParticipantOptions.map((option) => (
-                    <Pressable
-                      accessibilityRole="checkbox"
-                      accessibilityState={{ checked: option.selected }}
-                      disabled={saving || Boolean(viewModel.emptyMessage)}
-                      key={option.participantId}
-                      onPress={() => onToggleSplitParticipant(option.participantId)}
-                      style={[styles.payerChip, option.selected ? styles.optionCardSelected : null]}
-                    >
-                      <Text style={option.selected ? styles.payerChipTextSelected : styles.payerChipText}>
-                        {option.displayName}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-                {errors.participants || viewModel.splitParticipantError ? (
-                  <Text style={styles.errorMessage}>{errors.participants ?? viewModel.splitParticipantError}</Text>
-                ) : null}
-              </View>
-
-              {viewModel.splitPreviewRows.length > 0 ? (
-                <SplitRowsSection
-                  helper="저장하면 선택한 참여자에게 아래 금액으로 나눠져요."
-                  rows={viewModel.splitPreviewRows}
-                  title="예상 분담금"
-                />
-              ) : null}
-            </>
-          ) : (
-            <ManualSplitSection
-              amountInput={amountInput}
-              currency={viewModel.currency}
-              disabled={saving || Boolean(viewModel.emptyMessage)}
-              errorMessage={errors.participants ?? null}
-              manualSplitInputs={manualSplitInputs}
-              onToggleSplitParticipant={onToggleSplitParticipant}
-              onUpdateManualSplitInput={onUpdateManualSplitInput}
-              participants={viewModel.splitParticipantOptions}
-            />
-          )}
-
-          {viewModel.splitPreviewMessage ? (
-            <Text style={styles.errorMessage}>{viewModel.splitPreviewMessage}</Text>
-          ) : null}
-          <PrimaryButton label="적용" onPress={() => setActiveSheet(null)} />
-        </View>
-      </BottomSheet>
-
-      <BottomSheet onClose={() => setActiveSheet(null)} visible={activeSheet === 'settlement'}>
-        <View style={styles.sheetContent}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sheetTitle}>정산 옵션</Text>
-            <Text style={styles.splitHelper}>현장에서 이미 돈을 주고받은 지출인지 선택해요.</Text>
-          </View>
-          <SettlementChoice
-            description="나중에 여행 정산에서 함께 계산할 지출이에요."
-            label="최종 정산에 포함"
-            onPress={() => {
-              if (!includeInSettlement) {
-                onToggleIncludeInSettlement();
-              }
-            }}
-            selected={includeInSettlement}
-          />
-          <SettlementChoice
-            description="이미 돈을 주고받은 지출이에요. 내역과 총 사용 금액에는 남고 최종 정산에서는 제외돼요."
-            label="현장 정산 완료"
-            onPress={() => {
-              if (includeInSettlement) {
-                onToggleIncludeInSettlement();
-              }
-            }}
-            selected={!includeInSettlement}
-          />
-          <PrimaryButton label="적용" onPress={() => setActiveSheet(null)} />
-        </View>
-      </BottomSheet>
+      <ExpenseSettlementOptionSheet
+        includeInSettlement={includeInSettlement}
+        onClose={() => setActiveSheet(null)}
+        onSelectIncludeInSettlement={(nextIncludeInSettlement) => {
+          if (nextIncludeInSettlement !== includeInSettlement) {
+            onToggleIncludeInSettlement();
+          }
+        }}
+        visible={activeSheet === 'settlement'}
+      />
     </>
-  );
-}
-
-function SummaryActionRow({
-  disabled,
-  helper,
-  onPress,
-  title,
-  value,
-}: {
-  disabled: boolean;
-  helper?: string;
-  onPress: () => void;
-  title: string;
-  value: string;
-}) {
-  return (
-    <View style={styles.fieldGroup}>
-      <Text style={styles.label}>{title}</Text>
-      <Pressable
-        accessibilityRole="button"
-        disabled={disabled}
-        onPress={onPress}
-        style={({ pressed }) => [styles.summaryRow, disabled ? styles.disabled : null, pressed ? styles.pressed : null]}
-      >
-        <View style={styles.summaryTextColumn}>
-          <Text style={styles.summaryValue}>{value}</Text>
-          {helper ? <Text style={styles.splitHelper}>{helper}</Text> : null}
-        </View>
-        <Text style={styles.summaryAction}>변경</Text>
-      </Pressable>
-    </View>
-  );
-}
-
-function SettlementChoice({
-  description,
-  label,
-  onPress,
-  selected,
-}: {
-  description: string;
-  label: string;
-  onPress: () => void;
-  selected: boolean;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="radio"
-      accessibilityState={{ checked: selected }}
-      onPress={onPress}
-      style={[styles.optionCard, selected ? styles.optionCardSelected : null]}
-    >
-      <View style={styles.summaryTextColumn}>
-        <Text style={styles.optionTitle}>{label}</Text>
-        <Text style={styles.splitHelper}>{description}</Text>
-      </View>
-    </Pressable>
   );
 }
 
@@ -588,126 +340,12 @@ export function QuickExpenseSavedSummaryCard({
         <Text style={styles.successTitle}>지출을 저장했어요.</Text>
         <Text style={styles.message}>총 {summary.amountLabel}</Text>
       </View>
-      <SplitRowsSection helper="서버에 저장된 결과 기준이에요." rows={summary.splitRows} title="실제 저장된 분할" />
+      <ExpenseSplitRowsSection
+        helper="서버에 저장된 결과 기준이에요."
+        rows={summary.splitRows}
+        title="실제 저장된 분할"
+      />
       <PrimaryButton label="확인" onPress={onDone} />
     </Card>
-  );
-}
-
-function ManualSplitSection({
-  amountInput,
-  currency,
-  disabled,
-  errorMessage,
-  manualSplitInputs,
-  onToggleSplitParticipant,
-  onUpdateManualSplitInput,
-  participants,
-}: {
-  amountInput: string;
-  currency: SupportedCurrency;
-  disabled: boolean;
-  errorMessage: string | null;
-  manualSplitInputs: QuickExpenseManualSplitInput[];
-  onToggleSplitParticipant: (participantId: string) => void;
-  onUpdateManualSplitInput: (participantId: string, amount: string) => void;
-  participants: QuickExpenseViewModel['splitParticipantOptions'];
-}) {
-  const selectedParticipants = participants.filter((participant) => participant.selected);
-  const activeManualSplitInputs = manualSplitInputs.filter((input) =>
-    selectedParticipants.some((participant) => participant.participantId === input.participantId),
-  );
-  const summary = buildQuickExpenseManualSplitSummary({
-    amountInput,
-    currency,
-    manualSplitInputs: activeManualSplitInputs,
-  });
-  const inputByParticipantId = new Map(manualSplitInputs.map((split) => [split.participantId, split.amountInput]));
-  const differenceLabel = manualSplitDifferenceLabel(summary.differenceMinor, currency);
-  return (
-    <View style={styles.splitSection}>
-      <View style={styles.sectionHeader}>
-        <Text style={styles.label}>직접 분할</Text>
-        <Text style={styles.splitHelper}>분할할 참여자를 선택하고 각 부담 금액을 입력해주세요.</Text>
-      </View>
-      <View style={styles.optionList}>
-        {participants.map((participant) => (
-          <Pressable
-            accessibilityRole="checkbox"
-            accessibilityState={{ checked: participant.selected }}
-            disabled={disabled}
-            key={participant.participantId}
-            onPress={() => onToggleSplitParticipant(participant.participantId)}
-            style={[styles.payerChip, participant.selected ? styles.optionCardSelected : null]}
-          >
-            <Text style={participant.selected ? styles.payerChipTextSelected : styles.payerChipText}>
-              {participant.displayName}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
-      <View style={styles.splitRowList}>
-        {selectedParticipants.map((participant) => (
-          <View key={participant.participantId} style={styles.manualSplitRow}>
-            <Text style={styles.splitName}>{participant.displayName}</Text>
-            <TextInput
-              accessibilityLabel={`${participant.displayName} 부담 금액`}
-              editable={!disabled}
-              keyboardType={currency === 'KRW' || currency === 'JPY' ? 'number-pad' : 'decimal-pad'}
-              onChangeText={(value) => onUpdateManualSplitInput(participant.participantId, value)}
-              placeholder="0"
-              placeholderTextColor={theme.color.textFaint}
-              style={styles.manualSplitInput}
-              value={inputByParticipantId.get(participant.participantId) ?? ''}
-            />
-          </View>
-        ))}
-      </View>
-      <Text style={styles.splitHelper}>
-        입력 합계 {formatMoney(summary.splitAmountMinor, currency)} / 총액{' '}
-        {summary.totalAmountMinor === null ? '-' : formatMoney(summary.totalAmountMinor, currency)}
-      </Text>
-      {differenceLabel ? <Text style={styles.splitHelper}>{differenceLabel}</Text> : null}
-      {errorMessage || summary.validationMessage ? (
-        <Text style={styles.errorMessage}>{errorMessage ?? summary.validationMessage}</Text>
-      ) : null}
-    </View>
-  );
-}
-
-function manualSplitDifferenceLabel(differenceMinor: number | null, currency: SupportedCurrency): string | null {
-  if (differenceMinor === null || differenceMinor === 0) {
-    return null;
-  }
-  if (differenceMinor > 0) {
-    return `남은 금액 ${formatMoney(differenceMinor, currency)}`;
-  }
-  return `초과 금액 ${formatMoney(Math.abs(differenceMinor), currency)}`;
-}
-
-function SplitRowsSection({
-  helper,
-  rows,
-  title,
-}: {
-  helper: string;
-  rows: QuickExpenseViewModel['splitPreviewRows'];
-  title: string;
-}) {
-  return (
-    <View style={styles.splitSection}>
-      <View style={styles.sectionHeader}>
-        <Text style={styles.label}>{title}</Text>
-        <Text style={styles.splitHelper}>{helper}</Text>
-      </View>
-      <View style={styles.splitRowList}>
-        {rows.map((row, index) => (
-          <View key={`${row.participantId ?? 'removed'}-${index}`} style={styles.splitRow}>
-            <Text style={styles.splitName}>{row.displayName}</Text>
-            <Text style={styles.splitAmount}>{row.amountLabel}</Text>
-          </View>
-        ))}
-      </View>
-    </View>
   );
 }
