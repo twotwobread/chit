@@ -61,10 +61,39 @@ test('builds compact read-only day expense rows from canonical API display data'
       detailLine: '결제 민수 · 분담 민수 600엔 · 지영 600엔',
       settlementLabel: null,
       category: 'food',
-      accessibilityLabel: '도톤보리 1,200엔. 결제 민수 · 분담 민수 600엔 · 지영 600엔',
+      accessibilityLabel: '도톤보리 1,200엔. 식당 카테고리. 결제 민수 · 분담 민수 600엔 · 지영 600엔',
       editRoute: '/trips/trip-a/days/2026-07-10/expenses/expense-a/edit',
     },
   ]);
+});
+
+test('maps lodging place expenses to a lodging category and category-aware accessibility label', () => {
+  const viewModel = buildDayExpensesViewModel({
+    tripId: 'trip-a',
+    date: '2026-07-10',
+    expenses: [
+      expense({
+        displayTitle: '호텔 체크인',
+        place: {
+          tripPlaceId: 'place-hotel',
+          name: '오사카 호텔',
+          address: 'Namba',
+          placeType: 'lodging',
+          source: 'live',
+        },
+      }),
+    ],
+  });
+
+  assert.equal(viewModel.status, 'success');
+  if (viewModel.status !== 'success') {
+    return;
+  }
+  assert.equal(viewModel.rows[0].category, 'lodging');
+  assert.equal(
+    viewModel.rows[0].accessibilityLabel,
+    '호텔 체크인 1,200엔. 숙소 카테고리. 결제 민수 · 분담 민수 600엔 · 지영 600엔',
+  );
 });
 
 test('preserves API newest-first expense order in the view model', () => {
@@ -99,7 +128,7 @@ test('marks settlement-excluded expenses while keeping them in history totals', 
   assert.equal(viewModel.rows[0].detailLine, '결제 민수 · 분담 민수 600엔 · 지영 600엔 · 현장 정산 완료');
   assert.equal(
     viewModel.rows[0].accessibilityLabel,
-    '도톤보리 1,200엔. 결제 민수 · 분담 민수 600엔 · 지영 600엔 · 현장 정산 완료',
+    '도톤보리 1,200엔. 식당 카테고리. 결제 민수 · 분담 민수 600엔 · 지영 600엔 · 현장 정산 완료',
   );
 });
 

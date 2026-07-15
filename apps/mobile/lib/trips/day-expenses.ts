@@ -2,7 +2,7 @@ import type { Href } from 'expo-router';
 
 import type { DayExpenseListItem, DayExpenseSplitListItem, TripPlaceType } from '@i-um/api-contract';
 
-import type { ExpenseCategory } from '../trip-ui/ExpenseRow';
+import { type ExpenseCategory, getExpenseCategoryMarkerMeta } from '../trip-ui/expense-category-markers';
 
 import { buildQuickExpenseRoute, formatMoney } from './quick-expense';
 
@@ -84,6 +84,8 @@ export function buildDayExpensesViewModel({
       const detailLine = [payerLabel, splitLabel, settlementLabel]
         .filter((part): part is string => part !== null)
         .join(' · ');
+      const category = expenseCategory(expense.place?.placeType);
+      const categoryLabel = getExpenseCategoryMarkerMeta(category).label;
 
       return {
         id: expense.id,
@@ -95,8 +97,8 @@ export function buildDayExpensesViewModel({
         splitLabel,
         detailLine,
         settlementLabel,
-        category: expenseCategory(expense.place?.placeType),
-        accessibilityLabel: `${placeName} ${amountLabel}. ${detailLine}`,
+        category,
+        accessibilityLabel: `${placeName} ${amountLabel}. ${categoryLabel} 카테고리. ${detailLine}`,
         editRoute: buildExpenseEditRoute(tripId, date, expense.id),
       };
     }),
@@ -145,13 +147,12 @@ function expenseCategory(placeType?: TripPlaceType | null): ExpenseCategory {
   switch (placeType) {
     case 'cafe':
     case 'food':
+    case 'lodging':
     case 'shopping':
     case 'sights':
-      return placeType;
     case 'transport':
-      return 'transit';
+      return placeType;
     case 'etc':
-    case 'lodging':
     case null:
     case undefined:
       return 'etc';
