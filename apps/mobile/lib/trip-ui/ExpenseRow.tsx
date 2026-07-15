@@ -1,17 +1,33 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  BedDouble,
+  Coffee,
+  Landmark,
+  MapPin,
+  ShoppingBag,
+  TrainFront,
+  Utensils,
+  type LucideIcon,
+} from 'lucide-react-native';
 
 import { AmountText, Badge, theme } from '../design';
+import {
+  type ExpenseCategory,
+  type ExpenseCategoryMarkerIconName,
+  getExpenseCategoryMarkerMeta,
+} from './expense-category-markers';
 
-const CATEGORY = {
-  cafe: { color: theme.color.amber[600], glyph: '카' },
-  etc: { color: theme.color.ink[500], glyph: '기' },
-  food: { color: theme.color.red[500], glyph: '식' },
-  shopping: { color: theme.placeType.shopping.color, glyph: '쇼' },
-  sights: { color: theme.color.green[500], glyph: '관' },
-  transit: { color: theme.color.blue[500], glyph: '교' },
-} as const;
+export type { ExpenseCategory } from './expense-category-markers';
 
-export type ExpenseCategory = keyof typeof CATEGORY;
+const CATEGORY_ICON: Record<ExpenseCategoryMarkerIconName, LucideIcon> = {
+  bed: BedDouble,
+  coffee: Coffee,
+  landmark: Landmark,
+  'map-pin': MapPin,
+  'shopping-bag': ShoppingBag,
+  'train-front': TrainFront,
+  utensils: Utensils,
+};
 
 export type ExpenseRowProps = {
   title: string;
@@ -88,12 +104,17 @@ function ExpenseRowContent({
   needsReview: boolean;
   settlementLabel: string | null;
 }) {
-  const categoryMeta = CATEGORY[category] ?? CATEGORY.etc;
+  const categoryMeta = getExpenseCategoryMarkerMeta(category);
+  const CategoryIcon = CATEGORY_ICON[categoryMeta.iconName];
 
   return (
     <>
-      <View style={[styles.icon, { backgroundColor: categoryMeta.color }]}>
-        <Text style={styles.iconText}>{categoryMeta.glyph}</Text>
+      <View
+        accessibilityLabel={`${categoryMeta.label} 카테고리`}
+        accessible
+        style={[styles.icon, { backgroundColor: categoryMeta.color }]}
+      >
+        <CategoryIcon color={theme.color.onPrimary} size={18} strokeWidth={2.4} />
       </View>
       <View style={styles.body}>
         <Text numberOfLines={1} style={styles.title}>
@@ -127,12 +148,6 @@ const styles = StyleSheet.create({
     height: 36,
     justifyContent: 'center',
     width: 36,
-  },
-  iconText: {
-    color: theme.color.onPrimary,
-    fontFamily: theme.font.family.bold,
-    fontSize: theme.font.size.body,
-    fontWeight: theme.font.weight.bold,
   },
   meta: {
     color: theme.color.textMuted,

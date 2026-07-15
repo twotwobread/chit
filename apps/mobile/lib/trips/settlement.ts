@@ -12,6 +12,7 @@ import type {
 
 import type { DayChip } from '../trip-ui/DayChips';
 
+import { getExpenseCategoryMarkerMeta } from '../trip-ui/expense-category-markers';
 import { type DayExpenseRowViewModel, buildDayExpensesViewModel, buildTripExpenseEditRoute } from './day-expenses';
 import { formatTripDayDate, formatTripDayLabel } from './days';
 import { buildQuickExpenseRoute, formatMoney } from './quick-expense';
@@ -196,6 +197,7 @@ function compactSettlementExpenseRow({
     Boolean(part),
   );
   const detailLine = metaParts.join(' · ');
+  const categoryLabel = getExpenseCategoryMarkerMeta(row.category).label;
 
   return {
     ...row,
@@ -203,7 +205,7 @@ function compactSettlementExpenseRow({
     splitLabel: dateLabel ? `${splitLabel} · ${dateLabel}` : splitLabel,
     detailLine,
     settlementLabel,
-    accessibilityLabel: `${row.placeName} ${row.amountLabel}. ${detailLine}`,
+    accessibilityLabel: `${row.placeName} ${row.amountLabel}. ${categoryLabel} 카테고리. ${detailLine}`,
     editRoute: isTripSection ? buildTripExpenseEditRoute(tripId, expense.id) : row.editRoute,
   };
 }
