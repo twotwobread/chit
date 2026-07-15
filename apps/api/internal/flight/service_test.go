@@ -121,6 +121,127 @@ func TestServiceCreateFlightAllowsDateLineWhenUtcArrivalIsAfterDeparture(t *test
 	}
 }
 
+func TestServiceUpdateFlightAllowsCurrentTripParticipantAndNormalizesSharedFields(t *testing.T) {
+	repo := &fakeRepository{
+		membershipParticipantID: testParticipantID,
+		updatedFlight: Flight{
+			ID:              testFlightID,
+			TripID:          testTripID,
+			DisplayTitle:    "KE 018",
+			FlightNumber:    stringPtr("KE018"),
+			CreatedByUserID: testUserID,
+		},
+	}
+	service := NewService(repo)
+
+	_, err := service.UpdateFlight(context.Background(), testUserID, testTripID, testFlightID, UpdateFlightInput{
+		DisplayTitle: "  KE 018  ",
+		FlightNumber: stringPtr(" ke018 "),
+		Departure:    FlightEndpointInput{AirportText: " 인천 ", AirportCode: stringPtr(" icn "), LocalDate: "2026-08-02", LocalTime: "14:30", TimeZone: "Asia/Seoul"},
+		Arrival:      FlightEndpointInput{AirportText: " 로스앤젤레스 ", AirportCode: stringPtr(" lax "), LocalDate: "2026-08-02", LocalTime: "09:50", TimeZone: "America/Los_Angeles"},
+	})
+	if err != nil {
+		t.Fatalf("UpdateFlight returned error: %v", err)
+	}
+
+	record := repo.updateRecord
+	if record.TripID != testTripID || record.FlightID != testFlightID || record.UpdatedByUserID != testUserID {
+		t.Fatalf("unexpected update record identity fields: %#v", record)
+	}
+	if record.DisplayTitle != "KE 018" || record.FlightNumber == nil || *record.FlightNumber != "KE018" {
+		t.Fatalf("expected normalized title and flight number, got %#v", record)
+	}
+	if record.Departure.AirportText != "인천" || record.Departure.AirportCode == nil || *record.Departure.AirportCode != "ICN" {
+		t.Fatalf("expected normalized departure, got %#v", record.Departure)
+	}
+	if record.Arrival.AirportText != "로스앤젤레스" || record.Arrival.AirportCode == nil || *record.Arrival.AirportCode != "LAX" {
+		t.Fatalf("expected normalized arrival, got %#v", record.Arrival)
+	}
+	if got, want := record.Departure.At.Format(time.RFC3339), "2026-08-02T05:30:00Z"; got != want {
+		t.Fatalf("departure instant = %s, want %s", got, want)
+	}
+	if got, want := record.Arrival.At.Format(time.RFC3339), "2026-08-02T16:50:00Z"; got != want {
+		t.Fatalf("arrival instant = %s, want %s", got, want)
+	}
+}
+
+func TestServiceUpdateFlightRejectsInvalidSharedFieldsAndNonParticipants(t *testing.T) {
+	base := UpdateFlightInput{
+		DisplayTitle: "KE 018",
+		Departure:    FlightEndpointInput{AirportText: "ICN", LocalDate: "2026-08-02", LocalTime: "14:30", TimeZone: "Asia/Seoul"},
+		Arrival:      FlightEndpointInput{AirportText: "LAX", LocalDate: "2026-08-02", LocalTime: "09:50", TimeZone: "America/Los_Angeles"},
+	}
+	service := NewService(&fakeRepository{membershipParticipantID: testParticipantID})
+	invalidTitle := base
+	invalidTitle.DisplayTitle = " "
+	if _, err := service.UpdateFlight(context.Background(), testUserID, testTripID, testFlightID, invalidTitle); !errors.Is(err, ErrValidation) {
+		t.Fatalf("blank title error = %v, want ErrValidation", err)
+	}
+	invalidArrival := base
+	invalidArrival.Arrival.LocalDate = "2026-08-01"
+	if _, err := service.UpdateFlight(context.Background(), testUserID, testTripID, testFlightID, invalidArrival); !errors.Is(err, ErrValidation) {
+		t.Fatalf("arrival before departure error = %v, want ErrValidation", err)
+	}
+
+	service = NewService(&fakeRepository{})
+	if _, err := service.UpdateFlight(context.Background(), testUserID, testTripID, testFlightID, base); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("non-participant error = %v, want ErrForbidden", err)
+	}
+}
+
+func TestServiceAddPassengersRequiresCurrentTripParticipantAndNormalizesIDs(t *testing.T) {
+	secondParticipantID := "55555555-5555-5555-5555-555555555555"
+	repo := &fakeRepository{
+		membershipParticipantID: testParticipantID,
+		addPassengersResult: FlightDetail{Flight: Flight{ID: testFlightID, TripID: testTripID}, Passengers: []Passenger{
+			{ParticipantID: testParticipantID, DisplayName: "민수"},
+			{ParticipantID: secondParticipantID, DisplayName: "지영"},
+		}},
+	}
+	service := NewService(repo)
+
+	result, err := service.AddPassengers(context.Background(), testUserID, testTripID, testFlightID, AddPassengersInput{
+		PassengerIDs: []string{" " + secondParticipantID + " "},
+	})
+	if err != nil {
+		t.Fatalf("AddPassengers returned error: %v", err)
+	}
+	if repo.addPassengersRecord.TripID != testTripID || repo.addPassengersRecord.FlightID != testFlightID || repo.addPassengersRecord.AddedByUserID != testUserID {
+		t.Fatalf("unexpected add passengers record: %#v", repo.addPassengersRecord)
+	}
+	if !reflect.DeepEqual(repo.addPassengersRecord.PassengerIDs, []string{secondParticipantID}) {
+		t.Fatalf("expected normalized passenger ids, got %#v", repo.addPassengersRecord.PassengerIDs)
+	}
+	if len(result.Passengers) != 2 {
+		t.Fatalf("expected updated passenger list, got %#v", result.Passengers)
+	}
+}
+
+func TestServiceAddPassengersRejectsInvalidIDsAndPropagatesConflict(t *testing.T) {
+	service := NewService(&fakeRepository{membershipParticipantID: testParticipantID})
+	for _, input := range []AddPassengersInput{
+		{},
+		{PassengerIDs: []string{" "}},
+		{PassengerIDs: []string{testParticipantID, " " + testParticipantID + " "}},
+	} {
+		if _, err := service.AddPassengers(context.Background(), testUserID, testTripID, testFlightID, input); !errors.Is(err, ErrValidation) {
+			t.Fatalf("AddPassengers(%#v) error = %v, want ErrValidation", input, err)
+		}
+	}
+
+	repo := &fakeRepository{membershipParticipantID: testParticipantID, addPassengersErr: ErrConflict}
+	service = NewService(repo)
+	if _, err := service.AddPassengers(context.Background(), testUserID, testTripID, testFlightID, AddPassengersInput{PassengerIDs: []string{testParticipantID}}); !errors.Is(err, ErrConflict) {
+		t.Fatalf("conflict error = %v, want ErrConflict", err)
+	}
+
+	repo = &fakeRepository{}
+	service = NewService(repo)
+	if _, err := service.AddPassengers(context.Background(), testUserID, testTripID, testFlightID, AddPassengersInput{PassengerIDs: []string{testParticipantID}}); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("non-participant error = %v, want ErrForbidden", err)
+	}
+}
+
 func TestServiceUpsertPersonalDetailRequiresCurrentPassengerAndNormalizesFields(t *testing.T) {
 	repo := &fakeRepository{passengerParticipantID: testParticipantID, personalDetail: PersonalDetail{PassengerParticipantID: testParticipantID}}
 	service := NewService(repo)
@@ -154,8 +275,13 @@ type fakeRepository struct {
 	passengerParticipantID  string
 	passengerErr            error
 	createdFlight           Flight
+	updatedFlight           Flight
 	personalDetail          PersonalDetail
 	createRecord            CreateFlightRecord
+	updateRecord            UpdateFlightRecord
+	addPassengersRecord     AddPassengersRecord
+	addPassengersResult     FlightDetail
+	addPassengersErr        error
 	upsertRecord            UpsertPersonalDetailRecord
 }
 
@@ -169,6 +295,19 @@ func (r *fakeRepository) GetTripParticipantID(ctx context.Context, tripID string
 func (r *fakeRepository) CreateFlightWithPassengers(ctx context.Context, record CreateFlightRecord) (FlightDetail, error) {
 	r.createRecord = record
 	return FlightDetail{Flight: r.createdFlight}, nil
+}
+
+func (r *fakeRepository) UpdateFlight(ctx context.Context, record UpdateFlightRecord) (FlightDetail, error) {
+	r.updateRecord = record
+	return FlightDetail{Flight: r.updatedFlight}, nil
+}
+
+func (r *fakeRepository) AddFlightPassengers(ctx context.Context, record AddPassengersRecord) (FlightDetail, error) {
+	r.addPassengersRecord = record
+	if r.addPassengersErr != nil {
+		return FlightDetail{}, r.addPassengersErr
+	}
+	return r.addPassengersResult, nil
 }
 
 func (r *fakeRepository) ListFlights(ctx context.Context, tripID string, userID string) ([]FlightDetail, error) {

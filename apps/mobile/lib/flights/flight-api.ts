@@ -1,12 +1,16 @@
 import {
   FlightsService,
   OpenAPI,
+  type AddTripFlightPassengersRequest,
+  type AddTripFlightPassengersResponse,
   type CreateTripFlightRequest,
   type CreateTripFlightResponse,
   type GetTripFlightResponse,
   type ListTripFlightsResponse,
   type OpenMyFlightBoardingPassResponse,
   type UploadMyFlightBoardingPassResponse,
+  type UpdateTripFlightRequest,
+  type UpdateTripFlightResponse,
   type UpsertMyFlightPersonalDetailRequest,
   type UpsertMyFlightPersonalDetailResponse,
 } from '@i-um/api-contract';
@@ -26,6 +30,22 @@ export async function createTripFlight(
 
 export async function getTripFlight(tripId: string, flightId: string): Promise<GetTripFlightResponse> {
   return runAuthenticatedRequest(() => FlightsService.getTripFlight(tripId, flightId));
+}
+
+export async function updateTripFlight(
+  tripId: string,
+  flightId: string,
+  request: UpdateTripFlightRequest,
+): Promise<UpdateTripFlightResponse> {
+  return runAuthenticatedRequest(() => FlightsService.updateTripFlight(tripId, flightId, request));
+}
+
+export async function addTripFlightPassengers(
+  tripId: string,
+  flightId: string,
+  request: AddTripFlightPassengersRequest,
+): Promise<AddTripFlightPassengersResponse> {
+  return runAuthenticatedRequest(() => FlightsService.addTripFlightPassengers(tripId, flightId, request));
 }
 
 export async function upsertMyFlightPersonalDetail(

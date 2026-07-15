@@ -1059,6 +1059,133 @@ func (q *Queries) MarkStorageObjectDeletionJobSucceeded(ctx context.Context, job
 	return err
 }
 
+const updateFlight = `-- name: UpdateFlight :one
+UPDATE flights
+SET
+  flight_number = $1,
+  display_title = $2,
+  departure_airport_text = $3,
+  departure_airport_code = $4,
+  departure_local_date = $5,
+  departure_local_time = $6,
+  departure_time_zone = $7,
+  departure_at = $8,
+  arrival_airport_text = $9,
+  arrival_airport_code = $10,
+  arrival_local_date = $11,
+  arrival_local_time = $12,
+  arrival_time_zone = $13,
+  arrival_at = $14,
+  updated_at = now()
+WHERE trip_id = $15::uuid
+  AND id = $16::uuid
+RETURNING
+  id::text,
+  trip_id::text,
+  flight_number,
+  display_title,
+  departure_airport_text,
+  departure_airport_code,
+  departure_local_date,
+  departure_local_time,
+  departure_time_zone,
+  departure_at,
+  arrival_airport_text,
+  arrival_airport_code,
+  arrival_local_date,
+  arrival_local_time,
+  arrival_time_zone,
+  arrival_at,
+  created_by_user_id::text,
+  created_at,
+  updated_at
+`
+
+type UpdateFlightParams struct {
+	FlightNumber         pgtype.Text
+	DisplayTitle         string
+	DepartureAirportText string
+	DepartureAirportCode pgtype.Text
+	DepartureLocalDate   pgtype.Date
+	DepartureLocalTime   pgtype.Time
+	DepartureTimeZone    string
+	DepartureAt          pgtype.Timestamptz
+	ArrivalAirportText   string
+	ArrivalAirportCode   pgtype.Text
+	ArrivalLocalDate     pgtype.Date
+	ArrivalLocalTime     pgtype.Time
+	ArrivalTimeZone      string
+	ArrivalAt            pgtype.Timestamptz
+	TripID               pgtype.UUID
+	FlightID             pgtype.UUID
+}
+
+type UpdateFlightRow struct {
+	ID                   string
+	TripID               string
+	FlightNumber         pgtype.Text
+	DisplayTitle         string
+	DepartureAirportText string
+	DepartureAirportCode pgtype.Text
+	DepartureLocalDate   pgtype.Date
+	DepartureLocalTime   pgtype.Time
+	DepartureTimeZone    string
+	DepartureAt          pgtype.Timestamptz
+	ArrivalAirportText   string
+	ArrivalAirportCode   pgtype.Text
+	ArrivalLocalDate     pgtype.Date
+	ArrivalLocalTime     pgtype.Time
+	ArrivalTimeZone      string
+	ArrivalAt            pgtype.Timestamptz
+	CreatedByUserID      string
+	CreatedAt            pgtype.Timestamptz
+	UpdatedAt            pgtype.Timestamptz
+}
+
+func (q *Queries) UpdateFlight(ctx context.Context, arg UpdateFlightParams) (UpdateFlightRow, error) {
+	row := q.db.QueryRow(ctx, updateFlight,
+		arg.FlightNumber,
+		arg.DisplayTitle,
+		arg.DepartureAirportText,
+		arg.DepartureAirportCode,
+		arg.DepartureLocalDate,
+		arg.DepartureLocalTime,
+		arg.DepartureTimeZone,
+		arg.DepartureAt,
+		arg.ArrivalAirportText,
+		arg.ArrivalAirportCode,
+		arg.ArrivalLocalDate,
+		arg.ArrivalLocalTime,
+		arg.ArrivalTimeZone,
+		arg.ArrivalAt,
+		arg.TripID,
+		arg.FlightID,
+	)
+	var i UpdateFlightRow
+	err := row.Scan(
+		&i.ID,
+		&i.TripID,
+		&i.FlightNumber,
+		&i.DisplayTitle,
+		&i.DepartureAirportText,
+		&i.DepartureAirportCode,
+		&i.DepartureLocalDate,
+		&i.DepartureLocalTime,
+		&i.DepartureTimeZone,
+		&i.DepartureAt,
+		&i.ArrivalAirportText,
+		&i.ArrivalAirportCode,
+		&i.ArrivalLocalDate,
+		&i.ArrivalLocalTime,
+		&i.ArrivalTimeZone,
+		&i.ArrivalAt,
+		&i.CreatedByUserID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const upsertFlightBoardingPassMetadata = `-- name: UpsertFlightBoardingPassMetadata :one
 INSERT INTO flight_personal_details (
   flight_id,

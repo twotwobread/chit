@@ -2,11 +2,15 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
+import type { AddTripFlightPassengersRequest } from '../models/AddTripFlightPassengersRequest';
+import type { AddTripFlightPassengersResponse } from '../models/AddTripFlightPassengersResponse';
 import type { CreateTripFlightRequest } from '../models/CreateTripFlightRequest';
 import type { CreateTripFlightResponse } from '../models/CreateTripFlightResponse';
 import type { GetTripFlightResponse } from '../models/GetTripFlightResponse';
 import type { ListTripFlightsResponse } from '../models/ListTripFlightsResponse';
 import type { OpenMyFlightBoardingPassResponse } from '../models/OpenMyFlightBoardingPassResponse';
+import type { UpdateTripFlightRequest } from '../models/UpdateTripFlightRequest';
+import type { UpdateTripFlightResponse } from '../models/UpdateTripFlightResponse';
 import type { UploadMyFlightBoardingPassResponse } from '../models/UploadMyFlightBoardingPassResponse';
 import type { UpsertMyFlightPersonalDetailRequest } from '../models/UpsertMyFlightPersonalDetailRequest';
 import type { UpsertMyFlightPersonalDetailResponse } from '../models/UpsertMyFlightPersonalDetailResponse';
@@ -92,6 +96,71 @@ export class FlightsService {
                 401: `Unauthorized.`,
                 403: `Forbidden.`,
                 404: `Trip or flight not found.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
+     * Update trip flight shared details
+     * Updates shared flight metadata for an existing trip flight. Any current trip participant can update these shared fields. Personal reservation and boarding-pass details are not changed.
+     * @param tripId
+     * @param flightId
+     * @param requestBody
+     * @returns UpdateTripFlightResponse Flight updated.
+     * @throws ApiError
+     */
+    public static updateTripFlight(
+        tripId: string,
+        flightId: string,
+        requestBody: UpdateTripFlightRequest,
+    ): CancelablePromise<UpdateTripFlightResponse> {
+        return __request(OpenAPI, {
+            method: 'PUT',
+            url: '/trips/{tripId}/flights/{flightId}',
+            path: {
+                'tripId': tripId,
+                'flightId': flightId,
+            },
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                403: `Forbidden; current user is not a current trip participant.`,
+                404: `Trip or flight not found.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
+     * Add passengers to a trip flight
+     * Adds current trip participants to an existing shared flight. This changes passenger membership only and does not create personal reservation or boarding-pass details.
+     * @param tripId
+     * @param flightId
+     * @param requestBody
+     * @returns AddTripFlightPassengersResponse Passengers added.
+     * @throws ApiError
+     */
+    public static addTripFlightPassengers(
+        tripId: string,
+        flightId: string,
+        requestBody: AddTripFlightPassengersRequest,
+    ): CancelablePromise<AddTripFlightPassengersResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/trips/{tripId}/flights/{flightId}/passengers',
+            path: {
+                'tripId': tripId,
+                'flightId': flightId,
+            },
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                403: `Forbidden; current user is not a current trip participant.`,
+                404: `Trip or flight not found.`,
+                409: `Duplicate passenger or stale participant state.`,
                 500: `Unexpected server error.`,
             },
         });

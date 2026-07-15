@@ -66,6 +66,63 @@ func (s *Store) CreateFlightWithPassengers(ctx context.Context, record flight.Cr
 	return flight.FlightDetail{Flight: flightFromCreateRow(created), Passengers: passengersFromRows(passengerRows)}, nil
 }
 
+func (s *Store) UpdateFlight(ctx context.Context, record flight.UpdateFlightRecord) (flight.FlightDetail, error) {
+	_, err := s.queries.UpdateFlight(ctx, db.UpdateFlightParams{
+		FlightNumber:         textPtrToSQL(record.FlightNumber),
+		DisplayTitle:         record.DisplayTitle,
+		DepartureAirportText: record.Departure.AirportText,
+		DepartureAirportCode: textPtrToSQL(record.Departure.AirportCode),
+		DepartureLocalDate:   dateFromString(record.Departure.LocalDate),
+		DepartureLocalTime:   clockTimeFromString(record.Departure.LocalTime),
+		DepartureTimeZone:    record.Departure.TimeZone,
+		DepartureAt:          timestamptzValue(record.Departure.At),
+		ArrivalAirportText:   record.Arrival.AirportText,
+		ArrivalAirportCode:   textPtrToSQL(record.Arrival.AirportCode),
+		ArrivalLocalDate:     dateFromString(record.Arrival.LocalDate),
+		ArrivalLocalTime:     clockTimeFromString(record.Arrival.LocalTime),
+		ArrivalTimeZone:      record.Arrival.TimeZone,
+		ArrivalAt:            timestamptzValue(record.Arrival.At),
+		TripID:               mustUUID(record.TripID),
+		FlightID:             mustUUID(record.FlightID),
+	})
+	if err == pgx.ErrNoRows {
+		return flight.FlightDetail{}, flight.ErrNotFound
+	}
+	if err != nil {
+		return flight.FlightDetail{}, err
+	}
+	return s.GetFlight(ctx, record.TripID, record.FlightID, record.UpdatedByUserID)
+}
+
+func (s *Store) AddFlightPassengers(ctx context.Context, record flight.AddPassengersRecord) (flight.FlightDetail, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return flight.FlightDetail{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	qtx := s.queries.WithTx(tx)
+	if _, err := qtx.GetFlightByTrip(ctx, db.GetFlightByTripParams{TripID: mustUUID(record.TripID), FlightID: mustUUID(record.FlightID)}); err == pgx.ErrNoRows {
+		return flight.FlightDetail{}, flight.ErrNotFound
+	} else if err != nil {
+		return flight.FlightDetail{}, err
+	}
+
+	for _, passengerID := range record.PassengerIDs {
+		_, err := qtx.CreateFlightPassenger(ctx, db.CreateFlightPassengerParams{FlightID: mustUUID(record.FlightID), TripID: mustUUID(record.TripID), ParticipantID: mustUUID(passengerID), AddedByUserID: mustUUID(record.AddedByUserID)})
+		if err != nil {
+			if isUniqueConstraintViolation(err, "flight_passengers_flight_participant_unique") || isForeignKeyConstraintViolation(err, "flight_passengers_participant_trip_fk") || isForeignKeyConstraintViolation(err, "flight_passengers_flight_trip_fk") {
+				return flight.FlightDetail{}, flight.ErrConflict
+			}
+			return flight.FlightDetail{}, err
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return flight.FlightDetail{}, err
+	}
+	return s.GetFlight(ctx, record.TripID, record.FlightID, record.AddedByUserID)
+}
+
 func (s *Store) ListFlights(ctx context.Context, tripID string, userID string) ([]flight.FlightDetail, error) {
 	flightRows, err := s.queries.ListFlightsByTrip(ctx, mustUUID(tripID))
 	if err != nil {

@@ -23,6 +23,8 @@ const (
 type Repository interface {
 	GetTripParticipantID(ctx context.Context, tripID string, userID string) (string, error)
 	CreateFlightWithPassengers(ctx context.Context, record CreateFlightRecord) (FlightDetail, error)
+	UpdateFlight(ctx context.Context, record UpdateFlightRecord) (FlightDetail, error)
+	AddFlightPassengers(ctx context.Context, record AddPassengersRecord) (FlightDetail, error)
 	ListFlights(ctx context.Context, tripID string, userID string) ([]FlightDetail, error)
 	GetFlight(ctx context.Context, tripID string, flightID string, userID string) (FlightDetail, error)
 	GetFlightPassengerParticipantID(ctx context.Context, tripID string, flightID string, userID string) (string, error)
@@ -148,6 +150,80 @@ func (s *Service) CreateFlight(ctx context.Context, userID string, tripID string
 		Departure:       departure,
 		Arrival:         arrival,
 		PassengerIDs:    passengerIDs,
+	})
+}
+
+func (s *Service) UpdateFlight(ctx context.Context, userID string, tripID string, flightID string, input UpdateFlightInput) (FlightDetail, error) {
+	if strings.TrimSpace(userID) == "" {
+		return FlightDetail{}, ErrUnauthorized
+	}
+	tripID = strings.TrimSpace(tripID)
+	flightID = strings.TrimSpace(flightID)
+	if tripID == "" || flightID == "" || s.repo == nil {
+		return FlightDetail{}, ErrValidation
+	}
+	if _, err := s.repo.GetTripParticipantID(ctx, tripID, userID); err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return FlightDetail{}, ErrForbidden
+		}
+		return FlightDetail{}, err
+	}
+
+	displayTitle := strings.TrimSpace(input.DisplayTitle)
+	if len([]rune(displayTitle)) < 1 || len([]rune(displayTitle)) > 80 {
+		return FlightDetail{}, ErrValidation
+	}
+	flightNumber := normalizeOptionalUpper(input.FlightNumber)
+	if flightNumber != nil && len([]rune(*flightNumber)) > 20 {
+		return FlightDetail{}, ErrValidation
+	}
+	departure, err := normalizeEndpoint(input.Departure)
+	if err != nil {
+		return FlightDetail{}, err
+	}
+	arrival, err := normalizeEndpoint(input.Arrival)
+	if err != nil {
+		return FlightDetail{}, err
+	}
+	if !arrival.At.After(departure.At) {
+		return FlightDetail{}, ErrValidation
+	}
+
+	return s.repo.UpdateFlight(ctx, UpdateFlightRecord{
+		TripID:          tripID,
+		FlightID:        flightID,
+		UpdatedByUserID: strings.TrimSpace(userID),
+		DisplayTitle:    displayTitle,
+		FlightNumber:    flightNumber,
+		Departure:       departure,
+		Arrival:         arrival,
+	})
+}
+
+func (s *Service) AddPassengers(ctx context.Context, userID string, tripID string, flightID string, input AddPassengersInput) (FlightDetail, error) {
+	if strings.TrimSpace(userID) == "" {
+		return FlightDetail{}, ErrUnauthorized
+	}
+	tripID = strings.TrimSpace(tripID)
+	flightID = strings.TrimSpace(flightID)
+	if tripID == "" || flightID == "" || s.repo == nil {
+		return FlightDetail{}, ErrValidation
+	}
+	if _, err := s.repo.GetTripParticipantID(ctx, tripID, userID); err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return FlightDetail{}, ErrForbidden
+		}
+		return FlightDetail{}, err
+	}
+	passengerIDs, err := normalizePassengerIDs(input.PassengerIDs)
+	if err != nil {
+		return FlightDetail{}, err
+	}
+	return s.repo.AddFlightPassengers(ctx, AddPassengersRecord{
+		TripID:        tripID,
+		FlightID:      flightID,
+		AddedByUserID: strings.TrimSpace(userID),
+		PassengerIDs:  passengerIDs,
 	})
 }
 

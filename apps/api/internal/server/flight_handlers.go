@@ -77,6 +77,53 @@ func (s apiServer) GetTripFlight(w http.ResponseWriter, r *http.Request, tripId 
 	writeJSON(w, http.StatusOK, openapi.GetTripFlightResponse{Flight: flightDetailToOpenAPI(result)})
 }
 
+func (s apiServer) UpdateTripFlight(w http.ResponseWriter, r *http.Request, tripId string, flightId string) {
+	if s.auth == nil || s.flights == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "flights are not configured", nil)
+		return
+	}
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+	var body openapi.UpdateTripFlightJSONRequestBody
+	if !decodeJSON(w, r, &body) {
+		return
+	}
+	result, err := s.flights.UpdateFlight(r.Context(), authContext.UserID, tripId, flightId, flight.UpdateFlightInput{
+		DisplayTitle: body.DisplayTitle,
+		FlightNumber: body.FlightNumber,
+		Departure:    flightEndpointInputFromOpenAPI(body.Departure),
+		Arrival:      flightEndpointInputFromOpenAPI(body.Arrival),
+	})
+	if err != nil {
+		writeFlightError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, openapi.UpdateTripFlightResponse{Flight: flightDetailToOpenAPI(result)})
+}
+
+func (s apiServer) AddTripFlightPassengers(w http.ResponseWriter, r *http.Request, tripId string, flightId string) {
+	if s.auth == nil || s.flights == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "flights are not configured", nil)
+		return
+	}
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+	var body openapi.AddTripFlightPassengersJSONRequestBody
+	if !decodeJSON(w, r, &body) {
+		return
+	}
+	result, err := s.flights.AddPassengers(r.Context(), authContext.UserID, tripId, flightId, flight.AddPassengersInput{PassengerIDs: body.PassengerParticipantIds})
+	if err != nil {
+		writeFlightError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, openapi.AddTripFlightPassengersResponse{Flight: flightDetailToOpenAPI(result)})
+}
+
 func (s apiServer) UpsertMyFlightPersonalDetail(w http.ResponseWriter, r *http.Request, tripId string, flightId string) {
 	if s.auth == nil || s.flights == nil {
 		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "flight personal details are not configured", nil)
@@ -168,6 +215,8 @@ func writeFlightError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusForbidden, "FORBIDDEN", "forbidden", nil)
 	case errors.Is(err, flight.ErrNotFound):
 		writeError(w, http.StatusNotFound, "NOT_FOUND", "flight not found", nil)
+	case errors.Is(err, flight.ErrConflict):
+		writeError(w, http.StatusConflict, "CONFLICT", "flight passenger conflict", nil)
 	case errors.Is(err, flight.ErrUploadTooLarge):
 		writeError(w, http.StatusRequestEntityTooLarge, "UPLOAD_TOO_LARGE", "boarding pass upload is too large", nil)
 	case errors.Is(err, flight.ErrUnsupportedMediaType):
