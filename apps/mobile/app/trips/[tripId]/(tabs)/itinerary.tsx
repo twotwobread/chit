@@ -94,7 +94,9 @@ export default function TripItineraryTabScreen() {
         date={state.selectedDay.id}
         headerContent={<DayChips days={state.dayChips} selectedDayId={state.selectedDay.id} onSelectDay={selectDay} />}
         key={state.selectedDay.id}
+        onRequestDayChange={selectDay}
         showHeader={false}
+        tripDays={shellState?.status === 'success' ? shellState.detail.days : []}
         tripId={tripId ?? ''}
       />
     );

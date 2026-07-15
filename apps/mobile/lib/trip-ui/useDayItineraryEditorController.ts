@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, AppState, type AppStateStatus } from 'react-native';
+
+import type { TripDay } from '@i-um/api-contract';
 import { router, useFocusEffect } from 'expo-router';
 
 import { focusAccessibilityHandle } from './accessibility-focus';
 import {
   dayItineraryApiStatus,
   handleDayItineraryAuthOrReloadError,
+  isApiStatus,
   isDayItineraryAuthError,
 } from './day-itinerary-editor-errors';
 import { type DayItineraryContentFocusRequest, type DayItineraryContentFocusTarget } from './DayItineraryEditorParts';
@@ -15,6 +18,7 @@ import {
   type EditState,
   type LodgingPlacePickerState,
   type LodgingState,
+  type MoveState,
   type ReorderState,
 } from './DayItineraryEditorControllerTypes';
 import { createDayItineraryDeleteActions } from './day-itinerary-editor-delete-actions';
@@ -23,10 +27,21 @@ import { createDayItineraryLodgingActions } from './day-itinerary-editor-lodging
 import { createDayItineraryReorderActions } from './day-itinerary-editor-reorder-actions';
 import { useDayItineraryMapActions } from './useDayItineraryMapActions';
 import { useDayItineraryReorderAutoScroll } from './useDayItineraryReorderAutoScroll';
-import { buildDayItineraryViewModel, dayItineraryFailureState } from '../trips/day-itinerary';
+import {
+  buildDayItineraryViewModel,
+  dayItineraryFailureState,
+  type DayItineraryRowViewModel,
+} from '../trips/day-itinerary';
 import { buildPlaceScheduleDetailRoute } from '../places/place-schedule-detail';
 import { tripItineraryDayPath, tripItineraryPath } from '../trips/routes';
-import { getTripDayItinerary } from '../trips/itinerary-api';
+import { getTripDayItinerary, moveScheduleItemToDay } from '../trips/itinerary-api';
+import {
+  DAY_ITINERARY_MOVE_CONFLICT_MESSAGE,
+  buildDayItineraryMoveFailureState,
+  buildDayItineraryMoveRequest,
+  buildDayItineraryMoveTargetOptions,
+  requiresDayItineraryMoveStatusResetConfirmation,
+} from '../trips/move-itinerary';
 import {
   DAY_ITINERARY_SHARED_UPDATE_POLL_INTERVAL_MS,
   DAY_ITINERARY_SHARED_UPDATE_RELOAD_CONFIRMATION,
@@ -43,17 +58,23 @@ export type UseDayItineraryEditorControllerOptions = {
   tripId?: string;
   date?: string;
   initialAction?: string;
+  tripDays?: TripDay[];
+  onRequestDayChange?: (dayId: string) => void;
 };
 
 export function useDayItineraryEditorController({
   tripId,
   date,
   initialAction,
+  tripDays = [],
+  onRequestDayChange,
 }: UseDayItineraryEditorControllerOptions) {
   const [state, setState] = useState<DayItineraryState>({ status: 'loading' });
   const [editState, setEditState] = useState<EditState>({ status: 'idle' });
   const [deleteState, setDeleteState] = useState<DeleteState>({ status: 'idle' });
   const [reorderState, setReorderState] = useState<ReorderState>({ status: 'idle' });
+  const [moveState, setMoveState] = useState<MoveState>({ status: 'idle' });
+  const [moveFeedback, setMoveFeedback] = useState<string | null>(null);
   const [lodgingState, setLodgingState] = useState<LodgingState>({ status: 'idle' });
   const [lodgingPickerState, setLodgingPickerState] = useState<LodgingPlacePickerState>({ status: 'idle' });
   const [reorderFeedback, setReorderFeedback] = useState<string | null>(null);
@@ -76,6 +97,7 @@ export function useDayItineraryEditorController({
   const editStateRef = useRef<EditState>({ status: 'idle' });
   const deleteStateRef = useRef<DeleteState>({ status: 'idle' });
   const reorderStateRef = useRef<ReorderState>({ status: 'idle' });
+  const moveStateRef = useRef<MoveState>({ status: 'idle' });
   const lodgingStateRef = useRef<LodgingState>({ status: 'idle' });
   const lodgingPickerStateRef = useRef<LodgingPlacePickerState>({ status: 'idle' });
   const sharedUpdateStateRef = useRef<DayItinerarySharedUpdateState>({
@@ -104,6 +126,7 @@ export function useDayItineraryEditorController({
       createStatus: 'idle',
       editStatus: editStateRef.current.status,
       deleteStatus: deleteStateRef.current.status,
+      moveStatus: moveStateRef.current.status,
       lodgingStatus: lodgingStateRef.current.status,
       lodgingPickerStatus: lodgingPickerStateRef.current.status,
     }),
@@ -176,6 +199,10 @@ export function useDayItineraryEditorController({
   useEffect(() => {
     reorderStateRef.current = reorderState;
   }, [reorderState]);
+
+  useEffect(() => {
+    moveStateRef.current = moveState;
+  }, [moveState]);
 
   useEffect(() => {
     lodgingStateRef.current = lodgingState;
@@ -329,6 +356,7 @@ export function useDayItineraryEditorController({
     isAppActive,
     lodgingPickerState.status,
     lodgingState.status,
+    moveState.status,
     refetchSharedItinerary,
     reorderState.status,
     sharedUpdateState,
@@ -351,6 +379,10 @@ export function useDayItineraryEditorController({
         if (reorderStateRef.current.status === 'editing') {
           setReorderFeedback(null);
           setReorderState({ status: 'idle' });
+        }
+        if (moveStateRef.current.status !== 'idle') {
+          setMoveFeedback(null);
+          setMoveState({ status: 'idle' });
         }
       };
     }, [load, setReorderDragActive, startSharedUpdatePolling, stopSharedUpdatePolling, updateSharedUpdateState]),
@@ -382,6 +414,8 @@ export function useDayItineraryEditorController({
     setEditState({ status: 'idle' });
     setDeleteState({ status: 'idle' });
     setReorderState({ status: 'idle' });
+    setMoveState({ status: 'idle' });
+    setMoveFeedback(null);
     setLodgingState({ status: 'idle' });
     setLodgingPickerState({ status: 'idle' });
     setReorderFeedback(null);
@@ -479,6 +513,83 @@ export function useDayItineraryEditorController({
     discardReorder();
   };
 
+  const beginMove = useCallback(
+    (item: DayItineraryRowViewModel) => {
+      if (!date) {
+        return;
+      }
+      const targetOptions = buildDayItineraryMoveTargetOptions(tripDays, date);
+      if (targetOptions.length === 0) {
+        return;
+      }
+      setReorderFeedback(null);
+      setMoveFeedback(null);
+      setEditState({ status: 'idle' });
+      deleteOriginFocusTargetRef.current = null;
+      setDeleteState({ status: 'idle' });
+      setLodgingState({ status: 'idle' });
+      clearMapActionFeedback();
+      setMoveState({ status: 'pickingTarget', item, targetOptions });
+    },
+    [clearMapActionFeedback, date, tripDays],
+  );
+
+  const cancelMove = useCallback(() => {
+    setMoveState({ status: 'idle' });
+  }, []);
+
+  const submitMoveToDay = useCallback(
+    (targetTripDayId: string) => {
+      if (!tripId || !date || moveState.status !== 'pickingTarget') {
+        return;
+      }
+      const { item, targetOptions } = moveState;
+      const execute = async () => {
+        setMoveState({ status: 'saving', item, targetOptions, targetTripDayId });
+        try {
+          const response = await moveScheduleItemToDay(
+            tripId,
+            date,
+            item.id,
+            buildDayItineraryMoveRequest(item, targetTripDayId),
+          );
+          setMoveFeedback(null);
+          setMoveState({ status: 'idle' });
+          applyItineraryResponse({ day: response.targetDay, scheduleItems: response.targetScheduleItems });
+          onRequestDayChange?.(response.targetDay.id);
+        } catch (error) {
+          if (
+            await handleRecoverableMutationError(error, async () => {
+              setMoveState({ status: 'idle' });
+              await load();
+            })
+          ) {
+            return;
+          }
+          if (isApiStatus(error, 409)) {
+            setMoveState({ status: 'idle' });
+            setMoveFeedback(DAY_ITINERARY_MOVE_CONFLICT_MESSAGE);
+            await load();
+            return;
+          }
+          const failure = buildDayItineraryMoveFailureState();
+          setMoveState({ status: 'pickingTarget', item, targetOptions, error: failure });
+        }
+      };
+
+      if (requiresDayItineraryMoveStatusResetConfirmation(item)) {
+        Alert.alert('진행 상태를 초기화할까요?', '도착/건너뛴 일정은 다른 Day로 이동하면 진행 상태가 초기화돼요.', [
+          { text: '취소', style: 'cancel' },
+          { text: '이동', style: 'destructive', onPress: () => void execute() },
+        ]);
+        return;
+      }
+
+      void execute();
+    },
+    [applyItineraryResponse, date, handleRecoverableMutationError, load, moveState, onRequestDayChange, tripId],
+  );
+
   const { beginDelete, cancelDelete, submitDelete } = createDayItineraryDeleteActions({
     clearMapActionFeedback,
     date,
@@ -527,6 +638,7 @@ export function useDayItineraryEditorController({
     createStatus: 'idle',
     editStatus: editState.status,
     deleteStatus: deleteState.status,
+    moveStatus: moveState.status,
     lodgingStatus: lodgingState.status,
     lodgingPickerStatus: lodgingPickerState.status,
   };
@@ -564,6 +676,8 @@ export function useDayItineraryEditorController({
     lodgingPickerState,
     lodgingState,
     mapActionFeedback,
+    moveFeedback,
+    moveState,
     moveReorderItem,
     openLodgingPlaceSelection,
     openLodgingSearchRegister,
@@ -573,6 +687,8 @@ export function useDayItineraryEditorController({
     requestReorderAutoScroll,
     requestSharedUpdateReload,
     scrollViewRef,
+    beginMove,
+    cancelMove,
     setReorderDragActive,
     sharedUpdateBanner,
     sharedUpdateReloadDisabled,
@@ -581,6 +697,7 @@ export function useDayItineraryEditorController({
     submitClearLodging,
     submitDelete,
     submitEdit,
+    submitMoveToDay,
     submitReorder,
     submitSelectLodgingPlace,
     submitSetLodging,

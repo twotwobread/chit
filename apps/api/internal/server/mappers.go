@@ -451,6 +451,24 @@ func reorderScheduleItemsResponseToOpenAPI(result trip.ReorderScheduleItemsResul
 	}
 }
 
+func moveScheduleItemToDayResponseToOpenAPI(result trip.MoveScheduleItemToDayResult) openapi.MoveScheduleItemToDayResponse {
+	sourceItems := make([]openapi.ScheduleItem, 0, len(result.SourceItems))
+	for _, item := range result.SourceItems {
+		sourceItems = append(sourceItems, dayScheduleItemToOpenAPI(item))
+	}
+	targetItems := make([]openapi.ScheduleItem, 0, len(result.TargetItems))
+	for _, item := range result.TargetItems {
+		targetItems = append(targetItems, dayScheduleItemToOpenAPI(item))
+	}
+	return openapi.MoveScheduleItemToDayResponse{
+		SourceDay:           tripDayToOpenAPI(result.SourceDay),
+		SourceScheduleItems: sourceItems,
+		TargetDay:           tripDayToOpenAPI(result.TargetDay),
+		TargetScheduleItems: targetItems,
+		MovedScheduleItem:   dayScheduleItemToOpenAPI(result.MovedItem),
+	}
+}
+
 func markScheduleItemArrivedResponseToOpenAPI(result trip.MarkScheduleItemArrivedResult) openapi.MarkScheduleItemArrivedResponse {
 	items := make([]openapi.ScheduleItem, 0, len(result.Items))
 	for _, item := range result.Items {

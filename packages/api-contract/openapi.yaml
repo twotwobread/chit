@@ -2257,6 +2257,81 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /trips/{tripId}/days/{tripDayId}/schedule-items/{scheduleItemId}/move:
+    post:
+      operationId: moveScheduleItemToDay
+      summary: Move a schedule item to another trip day
+      description: Moves one active schedule item from the source Day to the end of another active Day in the same trip, resets Day execution status, and re-anchors schedule-item expenses in one transaction.
+      tags:
+        - Trips
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: tripDayId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Source active trip Day id.
+        - name: scheduleItemId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MoveScheduleItemToDayRequest'
+      responses:
+        '200':
+          description: Schedule item moved to the target Day.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MoveScheduleItemToDayResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip, source Day, target Day, or schedule item not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Move conflict because the item version or Day ordering state is stale.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /trips/{tripId}/days/{tripDayId}/schedule-items/{scheduleItemId}/arrive:
     post:
       operationId: markScheduleItemArrived
@@ -4969,6 +5044,46 @@ components:
           description: Latest server source-of-truth schedule items ordered by rank.
           items:
             $ref: '#/components/schemas/ScheduleItem'
+    MoveScheduleItemToDayRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - targetTripDayId
+        - clientVersion
+      properties:
+        targetTripDayId:
+          type: string
+          description: Target active trip Day id. Must belong to the same trip and differ from the source Day.
+        clientVersion:
+          type: integer
+          minimum: 1
+          description: The schedule item's optimistic locking version observed by the client.
+    MoveScheduleItemToDayResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - sourceDay
+        - sourceScheduleItems
+        - targetDay
+        - targetScheduleItems
+        - movedScheduleItem
+      properties:
+        sourceDay:
+          $ref: '#/components/schemas/TripDay'
+        sourceScheduleItems:
+          type: array
+          description: Latest source Day schedule items after the move, ordered by rank.
+          items:
+            $ref: '#/components/schemas/ScheduleItem'
+        targetDay:
+          $ref: '#/components/schemas/TripDay'
+        targetScheduleItems:
+          type: array
+          description: Latest target Day schedule items after the move, ordered by rank.
+          items:
+            $ref: '#/components/schemas/ScheduleItem'
+        movedScheduleItem:
+          $ref: '#/components/schemas/ScheduleItem'
     CreateManualScheduleItemRequest:
       type: object
       additionalProperties: false

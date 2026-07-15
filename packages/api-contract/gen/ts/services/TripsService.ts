@@ -26,6 +26,8 @@ import type { ListTripScheduleItemsResponse } from '../models/ListTripScheduleIt
 import type { ListTripsResponse } from '../models/ListTripsResponse';
 import type { MarkScheduleItemArrivedResponse } from '../models/MarkScheduleItemArrivedResponse';
 import type { MarkScheduleItemSkippedResponse } from '../models/MarkScheduleItemSkippedResponse';
+import type { MoveScheduleItemToDayRequest } from '../models/MoveScheduleItemToDayRequest';
+import type { MoveScheduleItemToDayResponse } from '../models/MoveScheduleItemToDayResponse';
 import type { ReorderScheduleItemsRequest } from '../models/ReorderScheduleItemsRequest';
 import type { ReorderScheduleItemsResponse } from '../models/ReorderScheduleItemsResponse';
 import type { RestoreScheduleItemResponse } from '../models/RestoreScheduleItemResponse';
@@ -826,6 +828,42 @@ export class TripsService {
                 403: `Forbidden.`,
                 404: `Trip or trip day not found.`,
                 409: `Reorder conflict.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
+     * Move a schedule item to another trip day
+     * Moves one active schedule item from the source Day to the end of another active Day in the same trip, resets Day execution status, and re-anchors schedule-item expenses in one transaction.
+     * @param tripId
+     * @param tripDayId Source active trip Day id.
+     * @param scheduleItemId
+     * @param requestBody
+     * @returns MoveScheduleItemToDayResponse Schedule item moved to the target Day.
+     * @throws ApiError
+     */
+    public static moveScheduleItemToDay(
+        tripId: string,
+        tripDayId: string,
+        scheduleItemId: string,
+        requestBody: MoveScheduleItemToDayRequest,
+    ): CancelablePromise<MoveScheduleItemToDayResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/trips/{tripId}/days/{tripDayId}/schedule-items/{scheduleItemId}/move',
+            path: {
+                'tripId': tripId,
+                'tripDayId': tripDayId,
+                'scheduleItemId': scheduleItemId,
+            },
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                403: `Forbidden.`,
+                404: `Trip, source Day, target Day, or schedule item not found.`,
+                409: `Move conflict because the item version or Day ordering state is stale.`,
                 500: `Unexpected server error.`,
             },
         });

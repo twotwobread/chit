@@ -81,6 +81,8 @@ export type { ManualExpenseSplitInput } from './models/ManualExpenseSplitInput';
 export type { MarkScheduleItemArrivedResponse } from './models/MarkScheduleItemArrivedResponse';
 export type { MarkScheduleItemSkippedResponse } from './models/MarkScheduleItemSkippedResponse';
 export type { MetadataReadinessCheck } from './models/MetadataReadinessCheck';
+export type { MoveScheduleItemToDayRequest } from './models/MoveScheduleItemToDayRequest';
+export type { MoveScheduleItemToDayResponse } from './models/MoveScheduleItemToDayResponse';
 export type { MyFlightPersonalDetail } from './models/MyFlightPersonalDetail';
 export type { MySettlementCurrencySummary } from './models/MySettlementCurrencySummary';
 export type { MySettlementDirection } from './models/MySettlementDirection';

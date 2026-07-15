@@ -1,4 +1,6 @@
 import { type ReactNode } from 'react';
+
+import type { TripDay } from '@i-um/api-contract';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -15,6 +17,8 @@ export type DayItineraryEditorProps = {
   initialAction?: string;
   showHeader?: boolean;
   headerContent?: ReactNode;
+  tripDays?: TripDay[];
+  onRequestDayChange?: (dayId: string) => void;
 };
 
 export function DayItineraryEditor({
@@ -23,16 +27,20 @@ export function DayItineraryEditor({
   initialAction,
   showHeader = true,
   headerContent,
+  tripDays = [],
+  onRequestDayChange,
 }: DayItineraryEditorProps) {
   const {
     addPlace,
     backToItinerary,
     beginDelete,
     beginEdit,
+    beginMove,
     beginReorder,
     cancelDelete,
     cancelEdit,
     cancelLodgingPicker,
+    cancelMove,
     cancelReorder,
     clearContentFocusRequest,
     contentFocusRequest,
@@ -47,6 +55,8 @@ export function DayItineraryEditor({
     lodgingPickerState,
     lodgingState,
     mapActionFeedback,
+    moveFeedback,
+    moveState,
     moveReorderItem,
     openLodgingPlaceSelection,
     openLodgingSearchRegister,
@@ -63,18 +73,24 @@ export function DayItineraryEditor({
     submitClearCurrentLodging,
     submitDelete,
     submitEdit,
+    submitMoveToDay,
     submitReorder,
     submitSelectLodgingPlace,
     updateEditValues,
     updateScrollContentSize,
     updateScrollLayout,
     updateScrollOffset,
-  } = useDayItineraryEditorController({ tripId, date, initialAction });
+  } = useDayItineraryEditorController({ tripId, date, initialAction, tripDays, onRequestDayChange });
   const insets = useSafeAreaInsets();
   const addFabLayout = buildTripRootFabLayout({ bottomInset: insets.bottom, rightInset: insets.right });
+  const canMovePlaces = Boolean(date && tripDays.some((day) => day.id !== date));
   const showAddFab = shouldShowTripRootFab({
     hasAction: true,
-    isBlocked: isDeleteModalVisible || editState.status !== 'idle' || reorderState.status !== 'idle',
+    isBlocked:
+      isDeleteModalVisible ||
+      editState.status !== 'idle' ||
+      reorderState.status !== 'idle' ||
+      moveState.status !== 'idle',
     status: state.status === 'success' ? 'ready' : state.status,
   });
 
@@ -110,6 +126,7 @@ export function DayItineraryEditor({
         {state.status === 'success' ? (
           <>
             <DayItineraryContent
+              canMovePlaces={canMovePlaces}
               editState={editState}
               focusRequest={contentFocusRequest}
               getReorderScrollOffsetY={getReorderScrollOffsetY}
@@ -118,6 +135,7 @@ export function DayItineraryEditor({
               onDeletePlace={beginDelete}
               onCancelEdit={cancelEdit}
               onEditPlace={beginEdit}
+              onMovePlace={beginMove}
               onEnterReorderMode={() => beginReorder(state.viewModel)}
               onExitReorderMode={cancelReorder}
               lodgingPickerState={lodgingPickerState}
@@ -135,7 +153,11 @@ export function DayItineraryEditor({
               onSubmitEdit={() => void submitEdit()}
               onUpdateEditValues={updateEditValues}
               mapActionFeedback={mapActionFeedback}
+              moveFeedback={moveFeedback}
+              moveState={moveState}
               onReloadSharedUpdate={requestSharedUpdateReload}
+              onCancelMove={cancelMove}
+              onSelectMoveTarget={submitMoveToDay}
               reorderFeedback={reorderFeedback}
               reorderState={reorderState}
               sharedUpdateBanner={sharedUpdateBanner}

@@ -1274,6 +1274,44 @@ func (s *Service) ReorderScheduleItems(ctx context.Context, userID string, tripI
 	return ReorderScheduleItemsResult{Day: day, Items: items}, nil
 }
 
+func (s *Service) MoveScheduleItemToDay(ctx context.Context, userID string, tripID string, sourceTripDayID string, scheduleItemID string, input MoveScheduleItemToDayInput) (MoveScheduleItemToDayResult, error) {
+	sourceDay, err := s.activeTripDay(ctx, userID, tripID, sourceTripDayID)
+	if err != nil {
+		return MoveScheduleItemToDayResult{}, err
+	}
+	targetDay, err := s.activeTripDay(ctx, userID, tripID, input.TargetTripDayID)
+	if err != nil {
+		return MoveScheduleItemToDayResult{}, err
+	}
+
+	tripID = strings.TrimSpace(tripID)
+	sourceTripDayID = strings.TrimSpace(sourceTripDayID)
+	targetTripDayID := strings.TrimSpace(input.TargetTripDayID)
+	scheduleItemID = strings.TrimSpace(scheduleItemID)
+	if sourceTripDayID == targetTripDayID || !isUUID(scheduleItemID) || input.ClientVersion < 1 {
+		return MoveScheduleItemToDayResult{}, ErrValidation
+	}
+
+	mutation, err := s.repo.MoveScheduleItemToDay(ctx, MoveScheduleItemToDayRecord{
+		TripID:          tripID,
+		SourceTripDayID: sourceTripDayID,
+		TargetTripDayID: targetTripDayID,
+		ScheduleItemID:  scheduleItemID,
+		ClientVersion:   input.ClientVersion,
+	})
+	if err != nil {
+		return MoveScheduleItemToDayResult{}, err
+	}
+
+	return MoveScheduleItemToDayResult{
+		SourceDay:   sourceDay,
+		SourceItems: mutation.SourceItems,
+		TargetDay:   targetDay,
+		TargetItems: mutation.TargetItems,
+		MovedItem:   mutation.MovedItem,
+	}, nil
+}
+
 func (s *Service) authorizedTrip(ctx context.Context, userID string, tripID string) (string, error) {
 	if strings.TrimSpace(userID) == "" {
 		return "", ErrUnauthorized

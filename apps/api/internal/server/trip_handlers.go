@@ -638,6 +638,34 @@ func (s apiServer) ReorderScheduleItems(w http.ResponseWriter, r *http.Request, 
 	writeJSON(w, http.StatusOK, reorderScheduleItemsResponseToOpenAPI(result))
 }
 
+func (s apiServer) MoveScheduleItemToDay(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, scheduleItemId string) {
+	if s.auth == nil || s.trips == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "day schedule move is not configured", nil)
+		return
+	}
+
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	var body openapi.MoveScheduleItemToDayJSONRequestBody
+	if !decodeJSON(w, r, &body) {
+		return
+	}
+
+	result, err := s.trips.MoveScheduleItemToDay(r.Context(), authContext.UserID, tripId, tripDayId, scheduleItemId, trip.MoveScheduleItemToDayInput{
+		TargetTripDayID: body.TargetTripDayId,
+		ClientVersion:   body.ClientVersion,
+	})
+	if err != nil {
+		writeDayScheduleMoveError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, moveScheduleItemToDayResponseToOpenAPI(result))
+}
+
 func (s apiServer) MarkScheduleItemArrived(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, scheduleItemId string) {
 	if s.auth == nil || s.trips == nil {
 		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "day schedule arrival is not configured", nil)

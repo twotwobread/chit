@@ -21,6 +21,7 @@ export type DayItinerarySharedUpdateLocalState = {
   createStatus: 'idle' | 'editing' | 'saving';
   editStatus: 'idle' | 'editing' | 'saving';
   deleteStatus: 'idle' | 'confirming' | 'deleting';
+  moveStatus: 'idle' | 'pickingTarget' | 'saving';
   lodgingStatus: 'idle' | 'setting' | 'clearing' | 'error';
   lodgingPickerStatus: 'idle' | 'loading' | 'selecting' | 'manual' | 'creating';
 };
@@ -90,6 +91,7 @@ export function isDayItinerarySharedUpdateProtected(localState: DayItineraryShar
     localState.editStatus === 'saving' ||
     localState.deleteStatus === 'confirming' ||
     localState.deleteStatus === 'deleting' ||
+    localState.moveStatus !== 'idle' ||
     localState.lodgingStatus === 'setting' ||
     localState.lodgingStatus === 'clearing' ||
     localState.lodgingPickerStatus !== 'idle'
@@ -102,6 +104,7 @@ export function isDayItinerarySharedUpdateReloadDisabled(localState: DayItinerar
     localState.createStatus === 'saving' ||
     localState.editStatus === 'saving' ||
     localState.deleteStatus === 'deleting' ||
+    localState.moveStatus === 'saving' ||
     localState.lodgingStatus === 'setting' ||
     localState.lodgingStatus === 'clearing' ||
     localState.lodgingPickerStatus === 'loading' ||
