@@ -33,6 +33,7 @@ import {
   buildGooglePlaceSearchResultsSectionTitle,
   buildGooglePlaceSelectedBiasSource,
   buildGooglePlaceSelectedMapRegion,
+  canBookmarkGooglePlaceSearchResult,
   canSearchGooglePlaces,
   clearGooglePlaceSearchResultsState,
   confirmingDuplicateGooglePlaceState,
@@ -196,6 +197,57 @@ describe('google place search helpers', () => {
       buildGooglePlaceSearchResultActionView({ addState: errorGooglePlaceAddState(), mode: 'scheduleAdd', result })
         .errorMessage,
       googlePlaceAddFailureMessage,
+    );
+  });
+
+  it('disables bookmark actions for search results already bookmarked by Google place id only', () => {
+    const result = { id: 'google-1', placeName: '도톤보리', address: 'Osaka', typeHint: '관광지' };
+    const matchingBookmark = {
+      id: 'google-1',
+      bookmarkId: 'bookmark-1',
+      placeName: '다른 표시명',
+      address: '다른 주소',
+      typeHint: '관광지',
+    };
+    const sameDisplayDifferentGooglePlace = {
+      id: 'google-2',
+      bookmarkId: 'bookmark-2',
+      placeName: '도톤보리',
+      address: 'Osaka',
+      typeHint: '관광지',
+    };
+
+    assert.equal(canBookmarkGooglePlaceSearchResult(result, [sameDisplayDifferentGooglePlace]), true);
+    assert.deepEqual(
+      buildGooglePlaceSearchResultActionView({
+        addState: idleGooglePlaceAddState(),
+        bookmarkResults: [sameDisplayDifferentGooglePlace],
+        mode: 'bookmark',
+        result,
+      }).primaryAction,
+      { isLoading: false, label: '장소 찜하기', loadingLabel: '저장 중...' },
+    );
+
+    assert.equal(canBookmarkGooglePlaceSearchResult(result, [matchingBookmark]), false);
+    assert.deepEqual(
+      buildGooglePlaceSearchResultActionView({
+        addState: idleGooglePlaceAddState(),
+        bookmarkResults: [matchingBookmark],
+        mode: 'bookmark',
+        result,
+      }).primaryAction,
+      { disabled: true, isLoading: false, label: '이미 찜한 장소입니다.', loadingLabel: '저장 중...' },
+    );
+
+    assert.equal(canBookmarkGooglePlaceSearchResult(result, []), true);
+    assert.deepEqual(
+      buildGooglePlaceSearchResultActionView({
+        addState: idleGooglePlaceAddState(),
+        bookmarkResults: [],
+        mode: 'bookmark',
+        result,
+      }).primaryAction,
+      { isLoading: false, label: '장소 찜하기', loadingLabel: '저장 중...' },
     );
   });
 
@@ -513,7 +565,7 @@ describe('google place search helpers', () => {
     );
   });
 
-  it('clears search-result UI while preserving matching bookmark detail context', () => {
+  it('clears search-result UI while preserving matching bookmark detail context until bookmark removal', () => {
     const selectedSearchResult = {
       id: 'google-hotel',
       placeName: '오사카 숙소',
@@ -521,6 +573,7 @@ describe('google place search helpers', () => {
       typeHint: '숙소',
     };
     const matchingBookmark = { ...selectedSearchResult, bookmarkId: 'bookmark-1' };
+    const removedOrDifferentBookmark = { ...selectedSearchResult, id: 'google-hotel-other', bookmarkId: 'bookmark-2' };
 
     assert.deepEqual(clearGooglePlaceSearchResultsState(' 호텔 '), {
       status: 'initial',
@@ -534,6 +587,10 @@ describe('google place search helpers', () => {
     assert.deepEqual(
       resolveGooglePlaceSearchSelectionAfterResultsClose(selectedSearchResult, [matchingBookmark]),
       matchingBookmark,
+    );
+    assert.equal(
+      resolveGooglePlaceSearchSelectionAfterResultsClose(selectedSearchResult, [removedOrDifferentBookmark]),
+      null,
     );
     assert.equal(resolveGooglePlaceSearchSelectionAfterResultsClose(selectedSearchResult, []), null);
   });

@@ -25,4 +25,27 @@ describe('google place search native module entry setup', () => {
     );
     assert.match(mapSearchSource, /topInset=\{resolvedSheetTopInset\}/);
   });
+
+  it('guards bookmark-mode search result actions with current bookmarkResults before invoking create flow', () => {
+    assert.match(mapSearchSource, /canBookmarkGooglePlaceSearchResult/);
+    assert.match(
+      mapSearchSource,
+      /if \(actionMode === 'bookmark'\) \{\s*if \(canBookmarkGooglePlaceSearchResult\(result, bookmarkResults\)\) \{\s*onBookmarkSelectResult\?\.\(result\);\s*}\s*return;\s*}/,
+    );
+  });
+
+  it('renders already-bookmarked search result primary actions as disabled controls', () => {
+    assert.match(
+      mapSearchSource,
+      /actionView=\{buildGooglePlaceSearchResultActionView\(\{\s*addState: actionState,\s*bookmarkResults,\s*mode: actionMode,\s*result: item,\s*}\)\}/,
+    );
+    assert.match(
+      mapSearchSource,
+      /const isPrimaryActionDisabled = isBusy \|\| actionView\.primaryAction\?\.disabled === true;/,
+    );
+    assert.match(
+      mapSearchSource,
+      /accessibilityState=\{\{ disabled: isPrimaryActionDisabled }}\s*disabled=\{isPrimaryActionDisabled\}/,
+    );
+  });
 });
