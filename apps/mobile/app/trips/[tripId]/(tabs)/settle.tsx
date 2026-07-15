@@ -20,12 +20,15 @@ import {
   buildKakaoSettlementRequestTemplate,
   buildSettlementExpenseHistoryViewModel,
   buildSettlementRequestMessage,
+  buildSettlementTotalSpendViewModel,
   buildSettlementTransferViewModel,
   settlementExpenseHistoryFailureState,
   settlementTransferFailureState,
   type SettlementBalanceDirection,
   type SettlementExpenseHistoryDayInput,
   type SettlementExpenseHistoryFailureViewModel,
+  type SettlementTotalSpendCategoryViewModel,
+  type SettlementTotalSpendCurrencySectionViewModel,
   type SettlementTransferFailureViewModel,
   type SettlementTransferViewModel,
 } from '../../../../lib/trips/settlement';
@@ -194,6 +197,8 @@ function SettlementContent({
 }) {
   return (
     <View style={styles.successStack}>
+      <SettlementTotalSpendCard expenseHistory={expenseHistory} />
+
       {viewModel.balanceSections.map((section) => (
         <TripListCard key={`balance-${section.currency}`}>
           <View style={styles.sectionHeader}>
@@ -252,6 +257,91 @@ function SettlementContent({
       ))}
 
       <SettlementRequestButton tripName={tripName} viewModel={viewModel} />
+    </View>
+  );
+}
+
+function SettlementTotalSpendCard({ expenseHistory }: { expenseHistory: SettlementExpenseHistoryState }) {
+  if (expenseHistory.status === 'error') {
+    return null;
+  }
+
+  const viewModel = buildSettlementTotalSpendViewModel({ days: expenseHistory.days });
+
+  return (
+    <TripListCard>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>{viewModel.title}</Text>
+        {viewModel.status === 'success' ? <Text style={styles.sectionHelper}>{viewModel.helper}</Text> : null}
+      </View>
+      {viewModel.status === 'empty' ? (
+        <View style={styles.totalSpendEmpty}>
+          <Text style={styles.totalSpendEmptyTitle}>{viewModel.emptyTitle}</Text>
+          <Text style={styles.sectionHelper}>{viewModel.helper}</Text>
+        </View>
+      ) : (
+        <View style={styles.totalSpendSectionList}>
+          {viewModel.sections.map((section) => (
+            <SettlementTotalSpendCurrencySection key={section.currency} section={section} />
+          ))}
+        </View>
+      )}
+    </TripListCard>
+  );
+}
+
+function SettlementTotalSpendCurrencySection({ section }: { section: SettlementTotalSpendCurrencySectionViewModel }) {
+  return (
+    <View style={styles.totalSpendCurrencySection}>
+      <View style={styles.totalSpendCurrencyHeader}>
+        <View style={styles.totalSpendCurrencyTitleGroup}>
+          <Text style={styles.totalSpendCurrencyTitle}>{section.title}</Text>
+          <Text style={styles.sectionHelper}>{section.helper}</Text>
+        </View>
+        <Text style={styles.totalSpendAmount}>{section.totalAmountLabel}</Text>
+      </View>
+      {section.totalMinor > 0 ? (
+        <SettlementTotalSpendBar categories={section.categories} />
+      ) : (
+        <View style={styles.totalSpendZeroBar} />
+      )}
+      <View style={styles.totalSpendLegendList}>
+        {section.categories.map((category) => (
+          <SettlementTotalSpendLegendRow category={category} key={category.key} />
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function SettlementTotalSpendBar({ categories }: { categories: SettlementTotalSpendCategoryViewModel[] }) {
+  return (
+    <View
+      accessibilityLabel={`카테고리 비율 ${categories
+        .map((category) => `${category.label} ${category.percentageLabel}`)
+        .join(', ')}`}
+      style={styles.totalSpendBar}
+    >
+      {categories.map((category) => (
+        <View
+          key={category.key}
+          style={[
+            styles.totalSpendBarSegment,
+            { backgroundColor: category.color, flexGrow: category.ratio, minWidth: category.ratio > 0 ? 2 : 0 },
+          ]}
+        />
+      ))}
+    </View>
+  );
+}
+
+function SettlementTotalSpendLegendRow({ category }: { category: SettlementTotalSpendCategoryViewModel }) {
+  return (
+    <View style={styles.totalSpendLegendRow}>
+      <View style={[styles.totalSpendLegendMarker, { backgroundColor: category.color }]} />
+      <Text style={styles.totalSpendLegendLabel}>{category.label}</Text>
+      <Text style={styles.totalSpendLegendAmount}>{category.amountLabel}</Text>
+      <Text style={styles.totalSpendLegendPercent}>{category.percentageLabel}</Text>
     </View>
   );
 }
@@ -574,6 +664,99 @@ const styles = StyleSheet.create({
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.subhead,
     fontWeight: theme.font.weight.bold,
+  },
+  totalSpendAmount: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.headline,
+    fontWeight: theme.font.weight.bold,
+  },
+  totalSpendBar: {
+    backgroundColor: theme.color.surfaceSunken,
+    borderRadius: theme.radius.pill,
+    flexDirection: 'row',
+    height: 12,
+    overflow: 'hidden',
+  },
+  totalSpendBarSegment: {
+    flexBasis: 0,
+  },
+  totalSpendCurrencyHeader: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: theme.space[4],
+    justifyContent: 'space-between',
+  },
+  totalSpendCurrencySection: {
+    borderTopColor: theme.color.borderSubtle,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    gap: theme.space[4],
+    paddingHorizontal: theme.space[1],
+    paddingVertical: theme.space[4],
+  },
+  totalSpendCurrencyTitle: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.semibold,
+    fontSize: theme.font.size.body,
+    fontWeight: theme.font.weight.semibold,
+  },
+  totalSpendCurrencyTitleGroup: {
+    flex: 1,
+    gap: theme.space[1],
+  },
+  totalSpendEmpty: {
+    borderTopColor: theme.color.borderSubtle,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    gap: theme.space[1],
+    paddingHorizontal: theme.space[1],
+    paddingVertical: theme.space[4],
+  },
+  totalSpendEmptyTitle: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.semibold,
+    fontSize: theme.font.size.body,
+    fontWeight: theme.font.weight.semibold,
+  },
+  totalSpendLegendAmount: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.semibold,
+    fontSize: theme.font.size.caption,
+    fontWeight: theme.font.weight.semibold,
+    marginLeft: 'auto',
+  },
+  totalSpendLegendLabel: {
+    color: theme.color.textBody,
+    flexShrink: 1,
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.caption,
+  },
+  totalSpendLegendList: {
+    gap: theme.space[3],
+  },
+  totalSpendLegendMarker: {
+    borderRadius: theme.radius.pill,
+    height: 10,
+    width: 10,
+  },
+  totalSpendLegendPercent: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.caption,
+    minWidth: 38,
+    textAlign: 'right',
+  },
+  totalSpendLegendRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: theme.space[3],
+  },
+  totalSpendSectionList: {
+    gap: 0,
+  },
+  totalSpendZeroBar: {
+    backgroundColor: theme.color.surfaceSunken,
+    borderRadius: theme.radius.pill,
+    height: 12,
   },
   statusBadge: {
     backgroundColor: theme.color.surfaceSunken,
