@@ -8,11 +8,12 @@ import type {
   SettlementCurrencySummary as ApiSettlementCurrencySummary,
   SupportedCurrency,
   TripDay,
+  TripPlaceType,
 } from '@i-um/api-contract';
 
 import type { DayChip } from '../trip-ui/DayChips';
 
-import { getExpenseCategoryMarkerMeta } from '../trip-ui/expense-category-markers';
+import { type ExpenseCategory, getExpenseCategoryMarkerMeta } from '../trip-ui/expense-category-markers';
 import { type DayExpenseRowViewModel, buildDayExpensesViewModel, buildTripExpenseEditRoute } from './day-expenses';
 import { formatTripDayDate, formatTripDayLabel } from './days';
 import { buildQuickExpenseRoute, formatMoney } from './quick-expense';
@@ -270,6 +271,196 @@ export function settlementExpenseHistoryFailureState(): SettlementExpenseHistory
     helper: '정산 정보는 그대로 볼 수 있어요. 잠시 후 다시 시도해주세요.',
     actionLabel: '지출 다시 불러오기',
   };
+}
+
+export type SettlementTotalSpendCategoryKey = ExpenseCategory;
+
+export type SettlementTotalSpendCategoryViewModel = {
+  key: SettlementTotalSpendCategoryKey;
+  label: string;
+  color: string;
+  amountMinor: number;
+  amountLabel: string;
+  ratio: number;
+  percentageLabel: string;
+};
+
+export type SettlementTotalSpendCurrencySectionViewModel = {
+  currency: SupportedCurrency;
+  title: string;
+  helper: string;
+  expenseCount: number;
+  totalMinor: number;
+  totalAmountLabel: string;
+  categories: SettlementTotalSpendCategoryViewModel[];
+};
+
+export type SettlementTotalSpendViewModel =
+  | {
+      status: 'success';
+      title: string;
+      helper: string;
+      totalExpenseCount: number;
+      sections: SettlementTotalSpendCurrencySectionViewModel[];
+    }
+  | {
+      status: 'empty';
+      title: string;
+      emptyTitle: string;
+      helper: string;
+    };
+
+const settlementTotalSpendCategoryOrder: SettlementTotalSpendCategoryKey[] = [
+  'food',
+  'cafe',
+  'lodging',
+  'shopping',
+  'sights',
+  'transport',
+  'etc',
+];
+
+export function buildSettlementTotalSpendViewModel({
+  days,
+}: {
+  days: SettlementExpenseHistoryDayInput[];
+}): SettlementTotalSpendViewModel {
+  const currencySummaries = new Map<SupportedCurrency, MutableTotalSpendCurrencySummary>();
+  let totalExpenseCount = 0;
+
+  for (const dayInput of days) {
+    for (const expense of dayInput.expenses) {
+      totalExpenseCount += 1;
+      const currencySummary = getOrCreateTotalSpendCurrencySummary(currencySummaries, expense.currency);
+      const categoryKey = settlementTotalSpendCategoryKey(expense.place?.placeType);
+      const categorySummary = getOrCreateTotalSpendCategorySummary(currencySummary.categories, categoryKey);
+
+      currencySummary.expenseCount += 1;
+      currencySummary.totalMinor += expense.amountMinor;
+      categorySummary.amountMinor += expense.amountMinor;
+    }
+  }
+
+  if (totalExpenseCount === 0) {
+    return {
+      status: 'empty',
+      title: '총 지출',
+      emptyTitle: '아직 등록된 지출이 없어요.',
+      helper: '지출을 등록하면 총 지출과 카테고리 비율을 보여드릴게요.',
+    };
+  }
+
+  const sections = Array.from(currencySummaries.values()).map(
+    (summary): SettlementTotalSpendCurrencySectionViewModel => {
+      const categories = Array.from(summary.categories.values())
+        .sort(compareTotalSpendCategorySummary)
+        .map((category): SettlementTotalSpendCategoryViewModel => {
+          const meta = getExpenseCategoryMarkerMeta(category.key);
+          const ratio = summary.totalMinor > 0 ? category.amountMinor / summary.totalMinor : 0;
+          return {
+            key: category.key,
+            label: meta.label,
+            color: meta.color,
+            amountMinor: category.amountMinor,
+            amountLabel: formatMoney(category.amountMinor, summary.currency),
+            ratio,
+            percentageLabel: `${Math.round(ratio * 100)}%`,
+          };
+        });
+
+      return {
+        currency: summary.currency,
+        title: `${summary.currency} 총 지출`,
+        helper: `${summary.expenseCount}건 · ${categories.length}개 카테고리`,
+        expenseCount: summary.expenseCount,
+        totalMinor: summary.totalMinor,
+        totalAmountLabel: formatMoney(summary.totalMinor, summary.currency),
+        categories,
+      };
+    },
+  );
+
+  return {
+    status: 'success',
+    title: '총 지출',
+    helper: '통화별 총 지출과 카테고리 비율을 한눈에 볼 수 있어요.',
+    totalExpenseCount,
+    sections,
+  };
+}
+
+type MutableTotalSpendCurrencySummary = {
+  currency: SupportedCurrency;
+  expenseCount: number;
+  totalMinor: number;
+  categories: Map<SettlementTotalSpendCategoryKey, MutableTotalSpendCategorySummary>;
+};
+
+type MutableTotalSpendCategorySummary = {
+  key: SettlementTotalSpendCategoryKey;
+  amountMinor: number;
+};
+
+function getOrCreateTotalSpendCurrencySummary(
+  summaries: Map<SupportedCurrency, MutableTotalSpendCurrencySummary>,
+  currency: SupportedCurrency,
+): MutableTotalSpendCurrencySummary {
+  const existing = summaries.get(currency);
+  if (existing) {
+    return existing;
+  }
+  const created: MutableTotalSpendCurrencySummary = {
+    currency,
+    expenseCount: 0,
+    totalMinor: 0,
+    categories: new Map(),
+  };
+  summaries.set(currency, created);
+  return created;
+}
+
+function getOrCreateTotalSpendCategorySummary(
+  summaries: Map<SettlementTotalSpendCategoryKey, MutableTotalSpendCategorySummary>,
+  key: SettlementTotalSpendCategoryKey,
+): MutableTotalSpendCategorySummary {
+  const existing = summaries.get(key);
+  if (existing) {
+    return existing;
+  }
+  const created = { key, amountMinor: 0 };
+  summaries.set(key, created);
+  return created;
+}
+
+function compareTotalSpendCategorySummary(
+  left: MutableTotalSpendCategorySummary,
+  right: MutableTotalSpendCategorySummary,
+): number {
+  const amountDiff = right.amountMinor - left.amountMinor;
+  if (amountDiff !== 0) {
+    return amountDiff;
+  }
+  return settlementTotalSpendCategoryOrder.indexOf(left.key) - settlementTotalSpendCategoryOrder.indexOf(right.key);
+}
+
+function settlementTotalSpendCategoryKey(placeType?: TripPlaceType | null): SettlementTotalSpendCategoryKey {
+  switch (placeType) {
+    case 'cafe':
+    case 'food':
+    case 'lodging':
+    case 'shopping':
+    case 'sights':
+    case 'transport':
+      return placeType;
+    case 'etc':
+    case null:
+    case undefined:
+      return 'etc';
+    default: {
+      const exhaustive: never = placeType;
+      throw new Error(`Unsupported trip place type: ${exhaustive}`);
+    }
+  }
 }
 
 export type SettlementTransferRowViewModel = {

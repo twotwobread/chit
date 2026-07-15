@@ -8,6 +8,8 @@ import type {
   TripDay,
 } from '@i-um/api-contract';
 
+import { getExpenseCategoryMarkerMeta } from '../trip-ui/expense-category-markers';
+
 import {
   buildKakaoSettlementRequestTemplate,
   buildSettlementExpenseEntryRoute,
@@ -15,6 +17,7 @@ import {
   buildSettlementExpenseHistoryDayInputs,
   buildSettlementExpenseHistoryViewModel,
   buildSettlementRequestMessage,
+  buildSettlementTotalSpendViewModel,
   buildSettlementTransferViewModel,
   computeSettlementBalances,
   getAuthoritativeSettlementCurrencySummaries,
@@ -372,6 +375,147 @@ test('builds retryable settlement expense history failure state', () => {
     helper: '정산 정보는 그대로 볼 수 있어요. 잠시 후 다시 시도해주세요.',
     actionLabel: '지출 다시 불러오기',
   });
+});
+
+test('builds total spend summary with category proportions and excluded expenses included', () => {
+  const viewModel = buildSettlementTotalSpendViewModel({
+    days: [
+      {
+        day: tripDay({ id: 'day-1' }),
+        expenses: [
+          dayExpense({ id: 'food-a', amountMinor: 3000, currency: 'JPY' }),
+          dayExpense({ id: 'food-onsite', amountMinor: 1000, currency: 'JPY', includeInSettlement: false }),
+          dayExpense({
+            id: 'transit-a',
+            amountMinor: 1000,
+            currency: 'JPY',
+            displayTitle: '지하철',
+            place: {
+              tripPlaceId: 'place-transit',
+              name: '지하철',
+              address: 'Namba Station',
+              placeType: 'transport',
+              source: 'live',
+            },
+          }),
+        ],
+      },
+    ],
+  });
+
+  assert.equal(viewModel.status, 'success');
+  if (viewModel.status !== 'success') {
+    return;
+  }
+  assert.equal(viewModel.title, '총 지출');
+  assert.equal(viewModel.totalExpenseCount, 3);
+  assert.equal(viewModel.sections.length, 1);
+  assert.deepEqual(
+    [
+      viewModel.sections[0].currency,
+      viewModel.sections[0].title,
+      viewModel.sections[0].helper,
+      viewModel.sections[0].totalMinor,
+      viewModel.sections[0].totalAmountLabel,
+    ],
+    ['JPY', 'JPY 총 지출', '3건 · 2개 카테고리', 5000, '5,000엔'],
+  );
+  assert.deepEqual(
+    viewModel.sections[0].categories.map((category) => [
+      category.key,
+      category.label,
+      category.amountMinor,
+      category.amountLabel,
+      category.ratio,
+      category.percentageLabel,
+      category.color,
+    ]),
+    [
+      ['food', '식당', 4000, '4,000엔', 0.8, '80%', getExpenseCategoryMarkerMeta('food').color],
+      ['transport', '교통', 1000, '1,000엔', 0.2, '20%', getExpenseCategoryMarkerMeta('transport').color],
+    ],
+  );
+});
+
+test('builds separate total spend summary sections for multiple currencies without conversion', () => {
+  const viewModel = buildSettlementTotalSpendViewModel({
+    days: [
+      {
+        day: tripDay({ id: 'day-1' }),
+        expenses: [
+          dayExpense({ id: 'jpy-food', amountMinor: 1200, currency: 'JPY' }),
+          dayExpense({
+            id: 'usd-cafe',
+            amountMinor: 1250,
+            currency: 'USD',
+            displayTitle: 'Coffee',
+            place: {
+              tripPlaceId: 'place-cafe',
+              name: 'Coffee',
+              address: 'Main Street',
+              placeType: 'cafe',
+              source: 'live',
+            },
+          }),
+        ],
+      },
+    ],
+  });
+
+  assert.equal(viewModel.status, 'success');
+  if (viewModel.status !== 'success') {
+    return;
+  }
+  assert.deepEqual(
+    viewModel.sections.map((section) => [section.currency, section.totalMinor, section.totalAmountLabel]),
+    [
+      ['JPY', 1200, '1,200엔'],
+      ['USD', 1250, '$12.50'],
+    ],
+  );
+  assert.deepEqual(
+    viewModel.sections.map((section) => section.categories.map((category) => category.percentageLabel)),
+    [['100%'], ['100%']],
+  );
+});
+
+test('builds empty total spend summary when there are no expenses', () => {
+  assert.deepEqual(
+    buildSettlementTotalSpendViewModel({
+      days: [{ day: tripDay({ id: 'day-1' }), expenses: [] }],
+    }),
+    {
+      status: 'empty',
+      title: '총 지출',
+      emptyTitle: '아직 등록된 지출이 없어요.',
+      helper: '지출을 등록하면 총 지출과 카테고리 비율을 보여드릴게요.',
+    },
+  );
+});
+
+test('keeps total spend percentages safe when a currency total is zero', () => {
+  const viewModel = buildSettlementTotalSpendViewModel({
+    days: [
+      {
+        day: tripDay({ id: 'day-1' }),
+        expenses: [dayExpense({ id: 'zero-food', amountMinor: 0, currency: 'KRW' })],
+      },
+    ],
+  });
+
+  assert.equal(viewModel.status, 'success');
+  if (viewModel.status !== 'success') {
+    return;
+  }
+  assert.equal(viewModel.sections[0].totalAmountLabel, '0원');
+  assert.deepEqual(
+    viewModel.sections[0].categories.map((category) => [
+      category.amountMinor,
+      category.ratio,
+      category.percentageLabel,
+    ]),
+    [[0, 0, '0%']],
+  );
 });
 
 test('uses authoritative settlement summaries returned by the API', () => {
