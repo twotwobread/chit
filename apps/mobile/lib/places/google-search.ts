@@ -132,7 +132,16 @@ export type GooglePlaceDestinationChipViewModel = {
 
 export type SearchBiasSource =
   | { kind: 'tripDestination'; destinationId: string }
-  | { kind: 'mapRegion'; latitude: number; longitude: number; radiusMeters: number };
+  | { kind: 'mapRegion'; latitude: number; longitude: number; radiusMeters: number }
+  | { kind: 'currentLocation'; latitude: number; longitude: number; radiusMeters: number }
+  | {
+      kind: 'selectedPlace';
+      googlePlaceId: string;
+      placeName: string;
+      latitude: number;
+      longitude: number;
+      radiusMeters: number;
+    };
 
 export type GooglePlaceDetailsViewState =
   | { status: 'idle' }
@@ -592,7 +601,7 @@ export function buildGooglePlaceSearchBiasFromSource(
   if (!source) {
     return null;
   }
-  if (source.kind === 'mapRegion') {
+  if (source.kind === 'mapRegion' || source.kind === 'currentLocation' || source.kind === 'selectedPlace') {
     if (!Number.isFinite(source.latitude) || !Number.isFinite(source.longitude)) {
       return null;
     }
@@ -611,6 +620,97 @@ export function buildGooglePlaceSearchBiasFromSource(
     latitude: roundCoordinate(destination.latitude),
     longitude: roundCoordinate(destination.longitude),
     radiusMeters: clampGooglePlaceSearchBiasRadius(destination.radiusMeters),
+  };
+}
+
+export function buildGooglePlaceSearchResultsSectionTitle(
+  source: SearchBiasSource | null | undefined,
+  destinations: GooglePlaceTripDestination[],
+): string {
+  if (source?.kind === 'tripDestination') {
+    const destination = destinations.find((candidate) => candidate.id === source.destinationId);
+    const label = destination?.displayName.trim();
+    if (label) {
+      return `${label} 주변 결과`;
+    }
+  }
+  if (source?.kind === 'currentLocation') {
+    return '현재 위치 주변 결과';
+  }
+  if (source?.kind === 'selectedPlace') {
+    const label = source.placeName.trim();
+    if (label) {
+      return `${label} 주변 결과`;
+    }
+  }
+  return '현재 지도 영역 주변 결과';
+}
+
+export function buildGooglePlaceSearchResultDistanceLabel(
+  result: GooglePlaceSearchRowViewModel,
+  source: SearchBiasSource | null | undefined,
+  destinations: GooglePlaceTripDestination[],
+): string | null {
+  if (!Number.isFinite(result.latitude) || !Number.isFinite(result.longitude)) {
+    return null;
+  }
+  const anchor = resolveGooglePlaceSearchDistanceAnchor(source, destinations);
+  if (!anchor) {
+    return null;
+  }
+  const distanceMeters = distanceMetersBetweenCoordinates(
+    { latitude: result.latitude as number, longitude: result.longitude as number },
+    anchor.coordinate,
+  );
+  return `${anchor.label}에서 ${formatGooglePlaceDistance(distanceMeters)}`;
+}
+
+export function buildGooglePlaceCurrentLocationBiasSource(
+  coordinate: GooglePlaceMapCoordinate | null | undefined,
+): SearchBiasSource | null {
+  if (!coordinate || !Number.isFinite(coordinate.latitude) || !Number.isFinite(coordinate.longitude)) {
+    return null;
+  }
+  return {
+    kind: 'currentLocation',
+    latitude: roundCoordinate(coordinate.latitude),
+    longitude: roundCoordinate(coordinate.longitude),
+    radiusMeters: googlePlaceSearchMinBiasRadiusMeters,
+  };
+}
+
+export function isGooglePlaceCoordinateWithinTripDestination(
+  coordinate: GooglePlaceMapCoordinate | null | undefined,
+  destination: GooglePlaceTripDestination | null | undefined,
+): boolean {
+  if (
+    !coordinate ||
+    !destination ||
+    !Number.isFinite(coordinate.latitude) ||
+    !Number.isFinite(coordinate.longitude) ||
+    !isValidGooglePlaceTripDestination(destination)
+  ) {
+    return false;
+  }
+  return (
+    distanceMetersBetweenCoordinates(coordinate, destination) <=
+    clampGooglePlaceSearchBiasRadius(destination.radiusMeters)
+  );
+}
+
+export function buildGooglePlaceSelectedBiasSource(
+  result: GooglePlaceSearchRowViewModel | null | undefined,
+): SearchBiasSource | null {
+  if (!result || !Number.isFinite(result.latitude) || !Number.isFinite(result.longitude)) {
+    return null;
+  }
+  return {
+    kind: 'selectedPlace',
+    googlePlaceId: result.id,
+    placeName: result.placeName.trim() || '선택한 장소',
+    latitude: roundCoordinate(result.latitude as number),
+    longitude: roundCoordinate(result.longitude as number),
+    radiusMeters: googlePlaceSearchMinBiasRadiusMeters,
   };
 }
 
@@ -851,6 +951,55 @@ function buildGoogleMapsSearchUrl(placeName: string, address: string): string {
 
 function toRadians(value: number): number {
   return (value * Math.PI) / 180;
+}
+
+function distanceMetersBetweenCoordinates(from: GooglePlaceMapCoordinate, to: GooglePlaceMapCoordinate): number {
+  const earthRadiusMeters = 6_371_000;
+  const latitudeDelta = toRadians(to.latitude - from.latitude);
+  const longitudeDelta = toRadians(to.longitude - from.longitude);
+  const fromLatitude = toRadians(from.latitude);
+  const toLatitude = toRadians(to.latitude);
+  const a =
+    Math.sin(latitudeDelta / 2) ** 2 +
+    Math.cos(fromLatitude) * Math.cos(toLatitude) * Math.sin(longitudeDelta / 2) ** 2;
+  return earthRadiusMeters * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function resolveGooglePlaceSearchDistanceAnchor(
+  source: SearchBiasSource | null | undefined,
+  destinations: GooglePlaceTripDestination[],
+): { label: string; coordinate: GooglePlaceMapCoordinate } | null {
+  if (source?.kind === 'currentLocation') {
+    return { label: '현재 위치', coordinate: { latitude: source.latitude, longitude: source.longitude } };
+  }
+  if (source?.kind === 'mapRegion') {
+    return { label: '지도 중심', coordinate: { latitude: source.latitude, longitude: source.longitude } };
+  }
+  if (source?.kind === 'selectedPlace') {
+    return {
+      label: source.placeName.trim() || '선택한 장소',
+      coordinate: { latitude: source.latitude, longitude: source.longitude },
+    };
+  }
+  if (source?.kind === 'tripDestination') {
+    const destination = destinations.find((candidate) => candidate.id === source.destinationId);
+    const label = destination?.displayName.trim();
+    if (!destination || !label || !isValidGooglePlaceTripDestination(destination)) {
+      return null;
+    }
+    return { label: `${label} 중심`, coordinate: destination };
+  }
+  return null;
+}
+
+function formatGooglePlaceDistance(distanceMeters: number): string {
+  if (!Number.isFinite(distanceMeters)) {
+    return '';
+  }
+  if (distanceMeters < 1000) {
+    return `${Math.max(0, Math.round(distanceMeters / 10) * 10)}m`;
+  }
+  return `${(distanceMeters / 1000).toFixed(1)}km`;
 }
 
 function clampNumber(value: number, min: number, max: number): number {

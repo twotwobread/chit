@@ -28,6 +28,10 @@ import {
   buildGooglePlaceSearchSheetMetrics,
   buildGooglePlaceSearchSheetSnapPoints,
   buildGooglePlaceSearchSheetStateFromIndex,
+  buildGooglePlaceCurrentLocationBiasSource,
+  buildGooglePlaceSearchResultDistanceLabel,
+  buildGooglePlaceSearchResultsSectionTitle,
+  buildGooglePlaceSelectedBiasSource,
   buildGooglePlaceSelectedMapRegion,
   canSearchGooglePlaces,
   clearGooglePlaceSearchResultsState,
@@ -50,6 +54,7 @@ import {
   shouldShowGooglePlaceCurrentLocationButton,
   shouldShowGooglePlaceRegionSearchAction,
   idleGooglePlaceAddState,
+  isGooglePlaceCoordinateWithinTripDestination,
   isDuplicateDayPlaceConfirmationError,
   normalizeGooglePlaceSearchQuery,
   successGooglePlaceSearchState,
@@ -670,7 +675,7 @@ describe('google place search helpers', () => {
     assert.equal(buildDefaultGooglePlaceDestinationSelection([]), null);
   });
 
-  it('converts trip destination and map region sources to Google Places bias', () => {
+  it('converts trip destination, map region, current-location, and selected-place sources to Google Places bias', () => {
     const destinations = [
       {
         id: 'destination-osaka',
@@ -708,10 +713,179 @@ describe('google place search helpers', () => {
       ),
       { latitude: 34.7, longitude: 135.5, radiusMeters: 5566 },
     );
+    assert.deepEqual(
+      buildGooglePlaceSearchBiasFromSource(
+        { kind: 'currentLocation', latitude: 34.71, longitude: 135.51, radiusMeters: 1000 },
+        destinations,
+      ),
+      { latitude: 34.71, longitude: 135.51, radiusMeters: 1000 },
+    );
+    assert.deepEqual(
+      buildGooglePlaceSearchBiasFromSource(
+        {
+          kind: 'selectedPlace',
+          googlePlaceId: 'google-1',
+          placeName: '우메다 카페',
+          latitude: 34.7,
+          longitude: 135.5,
+          radiusMeters: 1000,
+        },
+        destinations,
+      ),
+      { latitude: 34.7, longitude: 135.5, radiusMeters: 1000 },
+    );
     assert.equal(
       buildGooglePlaceSearchBiasFromSource({ kind: 'tripDestination', destinationId: 'missing' }, destinations),
       null,
     );
+  });
+
+  it('builds lightweight result-section titles without top-ten copy', () => {
+    const destinations = [
+      {
+        id: 'destination-osaka',
+        displayName: '오사카',
+        latitude: 34.693725,
+        longitude: 135.502254,
+        radiusMeters: 30000,
+      },
+    ];
+
+    assert.equal(
+      buildGooglePlaceSearchResultsSectionTitle(
+        { kind: 'tripDestination', destinationId: 'destination-osaka' },
+        destinations,
+      ),
+      '오사카 주변 결과',
+    );
+    assert.equal(
+      buildGooglePlaceSearchResultsSectionTitle(
+        { kind: 'mapRegion', latitude: 34.7, longitude: 135.5, radiusMeters: 5566 },
+        destinations,
+      ),
+      '현재 지도 영역 주변 결과',
+    );
+    assert.equal(
+      buildGooglePlaceSearchResultsSectionTitle(
+        { kind: 'currentLocation', latitude: 34.71, longitude: 135.51, radiusMeters: 1000 },
+        destinations,
+      ),
+      '현재 위치 주변 결과',
+    );
+    assert.equal(
+      buildGooglePlaceSearchResultsSectionTitle(
+        {
+          kind: 'selectedPlace',
+          googlePlaceId: 'google-1',
+          placeName: '우메다 카페',
+          latitude: 34.7,
+          longitude: 135.5,
+          radiusMeters: 1000,
+        },
+        destinations,
+      ),
+      '우메다 카페 주변 결과',
+    );
+    assert.equal(buildGooglePlaceSearchResultsSectionTitle(null, destinations), '현재 지도 영역 주변 결과');
+  });
+
+  it('builds subtle per-result distance labels from the active search basis', () => {
+    const result = {
+      id: 'google-1',
+      placeName: '우메다 카페',
+      address: 'Umeda',
+      typeHint: '카페',
+      latitude: 34.711,
+      longitude: 135.51,
+    };
+    const destinations = [
+      {
+        id: 'destination-osaka',
+        displayName: '오사카',
+        latitude: 34.693725,
+        longitude: 135.502254,
+        radiusMeters: 30000,
+      },
+    ];
+
+    assert.equal(
+      buildGooglePlaceSearchResultDistanceLabel(
+        result,
+        { kind: 'currentLocation', latitude: 34.71, longitude: 135.51, radiusMeters: 1000 },
+        destinations,
+      ),
+      '현재 위치에서 110m',
+    );
+    assert.equal(
+      buildGooglePlaceSearchResultDistanceLabel(
+        result,
+        {
+          kind: 'selectedPlace',
+          googlePlaceId: 'station-1',
+          placeName: '우메다역',
+          latitude: 34.711,
+          longitude: 135.51,
+          radiusMeters: 1000,
+        },
+        destinations,
+      ),
+      '우메다역에서 0m',
+    );
+    assert.equal(
+      buildGooglePlaceSearchResultDistanceLabel(
+        result,
+        { kind: 'tripDestination', destinationId: 'destination-osaka' },
+        destinations,
+      ),
+      '오사카 중심에서 2.0km',
+    );
+    assert.equal(
+      buildGooglePlaceSearchResultDistanceLabel({ ...result, latitude: undefined }, null, destinations),
+      null,
+    );
+  });
+
+  it('builds selected-place nearby search sources only for coordinate-backed places', () => {
+    const result = {
+      id: 'google-1',
+      placeName: ' 우메다 카페 ',
+      address: 'Umeda',
+      typeHint: '카페',
+      latitude: 34.7,
+      longitude: 135.5,
+    };
+
+    assert.deepEqual(buildGooglePlaceSelectedBiasSource(result), {
+      kind: 'selectedPlace',
+      googlePlaceId: 'google-1',
+      placeName: '우메다 카페',
+      latitude: 34.7,
+      longitude: 135.5,
+      radiusMeters: 1000,
+    });
+    assert.equal(buildGooglePlaceSelectedBiasSource({ ...result, latitude: Number.NaN }), null);
+  });
+
+  it('builds current-location search source and can detect whether it is inside the trip destination', () => {
+    const destination = {
+      id: 'destination-osaka',
+      displayName: '오사카',
+      latitude: 34.693725,
+      longitude: 135.502254,
+      radiusMeters: 30000,
+    };
+    const inside = { latitude: 34.71, longitude: 135.51 };
+    const outside = { latitude: 35.6895, longitude: 139.6917 };
+
+    assert.deepEqual(buildGooglePlaceCurrentLocationBiasSource(inside), {
+      kind: 'currentLocation',
+      latitude: 34.71,
+      longitude: 135.51,
+      radiusMeters: 1000,
+    });
+    assert.equal(isGooglePlaceCoordinateWithinTripDestination(inside, destination), true);
+    assert.equal(isGooglePlaceCoordinateWithinTripDestination(outside, destination), false);
+    assert.equal(buildGooglePlaceCurrentLocationBiasSource({ ...inside, latitude: Number.NaN }), null);
   });
 
   it('keeps map region search and destination chip search as switchable bias sources', () => {

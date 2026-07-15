@@ -11,7 +11,7 @@ import {
   type SetDayLodgingPlaceResponse,
 } from '@i-um/api-contract';
 
-import { runAuthenticatedRequest } from '../auth/client';
+import { runAuthenticatedRequest, type AuthClientDeps } from '../auth/client';
 import {
   buildCreateGooglePlaceScheduleItemRequest,
   googlePlaceSearchDefaultLimit,
@@ -21,23 +21,32 @@ import {
 
 export type SearchGooglePlacesOptions = Partial<GooglePlaceSearchBias> & { limit?: number };
 
+export type SearchGooglePlacesDeps = {
+  auth?: AuthClientDeps;
+  placesService?: Pick<typeof PlacesService, 'searchGooglePlaces'>;
+};
+
 export async function searchGooglePlaces(
   tripId: string,
   tripDayId: string,
   query: string,
   limitOrOptions: number | SearchGooglePlacesOptions = googlePlaceSearchDefaultLimit,
+  deps: SearchGooglePlacesDeps = {},
 ): Promise<SearchGooglePlacesResponse> {
   const options = typeof limitOrOptions === 'number' ? { limit: limitOrOptions } : limitOrOptions;
-  return runAuthenticatedRequest(() =>
-    PlacesService.searchGooglePlaces(
-      tripId,
-      tripDayId,
-      normalizeGooglePlaceSearchQuery(query),
-      options.limit ?? googlePlaceSearchDefaultLimit,
-      options.latitude,
-      options.longitude,
-      options.radiusMeters,
-    ),
+  const placesService = deps.placesService ?? PlacesService;
+  return runAuthenticatedRequest(
+    () =>
+      placesService.searchGooglePlaces(
+        tripId,
+        tripDayId,
+        normalizeGooglePlaceSearchQuery(query),
+        options.limit ?? googlePlaceSearchDefaultLimit,
+        options.latitude,
+        options.longitude,
+        options.radiusMeters,
+      ),
+    deps.auth,
   );
 }
 

@@ -67,11 +67,15 @@ import {
   buildGooglePlaceSearchMarkerViewModels,
   buildGooglePlaceSearchResultActionView,
   buildGooglePlaceSearchRegionFromDestination,
+  buildGooglePlaceSearchResultDistanceLabel,
   buildGooglePlaceSearchResultsRegion,
+  buildGooglePlaceSearchResultsSectionTitle,
   buildGooglePlaceSearchSheetIndex,
   buildGooglePlaceSearchSheetMetrics,
   buildGooglePlaceSearchSheetSnapPoints,
   buildGooglePlaceSearchSheetStateFromIndex,
+  buildGooglePlaceCurrentLocationBiasSource,
+  buildGooglePlaceSelectedBiasSource,
   buildGooglePlaceSelectedMapRegion,
   canSearchGooglePlaces,
   clearGooglePlaceSearchResultsState,
@@ -84,6 +88,7 @@ import {
   resolveGooglePlaceSearchSelectionAfterResultsClose,
   resolveGooglePlaceSearchSheetState,
   resolveGooglePlaceSearchSheetTopInset,
+  isGooglePlaceCoordinateWithinTripDestination,
   shouldRenderGooglePlaceBookmarkDetail,
   shouldRenderGooglePlaceSearchResults,
   shouldShowGooglePlaceCurrentLocationButton,
@@ -92,7 +97,6 @@ import {
   type GooglePlaceAddViewState,
   type GooglePlaceDetailsViewState,
   type GooglePlaceMapCoordinate,
-  type GooglePlaceSearchBias,
   type GooglePlaceSearchMarkerIconName,
   type GooglePlaceSearchResultActionMode,
   type GooglePlaceSearchRowViewModel,
@@ -337,6 +341,7 @@ export function GooglePlaceMapSearch({
   const suppressNextRegionDirtyRef = useRef(false);
   const suppressNextMapTapRef = useRef(false);
   const defaultDestinationAppliedRef = useRef<string | null>(defaultDestinationId);
+  const autoCurrentLocationRequestedRef = useRef(false);
   const initialMapRegion = initialRegion ?? initialDestinationRegion ?? defaultGooglePlaceSearchMapRegion;
   const [containerHeight, setContainerHeight] = useState<number | null>(null);
   const [query, setQuery] = useState('');
@@ -351,6 +356,7 @@ export function GooglePlaceMapSearch({
   const [activeBiasSource, setActiveBiasSource] = useState<SearchBiasSource | null>(
     defaultDestinationId ? { kind: 'tripDestination', destinationId: defaultDestinationId } : null,
   );
+  const [lastSearchBiasSource, setLastSearchBiasSource] = useState<SearchBiasSource | null>(activeBiasSource);
   const [regionDirty, setRegionDirty] = useState(false);
   const [sheetState, setSheetState] = useState<GooglePlaceSearchSheetState>('minimized');
   const [locationMessage, setLocationMessage] = useState<string | null>(null);
@@ -362,7 +368,9 @@ export function GooglePlaceMapSearch({
   const selectedChipDestinationId =
     activeBiasSource?.kind === 'tripDestination'
       ? activeBiasSource.destinationId
-      : activeBiasSource?.kind === 'mapRegion'
+      : activeBiasSource?.kind === 'mapRegion' ||
+          activeBiasSource?.kind === 'currentLocation' ||
+          activeBiasSource?.kind === 'selectedPlace'
         ? ''
         : selectedDestinationId;
   const destinationChips = useMemo(
@@ -382,6 +390,10 @@ export function GooglePlaceMapSearch({
   });
   const currentLocationMarker = buildGooglePlaceCurrentLocationMarkerViewModel(currentLocation);
   const showRegionSearch = shouldShowGooglePlaceRegionSearchAction(query, regionDirty, isBusy, sheetState);
+  const searchResultsSectionTitle =
+    state.status === 'success'
+      ? buildGooglePlaceSearchResultsSectionTitle(lastSearchBiasSource, tripDestinations)
+      : null;
   const showCurrentLocation = shouldShowGooglePlaceCurrentLocationButton(sheetState);
   const sheetMetricHeight = containerHeight ?? window.height;
   const resolvedSheetTopInset = resolveGooglePlaceSearchSheetTopInset(sheetTopInset);
@@ -450,6 +462,51 @@ export function GooglePlaceMapSearch({
     defaultDestinationAppliedRef.current = defaultDestinationId;
   }, [defaultDestinationId, defaultTripDestination, initialRegion]);
 
+  useEffect(() => {
+    if (initialRegion || !defaultTripDestination || autoCurrentLocationRequestedRef.current) {
+      return;
+    }
+    autoCurrentLocationRequestedRef.current = true;
+
+    let cancelled = false;
+    const applyCurrentLocationIfInsideDestination = async () => {
+      try {
+        const permission = await Location.requestForegroundPermissionsAsync();
+        if (permission.status !== Location.PermissionStatus.GRANTED || cancelled) {
+          return;
+        }
+        const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        const nextLocation = { latitude: position.coords.latitude, longitude: position.coords.longitude };
+        if (!isGooglePlaceCoordinateWithinTripDestination(nextLocation, defaultTripDestination) || cancelled) {
+          return;
+        }
+        const nextSource = buildGooglePlaceCurrentLocationBiasSource(nextLocation);
+        if (!nextSource) {
+          return;
+        }
+        const nextRegion: Region = {
+          ...nextLocation,
+          latitudeDelta: Math.min(mapRegion.latitudeDelta, 0.03),
+          longitudeDelta: Math.min(mapRegion.longitudeDelta, 0.03),
+        };
+        setCurrentLocation(nextLocation);
+        setSelectedDestinationId(null);
+        setActiveBiasSource(nextSource);
+        setRegionDirty(false);
+        suppressNextRegionDirtyRef.current = true;
+        setMapRegion(nextRegion);
+        mapRef.current?.animateToRegion(nextRegion, 260);
+      } catch {
+        // Initial current-location preference is best-effort; fall back to the trip destination without noisy copy.
+      }
+    };
+
+    void applyCurrentLocationIfInsideDestination();
+    return () => {
+      cancelled = true;
+    };
+  }, [defaultTripDestination, initialRegion, mapRegion.latitudeDelta, mapRegion.longitudeDelta]);
+
   const focusSearchInput = () => {
     setSelectedResult(null);
     setSelectedResultSource(null);
@@ -512,7 +569,12 @@ export function GooglePlaceMapSearch({
     };
   }, [dayId, selectedResult, tripId]);
 
-  const runSearch = async (bias?: GooglePlaceSearchBias | null) => {
+  const buildMapRegionBiasSource = (): SearchBiasSource | null => {
+    const regionBias = buildGooglePlaceSearchBiasFromRegion(mapRegion);
+    return regionBias ? { kind: 'mapRegion', ...regionBias } : null;
+  };
+
+  const runSearch = async (biasSource?: SearchBiasSource | null) => {
     if (isBusy) {
       return;
     }
@@ -537,13 +599,15 @@ export function GooglePlaceMapSearch({
     resetActionState();
     setState(googlePlaceSearchLoadingState());
     try {
+      const searchBias = buildGooglePlaceSearchBiasFromSource(biasSource, tripDestinations);
       const response = await searchGooglePlaces(
         tripId,
         dayId,
         normalizeGooglePlaceSearchQuery(query),
-        bias ?? undefined,
+        searchBias ?? undefined,
       );
       const nextState = successGooglePlaceSearchState(response.results);
+      setLastSearchBiasSource(biasSource ?? null);
       setState(nextState);
       setSheetState((current) => resolveGooglePlaceSearchSheetState(current, { kind: 'searchResults' }));
       setRegionDirty(false);
@@ -578,14 +642,16 @@ export function GooglePlaceMapSearch({
   };
 
   const runActiveSearch = () => {
-    void runSearch(buildGooglePlaceSearchBiasFromSource(activeBiasSource, tripDestinations));
+    const nextSource = activeBiasSource ?? buildMapRegionBiasSource();
+    setActiveBiasSource(nextSource);
+    void runSearch(nextSource);
   };
 
   const runRegionSearch = () => {
-    const regionBias = buildGooglePlaceSearchBiasFromRegion(mapRegion);
+    const nextSource = buildMapRegionBiasSource();
     setSelectedDestinationId(null);
-    setActiveBiasSource(regionBias ? { kind: 'mapRegion', ...regionBias } : null);
-    void runSearch(regionBias);
+    setActiveBiasSource(nextSource);
+    void runSearch(nextSource);
   };
 
   const selectDestinationChip = (destinationId: string) => {
@@ -631,6 +697,12 @@ export function GooglePlaceMapSearch({
     setSelectedResult(result);
     setSelectedResultSource(resultSource);
     setHighlightedResultId(result.id);
+    const selectedPlaceSource = buildGooglePlaceSelectedBiasSource(result);
+    if (selectedPlaceSource) {
+      setSelectedDestinationId(null);
+      setActiveBiasSource(selectedPlaceSource);
+      setRegionDirty(false);
+    }
     if (resultSource === 'bookmark') {
       setQuery('');
       setState(clearGooglePlaceSearchResultsState(query));
@@ -665,10 +737,6 @@ export function GooglePlaceMapSearch({
       suppressNextRegionDirtyRef.current = false;
       return;
     }
-    if (activeBiasSource?.kind === 'mapRegion') {
-      const regionBias = buildGooglePlaceSearchBiasFromRegion(region);
-      setActiveBiasSource(regionBias ? { kind: 'mapRegion', ...regionBias } : null);
-    }
     if (state.status === 'success' || canSearchGooglePlaces(query)) {
       setRegionDirty(true);
     }
@@ -702,6 +770,19 @@ export function GooglePlaceMapSearch({
     setMapActionMessage(null);
     setQuery('');
     setState(clearGooglePlaceSearchResultsState(query));
+    const routePlaceSource = buildGooglePlaceSelectedBiasSource({
+      id: place.id,
+      placeName: place.name,
+      address: '',
+      typeHint: theme.placeType[place.type]?.label ?? '장소',
+      latitude: place.latitude ?? undefined,
+      longitude: place.longitude ?? undefined,
+    });
+    if (routePlaceSource) {
+      setSelectedDestinationId(null);
+      setActiveBiasSource(routePlaceSource);
+      setRegionDirty(false);
+    }
     onRoutePlacePress?.(place);
     setSheetState((current) => resolveGooglePlaceSearchSheetState(current, { kind: 'markerPlaceSelect' }));
   };
@@ -751,12 +832,17 @@ export function GooglePlaceMapSearch({
         latitudeDelta: Math.min(mapRegion.latitudeDelta, 0.03),
         longitudeDelta: Math.min(mapRegion.longitudeDelta, 0.03),
       };
+      const nextSource = buildGooglePlaceCurrentLocationBiasSource(nextLocation);
       setCurrentLocation(nextLocation);
+      if (nextSource) {
+        setSelectedDestinationId(null);
+        setActiveBiasSource(nextSource);
+      }
       suppressNextRegionDirtyRef.current = true;
       setMapRegion(nextRegion);
       mapRef.current?.animateToRegion(nextRegion, 260);
-      setRegionDirty(canSearchGooglePlaces(query));
-      setLocationMessage('현재 위치로 지도를 이동했어요. 이 지역에서 다시 검색을 눌러 검색하세요.');
+      setRegionDirty(false);
+      setLocationMessage('현재 위치 기준으로 검색할게요. 검색 버튼을 눌러 주세요.');
     } catch {
       setLocationMessage('현재 위치를 가져오지 못했어요. 지도를 직접 이동해 주세요.');
     }
@@ -1061,6 +1147,9 @@ export function GooglePlaceMapSearch({
 
             {renderSearchResults ? (
               <View style={styles.resultListContent}>
+                {searchResultsSectionTitle ? (
+                  <Text style={styles.sectionTitle}>{searchResultsSectionTitle}</Text>
+                ) : null}
                 {state.results.map((item) => (
                   <PlaceResultCard
                     actionView={buildGooglePlaceSearchResultActionView({
@@ -1070,6 +1159,11 @@ export function GooglePlaceMapSearch({
                     })}
                     dayId={dayId}
                     detailsState={detailsState}
+                    basisDistanceLabel={buildGooglePlaceSearchResultDistanceLabel(
+                      item,
+                      lastSearchBiasSource,
+                      tripDestinations,
+                    )}
                     imageFailed={imageFailures[item.id] === true}
                     isBusy={isBusy}
                     isExpanded={selectedResult?.id === item.id}
@@ -1107,6 +1201,7 @@ type PlaceResultActionView = ReturnType<typeof buildGooglePlaceSearchResultActio
 
 function PlaceResultCard({
   actionView,
+  basisDistanceLabel,
   dayId,
   detailsState,
   imageFailed,
@@ -1126,6 +1221,7 @@ function PlaceResultCard({
   tripId,
 }: {
   actionView: PlaceResultActionView;
+  basisDistanceLabel?: string | null;
   result: GooglePlaceSearchRowViewModel;
   tripId: string;
   dayId: string;
@@ -1148,7 +1244,10 @@ function PlaceResultCard({
     detailsState.status === 'success' && detailsState.googlePlaceId === result.id
       ? detailsState.detail
       : buildGooglePlaceExplorationDetail(result);
-  const extraLabels = (result.metadataLabels ?? []).filter((label) => label !== result.typeHint);
+  const extraLabels = [
+    basisDistanceLabel,
+    ...(result.metadataLabels ?? []).filter((label) => label !== result.typeHint),
+  ].filter((label): label is string => typeof label === 'string' && label.trim().length > 0);
   const actionButtonLabel = actionView.primaryAction?.isLoading
     ? actionView.primaryAction.loadingLabel
     : actionView.primaryAction?.label;
@@ -1705,10 +1804,12 @@ const styles = StyleSheet.create({
   },
   inlineActionRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: theme.space[2],
   },
   inlineActionButton: {
     flex: 1,
+    minWidth: 120,
     paddingHorizontal: theme.space[3],
   },
   primaryButton: {
