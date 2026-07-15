@@ -1,8 +1,12 @@
 import type { TravelMode } from './travel-mode';
 
+export type TodayNavigationProvider = 'googleMaps' | 'naverMaps';
+
 export type TodayNavigationDestination = {
   placeName: string;
   address?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
 };
 
 export type TodayNavigationLauncher = {
@@ -14,7 +18,29 @@ export type TodayNavigationResult =
   | { status: 'openedInstall'; url: string }
   | { status: 'failed'; message: string };
 
+type TodayNavigationTripDestination = {
+  countryCode?: string | null;
+};
+
+type TodayNavigationDirectionsAttempt = {
+  provider: TodayNavigationProvider;
+  url: string;
+};
+
+const naverMapsAppName = 'com.twotwobread.ium';
+
 export const todayNavigationFailureMessage = '길찾기를 열 수 없어요. 잠시 후 다시 시도해 주세요.';
+
+export function resolveTodayNavigationProvider(
+  destinations: readonly TodayNavigationTripDestination[],
+): TodayNavigationProvider {
+  if (destinations.length === 0) {
+    return 'googleMaps';
+  }
+
+  const countryCodes = destinations.map((destination) => destination.countryCode?.trim().toUpperCase() ?? '');
+  return countryCodes.every((countryCode) => countryCode === 'KR') ? 'naverMaps' : 'googleMaps';
+}
 
 export function buildGoogleMapsDestinationQuery(destination: TodayNavigationDestination): string {
   const placeName = destination.placeName.trim();
@@ -45,6 +71,27 @@ export function buildGoogleMapsDirectionsUrl(
   return `https://www.google.com/maps/dir/?api=1&destination=${encodedDestination}${modeParameter}`;
 }
 
+export function buildNaverMapsDirectionsUrl(
+  destination: TodayNavigationDestination,
+  travelMode?: TravelMode,
+): string | null {
+  const latitude = validCoordinate(destination.latitude);
+  const longitude = validCoordinate(destination.longitude);
+  if (latitude === null || longitude === null) {
+    return null;
+  }
+
+  const destinationName = destination.placeName.trim() || buildGoogleMapsDestinationQuery(destination).trim();
+  if (!destinationName) {
+    return null;
+  }
+
+  const routeMode = naverRouteModePath(travelMode);
+  return `nmap://route/${routeMode}?dlat=${latitude}&dlng=${longitude}&dname=${encodeURIComponent(
+    destinationName,
+  )}&appname=${encodeURIComponent(naverMapsAppName)}`;
+}
+
 export function buildGoogleMapsInstallUrl(platform: string): string {
   if (platform === 'ios') {
     return 'itms-apps://apps.apple.com/app/google-maps/id585027354';
@@ -57,24 +104,38 @@ export function buildGoogleMapsInstallUrl(platform: string): string {
   return 'https://www.google.com/maps';
 }
 
+export function buildNaverMapsInstallUrl(platform: string): string {
+  if (platform === 'ios') {
+    return 'itms-apps://apps.apple.com/app/id311867728';
+  }
+
+  if (platform === 'android') {
+    return 'market://details?id=com.nhn.android.nmap';
+  }
+
+  return 'https://map.naver.com';
+}
+
 export async function openTodayNavigationDestination({
   destination,
   launcher,
   platform,
+  provider = 'googleMaps',
   travelMode,
 }: {
   destination: TodayNavigationDestination;
   launcher: TodayNavigationLauncher;
   platform: string;
+  provider?: TodayNavigationProvider;
   travelMode?: TravelMode;
 }): Promise<TodayNavigationResult> {
-  const directionsUrl = buildGoogleMapsDirectionsUrl(destination, platform, travelMode);
+  const attempt = buildTodayNavigationDirectionsAttempt(destination, platform, provider, travelMode);
 
   try {
-    await launcher.openURL(directionsUrl);
-    return { status: 'openedDirections', url: directionsUrl };
+    await launcher.openURL(attempt.url);
+    return { status: 'openedDirections', url: attempt.url };
   } catch {
-    const installUrl = buildGoogleMapsInstallUrl(platform);
+    const installUrl = buildMapInstallUrl(attempt.provider, platform);
 
     try {
       await launcher.openURL(installUrl);
@@ -83,6 +144,42 @@ export async function openTodayNavigationDestination({
       return { status: 'failed', message: todayNavigationFailureMessage };
     }
   }
+}
+
+function buildTodayNavigationDirectionsAttempt(
+  destination: TodayNavigationDestination,
+  platform: string,
+  provider: TodayNavigationProvider,
+  travelMode: TravelMode | undefined,
+): TodayNavigationDirectionsAttempt {
+  if (provider === 'naverMaps') {
+    const naverUrl = buildNaverMapsDirectionsUrl(destination, travelMode);
+    if (naverUrl) {
+      return { provider: 'naverMaps', url: naverUrl };
+    }
+  }
+
+  return { provider: 'googleMaps', url: buildGoogleMapsDirectionsUrl(destination, platform, travelMode) };
+}
+
+function buildMapInstallUrl(provider: TodayNavigationProvider, platform: string): string {
+  return provider === 'naverMaps' ? buildNaverMapsInstallUrl(platform) : buildGoogleMapsInstallUrl(platform);
+}
+
+function validCoordinate(value: number | null | undefined): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function naverRouteModePath(travelMode: TravelMode | undefined): 'public' | 'walk' | 'car' {
+  if (travelMode === 'walking') {
+    return 'walk';
+  }
+
+  if (travelMode === 'driving') {
+    return 'car';
+  }
+
+  return 'public';
 }
 
 function googleNavigationModeParameter(travelMode: TravelMode | undefined): 'd' | 'w' | null {

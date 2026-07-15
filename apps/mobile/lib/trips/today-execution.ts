@@ -17,6 +17,11 @@ import { tripItineraryDayPath } from './routes';
 import { buildQuickExpenseRoute } from './quick-expense';
 import { groupTripsByStatus } from './status';
 import {
+  resolveTodayNavigationProvider,
+  type TodayNavigationDestination,
+  type TodayNavigationProvider,
+} from './today-navigation';
+import {
   buildTravelModeSelectorViewModel,
   defaultTravelMode,
   type TravelMode,
@@ -61,10 +66,8 @@ export type TodayRestoreAction = {
 export type TodayNavigateAction = {
   kind: 'navigate';
   label: string;
-  destination: {
-    placeName: string;
-    address: string;
-  };
+  destination: TodayNavigationDestination;
+  provider: TodayNavigationProvider;
   travelMode: TravelMode;
 };
 
@@ -264,12 +267,17 @@ export function buildTodayExecutionViewModel({
   const dayRoute = tripItineraryDayPath(selectedTrip.id, currentDay.id);
   const orderedItems = orderedItineraryItems(getScheduleItems(itinerary));
   const lodgingSourceDay = itinerary.day.date === currentDay.date ? itinerary.day : currentDay;
+  const navigationProvider = resolveTodayNavigationProvider(tripDetail.trip.destinations ?? []);
   const common = {
     tripName: tripDetail.trip.name,
     dayLabel: formatTripDayLabel(currentDay.dayOrder),
     formattedDate: formatTripDayDate(currentDay.date),
     primaryAction: routeAction(orderedItems.length === 0 ? '오늘 일정 열기' : '오늘 일정 보기', dayRoute),
-    lodgingNavigationAction: buildLodgingNavigationAction(lodgingSourceDay.lodgingPlace, travelMode),
+    lodgingNavigationAction: buildLodgingNavigationAction(
+      lodgingSourceDay.lodgingPlace,
+      travelMode,
+      navigationProvider,
+    ),
     multipleOngoingTripNotice: buildMultipleOngoingTripNotice(ongoingTripCount),
   };
 
@@ -320,7 +328,14 @@ export function buildTodayExecutionViewModel({
       placeTypeLabel: getPlaceTypeLabel(placeBackedNext.placeType),
       address: placeBackedNext.address,
       routablePlace: placeBackedNext.routablePlace ?? null,
-      navigationAction: navigateAction('길찾기', placeBackedNext.name, placeBackedNext.address, travelMode),
+      navigationAction: navigateAction(
+        '길찾기',
+        placeBackedNext.name,
+        placeBackedNext.address,
+        travelMode,
+        navigationProvider,
+        placeBackedNext.routablePlace ?? null,
+      ),
       travelModeSelector: buildTravelModeSelectorViewModel(travelMode),
     },
     skippedSection: skippedItems.length > 0 ? buildSkippedSection(skippedItems, selectedTrip.id, currentDay.id) : null,
@@ -353,6 +368,7 @@ export function applyLocalizedTodayNextPlaceDisplay(
       navigationAction: {
         ...viewModel.nextPlace.navigationAction,
         destination: {
+          ...viewModel.nextPlace.navigationAction.destination,
           placeName,
           address,
         },
@@ -472,6 +488,7 @@ function restoreAction(tripId: string, date: string, itemId: string): TodayResto
 function buildLodgingNavigationAction(
   lodgingPlace: TripPlaceSummary | null,
   travelMode: TravelMode,
+  provider: TodayNavigationProvider,
 ): TodayLodgingNavigationActionViewModel {
   if (!lodgingPlace) {
     return {
@@ -486,7 +503,14 @@ function buildLodgingNavigationAction(
     label: todayLodgingNavigationCopy.action,
     disabled: false,
     helper: null,
-    action: navigateAction(todayLodgingNavigationCopy.action, lodgingPlace.name, lodgingPlace.address, travelMode),
+    action: navigateAction(
+      todayLodgingNavigationCopy.action,
+      lodgingPlace.name,
+      lodgingPlace.address,
+      travelMode,
+      provider,
+      lodgingPlace.routablePlace ?? null,
+    ),
   };
 }
 
@@ -512,6 +536,31 @@ function navigateAction(
   placeName: string,
   address: string,
   travelMode: TravelMode,
+  provider: TodayNavigationProvider,
+  routablePlace: RoutablePlace | null,
 ): TodayNavigateAction {
-  return { kind: 'navigate', label, destination: { placeName, address }, travelMode };
+  return {
+    kind: 'navigate',
+    label,
+    destination: buildTodayNavigationDestination(placeName, address, routablePlace),
+    provider,
+    travelMode,
+  };
+}
+
+function buildTodayNavigationDestination(
+  placeName: string,
+  address: string,
+  routablePlace: RoutablePlace | null,
+): TodayNavigationDestination {
+  if (!routablePlace || !Number.isFinite(routablePlace.latitude) || !Number.isFinite(routablePlace.longitude)) {
+    return { placeName, address };
+  }
+
+  return {
+    placeName,
+    address,
+    latitude: routablePlace.latitude,
+    longitude: routablePlace.longitude,
+  };
 }
