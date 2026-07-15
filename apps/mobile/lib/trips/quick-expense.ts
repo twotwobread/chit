@@ -276,6 +276,12 @@ export function settlementStatusSummaryLabel(includeInSettlement: boolean): stri
   return includeInSettlement ? '최종 정산에 포함' : '현장 정산 완료';
 }
 
+export function settlementStatusSummaryDetail(includeInSettlement: boolean): string {
+  return includeInSettlement
+    ? '나중에 여행 정산에서 함께 계산할 지출이에요.'
+    : '이미 돈을 주고받은 지출이에요. 내역과 총 사용 금액에는 남고 최종 정산에서는 제외돼요.';
+}
+
 function compactNameList(names: string[]): string {
   if (names.length <= 2) {
     return names.join(', ');

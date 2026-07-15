@@ -135,6 +135,51 @@ test('builds trip-level edit view model without day-specific place selection', (
   assert.deepEqual(viewModel.placeOptions, []);
 });
 
+test('builds edit day tabs and filters schedule options to the selected day', () => {
+  const firstDay = itinerary();
+  const secondDay: GetDayScheduleItemsResponse = {
+    day: { id: 'day-b', date: '2026-07-11', dayOrder: 2, lodgingPlace: null },
+    scheduleItems: [
+      {
+        id: 'item-c',
+        itemOrder: 2,
+        version: 1,
+        isLodging: false,
+        place: { id: 'place-c', name: '오사카성', address: 'Osakajo', placeType: 'sights' },
+        arrivedAt: null,
+        skippedAt: null,
+      },
+    ],
+  };
+
+  const viewModel = buildExpenseEditViewModel({
+    amountInput: '1000',
+    expense: expense({ tripDayId: 'day-b', scheduleItemId: 'item-c' }),
+    itinerary: firstDay,
+    itineraries: [firstDay, secondDay],
+    memoInput: '',
+    participants,
+    selectedItemId: 'item-c',
+    selectedPayerParticipantId: 'participant-a',
+    selectedTripDayId: 'day-b',
+  });
+
+  assert.equal(viewModel.dayLabel, '전체 일정');
+  assert.equal(viewModel.selectedTripDayId, 'day-b');
+  assert.deepEqual(
+    viewModel.dayOptions.map((option) => [option.tripDayId, option.dayLabel, option.itemCount, option.selected]),
+    [
+      ['day-a', '1일차', 2, false],
+      ['day-b', '2일차', 1, true],
+    ],
+  );
+  assert.deepEqual(
+    viewModel.itemOptions.map((option) => [option.itemId, option.tripDayId, option.dayLabel, option.orderLabel]),
+    [['item-c', 'day-b', '2일차', '2']],
+  );
+  assert.equal(viewModel.selectedItem?.itemId, 'item-c');
+});
+
 test('builds initial amount input from the stored currency', () => {
   assert.equal(buildExpenseEditInitialAmountInput(expense({ amountMinor: 1200, currency: 'JPY' })), '1200');
   assert.equal(buildExpenseEditInitialAmountInput(expense({ amountMinor: 1234, currency: 'USD' })), '12.34');
@@ -190,6 +235,11 @@ test('builds update expense request with trimmed memo and nullable place', () =>
     memo: '저녁 식사',
     scheduleItemId: null,
   });
+});
+
+test('builds edit participant ids from selected split targets', () => {
+  assert.deepEqual(buildExpenseEditParticipantIds(participants, ['participant-b']), ['participant-b']);
+  assert.deepEqual(buildExpenseEditParticipantIds(participants, ['missing']), []);
 });
 
 test('builds update expense request with an explicit settlement exclusion flag', () => {

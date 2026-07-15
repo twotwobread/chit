@@ -18,17 +18,20 @@ export default function ExpenseEditScreen() {
     manualSplitInputs,
     memoInput,
     saving,
+    clearTripDay,
+    selectItem,
+    selectTripDay,
     setAmountInput,
     setIncludeInSettlement,
     setMemoInput,
     setPayerParticipantId,
-    setSelectedItemId,
     setSplitPolicy,
     setTitleInput,
     splitPolicy,
     state,
     submitSave,
     titleInput,
+    toggleSplitParticipant,
     updateManualSplitInput,
     viewModel,
   } = useExpenseEditController();
@@ -81,10 +84,13 @@ export default function ExpenseEditScreen() {
           onMemoChange={setMemoInput}
           onPayerChange={setPayerParticipantId}
           onSettlementIncludeChange={setIncludeInSettlement}
-          onPlaceChange={setSelectedItemId}
+          onClearTripDay={clearTripDay}
+          onPlaceChange={selectItem}
           onSave={() => void submitSave()}
+          onSelectTripDay={selectTripDay}
           onSplitPolicyChange={setSplitPolicy}
           onTitleChange={setTitleInput}
+          onToggleSplitParticipant={toggleSplitParticipant}
           onUpdateManualSplitInput={updateManualSplitInput}
           saving={saving}
           splitPolicy={splitPolicy}

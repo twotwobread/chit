@@ -7,7 +7,12 @@ import type {
   UpdateExpenseRequest,
 } from '@i-um/api-contract';
 
-import { getPlaceTypeLabel, getScheduleItems, type PlaceBackedScheduleItem } from './day-itinerary';
+import {
+  formatScheduleItemTimeLabel,
+  getPlaceTypeLabel,
+  getScheduleItems,
+  type PlaceBackedScheduleItem,
+} from './day-itinerary';
 import { formatTripDayDate, formatTripDayLabel } from './days';
 import {
   buildDefaultEqualSplitPreview,
@@ -16,7 +21,10 @@ import {
   formatAmountInput,
   formatMoney,
   parseAmountMinor,
+  type QuickExpenseDayOption,
+  type QuickExpenseItemOption,
   type QuickExpenseManualSplitInput,
+  type QuickExpenseSplitParticipantOption,
   type QuickExpenseSplitPolicy,
   type QuickExpenseSplitRow,
 } from './quick-expense';
@@ -52,10 +60,16 @@ export type ExpenseEditViewModel = {
   showPlaceField: boolean;
   titlePlaceholder: string;
   currencyLabel: string;
+  selectedItem: QuickExpenseItemOption | null;
+  selectedTripDayId: string | null;
+  dayOptions: QuickExpenseDayOption[];
+  itemOptions: QuickExpenseItemOption[];
   payerOptions: ExpenseEditPayerOption[];
   placeOptions: ExpenseEditPlaceOption[];
+  splitParticipantOptions: QuickExpenseSplitParticipantOption[];
   splitPreviewRows: QuickExpenseSplitRow[];
   splitPreviewMessage: string | null;
+  splitParticipantError: string | null;
   saveLabel: string;
   deleteLabel: string;
 };
@@ -64,49 +78,96 @@ export function buildExpenseEditViewModel({
   amountInput,
   expense,
   itinerary,
+  itineraries,
   participants,
   selectedItemId,
   selectedPayerParticipantId,
+  selectedSplitParticipantIds,
+  selectedTripDayId,
 }: {
   amountInput: string;
   expense: Expense;
   itinerary: GetDayScheduleItemsResponse | null;
+  itineraries?: GetDayScheduleItemsResponse[];
   memoInput: string;
   participants: TripParticipantListItem[];
   selectedItemId: string | null;
   selectedPayerParticipantId: string | null;
+  selectedSplitParticipantIds?: string[];
+  selectedTripDayId?: string | null;
 }): ExpenseEditViewModel {
+  const itineraryList = orderedItineraries(
+    itineraries && itineraries.length > 0 ? itineraries : itinerary ? [itinerary] : [],
+  );
+  const allItemOptions = itineraryList.flatMap((optionItinerary) =>
+    orderedItems(getScheduleItems(optionItinerary)).map((item) =>
+      expenseEditItemOption(item, optionItinerary, selectedItemId),
+    ),
+  );
+  const isAllDayMode = itineraryList.length > 1 || (itinerary === null && itineraryList.length > 0);
+  const selectedItemFromAllDays = allItemOptions.find((item) => item.selected) ?? null;
+  const activeTripDayId = isAllDayMode
+    ? (selectedTripDayId ?? selectedItemFromAllDays?.tripDayId ?? null)
+    : (itineraryList[0]?.day.id ?? null);
+  const itemOptions = activeTripDayId
+    ? allItemOptions.filter((option) => option.tripDayId === activeTripDayId)
+    : allItemOptions;
+  const selectedItem = itemOptions.find((item) => item.selected) ?? null;
+  const dayOptions = isAllDayMode
+    ? itineraryList.map((optionItinerary) => ({
+        tripDayId: optionItinerary.day.id,
+        dayLabel: formatTripDayLabel(optionItinerary.day.dayOrder),
+        formattedDate: formatTripDayDate(optionItinerary.day.date),
+        itemCount: getScheduleItems(optionItinerary).length,
+        selected: activeTripDayId !== null && optionItinerary.day.id === activeTripDayId,
+      }))
+    : [];
+  const selectedParticipantSet = new Set(selectedSplitParticipantIds ?? buildDefaultSplitParticipantIds(participants));
+  const selectedParticipants = participants.filter((participant) =>
+    selectedParticipantSet.has(participant.participantId),
+  );
   const parsedAmount = amountInput.trim() === '' ? null : parseAmountMinor(amountInput, expense.currency);
   const splitPreviewRows = parsedAmount?.ok
-    ? buildDefaultEqualSplitPreview({ amountMinor: parsedAmount.amountMinor, currency: expense.currency, participants })
+    ? buildDefaultEqualSplitPreview({
+        amountMinor: parsedAmount.amountMinor,
+        currency: expense.currency,
+        participants: selectedParticipants,
+      })
     : [];
 
   const isTripLevel = itinerary === null;
 
   return {
     title: '지출 수정',
-    dayLabel: isTripLevel ? '여행 전체' : formatTripDayLabel(itinerary.day.dayOrder),
+    dayLabel: isAllDayMode ? '전체 일정' : isTripLevel ? '여행 전체' : formatTripDayLabel(itinerary.day.dayOrder),
     formattedDate: formatTripDayDate(expense.expenseDate),
     amountLabel: formatMoney(expense.amountMinor, expense.currency),
     currency: expense.currency,
     showTitleField: isTripLevel || selectedItemId === null || expense.title !== null,
-    showPlaceField: !isTripLevel,
+    showPlaceField: allItemOptions.length > 0,
     titlePlaceholder: selectedItemId === null ? '예: 항공권, 숙소 예약금' : '선택 입력',
     currencyLabel: currencyLabel(expense.currency),
+    selectedItem,
+    selectedTripDayId: activeTripDayId,
+    dayOptions,
+    itemOptions,
     payerOptions: participants.map((participant) => ({
       participantId: participant.participantId,
       displayName: participant.displayName.trim() || '이름 없음',
       selected: participant.participantId === selectedPayerParticipantId,
     })),
-    placeOptions: isTripLevel
-      ? []
-      : [
-          noPlaceOption(selectedItemId),
-          ...orderedItems(getScheduleItems(itinerary)).map((item) => placeOption(item, selectedItemId)),
-        ],
+    placeOptions:
+      allItemOptions.length === 0 ? [] : [noPlaceOption(selectedItemId), ...itemOptions.map(placeOptionFromItem)],
+    splitParticipantOptions: participants.map((participant) => ({
+      participantId: participant.participantId,
+      displayName: participant.displayName.trim() || '이름 없음',
+      selected: selectedParticipantSet.has(participant.participantId),
+    })),
     splitPreviewRows,
     splitPreviewMessage:
       parsedAmount?.ok && participants.length === 0 ? '참여자 정보를 불러오지 못해 분할을 계산할 수 없어요.' : null,
+    splitParticipantError:
+      participants.length > 0 && selectedParticipants.length === 0 ? '분할할 사람을 1명 이상 선택해주세요.' : null,
     saveLabel: '저장',
     deleteLabel: '삭제',
   };
@@ -230,8 +291,15 @@ export function buildExpenseEditInitialManualSplitInputs(
   }));
 }
 
-export function buildExpenseEditParticipantIds(participants: TripParticipantListItem[]): string[] {
-  return buildDefaultSplitParticipantIds(participants);
+export function buildExpenseEditParticipantIds(
+  participants: TripParticipantListItem[],
+  selectedParticipantIds?: string[],
+): string[] {
+  if (!selectedParticipantIds) {
+    return buildDefaultSplitParticipantIds(participants);
+  }
+  const availableParticipantIds = new Set(participants.map((participant) => participant.participantId));
+  return selectedParticipantIds.filter((participantId) => availableParticipantIds.has(participantId));
 }
 
 export function expenseSaveFailureMessage(): string {
@@ -251,13 +319,36 @@ function noPlaceOption(selectedItemId: string | null): ExpenseEditPlaceOption {
   };
 }
 
-function placeOption(item: PlaceBackedScheduleItem, selectedItemId: string | null): ExpenseEditPlaceOption {
+function placeOptionFromItem(item: QuickExpenseItemOption): ExpenseEditPlaceOption {
+  return {
+    itemId: item.itemId,
+    label: item.placeName,
+    detail: `${item.dayLabel} · ${item.placeTypeLabel} · ${item.address}`,
+    selected: item.selected,
+  };
+}
+
+function expenseEditItemOption(
+  item: PlaceBackedScheduleItem,
+  itinerary: GetDayScheduleItemsResponse,
+  selectedItemId: string | null,
+): QuickExpenseItemOption {
   return {
     itemId: item.id,
-    label: item.place.name,
-    detail: `${getPlaceTypeLabel(item.place.placeType)} · ${item.place.address}`,
+    tripDayId: itinerary.day.id,
+    dayLabel: formatTripDayLabel(itinerary.day.dayOrder),
+    formattedDate: formatTripDayDate(itinerary.day.date),
+    orderLabel: String(item.itemOrder),
+    placeName: item.place.name,
+    placeTypeLabel: getPlaceTypeLabel(item.place.placeType),
+    address: item.place.address,
+    timeLabel: formatScheduleItemTimeLabel(item.startTime, item.endTime) ?? null,
     selected: item.id === selectedItemId,
   };
+}
+
+function orderedItineraries(itineraries: GetDayScheduleItemsResponse[]): GetDayScheduleItemsResponse[] {
+  return [...itineraries].sort((left, right) => left.day.dayOrder - right.day.dayOrder);
 }
 
 function orderedItems(items: ScheduleItem[]): PlaceBackedScheduleItem[] {

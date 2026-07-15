@@ -13,7 +13,7 @@ import {
   updateExpense,
   updateTripExpense,
 } from '../trips/expense-api';
-import { getTripDayItinerary } from '../trips/itinerary-api';
+import { listTripScheduleItems } from '../trips/itinerary-api';
 import { listTripParticipants } from '../trips/trip-api';
 import {
   buildExpenseEditInitialAmountInput,
@@ -26,8 +26,16 @@ import {
   type ExpenseEditFormErrors,
   type ExpenseEditViewModel,
 } from '../trips/expense-edit';
-import { type QuickExpenseManualSplitInput, type QuickExpenseSplitPolicy } from '../trips/quick-expense';
+import {
+  resolveQuickExpenseItemDayId,
+  toggleQuickExpenseSplitParticipant,
+  type QuickExpenseManualSplitInput,
+  type QuickExpenseSplitPolicy,
+} from '../trips/quick-expense';
 import { tripItineraryDayPath, tripSettlePath } from '../trips/routes';
+import { resolveTripShellDetail } from '../trips/trip-shell-detail';
+import { useTripShellState } from '../trips/trip-shell-context';
+import { buildTripItinerariesFromTripScheduleItems } from '../trips/trip-map';
 
 export type ExpenseEditState =
   | { status: 'loading' }
@@ -35,6 +43,7 @@ export type ExpenseEditState =
       status: 'success';
       expense: Expense;
       itinerary: GetDayScheduleItemsResponse | null;
+      itineraries: GetDayScheduleItemsResponse[];
       participants: TripParticipantListItem[];
     }
   | { status: 'auth' }
@@ -55,6 +64,7 @@ export function useExpenseEditController() {
   const tripId = Array.isArray(tripIdParam) ? tripIdParam[0] : tripIdParam;
   const date = Array.isArray(dateParam) ? dateParam[0] : dateParam;
   const expenseId = Array.isArray(expenseIdParam) ? expenseIdParam[0] : expenseIdParam;
+  const shellState = useTripShellState();
 
   const [state, setState] = useState<ExpenseEditState>({ status: 'loading' });
   const [titleInput, setTitleInput] = useState('');
@@ -62,6 +72,8 @@ export function useExpenseEditController() {
   const [memoInput, setMemoInput] = useState('');
   const [payerParticipantId, setPayerParticipantId] = useState<string | null>(null);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [selectedTripDayId, setSelectedTripDayId] = useState<string | null>(null);
+  const [selectedSplitParticipantIds, setSelectedSplitParticipantIds] = useState<string[]>([]);
   const [splitPolicy, setSplitPolicy] = useState<QuickExpenseSplitPolicy>('equal');
   const [manualSplitInputs, setManualSplitInputs] = useState<QuickExpenseManualSplitInput[]>([]);
   const [includeInSettlement, setIncludeInSettlement] = useState(true);
@@ -90,17 +102,29 @@ export function useExpenseEditController() {
     setDeleting(false);
     setErrors({});
     setFormMessage(null);
+
+    const shellDetail = resolveTripShellDetail(shellState, tripId);
+    if (shellDetail.status === 'pending') {
+      return;
+    }
+    if (shellDetail.status !== 'success') {
+      setState(expenseEditShellFailureState(shellDetail.status));
+      return;
+    }
+
     try {
-      const [expenseResponse, itinerary, participantsResponse] = date
-        ? await Promise.all([
-            getDayExpense(tripId, date, expenseId),
-            getTripDayItinerary(tripId, date),
-            listTripParticipants(tripId),
-          ])
-        : await Promise.all([getTripExpense(tripId, expenseId), Promise.resolve(null), listTripParticipants(tripId)]);
+      const [expenseResponse, scheduleResponse, participantsResponse] = await Promise.all([
+        date ? getDayExpense(tripId, date, expenseId) : getTripExpense(tripId, expenseId),
+        listTripScheduleItems(tripId),
+        listTripParticipants(tripId),
+      ]);
       const expense = expenseResponse.expense;
+      const itineraries = buildTripItinerariesFromTripScheduleItems(shellDetail.detail.days, scheduleResponse);
+      const itinerary = date ? (itineraries.find((candidate) => candidate.day.id === date) ?? null) : null;
       const participantIDs = new Set(participantsResponse.participants.map((participant) => participant.participantId));
-      const itemIDs = new Set(itinerary?.scheduleItems.map((item) => item.id) ?? []);
+      const itemIDs = new Set(itineraries.flatMap((candidate) => candidate.scheduleItems.map((item) => item.id)));
+      const selectedItemId =
+        expense.scheduleItemId && itemIDs.has(expense.scheduleItemId) ? expense.scheduleItemId : null;
       setTitleInput(expense.title ?? (expense.anchorType === 'trip' ? expense.displayTitle : ''));
       setAmountInput(buildExpenseEditInitialAmountInput(expense));
       setMemoInput(expense.memo ?? '');
@@ -109,13 +133,17 @@ export function useExpenseEditController() {
           ? expense.payer.participantId
           : null,
       );
-      setSelectedItemId(expense.scheduleItemId && itemIDs.has(expense.scheduleItemId) ? expense.scheduleItemId : null);
+      setSelectedItemId(selectedItemId);
+      setSelectedTripDayId(resolveQuickExpenseItemDayId(itineraries, selectedItemId) ?? expense.tripDayId ?? null);
+      setSelectedSplitParticipantIds(
+        buildExpenseEditSelectedSplitParticipantIds(expense, participantsResponse.participants),
+      );
       setSplitPolicy(expense.splitPolicy === 'manual' ? 'manual' : 'equal');
       setIncludeInSettlement(expense.includeInSettlement);
       setManualSplitInputs(
         buildExpenseEditInitialManualSplitInputs(expense, expense.currency, participantsResponse.participants),
       );
-      setState({ status: 'success', expense, itinerary, participants: participantsResponse.participants });
+      setState({ status: 'success', expense, itinerary, itineraries, participants: participantsResponse.participants });
     } catch (error) {
       if (await handleAuthError(error)) {
         return;
@@ -126,7 +154,7 @@ export function useExpenseEditController() {
       }
       setState({ status: 'error', message: '지출 정보를 불러올 수 없어요. 잠시 후 다시 시도해주세요.' });
     }
-  }, [date, expenseId, handleAuthError, tripId]);
+  }, [date, expenseId, handleAuthError, shellState, tripId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -144,15 +172,18 @@ export function useExpenseEditController() {
     }
     const tripDayId = date ?? '';
 
+    const activeManualSplitInputs = manualSplitInputs.filter((input) =>
+      selectedSplitParticipantIds.includes(input.participantId),
+    );
     const validation = buildUpdateExpenseRequest({
       amountInput,
       currency: state.expense.currency,
       splitPolicy,
       payerParticipantId,
       memoInput,
-      participantIds: buildExpenseEditParticipantIds(state.participants),
-      manualSplitInputs,
-      scheduleItemId: isTripLevel ? null : selectedItemId,
+      participantIds: buildExpenseEditParticipantIds(state.participants, selectedSplitParticipantIds),
+      manualSplitInputs: activeManualSplitInputs,
+      scheduleItemId: selectedItemId,
       titleInput,
       includeInSettlement,
     });
@@ -170,8 +201,10 @@ export function useExpenseEditController() {
         await updateTripExpense(tripId, expenseId, validation.request);
         router.replace(tripSettlePath(tripId));
       } else {
-        await updateExpense(tripId, tripDayId, expenseId, validation.request);
-        router.replace(tripItineraryDayPath(tripId, tripDayId));
+        const targetTripDayId =
+          resolveQuickExpenseItemDayId(state.itineraries, selectedItemId) ?? selectedTripDayId ?? tripDayId;
+        await updateExpense(tripId, targetTripDayId, expenseId, validation.request);
+        router.replace(tripItineraryDayPath(tripId, targetTripDayId));
       }
     } catch (error) {
       if (await handleAuthError(error)) {
@@ -193,6 +226,8 @@ export function useExpenseEditController() {
     payerParticipantId,
     saving,
     selectedItemId,
+    selectedSplitParticipantIds,
+    selectedTripDayId,
     splitPolicy,
     state,
     titleInput,
@@ -229,6 +264,38 @@ export function useExpenseEditController() {
     }
   }, [date, deleting, expenseId, handleAuthError, saving, state, tripId]);
 
+  const selectTripDay = useCallback((tripDayId: string) => {
+    setSelectedTripDayId(tripDayId);
+    setSelectedItemId(null);
+    setErrors((current) => ({ ...current, item: undefined }));
+    setFormMessage(null);
+  }, []);
+
+  const clearTripDay = useCallback(() => {
+    setSelectedTripDayId(null);
+    setSelectedItemId(null);
+    setErrors((current) => ({ ...current, item: undefined }));
+    setFormMessage(null);
+  }, []);
+
+  const selectItem = useCallback(
+    (itemId: string | null) => {
+      setSelectedItemId(itemId);
+      if (state.status === 'success') {
+        setSelectedTripDayId(resolveQuickExpenseItemDayId(state.itineraries, itemId) ?? selectedTripDayId);
+      }
+      setErrors((current) => ({ ...current, item: undefined }));
+      setFormMessage(null);
+    },
+    [selectedTripDayId, state],
+  );
+
+  const toggleSplitParticipant = useCallback((participantId: string) => {
+    setSelectedSplitParticipantIds((current) => toggleQuickExpenseSplitParticipant(current, participantId));
+    setErrors((current) => ({ ...current, participants: undefined }));
+    setFormMessage(null);
+  }, []);
+
   const updateManualSplitInput = useCallback((participantId: string, amount: string) => {
     setManualSplitInputs((current) => {
       const existing = current.find((split) => split.participantId === participantId);
@@ -260,10 +327,13 @@ export function useExpenseEditController() {
       amountInput,
       expense: state.expense,
       itinerary: state.itinerary,
+      itineraries: state.itineraries,
       memoInput,
       participants: state.participants,
       selectedItemId,
       selectedPayerParticipantId: payerParticipantId,
+      selectedSplitParticipantIds,
+      selectedTripDayId,
     });
   }
 
@@ -279,18 +349,46 @@ export function useExpenseEditController() {
     manualSplitInputs,
     memoInput,
     saving,
+    clearTripDay,
+    selectItem,
+    selectTripDay,
+    selectedSplitParticipantIds,
+    selectedTripDayId,
     setAmountInput,
     setIncludeInSettlement,
     setMemoInput,
     setPayerParticipantId,
-    setSelectedItemId,
     setSplitPolicy,
     setTitleInput,
     splitPolicy,
     state,
     submitSave,
     titleInput,
+    toggleSplitParticipant,
     updateManualSplitInput,
     viewModel,
   };
+}
+
+function expenseEditShellFailureState(status: 'auth' | 'notFound' | 'error'): ExpenseEditState {
+  if (status === 'auth') {
+    return { status: 'auth' };
+  }
+  if (status === 'notFound') {
+    return { status: 'notFound', message: '여행이나 지출을 더 이상 사용할 수 없어요. 다시 불러와주세요.' };
+  }
+  return { status: 'error', message: '지출 정보를 불러올 수 없어요. 잠시 후 다시 시도해주세요.' };
+}
+
+function buildExpenseEditSelectedSplitParticipantIds(
+  expense: Expense,
+  participants: TripParticipantListItem[],
+): string[] {
+  const availableParticipantIds = new Set(participants.map((participant) => participant.participantId));
+  const splitParticipantIds = expense.splits
+    .map((split) => split.participant.participantId)
+    .filter(
+      (participantId): participantId is string => participantId !== null && availableParticipantIds.has(participantId),
+    );
+  return splitParticipantIds.length > 0 ? splitParticipantIds : buildExpenseEditParticipantIds(participants);
 }

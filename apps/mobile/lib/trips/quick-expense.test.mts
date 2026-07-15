@@ -34,6 +34,7 @@ import {
   resolveQuickExpenseReturnPath,
   resolveQuickExpenseSheetInitialSplitMode,
   selectQuickExpenseSheetSplitMode,
+  settlementStatusSummaryDetail,
   settlementStatusSummaryLabel,
   toggleQuickExpenseSplitParticipant,
 } from './quick-expense.ts';
@@ -219,9 +220,14 @@ test('builds compact payment split summary labels', () => {
   );
 });
 
-test('builds settlement status summary labels', () => {
+test('builds settlement status summary labels and details', () => {
   assert.equal(settlementStatusSummaryLabel(true), '최종 정산에 포함');
   assert.equal(settlementStatusSummaryLabel(false), '현장 정산 완료');
+  assert.equal(settlementStatusSummaryDetail(true), '나중에 여행 정산에서 함께 계산할 지출이에요.');
+  assert.equal(
+    settlementStatusSummaryDetail(false),
+    '이미 돈을 주고받은 지출이에요. 내역과 총 사용 금액에는 남고 최종 정산에서는 제외돼요.',
+  );
 });
 
 test('builds settlement day tabs and filters schedule options to the selected day', () => {
