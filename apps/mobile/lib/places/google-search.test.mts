@@ -17,6 +17,7 @@ import {
   buildGooglePlaceSearchBiasFromRegion,
   buildGooglePlaceSearchBiasFromSource,
   buildGooglePlaceSearchInputState,
+  buildGooglePlaceSearchFirstEntryLayoutState,
   buildGooglePlaceSearchRegionFromDestination,
   buildGooglePlaceSearchResultActionView,
   buildGooglePlaceSearchMarkerPinStyle,
@@ -24,10 +25,12 @@ import {
   buildGooglePlaceSearchMarkerViewModels,
   buildGooglePlaceSearchResultsRegion,
   buildGooglePlaceSearchRoute,
+  buildGooglePlaceSearchSheetBookmarkListState,
   buildGooglePlaceSearchSheetIndex,
   buildGooglePlaceSearchSheetMetrics,
   buildGooglePlaceSearchSheetSnapPoints,
   buildGooglePlaceSearchSheetStateFromIndex,
+  buildGooglePlaceSearchSheetTabs,
   buildGooglePlaceCurrentLocationBiasSource,
   buildGooglePlaceSearchResultDistanceLabel,
   buildGooglePlaceSearchResultsSectionTitle,
@@ -47,7 +50,9 @@ import {
   googlePlaceSearchLoadingState,
   resolveGooglePlaceSearchSelectionAfterResultsClose,
   resolveGooglePlaceSearchSheetContentState,
+  resolveGooglePlaceSearchMarkerSelection,
   resolveGooglePlaceSearchSheetState,
+  resolveGooglePlaceSearchSheetTab,
   resolveGooglePlaceSearchSheetTopInset,
   shouldNavigateBackFromGooglePlaceDetailGesture,
   shouldRenderGooglePlaceBookmarkDetail,
@@ -71,6 +76,72 @@ describe('google place search helpers', () => {
 
   it('uses ten results as the default map-search limit', () => {
     assert.equal(googlePlaceSearchDefaultLimit, 10);
+  });
+
+  it('keeps the top search bar visible on first entry while minimized sheet content stays collapsed', () => {
+    assert.deepEqual(buildGooglePlaceSearchFirstEntryLayoutState('minimized'), {
+      searchBarVisible: true,
+      sheetContentVisible: false,
+      sheetHandleVisible: true,
+    });
+    assert.deepEqual(buildGooglePlaceSearchFirstEntryLayoutState('expanded'), {
+      searchBarVisible: true,
+      sheetContentVisible: true,
+      sheetHandleVisible: true,
+    });
+  });
+
+  it('builds search-result and bookmark tabs with bookmark selection switching the active tab', () => {
+    assert.deepEqual(buildGooglePlaceSearchSheetTabs('searchResults'), [
+      {
+        id: 'searchResults',
+        label: '검색 결과',
+        accessibilityLabel: '검색 결과 탭 선택됨',
+        selected: true,
+      },
+      {
+        id: 'bookmarks',
+        label: '찜한 장소',
+        accessibilityLabel: '찜한 장소 탭 선택',
+        selected: false,
+      },
+    ]);
+    assert.equal(resolveGooglePlaceSearchSheetTab('searchResults', 'search'), 'searchResults');
+    assert.equal(resolveGooglePlaceSearchSheetTab('searchResults', 'bookmark'), 'bookmarks');
+    assert.equal(resolveGooglePlaceSearchSheetTab('bookmarks', null), 'bookmarks');
+  });
+
+  it('builds bookmark-list sheet state and resolves marker selection source', () => {
+    const searchResult = { id: 'google-1', placeName: '우메다 카페', address: 'Umeda', typeHint: '카페' };
+    const bookmarkResult = {
+      id: 'google-2',
+      bookmarkId: 'bookmark-2',
+      placeName: '오사카성',
+      address: 'Osaka Castle',
+      typeHint: '관광지',
+    };
+
+    assert.deepEqual(buildGooglePlaceSearchSheetBookmarkListState([]), {
+      status: 'empty',
+      title: '찜한 장소가 없어요.',
+      helper: '여행 중 가보고 싶은 장소를 찜하면 여기에서 바로 볼 수 있어요.',
+      results: [],
+    });
+    assert.deepEqual(buildGooglePlaceSearchSheetBookmarkListState([bookmarkResult]), {
+      status: 'results',
+      title: '찜한 장소',
+      helper: null,
+      results: [bookmarkResult],
+    });
+    assert.deepEqual(resolveGooglePlaceSearchMarkerSelection('google-1', [searchResult], [bookmarkResult]), {
+      result: searchResult,
+      source: 'search',
+    });
+    assert.deepEqual(resolveGooglePlaceSearchMarkerSelection('google-2', [searchResult], [bookmarkResult]), {
+      result: bookmarkResult,
+      source: 'bookmark',
+    });
+    assert.equal(resolveGooglePlaceSearchMarkerSelection('missing', [searchResult], [bookmarkResult]), null);
   });
 
   it('normalizes and validates query length without calling API for short input', () => {

@@ -22,6 +22,7 @@ export default function TripMapTabScreen() {
   if (state.status === 'success') {
     return (
       <MapContent
+        allBookmarkResults={state.allBookmarkResults}
         bookmarkActionState={bookmarkActionState}
         bookmarkLayerVisible={state.bookmarkLayerVisible}
         bookmarkResults={state.bookmarkResults}
