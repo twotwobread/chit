@@ -15,6 +15,7 @@ import {
 import { tripPlaceBookmarkToGoogleSearchRow } from '../../../../../lib/places/bookmarks';
 import {
   addingGooglePlaceState,
+  buildCreateGooglePlaceScheduleItemRequestFromSearchResult,
   confirmingDuplicateGooglePlaceState,
   errorGooglePlaceAddState,
   idleGooglePlaceAddState,
@@ -151,7 +152,11 @@ export default function GooglePlaceSearchScreen() {
       if (isLodgingMode) {
         await createGoogleDayLodgingPlace(tripId, date, buildGoogleDayLodgingPlaceRequest(result.id));
       } else {
-        await createGooglePlaceScheduleItem(tripId, date, result.id, duplicateConfirmed, result.placeName);
+        await createGooglePlaceScheduleItem(
+          tripId,
+          date,
+          buildCreateGooglePlaceScheduleItemRequestFromSearchResult(result, duplicateConfirmed),
+        );
       }
       returnToDay();
     } catch (error) {

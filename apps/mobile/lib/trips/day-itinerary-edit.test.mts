@@ -30,8 +30,6 @@ const item: DayItineraryRowViewModel = {
 describe('day itinerary edit/delete helpers', () => {
   it('initializes an edit form from an itinerary row', () => {
     assert.deepEqual(buildDayItineraryEditForm(item), {
-      name: '우메다 공중정원',
-      address: 'Umeda',
       placeType: 'sights',
       startTime: '09:30',
       endTime: '11:00',
@@ -39,20 +37,18 @@ describe('day itinerary edit/delete helpers', () => {
     });
   });
 
-  it('builds a partial generated PATCH request from changed fields only', () => {
+  it('builds a partial generated PATCH request from editable fields only', () => {
     const original = buildDayItineraryEditForm(item);
 
     assert.deepEqual(
       validateDayItineraryEditForm(original, {
         ...original,
-        name: ' 우메다 스카이빌딩 ',
         placeType: 'food',
         memo: ' 노을 보기 ',
       }),
       {
         ok: true,
         request: {
-          name: '우메다 스카이빌딩',
           placeType: 'food',
           memo: '노을 보기',
         },
@@ -105,11 +101,12 @@ describe('day itinerary edit/delete helpers', () => {
     });
   });
 
-  it('detects normalized edit changes for close confirmation', () => {
+  it('detects editable changes for close confirmation', () => {
     const original = buildDayItineraryEditForm(item);
 
-    assert.equal(hasDayItineraryEditFormChanges(original, { ...original, name: ' 우메다 공중정원 ' }), false);
+    assert.equal(hasDayItineraryEditFormChanges(original, { ...original }), false);
     assert.equal(hasDayItineraryEditFormChanges(original, { ...original, memo: '새 메모' }), true);
+    assert.equal(hasDayItineraryEditFormChanges(original, { ...original, placeType: 'food' }), true);
   });
 
   it('validates editable fields before submit', () => {
@@ -118,8 +115,6 @@ describe('day itinerary edit/delete helpers', () => {
     assert.deepEqual(
       validateDayItineraryEditForm(original, {
         ...original,
-        name: ' ',
-        address: '나'.repeat(301),
         placeType: 'museum',
         startTime: '9:00',
         endTime: '8:00',
@@ -128,8 +123,6 @@ describe('day itinerary edit/delete helpers', () => {
       {
         ok: false,
         errors: {
-          name: '장소명을 입력해주세요.',
-          address: '주소는 300자 이하로 입력해주세요.',
           placeType: '장소 타입을 선택해주세요.',
           startTime: '시작 시간은 HH:mm 형식으로 입력해주세요.',
           endTime: '종료 시간은 HH:mm 형식으로 입력해주세요.',
