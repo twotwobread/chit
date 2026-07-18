@@ -41,6 +41,12 @@ Use when changing Expo screens, mobile UI state, styling, copy, or navigation.
 - Move formatting, sorting, grouping, URL building, and API-response-to-view-state logic to `apps/mobile/lib/**` helpers.
 - Use generated API types/client when available.
 
+## Platform parity
+
+- Treat Android and iOS as simultaneous development targets for mobile work. Do not design, implement, or verify a mobile change for only one platform unless the task is explicitly platform-specific.
+- Keep route, UI, and helper behavior platform-neutral by default; when platform branching is necessary, document both Android and iOS behavior and verification status.
+- Completion reports for mobile work must record Android and iOS smoke/verification status, or an explicit gap when device/simulator checks were not run.
+
 ## Verification
 
 ```bash
