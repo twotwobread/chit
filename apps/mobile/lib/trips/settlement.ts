@@ -20,14 +20,20 @@ import { buildQuickExpenseRoute, formatMoney } from './quick-expense';
 
 export type AuthoritativeTripSettlement = GetTripSettlementResponse;
 
-export function buildSettlementExpenseEntryRoute(tripId: string, tripDayId: string): Href {
-  return buildQuickExpenseRoute(tripId, tripDayId, null, 'settle');
+export function buildSettlementExpenseEntryRoute(tripId: string, tripDayId: string, returnDayId?: string | null): Href {
+  return buildQuickExpenseRoute(tripId, tripDayId, null, 'settle', returnDayId);
 }
 
-export function buildSettlementExpenseEntryRouteForDays(tripId: string, days: TripDay[], today: string): Href | null {
+export function buildSettlementExpenseEntryRouteForDays(
+  tripId: string,
+  days: TripDay[],
+  today: string,
+  selectedDayId?: string | null,
+): Href | null {
   const orderedDays = [...days].sort((left, right) => left.dayOrder - right.dayOrder);
-  const entryDay = orderedDays.find((day) => day.date === today) ?? orderedDays[0] ?? null;
-  return entryDay ? buildSettlementExpenseEntryRoute(tripId, entryDay.id) : null;
+  const selectedDay = selectedDayId ? (orderedDays.find((day) => day.id === selectedDayId) ?? null) : null;
+  const entryDay = selectedDay ?? orderedDays.find((day) => day.date === today) ?? orderedDays[0] ?? null;
+  return entryDay ? buildSettlementExpenseEntryRoute(tripId, entryDay.id, selectedDay?.id ?? null) : null;
 }
 
 const tripExpenseSectionId = '__trip_expenses__';

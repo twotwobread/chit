@@ -1,9 +1,10 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Share, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import type { Href } from 'expo-router';
 import KakaoShareLink from 'react-native-kakao-share-link';
+
+import type { TripDay } from '@i-um/api-contract';
 
 import { SecondaryButton, theme } from '../../../../lib/design';
 import { DayChips } from '../../../../lib/trip-ui/DayChips';
@@ -45,7 +46,7 @@ type TripSettleState =
   | { status: 'loading' }
   | {
       status: 'settlement';
-      expenseEntryRoute: Href | null;
+      expenseEntryDays: TripDay[];
       expenseHistory: SettlementExpenseHistoryState;
       tripName: string;
       viewModel: SettlementTransferViewModel;
@@ -55,12 +56,23 @@ type TripSettleState =
   | { status: 'error'; error: Extract<SettlementTransferFailureViewModel, { status: 'error' }> };
 
 export default function TripSettleTabScreen() {
-  const { tripId: tripIdParam } = useLocalSearchParams<{ tripId?: string | string[] }>();
+  const { tripId: tripIdParam, expenseDayId: expenseDayIdParam } = useLocalSearchParams<{
+    tripId?: string | string[];
+    expenseDayId?: string | string[];
+  }>();
   const tripId = Array.isArray(tripIdParam) ? tripIdParam[0] : tripIdParam;
+  const routeExpenseDayId = Array.isArray(expenseDayIdParam) ? expenseDayIdParam[0] : expenseDayIdParam;
   const shellState = useTripShellState();
   const [selectedExpenseDayId, setSelectedExpenseDayId] = useState<string | null>(null);
   const [state, setState] = useState<TripSettleState>({ status: 'loading' });
   const insets = useSafeAreaInsets();
+
+  useEffect(() => {
+    const normalizedExpenseDayId = routeExpenseDayId?.trim() ?? '';
+    if (normalizedExpenseDayId) {
+      setSelectedExpenseDayId(normalizedExpenseDayId);
+    }
+  }, [routeExpenseDayId]);
 
   const load = useCallback(async () => {
     if (!tripId) {
@@ -82,7 +94,6 @@ export default function TripSettleTabScreen() {
     try {
       const detail = shellDetail.detail;
       const settlement = await getTripSettlement(tripId);
-      const expenseEntryRoute = buildSettlementExpenseEntryRouteForDays(tripId, detail.days, localDateString());
       let expenseHistory: SettlementExpenseHistoryState;
 
       try {
@@ -97,7 +108,7 @@ export default function TripSettleTabScreen() {
 
       setState({
         status: 'settlement',
-        expenseEntryRoute,
+        expenseEntryDays: detail.days,
         expenseHistory,
         tripName: detail.trip.name.trim() || '여행',
         viewModel: buildSettlementTransferViewModel({ settlement }),
@@ -119,7 +130,10 @@ export default function TripSettleTabScreen() {
     }, [load]),
   );
 
-  const expenseEntryRoute = state.status === 'settlement' ? state.expenseEntryRoute : null;
+  const expenseEntryRoute =
+    state.status === 'settlement' && tripId
+      ? buildSettlementExpenseEntryRouteForDays(tripId, state.expenseEntryDays, localDateString(), selectedExpenseDayId)
+      : null;
   const expenseFabLayout = buildTripRootFabLayout({ bottomInset: insets.bottom, rightInset: insets.right });
   const showExpenseFab = shouldShowTripRootFab({
     hasAction: Boolean(expenseEntryRoute),
