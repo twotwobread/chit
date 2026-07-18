@@ -7,6 +7,7 @@ import type {
 } from '@i-um/api-contract';
 
 import { theme } from '../design/theme';
+import { buildExternalMapUrl, externalMapViewLabel, type MapProvider } from '../trips/map-provider';
 
 export const googlePlaceSearchMinLength = 2;
 export const googlePlaceSearchDefaultLimit = 10;
@@ -121,6 +122,7 @@ export type GooglePlaceTripDestination = {
   latitude: number;
   longitude: number;
   radiusMeters: number;
+  countryCode?: string | null;
 };
 
 export type GooglePlaceDestinationChipViewModel = {
@@ -542,12 +544,16 @@ export function successGooglePlaceSearchState(results: GooglePlaceSearchResult[]
 export function buildGooglePlaceExplorationDetail(
   result: GooglePlaceSearchRowViewModel,
   details?: GooglePlaceDetailsResponse,
+  mapProvider: MapProvider = 'googleMaps',
 ): GooglePlaceExplorationDetailViewModel {
   return {
     ...result,
     description: details?.description?.trim() || undefined,
-    mapSearchLabel: '구글 지도에서 보기',
-    mapUrl: result.googleMapsUri || buildGoogleMapsSearchUrl(result.placeName, result.address),
+    mapSearchLabel: externalMapViewLabel,
+    mapUrl: buildExternalMapUrl(
+      { placeName: result.placeName, address: result.address, googleMapsUri: result.googleMapsUri },
+      mapProvider,
+    ),
   };
 }
 
@@ -973,15 +979,20 @@ export function buildGooglePlaceDetailsLoadingState(googlePlaceId: string): Goog
 export function buildGooglePlaceDetailsSuccessState(
   result: GooglePlaceSearchRowViewModel,
   details?: GooglePlaceDetailsResponse,
+  mapProvider: MapProvider = 'googleMaps',
 ): GooglePlaceDetailsViewState {
-  return { status: 'success', googlePlaceId: result.id, detail: buildGooglePlaceExplorationDetail(result, details) };
+  return {
+    status: 'success',
+    googlePlaceId: result.id,
+    detail: buildGooglePlaceExplorationDetail(result, details, mapProvider),
+  };
 }
 
 export function buildGooglePlaceDetailsErrorState(googlePlaceId: string): GooglePlaceDetailsViewState {
   return {
     status: 'error',
     googlePlaceId,
-    message: '장소 설명을 불러오지 못했어요. 구글 지도에서 자세한 정보를 확인해 주세요.',
+    message: '장소 설명을 불러오지 못했어요. 지도에서 자세한 정보를 확인해 주세요.',
   };
 }
 
@@ -1074,14 +1085,6 @@ function buildGooglePlacePhotoViewModel(result: GooglePlaceSearchResult): Google
     heightPx: result.photo.heightPx,
     attributionLabel: result.photo.authorAttributions.map((attribution) => attribution.displayName).join(', '),
   };
-}
-
-function buildGoogleMapsSearchUrl(placeName: string, address: string): string {
-  const query = [placeName, address]
-    .map((value) => value.trim())
-    .filter(Boolean)
-    .join(' ');
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
 }
 
 function toRadians(value: number): number {

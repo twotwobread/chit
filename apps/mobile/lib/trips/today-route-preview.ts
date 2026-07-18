@@ -1,5 +1,6 @@
 import type { CreateRoutePreviewRequest, RoutePreviewResponse, RoutablePlace } from '@i-um/api-contract';
 
+import { externalMapDetailLabel } from './map-provider';
 import { travelModeDisplayLabel, travelModes, type TravelMode } from './travel-mode';
 
 export type TodayRoutePreviewOrigin = {
@@ -27,7 +28,7 @@ export type TodayRoutePreviewViewModel = {
   modeLabel: string;
   summaryText: string;
   map: TodayRoutePreviewMapViewModel | null;
-  detailActionLabel: '구글 지도에서 자세히';
+  detailActionLabel: typeof externalMapDetailLabel;
 };
 
 export type TodayRoutePreviewModeSummaryRow =
@@ -94,7 +95,7 @@ export const todayRoutePreviewUnsupportedState = (): Extract<
 > => ({
   status: 'unsupported',
   title: '정확한 지도 장소가 필요해요.',
-  helper: 'Google 장소로 추가된 일정에서 경로 미리보기를 볼 수 있어요.',
+  helper: '정확한 지도 장소로 추가된 일정에서 경로 미리보기를 볼 수 있어요.',
 });
 
 export const todayRoutePreviewUnavailableState = (
@@ -102,7 +103,7 @@ export const todayRoutePreviewUnavailableState = (
 ): Extract<TodayRoutePreviewNonSuccessState, { status: 'unavailable' }> => ({
   status: 'unavailable',
   title,
-  helper: '잠시 후 다시 시도하거나 구글 지도에서 자세히 확인해주세요.',
+  helper: '잠시 후 다시 시도하거나 지도에서 자세히 확인해주세요.',
   retryLabel: '다시 시도',
 });
 
@@ -125,7 +126,7 @@ export function buildTodayRoutePreviewViewModel(response: RoutePreviewResponse):
     modeLabel: routeModeLabel(response.mode),
     summaryText: response.summary.summaryText || '환승 정보 없음',
     map: response.map ? buildMapViewModel(response.map) : null,
-    detailActionLabel: '구글 지도에서 자세히',
+    detailActionLabel: externalMapDetailLabel,
   };
 }
 
