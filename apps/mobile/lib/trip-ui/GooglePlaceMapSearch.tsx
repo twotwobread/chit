@@ -111,6 +111,7 @@ import {
   type GooglePlaceSearchViewState,
   type SearchBiasSource,
 } from '../places/google-search';
+import { resolveMapProvider, type MapProvider } from '../trips/map-provider';
 import { RouteMapOverlay, type RouteMapPlace, type RouteMapPolyline } from './RouteMap';
 
 type GooglePlaceSearchBottomSheetHandle = {
@@ -327,6 +328,7 @@ export function GooglePlaceMapSearch({
 }: GooglePlaceMapSearchProps) {
   const insets = useSafeAreaInsets();
   const window = useWindowDimensions();
+  const mapProvider = useMemo(() => resolveMapProvider(tripDestinations), [tripDestinations]);
   const defaultDestinationId = useMemo(
     () => buildDefaultGooglePlaceDestinationSelection(tripDestinations),
     [tripDestinations],
@@ -557,7 +559,7 @@ export function GooglePlaceMapSearch({
       try {
         const response = await getGooglePlaceDetails(tripId, dayId, selectedResult.id);
         if (!cancelled) {
-          setDetailsState(buildGooglePlaceDetailsSuccessState(selectedResult, response));
+          setDetailsState(buildGooglePlaceDetailsSuccessState(selectedResult, response, mapProvider));
         }
       } catch (error) {
         if (
@@ -581,7 +583,7 @@ export function GooglePlaceMapSearch({
     return () => {
       cancelled = true;
     };
-  }, [dayId, selectedResult, tripId]);
+  }, [dayId, mapProvider, selectedResult, tripId]);
 
   const buildMapRegionBiasSource = (): SearchBiasSource | null => {
     const regionBias = buildGooglePlaceSearchBiasFromRegion(mapRegion);
@@ -872,11 +874,11 @@ export function GooglePlaceMapSearch({
     }
   };
 
-  const openGoogleMaps = async (url: string) => {
+  const openExternalMap = async (url: string) => {
     try {
       await Linking.openURL(url);
     } catch {
-      setMapActionMessage('구글 지도를 열지 못했어요. 잠시 후 다시 시도해 주세요.');
+      setMapActionMessage('지도를 열지 못했어요. 잠시 후 다시 시도해 주세요.');
     }
   };
 
@@ -1199,6 +1201,7 @@ export function GooglePlaceMapSearch({
                         isSelected={highlightedResultId === item.id && selectedResultSource === 'search'}
                         key={item.id}
                         mapActionMessage={selectedResult?.id === item.id ? mapActionMessage : null}
+                        mapProvider={mapProvider}
                         onCancelDuplicate={resetActionState}
                         onConfirmDuplicate={() => onPrimaryAction?.(item, true)}
                         onDeleteBookmark={undefined}
@@ -1210,7 +1213,7 @@ export function GooglePlaceMapSearch({
                             focusResultInList(item.id, 'searchResults');
                           }
                         }}
-                        onOpenMaps={(url) => void openGoogleMaps(url)}
+                        onOpenMaps={(url) => void openExternalMap(url)}
                         onPress={() => selectResult(item, 'list', 'search')}
                         onPrimaryAction={() => handleResultPrimaryAction(item)}
                         result={item}
@@ -1242,6 +1245,7 @@ export function GooglePlaceMapSearch({
                         isSelected={highlightedResultId === item.id && selectedResultSource === 'bookmark'}
                         key={`bookmark-list-${item.id}`}
                         mapActionMessage={selectedResult?.id === item.id ? mapActionMessage : null}
+                        mapProvider={mapProvider}
                         onCancelDuplicate={resetActionState}
                         onConfirmDuplicate={() => onPrimaryAction?.(item, true)}
                         onDeleteBookmark={
@@ -1255,7 +1259,7 @@ export function GooglePlaceMapSearch({
                             focusResultInList(item.id, 'bookmarks');
                           }
                         }}
-                        onOpenMaps={(url) => void openGoogleMaps(url)}
+                        onOpenMaps={(url) => void openExternalMap(url)}
                         onPress={() => selectResult(item, 'list', 'bookmark')}
                         onPrimaryAction={() => handleResultPrimaryAction(item)}
                         result={item}
@@ -1285,6 +1289,7 @@ function PlaceResultCard({
   isExpanded,
   isSelected,
   mapActionMessage,
+  mapProvider,
   onCancelDuplicate,
   onConfirmDuplicate,
   onDeleteBookmark,
@@ -1307,6 +1312,7 @@ function PlaceResultCard({
   isSelected: boolean;
   imageFailed: boolean;
   mapActionMessage: string | null;
+  mapProvider: MapProvider;
   onCancelDuplicate: () => void;
   onConfirmDuplicate: () => void;
   onDeleteBookmark?: () => void;
@@ -1319,7 +1325,7 @@ function PlaceResultCard({
   const detail =
     detailsState.status === 'success' && detailsState.googlePlaceId === result.id
       ? detailsState.detail
-      : buildGooglePlaceExplorationDetail(result);
+      : buildGooglePlaceExplorationDetail(result, undefined, mapProvider);
   const extraLabels = [
     basisDistanceLabel,
     ...(result.metadataLabels ?? []).filter((label) => label !== result.typeHint),

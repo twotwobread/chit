@@ -9,12 +9,17 @@ import {
   type DayItineraryMapActionFeedback,
   type DayItineraryMapActionInput,
 } from '../trips/day-itinerary-map-actions';
+import type { MapProvider } from '../trips/map-provider';
 
 type UseDayItineraryMapActionsOptions = {
   discardReorder: () => void;
+  mapProvider?: MapProvider;
 };
 
-export function useDayItineraryMapActions({ discardReorder }: UseDayItineraryMapActionsOptions) {
+export function useDayItineraryMapActions({
+  discardReorder,
+  mapProvider = 'googleMaps',
+}: UseDayItineraryMapActionsOptions) {
   const [mapActionFeedback, setMapActionFeedback] = useState<DayItineraryMapActionFeedback | null>(null);
 
   const clearMapActionFeedback = useCallback(() => {
@@ -24,7 +29,7 @@ export function useDayItineraryMapActions({ discardReorder }: UseDayItineraryMap
   const openPlaceMap = useCallback(
     async (item: DayItineraryMapActionInput) => {
       discardReorder();
-      const actions = buildDayItineraryMapRowActions(item);
+      const actions = buildDayItineraryMapRowActions(item, mapProvider);
       clearMapActionFeedback();
 
       try {
@@ -33,13 +38,13 @@ export function useDayItineraryMapActions({ discardReorder }: UseDayItineraryMap
         setMapActionFeedback(dayItineraryMapActionFailureState('map'));
       }
     },
-    [clearMapActionFeedback, discardReorder],
+    [clearMapActionFeedback, discardReorder, mapProvider],
   );
 
   const copyPlaceAddress = useCallback(
     async (item: DayItineraryMapActionInput) => {
       discardReorder();
-      const actions = buildDayItineraryMapRowActions(item);
+      const actions = buildDayItineraryMapRowActions(item, mapProvider);
       if (actions.copy.disabled || !actions.copy.address) {
         return;
       }
@@ -52,7 +57,7 @@ export function useDayItineraryMapActions({ discardReorder }: UseDayItineraryMap
         setMapActionFeedback(dayItineraryMapActionFailureState('copy'));
       }
     },
-    [clearMapActionFeedback, discardReorder],
+    [clearMapActionFeedback, discardReorder, mapProvider],
   );
 
   return {

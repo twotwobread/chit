@@ -27,7 +27,7 @@ describe('day itinerary map action helpers', () => {
     );
   });
 
-  it('builds visible direct row actions and disables address copy for blank addresses', () => {
+  it('builds visible direct row actions with Google Maps URL by default and disables address copy for blank addresses', () => {
     assert.deepEqual(buildDayItineraryMapRowActions({ placeName: '도톤보리', address: ' Dotonbori ' }), {
       map: {
         label: '지도',
@@ -65,6 +65,30 @@ describe('day itinerary map action helpers', () => {
         failureFeedback: '주소를 복사할 수 없어요. 잠시 후 다시 시도해주세요.',
       },
     });
+  });
+
+  it('builds Naver Maps URL for Korea-only trip map actions without changing copy actions', () => {
+    assert.deepEqual(
+      buildDayItineraryMapRowActions({ placeName: '제주공항', address: ' 제주시 공항로 2 ' }, 'naverMaps'),
+      {
+        map: {
+          label: '지도',
+          accessibilityLabel: '제주공항 지도 열기',
+          url: 'https://map.naver.com/v5/search/%EC%A0%9C%EC%A3%BC%EA%B3%B5%ED%95%AD%20%EC%A0%9C%EC%A3%BC%EC%8B%9C%20%EA%B3%B5%ED%95%AD%EB%A1%9C%202',
+          successFeedback: null,
+          failureFeedback: '지도를 열 수 없어요. 잠시 후 다시 시도해주세요.',
+        },
+        copy: {
+          label: '주소 복사',
+          accessibilityLabel: '제주공항 주소 복사',
+          address: '제주시 공항로 2',
+          disabled: false,
+          disabledHelper: undefined,
+          successFeedback: '주소를 복사했어요.',
+          failureFeedback: '주소를 복사할 수 없어요. 잠시 후 다시 시도해주세요.',
+        },
+      },
+    );
   });
 
   it('maps success and failure feedback without adding map-open success feedback', () => {

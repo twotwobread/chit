@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react';
 
-import type { TripDay } from '@i-um/api-contract';
+import type { TripDay, TripDestination } from '@i-um/api-contract';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -18,6 +18,7 @@ export type DayItineraryEditorProps = {
   showHeader?: boolean;
   headerContent?: ReactNode;
   tripDays?: TripDay[];
+  tripDestinations?: TripDestination[];
   onRequestDayChange?: (dayId: string) => void;
 };
 
@@ -28,6 +29,7 @@ export function DayItineraryEditor({
   showHeader = true,
   headerContent,
   tripDays = [],
+  tripDestinations = [],
   onRequestDayChange,
 }: DayItineraryEditorProps) {
   const {
@@ -80,7 +82,7 @@ export function DayItineraryEditor({
     updateScrollContentSize,
     updateScrollLayout,
     updateScrollOffset,
-  } = useDayItineraryEditorController({ tripId, date, initialAction, tripDays, onRequestDayChange });
+  } = useDayItineraryEditorController({ tripId, date, initialAction, tripDays, tripDestinations, onRequestDayChange });
   const insets = useSafeAreaInsets();
   const addFabLayout = buildTripRootFabLayout({ bottomInset: insets.bottom, rightInset: insets.right });
   const canMovePlaces = Boolean(date && tripDays.some((day) => day.id !== date));

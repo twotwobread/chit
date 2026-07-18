@@ -28,7 +28,7 @@ describe('today route preview helpers', () => {
     assert.deepEqual(todayRoutePreviewUnsupportedState(), {
       status: 'unsupported',
       title: '정확한 지도 장소가 필요해요.',
-      helper: 'Google 장소로 추가된 일정에서 경로 미리보기를 볼 수 있어요.',
+      helper: '정확한 지도 장소로 추가된 일정에서 경로 미리보기를 볼 수 있어요.',
     });
   });
 
@@ -68,7 +68,7 @@ describe('today route preview helpers', () => {
     assert.equal(viewModel.distanceLabel, '5.4km');
     assert.equal(viewModel.modeLabel, '대중교통');
     assert.equal(viewModel.summaryText, '환승 1회');
-    assert.equal(viewModel.detailActionLabel, '구글 지도에서 자세히');
+    assert.equal(viewModel.detailActionLabel, '지도에서 자세히');
     assert.deepEqual(viewModel.map?.coordinates, [
       { latitude: 38.5, longitude: -120.2 },
       { latitude: 40.7, longitude: -120.95 },
@@ -87,7 +87,7 @@ describe('today route preview helpers', () => {
           modeLabel: '대중교통',
           summaryText: '환승 1회',
           map: null,
-          detailActionLabel: '구글 지도에서 자세히',
+          detailActionLabel: '지도에서 자세히',
         },
       }),
       '대중교통 · 약 22분 · 5.4km',
@@ -102,7 +102,7 @@ describe('today route preview helpers', () => {
           modeLabel: '대중교통',
           summaryText: '환승 1회',
           map: null,
-          detailActionLabel: '구글 지도에서 자세히',
+          detailActionLabel: '지도에서 자세히',
         },
       }),
       '대중교통 · 약 22분',
@@ -126,7 +126,7 @@ describe('today route preview helpers', () => {
           modeLabel: '대중교통',
           summaryText: '환승 1회',
           map: null,
-          detailActionLabel: '구글 지도에서 자세히',
+          detailActionLabel: '지도에서 자세히',
         },
       }),
       '경로 정보를 준비 중이에요',
@@ -243,6 +243,7 @@ describe('today route preview helpers', () => {
   it('maps permission and provider failure copy', () => {
     assert.equal(todayRoutePreviewPermissionNeededState().title, '현재 위치 권한이 필요해요.');
     assert.equal(todayRoutePreviewUnavailableState().title, '경로 미리보기를 불러올 수 없어요.');
+    assert.equal(todayRoutePreviewUnavailableState().helper, '잠시 후 다시 시도하거나 지도에서 자세히 확인해주세요.');
   });
 
   it('decodes Google encoded polylines defensively', () => {

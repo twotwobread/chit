@@ -1,3 +1,7 @@
+import { buildExternalMapUrl, buildGoogleMapsSearchUrl, type MapProvider } from './map-provider';
+
+export { buildGoogleMapsSearchUrl };
+
 export type DayItineraryMapActionInput = {
   placeName: string;
   address?: string | null;
@@ -27,28 +31,22 @@ export type DayItineraryMapRowActions = {
   };
 };
 
-const googleMapsSearchBaseUrl = 'https://www.google.com/maps/search/?api=1&query=';
 const copySuccessMessage = '주소를 복사했어요.';
 const mapFailureMessage = '지도를 열 수 없어요. 잠시 후 다시 시도해주세요.';
 const copyFailureMessage = '주소를 복사할 수 없어요. 잠시 후 다시 시도해주세요.';
 const missingAddressHelper = '주소 정보가 없어요.';
 
-export function buildGoogleMapsSearchUrl(placeName: string, address?: string | null): string {
-  const name = placeName.trim();
-  const normalizedAddress = normalizeAddress(address);
-  const query = normalizedAddress ? `${name} ${normalizedAddress}` : name;
-
-  return `${googleMapsSearchBaseUrl}${encodeURIComponent(query)}`;
-}
-
-export function buildDayItineraryMapRowActions(input: DayItineraryMapActionInput): DayItineraryMapRowActions {
+export function buildDayItineraryMapRowActions(
+  input: DayItineraryMapActionInput,
+  mapProvider: MapProvider = 'googleMaps',
+): DayItineraryMapRowActions {
   const address = normalizeAddress(input.address);
 
   return {
     map: {
       label: '지도',
       accessibilityLabel: `${input.placeName} 지도 열기`,
-      url: buildGoogleMapsSearchUrl(input.placeName, address),
+      url: buildExternalMapUrl({ placeName: input.placeName, address }, mapProvider),
       successFeedback: null,
       failureFeedback: mapFailureMessage,
     },

@@ -1,6 +1,7 @@
+import { naverMapsAppName, resolveMapProvider, type MapProvider } from './map-provider';
 import type { TravelMode } from './travel-mode';
 
-export type TodayNavigationProvider = 'googleMaps' | 'naverMaps';
+export type TodayNavigationProvider = MapProvider;
 
 export type TodayNavigationDestination = {
   placeName: string;
@@ -27,19 +28,12 @@ type TodayNavigationDirectionsAttempt = {
   url: string;
 };
 
-const naverMapsAppName = 'com.twotwobread.ium';
-
 export const todayNavigationFailureMessage = '길찾기를 열 수 없어요. 잠시 후 다시 시도해 주세요.';
 
 export function resolveTodayNavigationProvider(
   destinations: readonly TodayNavigationTripDestination[],
 ): TodayNavigationProvider {
-  if (destinations.length === 0) {
-    return 'googleMaps';
-  }
-
-  const countryCodes = destinations.map((destination) => destination.countryCode?.trim().toUpperCase() ?? '');
-  return countryCodes.every((countryCode) => countryCode === 'KR') ? 'naverMaps' : 'googleMaps';
+  return resolveMapProvider(destinations);
 }
 
 export function buildGoogleMapsDestinationQuery(destination: TodayNavigationDestination): string {

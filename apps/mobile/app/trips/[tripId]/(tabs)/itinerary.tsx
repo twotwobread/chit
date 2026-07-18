@@ -97,6 +97,7 @@ export default function TripItineraryTabScreen() {
         onRequestDayChange={selectDay}
         showHeader={false}
         tripDays={shellState?.status === 'success' ? shellState.detail.days : []}
+        tripDestinations={shellState?.status === 'success' ? shellState.detail.trip.destinations : []}
         tripId={tripId ?? ''}
       />
     );

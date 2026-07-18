@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, AppState, type AppStateStatus } from 'react-native';
 
-import type { TripDay } from '@i-um/api-contract';
+import type { TripDay, TripDestination } from '@i-um/api-contract';
 import { router, useFocusEffect } from 'expo-router';
 
 import { focusAccessibilityHandle } from './accessibility-focus';
@@ -33,6 +33,7 @@ import {
   type DayItineraryRowViewModel,
 } from '../trips/day-itinerary';
 import { buildDayItineraryAddPlaceSearchRoute } from '../trips/day-itinerary-add-place-navigation';
+import { resolveMapProvider } from '../trips/map-provider';
 import { tripItineraryDayPath, tripItineraryPath } from '../trips/routes';
 import { getTripDayItinerary, moveScheduleItemToDay } from '../trips/itinerary-api';
 import {
@@ -59,6 +60,7 @@ export type UseDayItineraryEditorControllerOptions = {
   date?: string;
   initialAction?: string;
   tripDays?: TripDay[];
+  tripDestinations?: TripDestination[];
   onRequestDayChange?: (dayId: string) => void;
 };
 
@@ -67,6 +69,7 @@ export function useDayItineraryEditorController({
   date,
   initialAction,
   tripDays = [],
+  tripDestinations = [],
   onRequestDayChange,
 }: UseDayItineraryEditorControllerOptions) {
   const [state, setState] = useState<DayItineraryState>({ status: 'loading' });
@@ -218,8 +221,10 @@ export function useDayItineraryEditorController({
     setReorderState({ status: 'idle' });
   }, [setReorderDragActive]);
 
+  const mapProvider = resolveMapProvider(tripDestinations);
   const { clearMapActionFeedback, copyPlaceAddress, mapActionFeedback, openPlaceMap } = useDayItineraryMapActions({
     discardReorder,
+    mapProvider,
   });
 
   const load = useCallback(async () => {
