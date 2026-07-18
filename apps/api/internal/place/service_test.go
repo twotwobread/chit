@@ -350,6 +350,93 @@ func TestServiceCreateGooglePlaceScheduleItemCreatesSnapshotAndItem(t *testing.T
 	}
 }
 
+func TestServiceCreateGooglePlaceScheduleItemsBatchCreatesItemsInSelectionOrder(t *testing.T) {
+	repo := &fakeRepository{
+		trip:               trip.Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"},
+		tripFound:          true,
+		isParticipant:      true,
+		existingGoogleByID: map[string]trip.TripPlaceSummary{"google-existing": {ID: "place-existing", Name: "우메다", PlaceType: "sights", Address: "Umeda"}},
+	}
+	provider := &fakeProvider{detailsByID: map[string]GooglePlaceDetails{"google-new": {
+		GooglePlaceID:    "google-new",
+		DisplayName:      "오사카성",
+		FormattedAddress: "Osaka Castle",
+		Latitude:         34.6873,
+		Longitude:        135.5262,
+		PrimaryType:      "tourist_attraction",
+		Types:            []string{"tourist_attraction", "point_of_interest"},
+	}}}
+	service := NewService(repo, provider)
+
+	result, err := service.CreateGooglePlaceScheduleItemsBatch(context.Background(), "user-1", testTripID, "2026-07-11", CreateGooglePlaceScheduleItemsBatchInput{Items: []CreateGooglePlaceScheduleItemsBatchInputItem{{GooglePlaceID: " google-new "}, {GooglePlaceID: "google-existing"}}})
+	if err != nil {
+		t.Fatalf("CreateGooglePlaceScheduleItemsBatch returned error: %v", err)
+	}
+
+	if len(provider.detailsInputs) != 1 || provider.detailsInputs[0].GooglePlaceID != "google-new" {
+		t.Fatalf("expected provider details only for the new place, got %#v", provider.detailsInputs)
+	}
+	if len(repo.createdBatchRecord.Items) != 2 {
+		t.Fatalf("expected two batch records, got %#v", repo.createdBatchRecord.Items)
+	}
+	if first := repo.createdBatchRecord.Items[0]; first.GooglePlaceID != "google-new" || first.Name != "오사카성" || first.Title != "오사카성" || first.TripPlaceID != "" {
+		t.Fatalf("unexpected first batch record %#v", first)
+	}
+	if second := repo.createdBatchRecord.Items[1]; second.GooglePlaceID != "google-existing" || second.TripPlaceID != "place-existing" || second.Title != "우메다" {
+		t.Fatalf("unexpected second batch record %#v", second)
+	}
+	if len(result.CreatedItems) != 2 || result.CreatedItems[0].Place.Name != "오사카성" || result.CreatedItems[1].Place.ID != "place-existing" {
+		t.Fatalf("expected created items in selection order, got %#v", result.CreatedItems)
+	}
+	if len(result.ScheduleItems) != 2 || result.ScheduleItems[0].ItemOrder != 1 || result.ScheduleItems[1].ItemOrder != 2 {
+		t.Fatalf("expected latest schedule items in order, got %#v", result.ScheduleItems)
+	}
+}
+
+func TestServiceCreateGooglePlaceScheduleItemsBatchAllowsExistingDayPlaceDuplicates(t *testing.T) {
+	repo := &fakeRepository{
+		trip:               trip.Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"},
+		tripFound:          true,
+		isParticipant:      true,
+		existingGoogleByID: map[string]trip.TripPlaceSummary{"google-dup": {ID: "place-dup", Name: "도톤보리", PlaceType: "sights", Address: "Osaka"}},
+	}
+	service := NewService(repo, &fakeProvider{})
+
+	result, err := service.CreateGooglePlaceScheduleItemsBatch(context.Background(), "user-1", testTripID, "2026-07-11", CreateGooglePlaceScheduleItemsBatchInput{Items: []CreateGooglePlaceScheduleItemsBatchInputItem{{GooglePlaceID: "google-dup"}, {GooglePlaceID: " google-dup "}}})
+	if err != nil {
+		t.Fatalf("expected duplicate Google place to append without confirmation, got %v", err)
+	}
+	if len(repo.createdBatchRecord.Items) != 2 || repo.createdBatchRecord.Items[0].TripPlaceID != "place-dup" || repo.createdBatchRecord.Items[1].TripPlaceID != "place-dup" {
+		t.Fatalf("expected duplicate to reuse existing trip place record twice, got %#v", repo.createdBatchRecord.Items)
+	}
+	if len(result.CreatedItems) != 2 || result.CreatedItems[0].Place.ID != "place-dup" || result.CreatedItems[1].Place.ID != "place-dup" {
+		t.Fatalf("expected duplicate created items, got %#v", result.CreatedItems)
+	}
+}
+
+func TestServiceCreateGooglePlaceScheduleItemsBatchValidation(t *testing.T) {
+	repo := &fakeRepository{trip: trip.Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"}, tripFound: true, isParticipant: true}
+	service := NewService(repo, &fakeProvider{})
+
+	tests := []struct {
+		name  string
+		input CreateGooglePlaceScheduleItemsBatchInput
+	}{
+		{name: "empty items", input: CreateGooglePlaceScheduleItemsBatchInput{}},
+		{name: "blank google id", input: CreateGooglePlaceScheduleItemsBatchInput{Items: []CreateGooglePlaceScheduleItemsBatchInputItem{{GooglePlaceID: " "}}}},
+		{name: "too many items", input: CreateGooglePlaceScheduleItemsBatchInput{Items: make([]CreateGooglePlaceScheduleItemsBatchInputItem, 21)}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := service.CreateGooglePlaceScheduleItemsBatch(context.Background(), "user-1", testTripID, "2026-07-11", tt.input)
+			if !errors.Is(err, ErrValidation) {
+				t.Fatalf("expected validation error, got %v", err)
+			}
+		})
+	}
+}
+
 func TestServiceCreateGooglePlaceScheduleItemReusesExistingTripPlaceWithoutProviderRefresh(t *testing.T) {
 	repo := &fakeRepository{
 		trip:                trip.Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"},
@@ -559,7 +646,9 @@ type fakeRepository struct {
 	checkedUserID              string
 	existingGooglePlace        trip.TripPlaceSummary
 	existingGoogleFound        bool
+	existingGoogleByID         map[string]trip.TripPlaceSummary
 	createdGoogleRecord        CreateGooglePlaceScheduleItemRecord
+	createdBatchRecord         CreateGooglePlaceScheduleItemsBatchRecord
 	createdGoogleLodgingRecord CreateGoogleDayLodgingPlaceRecord
 	createdBookmarkRecord      CreateGoogleTripPlaceBookmarkRecord
 	bookmarks                  []TripPlaceBookmark
@@ -567,6 +656,7 @@ type fakeRepository struct {
 	setGoogleLodgingRecord     trip.SetDayLodgingPlaceRecord
 	appendedGoogleRecord       AppendGooglePlaceScheduleItemRecord
 	appendErr                  error
+	batchErr                   error
 }
 
 func (r *fakeRepository) GetTripByID(context.Context, string) (trip.Trip, bool, error) {
@@ -595,7 +685,11 @@ func (r *fakeRepository) GetActiveTripDayByTripAndID(_ context.Context, tripID s
 	return day, true, nil
 }
 
-func (r *fakeRepository) GetGoogleTripPlaceByGooglePlaceID(context.Context, string, string) (trip.TripPlaceSummary, bool, error) {
+func (r *fakeRepository) GetGoogleTripPlaceByGooglePlaceID(_ context.Context, _ string, googlePlaceID string) (trip.TripPlaceSummary, bool, error) {
+	if r.existingGoogleByID != nil {
+		place, ok := r.existingGoogleByID[googlePlaceID]
+		return place, ok, nil
+	}
 	return r.existingGooglePlace, r.existingGoogleFound, nil
 }
 
@@ -657,6 +751,33 @@ func (r *fakeRepository) CreateGooglePlaceScheduleItem(_ context.Context, record
 	}, nil
 }
 
+func (r *fakeRepository) CreateGooglePlaceScheduleItemsBatch(_ context.Context, record CreateGooglePlaceScheduleItemsBatchRecord) (CreateGooglePlaceScheduleItemsBatchMutationResult, error) {
+	r.createdBatchRecord = record
+	if r.batchErr != nil {
+		return CreateGooglePlaceScheduleItemsBatchMutationResult{}, r.batchErr
+	}
+	items := make([]trip.ScheduleItem, 0, len(record.Items))
+	for index, item := range record.Items {
+		placeID := item.TripPlaceID
+		if placeID == "" {
+			placeID = "place-new-" + item.GooglePlaceID
+		}
+		items = append(items, trip.ScheduleItem{
+			ID:        "item-" + item.GooglePlaceID,
+			ItemOrder: index + 1,
+			Version:   1,
+			Place: trip.TripPlaceSummary{
+				ID:        placeID,
+				Name:      item.Name,
+				PlaceType: item.PlaceType,
+				Address:   item.Address,
+			},
+			PlaceSchedule: &trip.PlaceScheduleItemDetails{Title: item.Title},
+		})
+	}
+	return CreateGooglePlaceScheduleItemsBatchMutationResult{CreatedItems: items, ScheduleItems: items}, nil
+}
+
 func (r *fakeRepository) ListTripPlaceBookmarks(context.Context, string) ([]TripPlaceBookmark, error) {
 	return r.bookmarks, nil
 }
@@ -704,7 +825,9 @@ type fakeProvider struct {
 	destinationErr     error
 	detailsCalled      bool
 	detailsInput       ProviderDetailsInput
+	detailsInputs      []ProviderDetailsInput
 	details            GooglePlaceDetails
+	detailsByID        map[string]GooglePlaceDetails
 	detailsErr         error
 	photoCalled        bool
 	photoInput         ProviderPhotoInput
@@ -727,6 +850,10 @@ func (p *fakeProvider) SearchDestinations(_ context.Context, input ProviderDesti
 func (p *fakeProvider) Details(_ context.Context, input ProviderDetailsInput) (GooglePlaceDetails, error) {
 	p.detailsCalled = true
 	p.detailsInput = input
+	p.detailsInputs = append(p.detailsInputs, input)
+	if p.detailsByID != nil {
+		return p.detailsByID[input.GooglePlaceID], p.detailsErr
+	}
 	return p.details, p.detailsErr
 }
 

@@ -206,6 +206,26 @@ func (s apiServer) CreateGoogleDayLodgingPlace(w http.ResponseWriter, r *http.Re
 	writeJSON(w, http.StatusCreated, createGoogleDayLodgingPlaceResponseToOpenAPI(result))
 }
 
+func duplicateGooglePlaceScheduleDetails(err error, fallbackGooglePlaceID string) []map[string]interface{} {
+	var duplicateErr place.DuplicateDayPlaceConfirmationError
+	if errors.As(err, &duplicateErr) && len(duplicateErr.Duplicates) > 0 {
+		details := make([]map[string]interface{}, 0, len(duplicateErr.Duplicates))
+		for _, duplicate := range duplicateErr.Duplicates {
+			item := map[string]interface{}{"googlePlaceId": duplicate.GooglePlaceID}
+			if duplicate.TripPlaceID != "" {
+				item["tripPlaceId"] = duplicate.TripPlaceID
+			}
+			details = append(details, item)
+		}
+		return details
+	}
+	details := map[string]interface{}{"googlePlaceId": fallbackGooglePlaceID}
+	if errors.As(err, &duplicateErr) && duplicateErr.TripPlaceID != "" {
+		details["tripPlaceId"] = duplicateErr.TripPlaceID
+	}
+	return []map[string]interface{}{details}
+}
+
 func (s apiServer) CreateGooglePlaceScheduleItem(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string) {
 	if s.auth == nil || s.places == nil {
 		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "google place schedule creation is not configured", nil)
@@ -232,12 +252,7 @@ func (s apiServer) CreateGooglePlaceScheduleItem(w http.ResponseWriter, r *http.
 	})
 	if err != nil {
 		if errors.Is(err, place.ErrDuplicateDayPlaceConfirmationNeeded) {
-			details := map[string]interface{}{"googlePlaceId": body.GooglePlaceId}
-			var duplicateErr place.DuplicateDayPlaceConfirmationError
-			if errors.As(err, &duplicateErr) && duplicateErr.TripPlaceID != "" {
-				details["tripPlaceId"] = duplicateErr.TripPlaceID
-			}
-			writeError(w, http.StatusConflict, "DUPLICATE_DAY_PLACE_CONFIRMATION_REQUIRED", "duplicate day place confirmation required", []map[string]interface{}{details})
+			writeError(w, http.StatusConflict, "DUPLICATE_DAY_PLACE_CONFIRMATION_REQUIRED", "duplicate day place confirmation required", duplicateGooglePlaceScheduleDetails(err, body.GooglePlaceId))
 			return
 		}
 		writeGooglePlaceDayScheduleError(w, err)
@@ -245,4 +260,35 @@ func (s apiServer) CreateGooglePlaceScheduleItem(w http.ResponseWriter, r *http.
 	}
 
 	writeJSON(w, http.StatusCreated, createGooglePlaceScheduleItemResponseToOpenAPI(result))
+}
+
+func (s apiServer) CreateGooglePlaceScheduleItemsBatch(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string) {
+	if s.auth == nil || s.places == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "google place schedule batch creation is not configured", nil)
+		return
+	}
+
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	var body openapi.CreateGooglePlaceScheduleItemsBatchJSONRequestBody
+	if !decodeJSON(w, r, &body) {
+		return
+	}
+
+	items := make([]place.CreateGooglePlaceScheduleItemsBatchInputItem, 0, len(body.Items))
+	for _, item := range body.Items {
+		items = append(items, place.CreateGooglePlaceScheduleItemsBatchInputItem{GooglePlaceID: item.GooglePlaceId})
+	}
+	result, err := s.places.CreateGooglePlaceScheduleItemsBatch(r.Context(), authContext.UserID, tripId, tripDayId, place.CreateGooglePlaceScheduleItemsBatchInput{
+		Items: items,
+	})
+	if err != nil {
+		writeGooglePlaceDayScheduleError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, createGooglePlaceScheduleItemsBatchResponseToOpenAPI(result))
 }

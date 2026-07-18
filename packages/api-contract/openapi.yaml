@@ -3379,6 +3379,97 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                duplicateConfirmationRequired:
+                  summary: Same-Day duplicate Google place requires explicit confirmation
+                  value:
+                    error:
+                      code: DUPLICATE_DAY_PLACE_CONFIRMATION_REQUIRED
+                      message: duplicate day place confirmation required
+                      details:
+                        - googlePlaceId: ChIJ...
+                          tripPlaceId: 018f6d75-7a2b-7c9d-bd74-6a3a4e5b6c7d
+        '429':
+          description: Google Places provider rate limited.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Google Places provider unavailable or selected provider place is unusable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /trips/{tripId}/days/{tripDayId}/places/google/schedule-items/batch:
+    post:
+      operationId: createGooglePlaceScheduleItemsBatch
+      summary: Add multiple Google Place results to a trip day schedule
+      description: Resolves or reuses Google-backed places and appends untimed Day schedule items in request order within one atomic transaction. Same-Day duplicate places are allowed because travelers may intentionally revisit the same place.
+      tags:
+        - Places
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: tripDayId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGooglePlaceScheduleItemsBatchRequest'
+      responses:
+        '201':
+          description: Google-backed places added to the selected Day schedule in request order.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateGooglePlaceScheduleItemsBatchResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip or trip day not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Concurrent append conflict.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '429':
           description: Google Places provider rate limited.
           content:
@@ -5360,6 +5451,49 @@ components:
           $ref: '#/components/schemas/TripDay'
         scheduleItem:
           $ref: '#/components/schemas/ScheduleItem'
+    CreateGooglePlaceScheduleItemsBatchRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          minItems: 1
+          maxItems: 20
+          description: Ordered Google places to append to the Day schedule.
+          items:
+            $ref: '#/components/schemas/CreateGooglePlaceScheduleItemsBatchRequestItem'
+    CreateGooglePlaceScheduleItemsBatchRequestItem:
+      type: object
+      additionalProperties: false
+      required:
+        - googlePlaceId
+      properties:
+        googlePlaceId:
+          type: string
+          minLength: 1
+          maxLength: 255
+          example: ChIJ...
+    CreateGooglePlaceScheduleItemsBatchResponse:
+      type: object
+      required:
+        - day
+        - createdScheduleItems
+        - scheduleItems
+      properties:
+        day:
+          $ref: '#/components/schemas/TripDay'
+        createdScheduleItems:
+          type: array
+          description: Schedule items created by this batch, in the same order as request items.
+          items:
+            $ref: '#/components/schemas/ScheduleItem'
+        scheduleItems:
+          type: array
+          description: Latest server source-of-truth schedule items for the selected day, ordered by schedule order/rank.
+          items:
+            $ref: '#/components/schemas/ScheduleItem'
     UpdateScheduleItemRequest:
       type: object
       additionalProperties: false

@@ -1778,6 +1778,10 @@ func (s *Store) AppendGooglePlaceScheduleItem(ctx context.Context, record place.
 		return trip.ScheduleItem{}, err
 	}
 
+	if err := lockSameDayScheduleOrdering(ctx, tx, record.TripID, record.TripDayID); err != nil {
+		return trip.ScheduleItem{}, err
+	}
+
 	duplicateCount, err := qtx.CountScheduleItemsByTripDayAndPlace(ctx, db.CountScheduleItemsByTripDayAndPlaceParams{
 		TripID:      mustUUID(record.TripID),
 		TripDayID:   mustUUID(record.TripDayID),
@@ -1884,6 +1888,10 @@ func (s *Store) CreateGooglePlaceScheduleItem(ctx context.Context, record place.
 		return trip.ScheduleItem{}, err
 	}
 
+	if err := lockSameDayScheduleOrdering(ctx, tx, record.TripID, record.TripDayID); err != nil {
+		return trip.ScheduleItem{}, err
+	}
+
 	duplicateCount, err := qtx.CountScheduleItemsByTripDayAndPlace(ctx, db.CountScheduleItemsByTripDayAndPlaceParams{
 		TripID:      mustUUID(record.TripID),
 		TripDayID:   mustUUID(record.TripDayID),
@@ -1920,6 +1928,119 @@ func (s *Store) CreateGooglePlaceScheduleItem(ctx context.Context, record place.
 		Place:         tripPlaceSummary(placeRow.ID, placeRow.Name, placeRow.PlaceType, placeRow.Address, placeRow.Provider, placeRow.GooglePlaceID, placeRow.Latitude, placeRow.Longitude),
 		PlaceSchedule: placeScheduleItemDetails(item.PlaceTitle, item.PlaceMemo, placeRow.Name),
 	}, nil
+}
+
+func (s *Store) CreateGooglePlaceScheduleItemsBatch(ctx context.Context, record place.CreateGooglePlaceScheduleItemsBatchRecord) (place.CreateGooglePlaceScheduleItemsBatchMutationResult, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return place.CreateGooglePlaceScheduleItemsBatchMutationResult{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	qtx := s.queries.WithTx(tx)
+
+	if err := lockSameDayScheduleOrdering(ctx, tx, record.TripID, record.TripDayID); err != nil {
+		return place.CreateGooglePlaceScheduleItemsBatchMutationResult{}, err
+	}
+
+	type resolvedBatchItem struct {
+		recordItem place.CreateGooglePlaceScheduleItemsBatchRecordItem
+		placeID    string
+		placeName  string
+		placeType  string
+		address    string
+		provider   string
+		googleID   pgtype.Text
+		latitude   pgtype.Float8
+		longitude  pgtype.Float8
+	}
+	resolved := make([]resolvedBatchItem, 0, len(record.Items))
+
+	for _, item := range record.Items {
+		var resolvedItem resolvedBatchItem
+		resolvedItem.recordItem = item
+		if item.TripPlaceID != "" {
+			placeRow, err := qtx.GetTripPlaceSummaryByTripAndPlace(ctx, db.GetTripPlaceSummaryByTripAndPlaceParams{
+				TripID:      mustUUID(record.TripID),
+				TripPlaceID: mustUUID(item.TripPlaceID),
+			})
+			if err == pgx.ErrNoRows {
+				return place.CreateGooglePlaceScheduleItemsBatchMutationResult{}, place.ErrNotFound
+			}
+			if err != nil {
+				return place.CreateGooglePlaceScheduleItemsBatchMutationResult{}, err
+			}
+			resolvedItem.placeID = placeRow.ID
+			resolvedItem.placeName = placeRow.Name
+			resolvedItem.placeType = placeRow.PlaceType
+			resolvedItem.address = placeRow.Address
+			resolvedItem.provider = placeRow.Provider
+			resolvedItem.googleID = placeRow.GooglePlaceID
+			resolvedItem.latitude = placeRow.Latitude
+			resolvedItem.longitude = placeRow.Longitude
+		} else {
+			placeRow, err := qtx.UpsertGoogleTripPlace(ctx, db.UpsertGoogleTripPlaceParams{
+				TripID:            mustUUID(record.TripID),
+				Name:              item.Name,
+				Address:           item.Address,
+				PlaceType:         item.PlaceType,
+				GooglePlaceID:     textValue(item.GooglePlaceID),
+				Latitude:          float8Value(item.Latitude),
+				Longitude:         float8Value(item.Longitude),
+				GooglePrimaryType: textValue(item.GooglePrimaryType),
+				GoogleTypes:       item.GoogleTypes,
+			})
+			if err != nil {
+				return place.CreateGooglePlaceScheduleItemsBatchMutationResult{}, err
+			}
+			resolvedItem.placeID = placeRow.ID
+			resolvedItem.placeName = placeRow.Name
+			resolvedItem.placeType = placeRow.PlaceType
+			resolvedItem.address = placeRow.Address
+			resolvedItem.provider = placeRow.Provider
+			resolvedItem.googleID = placeRow.GooglePlaceID
+			resolvedItem.latitude = placeRow.Latitude
+			resolvedItem.longitude = placeRow.Longitude
+		}
+
+		resolved = append(resolved, resolvedItem)
+	}
+
+	createdItems := make([]trip.ScheduleItem, 0, len(resolved))
+	for _, item := range resolved {
+		appended, err := createScheduleItemAtEnd(ctx, tx, record.TripID, record.TripDayID, item.placeID, item.recordItem.Title, nil, nil, nil)
+		if err != nil {
+			if errors.Is(err, trip.ErrConflict) || isUniqueConstraintViolation(err, "schedule_items_active_day_order_unique") || isUniqueConstraintViolation(err, "schedule_items_active_day_rank_unique") {
+				return place.CreateGooglePlaceScheduleItemsBatchMutationResult{}, place.ErrConflict
+			}
+			return place.CreateGooglePlaceScheduleItemsBatchMutationResult{}, err
+		}
+		createdItems = append(createdItems, trip.ScheduleItem{
+			ID:            appended.ID,
+			ItemOrder:     int(appended.ItemOrder),
+			Version:       int(appended.Version),
+			ItemType:      trip.ScheduleItemTypePlace,
+			StartTime:     timeTextPtrFromSQL(appended.StartTime),
+			EndTime:       timeTextPtrFromSQL(appended.EndTime),
+			ArrivedAt:     timePtrFromTimestamptz(appended.ArrivedAt),
+			SkippedAt:     timePtrFromTimestamptz(appended.SkippedAt),
+			Place:         tripPlaceSummary(item.placeID, item.placeName, item.placeType, item.address, item.provider, item.googleID, item.latitude, item.longitude),
+			PlaceSchedule: placeScheduleItemDetails(appended.PlaceTitle, appended.PlaceMemo, item.placeName),
+		})
+	}
+
+	rows, err := qtx.ListScheduleItemsByTripDay(ctx, db.ListScheduleItemsByTripDayParams{
+		TripID:    mustUUID(record.TripID),
+		TripDayID: mustUUID(record.TripDayID),
+	})
+	if err != nil {
+		return place.CreateGooglePlaceScheduleItemsBatchMutationResult{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return place.CreateGooglePlaceScheduleItemsBatchMutationResult{}, err
+	}
+
+	return place.CreateGooglePlaceScheduleItemsBatchMutationResult{CreatedItems: createdItems, ScheduleItems: mapScheduleItems(rows)}, nil
 }
 
 type appendedScheduleItemRow struct {
