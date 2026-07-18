@@ -2,7 +2,12 @@ import { ActivityIndicator, Text, View } from 'react-native';
 
 import { Card, PrimaryButton, SecondaryButton, theme } from '../../../../../../lib/design';
 import { KeyboardAwareFormScrollView } from '../../../../../../lib/trip-ui/KeyboardAwareFormScrollView';
-import { QuickExpenseForm, QuickExpenseSavedSummaryCard } from '../../../../../../lib/trip-ui/QuickExpenseEntryParts';
+import {
+  QuickExpenseForm,
+  QuickExpenseSavedSummaryCard,
+  buildQuickExpenseFormSubmitState,
+} from '../../../../../../lib/trip-ui/QuickExpenseEntryParts';
+import { StickyActionFooter, useStickyActionFooterLayout } from '../../../../../../lib/trip-ui/StickyActionFooter';
 import { styles } from '../../../../../../lib/trip-ui/QuickExpenseEntryStyles';
 import { useQuickExpenseController } from '../../../../../../lib/trip-ui/useQuickExpenseController';
 
@@ -42,84 +47,123 @@ export default function QuickExpenseScreen() {
     updateTitleInput,
     viewModel,
   } = useQuickExpenseController();
+  const footerLayout = useStickyActionFooterLayout({ actionCount: 2 });
+  const submitState = viewModel
+    ? buildQuickExpenseFormSubmitState({
+        amountInput,
+        expenseDateInput,
+        includeInSettlement,
+        manualSplitInputs,
+        memoInput,
+        mode: state.status === 'success' ? state.mode : 'today',
+        payerParticipantId,
+        saving,
+        selectedItemId,
+        selectedSplitParticipantIds,
+        splitPolicy,
+        titleInput,
+        viewModel,
+      })
+    : null;
+  const showStickyActions = state.status === 'success' && !savedSummary && Boolean(viewModel) && Boolean(submitState);
 
   return (
-    <KeyboardAwareFormScrollView contentContainerStyle={styles.scrollContent} style={styles.scroll}>
-      <View style={styles.header}>
-        <Text style={styles.screenTitle}>지출 등록</Text>
-        <Text style={styles.subtitle}>금액과 결제자만 입력하면 함께 나눠요.</Text>
-      </View>
+    <View style={styles.screenRoot}>
+      <KeyboardAwareFormScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardFixedBottomOffset={footerLayout.keyboardFixedBottomOffset}
+        keyboardMinClearance={footerLayout.keyboardMinClearance}
+        style={styles.scroll}
+      >
+        <View style={styles.header}>
+          <Text style={styles.screenTitle}>지출 등록</Text>
+          <Text style={styles.subtitle}>금액과 결제자만 입력하면 함께 나눠요.</Text>
+        </View>
 
-      {state.status === 'loading' ? (
-        <Card>
-          <ActivityIndicator color={theme.color.primary} />
-          <Text style={styles.message}>지출 등록 정보를 불러오는 중...</Text>
-        </Card>
-      ) : null}
+        {state.status === 'loading' ? (
+          <Card>
+            <ActivityIndicator color={theme.color.primary} />
+            <Text style={styles.message}>지출 등록 정보를 불러오는 중...</Text>
+          </Card>
+        ) : null}
 
-      {state.status === 'success' && savedSummary ? (
-        <QuickExpenseSavedSummaryCard onDone={completeSavedExpense} summary={savedSummary} />
-      ) : null}
+        {state.status === 'success' && savedSummary ? (
+          <QuickExpenseSavedSummaryCard onDone={completeSavedExpense} summary={savedSummary} />
+        ) : null}
 
-      {state.status === 'success' && !savedSummary && viewModel ? (
-        <QuickExpenseForm
-          amountInput={amountInput}
-          errors={errors}
-          expenseDateInput={expenseDateInput}
-          formMessage={formMessage}
-          includeInSettlement={includeInSettlement}
-          mode={state.mode}
-          onBack={backToDay}
-          onClearTripDay={clearTripDay}
-          onSelectItem={selectItem}
-          onSelectPayer={selectPayer}
-          onSelectSplitPolicy={selectSplitPolicy}
-          onSelectTripDay={selectTripDay}
-          onSubmit={() => void submit()}
-          onToggleIncludeInSettlement={toggleIncludeInSettlement}
-          onToggleSplitParticipant={toggleSplitParticipant}
-          onUpdateAmount={updateAmountInput}
-          onUpdateExpenseDate={updateExpenseDateInput}
-          onUpdateMemo={setMemoInput}
-          onUpdateManualSplitInput={updateManualSplitInput}
-          onUpdateTitle={updateTitleInput}
-          payerParticipantId={payerParticipantId}
-          saving={saving}
-          selectedItemId={selectedItemId}
-          selectedSplitParticipantIds={selectedSplitParticipantIds}
-          splitPolicy={splitPolicy}
-          manualSplitInputs={manualSplitInputs}
-          memoInput={memoInput}
-          titleInput={titleInput}
-          tripName={state.tripName}
-          viewModel={viewModel}
-        />
-      ) : null}
+        {state.status === 'success' && !savedSummary && viewModel ? (
+          <QuickExpenseForm
+            amountInput={amountInput}
+            errors={errors}
+            expenseDateInput={expenseDateInput}
+            formMessage={formMessage}
+            includeInSettlement={includeInSettlement}
+            mode={state.mode}
+            onBack={backToDay}
+            onClearTripDay={clearTripDay}
+            onSelectItem={selectItem}
+            onSelectPayer={selectPayer}
+            onSelectSplitPolicy={selectSplitPolicy}
+            onSelectTripDay={selectTripDay}
+            onSubmit={() => void submit()}
+            onToggleIncludeInSettlement={toggleIncludeInSettlement}
+            onToggleSplitParticipant={toggleSplitParticipant}
+            onUpdateAmount={updateAmountInput}
+            onUpdateExpenseDate={updateExpenseDateInput}
+            onUpdateMemo={setMemoInput}
+            onUpdateManualSplitInput={updateManualSplitInput}
+            onUpdateTitle={updateTitleInput}
+            payerParticipantId={payerParticipantId}
+            saving={saving}
+            selectedItemId={selectedItemId}
+            selectedSplitParticipantIds={selectedSplitParticipantIds}
+            splitPolicy={splitPolicy}
+            manualSplitInputs={manualSplitInputs}
+            memoInput={memoInput}
+            titleInput={titleInput}
+            tripName={state.tripName}
+            viewModel={viewModel}
+            showActions={false}
+          />
+        ) : null}
 
-      {state.status === 'auth' ? (
-        <Card>
-          <Text style={styles.errorTitle}>다시 로그인해주세요.</Text>
-          <PrimaryButton label="로그인하기" onPress={goToLogin} />
-        </Card>
-      ) : null}
+        {state.status === 'auth' ? (
+          <Card>
+            <Text style={styles.errorTitle}>다시 로그인해주세요.</Text>
+            <PrimaryButton label="로그인하기" onPress={goToLogin} />
+          </Card>
+        ) : null}
 
-      {state.status === 'invalid' ? (
-        <Card>
-          <Text style={styles.errorTitle}>잘못된 지출 등록 주소예요.</Text>
-          <PrimaryButton label="일정으로 돌아가기" onPress={backToDay} />
-        </Card>
-      ) : null}
+        {state.status === 'invalid' ? (
+          <Card>
+            <Text style={styles.errorTitle}>잘못된 지출 등록 주소예요.</Text>
+            <PrimaryButton label="일정으로 돌아가기" onPress={backToDay} />
+          </Card>
+        ) : null}
 
-      {state.status === 'notFound' || state.status === 'error' ? (
-        <Card>
-          <Text style={styles.errorTitle}>
-            {state.status === 'notFound' ? '지출을 저장할 수 없어요.' : '불러올 수 없어요.'}
-          </Text>
-          <Text style={styles.message}>{state.message}</Text>
-          <PrimaryButton label="다시 시도" onPress={() => void load()} />
-          <SecondaryButton label="일정으로 돌아가기" onPress={backToDay} />
-        </Card>
+        {state.status === 'notFound' || state.status === 'error' ? (
+          <Card>
+            <Text style={styles.errorTitle}>
+              {state.status === 'notFound' ? '지출을 저장할 수 없어요.' : '불러올 수 없어요.'}
+            </Text>
+            <Text style={styles.message}>{state.message}</Text>
+            <PrimaryButton label="다시 시도" onPress={() => void load()} />
+            <SecondaryButton label="일정으로 돌아가기" onPress={backToDay} />
+          </Card>
+        ) : null}
+      </KeyboardAwareFormScrollView>
+      {showStickyActions && submitState ? (
+        <StickyActionFooter actionCount={2} layout={footerLayout}>
+          <PrimaryButton
+            disabled={submitState.disabled}
+            label="저장하기"
+            loading={saving}
+            loadingLabel="저장 중..."
+            onPress={() => void submit()}
+          />
+          <SecondaryButton disabled={saving} label="돌아가기" onPress={backToDay} />
+        </StickyActionFooter>
       ) : null}
-    </KeyboardAwareFormScrollView>
+    </View>
   );
 }

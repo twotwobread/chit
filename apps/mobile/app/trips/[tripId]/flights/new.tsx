@@ -123,7 +123,13 @@ export default function NewFlightScreen() {
   }
 
   return (
-    <TripScreen keyboardAware>
+    <TripScreen
+      keyboardAware
+      footer={
+        <PrimaryButton disabled={saving} label="항공편 저장" loading={saving} loadingLabel="저장 중" onPress={save} />
+      }
+      footerActionCount={1}
+    >
       <TripScreenHeader
         helper="티켓에 적힌 각 공항 현지 날짜·시간과 시간대를 선택해주세요. 시간대는 목록에서만 선택할 수 있어요."
         title="항공편 추가"
@@ -205,7 +211,6 @@ export default function NewFlightScreen() {
       </Card>
 
       {feedback ? <Text style={styles.feedback}>{feedback}</Text> : null}
-      <PrimaryButton disabled={saving} label="항공편 저장" loading={saving} loadingLabel="저장 중" onPress={save} />
     </TripScreen>
   );
 }

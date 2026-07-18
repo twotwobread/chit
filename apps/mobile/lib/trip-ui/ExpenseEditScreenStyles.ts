@@ -3,6 +3,10 @@ import { StyleSheet } from 'react-native';
 import { theme } from '../design';
 
 export const styles = StyleSheet.create({
+  screenRoot: {
+    backgroundColor: theme.color.bg,
+    flex: 1,
+  },
   container: {
     alignItems: 'center',
     backgroundColor: theme.color.bg,
@@ -308,5 +312,24 @@ export const styles = StyleSheet.create({
   },
   actions: {
     gap: theme.space[3],
+  },
+  destructiveHelper: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.caption,
+  },
+  destructiveSection: {
+    backgroundColor: theme.color.surfaceSunken,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    gap: theme.space[3],
+    padding: theme.space[4],
+  },
+  destructiveTitle: {
+    color: theme.color.danger,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.label,
+    fontWeight: theme.font.weight.bold,
   },
 });

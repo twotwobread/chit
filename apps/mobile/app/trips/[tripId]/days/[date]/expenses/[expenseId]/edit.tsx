@@ -1,8 +1,12 @@
-import { ActivityIndicator, Text } from 'react-native';
+import { ActivityIndicator, Text, View } from 'react-native';
 
-import { Card, SecondaryButton, theme } from '../../../../../../../lib/design';
-import { ExpenseEditForm } from '../../../../../../../lib/trip-ui/ExpenseEditScreenParts';
+import { Card, PrimaryButton, SecondaryButton, theme } from '../../../../../../../lib/design';
+import {
+  ExpenseEditForm,
+  buildExpenseEditFormSubmitState,
+} from '../../../../../../../lib/trip-ui/ExpenseEditScreenParts';
 import { KeyboardAwareFormScrollView } from '../../../../../../../lib/trip-ui/KeyboardAwareFormScrollView';
+import { StickyActionFooter, useStickyActionFooterLayout } from '../../../../../../../lib/trip-ui/StickyActionFooter';
 import { styles } from '../../../../../../../lib/trip-ui/ExpenseEditScreenStyles';
 import { useExpenseEditController } from '../../../../../../../lib/trip-ui/useExpenseEditController';
 
@@ -36,70 +40,103 @@ export default function ExpenseEditScreen() {
     updateManualSplitInput,
     viewModel,
   } = useExpenseEditController();
+  const footerLayout = useStickyActionFooterLayout({ actionCount: 1 });
+  const submitState = viewModel
+    ? buildExpenseEditFormSubmitState({
+        amountInput,
+        deleting,
+        includeInSettlement,
+        manualSplitInputs,
+        memoInput,
+        saving,
+        splitPolicy,
+        titleInput,
+        viewModel,
+      })
+    : null;
+  const showStickyActions = state.status === 'success' && Boolean(viewModel) && Boolean(submitState);
 
   return (
-    <KeyboardAwareFormScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.screenTitle}>지출 수정</Text>
+    <View style={styles.screenRoot}>
+      <KeyboardAwareFormScrollView
+        contentContainerStyle={styles.container}
+        keyboardFixedBottomOffset={footerLayout.keyboardFixedBottomOffset}
+        keyboardMinClearance={footerLayout.keyboardMinClearance}
+      >
+        <Text style={styles.screenTitle}>지출 수정</Text>
 
-      {state.status === 'loading' ? (
-        <Card>
-          <ActivityIndicator color={theme.color.primary} />
-          <Text style={styles.message}>지출 정보를 불러오는 중...</Text>
-        </Card>
-      ) : null}
+        {state.status === 'loading' ? (
+          <Card>
+            <ActivityIndicator color={theme.color.primary} />
+            <Text style={styles.message}>지출 정보를 불러오는 중...</Text>
+          </Card>
+        ) : null}
 
-      {state.status === 'auth' ? (
-        <Card>
-          <Text style={styles.errorTitle}>다시 로그인해주세요.</Text>
-          <Text style={styles.message}>로그인이 만료되었어요.</Text>
-        </Card>
-      ) : null}
+        {state.status === 'auth' ? (
+          <Card>
+            <Text style={styles.errorTitle}>다시 로그인해주세요.</Text>
+            <Text style={styles.message}>로그인이 만료되었어요.</Text>
+          </Card>
+        ) : null}
 
-      {state.status === 'invalid' ? (
-        <Card>
-          <Text style={styles.errorTitle}>잘못된 지출 수정 주소예요.</Text>
-          <SecondaryButton label="돌아가기" onPress={goBack} />
-        </Card>
-      ) : null}
+        {state.status === 'invalid' ? (
+          <Card>
+            <Text style={styles.errorTitle}>잘못된 지출 수정 주소예요.</Text>
+            <SecondaryButton label="돌아가기" onPress={goBack} />
+          </Card>
+        ) : null}
 
-      {state.status === 'notFound' || state.status === 'error' ? (
-        <Card>
-          <Text style={styles.errorTitle}>
-            {state.status === 'notFound' ? '지출을 찾을 수 없어요.' : '불러올 수 없어요.'}
-          </Text>
-          <Text style={styles.message}>{state.message}</Text>
-          <SecondaryButton label="다시 시도" onPress={() => void load()} />
-        </Card>
-      ) : null}
+        {state.status === 'notFound' || state.status === 'error' ? (
+          <Card>
+            <Text style={styles.errorTitle}>
+              {state.status === 'notFound' ? '지출을 찾을 수 없어요.' : '불러올 수 없어요.'}
+            </Text>
+            <Text style={styles.message}>{state.message}</Text>
+            <SecondaryButton label="다시 시도" onPress={() => void load()} />
+          </Card>
+        ) : null}
 
-      {state.status === 'success' && viewModel ? (
-        <ExpenseEditForm
-          amountInput={amountInput}
-          deleting={deleting}
-          errors={errors}
-          formMessage={formMessage}
-          includeInSettlement={includeInSettlement}
-          memoInput={memoInput}
-          onAmountChange={setAmountInput}
-          onDelete={confirmDelete}
-          onMemoChange={setMemoInput}
-          onPayerChange={setPayerParticipantId}
-          onSettlementIncludeChange={setIncludeInSettlement}
-          onClearTripDay={clearTripDay}
-          onPlaceChange={selectItem}
-          onSave={() => void submitSave()}
-          onSelectTripDay={selectTripDay}
-          onSplitPolicyChange={setSplitPolicy}
-          onTitleChange={setTitleInput}
-          onToggleSplitParticipant={toggleSplitParticipant}
-          onUpdateManualSplitInput={updateManualSplitInput}
-          saving={saving}
-          splitPolicy={splitPolicy}
-          titleInput={titleInput}
-          manualSplitInputs={manualSplitInputs}
-          viewModel={viewModel}
-        />
+        {state.status === 'success' && viewModel ? (
+          <ExpenseEditForm
+            amountInput={amountInput}
+            deleting={deleting}
+            errors={errors}
+            formMessage={formMessage}
+            includeInSettlement={includeInSettlement}
+            memoInput={memoInput}
+            onAmountChange={setAmountInput}
+            onDelete={confirmDelete}
+            onMemoChange={setMemoInput}
+            onPayerChange={setPayerParticipantId}
+            onSettlementIncludeChange={setIncludeInSettlement}
+            onClearTripDay={clearTripDay}
+            onPlaceChange={selectItem}
+            onSave={() => void submitSave()}
+            onSelectTripDay={selectTripDay}
+            onSplitPolicyChange={setSplitPolicy}
+            onTitleChange={setTitleInput}
+            onToggleSplitParticipant={toggleSplitParticipant}
+            onUpdateManualSplitInput={updateManualSplitInput}
+            saving={saving}
+            splitPolicy={splitPolicy}
+            titleInput={titleInput}
+            manualSplitInputs={manualSplitInputs}
+            viewModel={viewModel}
+            showSaveAction={false}
+          />
+        ) : null}
+      </KeyboardAwareFormScrollView>
+      {showStickyActions && submitState && viewModel ? (
+        <StickyActionFooter actionCount={1} layout={footerLayout}>
+          <PrimaryButton
+            disabled={submitState.disabled}
+            label={viewModel.saveLabel}
+            loading={saving}
+            loadingLabel="저장 중..."
+            onPress={() => void submitSave()}
+          />
+        </StickyActionFooter>
       ) : null}
-    </KeyboardAwareFormScrollView>
+    </View>
   );
 }

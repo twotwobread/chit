@@ -25,6 +25,70 @@ import {
 } from './ExpenseFormSharedParts';
 import { styles } from './QuickExpenseEntryStyles';
 
+export type QuickExpenseFormSubmitStateInput = {
+  amountInput: string;
+  expenseDateInput: string;
+  includeInSettlement: boolean;
+  manualSplitInputs: QuickExpenseManualSplitInput[];
+  memoInput: string;
+  mode: 'today' | 'settlement';
+  payerParticipantId: string | null;
+  saving: boolean;
+  selectedItemId: string | null;
+  selectedSplitParticipantIds: string[];
+  splitPolicy: QuickExpenseSplitPolicy;
+  titleInput: string;
+  viewModel: QuickExpenseViewModel;
+};
+
+export function buildQuickExpenseFormSubmitState({
+  amountInput,
+  expenseDateInput,
+  includeInSettlement,
+  manualSplitInputs,
+  memoInput,
+  mode,
+  payerParticipantId,
+  saving,
+  selectedItemId,
+  selectedSplitParticipantIds,
+  splitPolicy,
+  titleInput,
+  viewModel,
+}: QuickExpenseFormSubmitStateInput): { disabled: boolean } {
+  const activeManualSplitInputs = manualSplitInputs.filter((input) =>
+    selectedSplitParticipantIds.includes(input.participantId),
+  );
+  const validation =
+    mode === 'settlement'
+      ? buildCreateTripExpenseRequest({
+          titleInput,
+          expenseDate: expenseDateInput,
+          amountInput,
+          currency: viewModel.currency,
+          selectedTripDayId: viewModel.selectedTripDayId,
+          scheduleItemId: selectedItemId,
+          splitPolicy,
+          participantIds: selectedSplitParticipantIds,
+          manualSplitInputs: activeManualSplitInputs,
+          payerParticipantId,
+          memoInput,
+          includeInSettlement,
+        })
+      : buildCreateQuickExpenseRequest({
+          amountInput,
+          currency: viewModel.currency,
+          scheduleItemId: selectedItemId,
+          splitPolicy,
+          participantIds: selectedSplitParticipantIds,
+          manualSplitInputs: activeManualSplitInputs,
+          payerParticipantId,
+          includeInSettlement,
+        });
+
+  return { disabled: !validation.ok || saving || Boolean(viewModel.emptyMessage) };
+}
+
 export function QuickExpenseForm({
   amountInput,
   errors,
@@ -50,6 +114,7 @@ export function QuickExpenseForm({
   saving,
   selectedItemId,
   selectedSplitParticipantIds,
+  showActions = true,
   splitPolicy,
   manualSplitInputs,
   memoInput,
@@ -84,6 +149,7 @@ export function QuickExpenseForm({
   saving: boolean;
   selectedItemId: string | null;
   selectedSplitParticipantIds: string[];
+  showActions?: boolean;
   splitPolicy: QuickExpenseSplitPolicy;
   manualSplitInputs: QuickExpenseManualSplitInput[];
   memoInput: string;
@@ -91,36 +157,21 @@ export function QuickExpenseForm({
   tripName: string;
   viewModel: QuickExpenseViewModel;
 }) {
-  const activeManualSplitInputs = manualSplitInputs.filter((input) =>
-    selectedSplitParticipantIds.includes(input.participantId),
-  );
-  const validation =
-    mode === 'settlement'
-      ? buildCreateTripExpenseRequest({
-          titleInput,
-          expenseDate: expenseDateInput,
-          amountInput,
-          currency: viewModel.currency,
-          selectedTripDayId: viewModel.selectedTripDayId,
-          scheduleItemId: selectedItemId,
-          splitPolicy,
-          participantIds: selectedSplitParticipantIds,
-          manualSplitInputs: activeManualSplitInputs,
-          payerParticipantId,
-          memoInput,
-          includeInSettlement,
-        })
-      : buildCreateQuickExpenseRequest({
-          amountInput,
-          currency: viewModel.currency,
-          scheduleItemId: selectedItemId,
-          splitPolicy,
-          participantIds: selectedSplitParticipantIds,
-          manualSplitInputs: activeManualSplitInputs,
-          payerParticipantId,
-          includeInSettlement,
-        });
-  const canSubmit = validation.ok && !saving && !viewModel.emptyMessage;
+  const submitState = buildQuickExpenseFormSubmitState({
+    amountInput,
+    expenseDateInput,
+    includeInSettlement,
+    manualSplitInputs,
+    memoInput,
+    mode,
+    payerParticipantId,
+    saving,
+    selectedItemId,
+    selectedSplitParticipantIds,
+    splitPolicy,
+    titleInput,
+    viewModel,
+  });
   const selectedPayerOptions = viewModel.payerOptions.map((option) => ({
     ...option,
     selected: option.participantId === payerParticipantId,
@@ -283,14 +334,18 @@ export function QuickExpenseForm({
 
         {formMessage ? <Text style={styles.errorMessage}>{formMessage}</Text> : null}
 
-        <PrimaryButton
-          disabled={!canSubmit}
-          label="저장하기"
-          loading={saving}
-          loadingLabel="저장 중..."
-          onPress={onSubmit}
-        />
-        <SecondaryButton disabled={saving} label="돌아가기" onPress={onBack} />
+        {showActions ? (
+          <>
+            <PrimaryButton
+              disabled={submitState.disabled}
+              label="저장하기"
+              loading={saving}
+              loadingLabel="저장 중..."
+              onPress={onSubmit}
+            />
+            <SecondaryButton disabled={saving} label="돌아가기" onPress={onBack} />
+          </>
+        ) : null}
       </Card>
 
       <ExpensePaymentSplitSheet

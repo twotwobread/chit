@@ -20,6 +20,7 @@ import {
   type PlaceScheduleDetailFormValues,
 } from '../../../../../../lib/places/place-schedule-detail';
 import { KeyboardAwareFormScrollView } from '../../../../../../lib/trip-ui/KeyboardAwareFormScrollView';
+import { StickyActionFooter, useStickyActionFooterLayout } from '../../../../../../lib/trip-ui/StickyActionFooter';
 import { ScheduleTimeEditor } from '../../../../../../lib/trip-ui/ScheduleTimeEditor';
 import { tripItineraryDayPath, tripItineraryPath } from '../../../../../../lib/trips/routes';
 
@@ -176,6 +177,7 @@ export default function NewPlaceScheduleDetailScreen() {
   };
 
   const submitView = buildPlaceScheduleDetailSubmitState(isSubmitting, hasRequiredPlaceScheduleDetailFields(values));
+  const footerLayout = useStickyActionFooterLayout({ actionCount: 2 });
 
   if (!tripId || !date) {
     return (
@@ -190,110 +192,120 @@ export default function NewPlaceScheduleDetailScreen() {
   }
 
   return (
-    <KeyboardAwareFormScrollView contentContainerStyle={styles.scrollContent} style={styles.scroll}>
-      <View style={styles.header}>
-        <Text style={styles.screenTitle}>일정 상세 입력</Text>
-        <Text style={styles.screenHelper}>장소를 검색해 일정에 추가해 주세요.</Text>
-      </View>
+    <View style={styles.screenRoot}>
+      <KeyboardAwareFormScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardFixedBottomOffset={footerLayout.keyboardFixedBottomOffset}
+        keyboardMinClearance={footerLayout.keyboardMinClearance}
+        style={styles.scroll}
+      >
+        <View style={styles.header}>
+          <Text style={styles.screenTitle}>일정 상세 입력</Text>
+          <Text style={styles.screenHelper}>장소를 검색해 일정에 추가해 주세요.</Text>
+        </View>
 
-      <Card>
-        <View style={styles.fieldGroup}>
-          <Text style={styles.label}>장소</Text>
-          {values.selectedPlace ? (
-            <View style={styles.placeCard}>
-              <View style={styles.placeHeader}>
-                <Text style={styles.placeName}>{values.selectedPlace.placeName}</Text>
-                <Text style={styles.placeType}>{values.selectedPlace.typeHint}</Text>
+        <Card>
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>장소</Text>
+            {values.selectedPlace ? (
+              <View style={styles.placeCard}>
+                <View style={styles.placeHeader}>
+                  <Text style={styles.placeName}>{values.selectedPlace.placeName}</Text>
+                  <Text style={styles.placeType}>{values.selectedPlace.typeHint}</Text>
+                </View>
+                <Text style={styles.placeAddress}>{values.selectedPlace.address}</Text>
               </View>
-              <Text style={styles.placeAddress}>{values.selectedPlace.address}</Text>
-            </View>
-          ) : (
-            <Text style={styles.helperText}>일정을 저장하려면 장소를 먼저 검색해 주세요.</Text>
-          )}
-          {errors.place ? <Text style={styles.fieldError}>{errors.place}</Text> : null}
-          <PrimaryButton
-            disabled={isSubmitting}
-            label={values.selectedPlace ? '장소 다시 검색' : '장소 검색'}
-            onPress={openPlaceSearch}
-          />
-          {values.selectedPlace ? (
-            <SecondaryButton disabled={isSubmitting} label="장소 지우기" onPress={clearSelectedPlace} />
-          ) : null}
-        </View>
-
-        <View style={styles.fieldGroup}>
-          <Text style={styles.label}>일정 제목</Text>
-          <TextInput
-            editable={!isSubmitting}
-            onChangeText={(title) => updateValues({ title, titleTouched: true })}
-            placeholder="예: 도톤보리 산책"
-            placeholderTextColor={theme.color.textFaint}
-            style={styles.input}
-            value={values.title}
-          />
-          {errors.title ? <Text style={styles.fieldError}>{errors.title}</Text> : null}
-        </View>
-
-        <ScheduleTimeEditor
-          disabled={isSubmitting}
-          endTimeError={errors.endTime}
-          onChange={updateValues}
-          startTimeError={errors.startTime}
-          values={values}
-        />
-
-        <View style={styles.fieldGroup}>
-          <Text style={styles.label}>메모</Text>
-          <TextInput
-            editable={!isSubmitting}
-            multiline
-            onChangeText={(memo) => updateValues({ memo })}
-            placeholder="선택 입력"
-            placeholderTextColor={theme.color.textFaint}
-            style={[styles.input, styles.memoInput]}
-            textAlignVertical="top"
-            value={values.memo}
-          />
-          {errors.memo ? <Text style={styles.fieldError}>{errors.memo}</Text> : null}
-        </View>
-
-        {duplicateConfirmation ? (
-          <View style={styles.noticeBox}>
-            <Text style={styles.errorTitle}>이미 추가된 장소예요.</Text>
-            <Text style={styles.message}>{duplicateConfirmation}</Text>
+            ) : (
+              <Text style={styles.helperText}>일정을 저장하려면 장소를 먼저 검색해 주세요.</Text>
+            )}
+            {errors.place ? <Text style={styles.fieldError}>{errors.place}</Text> : null}
             <PrimaryButton
               disabled={isSubmitting}
-              label="한 번 더 추가"
-              loading={isSubmitting}
-              loadingLabel="저장 중..."
-              onPress={() => void submit(true)}
+              label={values.selectedPlace ? '장소 다시 검색' : '장소 검색'}
+              onPress={openPlaceSearch}
             />
+            {values.selectedPlace ? (
+              <SecondaryButton disabled={isSubmitting} label="장소 지우기" onPress={clearSelectedPlace} />
+            ) : null}
           </View>
-        ) : null}
 
-        {failure ? (
-          <View style={styles.noticeBox}>
-            <Text style={styles.errorTitle}>{failure.title}</Text>
-            <Text style={styles.message}>{failure.helper}</Text>
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>일정 제목</Text>
+            <TextInput
+              editable={!isSubmitting}
+              onChangeText={(title) => updateValues({ title, titleTouched: true })}
+              placeholder="예: 도톤보리 산책"
+              placeholderTextColor={theme.color.textFaint}
+              style={styles.input}
+              value={values.title}
+            />
+            {errors.title ? <Text style={styles.fieldError}>{errors.title}</Text> : null}
           </View>
-        ) : null}
 
-        <View style={styles.actionGroup}>
-          <PrimaryButton
-            disabled={submitView.disabled}
-            label={submitView.label}
-            loading={isSubmitting}
-            loadingLabel={submitView.label}
-            onPress={() => void submit(false)}
+          <ScheduleTimeEditor
+            disabled={isSubmitting}
+            endTimeError={errors.endTime}
+            onChange={updateValues}
+            startTimeError={errors.startTime}
+            values={values}
           />
-          <SecondaryButton disabled={isSubmitting} label="일정으로 돌아가기" onPress={backToDay} />
-        </View>
-      </Card>
-    </KeyboardAwareFormScrollView>
+
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>메모</Text>
+            <TextInput
+              editable={!isSubmitting}
+              multiline
+              onChangeText={(memo) => updateValues({ memo })}
+              placeholder="선택 입력"
+              placeholderTextColor={theme.color.textFaint}
+              style={[styles.input, styles.memoInput]}
+              textAlignVertical="top"
+              value={values.memo}
+            />
+            {errors.memo ? <Text style={styles.fieldError}>{errors.memo}</Text> : null}
+          </View>
+
+          {duplicateConfirmation ? (
+            <View style={styles.noticeBox}>
+              <Text style={styles.errorTitle}>이미 추가된 장소예요.</Text>
+              <Text style={styles.message}>{duplicateConfirmation}</Text>
+              <PrimaryButton
+                disabled={isSubmitting}
+                label="한 번 더 추가"
+                loading={isSubmitting}
+                loadingLabel="저장 중..."
+                onPress={() => void submit(true)}
+              />
+            </View>
+          ) : null}
+
+          {failure ? (
+            <View style={styles.noticeBox}>
+              <Text style={styles.errorTitle}>{failure.title}</Text>
+              <Text style={styles.message}>{failure.helper}</Text>
+            </View>
+          ) : null}
+        </Card>
+      </KeyboardAwareFormScrollView>
+      <StickyActionFooter actionCount={2} layout={footerLayout}>
+        <PrimaryButton
+          disabled={submitView.disabled}
+          label={submitView.label}
+          loading={isSubmitting}
+          loadingLabel={submitView.label}
+          onPress={() => void submit(false)}
+        />
+        <SecondaryButton disabled={isSubmitting} label="일정으로 돌아가기" onPress={backToDay} />
+      </StickyActionFooter>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screenRoot: {
+    backgroundColor: theme.color.bg,
+    flex: 1,
+  },
   scroll: {
     flex: 1,
     backgroundColor: theme.color.bg,

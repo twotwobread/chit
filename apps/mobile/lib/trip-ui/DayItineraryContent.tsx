@@ -9,7 +9,11 @@ import {
   type DayItineraryViewModel,
 } from '../trips/day-itinerary';
 import { buildDayItineraryDetailPanel } from '../trips/day-itinerary-detail-panel';
-import { hasDayItineraryEditFormChanges, type DayItineraryEditFormValues } from '../trips/day-itinerary-edit';
+import {
+  buildDayItineraryEditSubmitState,
+  hasDayItineraryEditFormChanges,
+  type DayItineraryEditFormValues,
+} from '../trips/day-itinerary-edit';
 import {
   type DayItineraryMapActionFeedback,
   type DayItineraryMapActionInput,
@@ -574,13 +578,34 @@ function DayItineraryItemSheet({
       return null;
     }
 
+    const isSaving = editState.status === 'saving';
+    const submitView = buildDayItineraryEditSubmitState(isSaving);
+
     return (
-      <BottomSheet onClose={onClose} scrollable visible>
+      <BottomSheet
+        footer={
+          <>
+            <SecondaryButton disabled={isSaving} label="취소" onPress={onCancelEdit} />
+            <PrimaryButton
+              disabled={submitView.disabled}
+              label={submitView.label}
+              loading={isSaving}
+              loadingLabel={submitView.label}
+              onPress={onSubmitEdit}
+            />
+          </>
+        }
+        footerActionCount={2}
+        onClose={onClose}
+        scrollable
+        visible
+      >
         <EditPlacePanel
           editState={editState}
           onCancel={onCancelEdit}
           onSubmit={onSubmitEdit}
           onUpdateValues={onUpdateEditValues}
+          showActions={false}
           variant="sheet"
         />
       </BottomSheet>
