@@ -1,6 +1,6 @@
 import type { Href } from 'expo-router';
 
-import { buildPlaceScheduleDetailRoute } from '../places/place-schedule-detail';
+import { buildGooglePlaceSearchRoute } from '../places/google-search';
 
 import { tripItineraryDayPath } from './routes';
 
@@ -14,9 +14,9 @@ const dayItineraryAddPlaceReturnParamName = 'returnTo';
 const dayItineraryAddPlaceReturnToDayValue = 'itinerary-tab';
 
 export function buildDayItineraryAddPlaceSearchRoute(tripId: string, date: string): Href {
-  const detailRoute = buildPlaceScheduleDetailRoute(tripId, date);
+  const searchRoute = buildGooglePlaceSearchRoute(tripId, date);
   const returnParam = `${dayItineraryAddPlaceReturnParamName}=${dayItineraryAddPlaceReturnToDayValue}`;
-  return `${detailRoute}?${returnParam}` as Href;
+  return `${searchRoute}?${returnParam}` as Href;
 }
 
 export function buildDayItineraryLodgingPlaceSearchRoute(tripId: string, date: string): Href {

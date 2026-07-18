@@ -4,8 +4,6 @@ import type { DayItineraryRowViewModel } from './day-itinerary';
 import { manualPlaceTypeValues } from './manual-place';
 
 export type DayItineraryEditFormValues = {
-  name: string;
-  address: string;
   placeType?: TripPlaceType | string;
   startTime: string;
   endTime: string;
@@ -13,8 +11,6 @@ export type DayItineraryEditFormValues = {
 };
 
 export type DayItineraryEditFormErrors = {
-  name?: string;
-  address?: string;
   placeType?: string;
   startTime?: string;
   endTime?: string;
@@ -48,8 +44,6 @@ export type DayItineraryDeleteFocusTarget =
 
 export function buildDayItineraryEditForm(item: DayItineraryRowViewModel): DayItineraryEditFormValues {
   return {
-    name: item.placeName,
-    address: item.address,
     placeType: item.placeType,
     startTime: item.startTime ?? '',
     endTime: item.endTime ?? '',
@@ -62,8 +56,6 @@ export function hasDayItineraryEditFormChanges(
   current: DayItineraryEditFormValues,
 ): boolean {
   return (
-    current.name.trim() !== original.name.trim() ||
-    current.address.trim() !== original.address.trim() ||
     current.placeType !== original.placeType ||
     current.startTime.trim() !== original.startTime.trim() ||
     current.endTime.trim() !== original.endTime.trim() ||
@@ -75,25 +67,11 @@ export function validateDayItineraryEditForm(
   original: DayItineraryEditFormValues,
   current: DayItineraryEditFormValues,
 ): DayItineraryEditValidationResult {
-  const name = current.name.trim();
-  const address = current.address.trim();
   const placeType = isTripPlaceType(current.placeType) ? current.placeType : undefined;
   const startTime = current.startTime.trim();
   const endTime = current.endTime.trim();
   const memo = current.memo.trim();
   const errors: DayItineraryEditFormErrors = {};
-
-  if (name.length === 0) {
-    errors.name = '장소명을 입력해주세요.';
-  } else if ([...name].length > 120) {
-    errors.name = '장소명은 120자 이하로 입력해주세요.';
-  }
-
-  if (address.length === 0) {
-    errors.address = '주소를 입력해주세요.';
-  } else if ([...address].length > 300) {
-    errors.address = '주소는 300자 이하로 입력해주세요.';
-  }
 
   if (!placeType) {
     errors.placeType = '장소 타입을 선택해주세요.';
@@ -120,20 +98,12 @@ export function validateDayItineraryEditForm(
     return { ok: false, errors };
   }
 
-  const originalName = original.name.trim();
-  const originalAddress = original.address.trim();
   const originalPlaceType = isTripPlaceType(original.placeType) ? original.placeType : undefined;
   const originalStartTime = original.startTime.trim();
   const originalEndTime = original.endTime.trim();
   const originalMemo = original.memo.trim();
   const request: UpdateScheduleItemRequest = {};
 
-  if (name !== originalName) {
-    request.name = name;
-  }
-  if (address !== originalAddress) {
-    request.address = address;
-  }
   if (placeType !== originalPlaceType) {
     request.placeType = placeType;
   }

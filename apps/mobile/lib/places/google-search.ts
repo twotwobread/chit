@@ -382,6 +382,13 @@ export function buildCreateGooglePlaceScheduleItemRequest(
   return { googlePlaceId: googlePlaceId.trim(), duplicateConfirmed, title: title.trim() };
 }
 
+export function buildCreateGooglePlaceScheduleItemRequestFromSearchResult(
+  result: GooglePlaceSearchRowViewModel,
+  duplicateConfirmed: boolean,
+): CreateGooglePlaceScheduleItemRequest {
+  return buildCreateGooglePlaceScheduleItemRequest(result.id, duplicateConfirmed, result.placeName);
+}
+
 export function isDuplicateDayPlaceConfirmationError(errorBody: unknown): boolean {
   if (!errorBody || typeof errorBody !== 'object' || !('error' in errorBody)) {
     return false;

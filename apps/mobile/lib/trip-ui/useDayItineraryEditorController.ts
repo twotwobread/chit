@@ -32,7 +32,7 @@ import {
   dayItineraryFailureState,
   type DayItineraryRowViewModel,
 } from '../trips/day-itinerary';
-import { buildPlaceScheduleDetailRoute } from '../places/place-schedule-detail';
+import { buildDayItineraryAddPlaceSearchRoute } from '../trips/day-itinerary-add-place-navigation';
 import { tripItineraryDayPath, tripItineraryPath } from '../trips/routes';
 import { getTripDayItinerary, moveScheduleItemToDay } from '../trips/itinerary-api';
 import {
@@ -648,7 +648,7 @@ export function useDayItineraryEditorController({
 
   const addPlace = () => {
     if (tripId && date) {
-      router.push(buildPlaceScheduleDetailRoute(tripId, date));
+      router.push(buildDayItineraryAddPlaceSearchRoute(tripId, date));
     }
   };
 

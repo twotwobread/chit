@@ -578,10 +578,7 @@ function DayItineraryItemSheet({
       <BottomSheet onClose={onClose} scrollable visible>
         <EditPlacePanel
           editState={editState}
-          mapActionFeedback={mapActionFeedback}
           onCancel={onCancelEdit}
-          onCopyAddress={onCopyAddress}
-          onOpenMap={onOpenMap}
           onSubmit={onSubmitEdit}
           onUpdateValues={onUpdateEditValues}
           variant="sheet"

@@ -5,6 +5,7 @@ import { theme } from '../design/theme';
 import {
   addingGooglePlaceState,
   buildCreateGooglePlaceScheduleItemRequest,
+  buildCreateGooglePlaceScheduleItemRequestFromSearchResult,
   buildGooglePlaceExplorationDetail,
   buildGooglePlaceDetailsErrorState,
   buildGooglePlaceDetailsLoadingState,
@@ -123,6 +124,14 @@ describe('google place search helpers', () => {
       duplicateConfirmed: false,
       title: '도톤보리 산책',
     });
+    assert.deepEqual(buildCreateGooglePlaceScheduleItemRequestFromSearchResult(result, true), {
+      googlePlaceId: 'google-1',
+      duplicateConfirmed: true,
+      title: '도톤보리',
+    });
+    assert.equal('startTime' in buildCreateGooglePlaceScheduleItemRequestFromSearchResult(result, false), false);
+    assert.equal('endTime' in buildCreateGooglePlaceScheduleItemRequestFromSearchResult(result, false), false);
+    assert.equal('memo' in buildCreateGooglePlaceScheduleItemRequestFromSearchResult(result, false), false);
     assert.deepEqual(idleGooglePlaceAddState(), { status: 'idle' });
     assert.deepEqual(addingGooglePlaceState('google-1'), { status: 'adding', googlePlaceId: 'google-1' });
     assert.deepEqual(confirmingDuplicateGooglePlaceState(result), {
