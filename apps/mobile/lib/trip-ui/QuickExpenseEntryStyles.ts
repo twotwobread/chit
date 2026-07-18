@@ -3,6 +3,10 @@ import { StyleSheet } from 'react-native';
 import { theme } from '../design';
 
 export const styles = StyleSheet.create({
+  screenRoot: {
+    backgroundColor: theme.color.bg,
+    flex: 1,
+  },
   scroll: {
     flex: 1,
     backgroundColor: theme.color.bg,

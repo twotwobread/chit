@@ -14,12 +14,14 @@ export function EditPlacePanel({
   onCancel,
   onSubmit,
   onUpdateValues,
+  showActions = true,
   variant = 'card',
 }: {
   editState: EditPlacePanelState;
   onCancel: () => void;
   onSubmit: () => void;
   onUpdateValues: (values: DayItineraryEditFormValues) => void;
+  showActions?: boolean;
   variant?: EditPlacePanelVariant;
 }) {
   const isSaving = editState.status === 'saving';
@@ -82,22 +84,24 @@ export function EditPlacePanel({
         </View>
       ) : null}
 
-      <View style={variant === 'sheet' ? styles.sheetActionRow : styles.actionGroup}>
-        <SecondaryButton
-          disabled={isSaving}
-          label="취소"
-          onPress={onCancel}
-          style={variant === 'sheet' ? styles.sheetActionButton : null}
-        />
-        <PrimaryButton
-          disabled={submitView.disabled}
-          label={submitView.label}
-          loading={isSaving}
-          loadingLabel={submitView.label}
-          onPress={onSubmit}
-          style={variant === 'sheet' ? styles.sheetActionButton : null}
-        />
-      </View>
+      {showActions ? (
+        <View style={variant === 'sheet' ? styles.sheetActionRow : styles.actionGroup}>
+          <SecondaryButton
+            disabled={isSaving}
+            label="취소"
+            onPress={onCancel}
+            style={variant === 'sheet' ? styles.sheetActionButton : null}
+          />
+          <PrimaryButton
+            disabled={submitView.disabled}
+            label={submitView.label}
+            loading={isSaving}
+            loadingLabel={submitView.label}
+            onPress={onSubmit}
+            style={variant === 'sheet' ? styles.sheetActionButton : null}
+          />
+        </View>
+      ) : null}
     </>
   );
 

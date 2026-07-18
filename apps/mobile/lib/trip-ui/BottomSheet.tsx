@@ -5,29 +5,35 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { theme } from '../design';
 import { KeyboardAwareFormScrollView } from './KeyboardAwareFormScrollView';
+import { StickyActionFooter, useStickyActionFooterLayout } from './StickyActionFooter';
 
 export type BottomSheetProps = {
   visible: boolean;
   onClose: () => void;
   children: ReactNode;
+  footer?: ReactNode;
+  footerActionCount?: number;
   scrollable?: boolean;
   showCloseButton?: boolean;
 };
 
 export function BottomSheet({
   children,
+  footer,
+  footerActionCount = 1,
   onClose,
   scrollable = false,
   showCloseButton = true,
   visible,
 }: BottomSheetProps) {
   const insets = useSafeAreaInsets();
+  const footerLayout = useStickyActionFooterLayout({ actionCount: footerActionCount });
 
   return (
     <Modal animationType="slide" onRequestClose={onClose} transparent visible={visible}>
       <View style={styles.root}>
         <Pressable accessibilityLabel="닫기" accessibilityRole="button" onPress={onClose} style={styles.scrim} />
-        <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, theme.space[6]) }]}>
+        <View style={[styles.sheet, { paddingBottom: footer ? 0 : Math.max(insets.bottom, theme.space[6]) }]}>
           {showCloseButton ? (
             <Pressable
               accessibilityLabel="닫기"
@@ -44,6 +50,8 @@ export function BottomSheet({
             <KeyboardAwareFormScrollView
               bounces={false}
               contentContainerStyle={styles.scrollContent}
+              keyboardFixedBottomOffset={footer ? footerLayout.keyboardFixedBottomOffset : undefined}
+              keyboardMinClearance={footer ? footerLayout.keyboardMinClearance : undefined}
               showsVerticalScrollIndicator={false}
             >
               {children}
@@ -51,6 +59,11 @@ export function BottomSheet({
           ) : (
             children
           )}
+          {footer ? (
+            <StickyActionFooter actionCount={footerActionCount} layout={footerLayout}>
+              {footer}
+            </StickyActionFooter>
+          ) : null}
         </View>
       </View>
     </Modal>

@@ -22,6 +22,53 @@ import {
 } from './ExpenseFormSharedParts';
 import { styles } from './ExpenseEditScreenStyles';
 
+export type ExpenseEditFormSubmitStateInput = {
+  amountInput: string;
+  deleting: boolean;
+  includeInSettlement: boolean;
+  manualSplitInputs: QuickExpenseManualSplitInput[];
+  memoInput: string;
+  saving: boolean;
+  splitPolicy: QuickExpenseSplitPolicy;
+  titleInput: string;
+  viewModel: ExpenseEditViewModel;
+};
+
+export function buildExpenseEditFormSubmitState({
+  amountInput,
+  deleting,
+  includeInSettlement,
+  manualSplitInputs,
+  memoInput,
+  saving,
+  splitPolicy,
+  titleInput,
+  viewModel,
+}: ExpenseEditFormSubmitStateInput): { disabled: boolean } {
+  const selectedPayerParticipantId = viewModel.payerOptions.find((option) => option.selected)?.participantId ?? null;
+  const selectedScheduleItemId = viewModel.selectedItem?.itemId ?? null;
+  const selectedSplitParticipantIds = viewModel.splitParticipantOptions
+    .filter((option) => option.selected)
+    .map((option) => option.participantId);
+  const activeManualSplitInputs = manualSplitInputs.filter((input) =>
+    selectedSplitParticipantIds.includes(input.participantId),
+  );
+  const saveValidation = buildUpdateExpenseRequest({
+    amountInput,
+    currency: viewModel.currency,
+    splitPolicy,
+    participantIds: selectedSplitParticipantIds,
+    manualSplitInputs: activeManualSplitInputs,
+    scheduleItemId: selectedScheduleItemId,
+    memoInput,
+    payerParticipantId: selectedPayerParticipantId,
+    titleInput,
+    includeInSettlement,
+  });
+
+  return { disabled: !saveValidation.ok || saving || deleting };
+}
+
 export function ExpenseEditForm({
   amountInput,
   deleting,
@@ -43,6 +90,7 @@ export function ExpenseEditForm({
   onToggleSplitParticipant,
   onUpdateManualSplitInput,
   saving,
+  showSaveAction = true,
   splitPolicy,
   titleInput,
   manualSplitInputs,
@@ -68,6 +116,7 @@ export function ExpenseEditForm({
   onToggleSplitParticipant: (participantId: string) => void;
   onUpdateManualSplitInput: (participantId: string, amount: string) => void;
   saving: boolean;
+  showSaveAction?: boolean;
   splitPolicy: QuickExpenseSplitPolicy;
   titleInput: string;
   manualSplitInputs: QuickExpenseManualSplitInput[];
@@ -78,22 +127,17 @@ export function ExpenseEditForm({
   const selectedSplitParticipantIds = viewModel.splitParticipantOptions
     .filter((option) => option.selected)
     .map((option) => option.participantId);
-  const activeManualSplitInputs = manualSplitInputs.filter((input) =>
-    selectedSplitParticipantIds.includes(input.participantId),
-  );
-  const saveValidation = buildUpdateExpenseRequest({
+  const submitState = buildExpenseEditFormSubmitState({
     amountInput,
-    currency: viewModel.currency,
-    splitPolicy,
-    participantIds: selectedSplitParticipantIds,
-    manualSplitInputs: activeManualSplitInputs,
-    scheduleItemId: selectedScheduleItemId,
-    memoInput,
-    payerParticipantId: selectedPayerParticipantId,
-    titleInput,
+    deleting,
     includeInSettlement,
+    manualSplitInputs,
+    memoInput,
+    saving,
+    splitPolicy,
+    titleInput,
+    viewModel,
   });
-  const canSave = saveValidation.ok && !saving && !deleting;
   const [activeSheet, setActiveSheet] = useState<'split' | 'settlement' | null>(null);
   const showDayTabs = viewModel.dayOptions.length > 0;
   const showAllScheduleContext = viewModel.selectedTripDayId === null && viewModel.dayOptions.length > 0;
@@ -200,14 +244,21 @@ export function ExpenseEditForm({
 
         {formMessage ? <Text style={styles.validationText}>{formMessage}</Text> : null}
 
-        <View style={styles.actions}>
-          <PrimaryButton
-            disabled={!canSave}
-            label={viewModel.saveLabel}
-            loading={saving}
-            loadingLabel="저장 중..."
-            onPress={onSave}
-          />
+        {showSaveAction ? (
+          <View style={styles.actions}>
+            <PrimaryButton
+              disabled={submitState.disabled}
+              label={viewModel.saveLabel}
+              loading={saving}
+              loadingLabel="저장 중..."
+              onPress={onSave}
+            />
+          </View>
+        ) : null}
+
+        <View style={styles.destructiveSection}>
+          <Text style={styles.destructiveTitle}>위험 작업</Text>
+          <Text style={styles.destructiveHelper}>삭제하면 이 지출 내역을 되돌릴 수 없어요.</Text>
           <SecondaryButton
             disabled={saving || deleting}
             label={deleting ? '삭제 중...' : viewModel.deleteLabel}

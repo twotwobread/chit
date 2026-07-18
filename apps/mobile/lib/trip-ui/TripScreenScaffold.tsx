@@ -3,22 +3,45 @@ import { ActivityIndicator, ScrollView, StyleSheet, Text, View, type StyleProp, 
 
 import { Card, PrimaryButton, SecondaryButton, theme } from '../design';
 import { KeyboardAwareFormScrollView } from './KeyboardAwareFormScrollView';
+import { StickyActionFooter, useStickyActionFooterLayout } from './StickyActionFooter';
 
 export function TripScreen({
   children,
   contentContainerStyle,
+  footer,
+  footerActionCount = 1,
   keyboardAware = false,
 }: {
   children: ReactNode;
   contentContainerStyle?: StyleProp<ViewStyle>;
+  footer?: ReactNode;
+  footerActionCount?: number;
   keyboardAware?: boolean;
 }) {
-  const ScreenScrollView = keyboardAware ? KeyboardAwareFormScrollView : ScrollView;
+  const footerLayout = useStickyActionFooterLayout({ actionCount: footerActionCount });
 
   return (
-    <ScreenScrollView contentContainerStyle={[styles.content, contentContainerStyle]} style={styles.scroll}>
-      {children}
-    </ScreenScrollView>
+    <View style={styles.root}>
+      {keyboardAware ? (
+        <KeyboardAwareFormScrollView
+          contentContainerStyle={[styles.content, contentContainerStyle]}
+          keyboardFixedBottomOffset={footer ? footerLayout.keyboardFixedBottomOffset : undefined}
+          keyboardMinClearance={footer ? footerLayout.keyboardMinClearance : undefined}
+          style={styles.scroll}
+        >
+          {children}
+        </KeyboardAwareFormScrollView>
+      ) : (
+        <ScrollView contentContainerStyle={[styles.content, contentContainerStyle]} style={styles.scroll}>
+          {children}
+        </ScrollView>
+      )}
+      {footer ? (
+        <StickyActionFooter actionCount={footerActionCount} layout={footerLayout}>
+          {footer}
+        </StickyActionFooter>
+      ) : null}
+    </View>
   );
 }
 
@@ -95,6 +118,10 @@ const styles = StyleSheet.create({
     gap: 0,
     paddingHorizontal: theme.space[5],
     paddingVertical: theme.space[2],
+  },
+  root: {
+    backgroundColor: theme.color.bg,
+    flex: 1,
   },
   scroll: {
     backgroundColor: theme.color.bg,

@@ -21,6 +21,7 @@ import {
 } from '../../lib/trips/destinations';
 import { createTrip, searchDestinations } from '../../lib/trips/trip-api';
 import { KeyboardAwareFormScrollView } from '../../lib/trip-ui/KeyboardAwareFormScrollView';
+import { StickyActionFooter, useStickyActionFooterLayout } from '../../lib/trip-ui/StickyActionFooter';
 import { TripDateRangeEditor } from '../../lib/trip-ui/TripDateRangeEditor';
 import { dateFromString, isValidDate, monthStringFromDate, todayString } from '../../lib/trips/date';
 import { TripFormField } from '../../lib/trips/date-picker';
@@ -160,6 +161,7 @@ export default function NewTripScreen() {
   };
 
   const destinationStatus = destinationSelectionStatus(destinations);
+  const footerLayout = useStickyActionFooterLayout({ actionCount: 1 });
 
   if (destinationSearchOpen) {
     return (
@@ -180,99 +182,109 @@ export default function NewTripScreen() {
   }
 
   return (
-    <KeyboardAwareFormScrollView contentContainerStyle={styles.scrollContent} style={styles.scroll}>
-      <View style={styles.header}>
-        <Text style={styles.title}>여행 생성</Text>
-        <Text style={styles.subtitle}>여행 도시와 이름, 기간을 정하면 바로 시작할 수 있어요.</Text>
-      </View>
+    <View style={styles.screenRoot}>
+      <KeyboardAwareFormScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardFixedBottomOffset={footerLayout.keyboardFixedBottomOffset}
+        keyboardMinClearance={footerLayout.keyboardMinClearance}
+        style={styles.scroll}
+      >
+        <View style={styles.header}>
+          <Text style={styles.title}>여행 생성</Text>
+          <Text style={styles.subtitle}>여행 도시와 이름, 기간을 정하면 바로 시작할 수 있어요.</Text>
+        </View>
 
-      <Card>
-        <View style={styles.field}>
-          <View style={styles.destinationHeaderRow}>
-            <View style={styles.destinationHeaderText}>
-              <Text style={styles.label}>여행 도시 *</Text>
-              <Text style={styles.helperText}>일정 장소를 검색할 기준 도시를 선택해 주세요.</Text>
+        <Card>
+          <View style={styles.field}>
+            <View style={styles.destinationHeaderRow}>
+              <View style={styles.destinationHeaderText}>
+                <Text style={styles.label}>여행 도시 *</Text>
+                <Text style={styles.helperText}>일정 장소를 검색할 기준 도시를 선택해 주세요.</Text>
+              </View>
+              <SecondaryButton
+                disabled={submitting || !destinationStatus.canAddMore}
+                label="+ 도시 검색"
+                onPress={() => {
+                  setDestinationSearchOpen(true);
+                  setError(null);
+                }}
+              />
             </View>
-            <SecondaryButton
-              disabled={submitting || !destinationStatus.canAddMore}
-              label="+ 도시 검색"
-              onPress={() => {
-                setDestinationSearchOpen(true);
-                setError(null);
-              }}
+            {destinations.length > 0 ? (
+              <View style={styles.destinationChipRow}>
+                {destinations.map((destination, index) => (
+                  <Pressable
+                    accessibilityRole="button"
+                    disabled={submitting}
+                    key={destinationKey(destination)}
+                    onPress={() =>
+                      setDestinations((current) => removeTripDestination(current, destinationKey(destination)))
+                    }
+                    style={styles.destinationChip}
+                  >
+                    <Text style={styles.destinationChipText}>
+                      {destination.displayName}
+                      {index === 0 ? '  대표' : ''}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : (
+              <Text style={styles.emptyDestinationText}>선택한 도시가 없어요.</Text>
+            )}
+            {destinationStatus.helperText ? (
+              <Text style={styles.helperText}>{destinationStatus.helperText}</Text>
+            ) : null}
+          </View>
+
+          <TripFormField label="여행 이름">
+            <TextInput
+              editable={!submitting}
+              onChangeText={(name) => setForm((current) => ({ ...current, name }))}
+              placeholder="예: 오사카 3박 4일"
+              placeholderTextColor={theme.color.textFaint}
+              style={styles.input}
+              value={form.name}
             />
-          </View>
-          {destinations.length > 0 ? (
-            <View style={styles.destinationChipRow}>
-              {destinations.map((destination, index) => (
-                <Pressable
-                  accessibilityRole="button"
-                  disabled={submitting}
-                  key={destinationKey(destination)}
-                  onPress={() =>
-                    setDestinations((current) => removeTripDestination(current, destinationKey(destination)))
-                  }
-                  style={styles.destinationChip}
-                >
-                  <Text style={styles.destinationChipText}>
-                    {destination.displayName}
-                    {index === 0 ? '  대표' : ''}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          ) : (
-            <Text style={styles.emptyDestinationText}>선택한 도시가 없어요.</Text>
-          )}
-          {destinationStatus.helperText ? <Text style={styles.helperText}>{destinationStatus.helperText}</Text> : null}
-        </View>
+          </TripFormField>
 
-        <TripFormField label="여행 이름">
-          <TextInput
-            editable={!submitting}
-            onChangeText={(name) => setForm((current) => ({ ...current, name }))}
-            placeholder="예: 오사카 3박 4일"
-            placeholderTextColor={theme.color.textFaint}
-            style={styles.input}
-            value={form.name}
+          <TripDateRangeEditor
+            activeField={activeDateField}
+            calendarMonth={calendarMonth}
+            disabled={submitting}
+            onClosePicker={() => setActiveDateField(null)}
+            onMonthChange={setCalendarMonth}
+            onOpenField={openDatePicker}
+            onSelectDate={selectDate}
+            today={today}
+            values={form}
+            yearOptionCount={yearOptionCount}
           />
-        </TripFormField>
 
-        <TripDateRangeEditor
-          activeField={activeDateField}
-          calendarMonth={calendarMonth}
-          disabled={submitting}
-          onClosePicker={() => setActiveDateField(null)}
-          onMonthChange={setCalendarMonth}
-          onOpenField={openDatePicker}
-          onSelectDate={selectDate}
-          today={today}
-          values={form}
-          yearOptionCount={yearOptionCount}
-        />
-
-        <View style={styles.field}>
-          <Text style={styles.label}>기본 통화</Text>
-          <View style={styles.currencyRow}>
-            {currencies.map((currency) => {
-              const selected = form.defaultCurrency === currency;
-              return (
-                <Pressable
-                  accessibilityRole="button"
-                  disabled={submitting}
-                  key={currency}
-                  onPress={() => setForm((current) => ({ ...current, defaultCurrency: currency }))}
-                  style={[styles.currencyChip, selected ? styles.currencyChipSelected : null]}
-                >
-                  <Text style={[styles.currencyText, selected ? styles.currencyTextSelected : null]}>{currency}</Text>
-                </Pressable>
-              );
-            })}
+          <View style={styles.field}>
+            <Text style={styles.label}>기본 통화</Text>
+            <View style={styles.currencyRow}>
+              {currencies.map((currency) => {
+                const selected = form.defaultCurrency === currency;
+                return (
+                  <Pressable
+                    accessibilityRole="button"
+                    disabled={submitting}
+                    key={currency}
+                    onPress={() => setForm((current) => ({ ...current, defaultCurrency: currency }))}
+                    style={[styles.currencyChip, selected ? styles.currencyChipSelected : null]}
+                  >
+                    <Text style={[styles.currencyText, selected ? styles.currencyTextSelected : null]}>{currency}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
           </View>
-        </View>
 
-        {error ? <Text style={styles.errorText}>{error}</Text> : null}
-
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        </Card>
+      </KeyboardAwareFormScrollView>
+      <StickyActionFooter actionCount={1} layout={footerLayout}>
         <PrimaryButton
           disabled={submitting}
           label="여행 만들기"
@@ -280,8 +292,8 @@ export default function NewTripScreen() {
           loadingLabel="여행 만드는 중..."
           onPress={() => void submit()}
         />
-      </Card>
-    </KeyboardAwareFormScrollView>
+      </StickyActionFooter>
+    </View>
   );
 }
 
@@ -509,6 +521,10 @@ function validateForm(form: FormState, today: string): string | null {
 }
 
 const styles = StyleSheet.create({
+  screenRoot: {
+    backgroundColor: theme.color.bg,
+    flex: 1,
+  },
   scroll: {
     flex: 1,
     backgroundColor: theme.color.bg,
