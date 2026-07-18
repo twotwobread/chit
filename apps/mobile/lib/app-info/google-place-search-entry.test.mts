@@ -7,6 +7,9 @@ const placeSearchSource = readFileSync(
   'utf8',
 );
 const mapSearchSource = readFileSync(new URL('../trip-ui/GooglePlaceMapSearch.tsx', import.meta.url), 'utf8');
+const tripMapPartsSource = readFileSync(new URL('../trip-ui/TripMapScreenParts.tsx', import.meta.url), 'utf8');
+const tripMapControllerSource = readFileSync(new URL('../trip-ui/useTripMapController.ts', import.meta.url), 'utf8');
+const tripMapTabSource = readFileSync(new URL('../../app/trips/[tripId]/(tabs)/map.tsx', import.meta.url), 'utf8');
 
 describe('google place search native module entry setup', () => {
   it('does not statically import native gesture bottom-sheet modules so Expo Go can fall back safely', () => {
@@ -43,6 +46,29 @@ describe('google place search native module entry setup', () => {
     assert.match(mapSearchSource, /bookmarkMarkerResults\?: GooglePlaceSearchRowViewModel\[\];/);
     assert.match(mapSearchSource, /bookmarkMarkerResults = bookmarkResults/);
     assert.match(mapSearchSource, /buildGooglePlaceSearchMarkerViewModels\(bookmarkMarkerResults/);
+  });
+
+  it('derives map-tab bookmark marker props from canonical bookmark data and layer visibility', () => {
+    assert.match(tripMapPartsSource, /buildTripMapBookmarkLayerViewModel\(allBookmarkResults, bookmarkLayerVisible\)/);
+    assert.match(tripMapPartsSource, /bookmarkMarkerResults=\{bookmarkLayer\.bookmarkMarkerResults\}/);
+    assert.match(tripMapPartsSource, /bookmarkResults=\{bookmarkLayer\.allBookmarkResults\}/);
+    assert.doesNotMatch(tripMapTabSource, /bookmarkResults=\{state\.bookmarkResults\}/);
+  });
+
+  it('keeps map-tab bookmark refresh fallback independent from required schedule loading', () => {
+    assert.match(
+      tripMapControllerSource,
+      /const allBookmarkResultsRef = useRef<GooglePlaceSearchRowViewModel\[\]>\(\[\]\);/,
+    );
+    assert.match(tripMapControllerSource, /Promise\.allSettled\(\[/);
+    assert.match(
+      tripMapControllerSource,
+      /resolveTripMapBookmarkRefreshFailure\(\s*allBookmarkResultsRef\.current,\s*bookmarkLayerVisibleRef\.current,\s*\)/,
+    );
+    assert.doesNotMatch(
+      tripMapControllerSource,
+      /bookmarkResults: bookmarkLayerVisibleRef\.current \? bookmarkResults : \[\]/,
+    );
   });
 
   it('guards bookmark-mode search result actions with current bookmarkResults before invoking create flow', () => {

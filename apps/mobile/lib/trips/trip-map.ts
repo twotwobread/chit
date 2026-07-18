@@ -6,7 +6,12 @@ import type {
 } from '@i-um/api-contract';
 
 import { theme } from '../design/theme';
-import { buildGooglePlaceSearchRegionFromDestination, type GooglePlaceTripDestination } from '../places/google-search';
+import {
+  buildGooglePlaceSearchRegionFromDestination,
+  type GooglePlaceSearchRowViewModel,
+  type GooglePlaceTripDestination,
+} from '../places/google-search';
+import type { DayItineraryMapActionFeedback } from './day-itinerary-map-actions';
 import type { DayChip } from '../trip-ui/DayChips';
 import type { RouteMapPlace, RouteMapPolyline } from '../trip-ui/RouteMap';
 import { getScheduleItems, type DayItineraryViewModel } from './day-itinerary';
@@ -45,6 +50,47 @@ export type TripMapRouteNotice = {
   title: string;
   helper: string;
 };
+
+export type TripMapBookmarkLayerViewModel = {
+  allBookmarkResults: GooglePlaceSearchRowViewModel[];
+  bookmarkLayerVisible: boolean;
+  bookmarkMarkerResults: GooglePlaceSearchRowViewModel[];
+};
+
+export type TripMapBookmarkRefreshFailure = {
+  feedback: DayItineraryMapActionFeedback;
+  layer: TripMapBookmarkLayerViewModel;
+};
+
+const tripMapBookmarkRefreshFailureMessage = '찜한 장소를 새로고침하지 못했어요. 이전 목록을 유지했어요.';
+const tripMapBookmarkInitialFailureMessage = '찜한 장소를 불러오지 못했어요. 잠시 후 다시 시도해주세요.';
+
+export function buildTripMapBookmarkLayerViewModel(
+  allBookmarkResults: GooglePlaceSearchRowViewModel[],
+  bookmarkLayerVisible: boolean,
+): TripMapBookmarkLayerViewModel {
+  return {
+    allBookmarkResults,
+    bookmarkLayerVisible,
+    bookmarkMarkerResults: bookmarkLayerVisible ? allBookmarkResults : [],
+  };
+}
+
+export function resolveTripMapBookmarkRefreshFailure(
+  previousAllBookmarkResults: GooglePlaceSearchRowViewModel[],
+  bookmarkLayerVisible: boolean,
+): TripMapBookmarkRefreshFailure {
+  return {
+    feedback: {
+      kind: 'error',
+      message:
+        previousAllBookmarkResults.length > 0
+          ? tripMapBookmarkRefreshFailureMessage
+          : tripMapBookmarkInitialFailureMessage,
+    },
+    layer: buildTripMapBookmarkLayerViewModel(previousAllBookmarkResults, bookmarkLayerVisible),
+  };
+}
 
 export type TripMapDayRoute = {
   color: string;
