@@ -335,7 +335,7 @@ export default function FlightDetailScreen() {
       : [];
 
   return (
-    <TripScreen>
+    <TripScreen keyboardAware>
       <TripScreenHeader helper={flightDetailPrivacyNotice(isPassenger)} title={card.title} />
       <Card>
         <Text style={styles.route}>{card.routeLabel}</Text>

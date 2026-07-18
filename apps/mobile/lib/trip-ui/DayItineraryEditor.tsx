@@ -1,12 +1,13 @@
 import { type ReactNode } from 'react';
 
 import type { TripDay, TripDestination } from '@i-um/api-contract';
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { theme } from '../design';
 import { buildTripRootFabLayout, shouldShowTripRootFab } from '../trips/trip-root-fab-layout';
 import { DayItineraryContent, DeletePlaceConfirmationModal } from './DayItineraryEditorParts';
+import { KeyboardAwareFormScrollView } from './KeyboardAwareFormScrollView';
 import { styles } from './DayItineraryEditorStyles';
 import { TripRootFab } from './TripRootFab';
 import { useDayItineraryEditorController } from './useDayItineraryEditorController';
@@ -95,14 +96,18 @@ export function DayItineraryEditor({
       moveState.status !== 'idle',
     status: state.status === 'success' ? 'ready' : state.status,
   });
+  const fabScrollExtraBottomSpacing = showAddFab
+    ? Math.max(0, addFabLayout.scrollContent.paddingBottom - Math.max(0, insets.bottom))
+    : 0;
 
   return (
     <View style={styles.root}>
-      <ScrollView
+      <KeyboardAwareFormScrollView
         ref={scrollViewRef}
         accessibilityElementsHidden={isDeleteModalVisible}
-        contentContainerStyle={[styles.scrollContent, showAddFab ? addFabLayout.scrollContent : null]}
+        contentContainerStyle={styles.scrollContent}
         importantForAccessibility={isDeleteModalVisible ? 'no-hide-descendants' : 'auto'}
+        keyboardExtraBottomSpacing={fabScrollExtraBottomSpacing}
         onContentSizeChange={updateScrollContentSize}
         onLayout={updateScrollLayout}
         onScroll={updateScrollOffset}
@@ -197,7 +202,7 @@ export function DayItineraryEditor({
             </Pressable>
           </View>
         ) : null}
-      </ScrollView>
+      </KeyboardAwareFormScrollView>
       {showAddFab ? (
         <TripRootFab
           accessibilityHint="장소 검색으로 일정 추가를 시작합니다."

@@ -1,7 +1,8 @@
-import { ActivityIndicator, ScrollView, Text } from 'react-native';
+import { ActivityIndicator, Text } from 'react-native';
 
 import { Card, SecondaryButton, theme } from '../../../../../../../lib/design';
 import { ExpenseEditForm } from '../../../../../../../lib/trip-ui/ExpenseEditScreenParts';
+import { KeyboardAwareFormScrollView } from '../../../../../../../lib/trip-ui/KeyboardAwareFormScrollView';
 import { styles } from '../../../../../../../lib/trip-ui/ExpenseEditScreenStyles';
 import { useExpenseEditController } from '../../../../../../../lib/trip-ui/useExpenseEditController';
 
@@ -37,7 +38,7 @@ export default function ExpenseEditScreen() {
   } = useExpenseEditController();
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <KeyboardAwareFormScrollView contentContainerStyle={styles.container}>
       <Text style={styles.screenTitle}>지출 수정</Text>
 
       {state.status === 'loading' ? (
@@ -99,6 +100,6 @@ export default function ExpenseEditScreen() {
           viewModel={viewModel}
         />
       ) : null}
-    </ScrollView>
+    </KeyboardAwareFormScrollView>
   );
 }

@@ -4,6 +4,7 @@ import { View, type ViewProps } from 'react-native';
 
 import { useDesignFonts } from '../lib/design';
 import { rootStackScreenOptions } from '../lib/navigation/root-stack-options';
+import { KeyboardControllerProvider } from '../lib/trip-ui/KeyboardControllerProvider';
 
 type GestureHandlerModule = {
   GestureHandlerRootView?: ComponentType<ViewProps>;
@@ -30,7 +31,9 @@ export default function RootLayout() {
 
   return (
     <AppRootView style={{ flex: 1 }}>
-      <Stack screenOptions={rootStackScreenOptions} />
+      <KeyboardControllerProvider>
+        <Stack screenOptions={rootStackScreenOptions} />
+      </KeyboardControllerProvider>
     </AppRootView>
   );
 }
