@@ -25,7 +25,6 @@ export default function TripMapTabScreen() {
         allBookmarkResults={state.allBookmarkResults}
         bookmarkActionState={bookmarkActionState}
         bookmarkLayerVisible={state.bookmarkLayerVisible}
-        bookmarkResults={state.bookmarkResults}
         feedback={feedback}
         mapPlaces={state.mapPlaces}
         onBookmarkSelect={(result) => void createBookmark(result)}

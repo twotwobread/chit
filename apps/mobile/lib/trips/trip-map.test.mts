@@ -10,7 +10,12 @@ import type {
 } from '@i-um/api-contract';
 
 import { theme } from '../design/theme';
-import { buildGooglePlaceSearchRegionFromDestination, type GooglePlaceTripDestination } from '../places/google-search';
+import {
+  buildGooglePlaceSearchRegionFromDestination,
+  clearGooglePlaceSearchResultsState,
+  type GooglePlaceSearchRowViewModel,
+  type GooglePlaceTripDestination,
+} from '../places/google-search';
 import { buildRouteWaypointMarkerChrome, buildRouteWaypointMarkerStyle } from './route-map-marker';
 import {
   buildRouteMapPlaces,
@@ -18,12 +23,14 @@ import {
   buildTripMapDayChips,
   buildTripMapScheduleMarkerDetail,
   buildTripMapDayRoutes,
+  buildTripMapBookmarkLayerViewModel,
   buildTripMapInitialRegion,
   buildTripMapRouteLayerChips,
   buildTripMapRouteLayerViewModel,
   buildTripMapSearchLayout,
   emptyTripMapRouteLayerSelection,
   resolveMapRouteSheetState,
+  resolveTripMapBookmarkRefreshFailure,
   resolveTripMapSelectedDay,
   toggleTripMapRouteLayer,
   tripMapRouteLayerChipId,
@@ -187,6 +194,48 @@ test('toggles route layer chips as none all or one selected day', () => {
   assert.deepEqual(allLayer, { kind: 'all' });
   assert.equal(tripMapRouteLayerChipId(allLayer), 'all');
   assert.deepEqual(toggleTripMapRouteLayer(allLayer, 'all'), { kind: 'none' });
+});
+
+const bookmarkResult: GooglePlaceSearchRowViewModel = {
+  id: 'google-hotel',
+  bookmarkId: 'bookmark-1',
+  placeName: '오사카 숙소',
+  address: 'Osaka',
+  typeHint: '숙소',
+  latitude: 34.68,
+  longitude: 135.48,
+};
+
+test('keeps bookmark marker inputs when search result state is cleared', () => {
+  const layer = buildTripMapBookmarkLayerViewModel([bookmarkResult], true);
+  const clearedSearchState = clearGooglePlaceSearchResultsState('호텔');
+
+  assert.deepEqual(clearedSearchState.results, []);
+  assert.deepEqual(
+    layer.bookmarkMarkerResults.map((result) => result.id),
+    ['google-hotel'],
+  );
+  assert.deepEqual(layer.allBookmarkResults, [bookmarkResult]);
+});
+
+test('derives bookmark marker inputs only from canonical data and layer visibility', () => {
+  const hidden = buildTripMapBookmarkLayerViewModel([bookmarkResult], false);
+  assert.deepEqual(hidden.bookmarkMarkerResults, []);
+  assert.deepEqual(hidden.allBookmarkResults, [bookmarkResult]);
+
+  const visibleAgain = buildTripMapBookmarkLayerViewModel(hidden.allBookmarkResults, true);
+  assert.deepEqual(visibleAgain.bookmarkMarkerResults, [bookmarkResult]);
+});
+
+test('keeps stale bookmark data and feedback when bookmark refresh fails', () => {
+  const fallback = resolveTripMapBookmarkRefreshFailure([bookmarkResult], true);
+
+  assert.deepEqual(fallback.layer.allBookmarkResults, [bookmarkResult]);
+  assert.deepEqual(fallback.layer.bookmarkMarkerResults, [bookmarkResult]);
+  assert.deepEqual(fallback.feedback, {
+    kind: 'error',
+    message: '찜한 장소를 새로고침하지 못했어요. 이전 목록을 유지했어요.',
+  });
 });
 
 test('builds visible route data for a selected day with one itinerary-order connector', () => {

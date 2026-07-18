@@ -34,6 +34,7 @@ import {
   buildTripMapRouteLayerViewModel,
   buildTripMapScheduleMarkerDetail,
   emptyTripMapRouteLayerSelection,
+  resolveTripMapBookmarkRefreshFailure,
   resolveTripMapSelectedDay,
   toggleTripMapRouteLayer,
   tripMapRouteLayerChipId,
@@ -51,7 +52,6 @@ export type TripMapState =
       status: 'success';
       allBookmarkResults: GooglePlaceSearchRowViewModel[];
       bookmarkLayerVisible: boolean;
-      bookmarkResults: GooglePlaceSearchRowViewModel[];
       dayRoutes: TripMapDayRoute[];
       mapPlaces: RouteMapPlace[];
       routeChips: ReturnType<typeof buildTripMapRouteLayerChips>;
@@ -77,6 +77,8 @@ export function useTripMapController() {
   const routeLayerRef = useRef<TripMapRouteLayerSelection>(emptyTripMapRouteLayerSelection);
   const selectedDayIdRef = useRef<string | null>(null);
   const bookmarkLayerVisibleRef = useRef(true);
+  const allBookmarkResultsRef = useRef<GooglePlaceSearchRowViewModel[]>([]);
+  const bookmarkResultsTripIdRef = useRef<string | null>(null);
   const selectedRoutePlaceIdRef = useRef<string | null>(null);
   const [state, setState] = useState<TripMapState>({ status: 'loading' });
   const [feedback, setFeedback] = useState<DayItineraryMapActionFeedback | null>(null);
@@ -85,8 +87,14 @@ export function useTripMapController() {
   const load = useCallback(
     async (preferredDayId: string | null = selectedDayIdRef.current) => {
       if (!tripId) {
+        allBookmarkResultsRef.current = [];
+        bookmarkResultsTripIdRef.current = null;
         setState({ status: 'notFound' });
         return;
+      }
+      if (bookmarkResultsTripIdRef.current !== tripId) {
+        allBookmarkResultsRef.current = [];
+        bookmarkResultsTripIdRef.current = tripId;
       }
 
       setFeedback(null);
@@ -114,11 +122,35 @@ export function useTripMapController() {
           return;
         }
 
-        const [scheduleResponse, bookmarkResponse] = await Promise.all([
+        const [scheduleResult, bookmarkResult] = await Promise.allSettled([
           listTripScheduleItems(tripId),
           listTripPlaceBookmarks(tripId),
-        ]);
-        const itineraries = buildTripItinerariesFromTripScheduleItems(detail.days, scheduleResponse);
+        ] as const);
+        if (scheduleResult.status === 'rejected') {
+          throw scheduleResult.reason;
+        }
+        let allBookmarkResults = allBookmarkResultsRef.current;
+        if (bookmarkResult.status === 'fulfilled') {
+          allBookmarkResults = bookmarkResult.value.bookmarks.flatMap((bookmark) => {
+            const row = tripPlaceBookmarkToGoogleSearchRow(bookmark);
+            return row ? [row] : [];
+          });
+          allBookmarkResultsRef.current = allBookmarkResults;
+        } else {
+          if (
+            isMobileAuthSessionError(bookmarkResult.reason) ||
+            isApiStatus(bookmarkResult.reason, 400, 401, 403, 404)
+          ) {
+            throw bookmarkResult.reason;
+          }
+          const fallback = resolveTripMapBookmarkRefreshFailure(
+            allBookmarkResultsRef.current,
+            bookmarkLayerVisibleRef.current,
+          );
+          allBookmarkResults = fallback.layer.allBookmarkResults;
+          setFeedback(fallback.feedback);
+        }
+        const itineraries = buildTripItinerariesFromTripScheduleItems(detail.days, scheduleResult.value);
         const dayRoutes = buildTripMapDayRoutes(itineraries);
         const routeLayer = resolveAvailableRouteLayer(routeLayerRef.current, dayRoutes);
         const routeViewModel = buildTripMapRouteLayerViewModel(dayRoutes, routeLayer);
@@ -127,15 +159,10 @@ export function useTripMapController() {
         selectedDayIdRef.current = selectedDay.id;
         const viewModel = buildDayItineraryViewModel(selectedItinerary);
         const selectedRoutePlaceId = selectedRoutePlaceIdRef.current;
-        const bookmarkResults = bookmarkResponse.bookmarks.flatMap((bookmark) => {
-          const row = tripPlaceBookmarkToGoogleSearchRow(bookmark);
-          return row ? [row] : [];
-        });
         setState({
           status: 'success',
-          allBookmarkResults: bookmarkResults,
+          allBookmarkResults,
           bookmarkLayerVisible: bookmarkLayerVisibleRef.current,
-          bookmarkResults: bookmarkLayerVisibleRef.current ? bookmarkResults : [],
           dayRoutes,
           mapPlaces: routeViewModel.places,
           routeChips: buildTripMapRouteLayerChips(detail.days),
@@ -206,7 +233,6 @@ export function useTripMapController() {
       return {
         ...current,
         bookmarkLayerVisible,
-        bookmarkResults: bookmarkLayerVisible ? current.allBookmarkResults : [],
       };
     });
   }, []);

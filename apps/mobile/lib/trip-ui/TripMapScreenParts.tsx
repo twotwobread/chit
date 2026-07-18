@@ -11,6 +11,7 @@ import {
 } from '../places/google-search';
 import { type DayItineraryMapActionFeedback } from '../trips/day-itinerary-map-actions';
 import {
+  buildTripMapBookmarkLayerViewModel,
   buildTripMapInitialRegion,
   buildTripMapRouteLayerChips,
   buildTripMapSearchLayout,
@@ -29,7 +30,6 @@ export function MapContent({
   allBookmarkResults,
   bookmarkActionState,
   bookmarkLayerVisible,
-  bookmarkResults,
   feedback,
   mapPlaces,
   onBookmarkSelect,
@@ -51,7 +51,6 @@ export function MapContent({
   allBookmarkResults: GooglePlaceSearchRowViewModel[];
   bookmarkActionState: GooglePlaceAddViewState;
   bookmarkLayerVisible: boolean;
-  bookmarkResults: GooglePlaceSearchRowViewModel[];
   mapPlaces: RouteMapPlace[];
   routePolylines: RouteMapPolyline[];
   tripId: string;
@@ -75,6 +74,7 @@ export function MapContent({
     [mapPlaces, tripDestinations],
   );
   const layout = buildTripMapSearchLayout();
+  const bookmarkLayer = buildTripMapBookmarkLayerViewModel(allBookmarkResults, bookmarkLayerVisible);
   const showDayChipsOverlay = layout.dayChipsPlacement === 'mapOverlay';
   const mapStyle = layout.screenMode === 'fullScreen' ? styles.mapSearchFullScreen : styles.mapSearch;
   const sheetTopInset = theme.space[4] + theme.layout.controlHSm + theme.space[4];
@@ -85,8 +85,8 @@ export function MapContent({
       <GooglePlaceMapSearch
         actionMode="bookmark"
         actionState={bookmarkActionState}
-        bookmarkMarkerResults={bookmarkResults}
-        bookmarkResults={allBookmarkResults}
+        bookmarkMarkerResults={bookmarkLayer.bookmarkMarkerResults}
+        bookmarkResults={bookmarkLayer.allBookmarkResults}
         bottomSheetFooter={scheduleMarkerDetail ? <ScheduleMarkerDetailCard detail={scheduleMarkerDetail} /> : null}
         dayId={selectedDayId}
         initialRegion={initialRegion}
