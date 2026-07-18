@@ -234,6 +234,7 @@ function collectSensitiveValues(config) {
   return [
     ...Object.values(config.secrets),
     config.eas.env.EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY,
+    config.eas.env.EXPO_PUBLIC_GOOGLE_MAPS_ANDROID_API_KEY,
     deriveDirectDatabaseUrl(config.secrets.DATABASE_URL),
   ].filter(Boolean);
 }

@@ -7,6 +7,7 @@ import {
   createSecretSpecs,
   deriveDirectDatabaseUrl,
   deriveInviteLinkHost,
+  easEnvSpecs,
   parseDeployArgs,
   parseDotenv,
   resolvePublicEndpoints,
@@ -107,6 +108,20 @@ describe('buildStageConfig', () => {
           }),
         }),
       /INVITE_APP_STORE_URL/,
+    );
+  });
+
+  it('carries the Android Google Maps SDK key into EAS environment config', () => {
+    const config = buildStageConfig({
+      env: requiredStageEnv({ EXPO_PUBLIC_GOOGLE_MAPS_ANDROID_API_KEY: 'android-maps-key' }),
+    });
+
+    assert.equal(config.eas.env.EXPO_PUBLIC_GOOGLE_MAPS_ANDROID_API_KEY, 'android-maps-key');
+    assert.deepEqual(
+      easEnvSpecs(config, 'https://api.example.com')
+        .filter((spec) => spec.name === 'EXPO_PUBLIC_GOOGLE_MAPS_ANDROID_API_KEY')
+        .map((spec) => [spec.value, spec.visibility]),
+      [['android-maps-key', 'sensitive']],
     );
   });
 });

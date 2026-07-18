@@ -3,6 +3,7 @@ import type { ConfigContext, ExpoConfig } from 'expo/config';
 import appJson from './app.json' with { type: 'json' };
 
 const kakaoNativeAppKey = process.env.EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY?.trim();
+const googleMapsAndroidApiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_ANDROID_API_KEY?.trim();
 const inviteLinkHost = process.env.EXPO_PUBLIC_INVITE_LINK_HOST?.trim();
 const usesRealProviderAuth = process.env.EXPO_PUBLIC_AUTH_DEV_MODE !== 'true';
 const isPreviewBuild = process.env.EAS_BUILD_PROFILE === 'preview';
@@ -15,6 +16,17 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   const baseConfig = appJson.expo as ExpoConfig;
   const iosConfig = baseConfig.ios ?? {};
   const androidConfig = baseConfig.android ?? {};
+  const androidMapsConfig = googleMapsAndroidApiKey
+    ? {
+        config: {
+          ...androidConfig.config,
+          googleMaps: {
+            ...androidConfig.config?.googleMaps,
+            apiKey: googleMapsAndroidApiKey,
+          },
+        },
+      }
+    : {};
   const kakaoPlugin: NonNullable<ExpoConfig['plugins']> = kakaoNativeAppKey
     ? [['@react-native-seoul/kakao-login', { kakaoAppKey: kakaoNativeAppKey, overrideKakaoSDKVersion: '2.22.0' }]]
     : [];
@@ -56,6 +68,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     },
     android: {
       ...androidConfig,
+      ...androidMapsConfig,
       intentFilters: [
         ...(androidConfig.intentFilters ?? []),
         ...(inviteLinkHost
