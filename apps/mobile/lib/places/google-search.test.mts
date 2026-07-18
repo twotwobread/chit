@@ -3,9 +3,11 @@ import { describe, it } from 'node:test';
 
 import { theme } from '../design/theme';
 import {
+  addGooglePlaceScheduleBatchSelection,
   addingGooglePlaceState,
   buildCreateGooglePlaceScheduleItemRequest,
   buildCreateGooglePlaceScheduleItemRequestFromSearchResult,
+  buildCreateGooglePlaceScheduleItemsBatchRequest,
   buildGooglePlaceExplorationDetail,
   buildGooglePlaceDetailsErrorState,
   buildGooglePlaceDetailsLoadingState,
@@ -46,6 +48,9 @@ import {
   errorGooglePlaceSearchState,
   getGooglePlaceTypeHint,
   googlePlaceAddFailureMessage,
+  googlePlaceScheduleBatchLimitMessage,
+  getDuplicateDayPlaceConfirmationGooglePlaceIds,
+  googlePlaceScheduleBatchMaxSelectionCount,
   googlePlaceSearchDefaultLimit,
   googlePlaceSearchDefaultSheetTopInset,
   googlePlaceSearchLoadingState,
@@ -63,8 +68,12 @@ import {
   idleGooglePlaceAddState,
   isGooglePlaceCoordinateWithinTripDestination,
   isDuplicateDayPlaceConfirmationError,
+  isGooglePlaceScheduleBatchSelected,
   normalizeGooglePlaceSearchQuery,
+  removeGooglePlaceScheduleBatchSelection,
   successGooglePlaceSearchState,
+  toggleGooglePlaceScheduleBatchSelection,
+  type GooglePlaceSearchRowViewModel,
 } from './google-search';
 
 describe('google place search helpers', () => {
@@ -213,6 +222,74 @@ describe('google place search helpers', () => {
     assert.deepEqual(errorGooglePlaceAddState(), { status: 'error', message: googlePlaceAddFailureMessage });
   });
 
+  it('manages schedule batch selection order, duplicate prevention, removal, toggle, and max limit', () => {
+    const makeResult = (id: string, placeName = id): GooglePlaceSearchRowViewModel => ({
+      id,
+      placeName,
+      address: `${placeName} address`,
+      typeHint: '관광지',
+    });
+    const first = makeResult('google-1', '도톤보리');
+    const second = makeResult('google-2', '우메다');
+
+    let addResult = addGooglePlaceScheduleBatchSelection([], first);
+    assert.deepEqual(
+      addResult.selectedResults.map((result) => result.id),
+      ['google-1'],
+    );
+    assert.equal(addResult.message, null);
+    assert.equal(isGooglePlaceScheduleBatchSelected(addResult.selectedResults, 'google-1'), true);
+
+    addResult = addGooglePlaceScheduleBatchSelection(addResult.selectedResults, second);
+    assert.deepEqual(
+      addResult.selectedResults.map((result) => result.id),
+      ['google-1', 'google-2'],
+    );
+
+    const duplicate = addGooglePlaceScheduleBatchSelection(addResult.selectedResults, first);
+    assert.deepEqual(
+      duplicate.selectedResults.map((result) => result.id),
+      ['google-1', 'google-2'],
+    );
+    assert.equal(duplicate.message, null);
+
+    const toggledOff = toggleGooglePlaceScheduleBatchSelection(duplicate.selectedResults, second);
+    assert.deepEqual(
+      toggledOff.selectedResults.map((result) => result.id),
+      ['google-1'],
+    );
+
+    const removed = removeGooglePlaceScheduleBatchSelection(addResult.selectedResults, 'google-1');
+    assert.deepEqual(
+      removed.map((result) => result.id),
+      ['google-2'],
+    );
+
+    const maxed = Array.from({ length: googlePlaceScheduleBatchMaxSelectionCount }, (_, index) =>
+      makeResult(`google-${index + 1}`),
+    );
+    const blocked = addGooglePlaceScheduleBatchSelection(maxed, makeResult('google-over-limit'));
+    assert.equal(blocked.selectedResults.length, googlePlaceScheduleBatchMaxSelectionCount);
+    assert.equal(blocked.message, googlePlaceScheduleBatchLimitMessage);
+  });
+
+  it('builds schedule batch requests without title, time, memo, or duplicate confirmation while preserving selected order', () => {
+    const selectedResults: GooglePlaceSearchRowViewModel[] = [
+      { id: ' google-1 ', placeName: '도톤보리', address: 'Osaka', typeHint: '관광지' },
+      { id: 'google-2', placeName: '우메다', address: 'Umeda', typeHint: '관광지' },
+    ];
+
+    const request = buildCreateGooglePlaceScheduleItemsBatchRequest(selectedResults);
+
+    assert.deepEqual(request, {
+      items: [{ googlePlaceId: 'google-1' }, { googlePlaceId: 'google-2' }],
+    });
+    assert.equal('title' in request.items[0], false);
+    assert.equal('startTime' in request.items[0], false);
+    assert.equal('endTime' in request.items[0], false);
+    assert.equal('memo' in request.items[0], false);
+  });
+
   it('resolves screen-specific result actions without exposing add or favorite actions in explore mode', () => {
     const result = { id: 'google-1', placeName: '도톤보리', address: 'Osaka', typeHint: '관광지' };
 
@@ -231,8 +308,17 @@ describe('google place search helpers', () => {
         duplicateConfirmation: null,
         errorMessage: null,
         favoriteAction: null,
-        primaryAction: { isLoading: false, label: '장소 추가', loadingLabel: '추가 중...' },
+        primaryAction: { isLoading: false, label: '선택', loadingLabel: '추가 중...' },
       },
+    );
+    assert.deepEqual(
+      buildGooglePlaceSearchResultActionView({
+        addState: idleGooglePlaceAddState(),
+        mode: 'scheduleAdd',
+        result,
+        selectedBatchPlaceIds: ['google-1'],
+      }).primaryAction,
+      { disabled: true, isLoading: false, label: '선택됨', loadingLabel: '추가 중...' },
     );
     assert.deepEqual(
       buildGooglePlaceSearchResultActionView({ addState: idleGooglePlaceAddState(), mode: 'scheduleSelect', result }),
@@ -258,7 +344,7 @@ describe('google place search helpers', () => {
         mode: 'scheduleAdd',
         result,
       }).primaryAction,
-      { isLoading: true, label: '장소 추가', loadingLabel: '추가 중...' },
+      { isLoading: true, label: '선택', loadingLabel: '추가 중...' },
     );
     assert.deepEqual(
       buildGooglePlaceSearchResultActionView({
@@ -329,6 +415,19 @@ describe('google place search helpers', () => {
       }).primaryAction,
       { isLoading: false, label: '장소 찜하기', loadingLabel: '저장 중...' },
     );
+  });
+
+  it('extracts duplicate confirmation google place ids from API errors', () => {
+    assert.deepEqual(
+      getDuplicateDayPlaceConfirmationGooglePlaceIds({
+        error: {
+          code: 'DUPLICATE_DAY_PLACE_CONFIRMATION_REQUIRED',
+          details: [{ googlePlaceId: 'google-1' }, { googlePlaceId: ' google-2 ' }, { tripPlaceId: 'missing' }],
+        },
+      }),
+      ['google-1', 'google-2'],
+    );
+    assert.deepEqual(getDuplicateDayPlaceConfirmationGooglePlaceIds({ error: { code: 'CONFLICT' } }), []);
   });
 
   it('detects duplicate confirmation API errors', () => {

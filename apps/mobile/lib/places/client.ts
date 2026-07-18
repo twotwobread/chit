@@ -3,6 +3,8 @@ import {
   type CreateGoogleDayLodgingPlaceRequest,
   type CreateGooglePlaceScheduleItemRequest,
   type CreateGooglePlaceScheduleItemResponse,
+  type CreateGooglePlaceScheduleItemsBatchRequest,
+  type CreateGooglePlaceScheduleItemsBatchResponse,
   type CreateGoogleTripPlaceBookmarkRequest,
   type CreateGoogleTripPlaceBookmarkResponse,
   type GooglePlaceDetailsResponse,
@@ -105,4 +107,12 @@ export async function createGooglePlaceScheduleItem(
       ? buildCreateGooglePlaceScheduleItemRequest(requestOrGooglePlaceId, duplicateConfirmed === true, title ?? '')
       : requestOrGooglePlaceId;
   return runAuthenticatedRequest(() => PlacesService.createGooglePlaceScheduleItem(tripId, tripDayId, request));
+}
+
+export async function createGooglePlaceScheduleItemsBatch(
+  tripId: string,
+  tripDayId: string,
+  request: CreateGooglePlaceScheduleItemsBatchRequest,
+): Promise<CreateGooglePlaceScheduleItemsBatchResponse> {
+  return runAuthenticatedRequest(() => PlacesService.createGooglePlaceScheduleItemsBatch(tripId, tripDayId, request));
 }

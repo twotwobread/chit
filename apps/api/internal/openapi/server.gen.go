@@ -264,6 +264,27 @@ type CreateGooglePlaceScheduleItemResponse struct {
 	ScheduleItem ScheduleItem `json:"scheduleItem"`
 }
 
+// CreateGooglePlaceScheduleItemsBatchRequest defines model for CreateGooglePlaceScheduleItemsBatchRequest.
+type CreateGooglePlaceScheduleItemsBatchRequest struct {
+	// Items Ordered Google places to append to the Day schedule.
+	Items []CreateGooglePlaceScheduleItemsBatchRequestItem `json:"items"`
+}
+
+// CreateGooglePlaceScheduleItemsBatchRequestItem defines model for CreateGooglePlaceScheduleItemsBatchRequestItem.
+type CreateGooglePlaceScheduleItemsBatchRequestItem struct {
+	GooglePlaceId string `json:"googlePlaceId"`
+}
+
+// CreateGooglePlaceScheduleItemsBatchResponse defines model for CreateGooglePlaceScheduleItemsBatchResponse.
+type CreateGooglePlaceScheduleItemsBatchResponse struct {
+	// CreatedScheduleItems Schedule items created by this batch, in the same order as request items.
+	CreatedScheduleItems []ScheduleItem `json:"createdScheduleItems"`
+	Day                  TripDay        `json:"day"`
+
+	// ScheduleItems Latest server source-of-truth schedule items for the selected day, ordered by schedule order/rank.
+	ScheduleItems []ScheduleItem `json:"scheduleItems"`
+}
+
 // CreateGoogleTripPlaceBookmarkRequest defines model for CreateGoogleTripPlaceBookmarkRequest.
 type CreateGoogleTripPlaceBookmarkRequest struct {
 	GooglePlaceId string `json:"googlePlaceId"`
@@ -1411,6 +1432,9 @@ type CreateManualDayLodgingPlaceJSONRequestBody = CreateManualDayLodgingPlaceReq
 // CreateGooglePlaceScheduleItemJSONRequestBody defines body for CreateGooglePlaceScheduleItem for application/json ContentType.
 type CreateGooglePlaceScheduleItemJSONRequestBody = CreateGooglePlaceScheduleItemRequest
 
+// CreateGooglePlaceScheduleItemsBatchJSONRequestBody defines body for CreateGooglePlaceScheduleItemsBatch for application/json ContentType.
+type CreateGooglePlaceScheduleItemsBatchJSONRequestBody = CreateGooglePlaceScheduleItemsBatchRequest
+
 // CreateManualScheduleItemJSONRequestBody defines body for CreateManualScheduleItem for application/json ContentType.
 type CreateManualScheduleItemJSONRequestBody = CreateManualScheduleItemRequest
 
@@ -1536,6 +1560,9 @@ type ServerInterface interface {
 	// Add a Google Place result to a trip day schedule
 	// (POST /trips/{tripId}/days/{tripDayId}/places/google/schedule-items)
 	CreateGooglePlaceScheduleItem(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string)
+	// Add multiple Google Place results to a trip day schedule
+	// (POST /trips/{tripId}/days/{tripDayId}/places/google/schedule-items/batch)
+	CreateGooglePlaceScheduleItemsBatch(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string)
 	// Search Google Places for a trip day
 	// (GET /trips/{tripId}/days/{tripDayId}/places/google/search)
 	SearchGooglePlaces(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, params SearchGooglePlacesParams)
@@ -1818,6 +1845,12 @@ func (_ Unimplemented) GetGooglePlacePhoto(w http.ResponseWriter, r *http.Reques
 // Add a Google Place result to a trip day schedule
 // (POST /trips/{tripId}/days/{tripDayId}/places/google/schedule-items)
 func (_ Unimplemented) CreateGooglePlaceScheduleItem(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Add multiple Google Place results to a trip day schedule
+// (POST /trips/{tripId}/days/{tripDayId}/places/google/schedule-items/batch)
+func (_ Unimplemented) CreateGooglePlaceScheduleItemsBatch(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -2926,6 +2959,46 @@ func (siw *ServerInterfaceWrapper) CreateGooglePlaceScheduleItem(w http.Response
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateGooglePlaceScheduleItem(w, r, tripId, tripDayId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateGooglePlaceScheduleItemsBatch operation middleware
+func (siw *ServerInterfaceWrapper) CreateGooglePlaceScheduleItemsBatch(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "tripDayId" -------------
+	var tripDayId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripDayId", chi.URLParam(r, "tripDayId"), &tripDayId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripDayId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateGooglePlaceScheduleItemsBatch(w, r, tripId, tripDayId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -4557,6 +4630,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/trips/{tripId}/days/{tripDayId}/places/google/schedule-items", wrapper.CreateGooglePlaceScheduleItem)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/trips/{tripId}/days/{tripDayId}/places/google/schedule-items/batch", wrapper.CreateGooglePlaceScheduleItemsBatch)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/trips/{tripId}/days/{tripDayId}/places/google/search", wrapper.SearchGooglePlaces)

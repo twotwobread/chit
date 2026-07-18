@@ -162,6 +162,7 @@ export type GooglePlaceMapSearchProps = {
   onRoutePlacePress?: (place: RouteMapPlace) => void;
   routePlaces?: RouteMapPlace[];
   routePolylines?: RouteMapPolyline[];
+  selectedBatchPlaceIds?: string[];
   selectedRoutePlaceId?: string | null;
   sheetTopInset?: number;
   style?: StyleProp<ViewStyle>;
@@ -319,6 +320,7 @@ export function GooglePlaceMapSearch({
   onRoutePlacePress,
   routePlaces = [],
   routePolylines,
+  selectedBatchPlaceIds = [],
   selectedRoutePlaceId,
   sheetTopInset,
   style,
@@ -394,10 +396,12 @@ export function GooglePlaceMapSearch({
 
   const results = state.status === 'success' ? state.results : [];
   const bookmarkMarkers = buildGooglePlaceSearchMarkerViewModels(bookmarkMarkerResults, highlightedResultId, {
+    selectedIds: selectedBatchPlaceIds,
     selectedVariant: selectedResultSource,
     variant: 'bookmark',
   });
   const markers = buildGooglePlaceSearchMarkerViewModels(results, highlightedResultId, {
+    selectedIds: selectedBatchPlaceIds,
     selectedVariant: selectedResultSource,
     variant: 'search',
   });
@@ -1187,6 +1191,7 @@ export function GooglePlaceMapSearch({
                           bookmarkResults,
                           mode: actionMode,
                           result: item,
+                          selectedBatchPlaceIds,
                         })}
                         dayId={dayId}
                         detailsState={detailsState}
@@ -1236,6 +1241,7 @@ export function GooglePlaceMapSearch({
                           addState: actionState,
                           mode: actionMode === 'bookmark' ? 'exploreOnly' : actionMode,
                           result: item,
+                          selectedBatchPlaceIds,
                         })}
                         dayId={dayId}
                         detailsState={detailsState}

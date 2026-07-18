@@ -5,6 +5,8 @@
 import type { CreateGoogleDayLodgingPlaceRequest } from '../models/CreateGoogleDayLodgingPlaceRequest';
 import type { CreateGooglePlaceScheduleItemRequest } from '../models/CreateGooglePlaceScheduleItemRequest';
 import type { CreateGooglePlaceScheduleItemResponse } from '../models/CreateGooglePlaceScheduleItemResponse';
+import type { CreateGooglePlaceScheduleItemsBatchRequest } from '../models/CreateGooglePlaceScheduleItemsBatchRequest';
+import type { CreateGooglePlaceScheduleItemsBatchResponse } from '../models/CreateGooglePlaceScheduleItemsBatchResponse';
 import type { CreateGoogleTripPlaceBookmarkRequest } from '../models/CreateGoogleTripPlaceBookmarkRequest';
 import type { CreateGoogleTripPlaceBookmarkResponse } from '../models/CreateGoogleTripPlaceBookmarkResponse';
 import type { GooglePlaceDetailsResponse } from '../models/GooglePlaceDetailsResponse';
@@ -281,6 +283,41 @@ export class PlacesService {
                 403: `Forbidden.`,
                 404: `Trip or trip day not found.`,
                 409: `Same-Day duplicate confirmation required or concurrent append conflict.`,
+                429: `Google Places provider rate limited.`,
+                500: `Unexpected server error.`,
+                502: `Google Places provider unavailable or selected provider place is unusable.`,
+            },
+        });
+    }
+    /**
+     * Add multiple Google Place results to a trip day schedule
+     * Resolves or reuses Google-backed places and appends untimed Day schedule items in request order within one atomic transaction. Same-Day duplicate places are allowed because travelers may intentionally revisit the same place.
+     * @param tripId
+     * @param tripDayId
+     * @param requestBody
+     * @returns CreateGooglePlaceScheduleItemsBatchResponse Google-backed places added to the selected Day schedule in request order.
+     * @throws ApiError
+     */
+    public static createGooglePlaceScheduleItemsBatch(
+        tripId: string,
+        tripDayId: string,
+        requestBody: CreateGooglePlaceScheduleItemsBatchRequest,
+    ): CancelablePromise<CreateGooglePlaceScheduleItemsBatchResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/trips/{tripId}/days/{tripDayId}/places/google/schedule-items/batch',
+            path: {
+                'tripId': tripId,
+                'tripDayId': tripDayId,
+            },
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                403: `Forbidden.`,
+                404: `Trip or trip day not found.`,
+                409: `Concurrent append conflict.`,
                 429: `Google Places provider rate limited.`,
                 500: `Unexpected server error.`,
                 502: `Google Places provider unavailable or selected provider place is unusable.`,

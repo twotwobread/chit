@@ -1289,6 +1289,85 @@ func TestCreateGooglePlaceScheduleItemReusesTripPlaceAndHandlesDuplicateConfirma
 	}
 }
 
+func TestCreateGooglePlaceScheduleItemsBatchAppendsInOrderAndAllowsSameDayDuplicates(t *testing.T) {
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("DATABASE_URL is required for storage integration test")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	store, err := Open(ctx, databaseURL)
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer store.Close()
+
+	var userID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO users (display_name)
+		VALUES ('구글 장소 배치 테스트')
+		RETURNING id::text
+	`).Scan(&userID); err != nil {
+		t.Fatalf("insert user: %v", err)
+	}
+	defer func() { _, _ = store.pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1::uuid`, userID) }()
+
+	var tripID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO trips (name, start_date, end_date, default_currency, created_by)
+		VALUES ('구글 장소 배치 테스트 여행', '2026-07-10', '2026-07-13', 'JPY', $1::uuid)
+		RETURNING id::text
+	`, userID).Scan(&tripID); err != nil {
+		t.Fatalf("insert trip: %v", err)
+	}
+	tripDayID := tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-11")
+
+	batch := place.CreateGooglePlaceScheduleItemsBatchRecord{
+		TripID:    tripID,
+		TripDayID: tripDayID,
+		Items: []place.CreateGooglePlaceScheduleItemsBatchRecordItem{
+			{GooglePlaceID: "google-batch-1", Name: "도톤보리", Address: "Osaka", PlaceType: "sights", Latitude: 34.6687, Longitude: 135.5013, GooglePrimaryType: "tourist_attraction", GoogleTypes: []string{"tourist_attraction"}, Title: "도톤보리"},
+			{GooglePlaceID: "google-batch-2", Name: "우메다", Address: "Umeda", PlaceType: "sights", Latitude: 34.7055, Longitude: 135.4982, GooglePrimaryType: "point_of_interest", GoogleTypes: []string{"point_of_interest"}, Title: "우메다"},
+		},
+	}
+	created, err := store.CreateGooglePlaceScheduleItemsBatch(ctx, batch)
+	if err != nil {
+		t.Fatalf("create batch: %v", err)
+	}
+	if len(created.CreatedItems) != 2 || created.CreatedItems[0].ItemOrder != 1 || created.CreatedItems[1].ItemOrder != 2 || created.CreatedItems[0].Place.Name != "도톤보리" || created.CreatedItems[1].Place.Name != "우메다" {
+		t.Fatalf("expected created items in request order, got %#v", created.CreatedItems)
+	}
+	if created.CreatedItems[0].PlaceSchedule == nil || created.CreatedItems[0].PlaceSchedule.Title != "도톤보리" || created.CreatedItems[0].StartTime != nil || created.CreatedItems[0].EndTime != nil {
+		t.Fatalf("expected provider-title untimed item, got %#v", created.CreatedItems[0])
+	}
+	if len(created.ScheduleItems) != 2 || created.ScheduleItems[0].ItemOrder != 1 || created.ScheduleItems[1].ItemOrder != 2 {
+		t.Fatalf("expected latest day schedule items, got %#v", created.ScheduleItems)
+	}
+
+	duplicateBatch, err := store.CreateGooglePlaceScheduleItemsBatch(ctx, place.CreateGooglePlaceScheduleItemsBatchRecord{
+		TripID:    tripID,
+		TripDayID: tripDayID,
+		Items: []place.CreateGooglePlaceScheduleItemsBatchRecordItem{
+			{GooglePlaceID: "google-batch-1", Name: "도톤보리", Address: "Osaka", PlaceType: "sights", Latitude: 34.6687, Longitude: 135.5013, GooglePrimaryType: "tourist_attraction", GoogleTypes: []string{"tourist_attraction"}, Title: "도톤보리"},
+			{GooglePlaceID: "google-batch-3", Name: "오사카성", Address: "Osaka Castle", PlaceType: "sights", Latitude: 34.6873, Longitude: 135.5262, GooglePrimaryType: "tourist_attraction", GoogleTypes: []string{"tourist_attraction"}, Title: "오사카성"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("expected duplicate Google place batch to append, got %v", err)
+	}
+	if len(duplicateBatch.CreatedItems) != 2 || duplicateBatch.CreatedItems[0].ItemOrder != 3 || duplicateBatch.CreatedItems[1].ItemOrder != 4 {
+		t.Fatalf("expected duplicate and new place to append after existing items, got %#v", duplicateBatch.CreatedItems)
+	}
+	if duplicateBatch.CreatedItems[0].Place.ID != created.CreatedItems[0].Place.ID {
+		t.Fatalf("expected duplicate Google place to reuse existing trip place, got %#v", duplicateBatch.CreatedItems[0].Place)
+	}
+	if len(duplicateBatch.ScheduleItems) != 4 {
+		t.Fatalf("expected latest schedule to include duplicate and new place, got %#v", duplicateBatch.ScheduleItems)
+	}
+}
+
 func TestReorderScheduleItemsAppliesMovesSequentiallyAndReturnsLatestOrder(t *testing.T) {
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {

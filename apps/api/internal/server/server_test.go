@@ -4463,6 +4463,82 @@ func TestCreateGooglePlaceScheduleItemDuplicateConfirmation(t *testing.T) {
 	}
 }
 
+func TestCreateGooglePlaceScheduleItemsBatchHandler(t *testing.T) {
+	backend := newFakeAuthBackend()
+	accessToken := loginTestUser(t, backend)
+	tripID := createTestTrip(t, backend, accessToken)
+	provider := &fakePlaceProvider{detailsByID: map[string]placedomain.GooglePlaceDetails{
+		"google-1": {
+			GooglePlaceID:    "google-1",
+			DisplayName:      "도톤보리",
+			FormattedAddress: "Osaka",
+			Latitude:         34.6687,
+			Longitude:        135.5013,
+			PrimaryType:      "tourist_attraction",
+			Types:            []string{"tourist_attraction"},
+		},
+		"google-2": {
+			GooglePlaceID:    "google-2",
+			DisplayName:      "우메다",
+			FormattedAddress: "Umeda",
+			Latitude:         34.7055,
+			Longitude:        135.4982,
+			PrimaryType:      "point_of_interest",
+			Types:            []string{"point_of_interest"},
+		},
+	}}
+
+	createBatch := func(body string) *httptest.ResponseRecorder {
+		recorder := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/days/2026-07-11/places/google/schedule-items/batch", bytes.NewReader([]byte(body)))
+		request.Header.Set("Content-Type", "application/json")
+		request.Header.Set("Authorization", "Bearer "+accessToken)
+		NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true, PlaceProvider: provider}).ServeHTTP(recorder, request)
+		return recorder
+	}
+
+	recorder := createBatch(`{"items":[{"googlePlaceId":"google-1"},{"googlePlaceId":"google-2"}]}`)
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("expected batch status %d, got %d with body %s", http.StatusCreated, recorder.Code, recorder.Body.String())
+	}
+	var body struct {
+		CreatedScheduleItems []struct {
+			ItemOrder int `json:"itemOrder"`
+			Place     struct {
+				Name string `json:"name"`
+			} `json:"place"`
+			PlaceSchedule struct {
+				Title string `json:"title"`
+			} `json:"placeSchedule"`
+			StartTime *string `json:"startTime"`
+			EndTime   *string `json:"endTime"`
+		} `json:"createdScheduleItems"`
+		ScheduleItems []struct {
+			ItemOrder int `json:"itemOrder"`
+		} `json:"scheduleItems"`
+	}
+	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+		t.Fatalf("decode batch response: %v", err)
+	}
+	if len(body.CreatedScheduleItems) != 2 || body.CreatedScheduleItems[0].Place.Name != "도톤보리" || body.CreatedScheduleItems[1].Place.Name != "우메다" {
+		t.Fatalf("expected created items in request order, got %#v", body.CreatedScheduleItems)
+	}
+	if body.CreatedScheduleItems[0].PlaceSchedule.Title != "도톤보리" || body.CreatedScheduleItems[0].StartTime != nil || body.CreatedScheduleItems[0].EndTime != nil {
+		t.Fatalf("expected provider title and empty time fields, got %#v", body.CreatedScheduleItems[0])
+	}
+	if len(body.ScheduleItems) != 2 || body.ScheduleItems[0].ItemOrder != 1 || body.ScheduleItems[1].ItemOrder != 2 {
+		t.Fatalf("expected latest ordered schedule items, got %#v", body.ScheduleItems)
+	}
+
+	recorder = createBatch(`{"items":[{"googlePlaceId":"google-1"}]}`)
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("expected duplicate Google place batch to append with status %d, got %d with body %s", http.StatusCreated, recorder.Code, recorder.Body.String())
+	}
+	if len(backend.dayScheduleItems[tripID+":2026-07-11"]) != 3 {
+		t.Fatalf("expected duplicate Google place batch to append a third item, got %#v", backend.dayScheduleItems[tripID+":2026-07-11"])
+	}
+}
+
 func TestCreateGooglePlaceScheduleItemValidationAuthAndProviderErrors(t *testing.T) {
 	backend := newFakeAuthBackend()
 	accessToken := loginTestUser(t, backend)
@@ -6520,6 +6596,53 @@ func (b *fakeAuthBackend) CreateGooglePlaceScheduleItem(ctx context.Context, rec
 	})
 }
 
+func (b *fakeAuthBackend) CreateGooglePlaceScheduleItemsBatch(ctx context.Context, record placedomain.CreateGooglePlaceScheduleItemsBatchRecord) (placedomain.CreateGooglePlaceScheduleItemsBatchMutationResult, error) {
+	key := record.TripID + ":" + record.TripDayID
+	resolvedPlaceIDs := make([]string, 0, len(record.Items))
+	for _, recordItem := range record.Items {
+		placeID := recordItem.TripPlaceID
+		if placeID == "" {
+			placeID = b.googleTripPlaces[record.TripID+":"+recordItem.GooglePlaceID]
+		}
+		resolvedPlaceIDs = append(resolvedPlaceIDs, placeID)
+	}
+
+	created := make([]tripdomain.ScheduleItem, 0, len(record.Items))
+	for index, recordItem := range record.Items {
+		placeID := resolvedPlaceIDs[index]
+		if placeID == "" {
+			b.nextPlace++
+			place := tripdomain.TripPlaceSummary{
+				ID:        testUUID(6000 + b.nextPlace),
+				Name:      recordItem.Name,
+				PlaceType: recordItem.PlaceType,
+				Address:   recordItem.Address,
+				RoutablePlace: &tripdomain.RoutablePlace{
+					Provider:      "google",
+					GooglePlaceID: recordItem.GooglePlaceID,
+					Latitude:      recordItem.Latitude,
+					Longitude:     recordItem.Longitude,
+				},
+			}
+			b.tripPlaces[record.TripID+":"+place.ID] = place
+			b.googleTripPlaces[record.TripID+":"+recordItem.GooglePlaceID] = place.ID
+			placeID = place.ID
+		}
+		item, err := b.AppendGooglePlaceScheduleItem(ctx, placedomain.AppendGooglePlaceScheduleItemRecord{
+			TripID:             record.TripID,
+			TripDayID:          record.TripDayID,
+			TripPlaceID:        placeID,
+			DuplicateConfirmed: true,
+			Title:              recordItem.Title,
+		})
+		if err != nil {
+			return placedomain.CreateGooglePlaceScheduleItemsBatchMutationResult{}, err
+		}
+		created = append(created, item)
+	}
+	return placedomain.CreateGooglePlaceScheduleItemsBatchMutationResult{CreatedItems: created, ScheduleItems: b.dayScheduleItems[key]}, nil
+}
+
 func (b *fakeAuthBackend) GetScheduleItemByTripDayAndID(_ context.Context, tripID string, date string, itemID string) (tripdomain.ScheduleItem, bool, error) {
 	for _, item := range b.dayScheduleItems[tripID+":"+date] {
 		if item.ID == itemID {
@@ -6859,7 +6982,9 @@ type fakePlaceProvider struct {
 	destinationErr     error
 	detailsCalled      bool
 	detailsInput       placedomain.ProviderDetailsInput
+	detailsInputs      []placedomain.ProviderDetailsInput
 	details            placedomain.GooglePlaceDetails
+	detailsByID        map[string]placedomain.GooglePlaceDetails
 	detailsErr         error
 	descriptionCalled  bool
 	descriptionInput   placedomain.ProviderDescriptionInput
@@ -6886,6 +7011,10 @@ func (p *fakePlaceProvider) SearchDestinations(_ context.Context, input placedom
 func (p *fakePlaceProvider) Details(_ context.Context, input placedomain.ProviderDetailsInput) (placedomain.GooglePlaceDetails, error) {
 	p.detailsCalled = true
 	p.detailsInput = input
+	p.detailsInputs = append(p.detailsInputs, input)
+	if p.detailsByID != nil {
+		return p.detailsByID[input.GooglePlaceID], p.detailsErr
+	}
 	return p.details, p.detailsErr
 }
 

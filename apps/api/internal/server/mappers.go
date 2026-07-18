@@ -415,6 +415,22 @@ func createGooglePlaceScheduleItemResponseToOpenAPI(result place.CreateGooglePla
 	}
 }
 
+func createGooglePlaceScheduleItemsBatchResponseToOpenAPI(result place.CreateGooglePlaceScheduleItemsBatchResult) openapi.CreateGooglePlaceScheduleItemsBatchResponse {
+	createdItems := make([]openapi.ScheduleItem, 0, len(result.CreatedItems))
+	for _, item := range result.CreatedItems {
+		createdItems = append(createdItems, dayScheduleItemToOpenAPI(item))
+	}
+	scheduleItems := make([]openapi.ScheduleItem, 0, len(result.ScheduleItems))
+	for _, item := range result.ScheduleItems {
+		scheduleItems = append(scheduleItems, dayScheduleItemToOpenAPI(item))
+	}
+	return openapi.CreateGooglePlaceScheduleItemsBatchResponse{
+		Day:                  tripDayToOpenAPI(result.Day),
+		CreatedScheduleItems: createdItems,
+		ScheduleItems:        scheduleItems,
+	}
+}
+
 func tripPlaceBookmarksResponseToOpenAPI(bookmarks []place.TripPlaceBookmark) openapi.ListTripPlaceBookmarksResponse {
 	items := make([]openapi.TripPlaceBookmark, 0, len(bookmarks))
 	for _, bookmark := range bookmarks {

@@ -2,6 +2,7 @@ import type { Href } from 'expo-router';
 
 import type {
   CreateGooglePlaceScheduleItemRequest,
+  CreateGooglePlaceScheduleItemsBatchRequest,
   GooglePlaceDetailsResponse,
   GooglePlaceSearchResult,
 } from '@i-um/api-contract';
@@ -11,6 +12,8 @@ import { buildExternalMapUrl, externalMapViewLabel, type MapProvider } from '../
 
 export const googlePlaceSearchMinLength = 2;
 export const googlePlaceSearchDefaultLimit = 10;
+export const googlePlaceScheduleBatchMaxSelectionCount = 20;
+export const googlePlaceScheduleBatchLimitMessage = '한 번에 최대 20개까지 선택할 수 있어요.';
 export const googlePlacePhotoDefaultWidth = 320;
 export const googlePlaceSearchMinBiasRadiusMeters = 1000;
 export const googlePlaceSearchMaxBiasRadiusMeters = 50000;
@@ -93,6 +96,7 @@ export type GooglePlaceSearchMarkerPinStyle = {
 };
 
 export type GooglePlaceSearchMarkerOptions = {
+  selectedIds?: string[];
   selectedVariant?: GooglePlaceSearchMarkerVariant | null;
   variant?: GooglePlaceSearchMarkerVariant;
 };
@@ -184,6 +188,11 @@ export type GooglePlaceSearchBookmarkListState =
 export type GooglePlaceSearchMarkerSelection = {
   result: GooglePlaceSearchRowViewModel;
   source: GooglePlaceSearchSelectionSource;
+};
+
+export type GooglePlaceScheduleBatchSelectionUpdate = {
+  selectedResults: GooglePlaceSearchRowViewModel[];
+  message: string | null;
 };
 
 export type GooglePlaceSearchSheetMetrics = {
@@ -429,16 +438,68 @@ export function errorGooglePlaceAddState(): GooglePlaceAddViewState {
   return { status: 'error', message: googlePlaceAddFailureMessage };
 }
 
+export function isGooglePlaceScheduleBatchSelected(
+  selectedResults: GooglePlaceSearchRowViewModel[],
+  googlePlaceId: string,
+): boolean {
+  const normalizedId = googlePlaceId.trim();
+  return selectedResults.some((result) => result.id.trim() === normalizedId);
+}
+
+export function addGooglePlaceScheduleBatchSelection(
+  selectedResults: GooglePlaceSearchRowViewModel[],
+  result: GooglePlaceSearchRowViewModel,
+  maxSelectionCount = googlePlaceScheduleBatchMaxSelectionCount,
+): GooglePlaceScheduleBatchSelectionUpdate {
+  if (isGooglePlaceScheduleBatchSelected(selectedResults, result.id)) {
+    return { selectedResults, message: null };
+  }
+  if (selectedResults.length >= maxSelectionCount) {
+    return { selectedResults, message: googlePlaceScheduleBatchLimitMessage };
+  }
+  return { selectedResults: [...selectedResults, { ...result, id: result.id.trim() }], message: null };
+}
+
+export function removeGooglePlaceScheduleBatchSelection(
+  selectedResults: GooglePlaceSearchRowViewModel[],
+  googlePlaceId: string,
+): GooglePlaceSearchRowViewModel[] {
+  const normalizedId = googlePlaceId.trim();
+  return selectedResults.filter((result) => result.id.trim() !== normalizedId);
+}
+
+export function toggleGooglePlaceScheduleBatchSelection(
+  selectedResults: GooglePlaceSearchRowViewModel[],
+  result: GooglePlaceSearchRowViewModel,
+  maxSelectionCount = googlePlaceScheduleBatchMaxSelectionCount,
+): GooglePlaceScheduleBatchSelectionUpdate {
+  if (isGooglePlaceScheduleBatchSelected(selectedResults, result.id)) {
+    return { selectedResults: removeGooglePlaceScheduleBatchSelection(selectedResults, result.id), message: null };
+  }
+  return addGooglePlaceScheduleBatchSelection(selectedResults, result, maxSelectionCount);
+}
+
+export function buildCreateGooglePlaceScheduleItemsBatchRequest(
+  selectedResults: GooglePlaceSearchRowViewModel[],
+): CreateGooglePlaceScheduleItemsBatchRequest {
+  const selectedIds = selectedResults.map((result) => result.id.trim()).filter((id) => id.length > 0);
+  return {
+    items: selectedIds.map((googlePlaceId) => ({ googlePlaceId })),
+  };
+}
+
 export function buildGooglePlaceSearchResultActionView({
   addState,
   bookmarkResults = [],
   mode,
   result,
+  selectedBatchPlaceIds = [],
 }: {
   mode: GooglePlaceSearchResultActionMode;
   result: GooglePlaceSearchRowViewModel;
   addState: GooglePlaceAddViewState;
   bookmarkResults?: GooglePlaceSearchRowViewModel[];
+  selectedBatchPlaceIds?: string[];
 }): GooglePlaceSearchResultActionView {
   if (mode === 'exploreOnly') {
     return {
@@ -450,15 +511,18 @@ export function buildGooglePlaceSearchResultActionView({
   }
 
   const isAlreadyBookmarked = mode === 'bookmark' && !canBookmarkGooglePlaceSearchResult(result, bookmarkResults);
+  const isSelectedForBatch = mode === 'scheduleAdd' && selectedBatchPlaceIds.includes(result.id);
   const label = isAlreadyBookmarked
     ? '이미 찜한 장소입니다.'
-    : mode === 'scheduleSelect'
-      ? '이 장소 선택'
-      : mode === 'lodgingRegister'
-        ? '숙소로 등록'
-        : mode === 'bookmark'
-          ? '장소 찜하기'
-          : '장소 추가';
+    : isSelectedForBatch
+      ? '선택됨'
+      : mode === 'scheduleSelect'
+        ? '이 장소 선택'
+        : mode === 'lodgingRegister'
+          ? '숙소로 등록'
+          : mode === 'bookmark'
+            ? '장소 찜하기'
+            : '선택';
   const loadingLabel =
     mode === 'scheduleSelect'
       ? '처리 중...'
@@ -482,7 +546,12 @@ export function buildGooglePlaceSearchResultActionView({
     duplicateConfirmation,
     errorMessage: addState.status === 'error' ? addState.message : null,
     favoriteAction: null,
-    primaryAction: { isLoading, label, loadingLabel, ...(isAlreadyBookmarked ? { disabled: true } : {}) },
+    primaryAction: {
+      isLoading,
+      label,
+      loadingLabel,
+      ...(isAlreadyBookmarked || isSelectedForBatch ? { disabled: true } : {}),
+    },
   };
 }
 
@@ -507,6 +576,30 @@ export function isDuplicateDayPlaceConfirmationError(errorBody: unknown): boolea
   }
   const error = (errorBody as { error?: { code?: unknown } }).error;
   return error?.code === duplicateDayPlaceConfirmationCode;
+}
+
+export function getDuplicateDayPlaceConfirmationGooglePlaceIds(errorBody: unknown): string[] {
+  if (!isDuplicateDayPlaceConfirmationError(errorBody)) {
+    return [];
+  }
+  const details = (errorBody as { error?: { details?: unknown } }).error?.details;
+  if (!Array.isArray(details)) {
+    return [];
+  }
+  const ids: string[] = [];
+  const seen = new Set<string>();
+  for (const detail of details) {
+    const googlePlaceId =
+      detail && typeof detail === 'object' && 'googlePlaceId' in detail
+        ? String((detail as { googlePlaceId?: unknown }).googlePlaceId ?? '').trim()
+        : '';
+    if (!googlePlaceId || seen.has(googlePlaceId)) {
+      continue;
+    }
+    seen.add(googlePlaceId);
+    ids.push(googlePlaceId);
+  }
+  return ids;
 }
 
 export function successGooglePlaceSearchState(results: GooglePlaceSearchResult[]): GooglePlaceSearchViewState {
@@ -597,7 +690,8 @@ export function buildGooglePlaceSearchMarkerViewModels(
     .filter((result) => Number.isFinite(result.latitude) && Number.isFinite(result.longitude))
     .map((result) => {
       const category = getGooglePlaceMarkerCategory(result.typeHint);
-      const selected = result.id === selectedId && (!options.selectedVariant || options.selectedVariant === variant);
+      const focused = result.id === selectedId && (!options.selectedVariant || options.selectedVariant === variant);
+      const selected = focused || options.selectedIds?.includes(result.id) === true;
       return {
         id: result.id,
         coordinate: { latitude: result.latitude as number, longitude: result.longitude as number },
@@ -607,7 +701,7 @@ export function buildGooglePlaceSearchMarkerViewModels(
         selected,
         iconName: getGooglePlaceMarkerIconName(category),
         variant,
-        emphasis: selected ? 'focused' : 'normal',
+        emphasis: focused ? 'focused' : 'normal',
       };
     });
 }

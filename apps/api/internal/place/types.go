@@ -24,8 +24,14 @@ var (
 	ErrProviderRateLimited                 = errors.New("place provider rate limited")
 )
 
+type DuplicateDayPlaceConfirmation struct {
+	GooglePlaceID string
+	TripPlaceID   string
+}
+
 type DuplicateDayPlaceConfirmationError struct {
 	TripPlaceID string
+	Duplicates  []DuplicateDayPlaceConfirmation
 }
 
 func (e DuplicateDayPlaceConfirmationError) Error() string {
@@ -45,6 +51,7 @@ type Repository interface {
 	CreateGoogleDayLodgingPlace(ctx context.Context, record CreateGoogleDayLodgingPlaceRecord) (trip.TripPlaceSummary, error)
 	AppendGooglePlaceScheduleItem(ctx context.Context, record AppendGooglePlaceScheduleItemRecord) (trip.ScheduleItem, error)
 	CreateGooglePlaceScheduleItem(ctx context.Context, record CreateGooglePlaceScheduleItemRecord) (trip.ScheduleItem, error)
+	CreateGooglePlaceScheduleItemsBatch(ctx context.Context, record CreateGooglePlaceScheduleItemsBatchRecord) (CreateGooglePlaceScheduleItemsBatchMutationResult, error)
 	ListTripPlaceBookmarks(ctx context.Context, tripID string) ([]TripPlaceBookmark, error)
 	UpsertGoogleTripPlaceBookmark(ctx context.Context, record CreateGoogleTripPlaceBookmarkRecord) (TripPlaceBookmark, error)
 	DeleteTripPlaceBookmark(ctx context.Context, tripID string, bookmarkID string) (bool, error)
@@ -119,6 +126,14 @@ type CreateGooglePlaceScheduleItemInput struct {
 	StartTime          *string
 	EndTime            *string
 	Memo               *string
+}
+
+type CreateGooglePlaceScheduleItemsBatchInputItem struct {
+	GooglePlaceID string
+}
+
+type CreateGooglePlaceScheduleItemsBatchInput struct {
+	Items []CreateGooglePlaceScheduleItemsBatchInputItem
 }
 
 type CreateGoogleTripPlaceBookmarkInput struct {
@@ -230,6 +245,30 @@ type CreateGooglePlaceScheduleItemRecord struct {
 	Memo               *string
 }
 
+type CreateGooglePlaceScheduleItemsBatchRecordItem struct {
+	TripPlaceID       string
+	GooglePlaceID     string
+	Name              string
+	Address           string
+	PlaceType         string
+	Latitude          float64
+	Longitude         float64
+	GooglePrimaryType string
+	GoogleTypes       []string
+	Title             string
+}
+
+type CreateGooglePlaceScheduleItemsBatchRecord struct {
+	TripID    string
+	TripDayID string
+	Items     []CreateGooglePlaceScheduleItemsBatchRecordItem
+}
+
+type CreateGooglePlaceScheduleItemsBatchMutationResult struct {
+	CreatedItems  []trip.ScheduleItem
+	ScheduleItems []trip.ScheduleItem
+}
+
 type CreateGoogleTripPlaceBookmarkRecord struct {
 	TripID            string
 	GooglePlaceID     string
@@ -260,6 +299,12 @@ type CreateGoogleDayLodgingPlaceResult struct {
 type CreateGooglePlaceScheduleItemResult struct {
 	Day  trip.TripDay
 	Item trip.ScheduleItem
+}
+
+type CreateGooglePlaceScheduleItemsBatchResult struct {
+	Day           trip.TripDay
+	CreatedItems  []trip.ScheduleItem
+	ScheduleItems []trip.ScheduleItem
 }
 
 type CreateGoogleTripPlaceBookmarkResult struct {

@@ -426,6 +426,90 @@ func (s *Service) CreateGooglePlaceScheduleItem(ctx context.Context, userID stri
 	return CreateGooglePlaceScheduleItemResult{Day: day, Item: item}, nil
 }
 
+func (s *Service) CreateGooglePlaceScheduleItemsBatch(ctx context.Context, userID string, tripID string, tripDayID string, input CreateGooglePlaceScheduleItemsBatchInput) (CreateGooglePlaceScheduleItemsBatchResult, error) {
+	if strings.TrimSpace(userID) == "" {
+		return CreateGooglePlaceScheduleItemsBatchResult{}, ErrUnauthorized
+	}
+	if s == nil || s.repo == nil {
+		return CreateGooglePlaceScheduleItemsBatchResult{}, ErrProviderUnavailable
+	}
+
+	tripID = strings.TrimSpace(tripID)
+	tripDayID = strings.TrimSpace(tripDayID)
+	if _, err := uuid.Parse(tripID); err != nil {
+		return CreateGooglePlaceScheduleItemsBatchResult{}, ErrValidation
+	}
+	if _, err := uuid.Parse(tripDayID); err != nil {
+		if _, parseErr := time.Parse(dateLayout, tripDayID); parseErr != nil {
+			return CreateGooglePlaceScheduleItemsBatchResult{}, ErrValidation
+		}
+	}
+
+	googlePlaceIDs, err := normalizeGooglePlaceScheduleBatchItems(input.Items)
+	if err != nil {
+		return CreateGooglePlaceScheduleItemsBatchResult{}, err
+	}
+	day, err := s.validateTripDayParticipant(ctx, userID, tripID, tripDayID)
+	if err != nil {
+		return CreateGooglePlaceScheduleItemsBatchResult{}, err
+	}
+	tripDayRecordID, err := activeTripDayRecordID(day)
+	if err != nil {
+		return CreateGooglePlaceScheduleItemsBatchResult{}, err
+	}
+
+	recordItems := make([]CreateGooglePlaceScheduleItemsBatchRecordItem, 0, len(googlePlaceIDs))
+	for _, googlePlaceID := range googlePlaceIDs {
+		if existingPlace, ok, err := s.repo.GetGoogleTripPlaceByGooglePlaceID(ctx, tripID, googlePlaceID); err != nil {
+			return CreateGooglePlaceScheduleItemsBatchResult{}, err
+		} else if ok {
+			recordItems = append(recordItems, CreateGooglePlaceScheduleItemsBatchRecordItem{
+				TripPlaceID:   existingPlace.ID,
+				GooglePlaceID: googlePlaceID,
+				Name:          existingPlace.Name,
+				Address:       existingPlace.Address,
+				PlaceType:     existingPlace.PlaceType,
+				Title:         existingPlace.Name,
+			})
+			continue
+		}
+
+		if s.provider == nil {
+			return CreateGooglePlaceScheduleItemsBatchResult{}, ErrProviderUnavailable
+		}
+		details, err := s.provider.Details(ctx, ProviderDetailsInput{GooglePlaceID: googlePlaceID})
+		if err != nil {
+			return CreateGooglePlaceScheduleItemsBatchResult{}, err
+		}
+		snapshot, err := buildGooglePlaceSnapshot(googlePlaceID, details)
+		if err != nil {
+			return CreateGooglePlaceScheduleItemsBatchResult{}, err
+		}
+		recordItems = append(recordItems, CreateGooglePlaceScheduleItemsBatchRecordItem{
+			GooglePlaceID:     snapshot.GooglePlaceID,
+			Name:              snapshot.DisplayName,
+			Address:           snapshot.FormattedAddress,
+			PlaceType:         MapProviderPlaceType(DestinationProviderGoogle, snapshot.PrimaryType, snapshot.Types),
+			Latitude:          snapshot.Latitude,
+			Longitude:         snapshot.Longitude,
+			GooglePrimaryType: snapshot.PrimaryType,
+			GoogleTypes:       snapshot.Types,
+			Title:             snapshot.DisplayName,
+		})
+	}
+
+	mutation, err := s.repo.CreateGooglePlaceScheduleItemsBatch(ctx, CreateGooglePlaceScheduleItemsBatchRecord{
+		TripID:    tripID,
+		TripDayID: tripDayRecordID,
+		Items:     recordItems,
+	})
+	if err != nil {
+		return CreateGooglePlaceScheduleItemsBatchResult{}, err
+	}
+
+	return CreateGooglePlaceScheduleItemsBatchResult{Day: day, CreatedItems: mutation.CreatedItems, ScheduleItems: mutation.ScheduleItems}, nil
+}
+
 func (s *Service) ListTripPlaceBookmarks(ctx context.Context, userID string, tripID string) ([]TripPlaceBookmark, error) {
 	if strings.TrimSpace(userID) == "" {
 		return nil, ErrUnauthorized
@@ -517,6 +601,21 @@ func (s *Service) DeleteTripPlaceBookmark(ctx context.Context, userID string, tr
 		return ErrNotFound
 	}
 	return nil
+}
+
+func normalizeGooglePlaceScheduleBatchItems(items []CreateGooglePlaceScheduleItemsBatchInputItem) ([]string, error) {
+	if len(items) < 1 || len(items) > 20 {
+		return nil, ErrValidation
+	}
+	googlePlaceIDs := make([]string, 0, len(items))
+	for _, item := range items {
+		googlePlaceID := strings.TrimSpace(item.GooglePlaceID)
+		if len([]rune(googlePlaceID)) < 1 || len([]rune(googlePlaceID)) > maxGooglePlaceIDLen {
+			return nil, ErrValidation
+		}
+		googlePlaceIDs = append(googlePlaceIDs, googlePlaceID)
+	}
+	return googlePlaceIDs, nil
 }
 
 func activeTripDayRecordID(day trip.TripDay) (string, error) {
