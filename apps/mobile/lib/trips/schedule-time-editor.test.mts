@@ -10,11 +10,11 @@ import {
 } from './schedule-time-editor';
 
 describe('schedule time editor helpers', () => {
-  it('adds a start time from the provided current time without requiring text entry', () => {
+  it('adds a fixed midnight start time without requiring text entry', () => {
     const values: ScheduleTimeEditorValues = { startTime: '', endTime: '' };
 
     assert.deepEqual(addScheduleStartTime(values, new Date('2026-07-10T09:30:00')), {
-      startTime: '09:30',
+      startTime: '00:00',
       endTime: '',
     });
   });
@@ -42,9 +42,9 @@ describe('schedule time editor helpers', () => {
       hasEndTime: false,
     });
     assert.deepEqual(buildScheduleTimeEditorSummary({ startTime: '08:12', endTime: '21:12' }), {
-      startLabel: '오전 8:12',
-      endLabel: '오후 9:12',
-      summaryLabel: '오전 8:12 → 오후 9:12',
+      startLabel: '08:12',
+      endLabel: '21:12',
+      summaryLabel: '08:12 → 21:12',
       hasStartTime: true,
       hasEndTime: true,
     });

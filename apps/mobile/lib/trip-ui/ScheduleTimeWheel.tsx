@@ -21,8 +21,6 @@ import {
   parseScheduleTimePickerValue,
   scheduleTimeHourOptions,
   scheduleTimeMinuteOptions,
-  scheduleTimePeriodOptions,
-  type PlaceScheduleTimePeriod,
   type PlaceScheduleTimePickerValue,
 } from '../places/place-schedule-detail';
 
@@ -56,16 +54,9 @@ export function ScheduleTimeWheel({
         <Text style={styles.timeWheelValue}>{formatScheduleTimeDisplay(pickerValue)}</Text>
       </View>
       <View style={styles.timeWheelRow}>
-        <TimeWheelColumn<PlaceScheduleTimePeriod>
-          disabled={disabled}
-          labelForOption={formatPeriodOption}
-          onChange={(period) => update({ period })}
-          options={scheduleTimePeriodOptions}
-          value={pickerValue.period}
-        />
         <TimeWheelColumn
           disabled={disabled}
-          labelForOption={(hour) => `${Number(hour)}시`}
+          labelForOption={(hour) => `${hour}시`}
           onChange={(hour) => update({ hour })}
           options={scheduleTimeHourOptions}
           value={pickerValue.hour}
@@ -150,12 +141,8 @@ function TimeWheelColumn<T extends string>({
   );
 }
 
-function formatPeriodOption(period: PlaceScheduleTimePeriod): string {
-  return period === 'AM' ? '오전' : '오후';
-}
-
 function formatScheduleTimeDisplay(value: PlaceScheduleTimePickerValue): string {
-  return `${formatPeriodOption(value.period)} ${Number(value.hour)}:${value.minute}`;
+  return `${value.hour}:${value.minute}`;
 }
 
 const styles = StyleSheet.create({
