@@ -26,6 +26,25 @@ describe('google place search native module entry setup', () => {
     assert.match(mapSearchSource, /topInset=\{resolvedSheetTopInset\}/);
   });
 
+  it('renders the always-visible top search overlay outside collapsed sheet content', () => {
+    assert.match(mapSearchSource, /styles\.topSearchOverlay/);
+    assert.match(mapSearchSource, /accessibilityLabel="장소 검색어 입력"/);
+    assert.match(mapSearchSource, /buildGooglePlaceSearchFirstEntryLayoutState\(sheetState\)/);
+    assert.match(mapSearchSource, /sheetLayout\.sheetContentVisible \? \(/);
+  });
+
+  it('renders bottom sheet tabs for search results and trip bookmarks', () => {
+    assert.match(mapSearchSource, /buildGooglePlaceSearchSheetTabs\(selectedSheetTab\)/);
+    assert.match(mapSearchSource, /검색 결과/);
+    assert.match(mapSearchSource, /찜한 장소/);
+  });
+
+  it('accepts a separate visible bookmark marker list so map-tab hidden layers do not hide the bookmark tab list', () => {
+    assert.match(mapSearchSource, /bookmarkMarkerResults\?: GooglePlaceSearchRowViewModel\[\];/);
+    assert.match(mapSearchSource, /bookmarkMarkerResults = bookmarkResults/);
+    assert.match(mapSearchSource, /buildGooglePlaceSearchMarkerViewModels\(bookmarkMarkerResults/);
+  });
+
   it('guards bookmark-mode search result actions with current bookmarkResults before invoking create flow', () => {
     assert.match(mapSearchSource, /canBookmarkGooglePlaceSearchResult/);
     assert.match(

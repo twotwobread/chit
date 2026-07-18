@@ -61,6 +61,7 @@ import {
   buildGooglePlacePhotoImageSource,
   buildGooglePlaceSearchBiasFromRegion,
   buildGooglePlaceSearchBiasFromSource,
+  buildGooglePlaceSearchFirstEntryLayoutState,
   buildGooglePlaceSearchInputState,
   buildGooglePlaceSearchMarkerPinStyle,
   buildGooglePlaceSearchMarkerScale,
@@ -70,10 +71,12 @@ import {
   buildGooglePlaceSearchResultDistanceLabel,
   buildGooglePlaceSearchResultsRegion,
   buildGooglePlaceSearchResultsSectionTitle,
+  buildGooglePlaceSearchSheetBookmarkListState,
   buildGooglePlaceSearchSheetIndex,
   buildGooglePlaceSearchSheetMetrics,
   buildGooglePlaceSearchSheetSnapPoints,
   buildGooglePlaceSearchSheetStateFromIndex,
+  buildGooglePlaceSearchSheetTabs,
   buildGooglePlaceCurrentLocationBiasSource,
   buildGooglePlaceSelectedBiasSource,
   buildGooglePlaceSelectedMapRegion,
@@ -88,9 +91,9 @@ import {
   normalizeGooglePlaceSearchQuery,
   resolveGooglePlaceSearchSelectionAfterResultsClose,
   resolveGooglePlaceSearchSheetState,
+  resolveGooglePlaceSearchSheetTab,
   resolveGooglePlaceSearchSheetTopInset,
   isGooglePlaceCoordinateWithinTripDestination,
-  shouldRenderGooglePlaceBookmarkDetail,
   shouldRenderGooglePlaceSearchResults,
   shouldShowGooglePlaceCurrentLocationButton,
   shouldShowGooglePlaceRegionSearchAction,
@@ -104,6 +107,7 @@ import {
   type GooglePlaceSearchSelectionSource,
   type GooglePlaceTripDestination,
   type GooglePlaceSearchSheetState,
+  type GooglePlaceSearchSheetTab,
   type GooglePlaceSearchViewState,
   type SearchBiasSource,
 } from '../places/google-search';
@@ -143,6 +147,7 @@ export type GooglePlaceMapSearchProps = {
   actionMode: GooglePlaceSearchResultActionMode;
   actionState?: GooglePlaceAddViewState;
   bookmarkResults?: GooglePlaceSearchRowViewModel[];
+  bookmarkMarkerResults?: GooglePlaceSearchRowViewModel[];
   bottomSheetFooter?: ReactNode;
   dayId: string;
   initialRegion?: Region | null;
@@ -159,6 +164,7 @@ export type GooglePlaceMapSearchProps = {
   selectedRoutePlaceId?: string | null;
   sheetTopInset?: number;
   style?: StyleProp<ViewStyle>;
+  topSearchTrailingInset?: number;
   tripDestinations?: GooglePlaceTripDestination[];
   tripId: string;
 };
@@ -298,6 +304,7 @@ export function GooglePlaceMapSearch({
   actionMode,
   actionState = idleGooglePlaceAddState(),
   bookmarkResults = [],
+  bookmarkMarkerResults = bookmarkResults,
   bottomSheetFooter,
   dayId,
   initialRegion,
@@ -314,6 +321,7 @@ export function GooglePlaceMapSearch({
   selectedRoutePlaceId,
   sheetTopInset,
   style,
+  topSearchTrailingInset = 0,
   tripDestinations = [],
   tripId,
 }: GooglePlaceMapSearchProps) {
@@ -337,8 +345,9 @@ export function GooglePlaceMapSearch({
   const mapRef = useRef<MapView | null>(null);
   const bottomSheetRef = useRef<GooglePlaceSearchBottomSheetHandle | null>(null);
   const resultScrollRef = useRef<GooglePlaceSearchScrollHandle | null>(null);
-  const resultCardYByIdRef = useRef<Record<string, number>>({});
-  const pendingResultFocusIdRef = useRef<string | null>(null);
+  const searchResultCardYByIdRef = useRef<Record<string, number>>({});
+  const bookmarkResultCardYByIdRef = useRef<Record<string, number>>({});
+  const pendingResultFocusRef = useRef<{ id: string; tab: GooglePlaceSearchSheetTab } | null>(null);
   const suppressNextRegionDirtyRef = useRef(false);
   const suppressNextMapTapRef = useRef(false);
   const defaultDestinationAppliedRef = useRef<string | null>(defaultDestinationId);
@@ -360,6 +369,7 @@ export function GooglePlaceMapSearch({
   const [lastSearchBiasSource, setLastSearchBiasSource] = useState<SearchBiasSource | null>(activeBiasSource);
   const [regionDirty, setRegionDirty] = useState(false);
   const [sheetState, setSheetState] = useState<GooglePlaceSearchSheetState>('minimized');
+  const [selectedSheetTab, setSelectedSheetTab] = useState<GooglePlaceSearchSheetTab>('searchResults');
   const [locationMessage, setLocationMessage] = useState<string | null>(null);
   const [mapActionMessage, setMapActionMessage] = useState<string | null>(null);
   const [imageFailures, setImageFailures] = useState<Record<string, true>>({});
@@ -381,7 +391,7 @@ export function GooglePlaceMapSearch({
   const hasDestinationChips = destinationChips.length > 0;
 
   const results = state.status === 'success' ? state.results : [];
-  const bookmarkMarkers = buildGooglePlaceSearchMarkerViewModels(bookmarkResults, highlightedResultId, {
+  const bookmarkMarkers = buildGooglePlaceSearchMarkerViewModels(bookmarkMarkerResults, highlightedResultId, {
     selectedVariant: selectedResultSource,
     variant: 'bookmark',
   });
@@ -410,7 +420,9 @@ export function GooglePlaceMapSearch({
   const sheetIndex = buildGooglePlaceSearchSheetIndex(sheetState);
   const visibleSheetHeight = sheetMetrics[`${sheetState}Height`];
   const renderSearchResults = shouldRenderGooglePlaceSearchResults(state);
-  const renderBookmarkDetail = shouldRenderGooglePlaceBookmarkDetail(selectedResultSource, selectedResult);
+  const sheetLayout = buildGooglePlaceSearchFirstEntryLayoutState(sheetState);
+  const sheetTabs = buildGooglePlaceSearchSheetTabs(selectedSheetTab);
+  const bookmarkListState = buildGooglePlaceSearchSheetBookmarkListState(bookmarkResults);
 
   const resetActionState = useCallback(() => {
     onResetActionState?.();
@@ -511,6 +523,7 @@ export function GooglePlaceMapSearch({
   const focusSearchInput = () => {
     setSelectedResult(null);
     setSelectedResultSource(null);
+    setSelectedSheetTab('searchResults');
     setHighlightedResultId(null);
     setDetailsState(buildGooglePlaceDetailsIdleState());
     setMapActionMessage(null);
@@ -522,13 +535,13 @@ export function GooglePlaceMapSearch({
     setSheetState((current) => resolveGooglePlaceSearchSheetState(current, { kind: 'resultsScrollStart' }));
   };
 
-  const focusResultInList = (resultId: string) => {
-    const y = resultCardYByIdRef.current[resultId];
+  const focusResultInList = (resultId: string, tab: GooglePlaceSearchSheetTab) => {
+    const y = (tab === 'bookmarks' ? bookmarkResultCardYByIdRef.current : searchResultCardYByIdRef.current)[resultId];
     if (!Number.isFinite(y)) {
-      pendingResultFocusIdRef.current = resultId;
+      pendingResultFocusRef.current = { id: resultId, tab };
       return;
     }
-    pendingResultFocusIdRef.current = null;
+    pendingResultFocusRef.current = null;
     resultScrollRef.current?.scrollTo({ y: Math.max(0, y - theme.space[3]), animated: true });
   };
 
@@ -594,6 +607,7 @@ export function GooglePlaceMapSearch({
     setMapActionMessage(null);
     setSelectedResult(null);
     setSelectedResultSource(null);
+    setSelectedSheetTab('searchResults');
     setHighlightedResultId(null);
     setDetailsState(buildGooglePlaceDetailsIdleState());
     onClearRoutePlaceSelection?.();
@@ -610,6 +624,7 @@ export function GooglePlaceMapSearch({
       const nextState = successGooglePlaceSearchState(response.results);
       setLastSearchBiasSource(biasSource ?? null);
       setState(nextState);
+      setSelectedSheetTab('searchResults');
       setSheetState((current) => resolveGooglePlaceSearchSheetState(current, { kind: 'searchResults' }));
       setRegionDirty(false);
       if (nextState.status === 'success') {
@@ -680,6 +695,7 @@ export function GooglePlaceMapSearch({
     setQuery(nextQuery);
     setSelectedResult(null);
     setSelectedResultSource(null);
+    setSelectedSheetTab('searchResults');
     setHighlightedResultId(null);
     setDetailsState(buildGooglePlaceDetailsIdleState());
     onClearRoutePlaceSelection?.();
@@ -695,8 +711,10 @@ export function GooglePlaceMapSearch({
     source: 'list' | 'marker',
     resultSource: GooglePlaceSearchSelectionSource,
   ) => {
+    const nextTab = resolveGooglePlaceSearchSheetTab(selectedSheetTab, resultSource);
     setSelectedResult(result);
     setSelectedResultSource(resultSource);
+    setSelectedSheetTab(nextTab);
     setHighlightedResultId(result.id);
     const selectedPlaceSource = buildGooglePlaceSelectedBiasSource(result);
     if (selectedPlaceSource) {
@@ -709,7 +727,7 @@ export function GooglePlaceMapSearch({
       setState(clearGooglePlaceSearchResultsState(query));
     }
     if (source === 'marker') {
-      pendingResultFocusIdRef.current = result.id;
+      pendingResultFocusRef.current = { id: result.id, tab: nextTab };
     }
     setSheetState((current) =>
       resolveGooglePlaceSearchSheetState(current, {
@@ -727,8 +745,8 @@ export function GooglePlaceMapSearch({
       setMapRegion(nextRegion);
       mapRef.current?.animateToRegion(nextRegion, 260);
     }
-    if (source === 'marker' && resultSource === 'search') {
-      setTimeout(() => focusResultInList(result.id), 0);
+    if (source === 'marker') {
+      setTimeout(() => focusResultInList(result.id, nextTab), 0);
     }
   };
 
@@ -766,6 +784,7 @@ export function GooglePlaceMapSearch({
     suppressNextMapTapRef.current = true;
     setSelectedResult(null);
     setSelectedResultSource(null);
+    setSelectedSheetTab('searchResults');
     setHighlightedResultId(null);
     setDetailsState(buildGooglePlaceDetailsIdleState());
     setMapActionMessage(null);
@@ -806,6 +825,7 @@ export function GooglePlaceMapSearch({
     if (bookmarkSelection) {
       setSelectedResult(bookmarkSelection);
       setSelectedResultSource('bookmark');
+      setSelectedSheetTab('bookmarks');
       setHighlightedResultId(bookmarkSelection.id);
       onClearRoutePlaceSelection?.();
       setSheetState((current) => resolveGooglePlaceSearchSheetState(current, { kind: 'markerPlaceSelect' }));
@@ -813,6 +833,7 @@ export function GooglePlaceMapSearch({
     }
     setSelectedResult(null);
     setSelectedResultSource(null);
+    setSelectedSheetTab('searchResults');
     setHighlightedResultId(null);
     setDetailsState(buildGooglePlaceDetailsIdleState());
   };
@@ -900,7 +921,7 @@ export function GooglePlaceMapSearch({
           selectedPlaceId={selectedRoutePlaceId}
         />
         {bookmarkMarkers.map((marker) => {
-          const result = bookmarkResults.find((candidate) => candidate.id === marker.id);
+          const result = bookmarkMarkerResults.find((candidate) => candidate.id === marker.id);
           if (!result) {
             return null;
           }
@@ -980,6 +1001,43 @@ export function GooglePlaceMapSearch({
         ) : null}
       </MapView>
 
+      <View
+        pointerEvents="box-none"
+        style={[
+          styles.topSearchOverlay,
+          {
+            paddingRight: theme.space[4] + Math.max(0, topSearchTrailingInset),
+            paddingTop: insets.top + theme.space[4],
+          },
+        ]}
+      >
+        <View style={styles.topSearchRow}>
+          <GooglePlaceBottomSheetTextInput
+            accessibilityLabel="장소 검색어 입력"
+            autoCapitalize="none"
+            editable={!isBusy}
+            onChangeText={updateQuery}
+            onFocus={focusSearchInput}
+            onSubmitEditing={runActiveSearch}
+            placeholder="어디를 찾아볼까요?"
+            placeholderTextColor={theme.color.textFaint}
+            returnKeyType="search"
+            style={styles.topSearchInput}
+            value={query}
+          />
+          <Pressable
+            accessibilityLabel="장소 검색"
+            accessibilityRole="button"
+            disabled={isBusy}
+            onPress={runActiveSearch}
+            style={[styles.topSearchButton, isBusy ? styles.searchButtonDisabled : null]}
+          >
+            {isLoading ? <ActivityIndicator color={theme.color.onPrimary} /> : null}
+            <Text style={styles.topSearchButtonText}>{isLoading ? '검색 중' : '검색'}</Text>
+          </Pressable>
+        </View>
+      </View>
+
       {showCurrentLocation ? (
         <Pressable
           accessibilityLabel="현재 위치로 이동"
@@ -1021,7 +1079,7 @@ export function GooglePlaceMapSearch({
         style={styles.sheet}
         topInset={resolvedSheetTopInset}
       >
-        {sheetState !== 'minimized' ? (
+        {sheetLayout.sheetContentVisible ? (
           <GooglePlaceBottomSheetScrollView
             contentContainerStyle={[styles.sheetContent, { paddingBottom: Math.max(insets.bottom, theme.space[5]) }]}
             keyboardShouldPersistTaps="handled"
@@ -1034,7 +1092,7 @@ export function GooglePlaceMapSearch({
                 <Text style={styles.sheetTitle}>장소 검색</Text>
                 <Text style={styles.sheetHelper}>주소는 카드에 표시하지 않아요. 지도 핀으로 위치를 확인하세요.</Text>
               </View>
-              {renderSearchResults ? (
+              {selectedSheetTab === 'searchResults' && renderSearchResults ? (
                 <Pressable
                   accessibilityLabel="검색 결과 닫기"
                   accessibilityRole="button"
@@ -1045,154 +1103,168 @@ export function GooglePlaceMapSearch({
                 </Pressable>
               ) : null}
             </View>
-            {hasDestinationChips ? (
-              <ScrollView
-                horizontal
-                keyboardShouldPersistTaps="handled"
-                showsHorizontalScrollIndicator={false}
-                style={styles.destinationChipScroller}
-              >
-                <View style={styles.destinationChipRow}>
-                  {destinationChips.map((chip) => (
-                    <Pressable
-                      accessibilityLabel={chip.accessibilityLabel}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: chip.selected }}
-                      disabled={isBusy}
-                      key={chip.id}
-                      onPress={() => selectDestinationChip(chip.id)}
-                      style={[
-                        styles.destinationChip,
-                        chip.selected ? styles.destinationChipSelected : null,
-                        isBusy ? styles.destinationChipDisabled : null,
-                      ]}
-                    >
-                      <Text
-                        style={[styles.destinationChipText, chip.selected ? styles.destinationChipTextSelected : null]}
-                      >
-                        {chip.label}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-              </ScrollView>
-            ) : null}
-            <View style={styles.searchRow}>
-              <GooglePlaceBottomSheetTextInput
-                autoCapitalize="none"
-                editable={!isBusy}
-                onChangeText={updateQuery}
-                onFocus={focusSearchInput}
-                onSubmitEditing={runActiveSearch}
-                placeholder="예: 도톤보리, 우메다 카페"
-                placeholderTextColor={theme.color.textFaint}
-                returnKeyType="search"
-                style={styles.searchInput}
-                value={query}
-              />
-              <Pressable
-                accessibilityRole="button"
-                disabled={isBusy}
-                onPress={runActiveSearch}
-                style={[styles.searchButton, isBusy ? styles.searchButtonDisabled : null]}
-              >
-                {isLoading ? <ActivityIndicator color={theme.color.onPrimary} /> : null}
-                <Text style={styles.searchButtonText}>{isLoading ? '검색 중' : '검색'}</Text>
-              </Pressable>
+            <View style={styles.sheetTabRow}>
+              {sheetTabs.map((tab) => (
+                <Pressable
+                  accessibilityHint={tab.id === 'bookmarks' ? '찜한 장소 목록을 봅니다.' : '검색 결과 목록을 봅니다.'}
+                  accessibilityLabel={tab.accessibilityLabel}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: tab.selected }}
+                  key={tab.id}
+                  onPress={() => setSelectedSheetTab(tab.id)}
+                  style={[styles.sheetTab, tab.selected ? styles.sheetTabSelected : null]}
+                >
+                  <Text style={[styles.sheetTabText, tab.selected ? styles.sheetTabTextSelected : null]}>
+                    {tab.label}
+                  </Text>
+                </Pressable>
+              ))}
             </View>
 
-            {'message' in state && state.message ? (
-              <Text style={state.status === 'minQuery' ? styles.fieldError : styles.sheetHelper}>{state.message}</Text>
-            ) : null}
-            {state.status === 'empty' ? <Text style={styles.message}>{state.message}</Text> : null}
-            {state.status === 'error' ? (
-              <View style={styles.noticeCard}>
-                <Text style={styles.errorTitle}>{state.title}</Text>
-                <Text style={styles.message}>{state.helper}</Text>
-              </View>
-            ) : null}
-            {locationMessage ? <Text style={styles.sheetHelper}>{locationMessage}</Text> : null}
-
-            {renderBookmarkDetail && selectedResult ? (
-              <View style={styles.resultListContent}>
-                <Text style={styles.sectionTitle}>찜한 장소</Text>
-                <PlaceResultCard
-                  actionView={buildGooglePlaceSearchResultActionView({
-                    addState: actionState,
-                    mode: actionMode === 'bookmark' ? 'exploreOnly' : actionMode,
-                    result: selectedResult,
-                  })}
-                  dayId={dayId}
-                  detailsState={detailsState}
-                  imageFailed={imageFailures[selectedResult.id] === true}
-                  isBusy={isBusy}
-                  isExpanded
-                  isSelected
-                  key={`bookmark-detail-${selectedResult.id}`}
-                  mapActionMessage={mapActionMessage}
-                  onCancelDuplicate={resetActionState}
-                  onConfirmDuplicate={() => onPrimaryAction?.(selectedResult, true)}
-                  onDeleteBookmark={
-                    onBookmarkDeleteResult && selectedResult.bookmarkId
-                      ? () => onBookmarkDeleteResult(selectedResult)
-                      : undefined
-                  }
-                  onImageError={() => setImageFailures((current) => ({ ...current, [selectedResult.id]: true }))}
-                  onLayout={() => undefined}
-                  onOpenMaps={(url) => void openGoogleMaps(url)}
-                  onPress={() => undefined}
-                  onPrimaryAction={() => handleResultPrimaryAction(selectedResult)}
-                  result={selectedResult}
-                  tripId={tripId}
-                />
-              </View>
-            ) : null}
-
-            {renderSearchResults ? (
-              <View style={styles.resultListContent}>
-                {searchResultsSectionTitle ? (
-                  <Text style={styles.sectionTitle}>{searchResultsSectionTitle}</Text>
+            {selectedSheetTab === 'searchResults' ? (
+              <>
+                {hasDestinationChips ? (
+                  <ScrollView
+                    horizontal
+                    keyboardShouldPersistTaps="handled"
+                    showsHorizontalScrollIndicator={false}
+                    style={styles.destinationChipScroller}
+                  >
+                    <View style={styles.destinationChipRow}>
+                      {destinationChips.map((chip) => (
+                        <Pressable
+                          accessibilityLabel={chip.accessibilityLabel}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: chip.selected }}
+                          disabled={isBusy}
+                          key={chip.id}
+                          onPress={() => selectDestinationChip(chip.id)}
+                          style={[
+                            styles.destinationChip,
+                            chip.selected ? styles.destinationChipSelected : null,
+                            isBusy ? styles.destinationChipDisabled : null,
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.destinationChipText,
+                              chip.selected ? styles.destinationChipTextSelected : null,
+                            ]}
+                          >
+                            {chip.label}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </ScrollView>
                 ) : null}
-                {state.results.map((item) => (
-                  <PlaceResultCard
-                    actionView={buildGooglePlaceSearchResultActionView({
-                      addState: actionState,
-                      bookmarkResults,
-                      mode: actionMode,
-                      result: item,
-                    })}
-                    dayId={dayId}
-                    detailsState={detailsState}
-                    basisDistanceLabel={buildGooglePlaceSearchResultDistanceLabel(
-                      item,
-                      lastSearchBiasSource,
-                      tripDestinations,
-                    )}
-                    imageFailed={imageFailures[item.id] === true}
-                    isBusy={isBusy}
-                    isExpanded={selectedResult?.id === item.id}
-                    isSelected={highlightedResultId === item.id}
-                    key={item.id}
-                    mapActionMessage={selectedResult?.id === item.id ? mapActionMessage : null}
-                    onCancelDuplicate={resetActionState}
-                    onConfirmDuplicate={() => onPrimaryAction?.(item, true)}
-                    onDeleteBookmark={undefined}
-                    onImageError={() => setImageFailures((current) => ({ ...current, [item.id]: true }))}
-                    onLayout={(y) => {
-                      resultCardYByIdRef.current[item.id] = y;
-                      if (pendingResultFocusIdRef.current === item.id) {
-                        focusResultInList(item.id);
-                      }
-                    }}
-                    onOpenMaps={(url) => void openGoogleMaps(url)}
-                    onPress={() => selectResult(item, 'list', 'search')}
-                    onPrimaryAction={() => handleResultPrimaryAction(item)}
-                    result={item}
-                    tripId={tripId}
-                  />
-                ))}
+
+                {'message' in state && state.message ? (
+                  <Text style={state.status === 'minQuery' ? styles.fieldError : styles.sheetHelper}>
+                    {state.message}
+                  </Text>
+                ) : null}
+                {state.status === 'empty' ? <Text style={styles.message}>{state.message}</Text> : null}
+                {state.status === 'error' ? (
+                  <View style={styles.noticeCard}>
+                    <Text style={styles.errorTitle}>{state.title}</Text>
+                    <Text style={styles.message}>{state.helper}</Text>
+                  </View>
+                ) : null}
+                {locationMessage ? <Text style={styles.sheetHelper}>{locationMessage}</Text> : null}
+
+                {renderSearchResults ? (
+                  <View style={styles.resultListContent}>
+                    {searchResultsSectionTitle ? (
+                      <Text style={styles.sectionTitle}>{searchResultsSectionTitle}</Text>
+                    ) : null}
+                    {state.results.map((item) => (
+                      <PlaceResultCard
+                        actionView={buildGooglePlaceSearchResultActionView({
+                          addState: actionState,
+                          bookmarkResults,
+                          mode: actionMode,
+                          result: item,
+                        })}
+                        dayId={dayId}
+                        detailsState={detailsState}
+                        basisDistanceLabel={buildGooglePlaceSearchResultDistanceLabel(
+                          item,
+                          lastSearchBiasSource,
+                          tripDestinations,
+                        )}
+                        imageFailed={imageFailures[item.id] === true}
+                        isBusy={isBusy}
+                        isExpanded={selectedResult?.id === item.id && selectedResultSource === 'search'}
+                        isSelected={highlightedResultId === item.id && selectedResultSource === 'search'}
+                        key={item.id}
+                        mapActionMessage={selectedResult?.id === item.id ? mapActionMessage : null}
+                        onCancelDuplicate={resetActionState}
+                        onConfirmDuplicate={() => onPrimaryAction?.(item, true)}
+                        onDeleteBookmark={undefined}
+                        onImageError={() => setImageFailures((current) => ({ ...current, [item.id]: true }))}
+                        onLayout={(y) => {
+                          searchResultCardYByIdRef.current[item.id] = y;
+                          const pending = pendingResultFocusRef.current;
+                          if (pending?.tab === 'searchResults' && pending.id === item.id) {
+                            focusResultInList(item.id, 'searchResults');
+                          }
+                        }}
+                        onOpenMaps={(url) => void openGoogleMaps(url)}
+                        onPress={() => selectResult(item, 'list', 'search')}
+                        onPrimaryAction={() => handleResultPrimaryAction(item)}
+                        result={item}
+                        tripId={tripId}
+                      />
+                    ))}
+                  </View>
+                ) : null}
+              </>
+            ) : (
+              <View style={styles.resultListContent}>
+                <View style={styles.bookmarkListHeader}>
+                  <Text style={styles.sectionTitle}>{bookmarkListState.title}</Text>
+                  {bookmarkListState.helper ? <Text style={styles.sheetHelper}>{bookmarkListState.helper}</Text> : null}
+                </View>
+                {bookmarkListState.status === 'results'
+                  ? bookmarkListState.results.map((item) => (
+                      <PlaceResultCard
+                        actionView={buildGooglePlaceSearchResultActionView({
+                          addState: actionState,
+                          mode: actionMode === 'bookmark' ? 'exploreOnly' : actionMode,
+                          result: item,
+                        })}
+                        dayId={dayId}
+                        detailsState={detailsState}
+                        imageFailed={imageFailures[item.id] === true}
+                        isBusy={isBusy}
+                        isExpanded={selectedResult?.id === item.id && selectedResultSource === 'bookmark'}
+                        isSelected={highlightedResultId === item.id && selectedResultSource === 'bookmark'}
+                        key={`bookmark-list-${item.id}`}
+                        mapActionMessage={selectedResult?.id === item.id ? mapActionMessage : null}
+                        onCancelDuplicate={resetActionState}
+                        onConfirmDuplicate={() => onPrimaryAction?.(item, true)}
+                        onDeleteBookmark={
+                          onBookmarkDeleteResult && item.bookmarkId ? () => onBookmarkDeleteResult(item) : undefined
+                        }
+                        onImageError={() => setImageFailures((current) => ({ ...current, [item.id]: true }))}
+                        onLayout={(y) => {
+                          bookmarkResultCardYByIdRef.current[item.id] = y;
+                          const pending = pendingResultFocusRef.current;
+                          if (pending?.tab === 'bookmarks' && pending.id === item.id) {
+                            focusResultInList(item.id, 'bookmarks');
+                          }
+                        }}
+                        onOpenMaps={(url) => void openGoogleMaps(url)}
+                        onPress={() => selectResult(item, 'list', 'bookmark')}
+                        onPrimaryAction={() => handleResultPrimaryAction(item)}
+                        result={item}
+                        tripId={tripId}
+                      />
+                    ))
+                  : null}
               </View>
-            ) : null}
+            )}
             {bottomSheetFooter}
           </GooglePlaceBottomSheetScrollView>
         ) : null}
@@ -1475,6 +1547,52 @@ const styles = StyleSheet.create({
   map: {
     ...StyleSheet.absoluteFillObject,
   },
+  topSearchOverlay: {
+    left: 0,
+    paddingHorizontal: theme.space[4],
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    zIndex: 4,
+  },
+  topSearchRow: {
+    alignItems: 'center',
+    backgroundColor: theme.color.surface,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.pill,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: theme.space[2],
+    minHeight: theme.layout.controlH,
+    paddingLeft: theme.space[4],
+    paddingRight: theme.space[2],
+    ...theme.shadow.md,
+  },
+  topSearchInput: {
+    color: theme.color.textStrong,
+    flex: 1,
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.body,
+    minHeight: theme.layout.controlH,
+    paddingVertical: 0,
+  },
+  topSearchButton: {
+    alignItems: 'center',
+    backgroundColor: theme.color.primary,
+    borderRadius: theme.radius.pill,
+    flexDirection: 'row',
+    gap: theme.space[2],
+    justifyContent: 'center',
+    minHeight: theme.layout.controlHSm,
+    minWidth: 64,
+    paddingHorizontal: theme.space[4],
+  },
+  topSearchButtonText: {
+    color: theme.color.onPrimary,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.label,
+    fontWeight: theme.font.weight.bold,
+  },
   locationButton: {
     alignItems: 'center',
     backgroundColor: theme.color.surface,
@@ -1555,6 +1673,35 @@ const styles = StyleSheet.create({
   },
   searchCopy: {
     flex: 1,
+  },
+  sheetTabRow: {
+    backgroundColor: theme.color.surfaceSunken,
+    borderRadius: theme.radius.pill,
+    flexDirection: 'row',
+    gap: theme.space[1],
+    padding: theme.space[1],
+  },
+  sheetTab: {
+    alignItems: 'center',
+    borderRadius: theme.radius.pill,
+    flex: 1,
+    minHeight: theme.layout.controlHSm,
+    justifyContent: 'center',
+    paddingHorizontal: theme.space[3],
+    paddingVertical: theme.space[2],
+  },
+  sheetTabSelected: {
+    backgroundColor: theme.color.surface,
+    ...theme.shadow.xs,
+  },
+  sheetTabText: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.semibold,
+    fontSize: theme.font.size.label,
+    fontWeight: theme.font.weight.semibold,
+  },
+  sheetTabTextSelected: {
+    color: theme.color.primary,
   },
   searchResultsCloseButton: {
     alignItems: 'center',
@@ -1699,6 +1846,9 @@ const styles = StyleSheet.create({
   resultListContent: {
     gap: theme.space[3],
     paddingBottom: theme.space[5],
+  },
+  bookmarkListHeader: {
+    gap: theme.space[1],
   },
   resultCard: {
     backgroundColor: theme.color.surface,

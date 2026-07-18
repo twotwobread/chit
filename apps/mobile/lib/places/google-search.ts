@@ -150,6 +150,39 @@ export type GooglePlaceDetailsViewState =
   | { status: 'error'; googlePlaceId: string; message: string };
 
 export type GooglePlaceSearchSheetState = 'minimized' | 'expanded' | 'full';
+export type GooglePlaceSearchSheetTab = 'searchResults' | 'bookmarks';
+
+export type GooglePlaceSearchFirstEntryLayoutState = {
+  searchBarVisible: boolean;
+  sheetContentVisible: boolean;
+  sheetHandleVisible: boolean;
+};
+
+export type GooglePlaceSearchSheetTabViewModel = {
+  id: GooglePlaceSearchSheetTab;
+  label: string;
+  accessibilityLabel: string;
+  selected: boolean;
+};
+
+export type GooglePlaceSearchBookmarkListState =
+  | {
+      status: 'empty';
+      title: string;
+      helper: string;
+      results: [];
+    }
+  | {
+      status: 'results';
+      title: string;
+      helper: null;
+      results: GooglePlaceSearchRowViewModel[];
+    };
+
+export type GooglePlaceSearchMarkerSelection = {
+  result: GooglePlaceSearchRowViewModel;
+  source: GooglePlaceSearchSelectionSource;
+};
 
 export type GooglePlaceSearchSheetMetrics = {
   minimizedHeight: number;
@@ -295,6 +328,83 @@ export function resolveGooglePlaceSearchSelectionAfterResultsClose(
     return null;
   }
   return resolveGooglePlaceSearchResultBookmark(selectedResult, bookmarkResults);
+}
+
+export function buildGooglePlaceSearchFirstEntryLayoutState(
+  sheetState: GooglePlaceSearchSheetState,
+): GooglePlaceSearchFirstEntryLayoutState {
+  return {
+    searchBarVisible: true,
+    sheetContentVisible: sheetState !== 'minimized',
+    sheetHandleVisible: true,
+  };
+}
+
+export function buildGooglePlaceSearchSheetTabs(
+  selectedTab: GooglePlaceSearchSheetTab,
+): GooglePlaceSearchSheetTabViewModel[] {
+  return [
+    {
+      id: 'searchResults',
+      label: '검색 결과',
+      accessibilityLabel: `검색 결과 탭 ${selectedTab === 'searchResults' ? '선택됨' : '선택'}`,
+      selected: selectedTab === 'searchResults',
+    },
+    {
+      id: 'bookmarks',
+      label: '찜한 장소',
+      accessibilityLabel: `찜한 장소 탭 ${selectedTab === 'bookmarks' ? '선택됨' : '선택'}`,
+      selected: selectedTab === 'bookmarks',
+    },
+  ];
+}
+
+export function resolveGooglePlaceSearchSheetTab(
+  current: GooglePlaceSearchSheetTab,
+  selectionSource: GooglePlaceSearchSelectionSource | null,
+): GooglePlaceSearchSheetTab {
+  if (selectionSource === 'search') {
+    return 'searchResults';
+  }
+  if (selectionSource === 'bookmark') {
+    return 'bookmarks';
+  }
+  return current;
+}
+
+export function buildGooglePlaceSearchSheetBookmarkListState(
+  bookmarkResults: GooglePlaceSearchRowViewModel[],
+): GooglePlaceSearchBookmarkListState {
+  if (bookmarkResults.length === 0) {
+    return {
+      status: 'empty',
+      title: '찜한 장소가 없어요.',
+      helper: '여행 중 가보고 싶은 장소를 찜하면 여기에서 바로 볼 수 있어요.',
+      results: [],
+    };
+  }
+  return {
+    status: 'results',
+    title: '찜한 장소',
+    helper: null,
+    results: bookmarkResults,
+  };
+}
+
+export function resolveGooglePlaceSearchMarkerSelection(
+  markerId: string,
+  searchResults: GooglePlaceSearchRowViewModel[],
+  bookmarkResults: GooglePlaceSearchRowViewModel[],
+): GooglePlaceSearchMarkerSelection | null {
+  const searchResult = searchResults.find((candidate) => candidate.id === markerId);
+  if (searchResult) {
+    return { result: searchResult, source: 'search' };
+  }
+  const bookmarkResult = bookmarkResults.find((candidate) => candidate.id === markerId);
+  if (bookmarkResult) {
+    return { result: bookmarkResult, source: 'bookmark' };
+  }
+  return null;
 }
 
 export function googlePlaceSearchLoadingState(): GooglePlaceSearchViewState {

@@ -26,6 +26,7 @@ import { TripStateCard } from './TripScreenScaffold';
 import { styles } from './TripMapScreenStyles';
 
 export function MapContent({
+  allBookmarkResults,
   bookmarkActionState,
   bookmarkLayerVisible,
   bookmarkResults,
@@ -47,6 +48,7 @@ export function MapContent({
   tripDestinations,
   tripId,
 }: {
+  allBookmarkResults: GooglePlaceSearchRowViewModel[];
   bookmarkActionState: GooglePlaceAddViewState;
   bookmarkLayerVisible: boolean;
   bookmarkResults: GooglePlaceSearchRowViewModel[];
@@ -83,7 +85,8 @@ export function MapContent({
       <GooglePlaceMapSearch
         actionMode="bookmark"
         actionState={bookmarkActionState}
-        bookmarkResults={bookmarkResults}
+        bookmarkMarkerResults={bookmarkResults}
+        bookmarkResults={allBookmarkResults}
         bottomSheetFooter={scheduleMarkerDetail ? <ScheduleMarkerDetailCard detail={scheduleMarkerDetail} /> : null}
         dayId={selectedDayId}
         initialRegion={initialRegion}
@@ -98,6 +101,7 @@ export function MapContent({
         selectedRoutePlaceId={selectedRoutePlaceId}
         sheetTopInset={sheetTopInset}
         style={mapStyle}
+        topSearchTrailingInset={44 + theme.space[2]}
         tripDestinations={tripDestinations}
         tripId={tripId}
       />
