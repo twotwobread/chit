@@ -13,6 +13,8 @@ import {
   emptyPlaceScheduleDetailForm,
   hasRequiredPlaceScheduleDetailFields,
   parseScheduleTimePickerValue,
+  scheduleTimeHourOptions,
+  scheduleTimeMinuteOptions,
   validatePlaceScheduleDetailForm,
   type PlaceScheduleSelectedPlace,
 } from './place-schedule-detail';
@@ -154,13 +156,20 @@ describe('place schedule detail helpers', () => {
     assert.deepEqual(buildPlaceScheduleDetailSubmitState(false, true), { disabled: false, label: '저장' });
   });
 
-  it('builds AM/PM wheel picker values from schedule time text and current time defaults', () => {
-    assert.equal(defaultScheduleTimeFromDate(new Date('2026-07-10T14:07:00')), '14:07');
-    assert.deepEqual(parseScheduleTimePickerValue('00:05'), { period: 'AM', hour: '12', minute: '05' });
-    assert.deepEqual(parseScheduleTimePickerValue('12:30'), { period: 'PM', hour: '12', minute: '30' });
-    assert.deepEqual(parseScheduleTimePickerValue('23:59'), { period: 'PM', hour: '11', minute: '59' });
-    assert.equal(buildScheduleTimeText({ period: 'AM', hour: '12', minute: '05' }), '00:05');
-    assert.equal(buildScheduleTimeText({ period: 'PM', hour: '01', minute: '05' }), '13:05');
+  it('builds 24-hour wheel picker values from schedule time text and fixed start defaults', () => {
+    assert.equal(defaultScheduleTimeFromDate(new Date('2026-07-10T14:07:00')), '00:00');
+    assert.deepEqual(
+      scheduleTimeHourOptions,
+      Array.from({ length: 24 }, (_, index) => index.toString().padStart(2, '0')),
+    );
+    assert.equal(scheduleTimeMinuteOptions[0], '00');
+    assert.equal(scheduleTimeMinuteOptions[59], '59');
+    assert.deepEqual(parseScheduleTimePickerValue('00:05'), { hour: '00', minute: '05' });
+    assert.deepEqual(parseScheduleTimePickerValue('12:30'), { hour: '12', minute: '30' });
+    assert.deepEqual(parseScheduleTimePickerValue('23:59'), { hour: '23', minute: '59' });
+    assert.deepEqual(parseScheduleTimePickerValue('invalid'), { hour: '00', minute: '00' });
+    assert.equal(buildScheduleTimeText({ hour: '00', minute: '05' }), '00:05');
+    assert.equal(buildScheduleTimeText({ hour: '23', minute: '59' }), '23:59');
   });
 
   it('defaults optional end time after start time without crossing the same-day boundary', () => {

@@ -49,5 +49,5 @@ export function buildScheduleTimeEditorSummary(values: ScheduleTimeEditorValues)
 
 function formatScheduleTimeLabel(timeText: string): string {
   const value = parseScheduleTimePickerValue(timeText);
-  return `${value.period === 'AM' ? '오전' : '오후'} ${Number(value.hour)}:${value.minute}`;
+  return `${value.hour}:${value.minute}`;
 }

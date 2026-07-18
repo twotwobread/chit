@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
+import { scheduleTimeHourOptions } from '../places/place-schedule-detail';
 import {
   DEFAULT_SCHEDULE_TIME_WHEEL_VISIBLE_ITEMS,
   buildScheduleTimeWheelOffset,
@@ -16,8 +17,16 @@ describe('schedule time wheel layout helpers', () => {
     assert.equal(buildScheduleTimeWheelOffset({ optionCount: 2, selectedIndex: 1 }), 36);
   });
 
-  it('centers the last hour with trailing padding instead of clamping it above the selector', () => {
-    assert.equal(buildScheduleTimeWheelOffset({ optionCount: 12, selectedIndex: 11 }), 396);
+  it('centers the 24-hour column boundaries with trailing padding instead of clamping them above the selector', () => {
+    assert.equal(scheduleTimeHourOptions[0], '00');
+    assert.equal(scheduleTimeHourOptions.at(-1), '23');
+    assert.equal(
+      buildScheduleTimeWheelOffset({
+        optionCount: scheduleTimeHourOptions.length,
+        selectedIndex: scheduleTimeHourOptions.length - 1,
+      }),
+      828,
+    );
   });
 
   it('keeps a middle selected value stable when momentum ends at the centered offset', () => {

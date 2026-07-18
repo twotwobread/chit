@@ -42,16 +42,12 @@ export type PlaceScheduleDetailParams = {
 
 const timePattern = /^([01]\d|2[0-3]):[0-5]\d$/;
 
-export type PlaceScheduleTimePeriod = 'AM' | 'PM';
-
 export type PlaceScheduleTimePickerValue = {
-  period: PlaceScheduleTimePeriod;
   hour: string;
   minute: string;
 };
 
-export const scheduleTimePeriodOptions: PlaceScheduleTimePeriod[] = ['AM', 'PM'];
-export const scheduleTimeHourOptions = Array.from({ length: 12 }, (_, index) => pad2(index + 1));
+export const scheduleTimeHourOptions = Array.from({ length: 24 }, (_, index) => pad2(index));
 export const scheduleTimeMinuteOptions = Array.from({ length: 60 }, (_, index) => pad2(index));
 
 export function emptyPlaceScheduleDetailForm(): PlaceScheduleDetailFormValues {
@@ -206,25 +202,20 @@ export function buildPlaceScheduleDetailSubmitState(
   return { disabled: !hasRequiredFields, label: '저장' };
 }
 
-export function defaultScheduleTimeFromDate(date = new Date()): string {
-  return `${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+export function defaultScheduleTimeFromDate(_date = new Date()): string {
+  return '00:00';
 }
 
 export function parseScheduleTimePickerValue(timeText: string): PlaceScheduleTimePickerValue {
   if (!timePattern.test(timeText)) {
-    return { period: 'AM', hour: '12', minute: '00' };
+    return { hour: '00', minute: '00' };
   }
-  const [hourText, minute] = timeText.split(':');
-  const hour24 = Number(hourText);
-  const period: PlaceScheduleTimePeriod = hour24 >= 12 ? 'PM' : 'AM';
-  const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
-  return { period, hour: pad2(hour12), minute };
+  const [hour, minute] = timeText.split(':');
+  return { hour, minute };
 }
 
 export function buildScheduleTimeText(value: PlaceScheduleTimePickerValue): string {
-  const hour12 = Number(value.hour);
-  const normalizedHour = value.period === 'AM' ? hour12 % 12 : hour12 === 12 ? 12 : hour12 + 12;
-  return `${pad2(normalizedHour)}:${value.minute}`;
+  return `${value.hour}:${value.minute}`;
 }
 
 export function defaultEndScheduleTimeFromStart(startTime: string): string {
