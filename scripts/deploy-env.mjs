@@ -111,6 +111,7 @@ export function buildStageConfig({ env }) {
   const appleBundleId = valueOrDefault(merged.APPLE_BUNDLE_ID, valueOrDefault(merged.IOS_BUNDLE_IDENTIFIER, DEFAULTS.appleBundleId));
   const inviteBaseUrl = optionalValue(merged.INVITE_BASE_URL);
   const inviteLinkHost = optionalValue(merged.EXPO_PUBLIC_INVITE_LINK_HOST) ?? (inviteBaseUrl ? deriveInviteLinkHost(inviteBaseUrl) : undefined);
+  const googleMapsAndroidApiKey = optionalValue(merged.EXPO_PUBLIC_GOOGLE_MAPS_ANDROID_API_KEY);
   const projectId = valueOrDefault(merged.GCP_PROJECT_ID, DEFAULTS.gcpProjectId);
   const runtimeServiceAccount = valueOrDefault(
     merged.CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT,
@@ -195,6 +196,7 @@ export function buildStageConfig({ env }) {
         EXPO_PUBLIC_API_BASE_URL: optionalValue(merged.EXPO_PUBLIC_API_BASE_URL),
         EXPO_PUBLIC_AUTH_DEV_MODE: 'false',
         EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY: merged.EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY,
+        EXPO_PUBLIC_GOOGLE_MAPS_ANDROID_API_KEY: googleMapsAndroidApiKey,
         EXPO_PUBLIC_INVITE_LINK_HOST: inviteLinkHost,
       },
     },
@@ -266,7 +268,7 @@ export function easEnvSpecs(config, apiBaseUrl) {
     .map(([name, value]) => ({
       name,
       value,
-      visibility: name === 'EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY' ? 'sensitive' : 'plaintext',
+      visibility: ['EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY', 'EXPO_PUBLIC_GOOGLE_MAPS_ANDROID_API_KEY'].includes(name) ? 'sensitive' : 'plaintext',
     }));
 }
 
