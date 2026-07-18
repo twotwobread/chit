@@ -115,6 +115,8 @@ export type QuickExpenseReturnTo = 'settle';
 
 export type QuickExpenseReturnParam = string | string[] | undefined;
 
+export type QuickExpenseReturnDayParam = string | string[] | undefined;
+
 export type QuickExpenseRouteTarget = {
   tripId: string;
   date: string;
@@ -126,11 +128,13 @@ export function buildQuickExpenseRoute(
   tripDayId: string,
   itemId?: string | null,
   returnTo?: QuickExpenseReturnTo | null,
+  returnDayId?: string | null,
 ): Href {
   const base = `/trips/${tripId}/days/${tripDayId}/expenses/quick`;
   const params = [
     itemId ? `itemId=${encodeURIComponent(itemId)}` : null,
     returnTo ? `returnTo=${encodeURIComponent(returnTo)}` : null,
+    returnTo && returnDayId ? `returnDayId=${encodeURIComponent(returnDayId)}` : null,
   ].filter((param): param is string => param !== null);
 
   return (params.length > 0 ? `${base}?${params.join('&')}` : base) as Href;
@@ -140,13 +144,20 @@ export function resolveQuickExpenseReturnPath({
   tripId,
   date,
   returnTo,
+  returnDayId,
 }: {
   tripId: string;
   date: string;
   returnTo?: QuickExpenseReturnParam;
+  returnDayId?: QuickExpenseReturnDayParam;
 }): Href {
   const returnValue = Array.isArray(returnTo) ? returnTo[0] : returnTo;
   if (returnValue === 'settle') {
+    const dayValue = Array.isArray(returnDayId) ? returnDayId[0] : returnDayId;
+    const normalizedDayValue = dayValue?.trim() ?? '';
+    if (normalizedDayValue) {
+      return `${tripSettlePath(tripId)}?expenseDayId=${encodeURIComponent(normalizedDayValue)}` as Href;
+    }
     return tripSettlePath(tripId);
   }
   return tripItineraryDayPath(tripId, date);

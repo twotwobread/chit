@@ -982,7 +982,7 @@ test('builds manual split summary without mutating entered amounts when total ch
   ]);
 });
 
-test('builds route with optional inferred item id and return intent', () => {
+test('builds route with optional inferred item id, return intent, and return day', () => {
   assert.equal(buildQuickExpenseRoute('trip-a', '2026-07-10'), '/trips/trip-a/days/2026-07-10/expenses/quick');
   assert.equal(
     buildQuickExpenseRoute('trip-a', '2026-07-10', 'item-a'),
@@ -996,6 +996,10 @@ test('builds route with optional inferred item id and return intent', () => {
     buildQuickExpenseRoute('trip-a', '2026-07-10', 'item a', 'settle'),
     '/trips/trip-a/days/2026-07-10/expenses/quick?itemId=item%20a&returnTo=settle',
   );
+  assert.equal(
+    buildQuickExpenseRoute('trip-a', '2026-07-10', null, 'settle', 'day-2'),
+    '/trips/trip-a/days/2026-07-10/expenses/quick?returnTo=settle&returnDayId=day-2',
+  );
 });
 
 test('resolves quick expense completion return destinations', () => {
@@ -1008,11 +1012,29 @@ test('resolves quick expense completion return destinations', () => {
     '/trips/trip-a/settle',
   );
   assert.equal(
+    resolveQuickExpenseReturnPath({
+      tripId: 'trip-a',
+      date: '2026-07-10',
+      returnTo: 'settle',
+      returnDayId: 'day-2',
+    }),
+    '/trips/trip-a/settle?expenseDayId=day-2',
+  );
+  assert.equal(
+    resolveQuickExpenseReturnPath({
+      tripId: 'trip-a',
+      date: '2026-07-10',
+      returnTo: ['settle'],
+      returnDayId: ['day 2'],
+    }),
+    '/trips/trip-a/settle?expenseDayId=day%202',
+  );
+  assert.equal(
     resolveQuickExpenseReturnPath({ tripId: 'trip-a', date: '2026-07-10' }),
     '/trips/trip-a/itinerary?dayId=2026-07-10',
   );
   assert.equal(
-    resolveQuickExpenseReturnPath({ tripId: 'trip-a', date: '2026-07-10', returnTo: 'today' }),
+    resolveQuickExpenseReturnPath({ tripId: 'trip-a', date: '2026-07-10', returnTo: 'today', returnDayId: 'day-2' }),
     '/trips/trip-a/itinerary?dayId=2026-07-10',
   );
 });

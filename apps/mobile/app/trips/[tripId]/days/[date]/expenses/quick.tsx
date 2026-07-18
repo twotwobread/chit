@@ -11,6 +11,7 @@ export default function QuickExpenseScreen() {
     amountInput,
     backToDay,
     clearTripDay,
+    completeSavedExpense,
     errors,
     expenseDateInput,
     formMessage,
@@ -57,7 +58,7 @@ export default function QuickExpenseScreen() {
       ) : null}
 
       {state.status === 'success' && savedSummary ? (
-        <QuickExpenseSavedSummaryCard onDone={backToDay} summary={savedSummary} />
+        <QuickExpenseSavedSummaryCard onDone={completeSavedExpense} summary={savedSummary} />
       ) : null}
 
       {state.status === 'success' && !savedSummary && viewModel ? (

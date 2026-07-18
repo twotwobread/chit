@@ -59,16 +59,19 @@ export function useQuickExpenseController() {
     date: dateParam,
     itemId: itemIdParam,
     returnTo: returnToParam,
+    returnDayId: returnDayIdParam,
   } = useLocalSearchParams<{
     tripId?: string | string[];
     date?: string | string[];
     itemId?: string | string[];
     returnTo?: string | string[];
+    returnDayId?: string | string[];
   }>();
   const tripId = Array.isArray(tripIdParam) ? tripIdParam[0] : tripIdParam;
   const date = Array.isArray(dateParam) ? dateParam[0] : dateParam;
   const routeItemId = Array.isArray(itemIdParam) ? itemIdParam[0] : itemIdParam;
   const returnTo = Array.isArray(returnToParam) ? returnToParam[0] : returnToParam;
+  const routeReturnDayId = Array.isArray(returnDayIdParam) ? returnDayIdParam[0] : returnDayIdParam;
   const shellState = useTripShellState();
 
   const [state, setState] = useState<QuickExpenseState>({ status: 'loading' });
@@ -373,12 +376,22 @@ export function useQuickExpenseController() {
     return response;
   };
 
-  const backToDay = () => {
+  const returnFromQuickExpense = (returnDayId?: string | null) => {
     if (!tripId || !date) {
       router.replace('/');
       return;
     }
-    router.replace(resolveQuickExpenseReturnPath({ tripId, date, returnTo: returnToParam }));
+    router.replace(
+      resolveQuickExpenseReturnPath({ tripId, date, returnTo: returnToParam, returnDayId: returnDayId ?? undefined }),
+    );
+  };
+
+  const backToDay = () => {
+    returnFromQuickExpense(routeReturnDayId);
+  };
+
+  const completeSavedExpense = () => {
+    returnFromQuickExpense(selectedTripDayId ?? routeReturnDayId);
   };
 
   const goToLogin = () => {
@@ -404,6 +417,7 @@ export function useQuickExpenseController() {
     amountInput,
     backToDay,
     clearTripDay,
+    completeSavedExpense,
     errors,
     expenseDateInput,
     formMessage,

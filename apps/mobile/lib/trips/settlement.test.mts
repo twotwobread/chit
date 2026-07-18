@@ -103,6 +103,22 @@ test('builds settlement expense entry route from today or the first trip day', (
   assert.equal(buildSettlementExpenseEntryRouteForDays('trip-a', [], '2026-07-20'), null);
 });
 
+test('builds selected settlement day expense entry route with settlement return day', () => {
+  const days = [
+    day({ id: 'day-2', date: '2026-07-11', dayOrder: 2 }),
+    day({ id: 'day-1', date: '2026-07-10', dayOrder: 1 }),
+  ];
+
+  assert.equal(
+    buildSettlementExpenseEntryRouteForDays('trip-a', days, '2026-07-10', 'day-2'),
+    '/trips/trip-a/days/day-2/expenses/quick?returnTo=settle&returnDayId=day-2',
+  );
+  assert.equal(
+    buildSettlementExpenseEntryRouteForDays('trip-a', days, '2026-07-10', 'missing-day'),
+    '/trips/trip-a/days/day-1/expenses/quick?returnTo=settle',
+  );
+});
+
 test('builds settlement expense history inputs with a trip-level section first', () => {
   const days = [tripDay({ id: 'day-a', dayOrder: 2 }), tripDay({ id: 'day-b', dayOrder: 1, date: '2026-07-09' })];
   const response: ListTripExpensesResponse = {
