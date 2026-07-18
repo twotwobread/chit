@@ -53,10 +53,10 @@ describe('google place search native module entry setup', () => {
     );
   });
 
-  it('renders already-bookmarked search result primary actions as disabled controls', () => {
+  it('renders already-bookmarked and already-selected search result primary actions as disabled controls', () => {
     assert.match(
       mapSearchSource,
-      /actionView=\{buildGooglePlaceSearchResultActionView\(\{\s*addState: actionState,\s*bookmarkResults,\s*mode: actionMode,\s*result: item,\s*}\)\}/,
+      /actionView=\{buildGooglePlaceSearchResultActionView\(\{\s*addState: actionState,\s*bookmarkResults,\s*mode: actionMode,\s*result: item,\s*selectedBatchPlaceIds,\s*}\)\}/,
     );
     assert.match(
       mapSearchSource,
