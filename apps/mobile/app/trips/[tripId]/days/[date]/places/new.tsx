@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 
 import { ApiError } from '@i-um/api-contract';
@@ -19,8 +19,9 @@ import {
   type PlaceScheduleDetailFormErrors,
   type PlaceScheduleDetailFormValues,
 } from '../../../../../../lib/places/place-schedule-detail';
-import { tripItineraryDayPath, tripItineraryPath } from '../../../../../../lib/trips/routes';
+import { KeyboardAwareFormScrollView } from '../../../../../../lib/trip-ui/KeyboardAwareFormScrollView';
 import { ScheduleTimeEditor } from '../../../../../../lib/trip-ui/ScheduleTimeEditor';
+import { tripItineraryDayPath, tripItineraryPath } from '../../../../../../lib/trips/routes';
 
 export default function NewPlaceScheduleDetailScreen() {
   const {
@@ -178,18 +179,18 @@ export default function NewPlaceScheduleDetailScreen() {
 
   if (!tripId || !date) {
     return (
-      <ScrollView contentContainerStyle={styles.scrollContent} style={styles.scroll}>
+      <KeyboardAwareFormScrollView contentContainerStyle={styles.scrollContent} style={styles.scroll}>
         <Card>
           <Text style={styles.errorTitle}>일정을 찾을 수 없어요.</Text>
           <Text style={styles.message}>삭제되었거나 접근할 수 없는 여행 일정이에요.</Text>
           <PrimaryButton label="일정으로" onPress={backToDay} />
         </Card>
-      </ScrollView>
+      </KeyboardAwareFormScrollView>
     );
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.scrollContent} style={styles.scroll}>
+    <KeyboardAwareFormScrollView contentContainerStyle={styles.scrollContent} style={styles.scroll}>
       <View style={styles.header}>
         <Text style={styles.screenTitle}>일정 상세 입력</Text>
         <Text style={styles.screenHelper}>장소를 검색해 일정에 추가해 주세요.</Text>
@@ -288,7 +289,7 @@ export default function NewPlaceScheduleDetailScreen() {
           <SecondaryButton disabled={isSubmitting} label="일정으로 돌아가기" onPress={backToDay} />
         </View>
       </Card>
-    </ScrollView>
+    </KeyboardAwareFormScrollView>
   );
 }
 

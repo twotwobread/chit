@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { ActivityIndicator, Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 
 import { Card, ListRow, PrimaryButton, SecondaryButton, theme } from '../../../../lib/design';
 import { BottomSheet } from '../../../../lib/trip-ui/BottomSheet';
 import { NextPlaceHeroCard } from '../../../../lib/trip-ui/NextPlaceHeroCard';
+import { KeyboardAwareFormScrollView } from '../../../../lib/trip-ui/KeyboardAwareFormScrollView';
 import { QuickExpenseForm, type QuickExpenseSubmitPayload } from '../../../../lib/trip-ui/QuickExpenseForm';
 import { TodaySpendCard } from '../../../../lib/trip-ui/TodaySpendCard';
 import { TripScreen, TripStateCard } from '../../../../lib/trip-ui/TripScreenScaffold';
@@ -326,7 +327,10 @@ function QuickExpenseOverlaySheet({
 
   return (
     <BottomSheet onClose={onClose} visible={state.status !== 'idle'}>
-      <ScrollView contentContainerStyle={styles.quickExpenseSheetBody} showsVerticalScrollIndicator={false}>
+      <KeyboardAwareFormScrollView
+        contentContainerStyle={styles.quickExpenseSheetBody}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.quickExpenseSheetHeader}>
           <Text style={styles.cardTitle}>지출 등록</Text>
           <Text style={styles.cardHelper}>오늘 화면을 떠나지 않고 금액과 결제자를 입력해요.</Text>
@@ -371,7 +375,7 @@ function QuickExpenseOverlaySheet({
             submitting={state.status === 'saving'}
           />
         ) : null}
-      </ScrollView>
+      </KeyboardAwareFormScrollView>
     </BottomSheet>
   );
 }

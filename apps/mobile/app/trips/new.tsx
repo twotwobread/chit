@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -20,6 +20,7 @@ import {
   validateTripDestinations,
 } from '../../lib/trips/destinations';
 import { createTrip, searchDestinations } from '../../lib/trips/trip-api';
+import { KeyboardAwareFormScrollView } from '../../lib/trip-ui/KeyboardAwareFormScrollView';
 import { TripDateRangeEditor } from '../../lib/trip-ui/TripDateRangeEditor';
 import { dateFromString, isValidDate, monthStringFromDate, todayString } from '../../lib/trips/date';
 import { TripFormField } from '../../lib/trips/date-picker';
@@ -179,7 +180,7 @@ export default function NewTripScreen() {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" style={styles.scroll}>
+    <KeyboardAwareFormScrollView contentContainerStyle={styles.scrollContent} style={styles.scroll}>
       <View style={styles.header}>
         <Text style={styles.title}>여행 생성</Text>
         <Text style={styles.subtitle}>여행 도시와 이름, 기간을 정하면 바로 시작할 수 있어요.</Text>
@@ -280,7 +281,7 @@ export default function NewTripScreen() {
           onPress={() => void submit()}
         />
       </Card>
-    </ScrollView>
+    </KeyboardAwareFormScrollView>
   );
 }
 
@@ -347,12 +348,11 @@ function DestinationSearchFlow({
   };
 
   return (
-    <ScrollView
+    <KeyboardAwareFormScrollView
       contentContainerStyle={[
         styles.searchContent,
         { paddingTop: buildDestinationSearchContentTopPadding(insets.top) },
       ]}
-      keyboardShouldPersistTaps="handled"
       style={styles.scroll}
     >
       <View style={styles.searchHeader}>
@@ -478,7 +478,7 @@ function DestinationSearchFlow({
           })}
         </View>
       </Card>
-    </ScrollView>
+    </KeyboardAwareFormScrollView>
   );
 }
 

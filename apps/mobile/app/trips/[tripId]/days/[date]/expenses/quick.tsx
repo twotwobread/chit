@@ -1,6 +1,7 @@
-import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Text, View } from 'react-native';
 
 import { Card, PrimaryButton, SecondaryButton, theme } from '../../../../../../lib/design';
+import { KeyboardAwareFormScrollView } from '../../../../../../lib/trip-ui/KeyboardAwareFormScrollView';
 import { QuickExpenseForm, QuickExpenseSavedSummaryCard } from '../../../../../../lib/trip-ui/QuickExpenseEntryParts';
 import { styles } from '../../../../../../lib/trip-ui/QuickExpenseEntryStyles';
 import { useQuickExpenseController } from '../../../../../../lib/trip-ui/useQuickExpenseController';
@@ -42,7 +43,7 @@ export default function QuickExpenseScreen() {
   } = useQuickExpenseController();
 
   return (
-    <ScrollView contentContainerStyle={styles.scrollContent} style={styles.scroll}>
+    <KeyboardAwareFormScrollView contentContainerStyle={styles.scrollContent} style={styles.scroll}>
       <View style={styles.header}>
         <Text style={styles.screenTitle}>지출 등록</Text>
         <Text style={styles.subtitle}>금액과 결제자만 입력하면 함께 나눠요.</Text>
@@ -118,6 +119,6 @@ export default function QuickExpenseScreen() {
           <SecondaryButton label="일정으로 돌아가기" onPress={backToDay} />
         </Card>
       ) : null}
-    </ScrollView>
+    </KeyboardAwareFormScrollView>
   );
 }

@@ -2,18 +2,23 @@ import type { ReactNode } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { Card, PrimaryButton, SecondaryButton, theme } from '../design';
+import { KeyboardAwareFormScrollView } from './KeyboardAwareFormScrollView';
 
 export function TripScreen({
   children,
   contentContainerStyle,
+  keyboardAware = false,
 }: {
   children: ReactNode;
   contentContainerStyle?: StyleProp<ViewStyle>;
+  keyboardAware?: boolean;
 }) {
+  const ScreenScrollView = keyboardAware ? KeyboardAwareFormScrollView : ScrollView;
+
   return (
-    <ScrollView contentContainerStyle={[styles.content, contentContainerStyle]} style={styles.scroll}>
+    <ScreenScrollView contentContainerStyle={[styles.content, contentContainerStyle]} style={styles.scroll}>
       {children}
-    </ScrollView>
+    </ScreenScrollView>
   );
 }
 

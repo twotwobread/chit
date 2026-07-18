@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, View } from 'react-native';
 import { X } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { theme } from '../design';
+import { KeyboardAwareFormScrollView } from './KeyboardAwareFormScrollView';
 
 export type BottomSheetProps = {
   visible: boolean;
@@ -40,14 +41,13 @@ export function BottomSheet({
           ) : null}
           <View style={styles.grabber} />
           {scrollable ? (
-            <ScrollView
+            <KeyboardAwareFormScrollView
               bounces={false}
               contentContainerStyle={styles.scrollContent}
-              keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
             >
               {children}
-            </ScrollView>
+            </KeyboardAwareFormScrollView>
           ) : (
             children
           )}

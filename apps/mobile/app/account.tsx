@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 
 import type { AuthMeResponse, AuthProvider } from '@i-um/api-contract';
@@ -22,6 +22,7 @@ import { normalizeDisplayNameInput } from '../lib/auth/display-name';
 import { createLogoutFlow, type LogoutFlow } from '../lib/auth/logout-flow';
 import { getOAuthCredential, getVisibleOAuthProviderConfigs } from '../lib/auth/oauth';
 import { theme } from '../lib/design';
+import { KeyboardAwareFormScrollView } from '../lib/trip-ui/KeyboardAwareFormScrollView';
 
 type AccountState =
   | { status: 'loading' }
@@ -202,7 +203,7 @@ export default function AccountScreen() {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container} style={styles.screen}>
+    <KeyboardAwareFormScrollView contentContainerStyle={styles.container} style={styles.screen}>
       <Text style={styles.title}>계정</Text>
 
       {state.status === 'loading' ? (
@@ -309,7 +310,7 @@ export default function AccountScreen() {
           />
         </View>
       ) : null}
-    </ScrollView>
+    </KeyboardAwareFormScrollView>
   );
 }
 

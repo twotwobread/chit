@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 
 import { ApiError } from '@i-um/api-contract';
@@ -7,6 +7,7 @@ import { ApiError } from '@i-um/api-contract';
 import { MobileAuthError } from '../../../lib/auth/client';
 import { getStoredSession } from '../../../lib/auth/session';
 import { Card, PrimaryButton, SecondaryButton, theme } from '../../../lib/design';
+import { KeyboardAwareFormScrollView } from '../../../lib/trip-ui/KeyboardAwareFormScrollView';
 import { updateTrip } from '../../../lib/trips/trip-api';
 import { dateFromString, monthStringFromDate, todayString } from '../../../lib/trips/date';
 import { tripDetailPath } from '../../../lib/trips/routes';
@@ -177,7 +178,7 @@ export default function EditTripScreen() {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" style={styles.scroll}>
+    <KeyboardAwareFormScrollView contentContainerStyle={styles.scrollContent} style={styles.scroll}>
       <View style={styles.header}>
         <Text style={styles.title}>여행 정보 수정</Text>
         <Text style={styles.subtitle}>이름, 기간, 기본 통화를 바꿀 수 있어요.</Text>
@@ -298,7 +299,7 @@ export default function EditTripScreen() {
           <SecondaryButton disabled={submitting} label="취소" onPress={returnToDetail} />
         </Card>
       ) : null}
-    </ScrollView>
+    </KeyboardAwareFormScrollView>
   );
 }
 
