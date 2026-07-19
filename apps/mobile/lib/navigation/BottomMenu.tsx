@@ -64,14 +64,14 @@ export function BottomMenu({ selected }: BottomMenuProps) {
 
 const styles = StyleSheet.create({
   container: {
-    width: '100%',
-    minHeight: theme.layout.tabbarH,
-    flexDirection: 'row',
-    backgroundColor: theme.color.surface,
-    borderColor: theme.color.borderSubtle,
+    backgroundColor: theme.color.shellElevated,
+    borderColor: theme.color.shellRaised,
     borderTopWidth: 1,
+    flexDirection: 'row',
+    minHeight: theme.layout.tabbarH,
     paddingHorizontal: theme.space[6],
     paddingTop: theme.space[3],
+    width: '100%',
   },
   item: {
     flex: 1,

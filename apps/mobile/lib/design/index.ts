@@ -1,4 +1,5 @@
-export { Card, PrimaryButton, SecondaryButton } from './components';
+export { BrandStamp, Card, PrimaryButton, ScreenBackground, SecondaryButton } from './components';
+export type { BrandStampSize, CardVariant } from './components';
 export {
   AmountText,
   formatAmountText,

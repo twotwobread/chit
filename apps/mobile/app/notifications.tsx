@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ApiError, type UserNotificationListItem } from '@i-um/api-contract';
 
 import { MobileAuthError } from '../lib/auth/client';
-import { Card, SecondaryButton, theme } from '../lib/design';
+import { Card, ScreenBackground, SecondaryButton, theme } from '../lib/design';
 import { BottomMenu } from '../lib/navigation/BottomMenu';
 import { getRootScreenContentTopPadding } from '../lib/navigation/root-screen-layout';
 import { listNotifications, markNotificationRead } from '../lib/notifications/api';
@@ -109,7 +109,7 @@ export default function NotificationsScreen() {
   }, []);
 
   return (
-    <View style={styles.screen}>
+    <ScreenBackground style={styles.screen}>
       <ScrollView
         contentContainerStyle={[styles.content, { paddingTop: getRootScreenContentTopPadding(insets.top) }]}
         refreshControl={
@@ -163,7 +163,7 @@ export default function NotificationsScreen() {
         ) : null}
       </ScrollView>
       {state.status === 'ready' ? <BottomMenu selected="my" /> : null}
-    </View>
+    </ScreenBackground>
   );
 }
 
@@ -239,7 +239,6 @@ function isAuthFailure(error: unknown): boolean {
 
 const styles = StyleSheet.create({
   screen: {
-    backgroundColor: theme.color.bg,
     flex: 1,
   },
   scroll: {
@@ -254,13 +253,13 @@ const styles = StyleSheet.create({
     gap: theme.space[1],
   },
   title: {
-    color: theme.color.textStrong,
+    color: theme.color.textOnShell,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.title,
     fontWeight: theme.font.weight.bold,
   },
   subtitle: {
-    color: theme.color.textMuted,
+    color: theme.color.textOnShellMuted,
     fontFamily: theme.font.family.regular,
     fontSize: theme.font.size.body,
     lineHeight: 22,
@@ -353,7 +352,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   notificationAction: {
-    color: theme.color.primary,
+    color: theme.color.primaryTextOnLight,
     fontFamily: theme.font.family.semibold,
     fontSize: theme.font.size.caption,
     fontWeight: theme.font.weight.semibold,

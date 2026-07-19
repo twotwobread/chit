@@ -91,8 +91,8 @@ export function TripTabBar({ navigation, state }: TripTabBarProps) {
 const styles = StyleSheet.create({
   bar: {
     alignItems: 'center',
-    backgroundColor: theme.color.surface,
-    borderTopColor: theme.color.borderSubtle,
+    backgroundColor: theme.color.shellElevated,
+    borderTopColor: theme.color.shellRaised,
     borderTopWidth: 1,
     flexDirection: 'row',
     paddingTop: theme.space[3],

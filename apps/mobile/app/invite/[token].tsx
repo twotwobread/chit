@@ -6,7 +6,7 @@ import { ApiError } from '@i-um/api-contract';
 
 import { MobileAuthError } from '../../lib/auth/client';
 import { clearStoredSession, readStoredSession } from '../../lib/auth/session';
-import { Card, PrimaryButton, SecondaryButton, theme } from '../../lib/design';
+import { Card, PrimaryButton, ScreenBackground, SecondaryButton, theme } from '../../lib/design';
 import { acceptTripInvite } from '../../lib/trips/trip-api';
 import {
   buildInviteInvalidViewModel,
@@ -87,18 +87,20 @@ export default function InviteAcceptScreen() {
   );
 
   return (
-    <ScrollView contentContainerStyle={styles.scrollContent} style={styles.scroll}>
-      <Card>
-        {state.status === 'loading' ? (
-          <View style={styles.centeredContent}>
-            <ActivityIndicator color={theme.color.primary} />
-            <Text style={styles.message}>초대 링크를 확인하고 있어요.</Text>
-          </View>
-        ) : (
-          <InviteAcceptResult onAction={runAction} viewModel={state.viewModel} />
-        )}
-      </Card>
-    </ScrollView>
+    <ScreenBackground>
+      <ScrollView contentContainerStyle={styles.scrollContent} style={styles.scroll}>
+        <Card>
+          {state.status === 'loading' ? (
+            <View style={styles.centeredContent}>
+              <ActivityIndicator color={theme.color.primary} />
+              <Text style={styles.message}>초대 링크를 확인하고 있어요.</Text>
+            </View>
+          ) : (
+            <InviteAcceptResult onAction={runAction} viewModel={state.viewModel} />
+          )}
+        </Card>
+      </ScrollView>
+    </ScreenBackground>
   );
 }
 
@@ -136,7 +138,6 @@ function isAuthFailure(error: unknown): boolean {
 const styles = StyleSheet.create({
   scroll: {
     flex: 1,
-    backgroundColor: theme.color.bg,
   },
   scrollContent: {
     alignItems: 'center',

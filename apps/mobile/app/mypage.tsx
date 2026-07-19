@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ProfileCard, SettingRow, SettingsList } from '../lib/account-ui/AccountRows';
-import { PrimaryButton, SecondaryButton, theme } from '../lib/design';
+import { PrimaryButton, ScreenBackground, SecondaryButton, theme } from '../lib/design';
 import { BottomMenu } from '../lib/navigation/BottomMenu';
 import { getRootScreenContentTopPadding } from '../lib/navigation/root-screen-layout';
 import {
@@ -33,7 +33,7 @@ export default function MyPageScreen() {
   } = useMyPageController();
 
   return (
-    <View style={styles.screen}>
+    <ScreenBackground style={styles.screen}>
       <ScrollView
         contentContainerStyle={[styles.content, { paddingTop: getRootScreenContentTopPadding(insets.top) }]}
         style={styles.scroll}
@@ -94,6 +94,6 @@ export default function MyPageScreen() {
       </ScrollView>
 
       {state.status === 'ready' ? <BottomMenu selected="my" /> : null}
-    </View>
+    </ScreenBackground>
   );
 }

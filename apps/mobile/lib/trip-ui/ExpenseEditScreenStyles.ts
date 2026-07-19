@@ -4,19 +4,17 @@ import { theme } from '../design';
 
 export const styles = StyleSheet.create({
   screenRoot: {
-    backgroundColor: theme.color.bg,
     flex: 1,
   },
   container: {
     alignItems: 'center',
-    backgroundColor: theme.color.bg,
     gap: theme.space[5],
     minHeight: '100%',
     padding: theme.space[5],
   },
   screenTitle: {
     alignSelf: 'stretch',
-    color: theme.color.textStrong,
+    color: theme.color.textOnShell,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.title,
     fontWeight: theme.font.weight.bold,
@@ -109,7 +107,7 @@ export const styles = StyleSheet.create({
     paddingVertical: theme.space[2],
   },
   optionChipSelected: {
-    backgroundColor: theme.color.primarySoft,
+    backgroundColor: theme.color.primary,
     borderColor: theme.color.primary,
   },
   optionText: {
@@ -119,7 +117,7 @@ export const styles = StyleSheet.create({
     fontWeight: theme.font.weight.semibold,
   },
   optionTextSelected: {
-    color: theme.color.primary,
+    color: theme.color.onPrimary,
   },
   optionDetail: {
     color: theme.color.textMuted,
@@ -146,7 +144,7 @@ export const styles = StyleSheet.create({
     padding: theme.space[4],
   },
   placeOptionSelected: {
-    backgroundColor: theme.color.primarySoft,
+    backgroundColor: theme.color.primary,
     borderColor: theme.color.primary,
   },
   scheduleSelectorButton: {
@@ -233,7 +231,7 @@ export const styles = StyleSheet.create({
     fontWeight: theme.font.weight.bold,
   },
   summaryAction: {
-    color: theme.color.primary,
+    color: theme.color.primaryTextOnLight,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.label,
     fontWeight: theme.font.weight.bold,
@@ -265,7 +263,7 @@ export const styles = StyleSheet.create({
     fontWeight: theme.font.weight.bold,
   },
   toggleStateSelected: {
-    color: theme.color.primary,
+    color: theme.color.primaryTextOnLight,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.label,
     fontWeight: theme.font.weight.bold,

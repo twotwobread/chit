@@ -5,7 +5,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { ApiError } from '@i-um/api-contract';
 
 import { MobileAuthError } from '../../../../../lib/auth/client';
-import { theme } from '../../../../../lib/design';
+import { ScreenBackground, theme } from '../../../../../lib/design';
 import { GooglePlaceMapSearch } from '../../../../../lib/trip-ui/GooglePlaceMapSearch';
 import {
   createGoogleDayLodgingPlace,
@@ -333,15 +333,17 @@ export default function GooglePlaceSearchScreen() {
 
   if (!tripId || !date) {
     return (
-      <ScrollView contentContainerStyle={styles.notFoundContent} style={styles.notFoundRoot}>
-        <View style={styles.notFoundCard}>
-          <Text style={styles.errorTitle}>일정을 찾을 수 없어요.</Text>
-          <Text style={styles.message}>삭제되었거나 접근할 수 없는 여행 일정이에요.</Text>
-          <Pressable accessibilityRole="button" onPress={returnToDay} style={styles.primaryButton}>
-            <Text style={styles.primaryButtonText}>일정으로</Text>
-          </Pressable>
-        </View>
-      </ScrollView>
+      <ScreenBackground>
+        <ScrollView contentContainerStyle={styles.notFoundContent} style={styles.notFoundRoot}>
+          <View style={styles.notFoundCard}>
+            <Text style={styles.errorTitle}>일정을 찾을 수 없어요.</Text>
+            <Text style={styles.message}>삭제되었거나 접근할 수 없는 여행 일정이에요.</Text>
+            <Pressable accessibilityRole="button" onPress={returnToDay} style={styles.primaryButton}>
+              <Text style={styles.primaryButtonText}>일정으로</Text>
+            </Pressable>
+          </View>
+        </ScrollView>
+      </ScreenBackground>
     );
   }
 
@@ -378,7 +380,6 @@ export default function GooglePlaceSearchScreen() {
 const styles = StyleSheet.create({
   notFoundRoot: {
     flex: 1,
-    backgroundColor: theme.color.bg,
   },
   notFoundContent: {
     alignItems: 'center',
@@ -441,7 +442,7 @@ const styles = StyleSheet.create({
   },
   batchChip: {
     alignItems: 'center',
-    backgroundColor: theme.color.primarySoft,
+    backgroundColor: theme.color.primary,
     borderColor: theme.color.primary,
     borderRadius: theme.radius.pill,
     borderWidth: 1,
@@ -458,13 +459,13 @@ const styles = StyleSheet.create({
     opacity: 0.48,
   },
   batchChipText: {
-    color: theme.color.textStrong,
+    color: theme.color.onPrimary,
     flexShrink: 1,
     fontFamily: theme.font.family.semibold,
     fontSize: theme.font.size.label,
   },
   batchChipRemove: {
-    color: theme.color.textMuted,
+    color: theme.color.onPrimary,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.label,
     fontWeight: theme.font.weight.bold,

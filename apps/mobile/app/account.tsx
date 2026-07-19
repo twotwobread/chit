@@ -22,7 +22,7 @@ import { normalizeDisplayNameInput } from '../lib/auth/display-name';
 import { createLogoutFlow, type LogoutFlow } from '../lib/auth/logout-flow';
 import { getOAuthCredential, getVisibleOAuthProviderConfigs } from '../lib/auth/oauth';
 import { ProfileCard, SettingRow, SettingsList, type AccountProvider } from '../lib/account-ui/AccountRows';
-import { Card, PrimaryButton, SecondaryButton, theme } from '../lib/design';
+import { Card, PrimaryButton, ScreenBackground, SecondaryButton, theme } from '../lib/design';
 import { KeyboardAwareFormScrollView } from '../lib/trip-ui/KeyboardAwareFormScrollView';
 
 type AccountState =
@@ -204,119 +204,121 @@ export default function AccountScreen() {
   };
 
   return (
-    <KeyboardAwareFormScrollView contentContainerStyle={styles.container} style={styles.screen}>
-      <View style={styles.header}>
-        <Text style={styles.eyebrow}>ACCOUNT</Text>
-        <Text style={styles.title}>계정</Text>
-        <Text style={styles.subtitle}>로그인 방법과 내 정보를 한눈에 확인해요.</Text>
-      </View>
-
-      {state.status === 'loading' ? (
-        <Card>
-          <ActivityIndicator color={theme.color.primary} />
-          <Text style={styles.message}>계정 정보를 확인 중이에요.</Text>
-        </Card>
-      ) : null}
-
-      {state.status === 'error' ? (
-        <Card>
-          <Text style={styles.errorTitle}>{state.message}</Text>
-          <Text style={styles.message}>계정 설정을 보려면 로그인이 필요해요.</Text>
-          <PrimaryButton label="로그인하기" onPress={() => router.replace('/login')} />
-        </Card>
-      ) : null}
-
-      {state.status === 'ready' ? (
-        <View style={styles.readyStack}>
-          <ProfileCard
-            helperLabel={linkedProvidersSummary(state.me.linkedProviders)}
-            name={state.me.user.displayName}
-            onEdit={startEditingName}
-            provider={primaryAccountProvider(state.me.linkedProviders)}
-          />
-
-          {isEditingName ? (
-            <Card style={styles.formCard}>
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>내 이름 수정</Text>
-                <Text style={styles.helperText}>여행 참여자와 정산 화면에 표시되는 이름이에요.</Text>
-              </View>
-              <View style={styles.fieldGroup}>
-                <Text style={styles.inputLabel}>이름</Text>
-                <TextInput
-                  accessibilityLabel="이름"
-                  editable={!isSavingName}
-                  onChangeText={setDraftDisplayName}
-                  placeholder="이름"
-                  placeholderTextColor={theme.color.textMuted}
-                  style={styles.input}
-                  value={draftDisplayName}
-                />
-                {nameError ? <Text style={styles.errorMessage}>{nameError}</Text> : null}
-              </View>
-              <View style={styles.actionRow}>
-                <PrimaryButton
-                  disabled={isSavingName}
-                  label="저장"
-                  loading={isSavingName}
-                  loadingLabel="저장 중..."
-                  onPress={() => void saveDisplayName()}
-                  style={styles.actionButton}
-                />
-                <SecondaryButton
-                  disabled={isSavingName}
-                  label="취소"
-                  onPress={cancelEditingName}
-                  style={styles.actionButton}
-                />
-              </View>
-            </Card>
-          ) : null}
-
-          {state.message ? (
-            <Card style={styles.noticeCard}>
-              <Text accessibilityLiveRegion="polite" style={styles.message}>
-                {state.message}
-              </Text>
-            </Card>
-          ) : null}
-
-          <SettingsList title="로그인 방법">
-            {providers.map((provider, index) => {
-              const linked = state.me.linkedProviders.includes(provider.id);
-              return (
-                <SettingRow
-                  affordance={linked ? '연결됨' : '연결하기'}
-                  disabled={linked}
-                  first={index === 0}
-                  key={provider.id}
-                  label={provider.linkLabel(provider, linked)}
-                  onPress={linked ? () => undefined : () => void linkProvider(provider.id)}
-                />
-              );
-            })}
-          </SettingsList>
-
-          <SettingsList title="계정 작업">
-            <SettingRow first label="이전 화면" onPress={() => router.back()} />
-            <SettingRow
-              affordance={isLoggingOut ? '진행 중' : '로그아웃'}
-              disabled={isLoggingOut}
-              label="로그아웃"
-              onPress={() => void logout()}
-            />
-          </SettingsList>
-
-          <AccountDeletionSection
-            error={deletionError}
-            onCancel={cancelAccountDeletion}
-            onConfirm={() => void confirmAccountDeletion()}
-            onRequest={requestAccountDeletion}
-            status={deletionStatus}
-          />
+    <ScreenBackground>
+      <KeyboardAwareFormScrollView contentContainerStyle={styles.container} style={styles.screen}>
+        <View style={styles.header}>
+          <Text style={styles.eyebrow}>ACCOUNT</Text>
+          <Text style={styles.title}>계정</Text>
+          <Text style={styles.subtitle}>로그인 방법과 내 정보를 한눈에 확인해요.</Text>
         </View>
-      ) : null}
-    </KeyboardAwareFormScrollView>
+
+        {state.status === 'loading' ? (
+          <Card>
+            <ActivityIndicator color={theme.color.primary} />
+            <Text style={styles.message}>계정 정보를 확인 중이에요.</Text>
+          </Card>
+        ) : null}
+
+        {state.status === 'error' ? (
+          <Card>
+            <Text style={styles.errorTitle}>{state.message}</Text>
+            <Text style={styles.message}>계정 설정을 보려면 로그인이 필요해요.</Text>
+            <PrimaryButton label="로그인하기" onPress={() => router.replace('/login')} />
+          </Card>
+        ) : null}
+
+        {state.status === 'ready' ? (
+          <View style={styles.readyStack}>
+            <ProfileCard
+              helperLabel={linkedProvidersSummary(state.me.linkedProviders)}
+              name={state.me.user.displayName}
+              onEdit={startEditingName}
+              provider={primaryAccountProvider(state.me.linkedProviders)}
+            />
+
+            {isEditingName ? (
+              <Card style={styles.formCard}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>내 이름 수정</Text>
+                  <Text style={styles.helperText}>여행 참여자와 정산 화면에 표시되는 이름이에요.</Text>
+                </View>
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.inputLabel}>이름</Text>
+                  <TextInput
+                    accessibilityLabel="이름"
+                    editable={!isSavingName}
+                    onChangeText={setDraftDisplayName}
+                    placeholder="이름"
+                    placeholderTextColor={theme.color.textMuted}
+                    style={styles.input}
+                    value={draftDisplayName}
+                  />
+                  {nameError ? <Text style={styles.errorMessage}>{nameError}</Text> : null}
+                </View>
+                <View style={styles.actionRow}>
+                  <PrimaryButton
+                    disabled={isSavingName}
+                    label="저장"
+                    loading={isSavingName}
+                    loadingLabel="저장 중..."
+                    onPress={() => void saveDisplayName()}
+                    style={styles.actionButton}
+                  />
+                  <SecondaryButton
+                    disabled={isSavingName}
+                    label="취소"
+                    onPress={cancelEditingName}
+                    style={styles.actionButton}
+                  />
+                </View>
+              </Card>
+            ) : null}
+
+            {state.message ? (
+              <Card style={styles.noticeCard}>
+                <Text accessibilityLiveRegion="polite" style={styles.message}>
+                  {state.message}
+                </Text>
+              </Card>
+            ) : null}
+
+            <SettingsList title="로그인 방법">
+              {providers.map((provider, index) => {
+                const linked = state.me.linkedProviders.includes(provider.id);
+                return (
+                  <SettingRow
+                    affordance={linked ? '연결됨' : '연결하기'}
+                    disabled={linked}
+                    first={index === 0}
+                    key={provider.id}
+                    label={provider.linkLabel(provider, linked)}
+                    onPress={linked ? () => undefined : () => void linkProvider(provider.id)}
+                  />
+                );
+              })}
+            </SettingsList>
+
+            <SettingsList title="계정 작업">
+              <SettingRow first label="이전 화면" onPress={() => router.back()} />
+              <SettingRow
+                affordance={isLoggingOut ? '진행 중' : '로그아웃'}
+                disabled={isLoggingOut}
+                label="로그아웃"
+                onPress={() => void logout()}
+              />
+            </SettingsList>
+
+            <AccountDeletionSection
+              error={deletionError}
+              onCancel={cancelAccountDeletion}
+              onConfirm={() => void confirmAccountDeletion()}
+              onRequest={requestAccountDeletion}
+              status={deletionStatus}
+            />
+          </View>
+        ) : null}
+      </KeyboardAwareFormScrollView>
+    </ScreenBackground>
   );
 }
 
@@ -366,7 +368,6 @@ const styles = StyleSheet.create({
   },
   container: {
     alignItems: 'center',
-    backgroundColor: theme.color.bg,
     flexGrow: 1,
     gap: theme.space[5],
     padding: theme.space[5],
@@ -386,7 +387,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   eyebrow: {
-    color: theme.color.textMuted,
+    color: theme.color.textOnShellMuted,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.micro,
     fontWeight: theme.font.weight.bold,
@@ -443,7 +444,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   screen: {
-    backgroundColor: theme.color.bg,
+    flex: 1,
   },
   sectionHeader: {
     gap: theme.space[2],
@@ -455,14 +456,14 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.bold,
   },
   subtitle: {
-    color: theme.color.textMuted,
+    color: theme.color.textOnShellMuted,
     fontFamily: theme.font.family.regular,
     fontSize: theme.font.size.body,
     lineHeight: theme.font.size.body * theme.font.leading.normal,
     textAlign: 'center',
   },
   title: {
-    color: theme.color.textStrong,
+    color: theme.color.textOnShell,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.titleLg,
     fontWeight: theme.font.weight.bold,

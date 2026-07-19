@@ -749,7 +749,7 @@ const styles = StyleSheet.create({
     padding: theme.space[4],
   },
   optionCardSelected: {
-    backgroundColor: theme.color.primarySoft,
+    backgroundColor: theme.color.primary,
     borderColor: theme.color.primary,
   },
   optionList: {
@@ -848,7 +848,7 @@ const styles = StyleSheet.create({
     padding: theme.space[4],
   },
   summaryAction: {
-    color: theme.color.primary,
+    color: theme.color.primaryTextOnLight,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.label,
     fontWeight: theme.font.weight.bold,
@@ -875,7 +875,7 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.bold,
   },
   timeLabel: {
-    color: theme.color.primary,
+    color: theme.color.primaryTextOnLight,
     fontFamily: theme.font.family.semibold,
     fontSize: theme.font.size.label,
     fontWeight: theme.font.weight.semibold,

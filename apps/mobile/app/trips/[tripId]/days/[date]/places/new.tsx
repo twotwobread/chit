@@ -5,7 +5,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { ApiError } from '@i-um/api-contract';
 
 import { MobileAuthError } from '../../../../../../lib/auth/client';
-import { Card, PrimaryButton, SecondaryButton, theme } from '../../../../../../lib/design';
+import { Card, PrimaryButton, ScreenBackground, SecondaryButton, theme } from '../../../../../../lib/design';
 import { createGooglePlaceScheduleItem } from '../../../../../../lib/places/client';
 import { isDuplicateDayPlaceConfirmationError } from '../../../../../../lib/places/google-search';
 import {
@@ -181,18 +181,20 @@ export default function NewPlaceScheduleDetailScreen() {
 
   if (!tripId || !date) {
     return (
-      <KeyboardAwareFormScrollView contentContainerStyle={styles.scrollContent} style={styles.scroll}>
-        <Card>
-          <Text style={styles.errorTitle}>일정을 찾을 수 없어요.</Text>
-          <Text style={styles.message}>삭제되었거나 접근할 수 없는 여행 일정이에요.</Text>
-          <PrimaryButton label="일정으로" onPress={backToDay} />
-        </Card>
-      </KeyboardAwareFormScrollView>
+      <ScreenBackground>
+        <KeyboardAwareFormScrollView contentContainerStyle={styles.scrollContent} style={styles.scroll}>
+          <Card>
+            <Text style={styles.errorTitle}>일정을 찾을 수 없어요.</Text>
+            <Text style={styles.message}>삭제되었거나 접근할 수 없는 여행 일정이에요.</Text>
+            <PrimaryButton label="일정으로" onPress={backToDay} />
+          </Card>
+        </KeyboardAwareFormScrollView>
+      </ScreenBackground>
     );
   }
 
   return (
-    <View style={styles.screenRoot}>
+    <ScreenBackground style={styles.screenRoot}>
       <KeyboardAwareFormScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardFixedBottomOffset={footerLayout.keyboardFixedBottomOffset}
@@ -297,18 +299,16 @@ export default function NewPlaceScheduleDetailScreen() {
         />
         <SecondaryButton disabled={isSubmitting} label="일정으로 돌아가기" onPress={backToDay} />
       </StickyActionFooter>
-    </View>
+    </ScreenBackground>
   );
 }
 
 const styles = StyleSheet.create({
   screenRoot: {
-    backgroundColor: theme.color.bg,
     flex: 1,
   },
   scroll: {
     flex: 1,
-    backgroundColor: theme.color.bg,
   },
   scrollContent: {
     alignItems: 'center',
@@ -322,14 +322,14 @@ const styles = StyleSheet.create({
     gap: theme.space[3],
   },
   screenTitle: {
-    color: theme.color.textStrong,
+    color: theme.color.textOnShell,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.titleLg,
     fontWeight: theme.font.weight.bold,
     textAlign: 'center',
   },
   screenHelper: {
-    color: theme.color.textBody,
+    color: theme.color.textOnShellMuted,
     fontFamily: theme.font.family.regular,
     fontSize: theme.font.size.body,
     textAlign: 'center',
@@ -390,7 +390,7 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.bold,
   },
   placeType: {
-    color: theme.color.primary,
+    color: theme.color.primaryTextOnLight,
     fontFamily: theme.font.family.semibold,
     fontSize: theme.font.size.caption,
     fontWeight: theme.font.weight.semibold,

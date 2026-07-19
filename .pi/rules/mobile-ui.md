@@ -32,15 +32,17 @@ Use when changing Expo screens, mobile UI state, styling, copy, or navigation.
 
 ## Visual rules
 
-- Use Chit `Paper Fintech` as the default app UI language: Paper background, White surfaces, Charcoal text, Acid Lime primary accents.
-- Reserve `Dark Acid` for app icon, splash, key visuals, settlement summary/complete hero moments, and other high-emphasis surfaces.
-- Use `Stamp Pop` only for onboarding, empty/completion states, campaign-like accents, or small receipt/stamp details.
+- Use Chit `Dark Shell + Off-white Content` as the default app UI language: Matte Charcoal shell, clean Off-white content surfaces, Charcoal text on light surfaces, Acid Lime primary accents.
+- Do not use retired Warm Paper `#F5F1E8` for core app backgrounds/cards.
+- Keep shell glow centralized through design tokens/shared components (`theme.color.shellGlow`, `ScreenBackground`); do not add ad-hoc rgba/radial values per screen.
+- Reserve `Dark Acid` hero treatment for app icon, splash, login/home brand moments, settlement summary/complete hero moments, and other high-emphasis surfaces.
+- Use `Stamp Pop`/`BrandStamp` only for approved brand/header, onboarding, empty/loading/completion, mypage accent, or settlement moments; avoid repeated dense rows, bottom tabs, and routine forms.
 - Use theme tokens for color, spacing, radius, typography, and shadow.
 - Do not add raw hex colors in screen code.
 - External brand colors also need tokens before use.
-- Acid Lime is for primary CTA fill, large/key amounts, selected state, and success/complete emphasis; do not use it for long body text or danger/error states.
+- Acid Lime is for primary CTA fill, large/key amounts, selected state, BrandStamp accent/glow, and success/complete emphasis; do not use it for long body text, small text on light/off-white surfaces, or danger/error states.
 - Credit/받을 돈 uses credit color and `+`; debit/보낼 돈 uses debit color and `−`.
-- Reuse shared Button/Card/ListRow/Badge/Chip patterns before duplicating styles.
+- Reuse shared Button/Card/ListRow/Badge/Chip/ScreenBackground/BrandStamp patterns before duplicating styles.
 
 ## Common patterns
 

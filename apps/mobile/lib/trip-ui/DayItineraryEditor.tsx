@@ -4,7 +4,7 @@ import type { TripDay, TripDefaultTravelMode, TripDestination } from '@i-um/api-
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { theme } from '../design';
+import { ScreenBackground, theme } from '../design';
 import { buildTripRootFabLayout, shouldShowTripRootFab } from '../trips/trip-root-fab-layout';
 import { DayItineraryContent, DeletePlaceConfirmationModal } from './DayItineraryEditorParts';
 import { KeyboardAwareFormScrollView } from './KeyboardAwareFormScrollView';
@@ -107,7 +107,7 @@ export function DayItineraryEditor({
     : 0;
 
   return (
-    <View style={styles.root}>
+    <ScreenBackground style={styles.root}>
       <KeyboardAwareFormScrollView
         ref={scrollViewRef}
         accessibilityElementsHidden={isDeleteModalVisible}
@@ -245,7 +245,7 @@ export function DayItineraryEditor({
           onConfirm={() => void submitDelete()}
         />
       ) : null}
-    </View>
+    </ScreenBackground>
   );
 }
 

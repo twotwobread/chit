@@ -205,7 +205,7 @@ export function TripDatePicker({
           textDayHeaderFontWeight: theme.font.weight.semibold,
           textDisabledColor: theme.color.textFaint,
           textSectionTitleColor: theme.color.textMuted,
-          todayTextColor: theme.color.primary,
+          todayTextColor: theme.color.primaryTextOnLight,
         }}
       />
 
@@ -224,7 +224,7 @@ function buildMarkedDates({ anchorDate, selectedDate }: { anchorDate?: string; s
     dates[anchorDate] = {
       selected: true,
       selectedColor: theme.color.primarySoft,
-      selectedTextColor: theme.color.primary,
+      selectedTextColor: theme.color.primaryTextOnLight,
     };
   }
 
@@ -324,7 +324,7 @@ const styles = StyleSheet.create({
     paddingVertical: theme.space[2],
   },
   optionChipSelected: {
-    backgroundColor: theme.color.primarySoft,
+    backgroundColor: theme.color.primary,
     borderColor: theme.color.primary,
   },
   optionChipText: {
@@ -334,7 +334,7 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.semibold,
   },
   optionChipTextSelected: {
-    color: theme.color.primary,
+    color: theme.color.onPrimary,
   },
   optionChipTextDisabled: {
     color: theme.color.textFaint,
@@ -350,7 +350,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.space[4],
   },
   calendarNavText: {
-    color: theme.color.primary,
+    color: theme.color.primaryTextOnLight,
     fontFamily: theme.font.family.semibold,
     fontSize: theme.font.size.label,
     fontWeight: theme.font.weight.semibold,
@@ -374,7 +374,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.space[5],
   },
   secondaryButtonText: {
-    color: theme.color.primary,
+    color: theme.color.primaryTextOnLight,
     fontFamily: theme.font.family.semibold,
     fontWeight: theme.font.weight.semibold,
   },

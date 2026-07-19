@@ -737,7 +737,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   receiptActionText: {
-    color: theme.color.primary,
+    color: theme.color.primaryTextOnLight,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.label,
     fontWeight: theme.font.weight.bold,
@@ -766,7 +766,7 @@ const styles = StyleSheet.create({
     gap: theme.space[2],
   },
   selectorAction: {
-    color: theme.color.primary,
+    color: theme.color.primaryTextOnLight,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.label,
     fontWeight: theme.font.weight.bold,
@@ -807,7 +807,7 @@ const styles = StyleSheet.create({
     paddingVertical: theme.space[3],
   },
   selectorOptionSelected: {
-    backgroundColor: theme.color.primarySoft,
+    backgroundColor: theme.color.primary,
     borderColor: theme.color.primary,
   },
   selectorOptionTitle: {
@@ -817,7 +817,7 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.semibold,
   },
   selectorOptionTitleSelected: {
-    color: theme.color.primary,
+    color: theme.color.onPrimary,
     fontFamily: theme.font.family.bold,
     fontWeight: theme.font.weight.bold,
   },
@@ -869,7 +869,7 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.bold,
   },
   summaryAction: {
-    color: theme.color.primary,
+    color: theme.color.primaryTextOnLight,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.label,
     fontWeight: theme.font.weight.bold,
@@ -896,7 +896,7 @@ const styles = StyleSheet.create({
     paddingVertical: theme.space[3],
   },
   toggleCardSelected: {
-    backgroundColor: theme.color.primarySoft,
+    backgroundColor: theme.color.primary,
     borderColor: theme.color.primary,
   },
   toggleTextColumn: {
@@ -910,7 +910,7 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.bold,
   },
   toggleStateSelected: {
-    color: theme.color.primary,
+    color: theme.color.onPrimary,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.label,
     fontWeight: theme.font.weight.bold,
@@ -929,7 +929,7 @@ const styles = StyleSheet.create({
     paddingVertical: theme.space[2],
   },
   participantChipSelected: {
-    backgroundColor: theme.color.primarySoft,
+    backgroundColor: theme.color.primary,
     borderColor: theme.color.primary,
   },
   participantDot: {
@@ -952,7 +952,7 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.semibold,
   },
   participantNameSelected: {
-    color: theme.color.green[800],
+    color: theme.color.onPrimary,
     fontFamily: theme.font.family.bold,
     fontWeight: theme.font.weight.bold,
   },

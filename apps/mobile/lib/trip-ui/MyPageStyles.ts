@@ -52,7 +52,6 @@ export const styles = StyleSheet.create({
     fontFamily: theme.font.family.regular,
   },
   screen: {
-    backgroundColor: theme.color.bg,
     flex: 1,
   },
   scroll: {
@@ -125,17 +124,17 @@ export const styles = StyleSheet.create({
     width: '100%',
   },
   sectionTitle: {
-    color: theme.color.textStrong,
+    color: theme.color.textOnShell,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.headline,
     fontWeight: theme.font.weight.bold,
   },
   subtitle: {
-    color: theme.color.textMuted,
+    color: theme.color.textOnShellMuted,
     fontFamily: theme.font.family.regular,
   },
   title: {
-    color: theme.color.textStrong,
+    color: theme.color.textOnShell,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.titleLg,
     fontWeight: theme.font.weight.bold,
@@ -151,7 +150,7 @@ export const styles = StyleSheet.create({
     gap: theme.space[3],
   },
   tripSectionTitle: {
-    color: theme.color.textBody,
+    color: theme.color.textOnShellMuted,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.label,
     fontWeight: theme.font.weight.bold,

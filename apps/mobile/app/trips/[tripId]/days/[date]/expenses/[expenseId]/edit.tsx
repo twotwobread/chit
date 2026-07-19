@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   Keyboard,
   Text,
-  View,
   type KeyboardEvent,
   type LayoutChangeEvent,
   type NativeScrollEvent,
@@ -11,7 +10,7 @@ import {
   type ScrollView,
 } from 'react-native';
 
-import { Card, PrimaryButton, SecondaryButton, theme } from '../../../../../../../lib/design';
+import { Card, PrimaryButton, ScreenBackground, SecondaryButton, theme } from '../../../../../../../lib/design';
 import {
   QUICK_EXPENSE_MEMO_KEYBOARD_MIN_CLEARANCE,
   buildFocusedMemoScrollTarget,
@@ -140,7 +139,7 @@ export default function ExpenseEditScreen() {
   const showStickyActions = state.status === 'success' && Boolean(viewModel) && Boolean(submitState);
 
   return (
-    <View style={styles.screenRoot}>
+    <ScreenBackground style={styles.screenRoot}>
       <KeyboardAwareFormScrollView
         contentContainerStyle={styles.container}
         keyboardFixedBottomOffset={footerLayout.keyboardFixedBottomOffset}
@@ -229,6 +228,6 @@ export default function ExpenseEditScreen() {
           />
         </StickyActionFooter>
       ) : null}
-    </View>
+    </ScreenBackground>
   );
 }

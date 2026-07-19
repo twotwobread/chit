@@ -115,7 +115,7 @@ const styles = StyleSheet.create({
     paddingVertical: theme.space[3],
   },
   secondaryButtonText: {
-    color: theme.color.primary,
+    color: theme.color.primaryTextOnLight,
     fontFamily: theme.font.family.bold,
     fontWeight: theme.font.weight.bold,
     textAlign: 'center',

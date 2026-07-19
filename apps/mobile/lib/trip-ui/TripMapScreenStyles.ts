@@ -28,7 +28,7 @@ export const styles = StyleSheet.create({
     padding: theme.space[4],
   },
   placeType: {
-    color: theme.color.primary,
+    color: theme.color.primaryTextOnLight,
     fontFamily: theme.font.family.semibold,
     fontSize: theme.font.size.caption,
     fontWeight: theme.font.weight.semibold,
@@ -163,7 +163,7 @@ export const styles = StyleSheet.create({
     padding: theme.space[4],
   },
   scheduleMarkerDetailSubtitle: {
-    color: theme.color.primary,
+    color: theme.color.primaryTextOnLight,
     fontFamily: theme.font.family.semibold,
     fontSize: theme.font.size.caption,
     fontWeight: theme.font.weight.semibold,

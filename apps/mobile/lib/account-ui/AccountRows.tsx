@@ -169,7 +169,7 @@ const styles = StyleSheet.create({
     ...theme.shadow.sm,
   },
   groupLabel: {
-    color: theme.color.textMuted,
+    color: theme.color.textOnShellMuted,
     fontFamily: theme.font.family.semibold,
     fontSize: theme.font.size.caption,
     fontWeight: theme.font.weight.semibold,
@@ -226,7 +226,7 @@ const styles = StyleSheet.create({
     paddingVertical: theme.space[3],
   },
   rowAffordance: {
-    color: theme.color.primary,
+    color: theme.color.primaryTextOnLight,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.caption,
     fontWeight: theme.font.weight.bold,

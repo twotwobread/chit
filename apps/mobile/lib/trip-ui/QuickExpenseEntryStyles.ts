@@ -5,12 +5,10 @@ import { QUICK_EXPENSE_MEMO_INPUT_MIN_HEIGHT } from '../trips/quick-expense-keyb
 
 export const styles = StyleSheet.create({
   screenRoot: {
-    backgroundColor: theme.color.bg,
     flex: 1,
   },
   scroll: {
     flex: 1,
-    backgroundColor: theme.color.bg,
   },
   scrollContent: {
     alignItems: 'center',
@@ -25,14 +23,14 @@ export const styles = StyleSheet.create({
     gap: theme.space[2],
   },
   screenTitle: {
-    color: theme.color.textStrong,
+    color: theme.color.textOnShell,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.titleLg,
     fontWeight: theme.font.weight.bold,
     textAlign: 'center',
   },
   subtitle: {
-    color: theme.color.textMuted,
+    color: theme.color.textOnShellMuted,
     fontFamily: theme.font.family.regular,
     textAlign: 'center',
   },
@@ -175,7 +173,7 @@ export const styles = StyleSheet.create({
     fontWeight: theme.font.weight.bold,
   },
   summaryAction: {
-    color: theme.color.primary,
+    color: theme.color.primaryTextOnLight,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.label,
     fontWeight: theme.font.weight.bold,
@@ -225,7 +223,7 @@ export const styles = StyleSheet.create({
     fontWeight: theme.font.weight.bold,
   },
   toggleStateSelected: {
-    color: theme.color.primary,
+    color: theme.color.primaryTextOnLight,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.label,
     fontWeight: theme.font.weight.bold,
@@ -383,7 +381,7 @@ export const styles = StyleSheet.create({
     fontWeight: theme.font.weight.semibold,
   },
   payerChipTextSelected: {
-    color: theme.color.primary,
+    color: theme.color.primaryTextOnLight,
     fontFamily: theme.font.family.bold,
     fontWeight: theme.font.weight.bold,
   },
