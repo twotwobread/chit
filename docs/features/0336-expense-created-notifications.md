@@ -43,7 +43,8 @@
 - Authenticated in-app notification list/read API.
 - `CreateQuickExpense` and `CreateTripExpense` transaction에서 `expense.created` event/user notification/outbox 생성.
 - Expo push provider behind an interface.
-- Push outbox worker with claim/retry/dead-letter/invalid-token handling.
+- Separate push outbox worker command intended to run as a Cloud Run Job, with claim/retry/dead-letter/invalid-token handling.
+- Cloud Scheduler/Cloud Run Job deployment shape for periodic outbox draining.
 - Mobile push permission/token registration from an explicit notification surface.
 - Minimal MyPage notification entry + notification history screen.
 - Push notification tap routing to settlement expense history by `expenseId`.
@@ -201,8 +202,10 @@ Important columns:
 ## Push Delivery Model
 
 - Expense creation transaction inserts expense, splits, notification event, user notification rows, and push outbox rows together.
-- Push is sent only after commit by a worker.
-- Worker claims rows in small batches using status/next-at indexes and row locking.
+- Push is sent only after commit by a separate worker command, not by an API request goroutine.
+- MVP deployment target is a Cloud Run Job. Each job invocation claims due outbox rows, processes batches until no due rows or a time/batch limit is reached, then exits.
+- Cloud Scheduler can trigger the job every 1 minute for staging/prod; expected push latency is therefore eventual and usually bounded by the scheduler interval plus provider latency.
+- Worker claim queries must be safe when job invocations overlap, using status/next-at indexes, row locking, and `SKIP LOCKED`-style concurrency control.
 - Retry backoff starts around 1 minute and grows up to 60 minutes.
 - After max attempts, row becomes `dead` and keeps `last_error`.
 - Invalid/unregistered Expo tokens mark the token `invalid` and terminally stop that outbox row.
@@ -218,9 +221,17 @@ Important columns:
 - App root listens for notification responses and routes action paths.
 - Settlement tab accepts `expenseId` from notification action paths, selects the matching expense section when found, and shows unavailable fallback when not found/access denied.
 
+## Worker Deployment Decision: Cloud Run Jobs
+
+Cloud Run Jobs exist and fit this slice better than an API-process goroutine. Implement the push sender as a finite `cmd/notification-worker` command that reuses the same notification worker package and can run in the same container image with a different command/args.
+
+For staging/prod, use Cloud Scheduler to invoke the Cloud Run Job on a short interval such as every 1 minute. This avoids depending on Cloud Run service background CPU, request traffic, or instance lifetime. The outbox table remains the reliability boundary: if no job is running, rows stay `pending`; if a job is killed mid-send, stuck `running` rows are recovered by timeout/retry policy.
+
+If product requirements later demand seconds-level delivery latency instead of minute-level eventual delivery, move the same worker package to an always-on Cloud Run service with min instances/CPU always allocated, or revisit Cloud Tasks/PubSub/Kafka depending on the number of consumers and fan-out requirements.
+
 ## Architecture Decision: Why not Kafka now?
 
-Use a DB-backed transactional outbox for this slice.
+Use a DB-backed transactional outbox plus Cloud Run Job worker for this slice.
 
 Kafka or a managed event bus is common when a product has many independent consumers, high event volume, replay requirements, or separate service/team boundaries. i-um currently has one Go API, one Postgres database, and one mobile client. The key correctness requirement is atomicity with expense creation; a Postgres transaction plus outbox rows handles that directly.
 
@@ -232,7 +243,7 @@ Reconsider Kafka/PubSub when:
 - analytics/audit/recommendation/email/notification consumers need durable replay;
 - event fan-out or throughput makes DB polling a measurable bottleneck;
 - event ordering by trip/user becomes a core cross-service requirement;
-- notification delivery needs to be decoupled from API runtime beyond an outbox worker;
+- notification delivery needs to be lower-latency or more continuously available than a scheduled Cloud Run Job;
 - the team has monitoring/schema/dead-letter operations mature enough for a broker.
 
 Until then, keep event boundaries clean so a future outbox publisher can publish `notification_events` to Kafka without changing expense write paths.
