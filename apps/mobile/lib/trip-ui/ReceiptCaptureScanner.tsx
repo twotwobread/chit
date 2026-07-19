@@ -150,7 +150,7 @@ export function ReceiptCaptureScanner({
         {step === 'mode' ? (
           <View style={scannerStyles.card}>
             <Text style={scannerStyles.cardTitle}>영수증을 어떻게 촬영할까요?</Text>
-            <Text style={scannerStyles.helper}>긴 영수증은 상단과 결제금액 부분을 나눠 촬영해주세요.</Text>
+            <Text style={scannerStyles.helper}>긴 영수증은 상단과 총액 부분을 나눠 크게 촬영해주세요.</Text>
             <PrimaryButton label="한 번에 촬영" onPress={() => beginCapture('single')} />
             <SecondaryButton label="긴 영수증 나눠찍기" onPress={() => beginCapture('split')} />
           </View>
@@ -167,10 +167,9 @@ export function ReceiptCaptureScanner({
                   mode="picture"
                   style={scannerStyles.camera}
                 />
-                <View pointerEvents="none" style={scannerStyles.guideBox} />
                 <View style={scannerStyles.captureCard}>
                   <Text style={scannerStyles.cardTitle}>{captureInstruction(mode, captureRole)}</Text>
-                  <Text style={scannerStyles.helper}>흔들리지 않게 맞춘 뒤 직접 촬영해주세요.</Text>
+                  <Text style={scannerStyles.helper}>빛 반사 없이 흔들리지 않게 촬영해주세요.</Text>
                   <PrimaryButton
                     label={takingPicture ? '촬영 중...' : '촬영하기'}
                     loading={takingPicture}
@@ -225,12 +224,12 @@ export function ReceiptCaptureScanner({
 
 function captureInstruction(mode: ReceiptCaptureMode, role: ReceiptImageRole): string {
   if (mode === 'split' && role === 'header') {
-    return '상호와 날짜가 보이게 촬영해주세요.';
+    return '상호와 날짜가 크게 보이도록 촬영해주세요.';
   }
   if (mode === 'split' && role === 'total') {
-    return '총액이 보이게 촬영해주세요.';
+    return '총액/결제금액이 크게 보이도록 촬영해주세요.';
   }
-  return '영수증 전체가 보이게 촬영해주세요.';
+  return '영수증 전체가 보이고 글자가 선명하도록 촬영해주세요.';
 }
 
 function receiptCaptureFailureMessage(error: unknown): string {
@@ -289,16 +288,6 @@ const scannerStyles = StyleSheet.create({
     flex: 1,
     overflow: 'hidden',
     borderRadius: theme.radius.lg,
-  },
-  guideBox: {
-    borderColor: 'rgba(255,255,255,0.8)',
-    borderRadius: theme.radius.md,
-    borderWidth: 2,
-    height: '58%',
-    left: '12%',
-    position: 'absolute',
-    right: '12%',
-    top: '12%',
   },
   captureCard: {
     backgroundColor: theme.color.surface,
