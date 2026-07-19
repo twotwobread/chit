@@ -1,12 +1,11 @@
-<svg width="220" height="72" viewBox="0 0 220 72" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="이음 i-um logo (dark surface)">
-  <rect x="0" y="4" width="64" height="64" rx="17" fill="#ffffff"></rect>
-  <svg x="0" y="4" width="64" height="64" viewBox="0 0 96 96">
-    <g transform="rotate(-30 48 48)">
-      <circle cx="57" cy="48" r="18" stroke="#23b187" stroke-width="8"></circle>
-      <circle cx="39" cy="48" r="18" stroke="#098563" stroke-width="8"></circle>
-      <path d="M44 35 A18 18 0 0 1 52 31" stroke="#23b187" stroke-width="8" fill="none"></path>
-    </g>
-  </svg>
-  <text x="82" y="48" font-family="&#39;Pretendard Variable&#39;, sans-serif" font-size="34" font-weight="700" letter-spacing="-0.02em" fill="#ffffff">이음</text>
-  <text x="150" y="48" font-family="&#39;Pretendard Variable&#39;, sans-serif" font-size="20" font-weight="500" letter-spacing="-0.01em" fill="#7CE0BE">i-um</text>
+<svg width="220" height="72" viewBox="0 0 220 72" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="칫 Chit stamp lockup for dark surfaces">
+  <rect width="220" height="72" rx="20" fill="#191B1F"></rect>
+  <g transform="rotate(-7 40 36)">
+    <rect x="10" y="16" width="60" height="40" rx="11" fill="#C8FF00"></rect>
+    <path d="M18 28H62" stroke="#111315" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="3 5" opacity="0.42"></path>
+    <text x="40" y="45" text-anchor="middle" font-family="'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, sans-serif" font-size="24" font-weight="800" letter-spacing="-0.08em" fill="#111315">칫</text>
+  </g>
+  <text x="88" y="43" font-family="'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, sans-serif" font-size="32" font-weight="800" letter-spacing="-0.06em" fill="#FFFFFF">칫</text>
+  <text x="135" y="43" font-family="'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, sans-serif" font-size="18" font-weight="700" letter-spacing="0.12em" fill="#C8FF00">CHIT</text>
+  <path d="M88 53H200" stroke="#C8FF00" stroke-width="2" stroke-linecap="round" stroke-dasharray="5 7" opacity="0.75"></path>
 </svg>
