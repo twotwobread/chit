@@ -55,3 +55,38 @@ test('opts TripScreen-based flight mutation screens into keyboard-aware scrollin
     assert.match(source(relativePath), /<TripScreen\s+keyboardAware/, `expected ${relativePath} to pass keyboardAware`);
   }
 });
+
+test('uses a plain TextInput for the Google place top search field outside the bottom sheet', () => {
+  const googlePlaceMapSearch = source('lib/trip-ui/GooglePlaceMapSearch.tsx');
+
+  assert.doesNotMatch(
+    googlePlaceMapSearch,
+    /GooglePlaceBottomSheetTextInput/,
+    'top overlay search input is outside BottomSheet context and must not use BottomSheetTextInput',
+  );
+  assert.match(
+    googlePlaceMapSearch,
+    /<TextInput\s+accessibilityLabel="장소 검색어 입력"/,
+    'expected the top overlay search field to render a plain React Native TextInput',
+  );
+});
+
+test('keeps keyboard-aware forms protected when the native keyboard controller fallback is used', () => {
+  const keyboardAwareFormScrollView = source('lib/trip-ui/KeyboardAwareFormScrollView.tsx');
+
+  assert.match(
+    keyboardAwareFormScrollView,
+    /KeyboardAvoidingView/,
+    'expected the fallback path to avoid the keyboard instead of returning a plain ScrollView',
+  );
+  assert.match(
+    keyboardAwareFormScrollView,
+    /automaticallyAdjustKeyboardInsets=.*Platform\.OS === 'ios'/s,
+    'expected the fallback ScrollView to enable iOS keyboard inset adjustment by default',
+  );
+  assert.match(
+    keyboardAwareFormScrollView,
+    /enabled={enabled}/,
+    'expected fallback keyboard avoidance to respect the enabled flag',
+  );
+});

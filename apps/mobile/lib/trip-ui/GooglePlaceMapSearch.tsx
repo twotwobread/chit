@@ -140,7 +140,6 @@ type GooglePlaceSearchBottomSheetProps = {
 
 type GooglePlaceSearchBottomSheetModule = {
   BottomSheetScrollView?: unknown;
-  BottomSheetTextInput?: unknown;
   default?: unknown;
 };
 
@@ -298,9 +297,6 @@ const GooglePlaceBottomSheet = (nativeBottomSheetModule?.default ??
 >;
 const GooglePlaceBottomSheetScrollView = (nativeBottomSheetModule?.BottomSheetScrollView ??
   ScrollView) as ComponentType<ComponentProps<typeof ScrollView> & RefAttributes<GooglePlaceSearchScrollHandle>>;
-const GooglePlaceBottomSheetTextInput = (nativeBottomSheetModule?.BottomSheetTextInput ?? TextInput) as ComponentType<
-  ComponentProps<typeof TextInput>
->;
 
 export function GooglePlaceMapSearch({
   actionMode,
@@ -1018,7 +1014,7 @@ export function GooglePlaceMapSearch({
         ]}
       >
         <View style={styles.topSearchRow}>
-          <GooglePlaceBottomSheetTextInput
+          <TextInput
             accessibilityLabel="장소 검색어 입력"
             autoCapitalize="none"
             editable={!isBusy}

@@ -1,5 +1,5 @@
 import { forwardRef, type ComponentType, type RefAttributes } from 'react';
-import { ScrollView, type ScrollViewProps } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, type ScrollViewProps } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
@@ -26,19 +26,40 @@ export type KeyboardAwareFormScrollViewProps = ScrollViewProps & {
   keyboardMinClearance?: KeyboardAwareFormScrollConfigInput['minClearance'];
 };
 
+const fallbackKeyboardAvoidingBehavior = Platform.select({
+  android: 'height' as const,
+  ios: 'padding' as const,
+});
+
 const FallbackKeyboardAwareScrollView = forwardRef<ScrollView, NativeKeyboardAwareScrollViewProps>(
   (
     {
+      automaticallyAdjustKeyboardInsets,
       bottomOffset: _bottomOffset,
       disableScrollOnKeyboardHide: _disableScrollOnKeyboardHide,
-      enabled: _enabled,
+      enabled = true,
       extraKeyboardSpace: _extraKeyboardSpace,
       mode: _mode,
       ScrollViewComponent: _ScrollViewComponent,
+      style,
       ...scrollProps
     },
     ref,
-  ) => <ScrollView ref={ref} {...scrollProps} />,
+  ) => (
+    <KeyboardAvoidingView
+      behavior={fallbackKeyboardAvoidingBehavior}
+      enabled={enabled}
+      keyboardVerticalOffset={0}
+      style={[styles.fallbackKeyboardAvoidingView, style]}
+    >
+      <ScrollView
+        automaticallyAdjustKeyboardInsets={automaticallyAdjustKeyboardInsets ?? Platform.OS === 'ios'}
+        ref={ref}
+        style={styles.fallbackScrollView}
+        {...scrollProps}
+      />
+    </KeyboardAvoidingView>
+  ),
 );
 FallbackKeyboardAwareScrollView.displayName = 'FallbackKeyboardAwareScrollView';
 
@@ -92,3 +113,12 @@ export const KeyboardAwareFormScrollView = forwardRef<ScrollView, KeyboardAwareF
   },
 );
 KeyboardAwareFormScrollView.displayName = 'KeyboardAwareFormScrollView';
+
+const styles = StyleSheet.create({
+  fallbackKeyboardAvoidingView: {
+    flex: 1,
+  },
+  fallbackScrollView: {
+    flex: 1,
+  },
+});
