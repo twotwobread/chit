@@ -16,6 +16,7 @@ import {
   buildSettlementExpenseEntryRouteForDays,
   buildSettlementExpenseHistoryDayInputs,
   buildSettlementExpenseHistoryViewModel,
+  buildSettlementDetailViewModel,
   buildSettlementRequestMessage,
   buildSettlementTotalSpendViewModel,
   buildSettlementTransferViewModel,
@@ -939,6 +940,183 @@ test('builds settlement request message from suggested transfers', () => {
   assert.equal(
     buildSettlementRequestMessage(viewModel, '오사카 여행'),
     '[i-um] 오사카 여행 정산 요청\n유나님 → 민수님 18,500원\n확인 후 송금 부탁드려요.',
+  );
+});
+
+test('builds settlement request message with latest detail link', () => {
+  const viewModel = buildSettlementTransferViewModel({
+    settlement: {
+      tripId: 'trip-1',
+      defaultCurrency: 'KRW',
+      currencySummaries: [
+        {
+          currency: 'KRW',
+          totalPaidMinor: 50000,
+          totalShareMinor: 50000,
+          balances: [],
+          suggestedTransfers: [
+            {
+              fromParticipant: { participantId: 'c', displayName: '유나', participantStatus: 'current' as const },
+              toParticipant: { participantId: 'a', displayName: '민수', participantStatus: 'current' as const },
+              amountMinor: 18500,
+            },
+          ],
+        },
+      ],
+    },
+  });
+
+  assert.equal(
+    buildSettlementRequestMessage(viewModel, '오사카 여행', '/trips/trip-1/settlement-detail'),
+    '[i-um] 오사카 여행 정산 요청\n유나님 → 민수님 18,500원\n최신 정산 상세: /trips/trip-1/settlement-detail\n현재 여행 지출 기준으로 계산된 최신 정산이에요.\n확인 후 송금 부탁드려요.',
+  );
+});
+
+test('builds latest settlement detail view model with balances transfers and expense evidence', () => {
+  const viewModel = buildSettlementDetailViewModel({
+    tripId: 'trip-a',
+    settlement: {
+      tripId: 'trip-a',
+      defaultCurrency: 'KRW',
+      currencySummaries: [
+        {
+          currency: 'KRW',
+          totalPaidMinor: 102000,
+          totalShareMinor: 102000,
+          balances: [
+            {
+              participant: { participantId: 'payer-a', displayName: '민수', participantStatus: 'current' as const },
+              paidMinor: 84000,
+              shareMinor: 21000,
+              netMinor: 63000,
+            },
+            {
+              participant: {
+                participantId: 'participant-b',
+                displayName: '지영',
+                participantStatus: 'current' as const,
+              },
+              paidMinor: 0,
+              shareMinor: 21000,
+              netMinor: -21000,
+            },
+          ],
+          suggestedTransfers: [
+            {
+              fromParticipant: {
+                participantId: 'participant-b',
+                displayName: '지영',
+                participantStatus: 'current' as const,
+              },
+              toParticipant: { participantId: 'payer-a', displayName: '민수', participantStatus: 'current' as const },
+              amountMinor: 21000,
+            },
+          ],
+        },
+      ],
+    },
+    expenseDays: [
+      {
+        day: tripDay({ id: 'day-1', date: '2026-07-10', dayOrder: 1 }),
+        expenses: [
+          dayExpense({
+            id: 'included-a',
+            currency: 'KRW',
+            amountMinor: 84000,
+            includeInSettlement: true,
+            splits: [
+              { splitOrder: 1, participant: participant('민수', 'payer-a'), amountMinor: 42000 },
+              { splitOrder: 2, participant: participant('지영', 'participant-b'), amountMinor: 42000 },
+            ],
+          }),
+        ],
+      },
+      {
+        day: tripDay({ id: 'day-2', date: '2026-07-11', dayOrder: 2 }),
+        expenses: [
+          dayExpense({
+            id: 'excluded-a',
+            currency: 'KRW',
+            amountMinor: 18000,
+            displayTitle: '택시 선결제',
+            includeInSettlement: false,
+          }),
+        ],
+      },
+    ],
+  });
+
+  assert.equal(viewModel.title, '정산 상세');
+  assert.equal(viewModel.latestNotice, '현재 여행 지출 기준으로 계산된 최신 정산이에요.');
+  assert.equal(viewModel.formulaCopy, '결제 금액 - 부담 금액 = 받을/보낼 금액');
+  assert.deepEqual(
+    viewModel.currencySections.map((section) => [
+      section.currency,
+      section.totalPaidAmountLabel,
+      section.totalShareAmountLabel,
+    ]),
+    [['KRW', '102,000원', '102,000원']],
+  );
+  assert.deepEqual(
+    viewModel.currencySections[0].balanceRows.map((row) => [
+      row.displayName,
+      row.paidAmountLabel,
+      row.shareAmountLabel,
+      row.netLabel,
+      row.netAmountLabel,
+    ]),
+    [
+      ['민수', '84,000원', '21,000원', '받을 금액', '63,000원'],
+      ['지영', '0원', '21,000원', '보낼 금액', '21,000원'],
+    ],
+  );
+  assert.deepEqual(
+    viewModel.currencySections[0].transferRows.map((row) => [row.fromName, row.toName, row.amountLabel]),
+    [['지영', '민수', '21,000원']],
+  );
+  assert.deepEqual(
+    viewModel.currencySections[0].includedExpenses.map((row) => [row.id, row.contextLabel, row.settlementLabel]),
+    [['included-a', '1일차', '정산 포함']],
+  );
+  assert.deepEqual(
+    viewModel.currencySections[0].excludedExpenses.map((row) => [row.id, row.title, row.settlementLabel]),
+    [['excluded-a', '택시 선결제', '최종 정산 제외']],
+  );
+  assert.deepEqual(
+    viewModel.currencySections[0].includedExpenses[0].splitRows.map((row) => row.amountLabel),
+    ['42,000원', '42,000원'],
+  );
+});
+
+test('builds latest settlement detail sections for multiple currencies without conversion', () => {
+  const viewModel = buildSettlementDetailViewModel({
+    tripId: 'trip-a',
+    settlement: {
+      tripId: 'trip-a',
+      defaultCurrency: 'KRW',
+      currencySummaries: [
+        { currency: 'JPY', totalPaidMinor: 1000, totalShareMinor: 1000, balances: [], suggestedTransfers: [] },
+        { currency: 'KRW', totalPaidMinor: 10000, totalShareMinor: 10000, balances: [], suggestedTransfers: [] },
+      ],
+    },
+    expenseDays: [
+      {
+        day: tripDay({ id: 'day-1', date: '2026-07-10', dayOrder: 1 }),
+        expenses: [dayExpense({ currency: 'JPY', amountMinor: 1000 })],
+      },
+      {
+        day: tripDay({ id: 'day-2', date: '2026-07-11', dayOrder: 2 }),
+        expenses: [dayExpense({ currency: 'KRW', amountMinor: 10000 })],
+      },
+    ],
+  });
+
+  assert.deepEqual(
+    viewModel.currencySections.map((section) => [section.currency, section.totalPaidAmountLabel]),
+    [
+      ['JPY', '1,000엔'],
+      ['KRW', '10,000원'],
+    ],
   );
 });
 

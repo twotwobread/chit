@@ -15,6 +15,7 @@ import {
   buildCreateQuickExpenseRequest,
   buildCreateTripExpenseRequest,
   buildDefaultEqualSplitPreview,
+  buildQuickExpenseEntryChoiceViewModel,
   buildQuickExpenseMemoUpdateRequest,
   buildQuickExpenseManualSplitInputsFromRows,
   buildQuickExpenseManualSplitSummary,
@@ -28,6 +29,7 @@ import {
   parseAmountMinor,
   resolveInitialQuickExpenseItemId,
   resolveInitialQuickExpenseItemIdFromItineraries,
+  resolveQuickExpenseFormMode,
   resolveQuickExpenseItemDayId,
   resolveTodayQuickExpenseInitialItemId,
   parseQuickExpenseRoute,
@@ -192,6 +194,33 @@ test('resolves the trip day for a selected quick expense item across multiple da
 
   assert.equal(resolveQuickExpenseItemDayId(itineraries, 'item-b'), 'day-2');
   assert.equal(resolveQuickExpenseItemDayId(itineraries, 'missing'), null);
+});
+
+test('resolves trip-level expense form mode for Expense and Settlement tab return targets', () => {
+  assert.equal(resolveQuickExpenseFormMode('expenses'), 'settlement');
+  assert.equal(resolveQuickExpenseFormMode('settle'), 'settlement');
+  assert.equal(resolveQuickExpenseFormMode(['expenses']), 'settlement');
+  assert.equal(resolveQuickExpenseFormMode(undefined), 'today');
+  assert.equal(resolveQuickExpenseFormMode('today'), 'today');
+});
+
+test('builds OCR-primary quick expense entry choice copy', () => {
+  assert.deepEqual(buildQuickExpenseEntryChoiceViewModel({ hasTripId: true }), {
+    title: '지출을 어떻게 추가할까요?',
+    helper: '영수증을 먼저 촬영하면 입력할 내용을 줄일 수 있어요.',
+    primaryAction: {
+      label: '영수증 촬영으로 입력',
+      helper: '금액, 결제일자, 지출명 초안을 자동으로 채워요. 저장 전 확인이 필요해요.',
+      disabled: false,
+    },
+    secondaryAction: {
+      label: '직접 입력',
+      helper: '영수증이 없거나 바로 기록할 때 금액과 결제자부터 입력해요.',
+      disabled: false,
+    },
+    verificationCopy: 'OCR 초안은 자동 저장되지 않아요. 확인 후 저장해야 정산에 반영됩니다.',
+  });
+  assert.equal(buildQuickExpenseEntryChoiceViewModel({ hasTripId: false }).primaryAction.disabled, true);
 });
 
 test('builds compact payment split summary labels', () => {
@@ -1100,6 +1129,10 @@ test('builds route with optional inferred item id, return intent, and return day
     '/trips/trip-a/days/2026-07-10/expenses/quick?returnTo=settle',
   );
   assert.equal(
+    buildQuickExpenseRoute('trip-a', '2026-07-10', null, 'expenses'),
+    '/trips/trip-a/days/2026-07-10/expenses/quick?returnTo=expenses',
+  );
+  assert.equal(
     buildQuickExpenseRoute('trip-a', '2026-07-10', 'item a', 'settle'),
     '/trips/trip-a/days/2026-07-10/expenses/quick?itemId=item%20a&returnTo=settle',
   );
@@ -1117,6 +1150,10 @@ test('resolves quick expense completion return destinations', () => {
   assert.equal(
     resolveQuickExpenseReturnPath({ tripId: 'trip-a', date: '2026-07-10', returnTo: ['settle'] }),
     '/trips/trip-a/settle',
+  );
+  assert.equal(
+    resolveQuickExpenseReturnPath({ tripId: 'trip-a', date: '2026-07-10', returnTo: 'expenses' }),
+    '/trips/trip-a/expenses',
   );
   assert.equal(
     resolveQuickExpenseReturnPath({

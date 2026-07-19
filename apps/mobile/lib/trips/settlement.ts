@@ -536,6 +536,136 @@ export type SettlementTransferFailureViewModel =
   | { status: 'notFound' }
   | { status: 'error'; title: string; helper: string; actionLabel: string };
 
+export type SettlementDetailExpenseSplitRowViewModel = {
+  displayName: string;
+  amountMinor: number;
+  amountLabel: string;
+};
+
+export type SettlementDetailExpenseRowViewModel = {
+  id: string;
+  title: string;
+  contextLabel: string;
+  amountMinor: number;
+  amountLabel: string;
+  payerLabel: string;
+  splitRows: SettlementDetailExpenseSplitRowViewModel[];
+  categoryLabel: string;
+  settlementLabel: string;
+  includeInSettlement: boolean;
+};
+
+export type SettlementDetailCurrencySectionViewModel = {
+  currency: SupportedCurrency;
+  title: string;
+  totalPaidAmountLabel: string;
+  totalShareAmountLabel: string;
+  balanceRows: SettlementBalanceRowViewModel[];
+  transferRows: SettlementTransferRowViewModel[];
+  includedExpenses: SettlementDetailExpenseRowViewModel[];
+  excludedExpenses: SettlementDetailExpenseRowViewModel[];
+};
+
+export type SettlementDetailViewModel = {
+  title: string;
+  latestNotice: string;
+  formulaCopy: string;
+  currencySections: SettlementDetailCurrencySectionViewModel[];
+};
+
+export function buildSettlementDetailViewModel({
+  expenseDays,
+  settlement,
+}: {
+  tripId: string;
+  settlement: GetTripSettlementResponse;
+  expenseDays: SettlementExpenseHistoryDayInput[];
+}): SettlementDetailViewModel {
+  return {
+    title: '정산 상세',
+    latestNotice: '현재 여행 지출 기준으로 계산된 최신 정산이에요.',
+    formulaCopy: '결제 금액 - 부담 금액 = 받을/보낼 금액',
+    currencySections: settlement.currencySummaries.map((summary) => {
+      const expenseRows = buildSettlementDetailExpenseRows(expenseDays, summary.currency);
+      return {
+        currency: summary.currency,
+        title: `${summary.currency} 정산 상세`,
+        totalPaidAmountLabel: formatMoney(summary.totalPaidMinor, summary.currency),
+        totalShareAmountLabel: formatMoney(summary.totalShareMinor, summary.currency),
+        balanceRows: buildSettlementDetailBalanceRows(summary),
+        transferRows: buildSettlementDetailTransferRows(summary),
+        includedExpenses: expenseRows.filter((row) => row.includeInSettlement),
+        excludedExpenses: expenseRows.filter((row) => !row.includeInSettlement),
+      };
+    }),
+  };
+}
+
+function buildSettlementDetailBalanceRows(summary: ApiSettlementCurrencySummary): SettlementBalanceRowViewModel[] {
+  return summary.balances.map((balance) => {
+    const direction = settlementNetDirection(balance.netMinor);
+    return {
+      displayName: normalizeDisplayName(balance.participant.displayName),
+      statusLabel: balance.participant.participantStatus === 'removed' ? '이전 참여자' : null,
+      paidMinor: balance.paidMinor,
+      paidAmountLabel: formatMoney(balance.paidMinor, summary.currency),
+      shareMinor: balance.shareMinor,
+      shareAmountLabel: formatMoney(balance.shareMinor, summary.currency),
+      netMinor: balance.netMinor,
+      netDirection: direction,
+      netLabel: settlementNetLabel(direction),
+      netAmountLabel: formatMoney(Math.abs(balance.netMinor), summary.currency),
+    };
+  });
+}
+
+function buildSettlementDetailTransferRows(summary: ApiSettlementCurrencySummary): SettlementTransferRowViewModel[] {
+  return summary.suggestedTransfers.map((transfer) => ({
+    fromName: normalizeDisplayName(transfer.fromParticipant.displayName),
+    toName: normalizeDisplayName(transfer.toParticipant.displayName),
+    amountMinor: transfer.amountMinor,
+    amountLabel: formatMoney(transfer.amountMinor, summary.currency),
+  }));
+}
+
+function buildSettlementDetailExpenseRows(
+  expenseDays: SettlementExpenseHistoryDayInput[],
+  currency: SupportedCurrency,
+): SettlementDetailExpenseRowViewModel[] {
+  return expenseDays.flatMap((dayInput) => {
+    const contextLabel =
+      dayInput.day.id === tripExpenseSectionId ? '여행 전체' : formatTripDayLabel(dayInput.day.dayOrder);
+    return dayInput.expenses
+      .filter((expense) => expense.currency === currency)
+      .map((expense) => settlementDetailExpenseRow(expense, contextLabel));
+  });
+}
+
+function settlementDetailExpenseRow(
+  expense: DayExpenseListItem,
+  contextLabel: string,
+): SettlementDetailExpenseRowViewModel {
+  const categoryMeta = getExpenseCategoryMarkerMeta(expense.expenseCategory);
+  return {
+    id: expense.id,
+    title: expense.displayTitle.trim() || expense.place?.name.trim() || '지출',
+    contextLabel,
+    amountMinor: expense.amountMinor,
+    amountLabel: formatMoney(expense.amountMinor, expense.currency),
+    payerLabel: `${normalizeDisplayName(expense.payer.displayName)} 결제`,
+    splitRows: [...expense.splits]
+      .sort((left, right) => left.splitOrder - right.splitOrder)
+      .map((split) => ({
+        displayName: normalizeDisplayName(split.participant.displayName),
+        amountMinor: split.amountMinor,
+        amountLabel: formatMoney(split.amountMinor, expense.currency),
+      })),
+    categoryLabel: categoryMeta.label,
+    settlementLabel: expense.includeInSettlement ? '정산 포함' : '최종 정산 제외',
+    includeInSettlement: expense.includeInSettlement,
+  };
+}
+
 export function getAuthoritativeSettlementCurrencySummaries(
   settlement: GetTripSettlementResponse,
 ): ApiSettlementCurrencySummary[] {
@@ -669,6 +799,7 @@ function settlementNetLabel(direction: SettlementBalanceDirection): string {
 export function buildSettlementRequestMessage(
   viewModel: SettlementTransferViewModel,
   tripName = '여행',
+  detailLink?: string | null,
 ): string | null {
   if (viewModel.sections.length === 0) {
     return null;
@@ -681,7 +812,11 @@ export function buildSettlementRequestMessage(
     return null;
   }
 
-  return [`[i-um] ${tripName} 정산 요청`, ...lines, '확인 후 송금 부탁드려요.'].join('\n');
+  const detailLines = detailLink
+    ? [`최신 정산 상세: ${detailLink}`, '현재 여행 지출 기준으로 계산된 최신 정산이에요.']
+    : [];
+
+  return [`[i-um] ${tripName} 정산 요청`, ...lines, ...detailLines, '확인 후 송금 부탁드려요.'].join('\n');
 }
 
 export function buildKakaoSettlementRequestTemplate(message: string): TextTemplateType {

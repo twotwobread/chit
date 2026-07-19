@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Compass, ListOrdered, Map as MapIcon, Wallet } from 'lucide-react-native';
+import { Compass, ListOrdered, Map as MapIcon, ReceiptText, Wallet } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { theme } from '../design';
@@ -30,6 +30,7 @@ export type TripTabBarProps = {
 };
 
 const ICONS: Record<string, typeof Compass> = {
+  expenses: ReceiptText,
   itinerary: ListOrdered,
   map: MapIcon,
   settle: Wallet,
@@ -37,6 +38,7 @@ const ICONS: Record<string, typeof Compass> = {
 };
 
 const LABELS: Record<string, string> = {
+  expenses: '지출',
   itinerary: '일정',
   map: '지도',
   settle: '정산',

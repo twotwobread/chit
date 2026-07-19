@@ -1060,7 +1060,7 @@ paths:
     get:
       operationId: getTripSettlement
       summary: Get trip settlement calculation
-      description: Returns authoritative per-currency participant balances and deterministic suggested transfers for an authenticated current trip participant.
+      description: Returns the current/latest per-currency participant balances and deterministic suggested transfers for an authenticated current trip participant. This response is not a historical settlement-request snapshot.
       tags:
         - Trips
       security:

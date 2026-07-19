@@ -12,6 +12,7 @@ import {
   buildCreateQuickExpenseRequest,
   buildCreateTripExpenseRequest,
   buildExpensePaymentSplitSummaryLabel,
+  buildQuickExpenseEntryChoiceViewModel,
   type QuickExpenseFormErrors,
   type QuickExpenseManualSplitInput,
   type QuickExpenseSavedSplitSummary,
@@ -250,17 +251,31 @@ export function QuickExpenseForm({
     setScannerVisible(false);
     setEntryMode('manual');
   };
+  const entryChoice = buildQuickExpenseEntryChoiceViewModel({ hasTripId: Boolean(tripId) });
 
   if (entryMode === 'choice' && !receiptDraft) {
     return (
       <>
         <Card>
           <View style={styles.fieldGroup}>
-            <Text style={styles.screenTitle}>지출을 어떻게 입력할까요?</Text>
-            <Text style={styles.helper}>직접 입력하거나 영수증을 촬영해 금액 초안을 채울 수 있어요.</Text>
+            <Text style={styles.screenTitle}>{entryChoice.title}</Text>
+            <Text style={styles.helper}>{entryChoice.helper}</Text>
           </View>
-          <PrimaryButton label="직접 입력" onPress={handleDirectInput} />
-          <SecondaryButton disabled={!tripId} label="영수증 촬영" onPress={() => setScannerVisible(true)} />
+          <View style={styles.noticeBox}>
+            <Text style={styles.label}>{entryChoice.primaryAction.label}</Text>
+            <Text style={styles.helper}>{entryChoice.primaryAction.helper}</Text>
+            <PrimaryButton
+              disabled={entryChoice.primaryAction.disabled}
+              label={entryChoice.primaryAction.label}
+              onPress={() => setScannerVisible(true)}
+            />
+          </View>
+          <View style={styles.noticeBox}>
+            <Text style={styles.label}>{entryChoice.secondaryAction.label}</Text>
+            <Text style={styles.helper}>{entryChoice.secondaryAction.helper}</Text>
+            <SecondaryButton label={entryChoice.secondaryAction.label} onPress={handleDirectInput} />
+          </View>
+          <Text style={styles.helper}>{entryChoice.verificationCopy}</Text>
           <SecondaryButton label="돌아가기" onPress={onBack} />
         </Card>
         <ReceiptCaptureScanner

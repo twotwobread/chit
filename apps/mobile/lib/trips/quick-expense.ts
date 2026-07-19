@@ -19,7 +19,7 @@ import {
   type PlaceBackedScheduleItem,
 } from './day-itinerary';
 import { formatTripDayDate, formatTripDayLabel } from './days';
-import { tripItineraryDayPath, tripSettlePath } from './routes';
+import { tripExpensesPath, tripItineraryDayPath, tripSettlePath } from './routes';
 import { orderScheduleItemsByDisplayTime } from './schedule-item-ordering';
 
 export type QuickExpenseFormErrors = {
@@ -92,6 +92,42 @@ export type QuickExpenseSavedSplitSummary = {
   splitRows: QuickExpenseSplitRow[];
 };
 
+export type QuickExpenseEntryChoiceActionViewModel = {
+  label: string;
+  helper: string;
+  disabled: boolean;
+};
+
+export type QuickExpenseEntryChoiceViewModel = {
+  title: string;
+  helper: string;
+  primaryAction: QuickExpenseEntryChoiceActionViewModel;
+  secondaryAction: QuickExpenseEntryChoiceActionViewModel;
+  verificationCopy: string;
+};
+
+export function buildQuickExpenseEntryChoiceViewModel({
+  hasTripId,
+}: {
+  hasTripId: boolean;
+}): QuickExpenseEntryChoiceViewModel {
+  return {
+    title: '지출을 어떻게 추가할까요?',
+    helper: '영수증을 먼저 촬영하면 입력할 내용을 줄일 수 있어요.',
+    primaryAction: {
+      label: '영수증 촬영으로 입력',
+      helper: '금액, 결제일자, 지출명 초안을 자동으로 채워요. 저장 전 확인이 필요해요.',
+      disabled: !hasTripId,
+    },
+    secondaryAction: {
+      label: '직접 입력',
+      helper: '영수증이 없거나 바로 기록할 때 금액과 결제자부터 입력해요.',
+      disabled: false,
+    },
+    verificationCopy: 'OCR 초안은 자동 저장되지 않아요. 확인 후 저장해야 정산에 반영됩니다.',
+  };
+}
+
 export type QuickExpenseViewModel = {
   dayLabel: string;
   formattedDate: string;
@@ -113,7 +149,9 @@ export type QuickExpenseViewModel = {
 
 const zeroDecimalCurrencies = new Set<SupportedCurrency>(['KRW', 'JPY']);
 
-export type QuickExpenseReturnTo = 'settle';
+export type QuickExpenseReturnTo = 'settle' | 'expenses';
+
+export type QuickExpenseFormMode = 'today' | 'settlement';
 
 export type QuickExpenseReturnParam = string | string[] | undefined;
 
@@ -142,6 +180,11 @@ export function buildQuickExpenseRoute(
   return (params.length > 0 ? `${base}?${params.join('&')}` : base) as Href;
 }
 
+export function resolveQuickExpenseFormMode(returnTo?: QuickExpenseReturnParam): QuickExpenseFormMode {
+  const returnValue = Array.isArray(returnTo) ? returnTo[0] : returnTo;
+  return returnValue === 'settle' || returnValue === 'expenses' ? 'settlement' : 'today';
+}
+
 export function resolveQuickExpenseReturnPath({
   tripId,
   date,
@@ -161,6 +204,9 @@ export function resolveQuickExpenseReturnPath({
       return `${tripSettlePath(tripId)}?expenseDayId=${encodeURIComponent(normalizedDayValue)}` as Href;
     }
     return tripSettlePath(tripId);
+  }
+  if (returnValue === 'expenses') {
+    return tripExpensesPath(tripId);
   }
   return tripItineraryDayPath(tripId, date);
 }

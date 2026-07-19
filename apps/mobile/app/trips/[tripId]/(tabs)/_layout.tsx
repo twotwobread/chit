@@ -16,6 +16,7 @@ export default function TripTabsLayout() {
       <Tabs.Screen name="today" />
       <Tabs.Screen name="map" />
       <Tabs.Screen name="itinerary" />
+      <Tabs.Screen name="expenses" />
       <Tabs.Screen name="settle" />
     </Tabs>
   );
