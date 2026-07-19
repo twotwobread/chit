@@ -39,6 +39,12 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         locationWhenInUsePermission: '현재 위치를 기준으로 다음 장소까지의 경로 미리보기를 보여드려요.',
       },
     ],
+    [
+      'expo-camera',
+      {
+        cameraPermission: '영수증을 촬영하려면 카메라 접근이 필요해요.',
+      },
+    ],
     ...kakaoPlugin,
     [
       'expo-font',

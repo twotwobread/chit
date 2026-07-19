@@ -709,6 +709,32 @@ test('builds create quick expense request with an explicit settlement exclusion 
   );
 });
 
+test('builds create quick expense request with a reviewed receipt draft id', () => {
+  assert.deepEqual(
+    buildCreateQuickExpenseRequest({
+      amountInput: '18,500',
+      currency: 'KRW',
+      scheduleItemId: 'item-a',
+      splitPolicy: 'equal',
+      participantIds: ['participant-b'],
+      manualSplitInputs: [],
+      payerParticipantId: 'participant-a',
+      receiptDraftId: 'receipt-draft-a',
+    }),
+    {
+      ok: true,
+      request: {
+        scheduleItemId: 'item-a',
+        amountMinor: 18500,
+        payerParticipantId: 'participant-a',
+        splitPolicy: 'equal',
+        participantIds: ['participant-b'],
+        receiptDraftId: 'receipt-draft-a',
+      },
+    },
+  );
+});
+
 test('builds memo update request after quick expense creation and skips blank memo', () => {
   const createValidation = buildCreateQuickExpenseRequest({
     amountInput: '18,500',
@@ -802,6 +828,40 @@ test('builds trip-level general expense request with an explicit settlement excl
         participantIds: ['participant-a', 'participant-b'],
         memo: null,
         includeInSettlement: false,
+      },
+    },
+  );
+});
+
+test('builds trip expense request with a reviewed receipt draft id', () => {
+  assert.deepEqual(
+    buildCreateTripExpenseRequest({
+      titleInput: '영수증 지출',
+      expenseDate: '2026-06-12',
+      amountInput: '10,000',
+      currency: 'KRW',
+      selectedTripDayId: null,
+      scheduleItemId: null,
+      splitPolicy: 'equal',
+      participantIds: ['participant-a', 'participant-b'],
+      manualSplitInputs: [],
+      payerParticipantId: 'payer-a',
+      memoInput: '',
+      receiptDraftId: 'receipt-draft-a',
+    }),
+    {
+      ok: true,
+      request: {
+        title: '영수증 지출',
+        expenseDate: '2026-06-12',
+        tripDayId: null,
+        scheduleItemId: null,
+        amountMinor: 10000,
+        payerParticipantId: 'payer-a',
+        splitPolicy: 'equal',
+        participantIds: ['participant-a', 'participant-b'],
+        memo: null,
+        receiptDraftId: 'receipt-draft-a',
       },
     },
   );

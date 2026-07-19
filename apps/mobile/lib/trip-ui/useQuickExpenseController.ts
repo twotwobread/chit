@@ -2,13 +2,14 @@ import { useCallback, useState } from 'react';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 
 import {
+  type ExpenseReceiptDraft,
   type GetDayScheduleItemsResponse,
   type SupportedCurrency,
   type TripParticipantListItem,
 } from '@i-um/api-contract';
 
 import { apiErrorStatus, clearStoredSessionOnAuthError, isApiStatus } from '../auth/errors';
-import { createQuickExpense, createTripExpense, updateExpense } from '../trips/expense-api';
+import { cancelExpenseReceiptDraft, createQuickExpense, createTripExpense, updateExpense } from '../trips/expense-api';
 import { getTripDayItinerary, listTripScheduleItems } from '../trips/itinerary-api';
 import { listTripParticipants } from '../trips/trip-api';
 import { getScheduleItems } from '../trips/day-itinerary';
@@ -23,6 +24,7 @@ import {
   buildQuickExpenseMemoUpdateRequest,
   buildQuickExpenseViewModel,
   buildSavedEqualSplitSummary,
+  formatAmountInput,
   quickExpenseFailureMessage,
   resolveQuickExpenseItemDayId,
   resolveTodayQuickExpenseInitialItemId,
@@ -90,6 +92,9 @@ export function useQuickExpenseController() {
   const [saving, setSaving] = useState(false);
   const [formMessage, setFormMessage] = useState<string | null>(null);
   const [savedSummary, setSavedSummary] = useState<QuickExpenseSavedSplitSummary | null>(null);
+  const [receiptDraft, setReceiptDraft] = useState<ExpenseReceiptDraft | null>(null);
+  const [receiptBusy, setReceiptBusy] = useState(false);
+  const [receiptMessage, setReceiptMessage] = useState<string | null>(null);
 
   const handleAuthError = useCallback(async (error: unknown) => {
     if (!(await clearStoredSessionOnAuthError(error))) {
@@ -111,6 +116,9 @@ export function useQuickExpenseController() {
     setErrors({});
     setFormMessage(null);
     setSavedSummary(null);
+    setReceiptDraft(null);
+    setReceiptBusy(false);
+    setReceiptMessage(null);
 
     const shellDetail = resolveTripShellDetail(shellState, tripId);
     if (shellDetail.status === 'pending') {
@@ -155,6 +163,8 @@ export function useQuickExpenseController() {
       setExpenseDateInput(localDateString());
       setAmountInput('');
       setMemoInput('');
+      setReceiptDraft(null);
+      setReceiptMessage(null);
       setState({
         status: 'success',
         tripName: tripDetail.trip.name,
@@ -271,6 +281,80 @@ export function useQuickExpenseController() {
     setFormMessage(null);
   };
 
+  const acceptReceiptDraft = (draft: ExpenseReceiptDraft) => {
+    if (state.status !== 'success' || !tripId) {
+      return;
+    }
+    const previousDraft = receiptDraft;
+    if (previousDraft) {
+      void cancelExpenseReceiptDraft(tripId, previousDraft.id).catch(() => undefined);
+    }
+    setReceiptDraft(draft);
+    setReceiptMessage(null);
+    setFormMessage(null);
+    applyReceiptDraft(draft, state);
+  };
+
+  const clearReceiptDraft = async () => {
+    if (!tripId || !receiptDraft || receiptBusy) {
+      return;
+    }
+    const draft = receiptDraft;
+    setReceiptDraft(null);
+    setReceiptMessage(null);
+    setReceiptBusy(true);
+    try {
+      await cancelExpenseReceiptDraft(tripId, draft.id);
+    } catch (error) {
+      if (await handleAuthError(error)) {
+        return;
+      }
+      setReceiptMessage('영수증 초안을 해제했지만 정리에 실패했어요. 잠시 후 다시 시도해주세요.');
+    } finally {
+      setReceiptBusy(false);
+    }
+  };
+
+  const applyReceiptDraft = (
+    draft: ExpenseReceiptDraft,
+    currentState: Extract<QuickExpenseState, { status: 'success' }>,
+  ) => {
+    const extraction = draft.extraction;
+    const candidateCurrency = extraction.currency ?? currentState.currency;
+    const warnings: string[] = [];
+    if (extraction.totalAmountMinor != null) {
+      if (candidateCurrency === currentState.currency) {
+        setAmountInput(formatAmountInput(extraction.totalAmountMinor, currentState.currency));
+        setErrors((current) => ({ ...current, amount: undefined }));
+      } else {
+        warnings.push(
+          `영수증 통화(${candidateCurrency})가 여행 통화(${currentState.currency})와 달라 금액은 직접 확인해주세요.`,
+        );
+      }
+    }
+    if (currentState.mode === 'settlement') {
+      const titleCandidate = extraction.expenseTitle?.trim() || extraction.merchantName?.trim() || '';
+      if (titleCandidate) {
+        setTitleInput(titleCandidate);
+        setErrors((current) => ({ ...current, title: undefined }));
+      }
+      if (extraction.expenseDate) {
+        setExpenseDateInput(extraction.expenseDate);
+        setErrors((current) => ({ ...current, expenseDate: undefined }));
+      }
+    }
+    const providerWarning = extraction.warnings[0];
+    setReceiptMessage(
+      [
+        `영수증 초안을 채웠어요. 신뢰도 ${receiptConfidenceLabel(extraction.confidence)} · 저장 전 금액/결제자/분할을 확인해주세요.`,
+        providerWarning,
+        ...warnings,
+      ]
+        .filter(Boolean)
+        .join('\n'),
+    );
+  };
+
   const submit = async () => {
     if (state.status !== 'success' || !tripId || !date || saving) {
       return;
@@ -295,6 +379,8 @@ export function useQuickExpenseController() {
           splits: response.expense.splits,
         }),
       );
+      setReceiptDraft(null);
+      setReceiptMessage(null);
     } catch (error) {
       if (error instanceof QuickExpenseValidationAbort) {
         return;
@@ -337,6 +423,7 @@ export function useQuickExpenseController() {
       payerParticipantId,
       memoInput,
       includeInSettlement,
+      receiptDraftId: receiptDraft?.id ?? null,
     });
     if (!validation.ok) {
       setErrors(validation.errors);
@@ -361,6 +448,7 @@ export function useQuickExpenseController() {
       manualSplitInputs: activeManualSplitInputs,
       payerParticipantId,
       includeInSettlement,
+      receiptDraftId: receiptDraft?.id ?? null,
     });
     if (!validation.ok) {
       setErrors(validation.errors);
@@ -414,8 +502,10 @@ export function useQuickExpenseController() {
       : null;
 
   return {
+    acceptReceiptDraft,
     amountInput,
     backToDay,
+    clearReceiptDraft,
     clearTripDay,
     completeSavedExpense,
     errors,
@@ -427,6 +517,9 @@ export function useQuickExpenseController() {
     manualSplitInputs,
     memoInput,
     payerParticipantId,
+    receiptBusy,
+    receiptDraft,
+    receiptMessage,
     savedSummary,
     saving,
     selectItem,
@@ -441,6 +534,7 @@ export function useQuickExpenseController() {
     state,
     submit,
     titleInput,
+    tripId,
     toggleIncludeInSettlement,
     toggleSplitParticipant,
     updateAmountInput,
@@ -452,6 +546,16 @@ export function useQuickExpenseController() {
 }
 
 class QuickExpenseValidationAbort extends Error {}
+
+function receiptConfidenceLabel(confidence: string): string {
+  if (confidence === 'high') {
+    return '높음';
+  }
+  if (confidence === 'medium') {
+    return '보통';
+  }
+  return '낮음';
+}
 
 function quickExpenseShellFailureState(status: 'auth' | 'notFound' | 'error'): QuickExpenseState {
   if (status === 'notFound') {

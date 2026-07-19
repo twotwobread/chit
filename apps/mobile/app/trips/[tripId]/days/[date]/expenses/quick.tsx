@@ -13,8 +13,10 @@ import { useQuickExpenseController } from '../../../../../../lib/trip-ui/useQuic
 
 export default function QuickExpenseScreen() {
   const {
+    acceptReceiptDraft,
     amountInput,
     backToDay,
+    clearReceiptDraft,
     clearTripDay,
     completeSavedExpense,
     errors,
@@ -26,6 +28,9 @@ export default function QuickExpenseScreen() {
     manualSplitInputs,
     memoInput,
     payerParticipantId,
+    receiptBusy,
+    receiptDraft,
+    receiptMessage,
     savedSummary,
     saving,
     selectItem,
@@ -39,6 +44,7 @@ export default function QuickExpenseScreen() {
     state,
     submit,
     titleInput,
+    tripId,
     toggleIncludeInSettlement,
     toggleSplitParticipant,
     updateAmountInput,
@@ -100,7 +106,9 @@ export default function QuickExpenseScreen() {
             includeInSettlement={includeInSettlement}
             mode={state.mode}
             onBack={backToDay}
+            onClearReceiptDraft={() => void clearReceiptDraft()}
             onClearTripDay={clearTripDay}
+            onReceiptDraftCreated={acceptReceiptDraft}
             onSelectItem={selectItem}
             onSelectPayer={selectPayer}
             onSelectSplitPolicy={selectSplitPolicy}
@@ -114,6 +122,9 @@ export default function QuickExpenseScreen() {
             onUpdateManualSplitInput={updateManualSplitInput}
             onUpdateTitle={updateTitleInput}
             payerParticipantId={payerParticipantId}
+            receiptBusy={receiptBusy}
+            receiptDraft={receiptDraft}
+            receiptMessage={receiptMessage}
             saving={saving}
             selectedItemId={selectedItemId}
             selectedSplitParticipantIds={selectedSplitParticipantIds}
@@ -121,6 +132,7 @@ export default function QuickExpenseScreen() {
             manualSplitInputs={manualSplitInputs}
             memoInput={memoInput}
             titleInput={titleInput}
+            tripId={tripId ?? ''}
             tripName={state.tripName}
             viewModel={viewModel}
             showActions={false}

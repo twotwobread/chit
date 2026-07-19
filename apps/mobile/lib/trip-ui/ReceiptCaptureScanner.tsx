@@ -1,0 +1,319 @@
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Image, Modal, StyleSheet, Text, View } from 'react-native';
+import { CameraView, useCameraPermissions } from 'expo-camera';
+
+import { type ExpenseReceiptDraft, type ReceiptCaptureMode, type ReceiptImageRole } from '@i-um/api-contract';
+
+import { PrimaryButton, SecondaryButton, theme } from '../design';
+import {
+  ExpenseReceiptUploadError,
+  createExpenseReceiptDraftFromCapture,
+  type ExpenseReceiptDraftImageInput,
+} from '../trips/expense-api';
+import {
+  buildReceiptOCRTextParts,
+  validateKoreanReceiptTextParts,
+  type ReceiptOCRTextPart,
+} from '../trips/receipt-ocr';
+import { recognizeKoreanReceiptText } from '../trips/receipt-ocr-native';
+
+type CapturedReceiptImage = ExpenseReceiptDraftImageInput & {
+  role: ReceiptImageRole;
+};
+
+type ScannerStep = 'mode' | 'capture' | 'review' | 'recognizing' | 'failure';
+
+export function ReceiptCaptureScanner({
+  onClose,
+  onDirectInput,
+  onDraftCreated,
+  tripId,
+  visible,
+}: {
+  tripId: string;
+  visible: boolean;
+  onClose: () => void;
+  onDirectInput: () => void;
+  onDraftCreated: (draft: ExpenseReceiptDraft) => void;
+}) {
+  const cameraRef = useRef<CameraView>(null);
+  const [permission, requestPermission] = useCameraPermissions();
+  const [step, setStep] = useState<ScannerStep>('mode');
+  const [mode, setMode] = useState<ReceiptCaptureMode>('single');
+  const [captureRole, setCaptureRole] = useState<ReceiptImageRole>('single');
+  const [capturedImages, setCapturedImages] = useState<CapturedReceiptImage[]>([]);
+  const [failureMessage, setFailureMessage] = useState(
+    '이미지를 인식하지 못했어요. 다시 촬영하거나 직접 입력해주세요.',
+  );
+  const [takingPicture, setTakingPicture] = useState(false);
+
+  useEffect(() => {
+    if (!visible) {
+      return;
+    }
+    setStep('mode');
+    setMode('single');
+    setCaptureRole('single');
+    setCapturedImages([]);
+    setFailureMessage('이미지를 인식하지 못했어요. 다시 촬영하거나 직접 입력해주세요.');
+    setTakingPicture(false);
+  }, [visible]);
+
+  const beginCapture = (nextMode: ReceiptCaptureMode) => {
+    setMode(nextMode);
+    setCapturedImages([]);
+    setCaptureRole(nextMode === 'split' ? 'header' : 'single');
+    setStep('capture');
+  };
+
+  const takePicture = async () => {
+    if (!cameraRef.current || takingPicture) {
+      return;
+    }
+    setTakingPicture(true);
+    try {
+      const picture = await cameraRef.current.takePictureAsync({ quality: 0.92, skipProcessing: false });
+      const image: CapturedReceiptImage = {
+        role: captureRole,
+        uri: picture.uri,
+        contentType: 'image/jpeg',
+        fileName: `${captureRole}-receipt.jpg`,
+      };
+      setCapturedImages((current) => {
+        const next = [...current.filter((item) => item.role !== captureRole), image];
+        if (mode === 'split' && captureRole === 'header') {
+          setCaptureRole('total');
+          setStep('capture');
+        } else {
+          setStep('review');
+        }
+        return next;
+      });
+    } catch {
+      setFailureMessage('이미지를 인식하지 못했어요. 다시 촬영하거나 직접 입력해주세요.');
+      setStep('failure');
+    } finally {
+      setTakingPicture(false);
+    }
+  };
+
+  const retake = () => {
+    setCapturedImages([]);
+    setCaptureRole(mode === 'split' ? 'header' : 'single');
+    setFailureMessage('이미지를 인식하지 못했어요. 다시 촬영하거나 직접 입력해주세요.');
+    setStep('capture');
+  };
+
+  const recognizeAndCreateDraft = async () => {
+    setStep('recognizing');
+    try {
+      const parts: ReceiptOCRTextPart[] = [];
+      for (const image of capturedImages) {
+        parts.push({ role: image.role, text: await recognizeKoreanReceiptText(image.uri) });
+      }
+      const textParts = buildReceiptOCRTextParts({ mode, parts });
+      const validation = validateKoreanReceiptTextParts(textParts);
+      if (!validation.ok) {
+        setFailureMessage(
+          validation.reason === 'unsupported-language'
+            ? '한국어 영수증만 등록할 수 있어요. 다시 촬영하거나 직접 입력해주세요.'
+            : '이미지를 인식하지 못했어요. 다시 촬영하거나 직접 입력해주세요.',
+        );
+        setStep('failure');
+        return;
+      }
+      const response = await createExpenseReceiptDraftFromCapture({
+        tripId,
+        captureMode: mode,
+        ocrTextParts: textParts,
+        images: capturedImages,
+      });
+      onDraftCreated(response.draft);
+    } catch (error) {
+      setFailureMessage(receiptCaptureFailureMessage(error));
+      setStep('failure');
+    }
+  };
+
+  const useDirectInput = () => {
+    onDirectInput();
+  };
+
+  return (
+    <Modal animationType="slide" onRequestClose={onClose} presentationStyle="fullScreen" visible={visible}>
+      <View style={scannerStyles.screen}>
+        <View style={scannerStyles.header}>
+          <Text style={scannerStyles.title}>영수증 촬영</Text>
+          <SecondaryButton label="닫기" onPress={onClose} />
+        </View>
+
+        {step === 'mode' ? (
+          <View style={scannerStyles.card}>
+            <Text style={scannerStyles.cardTitle}>영수증을 어떻게 촬영할까요?</Text>
+            <Text style={scannerStyles.helper}>긴 영수증은 상단과 결제금액 부분을 나눠 촬영해주세요.</Text>
+            <PrimaryButton label="한 번에 촬영" onPress={() => beginCapture('single')} />
+            <SecondaryButton label="긴 영수증 나눠찍기" onPress={() => beginCapture('split')} />
+          </View>
+        ) : null}
+
+        {step === 'capture' ? (
+          <View style={scannerStyles.captureWrap}>
+            {permission?.granted ? (
+              <>
+                <CameraView
+                  ref={cameraRef}
+                  active={visible && step === 'capture'}
+                  facing="back"
+                  mode="picture"
+                  style={scannerStyles.camera}
+                />
+                <View pointerEvents="none" style={scannerStyles.guideBox} />
+                <View style={scannerStyles.captureCard}>
+                  <Text style={scannerStyles.cardTitle}>{captureInstruction(mode, captureRole)}</Text>
+                  <Text style={scannerStyles.helper}>흔들리지 않게 맞춘 뒤 직접 촬영해주세요.</Text>
+                  <PrimaryButton
+                    label={takingPicture ? '촬영 중...' : '촬영하기'}
+                    loading={takingPicture}
+                    onPress={() => void takePicture()}
+                  />
+                  <SecondaryButton label="이전" onPress={() => setStep('mode')} />
+                </View>
+              </>
+            ) : (
+              <View style={scannerStyles.card}>
+                <Text style={scannerStyles.cardTitle}>카메라 권한이 필요해요.</Text>
+                <Text style={scannerStyles.helper}>영수증을 촬영하려면 카메라 접근을 허용해주세요.</Text>
+                <PrimaryButton label="권한 허용" onPress={() => void requestPermission()} />
+                <SecondaryButton label="직접 입력" onPress={useDirectInput} />
+              </View>
+            )}
+          </View>
+        ) : null}
+
+        {step === 'review' ? (
+          <View style={scannerStyles.card}>
+            <Text style={scannerStyles.cardTitle}>촬영한 이미지를 확인해주세요.</Text>
+            <Text style={scannerStyles.helper}>글자가 흐리면 다시 촬영해주세요.</Text>
+            <View style={scannerStyles.previewRow}>
+              {capturedImages.map((image) => (
+                <Image key={image.role} source={{ uri: image.uri }} style={scannerStyles.previewImage} />
+              ))}
+            </View>
+            <PrimaryButton label="이미지 인식하기" onPress={() => void recognizeAndCreateDraft()} />
+            <SecondaryButton label="다시 촬영" onPress={retake} />
+          </View>
+        ) : null}
+
+        {step === 'recognizing' ? (
+          <View style={scannerStyles.card}>
+            <ActivityIndicator color={theme.color.primary} />
+            <Text style={scannerStyles.cardTitle}>이미지를 인식 중입니다.</Text>
+          </View>
+        ) : null}
+
+        {step === 'failure' ? (
+          <View style={scannerStyles.card}>
+            <Text style={scannerStyles.cardTitle}>{failureMessage}</Text>
+            <PrimaryButton label="다시 촬영" onPress={retake} />
+            <SecondaryButton label="직접 입력" onPress={useDirectInput} />
+          </View>
+        ) : null}
+      </View>
+    </Modal>
+  );
+}
+
+function captureInstruction(mode: ReceiptCaptureMode, role: ReceiptImageRole): string {
+  if (mode === 'split' && role === 'header') {
+    return '상호와 날짜가 보이게 촬영해주세요.';
+  }
+  if (mode === 'split' && role === 'total') {
+    return '총액이 보이게 촬영해주세요.';
+  }
+  return '영수증 전체가 보이게 촬영해주세요.';
+}
+
+function receiptCaptureFailureMessage(error: unknown): string {
+  const status = error instanceof ExpenseReceiptUploadError ? error.status : undefined;
+  if (status === 422) {
+    return '한국어 영수증만 등록할 수 있어요. 다시 촬영하거나 직접 입력해주세요.';
+  }
+  if (status === 413) {
+    return '영수증 이미지는 10MB 이하만 등록할 수 있어요. 다시 촬영하거나 직접 입력해주세요.';
+  }
+  return '이미지를 인식하지 못했어요. 다시 촬영하거나 직접 입력해주세요.';
+}
+
+const scannerStyles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: theme.color.bg,
+    padding: theme.space[6],
+    gap: theme.space[5],
+  },
+  header: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingTop: theme.space[6],
+  },
+  title: {
+    color: theme.color.textStrong,
+    fontSize: 22,
+    fontWeight: '800',
+  },
+  card: {
+    backgroundColor: theme.color.surface,
+    borderColor: theme.color.borderDefault,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    gap: theme.space[5],
+    padding: theme.space[6],
+  },
+  cardTitle: {
+    color: theme.color.textStrong,
+    fontSize: 18,
+    fontWeight: '800',
+    lineHeight: 25,
+  },
+  helper: {
+    color: theme.color.textMuted,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  captureWrap: {
+    flex: 1,
+    gap: theme.space[5],
+  },
+  camera: {
+    flex: 1,
+    overflow: 'hidden',
+    borderRadius: theme.radius.lg,
+  },
+  guideBox: {
+    borderColor: 'rgba(255,255,255,0.8)',
+    borderRadius: theme.radius.md,
+    borderWidth: 2,
+    height: '58%',
+    left: '12%',
+    position: 'absolute',
+    right: '12%',
+    top: '12%',
+  },
+  captureCard: {
+    backgroundColor: theme.color.surface,
+    borderRadius: theme.radius.lg,
+    gap: theme.space[3],
+    padding: theme.space[4],
+  },
+  previewRow: {
+    flexDirection: 'row',
+    gap: theme.space[3],
+  },
+  previewImage: {
+    backgroundColor: theme.color.surfaceSunken,
+    borderRadius: theme.radius.md,
+    flex: 1,
+    height: 220,
+  },
+});

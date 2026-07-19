@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { type ExpenseReceiptDraft } from '@i-um/api-contract';
+
 import { SegmentedControl, theme } from '../design';
+import { cancelExpenseReceiptDraft } from '../trips/expense-api';
 import {
   buildExpensePaymentSplitSummaryLabel,
   quickExpenseDirectSplitUnavailableMessage,
@@ -11,6 +14,7 @@ import {
   type QuickExpenseSplitPolicy,
 } from '../trips/quick-expense';
 import { BottomSheet } from './BottomSheet';
+import { ReceiptCaptureScanner } from './ReceiptCaptureScanner';
 
 export type QuickExpenseItemOption = {
   id: string;
@@ -42,6 +46,7 @@ export type QuickExpenseSubmitPayload = {
   splitParticipantIds: string[];
   memoInput: string;
   includeInSettlement: boolean;
+  receiptDraftId: string | null;
 };
 
 export type QuickExpenseFormProps = {
@@ -54,6 +59,7 @@ export type QuickExpenseFormProps = {
   onCancel?: () => void;
   submitting?: boolean;
   errorMessage?: string | null;
+  tripId?: string | null;
 };
 
 type QuickExpenseErrors = Partial<Record<'amount' | 'item' | 'payer' | 'participants', string>>;
@@ -74,6 +80,7 @@ export function QuickExpenseForm({
   onSave,
   participantOptions,
   submitting = false,
+  tripId,
 }: QuickExpenseFormProps) {
   const defaultItemId = Object.prototype.hasOwnProperty.call(initialDraft ?? {}, 'itemId')
     ? (initialDraft?.itemId ?? null)
@@ -100,6 +107,11 @@ export function QuickExpenseForm({
   const [errors, setErrors] = useState<QuickExpenseErrors>({});
   const [itemSelectorExpanded, setItemSelectorExpanded] = useState(false);
   const [activeSheet, setActiveSheet] = useState<'split' | 'settlement' | null>(null);
+  const [entryMode, setEntryMode] = useState<'choice' | 'manual'>('choice');
+  const [receiptDraft, setReceiptDraft] = useState<ExpenseReceiptDraft | null>(null);
+  const [receiptBusy, setReceiptBusy] = useState(false);
+  const [receiptMessage, setReceiptMessage] = useState<string | null>(null);
+  const [scannerVisible, setScannerVisible] = useState(false);
   const splitMode = draft.splitMode;
   const selectedItem = useMemo(
     () => itemOptions.find((item) => item.id === draft.itemId) ?? null,
@@ -137,6 +149,60 @@ export function QuickExpenseForm({
     setErrors((current) => ({ ...current, participants: undefined }));
   };
 
+  const acceptReceiptDraft = (nextDraft: ExpenseReceiptDraft) => {
+    if (!tripId) {
+      return;
+    }
+    const previousDraft = receiptDraft;
+    if (previousDraft) {
+      void cancelExpenseReceiptDraft(tripId, previousDraft.id).catch(() => undefined);
+    }
+    setScannerVisible(false);
+    setEntryMode('manual');
+    setReceiptDraft(nextDraft);
+    applyReceiptDraft(nextDraft);
+  };
+
+  const clearReceiptDraft = async () => {
+    if (!tripId || !receiptDraft || receiptBusy) {
+      return;
+    }
+    const draftToCancel = receiptDraft;
+    setReceiptDraft(null);
+    setReceiptMessage(null);
+    setReceiptBusy(true);
+    try {
+      await cancelExpenseReceiptDraft(tripId, draftToCancel.id);
+    } catch {
+      setReceiptMessage('영수증 초안을 해제했지만 정리에 실패했어요. 잠시 후 다시 시도해주세요.');
+    } finally {
+      setReceiptBusy(false);
+    }
+  };
+
+  const applyReceiptDraft = (draftToApply: ExpenseReceiptDraft) => {
+    const extraction = draftToApply.extraction;
+    const warnings: string[] = [];
+    const candidateCurrency = extraction.currency ?? currency;
+    if (extraction.totalAmountMinor != null) {
+      if (candidateCurrency === currency) {
+        updateDraft({ amountInput: formatReceiptAmountInput(extraction.totalAmountMinor, currency) });
+        setErrors((current) => ({ ...current, amount: undefined }));
+      } else {
+        warnings.push(`영수증 통화(${candidateCurrency})가 여행 통화(${currency})와 달라 금액은 직접 확인해주세요.`);
+      }
+    }
+    setReceiptMessage(
+      [
+        `영수증 초안을 채웠어요. 신뢰도 ${receiptConfidenceLabel(extraction.confidence)} · 저장 전 금액/결제자/분할을 확인해주세요.`,
+        extraction.warnings[0],
+        ...warnings,
+      ]
+        .filter(Boolean)
+        .join('\n'),
+    );
+  };
+
   const save = () => {
     const parsedAmount = parseAmountInput(draft.amountInput);
     const nextErrors: QuickExpenseErrors = {};
@@ -166,6 +232,7 @@ export function QuickExpenseForm({
       splitParticipantIds: draft.splitParticipantIds,
       memoInput: draft.memoInput,
       includeInSettlement: draft.includeInSettlement,
+      receiptDraftId: receiptDraft?.id ?? null,
     });
   };
 
@@ -180,6 +247,49 @@ export function QuickExpenseForm({
   });
   const splitErrorMessage = errors.payer ?? errors.participants;
   const settlementSummary = settlementStatusSummaryLabel(draft.includeInSettlement);
+  const handleDirectInput = () => {
+    setScannerVisible(false);
+    setEntryMode('manual');
+  };
+
+  if (entryMode === 'choice' && !receiptDraft) {
+    return (
+      <>
+        <View style={styles.wrap}>
+          <Text style={styles.sheetTitle}>지출을 어떻게 입력할까요?</Text>
+          <Text style={styles.helperText}>직접 입력하거나 영수증을 촬영해 금액 초안을 채울 수 있어요.</Text>
+          <Pressable accessibilityRole="button" onPress={handleDirectInput} style={styles.save}>
+            <Text style={styles.saveText}>직접 입력</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ disabled: !tripId }}
+            disabled={!tripId}
+            onPress={() => setScannerVisible(true)}
+            style={({ pressed }) => [
+              styles.receiptAction,
+              !tripId ? styles.disabled : null,
+              pressed ? styles.pressed : null,
+            ]}
+          >
+            <Text style={styles.receiptActionText}>영수증 촬영</Text>
+          </Pressable>
+          {onCancel ? (
+            <Pressable accessibilityRole="button" onPress={onCancel} style={styles.cancel}>
+              <Text style={styles.cancelText}>취소</Text>
+            </Pressable>
+          ) : null}
+        </View>
+        <ReceiptCaptureScanner
+          onClose={() => setScannerVisible(false)}
+          onDirectInput={handleDirectInput}
+          onDraftCreated={acceptReceiptDraft}
+          tripId={tripId ?? ''}
+          visible={scannerVisible}
+        />
+      </>
+    );
+  }
 
   return (
     <>
@@ -197,6 +307,47 @@ export function QuickExpenseForm({
           <Text style={styles.currencyLabel}>{currencyLabel(currency)}</Text>
         </View>
         {errors.amount ? <Text style={styles.errorText}>{errors.amount}</Text> : null}
+
+        <Text style={styles.label}>영수증</Text>
+        <View style={styles.receiptBox}>
+          <Text style={styles.helperText}>영수증을 촬영하면 금액 초안을 채워줘요. 저장 전 직접 확인해야 해요.</Text>
+          {receiptDraft ? (
+            <Text style={styles.helperText}>
+              첨부된 초안 · 신뢰도 {receiptConfidenceLabel(receiptDraft.extraction.confidence)}
+            </Text>
+          ) : null}
+          {receiptMessage ? <Text style={styles.helperText}>{receiptMessage}</Text> : null}
+          <View style={styles.actionRow}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ disabled: submitting || receiptBusy || !tripId }}
+              disabled={submitting || receiptBusy || !tripId}
+              onPress={() => setScannerVisible(true)}
+              style={({ pressed }) => [
+                styles.receiptAction,
+                submitting || receiptBusy || !tripId ? styles.disabled : null,
+                pressed ? styles.pressed : null,
+              ]}
+            >
+              <Text style={styles.receiptActionText}>{receiptDraft ? '다른 영수증 촬영' : '영수증 촬영'}</Text>
+            </Pressable>
+            {receiptDraft ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ disabled: submitting || receiptBusy }}
+                disabled={submitting || receiptBusy}
+                onPress={() => void clearReceiptDraft()}
+                style={({ pressed }) => [
+                  styles.receiptAction,
+                  submitting || receiptBusy ? styles.disabled : null,
+                  pressed ? styles.pressed : null,
+                ]}
+              >
+                <Text style={styles.receiptActionText}>{receiptBusy ? '해제 중...' : '초안 해제'}</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        </View>
 
         <Text style={styles.label}>연결할 일정</Text>
         {itemOptions.length === 0 ? (
@@ -384,6 +535,13 @@ export function QuickExpenseForm({
           </Pressable>
         </View>
       </BottomSheet>
+      <ReceiptCaptureScanner
+        onClose={() => setScannerVisible(false)}
+        onDirectInput={handleDirectInput}
+        onDraftCreated={acceptReceiptDraft}
+        tripId={tripId ?? ''}
+        visible={scannerVisible}
+      />
     </>
   );
 }
@@ -494,6 +652,23 @@ function currencyLabel(currency: string): string {
   return currency;
 }
 
+function formatReceiptAmountInput(amountMinor: number, currency: string): string {
+  if (currency === 'KRW' || currency === 'JPY') {
+    return String(amountMinor);
+  }
+  return (amountMinor / 100).toFixed(2);
+}
+
+function receiptConfidenceLabel(confidence: string): string {
+  if (confidence === 'high') {
+    return '높음';
+  }
+  if (confidence === 'medium') {
+    return '보통';
+  }
+  return '낮음';
+}
+
 const styles = StyleSheet.create({
   actionRow: {
     flexDirection: 'row',
@@ -552,6 +727,29 @@ const styles = StyleSheet.create({
     fontFamily: theme.font.family.regular,
     fontSize: theme.font.size.caption,
     lineHeight: theme.font.size.caption * theme.font.leading.normal,
+  },
+  receiptBox: {
+    backgroundColor: theme.color.surfaceSunken,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    gap: theme.space[3],
+    padding: theme.space[4],
+  },
+  receiptAction: {
+    alignItems: 'center',
+    borderColor: theme.color.borderDefault,
+    borderRadius: theme.radius.pill,
+    borderWidth: 1,
+    flex: 1,
+    paddingHorizontal: theme.space[4],
+    paddingVertical: theme.space[3],
+  },
+  receiptActionText: {
+    color: theme.color.primary,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.label,
+    fontWeight: theme.font.weight.bold,
   },
   label: {
     color: theme.color.textBody,
