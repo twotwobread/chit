@@ -11,7 +11,7 @@ import {
 } from '../app-info/legal';
 import { SettingRow, StatRow, type AccountProvider } from '../account-ui/AccountRows';
 import { PastTripRow, UpcomingTripRow } from '../home-ui/TripCards';
-import { theme } from '../design';
+import { PrimaryButton, SecondaryButton, theme } from '../design';
 import { type SettlementSummaryState, type TripListState } from './useMyPageController';
 import {
   buildMySettlementSummaryViewModel,
@@ -83,9 +83,7 @@ export function MySettlementSummarySection({ state, onRetry }: { state: Settleme
         <View style={styles.card}>
           <Text style={styles.errorMessage}>정산 요약을 불러올 수 없어요.</Text>
           <Text style={styles.message}>잠시 후 다시 시도해주세요.</Text>
-          <Pressable accessibilityRole="button" onPress={onRetry} style={styles.secondaryButton}>
-            <Text style={styles.secondaryButtonText}>다시 시도</Text>
-          </Pressable>
+          <SecondaryButton label="다시 시도" onPress={onRetry} />
         </View>
       ) : null}
 
@@ -172,9 +170,7 @@ export function MyTripsSection({ state, onRetry }: { state: TripListState; onRet
       {state.status === 'error' ? (
         <View style={styles.card}>
           <Text style={styles.errorMessage}>내 여행을 불러올 수 없어요.</Text>
-          <Pressable accessibilityRole="button" onPress={onRetry} style={styles.secondaryButton}>
-            <Text style={styles.secondaryButtonText}>다시 시도</Text>
-          </Pressable>
+          <SecondaryButton label="다시 시도" onPress={onRetry} />
         </View>
       ) : null}
 
@@ -182,9 +178,7 @@ export function MyTripsSection({ state, onRetry }: { state: TripListState; onRet
         <View style={styles.card}>
           <Text style={styles.emptyTitle}>아직 여행이 없어요.</Text>
           <Text style={styles.message}>새 여행을 만들고 여정을 이어가요.</Text>
-          <Pressable accessibilityRole="button" onPress={() => router.push('/trips/new')} style={styles.button}>
-            <Text style={styles.buttonText}>새 여행 만들기</Text>
-          </Pressable>
+          <PrimaryButton label="새 여행 만들기" onPress={() => router.push('/trips/new')} />
         </View>
       ) : null}
 
@@ -197,13 +191,7 @@ export function MyTripsSection({ state, onRetry }: { state: TripListState; onRet
             ]}
           />
           <TripSections sections={groupedTrips} />
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => router.push('/trips/new')}
-            style={styles.secondaryButton}
-          >
-            <Text style={styles.secondaryButtonText}>새 여행 만들기</Text>
-          </Pressable>
+          <SecondaryButton label="새 여행 만들기" onPress={() => router.push('/trips/new')} />
         </>
       ) : null}
     </View>

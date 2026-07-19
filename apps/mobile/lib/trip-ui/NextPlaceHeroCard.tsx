@@ -69,12 +69,12 @@ export function NextPlaceHeroCard({
       </View>
 
       <View style={styles.metaRow}>
-        <MapPin color={theme.color.green[100]} size={15} strokeWidth={2} />
+        <MapPin color={theme.color.primary} size={15} strokeWidth={2} />
         <Text style={styles.meta}>{place.legText}</Text>
       </View>
       {place.openText ? (
         <View style={styles.metaRow}>
-          <Clock color={theme.color.green[100]} size={15} strokeWidth={2} />
+          <Clock color={theme.color.primary} size={15} strokeWidth={2} />
           <Text style={styles.meta}>{place.openText}</Text>
         </View>
       ) : null}
@@ -100,7 +100,7 @@ export function NextPlaceHeroCard({
             onPress={onNavigate}
             style={({ pressed }) => [styles.action, styles.actionLight, pressed ? styles.pressed : null]}
           >
-            <Navigation color={theme.color.green[800]} size={18} strokeWidth={2.2} />
+            <Navigation color={theme.color.onPrimary} size={18} strokeWidth={2.2} />
             <Text style={[styles.actionText, styles.actionTextDark]}>길찾기</Text>
           </Pressable>
         ) : null}
@@ -165,10 +165,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   actionGreen: {
-    backgroundColor: theme.color.green[500],
+    backgroundColor: theme.color.primary,
   },
   actionLight: {
-    backgroundColor: theme.color.onPrimary,
+    backgroundColor: theme.color.surface,
   },
   actionRow: {
     flexDirection: 'row',
@@ -181,13 +181,13 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.bold,
   },
   actionTextDark: {
-    color: theme.color.green[800],
+    color: theme.color.onPrimary,
   },
   actionTextLight: {
     color: theme.color.onPrimary,
   },
   address: {
-    color: theme.color.green[100],
+    color: theme.color.chit.acidLimeSofter,
     fontFamily: theme.font.family.regular,
     fontSize: theme.font.size.label,
     marginTop: theme.space[1] + 1,
@@ -195,11 +195,13 @@ const styles = StyleSheet.create({
   card: {
     width: '100%',
     maxWidth: theme.layout.cardMaxW,
-    backgroundColor: theme.color.green[900],
+    backgroundColor: theme.color.chit.charcoal,
+    borderColor: theme.color.chit.charcoalElevated,
     borderRadius: theme.radius['2xl'],
+    borderWidth: 1,
     gap: theme.space[3],
     padding: theme.space[6] + 2,
-    ...theme.shadow.lg,
+    ...theme.shadow.md,
   },
   head: {
     alignItems: 'flex-start',
@@ -214,12 +216,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   meta: {
-    color: theme.color.green[100],
+    color: theme.color.chit.acidLimeSofter,
     fontFamily: theme.font.family.regular,
     fontSize: theme.font.size.caption,
   },
   lodgingHelper: {
-    color: theme.color.green[100],
+    color: theme.color.chit.acidLimeSofter,
     fontFamily: theme.font.family.regular,
     fontSize: theme.font.size.caption,
     textAlign: 'center',
@@ -230,14 +232,14 @@ const styles = StyleSheet.create({
     gap: theme.space[2],
   },
   name: {
-    color: theme.color.onPrimary,
+    color: theme.color.textOnDark,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.title,
     fontWeight: theme.font.weight.bold,
     letterSpacing: -0.4,
   },
   overline: {
-    color: theme.color.green[200],
+    color: theme.color.primary,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.micro,
     fontWeight: theme.font.weight.bold,
@@ -268,14 +270,14 @@ const styles = StyleSheet.create({
   },
   subAction: {
     alignItems: 'center',
-    backgroundColor: theme.color.green[800],
+    backgroundColor: theme.color.chit.charcoalElevated,
     borderRadius: theme.radius.md,
     flex: 1,
     height: theme.layout.tapMin,
     justifyContent: 'center',
   },
   subActionText: {
-    color: theme.color.green[100],
+    color: theme.color.chit.acidLimeSofter,
     fontFamily: theme.font.family.semibold,
     fontSize: theme.font.size.label,
     fontWeight: theme.font.weight.semibold,

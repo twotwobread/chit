@@ -3,21 +3,6 @@ import { StyleSheet } from 'react-native';
 import { theme } from '../design';
 
 export const styles = StyleSheet.create({
-  button: {
-    alignItems: 'center',
-    backgroundColor: theme.color.primary,
-    borderRadius: theme.radius.md,
-    justifyContent: 'center',
-    minHeight: theme.layout.controlH,
-    paddingHorizontal: theme.space[5],
-    paddingVertical: theme.space[3],
-  },
-  buttonText: {
-    color: theme.color.onPrimary,
-    fontFamily: theme.font.family.bold,
-    fontWeight: theme.font.weight.bold,
-    textAlign: 'center',
-  },
   card: {
     backgroundColor: theme.color.surface,
     borderColor: theme.color.borderSubtle,
@@ -72,22 +57,6 @@ export const styles = StyleSheet.create({
   },
   scroll: {
     flex: 1,
-  },
-  secondaryButton: {
-    alignItems: 'center',
-    borderColor: theme.color.primary,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    justifyContent: 'center',
-    minHeight: theme.layout.controlH,
-    paddingHorizontal: theme.space[5],
-    paddingVertical: theme.space[3],
-  },
-  secondaryButtonText: {
-    color: theme.color.primary,
-    fontFamily: theme.font.family.bold,
-    fontWeight: theme.font.weight.bold,
-    textAlign: 'center',
   },
   settlementChip: {
     borderRadius: theme.radius.pill,

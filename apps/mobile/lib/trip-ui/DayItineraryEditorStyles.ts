@@ -96,8 +96,8 @@ export const styles = StyleSheet.create({
     paddingHorizontal: theme.space[4],
   },
   defaultTravelModeChipSelected: {
-    backgroundColor: theme.color.primarySoft,
-    borderColor: theme.color.primary,
+    backgroundColor: theme.color.primary,
+    borderColor: theme.color.primaryPressed,
   },
   defaultTravelModeChipDisabled: {
     opacity: 0.55,
@@ -109,7 +109,7 @@ export const styles = StyleSheet.create({
     fontWeight: theme.font.weight.bold,
   },
   defaultTravelModeChipTextSelected: {
-    color: theme.color.primary,
+    color: theme.color.onPrimary,
   },
   defaultTravelModeFeedback: {
     color: theme.color.textMuted,
@@ -689,8 +689,8 @@ export const styles = StyleSheet.create({
     paddingVertical: theme.space[2],
   },
   chipSelected: {
-    backgroundColor: theme.color.primarySoft,
-    borderColor: theme.color.primary,
+    backgroundColor: theme.color.primary,
+    borderColor: theme.color.primaryPressed,
   },
   chipText: {
     color: theme.color.textBody,
@@ -699,7 +699,7 @@ export const styles = StyleSheet.create({
     fontWeight: theme.font.weight.semibold,
   },
   chipTextSelected: {
-    color: theme.color.primary,
+    color: theme.color.onPrimary,
   },
   errorBox: {
     backgroundColor: theme.color.surfaceSunken,

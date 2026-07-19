@@ -1,7 +1,6 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Plus } from 'lucide-react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
-import { AmountText, Badge, theme } from '../design';
+import { AmountText, Badge, PrimaryButton, theme } from '../design';
 
 export type TodaySpendCardProps = {
   totalAmount: number;
@@ -54,14 +53,7 @@ export function TodaySpendCard({
         )}
       </View>
 
-      <Pressable
-        accessibilityRole="button"
-        onPress={onPressAdd}
-        style={({ pressed }) => [styles.cta, pressed ? styles.pressed : null]}
-      >
-        <Plus color={theme.color.amber[700]} size={18} strokeWidth={2.4} />
-        <Text style={styles.ctaText}>{addLabel}</Text>
-      </Pressable>
+      <PrimaryButton label={addLabel} onPress={onPressAdd} />
     </View>
   );
 }
@@ -71,7 +63,7 @@ const styles = StyleSheet.create({
     gap: theme.space[1],
   },
   additionalAmountText: {
-    color: theme.color.amber[700],
+    color: theme.color.textMuted,
     fontFamily: theme.font.family.semibold,
     fontSize: theme.font.size.caption,
     fontWeight: theme.font.weight.semibold,
@@ -81,28 +73,14 @@ const styles = StyleSheet.create({
     gap: theme.space[2],
   },
   card: {
-    backgroundColor: theme.color.accentSoft,
-    borderColor: theme.color.amber[100],
+    backgroundColor: theme.color.surface,
+    borderColor: theme.color.borderSubtle,
     borderRadius: theme.radius.xl,
     borderWidth: 1,
     gap: theme.space[4],
     padding: theme.space[5],
     width: '100%',
-  },
-  cta: {
-    alignItems: 'center',
-    backgroundColor: theme.color.amber[100],
-    borderRadius: theme.radius.lg,
-    flexDirection: 'row',
-    gap: theme.space[2],
-    height: theme.layout.controlH,
-    justifyContent: 'center',
-  },
-  ctaText: {
-    color: theme.color.amber[700],
-    fontFamily: theme.font.family.bold,
-    fontSize: theme.font.size.body,
-    fontWeight: theme.font.weight.bold,
+    ...theme.shadow.xs,
   },
   head: {
     alignItems: 'center',
@@ -110,17 +88,17 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   overline: {
-    color: theme.color.amber[700],
+    color: theme.color.textMuted,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.micro,
     fontWeight: theme.font.weight.bold,
     letterSpacing: 1,
   },
   paidByMeAmount: {
-    color: theme.color.amber[700],
+    color: theme.color.textStrong,
   },
   paidByMeLabel: {
-    color: theme.color.amber[700],
+    color: theme.color.textMuted,
     fontFamily: theme.font.family.regular,
     fontSize: theme.font.size.caption,
   },
@@ -128,9 +106,6 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
     flexDirection: 'row',
     gap: theme.space[2],
-  },
-  pressed: {
-    opacity: 0.72,
   },
   totalAmountLabel: {
     color: theme.color.textStrong,
