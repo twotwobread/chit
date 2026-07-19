@@ -40,6 +40,7 @@ i-um/
 - API contract: `packages/api-contract/openapi.yaml`.
 - DB schema changes: `apps/api/migrations/` and generated `apps/api/schema.sql`.
 - SQL queries: `apps/api/queries/` and generated `apps/api/internal/db/`.
+- Mobile brand/design: `docs/features/0341-chit-brand-design-system.md`.
 - Mobile design tokens: `apps/mobile/lib/design/theme.ts`.
 - Shared mobile primitives: `apps/mobile/lib/design/components.tsx`.
 - Decision records are history, not current implementation truth.
