@@ -1,6 +1,6 @@
 # i-um
 
-이음(i-um)은 여행 중 다음 일정과 지출을 한 흐름으로 이어주는 공동 여행 실행 앱입니다.
+칫 Chit(구 이음/i-um)은 여행 중 다음 일정과 지출·정산을 한 흐름으로 이어주는 공동 여행 실행 앱입니다.
 
 ## Monorepo Overview
 
@@ -22,6 +22,7 @@ packages/api-contract   OpenAPI contract and generated TypeScript client
 | API generated code | `apps/api/internal/openapi/`, `packages/api-contract/gen/ts/` |
 | DB | PostgreSQL, goose migrations, sqlc + pgx |
 | DB schema/query source | `apps/api/migrations/`, `apps/api/schema.sql`, `apps/api/queries/` |
+| Mobile brand/design | `docs/features/0341-chit-brand-design-system.md` |
 | Mobile design tokens | `apps/mobile/lib/design/theme.ts` |
 | Shared mobile primitives | `apps/mobile/lib/design/components.tsx` |
 | Agent workflow rules | `.pi/rules/` |
@@ -52,7 +53,7 @@ pnpm install
 
 ## Mobile UI
 
-모바일 UI 구현 규칙은 `.pi/rules/mobile-ui.md`, 토큰은 `apps/mobile/lib/design/theme.ts`, 공용 primitive는 `apps/mobile/lib/design/components.tsx`를 기준으로 합니다. 브랜드 에셋은 `apps/mobile/assets/brand/`에 있습니다.
+모바일 브랜드/디자인 기준은 `docs/features/0341-chit-brand-design-system.md`, 구현 규칙은 `.pi/rules/mobile-ui.md`, 토큰은 `apps/mobile/lib/design/theme.ts`, 공용 primitive는 `apps/mobile/lib/design/components.tsx`를 기준으로 합니다. 브랜드 에셋은 `apps/mobile/assets/brand/`에 있습니다.
 
 ## OpenAPI/codegen Workflow
 

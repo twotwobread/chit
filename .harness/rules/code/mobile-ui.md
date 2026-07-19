@@ -4,6 +4,7 @@ Use when changing Expo screens, mobile UI state, styling, copy, or navigation.
 
 ## Sources
 
+- Brand/design: `docs/features/0341-chit-brand-design-system.md`
 - Tokens: `apps/mobile/lib/design/theme.ts`
 - Shared primitives: `apps/mobile/lib/design/components.tsx`
 - Assets/fonts: `apps/mobile/assets/`
@@ -11,18 +12,21 @@ Use when changing Expo screens, mobile UI state, styling, copy, or navigation.
 ## Voice
 
 - Korean first.
-- Friendly polite tone.
-- Short and action-oriented.
+- Short, confident, and slightly 시크 for normal/product states.
+- Keep error/recovery copy clear and kind; do not make failure states sarcastic.
 - Show the next action before long state descriptions.
 - Do not use emoji or decorative unicode in product UI.
 - Money uses comma separators and Korean suffix by default: `18,500원`, `3,200엔`.
 
 ## Visual rules
 
-- Use warm, calm, high-readability mobile surfaces.
+- Use Chit `Paper Fintech` as the default app UI language: Paper background, White surfaces, Charcoal text, Acid Lime primary accents.
+- Reserve `Dark Acid` for app icon, splash, key visuals, settlement summary/complete hero moments, and other high-emphasis surfaces.
+- Use `Stamp Pop` only for onboarding, empty/completion states, campaign-like accents, or small receipt/stamp details.
 - Use theme tokens for color, spacing, radius, typography, and shadow.
 - Do not add raw hex colors in screen code.
 - External brand colors also need tokens before use.
+- Acid Lime is for primary CTA fill, large/key amounts, selected state, and success/complete emphasis; do not use it for long body text or danger/error states.
 - Credit/받을 돈 uses credit color and `+`; debit/보낼 돈 uses debit color and `−`.
 - Reuse shared Button/Card/ListRow/Badge/Chip patterns before duplicating styles.
 
