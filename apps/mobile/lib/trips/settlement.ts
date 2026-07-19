@@ -812,11 +812,9 @@ export function buildSettlementRequestMessage(
     return null;
   }
 
-  const detailLines = detailLink
-    ? [`최신 정산 상세: ${detailLink}`, '현재 여행 지출 기준으로 계산된 최신 정산이에요.']
-    : [];
+  const detailLines = detailLink ? [`최신 정산 상세: ${detailLink}`, '최신 지출 기준으로 다시 계산했어요.'] : [];
 
-  return [`[i-um] ${tripName} 정산 요청`, ...lines, ...detailLines, '확인 후 송금 부탁드려요.'].join('\n');
+  return [`[칫] ${tripName} 정산 요청`, ...lines, ...detailLines, '확인 후 송금 부탁드려요.'].join('\n');
 }
 
 export function buildKakaoSettlementRequestTemplate(message: string): TextTemplateType {

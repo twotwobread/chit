@@ -38,6 +38,13 @@ test('uses Chit icon metadata while keeping existing infrastructure identifiers 
   assert.equal(appConfig.expo.android?.adaptiveIcon?.backgroundColor, '#111315');
 });
 
+test('login entry screen uses the formal Chit brand name', () => {
+  const source = readMobileSourceText('app/login.tsx');
+
+  assert.match(source, />칫 Chit<\/Text>/);
+  assert.doesNotMatch(source, />이음<\/Text>/);
+});
+
 test('brand SVG assets use Chit stamp direction and remove the old i-um linked-ring mark', () => {
   const brandSvgs = ['logo-mark.svg', 'logo-wordmark.svg', 'logo-wordmark-dark.svg'];
 
@@ -67,6 +74,10 @@ test('app icon PNG assets are 1024 square Chit raster outputs', () => {
 });
 
 function readMobileAssetText(relativePath: string): string {
+  return readFileSync(new URL(`../../${relativePath}`, import.meta.url), 'utf8');
+}
+
+function readMobileSourceText(relativePath: string): string {
   return readFileSync(new URL(`../../${relativePath}`, import.meta.url), 'utf8');
 }
 
