@@ -3,7 +3,9 @@ import { describe, it } from 'node:test';
 
 import { scheduleTimeHourOptions } from '../places/place-schedule-detail';
 import {
+  DEFAULT_SCHEDULE_TIME_WHEEL_ITEM_HEIGHT,
   DEFAULT_SCHEDULE_TIME_WHEEL_VISIBLE_ITEMS,
+  buildScheduleTimeWheelLayout,
   buildScheduleTimeWheelOffset,
   buildScheduleTimeWheelSelectedIndex,
 } from './schedule-time-wheel-layout';
@@ -49,5 +51,22 @@ describe('schedule time wheel layout helpers', () => {
       360,
     );
     assert.equal(buildScheduleTimeWheelSelectedIndex({ itemHeight: 40, optionCount: 10, contentOffsetY: 360 }), 9);
+  });
+
+  it('grows wheel rows for larger font scales without breaking selected offset math', () => {
+    const layout = buildScheduleTimeWheelLayout({ fontScale: 1.5 });
+    const offset = buildScheduleTimeWheelOffset({
+      itemHeight: layout.itemHeight,
+      optionCount: 12,
+      selectedIndex: 5,
+      visibleItems: layout.visibleItems,
+    });
+
+    assert.ok(layout.itemHeight > DEFAULT_SCHEDULE_TIME_WHEEL_ITEM_HEIGHT);
+    assert.equal(layout.viewportHeight, layout.itemHeight * layout.visibleItems);
+    assert.equal(
+      buildScheduleTimeWheelSelectedIndex({ itemHeight: layout.itemHeight, optionCount: 12, contentOffsetY: offset }),
+      5,
+    );
   });
 });

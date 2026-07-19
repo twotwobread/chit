@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 import { theme } from '../design';
 import {
@@ -13,7 +13,6 @@ import {
 import { buildScheduleTimeEditorLayout } from '../trips/schedule-time-editor-layout';
 import { ScheduleTimeWheel } from './ScheduleTimeWheel';
 
-const timeEditorLayout = buildScheduleTimeEditorLayout();
 const endTimeDurationOptions = [
   { label: '+30분', minutes: 30 },
   { label: '+1시간', minutes: 60 },
@@ -36,6 +35,8 @@ export function ScheduleTimeEditor({
   values: ScheduleTimeEditorValues;
 }) {
   const [activeWheel, setActiveWheel] = useState<'start' | 'end' | null>(null);
+  const { fontScale, width } = useWindowDimensions();
+  const timeEditorLayout = buildScheduleTimeEditorLayout({ fontScale, width });
   const summary = buildScheduleTimeEditorSummary(values);
   const updateValues = (nextValues: ScheduleTimeEditorValues) => {
     onChange({ startTime: nextValues.startTime, endTime: nextValues.endTime });
@@ -77,6 +78,13 @@ export function ScheduleTimeEditor({
     setActiveWheel(null);
     updateValues(clearScheduleTimes(values));
   };
+  const segmentDynamicStyle = {
+    flexDirection: timeEditorLayout.segmentContentDirection,
+    gap: timeEditorLayout.segmentGap,
+    minHeight: timeEditorLayout.segmentMinHeight,
+    paddingHorizontal: timeEditorLayout.segmentHorizontalPadding,
+    paddingVertical: timeEditorLayout.segmentVerticalPadding,
+  } as const;
 
   return (
     <View style={styles.fieldGroup}>
@@ -89,36 +97,65 @@ export function ScheduleTimeEditor({
         ) : null}
       </View>
 
-      <View style={styles.timeCompactBox}>
-        <View style={styles.timeSegmentedControl}>
+      <View
+        style={[
+          styles.timeCompactBox,
+          { gap: timeEditorLayout.containerGap, padding: timeEditorLayout.containerPadding },
+        ]}
+      >
+        <View style={[styles.timeSegmentedControl, { minHeight: timeEditorLayout.segmentMinHeight }]}>
           <Pressable
-            accessibilityLabel="시작 시간 수정"
+            accessibilityLabel={`시작 시간 수정, 현재 ${summary.startLabel}`}
             accessibilityRole="button"
             disabled={disabled}
             onPress={openStartWheel}
-            style={[styles.timeSegment, activeWheel === 'start' ? styles.timeSegmentActive : null]}
+            style={[styles.timeSegment, segmentDynamicStyle, activeWheel === 'start' ? styles.timeSegmentActive : null]}
           >
-            <Text style={[styles.timeSegmentLabel, activeWheel === 'start' ? styles.timeSegmentLabelActive : null]}>
+            <Text
+              style={[
+                styles.timeSegmentLabel,
+                { lineHeight: timeEditorLayout.segmentLabelLineHeight },
+                activeWheel === 'start' ? styles.timeSegmentLabelActive : null,
+              ]}
+            >
               시작
             </Text>
-            <Text style={[styles.timeSegmentText, activeWheel === 'start' ? styles.timeSegmentTextActive : null]}>
+            <Text
+              style={[
+                styles.timeSegmentText,
+                { lineHeight: timeEditorLayout.segmentTextLineHeight },
+                activeWheel === 'start' ? styles.timeSegmentTextActive : null,
+              ]}
+            >
               {summary.startLabel}
             </Text>
           </Pressable>
-          <View style={styles.timeBridge}>
+          <View style={[styles.timeBridge, { width: timeEditorLayout.timeBridgeWidth }]}>
             <Text style={styles.timeArrow}>→</Text>
           </View>
           <Pressable
-            accessibilityLabel="종료 시간 수정"
+            accessibilityLabel={`종료 시간 수정, 현재 ${summary.endLabel}`}
             accessibilityRole="button"
             disabled={disabled}
             onPress={openEndWheel}
-            style={[styles.timeSegment, activeWheel === 'end' ? styles.timeSegmentActive : null]}
+            style={[styles.timeSegment, segmentDynamicStyle, activeWheel === 'end' ? styles.timeSegmentActive : null]}
           >
-            <Text style={[styles.timeSegmentLabel, activeWheel === 'end' ? styles.timeSegmentLabelActive : null]}>
+            <Text
+              style={[
+                styles.timeSegmentLabel,
+                { lineHeight: timeEditorLayout.segmentLabelLineHeight },
+                activeWheel === 'end' ? styles.timeSegmentLabelActive : null,
+              ]}
+            >
               종료
             </Text>
-            <Text style={[styles.timeSegmentText, activeWheel === 'end' ? styles.timeSegmentTextActive : null]}>
+            <Text
+              style={[
+                styles.timeSegmentText,
+                { lineHeight: timeEditorLayout.segmentTextLineHeight },
+                activeWheel === 'end' ? styles.timeSegmentTextActive : null,
+              ]}
+            >
               {summary.endLabel}
             </Text>
           </Pressable>
@@ -233,22 +270,13 @@ const styles = StyleSheet.create({
     borderLeftWidth: 1,
     borderRightWidth: 1,
     justifyContent: 'center',
-    width: theme.space[8],
   },
-  timeCompactBox: {
-    gap: timeEditorLayout.containerGap,
-    padding: timeEditorLayout.containerPadding,
-  },
+  timeCompactBox: {},
   timeSegment: {
     alignItems: 'center',
     backgroundColor: theme.color.surface,
     flex: 1,
-    flexDirection: timeEditorLayout.segmentContentDirection,
-    gap: timeEditorLayout.segmentGap,
     justifyContent: 'center',
-    minHeight: timeEditorLayout.segmentMinHeight,
-    paddingHorizontal: timeEditorLayout.segmentHorizontalPadding,
-    paddingVertical: timeEditorLayout.segmentVerticalPadding,
   },
   timeSegmentActive: {
     backgroundColor: theme.color.primarySoft,
@@ -260,7 +288,6 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.md,
     borderWidth: 1,
     flexDirection: 'row',
-    minHeight: timeEditorLayout.segmentMinHeight,
     overflow: 'hidden',
     width: '100%',
   },

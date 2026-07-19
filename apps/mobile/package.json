@@ -7,7 +7,7 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "test": "node --import tsx --test lib/trips/*.test.mts lib/flights/*.test.mts lib/places/*.test.mts lib/app-info/*.test.mts lib/auth/*.test.mts lib/navigation/*.test.mts lib/notifications/*.test.mts",
+    "test": "node --import tsx --test lib/design/*.test.mts lib/trip-ui/*.test.mts lib/trips/*.test.mts lib/flights/*.test.mts lib/places/*.test.mts lib/app-info/*.test.mts lib/auth/*.test.mts lib/navigation/*.test.mts lib/notifications/*.test.mts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint --max-warnings=0 \"app/**/*.{ts,tsx}\" \"lib/**/*.{ts,tsx,mts}\" app.config.ts babel.config.js metro.config.js eslint.config.js",
     "format": "prettier --write \"app/**/*.{ts,tsx}\" \"lib/**/*.{ts,tsx,mts}\" app.config.ts babel.config.js metro.config.js eslint.config.js app.json eas.json package.json tsconfig.json",

@@ -1,6 +1,16 @@
 import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View, type PressableProps, type StyleProp, type TextStyle } from 'react-native';
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+  type PressableProps,
+  type StyleProp,
+  type TextStyle,
+} from 'react-native';
 
+import { buildCriticalTextLayout, buildNonCriticalTextLayout, buildResponsiveLineHeight } from './responsive-text';
 import { theme } from './theme';
 
 type PlaceTypeKey = keyof typeof theme.placeType;
@@ -18,6 +28,7 @@ const BADGE_TONES: Record<BadgeTone, ToneColors> = {
 };
 
 export function Badge({
+  accessibilityLabel,
   label,
   tone = 'neutral',
   solid = false,
@@ -25,23 +36,46 @@ export function Badge({
   label: string;
   tone?: BadgeTone;
   solid?: boolean;
+  accessibilityLabel?: string;
 }) {
   const colors = BADGE_TONES[tone];
+  const { fontScale } = useWindowDimensions();
+  const lineHeight = buildResponsiveLineHeight({ fontSize: theme.font.size.micro, fontScale });
 
   return (
     <View style={[styles.badge, { backgroundColor: solid ? colors.fg : colors.bg }]}>
-      <Text style={[styles.badgeText, { color: solid ? theme.color.onPrimary : colors.fg }]}>{label}</Text>
+      <Text
+        accessibilityLabel={accessibilityLabel ?? label}
+        style={[styles.badgeText, { color: solid ? theme.color.onPrimary : colors.fg, lineHeight }]}
+      >
+        {label}
+      </Text>
     </View>
   );
 }
 
-export function Pill({ label, tone = 'neutral' }: { label: string; tone?: BadgeTone }) {
+export function Pill({
+  accessibilityLabel,
+  label,
+  tone = 'neutral',
+}: {
+  label: string;
+  tone?: BadgeTone;
+  accessibilityLabel?: string;
+}) {
   const colors = BADGE_TONES[tone];
+  const { fontScale } = useWindowDimensions();
+  const lineHeight = buildResponsiveLineHeight({ fontSize: theme.font.size.caption, fontScale });
 
   return (
     <View style={[styles.pill, { backgroundColor: colors.bg }]}>
       <View style={[styles.pillDot, { backgroundColor: colors.fg }]} />
-      <Text style={[styles.pillText, { color: colors.fg }]}>{label}</Text>
+      <Text
+        accessibilityLabel={accessibilityLabel ?? label}
+        style={[styles.pillText, { color: colors.fg, lineHeight }]}
+      >
+        {label}
+      </Text>
     </View>
   );
 }
@@ -57,6 +91,14 @@ export function Chip({
   leading?: ReactNode;
   onPress?: PressableProps['onPress'];
 }) {
+  const { fontScale } = useWindowDimensions();
+  const textLayout = buildCriticalTextLayout({
+    fontSize: theme.font.size.label,
+    fontScale,
+    minHeight: theme.layout.controlHSm,
+    verticalPadding: theme.space[2],
+  });
+
   return (
     <Pressable
       accessibilityLabel={label}
@@ -65,12 +107,15 @@ export function Chip({
       onPress={onPress}
       style={({ pressed }) => [
         styles.chip,
+        { minHeight: textLayout.minHeight },
         selected ? styles.chipSelected : styles.chipIdle,
         pressed ? styles.chipPressed : null,
       ]}
     >
       {leading}
-      <Text style={[styles.chipText, selected ? styles.chipTextSelected : null]}>{label}</Text>
+      <Text style={[styles.chipText, { lineHeight: textLayout.lineHeight }, selected ? styles.chipTextSelected : null]}>
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -90,7 +135,24 @@ const CURRENCY_SUFFIX: Record<string, string> = {
   KRW: '원',
 };
 
+export function formatAmountText({
+  currency = 'KRW',
+  tone = 'neutral',
+  value,
+}: {
+  value: number;
+  currency?: 'KRW' | 'JPY' | string;
+  tone?: AmountTone;
+}): string {
+  const sign = tone === 'credit' ? '+' : tone === 'debit' ? '−' : '';
+  const amount = Math.abs(Math.round(value)).toLocaleString('ko-KR');
+  const suffix = CURRENCY_SUFFIX[currency] ?? '';
+
+  return `${sign}${amount}${suffix}`;
+}
+
 export function AmountText({
+  accessibilityLabel,
   currency = 'KRW',
   size = 'md',
   style,
@@ -102,14 +164,21 @@ export function AmountText({
   tone?: AmountTone;
   size?: AmountSize;
   style?: StyleProp<TextStyle>;
+  accessibilityLabel?: string;
 }) {
-  const sign = tone === 'credit' ? '+' : tone === 'debit' ? '−' : '';
+  const { fontScale } = useWindowDimensions();
   const color = tone === 'credit' ? theme.color.credit : tone === 'debit' ? theme.color.debit : theme.color.textStrong;
-  const amount = Math.abs(Math.round(value)).toLocaleString('ko-KR');
-  const suffix = CURRENCY_SUFFIX[currency] ?? '';
+  const label = formatAmountText({ currency, tone, value });
+  const fontSize = AMOUNT_SIZE[size];
+  const lineHeight = buildResponsiveLineHeight({ fontSize, fontScale, leading: theme.font.leading.tight });
 
   return (
-    <Text style={[styles.amount, { color, fontSize: AMOUNT_SIZE[size] }, style]}>{`${sign}${amount}${suffix}`}</Text>
+    <Text
+      accessibilityLabel={accessibilityLabel ?? label}
+      style={[styles.amount, { color, fontSize, lineHeight }, style]}
+    >
+      {label}
+    </Text>
   );
 }
 
@@ -144,11 +213,13 @@ export function PlacePin({
 
 export function PlaceTag({ type }: { type: PlaceTypeKey }) {
   const place = theme.placeType[type];
+  const { fontScale } = useWindowDimensions();
+  const lineHeight = buildResponsiveLineHeight({ fontSize: theme.font.size.caption, fontScale });
 
   return (
     <View style={[styles.placeTag, { backgroundColor: tintColor(place.color) }]}>
       <View style={[styles.placeTagDot, { backgroundColor: place.color }]} />
-      <Text style={[styles.placeTagText, { color: place.color }]}>{place.label}</Text>
+      <Text style={[styles.placeTagText, { color: place.color, lineHeight }]}>{place.label}</Text>
     </View>
   );
 }
@@ -256,14 +327,36 @@ export function ListRow({
   onPress?: PressableProps['onPress'];
   first?: boolean;
 }) {
-  const rowStyle = [styles.listRow, first ? null : styles.listRowDivider];
+  const { fontScale } = useWindowDimensions();
+  const titleLayout = buildCriticalTextLayout({
+    fontSize: theme.font.size.body,
+    fontScale,
+    verticalPadding: theme.space[4],
+  });
+  const subtitleLayout = buildNonCriticalTextLayout({
+    fontSize: theme.font.size.caption,
+    fontScale,
+    maxLines: 2,
+  });
+  const rowStyle = [styles.listRow, { minHeight: titleLayout.minHeight }, first ? null : styles.listRowDivider];
   const content = (
     <>
       {leading}
       <View style={styles.listRowBody}>
-        {typeof title === 'string' ? <Text style={styles.listRowTitle}>{title}</Text> : title}
+        {typeof title === 'string' ? (
+          <Text style={[styles.listRowTitle, { lineHeight: titleLayout.lineHeight }]}>{title}</Text>
+        ) : (
+          title
+        )}
         {subtitle == null ? null : typeof subtitle === 'string' ? (
-          <Text style={styles.listRowSubtitle}>{subtitle}</Text>
+          <Text
+            accessibilityLabel={subtitle}
+            ellipsizeMode={subtitleLayout.ellipsizeMode}
+            numberOfLines={subtitleLayout.numberOfLines}
+            style={[styles.listRowSubtitle, { lineHeight: subtitleLayout.lineHeight }]}
+          >
+            {subtitle}
+          </Text>
         ) : (
           subtitle
         )}
@@ -300,6 +393,14 @@ export function SegmentedControl({
   dark?: boolean;
   disabledOptions?: string[];
 }) {
+  const { fontScale } = useWindowDimensions();
+  const textLayout = buildCriticalTextLayout({
+    fontSize: theme.font.size.label,
+    fontScale,
+    minHeight: theme.layout.tapMin,
+    verticalPadding: theme.space[3],
+  });
+
   return (
     <View style={[styles.segment, dark ? styles.segmentDark : null]}>
       {options.map((option) => {
@@ -316,6 +417,7 @@ export function SegmentedControl({
             onPress={() => onChange(option)}
             style={[
               styles.segmentItem,
+              { minHeight: textLayout.minHeight },
               active ? (dark ? styles.segmentItemActiveDark : styles.segmentItemActive) : null,
               disabled ? styles.segmentItemDisabled : null,
             ]}
@@ -323,6 +425,7 @@ export function SegmentedControl({
             <Text
               style={[
                 styles.segmentText,
+                { lineHeight: textLayout.lineHeight },
                 dark ? styles.segmentTextDark : null,
                 active ? (dark ? styles.segmentTextActiveDark : styles.segmentTextActive) : null,
                 disabled ? styles.segmentTextDisabled : null,
@@ -339,6 +442,7 @@ export function SegmentedControl({
 
 const styles = StyleSheet.create({
   amount: {
+    flexShrink: 0,
     fontFamily: theme.font.family.bold,
     fontVariant: ['tabular-nums'],
     fontWeight: theme.font.weight.bold,
@@ -370,10 +474,12 @@ const styles = StyleSheet.create({
   badge: {
     alignSelf: 'flex-start',
     borderRadius: theme.radius.pill,
+    maxWidth: '100%',
     paddingHorizontal: theme.space[3],
     paddingVertical: theme.space[1] + 1,
   },
   badgeText: {
+    flexShrink: 1,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.micro,
     fontWeight: theme.font.weight.bold,
@@ -383,9 +489,11 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.pill,
     borderWidth: 1.5,
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: theme.space[2],
-    height: theme.layout.controlHSm,
+    justifyContent: 'center',
     paddingHorizontal: theme.space[4],
+    paddingVertical: theme.space[2],
   },
   chipIdle: {
     backgroundColor: theme.color.surface,
@@ -401,9 +509,11 @@ const styles = StyleSheet.create({
   },
   chipText: {
     color: theme.color.textBody,
+    flexShrink: 1,
     fontFamily: theme.font.family.semibold,
     fontSize: theme.font.size.label,
     fontWeight: theme.font.weight.semibold,
+    textAlign: 'center',
   },
   chipTextSelected: {
     color: theme.color.onPrimary,
@@ -413,13 +523,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     gap: theme.space[4],
-    minHeight: theme.layout.tapMin,
     paddingHorizontal: theme.space[5],
     paddingVertical: theme.space[4],
   },
   listRowBody: {
     flex: 1,
     gap: 2,
+    minWidth: 0,
   },
   listRowDivider: {
     borderTopColor: theme.color.borderSubtle,
@@ -444,7 +554,9 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     borderRadius: theme.radius.pill,
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: theme.space[2],
+    maxWidth: '100%',
     paddingHorizontal: theme.space[4],
     paddingVertical: theme.space[2] + 1,
   },
@@ -454,6 +566,7 @@ const styles = StyleSheet.create({
     width: 7,
   },
   pillText: {
+    flexShrink: 1,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.caption,
     fontWeight: theme.font.weight.bold,
@@ -472,7 +585,9 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     borderRadius: theme.radius.pill,
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: theme.space[2],
+    maxWidth: '100%',
     paddingHorizontal: theme.space[3],
     paddingVertical: theme.space[2],
   },
@@ -482,6 +597,7 @@ const styles = StyleSheet.create({
     width: 6,
   },
   placeTagText: {
+    flexShrink: 1,
     fontFamily: theme.font.family.semibold,
     fontSize: theme.font.size.caption,
     fontWeight: theme.font.weight.semibold,
@@ -502,6 +618,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     minHeight: theme.layout.tapMin,
+    paddingHorizontal: theme.space[2],
     paddingVertical: theme.space[3],
   },
   segmentItemActive: {
@@ -516,9 +633,11 @@ const styles = StyleSheet.create({
   },
   segmentText: {
     color: theme.color.textMuted,
+    flexShrink: 1,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.label,
     fontWeight: theme.font.weight.bold,
+    textAlign: 'center',
   },
   segmentTextActive: {
     color: theme.color.onPrimary,
