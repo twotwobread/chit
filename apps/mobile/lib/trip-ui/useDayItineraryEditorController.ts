@@ -32,7 +32,10 @@ import {
   dayItineraryFailureState,
   type DayItineraryRowViewModel,
 } from '../trips/day-itinerary';
-import { buildDayItineraryAddPlaceSearchRoute } from '../trips/day-itinerary-add-place-navigation';
+import {
+  buildDayItineraryAddPlaceSearchRoute,
+  dayItineraryLodgingInitialActionValue,
+} from '../trips/day-itinerary-add-place-navigation';
 import { resolveMapProvider } from '../trips/map-provider';
 import { tripItineraryDayPath, tripItineraryPath } from '../trips/routes';
 import { getTripDayItinerary, moveScheduleItemToDay } from '../trips/itinerary-api';
@@ -510,6 +513,11 @@ export function useDayItineraryEditorController({
     if (initialAction === 'reorder') {
       handledInitialActionRef.current = initialAction;
       beginReorder(state.viewModel);
+      return;
+    }
+    if (initialAction === dayItineraryLodgingInitialActionValue) {
+      handledInitialActionRef.current = initialAction;
+      requestContentFocus({ kind: 'lodgingPanel' });
     }
     // The entry functions intentionally use latest local state setters and are recreated per render.
     // eslint-disable-next-line react-hooks/exhaustive-deps

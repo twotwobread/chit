@@ -14,6 +14,7 @@ import { styles } from './DayItineraryEditorStyles';
 import type { DayItineraryLodgingPickerState, DayItineraryLodgingState } from './DayItineraryEditorTypes';
 
 export function DayLodgingPanel({
+  highlighted = false,
   isSheetVisible,
   lodgingState,
   onCancelPicker,
@@ -21,12 +22,13 @@ export function DayLodgingPanel({
   onCloseSheet,
   onCopyAddress,
   onOpenSearchRegister,
-  onOpenSelection,
   onOpenSheet,
+  onSummaryRef,
   onSelectPlace,
   pickerState,
   viewModel,
 }: {
+  highlighted?: boolean;
   isSheetVisible: boolean;
   lodgingState: DayItineraryLodgingState;
   pickerState: DayItineraryLodgingPickerState;
@@ -36,8 +38,8 @@ export function DayLodgingPanel({
   onCloseSheet: () => void;
   onCopyAddress: () => void;
   onOpenSearchRegister: () => void;
-  onOpenSelection: () => void;
   onOpenSheet: () => void;
+  onSummaryRef?: (node: View | null) => void;
   onSelectPlace: (option: DayLodgingPlaceOptionViewModel) => void;
 }) {
   const isMutating = lodgingState.status === 'setting' || lodgingState.status === 'clearing';
@@ -58,7 +60,12 @@ export function DayLodgingPanel({
 
   return (
     <>
-      <Pressable accessibilityRole="button" onPress={onOpenSheet} style={styles.lodgingSummary}>
+      <Pressable
+        ref={onSummaryRef}
+        accessibilityRole="button"
+        onPress={viewModel.sheet.placeName ? onOpenSheet : onOpenSearchRegister}
+        style={[styles.lodgingSummary, highlighted ? styles.lodgingSummaryHighlighted : null]}
+      >
         <View style={styles.lodgingSummaryTextGroup}>
           <Text style={styles.lodgingSummaryLabel}>{viewModel.summary.label}</Text>
           <Text numberOfLines={1} style={styles.lodgingSummaryName}>
@@ -129,7 +136,7 @@ export function DayLodgingPanel({
                   accessibilityRole="button"
                   disabled={isBusy}
                   key={action.kind}
-                  onPress={action.kind === 'change' ? onOpenSelection : onOpenSearchRegister}
+                  onPress={onOpenSearchRegister}
                   style={[
                     styles.secondaryButton,
                     styles.lodgingSheetActionButton,

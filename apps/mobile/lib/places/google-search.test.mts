@@ -29,6 +29,7 @@ import {
   buildGooglePlaceSearchResultsRegion,
   buildGooglePlaceSearchRoute,
   buildGooglePlaceSearchSheetBookmarkListState,
+  buildGooglePlaceSearchSheetLodgingListState,
   buildGooglePlaceSearchSheetIndex,
   buildGooglePlaceSearchSheetMetrics,
   buildGooglePlaceSearchSheetSnapPoints,
@@ -101,23 +102,24 @@ describe('google place search helpers', () => {
     });
   });
 
-  it('builds search-result and bookmark tabs with bookmark selection switching the active tab', () => {
-    assert.deepEqual(buildGooglePlaceSearchSheetTabs('searchResults'), [
-      {
-        id: 'searchResults',
-        label: '검색 결과',
-        accessibilityLabel: '검색 결과 탭 선택됨',
-        selected: true,
-      },
+  it('builds bookmark and lodging tabs while search results stay outside the tab model', () => {
+    assert.deepEqual(buildGooglePlaceSearchSheetTabs('bookmarks'), [
       {
         id: 'bookmarks',
         label: '찜한 장소',
-        accessibilityLabel: '찜한 장소 탭 선택',
+        accessibilityLabel: '찜한 장소 탭 선택됨',
+        selected: true,
+      },
+      {
+        id: 'lodging',
+        label: '내 숙소',
+        accessibilityLabel: '내 숙소 탭 선택',
         selected: false,
       },
     ]);
-    assert.equal(resolveGooglePlaceSearchSheetTab('searchResults', 'search'), 'searchResults');
+    assert.equal(resolveGooglePlaceSearchSheetTab('bookmarks', 'search'), 'searchResults');
     assert.equal(resolveGooglePlaceSearchSheetTab('searchResults', 'bookmark'), 'bookmarks');
+    assert.equal(resolveGooglePlaceSearchSheetTab('bookmarks', 'lodging'), 'lodging');
     assert.equal(resolveGooglePlaceSearchSheetTab('bookmarks', null), 'bookmarks');
   });
 
@@ -133,8 +135,14 @@ describe('google place search helpers', () => {
 
     assert.deepEqual(buildGooglePlaceSearchSheetBookmarkListState([]), {
       status: 'empty',
-      title: '찜한 장소가 없어요.',
-      helper: '여행 중 가보고 싶은 장소를 찜하면 여기에서 바로 볼 수 있어요.',
+      title: '찜한 장소',
+      helper: null,
+      results: [],
+    });
+    assert.deepEqual(buildGooglePlaceSearchSheetLodgingListState([]), {
+      status: 'empty',
+      title: '내 숙소',
+      helper: null,
       results: [],
     });
     assert.deepEqual(buildGooglePlaceSearchSheetBookmarkListState([bookmarkResult]), {
@@ -151,6 +159,18 @@ describe('google place search helpers', () => {
       result: bookmarkResult,
       source: 'bookmark',
     });
+    assert.deepEqual(
+      resolveGooglePlaceSearchMarkerSelection(
+        'google-3',
+        [searchResult],
+        [bookmarkResult],
+        [{ id: 'google-3', placeName: '호텔', address: 'Namba', typeHint: '숙소' }],
+      ),
+      {
+        result: { id: 'google-3', placeName: '호텔', address: 'Namba', typeHint: '숙소' },
+        source: 'lodging',
+      },
+    );
     assert.equal(resolveGooglePlaceSearchMarkerSelection('missing', [searchResult], [bookmarkResult]), null);
   });
 
@@ -318,7 +338,7 @@ describe('google place search helpers', () => {
         result,
         selectedBatchPlaceIds: ['google-1'],
       }).primaryAction,
-      { disabled: true, isLoading: false, label: '선택됨', loadingLabel: '추가 중...' },
+      { isLoading: false, label: '선택됨', loadingLabel: '추가 중...' },
     );
     assert.deepEqual(
       buildGooglePlaceSearchResultActionView({ addState: idleGooglePlaceAddState(), mode: 'scheduleSelect', result }),

@@ -41,7 +41,10 @@ export type DayItineraryReorderState =
       error?: { title: string; helper: string };
     };
 
-export type DayItineraryContentFocusTarget = DayItineraryDeleteFocusTarget | { kind: 'deleteTrigger'; itemId: string };
+export type DayItineraryContentFocusTarget =
+  | DayItineraryDeleteFocusTarget
+  | { kind: 'deleteTrigger'; itemId: string }
+  | { kind: 'lodgingPanel' };
 
 export type DayItineraryContentFocusRequest = {
   id: number;

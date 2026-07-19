@@ -216,9 +216,8 @@ export function buildDayLodgingManagementActions(
   if (sheet.changeAction) {
     actions.push({ kind: 'change', label: sheet.changeAction });
   } else {
-    actions.push({ kind: 'change', label: sheet.selectExistingAction });
+    actions.push({ kind: 'searchRegister', label: sheet.manualRegisterAction });
   }
-  actions.push({ kind: 'searchRegister', label: sheet.manualRegisterAction });
 
   return actions;
 }

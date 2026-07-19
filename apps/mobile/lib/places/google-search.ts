@@ -69,7 +69,7 @@ export type GooglePlaceSearchMarkerIconName =
   | 'map-pin';
 
 export type GooglePlaceSearchMarkerEmphasis = 'normal' | 'focused';
-export type GooglePlaceSearchMarkerVariant = 'search' | 'bookmark';
+export type GooglePlaceSearchMarkerVariant = 'search' | 'bookmark' | 'lodging';
 export type GooglePlaceSearchSelectionSource = GooglePlaceSearchMarkerVariant;
 
 export type GooglePlaceMapCoordinate = { latitude: number; longitude: number };
@@ -156,7 +156,7 @@ export type GooglePlaceDetailsViewState =
   | { status: 'error'; googlePlaceId: string; message: string };
 
 export type GooglePlaceSearchSheetState = 'minimized' | 'expanded' | 'full';
-export type GooglePlaceSearchSheetTab = 'searchResults' | 'bookmarks';
+export type GooglePlaceSearchSheetTab = 'searchResults' | 'bookmarks' | 'lodging';
 
 export type GooglePlaceSearchFirstEntryLayoutState = {
   searchBarVisible: boolean;
@@ -171,11 +171,11 @@ export type GooglePlaceSearchSheetTabViewModel = {
   selected: boolean;
 };
 
-export type GooglePlaceSearchBookmarkListState =
+export type GooglePlaceSearchCandidateListState =
   | {
       status: 'empty';
       title: string;
-      helper: string;
+      helper: string | null;
       results: [];
     }
   | {
@@ -184,6 +184,9 @@ export type GooglePlaceSearchBookmarkListState =
       helper: null;
       results: GooglePlaceSearchRowViewModel[];
     };
+
+export type GooglePlaceSearchBookmarkListState = GooglePlaceSearchCandidateListState;
+export type GooglePlaceSearchLodgingListState = GooglePlaceSearchCandidateListState;
 
 export type GooglePlaceSearchMarkerSelection = {
   result: GooglePlaceSearchRowViewModel;
@@ -356,16 +359,16 @@ export function buildGooglePlaceSearchSheetTabs(
 ): GooglePlaceSearchSheetTabViewModel[] {
   return [
     {
-      id: 'searchResults',
-      label: '검색 결과',
-      accessibilityLabel: `검색 결과 탭 ${selectedTab === 'searchResults' ? '선택됨' : '선택'}`,
-      selected: selectedTab === 'searchResults',
-    },
-    {
       id: 'bookmarks',
       label: '찜한 장소',
       accessibilityLabel: `찜한 장소 탭 ${selectedTab === 'bookmarks' ? '선택됨' : '선택'}`,
       selected: selectedTab === 'bookmarks',
+    },
+    {
+      id: 'lodging',
+      label: '내 숙소',
+      accessibilityLabel: `내 숙소 탭 ${selectedTab === 'lodging' ? '선택됨' : '선택'}`,
+      selected: selectedTab === 'lodging',
     },
   ];
 }
@@ -380,25 +383,41 @@ export function resolveGooglePlaceSearchSheetTab(
   if (selectionSource === 'bookmark') {
     return 'bookmarks';
   }
+  if (selectionSource === 'lodging') {
+    return 'lodging';
+  }
   return current;
 }
 
 export function buildGooglePlaceSearchSheetBookmarkListState(
   bookmarkResults: GooglePlaceSearchRowViewModel[],
 ): GooglePlaceSearchBookmarkListState {
-  if (bookmarkResults.length === 0) {
+  return buildGooglePlaceSearchCandidateListState(bookmarkResults, '찜한 장소');
+}
+
+export function buildGooglePlaceSearchSheetLodgingListState(
+  lodgingResults: GooglePlaceSearchRowViewModel[],
+): GooglePlaceSearchLodgingListState {
+  return buildGooglePlaceSearchCandidateListState(lodgingResults, '내 숙소');
+}
+
+function buildGooglePlaceSearchCandidateListState(
+  results: GooglePlaceSearchRowViewModel[],
+  title: string,
+): GooglePlaceSearchCandidateListState {
+  if (results.length === 0) {
     return {
       status: 'empty',
-      title: '찜한 장소가 없어요.',
-      helper: '여행 중 가보고 싶은 장소를 찜하면 여기에서 바로 볼 수 있어요.',
+      title,
+      helper: null,
       results: [],
     };
   }
   return {
     status: 'results',
-    title: '찜한 장소',
+    title,
     helper: null,
-    results: bookmarkResults,
+    results,
   };
 }
 
@@ -406,6 +425,7 @@ export function resolveGooglePlaceSearchMarkerSelection(
   markerId: string,
   searchResults: GooglePlaceSearchRowViewModel[],
   bookmarkResults: GooglePlaceSearchRowViewModel[],
+  lodgingResults: GooglePlaceSearchRowViewModel[] = [],
 ): GooglePlaceSearchMarkerSelection | null {
   const searchResult = searchResults.find((candidate) => candidate.id === markerId);
   if (searchResult) {
@@ -414,6 +434,10 @@ export function resolveGooglePlaceSearchMarkerSelection(
   const bookmarkResult = bookmarkResults.find((candidate) => candidate.id === markerId);
   if (bookmarkResult) {
     return { result: bookmarkResult, source: 'bookmark' };
+  }
+  const lodgingResult = lodgingResults.find((candidate) => candidate.id === markerId);
+  if (lodgingResult) {
+    return { result: lodgingResult, source: 'lodging' };
   }
   return null;
 }
@@ -550,7 +574,7 @@ export function buildGooglePlaceSearchResultActionView({
       isLoading,
       label,
       loadingLabel,
-      ...(isAlreadyBookmarked || isSelectedForBatch ? { disabled: true } : {}),
+      ...(isAlreadyBookmarked ? { disabled: true } : {}),
     },
   };
 }

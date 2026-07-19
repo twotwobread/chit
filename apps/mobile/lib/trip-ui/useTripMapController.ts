@@ -6,17 +6,27 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { isApiStatus, isMobileAuthSessionError } from '../auth/errors';
 import type { RouteMapPlace, RouteMapPolyline } from './RouteMap';
 import type { GetDayScheduleItemsResponse, TripDay } from '@i-um/api-contract';
-import { createGoogleTripPlaceBookmark, deleteTripPlaceBookmark, listTripPlaceBookmarks } from '../places/client';
+import {
+  createGooglePlaceScheduleItemsBatch,
+  createGoogleTripPlaceBookmark,
+  deleteTripPlaceBookmark,
+  listTripPlaceBookmarks,
+} from '../places/client';
 import { tripPlaceBookmarkToGoogleSearchRow } from '../places/bookmarks';
 import {
   addingGooglePlaceState,
+  buildCreateGooglePlaceScheduleItemsBatchRequest,
   errorGooglePlaceAddState,
+  googlePlaceAddFailureMessage,
   idleGooglePlaceAddState,
+  removeGooglePlaceScheduleBatchSelection,
+  toggleGooglePlaceScheduleBatchSelection,
   type GooglePlaceAddViewState,
   type GooglePlaceSearchRowViewModel,
   type GooglePlaceTripDestination,
 } from '../places/google-search';
 import { listTripScheduleItems } from '../trips/itinerary-api';
+import { getTripDetail } from '../trips/trip-api';
 import { beginStaleWhileRevalidate, resolveStaleWhileRevalidateFailure } from '../trips/stale-refresh';
 import { resolveTripShellDetail } from '../trips/trip-shell-detail';
 import { useTripShellState } from '../trips/trip-shell-context';
@@ -29,7 +39,9 @@ import {
 import { localDateString } from '../trips/status';
 import {
   buildTripItinerariesFromTripScheduleItems,
+  buildTripMapDayChips,
   buildTripMapDayRoutes,
+  buildTripMapLodgingResults,
   buildTripMapRouteLayerChips,
   buildTripMapRouteLayerViewModel,
   buildTripMapScheduleMarkerDetail,
@@ -37,7 +49,7 @@ import {
   resolveTripMapBookmarkRefreshFailure,
   resolveTripMapSelectedDay,
   toggleTripMapRouteLayer,
-  tripMapRouteLayerChipId,
+  tripMapRouteLayerChipIds,
   type TripMapDayRoute,
   type TripMapRouteLayerChipId,
   type TripMapRouteLayerSelection,
@@ -53,13 +65,15 @@ export type TripMapState =
       allBookmarkResults: GooglePlaceSearchRowViewModel[];
       bookmarkLayerVisible: boolean;
       dayRoutes: TripMapDayRoute[];
+      lodgingResults: GooglePlaceSearchRowViewModel[];
       mapPlaces: RouteMapPlace[];
       routeChips: ReturnType<typeof buildTripMapRouteLayerChips>;
       routeLayer: TripMapRouteLayerSelection;
       routeNotice: TripMapRouteNotice | null;
       routePolylines: RouteMapPolyline[];
+      scheduleTargetDayChips: ReturnType<typeof buildTripMapDayChips>;
       selectedDayId: string;
-      selectedRouteLayerChipId: TripMapRouteLayerChipId | null;
+      selectedRouteLayerChipIds: TripMapRouteLayerChipId[];
       tripDestinations: GooglePlaceTripDestination[];
       selectedRoutePlaceId: string | null;
       scheduleMarkerDetail: TripMapScheduleMarkerDetail | null;
@@ -83,6 +97,9 @@ export function useTripMapController() {
   const [state, setState] = useState<TripMapState>({ status: 'loading' });
   const [feedback, setFeedback] = useState<DayItineraryMapActionFeedback | null>(null);
   const [bookmarkActionState, setBookmarkActionState] = useState<GooglePlaceAddViewState>(idleGooglePlaceAddState());
+  const [scheduleAddState, setScheduleAddState] = useState<GooglePlaceAddViewState>(idleGooglePlaceAddState());
+  const [selectedScheduleResults, setSelectedScheduleResults] = useState<GooglePlaceSearchRowViewModel[]>([]);
+  const [scheduleFeedbackMessage, setScheduleFeedbackMessage] = useState<string | null>(null);
 
   const load = useCallback(
     async (preferredDayId: string | null = selectedDayIdRef.current) => {
@@ -110,7 +127,18 @@ export function useTripMapController() {
       }
 
       try {
-        const detail = shellDetail.detail;
+        const [detailResult, scheduleResult, bookmarkResult] = await Promise.allSettled([
+          getTripDetail(tripId),
+          listTripScheduleItems(tripId),
+          listTripPlaceBookmarks(tripId),
+        ] as const);
+        if (detailResult.status === 'rejected') {
+          throw detailResult.reason;
+        }
+        if (scheduleResult.status === 'rejected') {
+          throw scheduleResult.reason;
+        }
+        const detail = detailResult.value;
         const selectedDay = resolveTripMapSelectedDay({
           days: detail.days,
           preferredDayId,
@@ -120,14 +148,6 @@ export function useTripMapController() {
           selectedDayIdRef.current = null;
           setState({ status: 'unavailable', viewModel: buildTripTabUnavailableViewModel('map', tripId) });
           return;
-        }
-
-        const [scheduleResult, bookmarkResult] = await Promise.allSettled([
-          listTripScheduleItems(tripId),
-          listTripPlaceBookmarks(tripId),
-        ] as const);
-        if (scheduleResult.status === 'rejected') {
-          throw scheduleResult.reason;
         }
         let allBookmarkResults = allBookmarkResultsRef.current;
         if (bookmarkResult.status === 'fulfilled') {
@@ -164,13 +184,15 @@ export function useTripMapController() {
           allBookmarkResults,
           bookmarkLayerVisible: bookmarkLayerVisibleRef.current,
           dayRoutes,
+          lodgingResults: buildTripMapLodgingResults(detail.days),
           mapPlaces: routeViewModel.places,
           routeChips: buildTripMapRouteLayerChips(detail.days),
           routeLayer,
           routeNotice: routeViewModel.notice,
           routePolylines: routeViewModel.polylines,
+          scheduleTargetDayChips: buildTripMapDayChips(detail.days),
           selectedDayId: selectedDay.id,
-          selectedRouteLayerChipId: tripMapRouteLayerChipId(routeLayer),
+          selectedRouteLayerChipIds: tripMapRouteLayerChipIds(routeLayer),
           selectedRoutePlaceId,
           tripDestinations: detail.trip.destinations,
           scheduleMarkerDetail: buildTripMapScheduleMarkerDetail(viewModel, selectedRoutePlaceId),
@@ -205,9 +227,7 @@ export function useTripMapController() {
 
       const routeLayer = toggleTripMapRouteLayer(current.routeLayer, chipId);
       const routeViewModel = buildTripMapRouteLayerViewModel(current.dayRoutes, routeLayer);
-      const selectedDayId = routeLayer.kind === 'day' ? routeLayer.dayId : current.selectedDayId;
       routeLayerRef.current = routeLayer;
-      selectedDayIdRef.current = selectedDayId;
 
       return {
         ...current,
@@ -215,8 +235,7 @@ export function useTripMapController() {
         routeLayer,
         routeNotice: routeViewModel.notice,
         routePolylines: routeViewModel.polylines,
-        selectedDayId,
-        selectedRouteLayerChipId: tripMapRouteLayerChipId(routeLayer),
+        selectedRouteLayerChipIds: tripMapRouteLayerChipIds(routeLayer),
         selectedRoutePlaceId: null,
         scheduleMarkerDetail: null,
       };
@@ -268,6 +287,64 @@ export function useTripMapController() {
   const resetBookmarkActionState = useCallback(() => {
     setBookmarkActionState(idleGooglePlaceAddState());
   }, []);
+
+  const resetScheduleAddState = useCallback(() => {
+    setScheduleAddState(idleGooglePlaceAddState());
+    setScheduleFeedbackMessage(null);
+  }, []);
+
+  const selectScheduleResult = useCallback(
+    (result: GooglePlaceSearchRowViewModel) => {
+      if (scheduleAddState.status === 'adding') {
+        return;
+      }
+      const update = toggleGooglePlaceScheduleBatchSelection(selectedScheduleResults, result);
+      setSelectedScheduleResults(update.selectedResults);
+      setScheduleFeedbackMessage(update.message);
+      setScheduleAddState(idleGooglePlaceAddState());
+    },
+    [scheduleAddState.status, selectedScheduleResults],
+  );
+
+  const removeScheduleResult = useCallback(
+    (googlePlaceId: string) => {
+      if (scheduleAddState.status === 'adding') {
+        return;
+      }
+      setSelectedScheduleResults(removeGooglePlaceScheduleBatchSelection(selectedScheduleResults, googlePlaceId));
+      setScheduleFeedbackMessage(null);
+      setScheduleAddState(idleGooglePlaceAddState());
+    },
+    [scheduleAddState.status, selectedScheduleResults],
+  );
+
+  const submitScheduleBatch = useCallback(
+    async (targetDayId: string) => {
+      if (!tripId || scheduleAddState.status === 'adding' || selectedScheduleResults.length === 0) {
+        return;
+      }
+      setScheduleAddState(addingGooglePlaceState('batch'));
+      setScheduleFeedbackMessage(null);
+      try {
+        await createGooglePlaceScheduleItemsBatch(
+          tripId,
+          targetDayId,
+          buildCreateGooglePlaceScheduleItemsBatchRequest(selectedScheduleResults),
+        );
+        setSelectedScheduleResults([]);
+        setScheduleAddState(idleGooglePlaceAddState());
+        await load(targetDayId);
+      } catch (error) {
+        if (isMobileAuthSessionError(error) || isApiStatus(error, 401)) {
+          router.replace('/login');
+          return;
+        }
+        setScheduleFeedbackMessage(googlePlaceAddFailureMessage);
+        setScheduleAddState(idleGooglePlaceAddState());
+      }
+    },
+    [load, scheduleAddState.status, selectedScheduleResults, tripId],
+  );
 
   const createBookmark = useCallback(
     async (result: GooglePlaceSearchRowViewModel) => {
@@ -341,9 +418,16 @@ export function useTripMapController() {
     goLogin,
     load,
     openMap,
+    removeScheduleResult,
     resetBookmarkActionState,
+    resetScheduleAddState,
+    scheduleAddState,
+    scheduleFeedbackMessage,
     selectRoutePlace,
+    selectScheduleResult,
+    selectedScheduleResults,
     state,
+    submitScheduleBatch,
     toggleBookmarkLayer,
     toggleRouteLayer,
     tripId,
@@ -354,10 +438,12 @@ function resolveAvailableRouteLayer(
   routeLayer: TripMapRouteLayerSelection,
   dayRoutes: TripMapDayRoute[],
 ): TripMapRouteLayerSelection {
-  if (routeLayer.kind !== 'day') {
+  if (routeLayer.kind !== 'days') {
     return routeLayer;
   }
-  return dayRoutes.some((route) => route.dayId === routeLayer.dayId) ? routeLayer : emptyTripMapRouteLayerSelection;
+  const availableDayIds = new Set(dayRoutes.map((route) => route.dayId));
+  const dayIds = routeLayer.dayIds.filter((dayId) => availableDayIds.has(dayId));
+  return dayIds.length > 0 ? { dayIds, kind: 'days' } : emptyTripMapRouteLayerSelection;
 }
 
 function resolveSelectedItinerary(

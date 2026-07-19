@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 
 import {
   buildDayItineraryAddPlaceSearchRoute,
+  buildDayItineraryLodgingManagementRoute,
   buildDayItineraryLodgingPlaceSearchRoute,
   isDayItineraryAddPlaceReturnToDay,
   resolveDayItineraryAddPlaceReturnNavigation,
@@ -30,6 +31,13 @@ describe('day itinerary add-place navigation helpers', () => {
     assert.equal(
       buildDayItineraryLodgingPlaceSearchRoute(tripId, date),
       `/trips/${tripId}/days/${date}/place-search?returnTo=itinerary-tab&mode=lodging`,
+    );
+  });
+
+  it('builds the itinerary lodging management route for empty lodging CTAs', () => {
+    assert.equal(
+      buildDayItineraryLodgingManagementRoute(tripId, date),
+      `/trips/${tripId}/itinerary?dayId=${date}&initialAction=lodging`,
     );
   });
 

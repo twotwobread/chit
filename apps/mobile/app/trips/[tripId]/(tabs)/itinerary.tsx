@@ -24,12 +24,18 @@ type ItineraryState =
   | { status: 'error' };
 
 export default function TripItineraryTabScreen() {
-  const { tripId: tripIdParam, dayId: dayIdParam } = useLocalSearchParams<{
+  const {
+    tripId: tripIdParam,
+    dayId: dayIdParam,
+    initialAction: initialActionParam,
+  } = useLocalSearchParams<{
     tripId?: string | string[];
     dayId?: string | string[];
+    initialAction?: string | string[];
   }>();
   const tripId = Array.isArray(tripIdParam) ? tripIdParam[0] : tripIdParam;
   const routeDayId = Array.isArray(dayIdParam) ? dayIdParam[0] : dayIdParam;
+  const initialAction = Array.isArray(initialActionParam) ? initialActionParam[0] : initialActionParam;
   const shellState = useTripShellState();
   const selectedDayIdRef = useRef<string | null>(null);
   const [state, setState] = useState<ItineraryState>({ status: 'loading' });
@@ -93,6 +99,7 @@ export default function TripItineraryTabScreen() {
       <DayItineraryEditor
         date={state.selectedDay.id}
         headerContent={<DayChips days={state.dayChips} selectedDayId={state.selectedDay.id} onSelectDay={selectDay} />}
+        initialAction={initialAction}
         key={state.selectedDay.id}
         onRequestDayChange={selectDay}
         showHeader={false}

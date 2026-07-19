@@ -7,9 +7,16 @@ const placeSearchSource = readFileSync(
   'utf8',
 );
 const mapSearchSource = readFileSync(new URL('../trip-ui/GooglePlaceMapSearch.tsx', import.meta.url), 'utf8');
+const googleSearchSource = readFileSync(new URL('../places/google-search.ts', import.meta.url), 'utf8');
 const tripMapPartsSource = readFileSync(new URL('../trip-ui/TripMapScreenParts.tsx', import.meta.url), 'utf8');
 const tripMapControllerSource = readFileSync(new URL('../trip-ui/useTripMapController.ts', import.meta.url), 'utf8');
 const tripMapTabSource = readFileSync(new URL('../../app/trips/[tripId]/(tabs)/map.tsx', import.meta.url), 'utf8');
+const itineraryTabSource = readFileSync(
+  new URL('../../app/trips/[tripId]/(tabs)/itinerary.tsx', import.meta.url),
+  'utf8',
+);
+const dayItineraryContentSource = readFileSync(new URL('../trip-ui/DayItineraryContent.tsx', import.meta.url), 'utf8');
+const dayLodgingPanelSource = readFileSync(new URL('../trip-ui/DayLodgingPanel.tsx', import.meta.url), 'utf8');
 
 describe('google place search native module entry setup', () => {
   it('does not statically import native gesture bottom-sheet modules so Expo Go can fall back safely', () => {
@@ -36,23 +43,44 @@ describe('google place search native module entry setup', () => {
     assert.match(mapSearchSource, /sheetLayout\.sheetContentVisible \? \(/);
   });
 
-  it('renders bottom sheet tabs for search results and trip bookmarks', () => {
+  it('renders bottom sheet candidate tabs for trip bookmarks and lodging while keeping search results outside tabs', () => {
     assert.match(mapSearchSource, /buildGooglePlaceSearchSheetTabs\(selectedSheetTab\)/);
-    assert.match(mapSearchSource, /검색 결과/);
-    assert.match(mapSearchSource, /찜한 장소/);
+    assert.match(mapSearchSource, /selectedSheetTab === 'searchResults'/);
+    assert.match(mapSearchSource, /buildGooglePlaceSearchSheetLodgingListState/);
+    assert.match(googleSearchSource, /label: '찜한 장소'/);
+    assert.match(googleSearchSource, /label: '내 숙소'/);
+    assert.doesNotMatch(googleSearchSource, /label: '검색 결과'/);
   });
 
-  it('accepts a separate visible bookmark marker list so map-tab hidden layers do not hide the bookmark tab list', () => {
+  it('keeps bookmark and lodging markers visible after their candidate tab was opened and the sheet is lowered', () => {
     assert.match(mapSearchSource, /bookmarkMarkerResults\?: GooglePlaceSearchRowViewModel\[\];/);
     assert.match(mapSearchSource, /bookmarkMarkerResults = bookmarkResults/);
-    assert.match(mapSearchSource, /buildGooglePlaceSearchMarkerViewModels\(bookmarkMarkerResults/);
+    assert.match(mapSearchSource, /activeCandidateMarkerTab, setActiveCandidateMarkerTab/);
+    assert.match(
+      mapSearchSource,
+      /if \(sheetContentVisible && isCandidateSheetTab\(selectedSheetTab\)\) \{\s*setActiveCandidateMarkerTab\(selectedSheetTab\);\s*}/,
+    );
+    assert.match(
+      mapSearchSource,
+      /visibleBookmarkMarkerResults = useMemo\(\s*\(\) => \(activeCandidateMarkerTab === 'bookmarks' \? bookmarkMarkerResults : \[\]\)/,
+    );
+    assert.match(
+      mapSearchSource,
+      /visibleLodgingMarkerResults = useMemo\(\s*\(\) => \(activeCandidateMarkerTab === 'lodging' \? effectiveLodgingMarkerResults : \[\]\)/,
+    );
+    assert.doesNotMatch(mapSearchSource, /activeCandidateMarkerTab === 'bookmarks' && sheetContentVisible/);
+    assert.doesNotMatch(mapSearchSource, /activeCandidateMarkerTab === 'lodging' && sheetContentVisible/);
+    assert.match(mapSearchSource, /buildGooglePlaceSearchMarkerViewModels\(visibleBookmarkMarkerResults/);
+    assert.match(mapSearchSource, /buildGooglePlaceSearchMarkerViewModels\(visibleLodgingMarkerResults/);
   });
 
-  it('derives map-tab bookmark marker props from canonical bookmark data and layer visibility', () => {
-    assert.match(tripMapPartsSource, /buildTripMapBookmarkLayerViewModel\(allBookmarkResults, bookmarkLayerVisible\)/);
-    assert.match(tripMapPartsSource, /bookmarkMarkerResults=\{bookmarkLayer\.bookmarkMarkerResults\}/);
+  it('removes the map-tab floating bookmark layer toggle and lets the search surface span the screen', () => {
+    assert.doesNotMatch(tripMapPartsSource, /bookmarkLayerFloatingButton/);
+    assert.doesNotMatch(tripMapPartsSource, /onToggleBookmarkLayer/);
+    assert.doesNotMatch(tripMapTabSource, /toggleBookmarkLayer/);
+    assert.doesNotMatch(tripMapPartsSource, /topSearchTrailingInset=\{44 \+ theme\.space\[2\]\}/);
+    assert.match(tripMapPartsSource, /bookmarkMarkerResults=\{bookmarkLayer\.allBookmarkResults\}/);
     assert.match(tripMapPartsSource, /bookmarkResults=\{bookmarkLayer\.allBookmarkResults\}/);
-    assert.doesNotMatch(tripMapTabSource, /bookmarkResults=\{state\.bookmarkResults\}/);
   });
 
   it('keeps map-tab bookmark refresh fallback independent from required schedule loading', () => {
@@ -79,7 +107,7 @@ describe('google place search native module entry setup', () => {
     );
   });
 
-  it('renders already-bookmarked and already-selected search result primary actions as disabled controls', () => {
+  it('renders already-bookmarked actions as disabled while schedule selections remain toggleable', () => {
     assert.match(
       mapSearchSource,
       /actionView=\{buildGooglePlaceSearchResultActionView\(\{\s*addState: actionState,\s*bookmarkResults,\s*mode: actionMode,\s*result: item,\s*selectedBatchPlaceIds,\s*}\)\}/,
@@ -88,9 +116,85 @@ describe('google place search native module entry setup', () => {
       mapSearchSource,
       /const isPrimaryActionDisabled = isBusy \|\| actionView\.primaryAction\?\.disabled === true;/,
     );
+    assert.match(mapSearchSource, /onToggleFavorite/);
+    assert.match(mapSearchSource, /stickyFooter/);
+    assert.match(mapSearchSource, /styles\.resultPrimaryActionButton/);
+    assert.match(mapSearchSource, /const isPrimaryActionSelected = actionView\.primaryAction\?\.label === '선택됨';/);
+    assert.match(mapSearchSource, /styles\.resultPrimaryActionButtonSelected/);
+    assert.match(mapSearchSource, /styles\.resultPrimaryActionTextSelected/);
     assert.match(
       mapSearchSource,
-      /accessibilityState=\{\{ disabled: isPrimaryActionDisabled }}\s*disabled=\{isPrimaryActionDisabled\}/,
+      /accessibilityState=\{\{ disabled: isPrimaryActionDisabled, selected: isPrimaryActionSelected \}\}/,
     );
+    assert.match(mapSearchSource, /styles\.topSearchClearButton/);
+    assert.doesNotMatch(mapSearchSource, /styles\.searchResultsCloseButton/);
+  });
+
+  it('keeps the top search margin equal to the horizontal screen margin', () => {
+    assert.match(mapSearchSource, /paddingHorizontal: theme\.space\[3\]/);
+    assert.match(mapSearchSource, /paddingTop: theme\.space\[3\]/);
+    assert.doesNotMatch(mapSearchSource, /paddingTop: insets\.top/);
+  });
+
+  it('renders a lodging empty state with an itinerary lodging-management CTA from map and day search entries', () => {
+    assert.match(mapSearchSource, /lodgingEmptyAction\?: \{ label: string; onPress: \(\) => void \};/);
+    assert.match(mapSearchSource, /등록된 숙소가 없어요\./);
+    assert.match(mapSearchSource, /lodgingEmptyAction\.label/);
+    assert.match(tripMapPartsSource, /buildDayItineraryLodgingManagementRoute/);
+    assert.match(tripMapPartsSource, /lodgingEmptyAction=\{\{/);
+    assert.match(placeSearchSource, /buildDayItineraryLodgingManagementRoute/);
+    assert.match(placeSearchSource, /lodgingEmptyAction=\{\s*!isLodgingMode/);
+    assert.match(placeSearchSource, /숙소 등록하러 가기/);
+    assert.doesNotMatch(tripMapPartsSource, /lodgingEmptyAction=\{\{[\s\S]*buildDayItineraryLodgingPlaceSearchRoute/);
+    assert.doesNotMatch(placeSearchSource, /lodgingEmptyAction=\{[\s\S]*buildDayItineraryLodgingPlaceSearchRoute/);
+  });
+
+  it('supports opening the itinerary tab with the lodging summary highlighted before direct map search', () => {
+    assert.match(itineraryTabSource, /initialAction: initialActionParam/);
+    assert.match(itineraryTabSource, /initialAction=\{initialAction\}/);
+    assert.match(dayItineraryContentSource, /focusRequest\.target\.kind === 'lodgingPanel'/);
+    assert.match(dayLodgingPanelSource, /styles\.lodgingSummaryHighlighted/);
+    assert.match(
+      dayLodgingPanelSource,
+      /onPress=\{viewModel\.sheet\.placeName \? onOpenSheet : onOpenSearchRegister\}/,
+    );
+    assert.match(dayItineraryContentSource, /onSummaryRef/);
+  });
+
+  it('routes existing lodging changes through the lodging map search instead of the existing-place picker', () => {
+    assert.doesNotMatch(dayLodgingPanelSource, /onOpenSelection/);
+    assert.doesNotMatch(dayLodgingPanelSource, /action\.kind === 'change' \? onOpenSelection : onOpenSearchRegister/);
+    assert.match(dayLodgingPanelSource, /onPress=\{onOpenSearchRegister\}/);
+    assert.doesNotMatch(dayItineraryContentSource, /onOpenLodgingPlaceSelection/);
+  });
+
+  it('refreshes trip detail inside map loading so lodging markers do not depend on stale shell days', () => {
+    assert.match(tripMapControllerSource, /import \{ getTripDetail \} from '..\/trips\/trip-api';/);
+    assert.match(
+      tripMapControllerSource,
+      /const \[detailResult, scheduleResult, bookmarkResult\] = await Promise\.allSettled\(\[\s*getTripDetail\(tripId\),\s*listTripScheduleItems\(tripId\),\s*listTripPlaceBookmarks\(tripId\),\s*\] as const\);/,
+    );
+    assert.match(tripMapControllerSource, /const detail = detailResult\.value;/);
+    assert.doesNotMatch(tripMapControllerSource, /const detail = shellDetail\.detail;/);
+    assert.match(tripMapControllerSource, /lodgingResults: buildTripMapLodgingResults\(detail\.days\)/);
+  });
+
+  it('retries marker-driven row focus after the bottom sheet and row layout settle', () => {
+    assert.match(mapSearchSource, /const focusResultInList = useCallback/);
+    assert.match(mapSearchSource, /pendingResultFocusRef\.current = \{ id: result\.id, tab: nextTab \};/);
+    assert.match(mapSearchSource, /setTimeout\(\(\) => focusResultInList\(pending\.id, pending\.tab\), 80\)/);
+    assert.match(mapSearchSource, /sheetContentVisible/);
+  });
+
+  it('renders selected-place trays as bottom-attached surfaces with only chips and a full-width register button', () => {
+    assert.match(mapSearchSource, /styles\.stickyFooterContainer, \{ paddingBottom: insets\.bottom }/);
+    assert.match(mapSearchSource, /backgroundColor: theme\.color\.surface/);
+    assert.match(tripMapPartsSource, /selectedScheduleResults\.length > 0/);
+    assert.match(tripMapPartsSource, /선택된 장소 일정 등록/);
+    assert.doesNotMatch(tripMapPartsSource, /선택 \{results\.length\}/);
+    assert.doesNotMatch(tripMapPartsSource, /scheduleAddTrayHeader/);
+    assert.match(placeSearchSource, /선택된 장소 일정 등록/);
+    assert.doesNotMatch(placeSearchSource, /선택 \{selectedBatchResults\.length\}/);
+    assert.doesNotMatch(placeSearchSource, /batchFooterHeader/);
   });
 });
