@@ -42,6 +42,9 @@ const expectedGeneratedAdapters = [
   ['.harness/skills/staging-deploy/SKILL.md', '.pi/skills/i-um-staging-deploy/SKILL.md'],
   ['.harness/skills/staging-deploy/SKILL.md', '.claude/skills/i-um-staging-deploy/SKILL.md'],
   ['.harness/skills/staging-deploy/SKILL.md', '.agents/skills/i-um-staging-deploy/SKILL.md'],
+  ['.harness/skills/ui-ux-pro-max/SKILL.md', '.pi/skills/ui-ux-pro-max/SKILL.md'],
+  ['.harness/skills/ui-ux-pro-max/SKILL.md', '.claude/skills/ui-ux-pro-max/SKILL.md'],
+  ['.harness/skills/ui-ux-pro-max/SKILL.md', '.agents/skills/ui-ux-pro-max/SKILL.md'],
   ['.harness/rules/code/api-db.md', '.pi/rules/api-db.md'],
   ['.harness/rules/code/code-quality.md', '.pi/rules/code-quality.md'],
   ['.harness/rules/core/commit.md', '.pi/rules/commit.md'],
@@ -56,6 +59,12 @@ const expectedGeneratedAdapters = [
   ['.harness/rules/core/worktree.md', '.pi/rules/worktree.md'],
 ];
 
+const expectedGeneratedSkillDirectories = [
+  ['.harness/skills/ui-ux-pro-max', '.pi/skills/ui-ux-pro-max'],
+  ['.harness/skills/ui-ux-pro-max', '.claude/skills/ui-ux-pro-max'],
+  ['.harness/skills/ui-ux-pro-max', '.agents/skills/ui-ux-pro-max'],
+];
+
 const errors = [];
 const pendingPathChecks = [];
 
@@ -66,6 +75,31 @@ async function exists(relPath) {
   } catch {
     return false;
   }
+}
+
+async function listFiles(relDir, baseDir = relDir) {
+  let entries;
+  try {
+    entries = await readdir(path.join(repoRoot, relDir), { withFileTypes: true });
+  } catch {
+    return undefined;
+  }
+
+  const files = [];
+  for (const entry of entries) {
+    if (entry.name === '__pycache__' || entry.name === '.DS_Store' || entry.name.endsWith('.pyc') || entry.name.endsWith('.pyo')) {
+      continue;
+    }
+
+    const childRel = `${relDir}/${entry.name}`;
+    if (entry.isDirectory()) {
+      const childFiles = await listFiles(childRel, baseDir);
+      if (childFiles) files.push(...childFiles);
+    } else if (entry.isFile()) {
+      files.push(path.relative(path.join(repoRoot, baseDir), path.join(repoRoot, childRel)).split(path.sep).join('/'));
+    }
+  }
+  return files.sort();
 }
 
 function notice(source) {
@@ -497,6 +531,38 @@ for (const [source, target] of expectedGeneratedAdapters) {
   }
   if (text !== renderGenerated(sourceText, source)) {
     errors.push(`${target} is out of sync with ${source}; run pnpm harness:sync`);
+  }
+}
+
+for (const [sourceDir, targetDir] of expectedGeneratedSkillDirectories) {
+  const sourceFiles = await listFiles(sourceDir);
+  if (!sourceFiles) {
+    errors.push(`missing adapter source directory: ${sourceDir}`);
+    continue;
+  }
+
+  const targetFiles = await listFiles(targetDir);
+  if (!targetFiles) {
+    errors.push(`missing generated adapter directory: ${targetDir}`);
+    continue;
+  }
+
+  const missing = sourceFiles.filter((file) => !targetFiles.includes(file));
+  const extra = targetFiles.filter((file) => !sourceFiles.includes(file));
+  if (missing.length || extra.length) {
+    errors.push(`${targetDir} file list is out of sync with ${sourceDir}; missing: ${missing.join(', ') || 'none'}; extra: ${extra.join(', ') || 'none'}`);
+  }
+
+  for (const file of sourceFiles) {
+    if (!targetFiles.includes(file)) continue;
+    const source = `${sourceDir}/${file}`;
+    const target = `${targetDir}/${file}`;
+    const sourceText = await readFile(path.join(repoRoot, source), 'utf8');
+    const targetText = await readFile(path.join(repoRoot, target), 'utf8');
+    const expectedText = file === 'SKILL.md' ? renderGenerated(sourceText, source) : sourceText;
+    if (targetText !== expectedText) {
+      errors.push(`${target} is out of sync with ${source}; run pnpm harness:sync`);
+    }
   }
 }
 

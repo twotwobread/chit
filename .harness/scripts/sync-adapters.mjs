@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -49,6 +49,17 @@ const skillMappings = [
   },
 ];
 
+const skillDirectoryMappings = [
+  {
+    source: '.harness/skills/ui-ux-pro-max',
+    targets: [
+      '.pi/skills/ui-ux-pro-max',
+      '.claude/skills/ui-ux-pro-max',
+      '.agents/skills/ui-ux-pro-max',
+    ],
+  },
+];
+
 const ruleMappings = [
   { source: '.harness/rules/code/api-db.md', target: '.pi/rules/api-db.md' },
   { source: '.harness/rules/code/code-quality.md', target: '.pi/rules/code-quality.md' },
@@ -83,6 +94,11 @@ function renderGenerated(content, source) {
   return `${frontmatter}\n${notice(source)}${body}`;
 }
 
+function shouldCopySkillPath(sourcePath) {
+  const name = path.basename(sourcePath);
+  return name !== '__pycache__' && name !== '.DS_Store' && !name.endsWith('.pyc') && !name.endsWith('.pyo');
+}
+
 async function syncMapping(source, targets) {
   const sourcePath = path.join(repoRoot, source);
   const sourceContent = await readFile(sourcePath, 'utf8');
@@ -96,8 +112,28 @@ async function syncMapping(source, targets) {
   }
 }
 
+async function syncSkillDirectory(source, targets) {
+  const sourceDir = path.join(repoRoot, source);
+  const sourceSkill = path.join(sourceDir, 'SKILL.md');
+  const sourceSkillContent = await readFile(sourceSkill, 'utf8');
+  const renderedSkill = renderGenerated(sourceSkillContent, `${source}/SKILL.md`);
+
+  for (const target of targets) {
+    const targetDir = path.join(repoRoot, target);
+    await rm(targetDir, { recursive: true, force: true });
+    await mkdir(path.dirname(targetDir), { recursive: true });
+    await cp(sourceDir, targetDir, { recursive: true, force: true, filter: shouldCopySkillPath });
+    await writeFile(path.join(targetDir, 'SKILL.md'), renderedSkill, 'utf8');
+    console.log(`synced ${source} -> ${target}`);
+  }
+}
+
 for (const mapping of skillMappings) {
   await syncMapping(mapping.source, mapping.targets);
+}
+
+for (const mapping of skillDirectoryMappings) {
+  await syncSkillDirectory(mapping.source, mapping.targets);
 }
 
 for (const mapping of ruleMappings) {
