@@ -19,7 +19,7 @@ import {
   type PlaceBackedScheduleItem,
 } from './day-itinerary';
 import { formatTripDayDate, formatTripDayLabel } from './days';
-import { tripItineraryDayPath, tripSettlePath } from './routes';
+import { tripExpensesPath, tripItineraryDayPath, tripSettlePath } from './routes';
 import { orderScheduleItemsByDisplayTime } from './schedule-item-ordering';
 
 export type QuickExpenseFormErrors = {
@@ -113,7 +113,7 @@ export type QuickExpenseViewModel = {
 
 const zeroDecimalCurrencies = new Set<SupportedCurrency>(['KRW', 'JPY']);
 
-export type QuickExpenseReturnTo = 'settle';
+export type QuickExpenseReturnTo = 'settle' | 'expenses';
 
 export type QuickExpenseReturnParam = string | string[] | undefined;
 
@@ -161,6 +161,9 @@ export function resolveQuickExpenseReturnPath({
       return `${tripSettlePath(tripId)}?expenseDayId=${encodeURIComponent(normalizedDayValue)}` as Href;
     }
     return tripSettlePath(tripId);
+  }
+  if (returnValue === 'expenses') {
+    return tripExpensesPath(tripId);
   }
   return tripItineraryDayPath(tripId, date);
 }

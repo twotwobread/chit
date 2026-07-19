@@ -1100,6 +1100,10 @@ test('builds route with optional inferred item id, return intent, and return day
     '/trips/trip-a/days/2026-07-10/expenses/quick?returnTo=settle',
   );
   assert.equal(
+    buildQuickExpenseRoute('trip-a', '2026-07-10', null, 'expenses'),
+    '/trips/trip-a/days/2026-07-10/expenses/quick?returnTo=expenses',
+  );
+  assert.equal(
     buildQuickExpenseRoute('trip-a', '2026-07-10', 'item a', 'settle'),
     '/trips/trip-a/days/2026-07-10/expenses/quick?itemId=item%20a&returnTo=settle',
   );
@@ -1117,6 +1121,10 @@ test('resolves quick expense completion return destinations', () => {
   assert.equal(
     resolveQuickExpenseReturnPath({ tripId: 'trip-a', date: '2026-07-10', returnTo: ['settle'] }),
     '/trips/trip-a/settle',
+  );
+  assert.equal(
+    resolveQuickExpenseReturnPath({ tripId: 'trip-a', date: '2026-07-10', returnTo: 'expenses' }),
+    '/trips/trip-a/expenses',
   );
   assert.equal(
     resolveQuickExpenseReturnPath({
