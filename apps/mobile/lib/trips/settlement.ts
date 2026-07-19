@@ -669,6 +669,7 @@ function settlementNetLabel(direction: SettlementBalanceDirection): string {
 export function buildSettlementRequestMessage(
   viewModel: SettlementTransferViewModel,
   tripName = '여행',
+  detailLink?: string | null,
 ): string | null {
   if (viewModel.sections.length === 0) {
     return null;
@@ -681,7 +682,11 @@ export function buildSettlementRequestMessage(
     return null;
   }
 
-  return [`[i-um] ${tripName} 정산 요청`, ...lines, '확인 후 송금 부탁드려요.'].join('\n');
+  const detailLines = detailLink
+    ? [`최신 정산 상세: ${detailLink}`, '현재 여행 지출 기준으로 계산된 최신 정산이에요.']
+    : [];
+
+  return [`[i-um] ${tripName} 정산 요청`, ...lines, ...detailLines, '확인 후 송금 부탁드려요.'].join('\n');
 }
 
 export function buildKakaoSettlementRequestTemplate(message: string): TextTemplateType {

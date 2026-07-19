@@ -942,6 +942,35 @@ test('builds settlement request message from suggested transfers', () => {
   );
 });
 
+test('builds settlement request message with latest detail link', () => {
+  const viewModel = buildSettlementTransferViewModel({
+    settlement: {
+      tripId: 'trip-1',
+      defaultCurrency: 'KRW',
+      currencySummaries: [
+        {
+          currency: 'KRW',
+          totalPaidMinor: 50000,
+          totalShareMinor: 50000,
+          balances: [],
+          suggestedTransfers: [
+            {
+              fromParticipant: { participantId: 'c', displayName: '유나', participantStatus: 'current' as const },
+              toParticipant: { participantId: 'a', displayName: '민수', participantStatus: 'current' as const },
+              amountMinor: 18500,
+            },
+          ],
+        },
+      ],
+    },
+  });
+
+  assert.equal(
+    buildSettlementRequestMessage(viewModel, '오사카 여행', '/trips/trip-1/settlement-detail'),
+    '[i-um] 오사카 여행 정산 요청\n유나님 → 민수님 18,500원\n최신 정산 상세: /trips/trip-1/settlement-detail\n현재 여행 지출 기준으로 계산된 최신 정산이에요.\n확인 후 송금 부탁드려요.',
+  );
+});
+
 test('builds Kakao settlement request template from the same share message', () => {
   const template = buildKakaoSettlementRequestTemplate(
     '[i-um] 오사카 여행 정산 요청\n유나님 → 민수님 18,500원\n확인 후 송금 부탁드려요.',

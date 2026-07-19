@@ -1,92 +1,43 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Share, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import KakaoShareLink from 'react-native-kakao-share-link';
 
-import type { TripDay } from '@i-um/api-contract';
-
 import { SecondaryButton, theme } from '../../../../lib/design';
-import { DayChips } from '../../../../lib/trip-ui/DayChips';
-import { ExpenseRow } from '../../../../lib/trip-ui/ExpenseRow';
 import { TransferRow } from '../../../../lib/trip-ui/TransferRow';
-import { TripRootFab } from '../../../../lib/trip-ui/TripRootFab';
-import { TripListCard, TripScreen, TripStateCard } from '../../../../lib/trip-ui/TripScreenScaffold';
-import { listTripExpenses } from '../../../../lib/trips/expense-api';
+import { TripListCard, TripScreen, TripScreenHeader, TripStateCard } from '../../../../lib/trip-ui/TripScreenScaffold';
 import { getTripSettlement } from '../../../../lib/trips/settlement-api';
-import { beginStaleWhileRevalidate, resolveStaleWhileRevalidateFailure } from '../../../../lib/trips/stale-refresh';
 import {
-  buildSettlementExpenseEntryRouteForDays,
-  buildSettlementExpenseHistoryDayInputs,
   buildKakaoSettlementRequestTemplate,
-  buildSettlementExpenseHistoryViewModel,
   buildSettlementRequestMessage,
-  buildSettlementTotalSpendViewModel,
   buildSettlementTransferViewModel,
-  settlementExpenseHistoryFailureState,
   settlementTransferFailureState,
   type SettlementBalanceDirection,
-  type SettlementExpenseHistoryDayInput,
-  type SettlementExpenseHistoryFailureViewModel,
-  type SettlementTotalSpendCategoryViewModel,
-  type SettlementTotalSpendCurrencySectionViewModel,
   type SettlementTransferFailureViewModel,
   type SettlementTransferViewModel,
 } from '../../../../lib/trips/settlement';
-import { localDateString } from '../../../../lib/trips/status';
+import { tripSettlementDetailPath } from '../../../../lib/trips/routes';
 import { resolveTripShellDetail } from '../../../../lib/trips/trip-shell-detail';
 import { useTripShellState } from '../../../../lib/trips/trip-shell-context';
-import { buildTripRootFabLayout, shouldShowTripRootFab } from '../../../../lib/trips/trip-root-fab-layout';
-
-type SettlementExpenseHistoryState =
-  | { status: 'ready'; days: SettlementExpenseHistoryDayInput[] }
-  | { status: 'error'; error: SettlementExpenseHistoryFailureViewModel };
 
 type TripSettleState =
   | { status: 'loading' }
-  | {
-      status: 'settlement';
-      expenseEntryDays: TripDay[];
-      expenseHistory: SettlementExpenseHistoryState;
-      tripName: string;
-      viewModel: SettlementTransferViewModel;
-    }
+  | { status: 'settlement'; tripName: string; viewModel: SettlementTransferViewModel }
   | { status: 'auth' }
   | { status: 'notFound' }
   | { status: 'error'; error: Extract<SettlementTransferFailureViewModel, { status: 'error' }> };
 
 export default function TripSettleTabScreen() {
-  const {
-    tripId: tripIdParam,
-    expenseDayId: expenseDayIdParam,
-    expenseId: expenseIdParam,
-  } = useLocalSearchParams<{
-    tripId?: string | string[];
-    expenseDayId?: string | string[];
-    expenseId?: string | string[];
-  }>();
+  const { tripId: tripIdParam } = useLocalSearchParams<{ tripId?: string | string[] }>();
   const tripId = Array.isArray(tripIdParam) ? tripIdParam[0] : tripIdParam;
-  const routeExpenseDayId = Array.isArray(expenseDayIdParam) ? expenseDayIdParam[0] : expenseDayIdParam;
-  const routeExpenseId = Array.isArray(expenseIdParam) ? expenseIdParam[0] : expenseIdParam;
   const shellState = useTripShellState();
-  const [selectedExpenseDayId, setSelectedExpenseDayId] = useState<string | null>(null);
   const [state, setState] = useState<TripSettleState>({ status: 'loading' });
-  const insets = useSafeAreaInsets();
-
-  useEffect(() => {
-    const normalizedExpenseDayId = routeExpenseDayId?.trim() ?? '';
-    if (normalizedExpenseDayId) {
-      setSelectedExpenseDayId(normalizedExpenseDayId);
-    }
-  }, [routeExpenseDayId]);
 
   const load = useCallback(async () => {
     if (!tripId) {
       setState({ status: 'notFound' });
       return;
     }
-
-    setState((current) => beginStaleWhileRevalidate(current, { status: 'loading' }, ['settlement']));
 
     const shellDetail = resolveTripShellDetail(shellState, tripId);
     if (shellDetail.status === 'pending') {
@@ -97,36 +48,16 @@ export default function TripSettleTabScreen() {
       return;
     }
 
+    setState({ status: 'loading' });
     try {
-      const detail = shellDetail.detail;
       const settlement = await getTripSettlement(tripId);
-      let expenseHistory: SettlementExpenseHistoryState;
-
-      try {
-        const expensesResponse = await listTripExpenses(tripId);
-        expenseHistory = {
-          status: 'ready',
-          days: buildSettlementExpenseHistoryDayInputs(detail.days, expensesResponse),
-        };
-      } catch {
-        expenseHistory = { status: 'error', error: settlementExpenseHistoryFailureState() };
-      }
-
       setState({
         status: 'settlement',
-        expenseEntryDays: detail.days,
-        expenseHistory,
-        tripName: detail.trip.name.trim() || '여행',
+        tripName: shellDetail.detail.trip.name.trim() || '여행',
         viewModel: buildSettlementTransferViewModel({ settlement }),
       });
     } catch (error) {
-      const failureState = settleFailureState(error);
-      setState((current) =>
-        resolveStaleWhileRevalidateFailure(current, failureState, {
-          shouldKeepStale: (state) => state.status === 'error',
-          staleStatuses: ['settlement'],
-        }),
-      );
+      setState(settleFailureState(error));
     }
   }, [shellState, tripId]);
 
@@ -136,91 +67,59 @@ export default function TripSettleTabScreen() {
     }, [load]),
   );
 
-  const expenseEntryRoute =
-    state.status === 'settlement' && tripId
-      ? buildSettlementExpenseEntryRouteForDays(tripId, state.expenseEntryDays, localDateString(), selectedExpenseDayId)
-      : null;
-  const expenseFabLayout = buildTripRootFabLayout({ bottomInset: insets.bottom, rightInset: insets.right });
-  const showExpenseFab = shouldShowTripRootFab({
-    hasAction: Boolean(expenseEntryRoute),
-    isBlocked: false,
-    status: state.status === 'settlement' ? 'ready' : state.status,
-  });
-
   return (
-    <View style={styles.root}>
-      <TripScreen contentContainerStyle={showExpenseFab ? expenseFabLayout.scrollContent : undefined}>
-        {state.status === 'loading' ? <TripStateCard loading title="정산을 불러오는 중..." /> : null}
-        {state.status === 'auth' ? (
-          <TripStateCard
-            primaryAction={{ label: '로그인하기', onPress: () => router.replace('/login') }}
-            title="다시 로그인해주세요."
-          />
-        ) : null}
-        {state.status === 'notFound' ? (
-          <TripStateCard
-            helper="삭제되었거나 접근할 수 없는 여행이에요."
-            primaryAction={{ label: '홈으로', onPress: () => router.replace('/') }}
-            title="여행을 찾을 수 없어요."
-          />
-        ) : null}
-        {state.status === 'error' ? (
-          <TripStateCard
-            helper={state.error.helper}
-            primaryAction={{ label: state.error.actionLabel, onPress: () => void load() }}
-            title={state.error.title}
-          />
-        ) : null}
-        {state.status === 'settlement' ? (
-          <SettlementContent
-            expenseHistory={state.expenseHistory}
-            onRetryExpenseHistory={() => void load()}
-            onSelectExpenseDay={setSelectedExpenseDayId}
-            selectedExpenseDayId={selectedExpenseDayId}
-            targetExpenseId={selectedExpenseDayId ? null : routeExpenseId}
-            today={localDateString()}
-            tripId={tripId ?? ''}
-            tripName={state.tripName}
-            viewModel={state.viewModel}
-          />
-        ) : null}
-      </TripScreen>
-      {showExpenseFab && expenseEntryRoute ? (
-        <TripRootFab
-          accessibilityHint="선택한 여행의 지출 등록을 시작합니다."
-          accessibilityLabel="지출 등록"
-          layout={expenseFabLayout.fab}
-          onPress={() => router.push(expenseEntryRoute)}
+    <TripScreen>
+      {state.status === 'loading' ? <TripStateCard loading title="정산을 불러오는 중..." /> : null}
+      {state.status === 'auth' ? (
+        <TripStateCard primaryAction={{ label: '로그인하기', onPress: () => router.replace('/login') }} title="다시 로그인해주세요." />
+      ) : null}
+      {state.status === 'notFound' ? (
+        <TripStateCard
+          helper="삭제되었거나 접근할 수 없는 여행이에요."
+          primaryAction={{ label: '홈으로', onPress: () => router.replace('/') }}
+          title="여행을 찾을 수 없어요."
         />
       ) : null}
-    </View>
+      {state.status === 'error' ? (
+        <TripStateCard
+          helper={state.error.helper}
+          primaryAction={{ label: state.error.actionLabel, onPress: () => void load() }}
+          title={state.error.title}
+        />
+      ) : null}
+      {state.status === 'settlement' ? (
+        <SettlementContent tripId={tripId ?? ''} tripName={state.tripName} viewModel={state.viewModel} />
+      ) : null}
+    </TripScreen>
   );
 }
 
 function SettlementContent({
-  expenseHistory,
-  onRetryExpenseHistory,
-  onSelectExpenseDay,
-  selectedExpenseDayId,
-  targetExpenseId,
-  today,
   tripId,
   tripName,
   viewModel,
 }: {
-  expenseHistory: SettlementExpenseHistoryState;
-  onRetryExpenseHistory: () => void;
-  onSelectExpenseDay: (dayId: string) => void;
-  selectedExpenseDayId: string | null;
-  targetExpenseId?: string | null;
-  today: string;
   tripId: string;
   tripName: string;
   viewModel: SettlementTransferViewModel;
 }) {
   return (
-    <View style={styles.successStack}>
-      <SettlementTotalSpendCard expenseHistory={expenseHistory} />
+    <>
+      <TripScreenHeader helper="누가 누구에게 얼마를 보내면 되는지 확인해요." title="정산" />
+      <TripListCard>
+        <View style={styles.noticeCardContent}>
+          <Text style={styles.noticeTitle}>현재 지출 기준 최신 정산이에요.</Text>
+          <Text style={styles.noticeHelper}>지출이 수정되면 사람별 금액과 송금 제안도 함께 바뀝니다.</Text>
+          <Text style={styles.formulaText}>결제 금액 - 부담 금액 = 받을/보낼 금액</Text>
+        </View>
+      </TripListCard>
+
+      <TripListCard>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>{viewModel.currencyRuleNotice.title}</Text>
+          <Text style={styles.sectionHelper}>{viewModel.currencyRuleNotice.helper}</Text>
+        </View>
+      </TripListCard>
 
       {viewModel.balanceSections.map((section) => (
         <TripListCard key={`balance-${section.currency}`}>
@@ -250,16 +149,6 @@ function SettlementContent({
         </TripListCard>
       ))}
 
-      <ExpenseHistoryContent
-        expenseHistory={expenseHistory}
-        onRetry={onRetryExpenseHistory}
-        onSelectDay={onSelectExpenseDay}
-        selectedDayId={selectedExpenseDayId}
-        targetExpenseId={targetExpenseId}
-        today={today}
-        tripId={tripId}
-      />
-
       {viewModel.sections.map((section) => (
         <TripListCard key={`transfer-${section.currency}`}>
           <View style={styles.sectionHeader}>
@@ -280,202 +169,26 @@ function SettlementContent({
         </TripListCard>
       ))}
 
-      <SettlementRequestButton tripName={tripName} viewModel={viewModel} />
-    </View>
-  );
-}
-
-function SettlementTotalSpendCard({ expenseHistory }: { expenseHistory: SettlementExpenseHistoryState }) {
-  if (expenseHistory.status === 'error') {
-    return null;
-  }
-
-  const viewModel = buildSettlementTotalSpendViewModel({ days: expenseHistory.days });
-
-  return (
-    <TripListCard>
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>{viewModel.title}</Text>
-        {viewModel.status === 'success' ? <Text style={styles.sectionHelper}>{viewModel.helper}</Text> : null}
-      </View>
-      {viewModel.status === 'empty' ? (
-        <View style={styles.totalSpendEmpty}>
-          <Text style={styles.totalSpendEmptyTitle}>{viewModel.emptyTitle}</Text>
-          <Text style={styles.sectionHelper}>{viewModel.helper}</Text>
-        </View>
-      ) : (
-        <View style={styles.totalSpendSectionList}>
-          {viewModel.sections.map((section) => (
-            <SettlementTotalSpendCurrencySection key={section.currency} section={section} />
-          ))}
-        </View>
-      )}
-    </TripListCard>
-  );
-}
-
-function SettlementTotalSpendCurrencySection({ section }: { section: SettlementTotalSpendCurrencySectionViewModel }) {
-  return (
-    <View style={styles.totalSpendCurrencySection}>
-      <View style={styles.totalSpendCurrencyHeader}>
-        <View style={styles.totalSpendCurrencyTitleGroup}>
-          <Text style={styles.totalSpendCurrencyTitle}>{section.title}</Text>
-          <Text style={styles.sectionHelper}>{section.helper}</Text>
-        </View>
-        <Text style={styles.totalSpendAmount}>{section.totalAmountLabel}</Text>
-      </View>
-      {section.totalMinor > 0 ? (
-        <SettlementTotalSpendBar categories={section.categories} />
-      ) : (
-        <View style={styles.totalSpendZeroBar} />
-      )}
-      <View style={styles.totalSpendLegendList}>
-        {section.categories.map((category) => (
-          <SettlementTotalSpendLegendRow category={category} key={category.key} />
-        ))}
-      </View>
-    </View>
-  );
-}
-
-function SettlementTotalSpendBar({ categories }: { categories: SettlementTotalSpendCategoryViewModel[] }) {
-  return (
-    <View
-      accessibilityLabel={`카테고리 비율 ${categories
-        .map((category) => `${category.label} ${category.percentageLabel}`)
-        .join(', ')}`}
-      style={styles.totalSpendBar}
-    >
-      {categories.map((category) => (
-        <View
-          key={category.key}
-          style={[
-            styles.totalSpendBarSegment,
-            { backgroundColor: category.color, flexGrow: category.ratio, minWidth: category.ratio > 0 ? 2 : 0 },
-          ]}
-        />
-      ))}
-    </View>
-  );
-}
-
-function SettlementTotalSpendLegendRow({ category }: { category: SettlementTotalSpendCategoryViewModel }) {
-  return (
-    <View style={styles.totalSpendLegendRow}>
-      <View style={[styles.totalSpendLegendMarker, { backgroundColor: category.color }]} />
-      <Text style={styles.totalSpendLegendLabel}>{category.label}</Text>
-      <Text style={styles.totalSpendLegendAmount}>{category.amountLabel}</Text>
-      <Text style={styles.totalSpendLegendPercent}>{category.percentageLabel}</Text>
-    </View>
-  );
-}
-
-function ExpenseHistoryContent({
-  expenseHistory,
-  onRetry,
-  onSelectDay,
-  selectedDayId,
-  targetExpenseId,
-  today,
-  tripId,
-}: {
-  expenseHistory: SettlementExpenseHistoryState;
-  onRetry: () => void;
-  onSelectDay: (dayId: string) => void;
-  selectedDayId: string | null;
-  targetExpenseId?: string | null;
-  today: string;
-  tripId: string;
-}) {
-  if (expenseHistory.status === 'error') {
-    return (
-      <TripStateCard
-        helper={expenseHistory.error.helper}
-        primaryAction={{ label: expenseHistory.error.actionLabel, onPress: onRetry }}
-        title={expenseHistory.error.title}
-      />
-    );
-  }
-
-  const viewModel = buildSettlementExpenseHistoryViewModel({
-    days: expenseHistory.days,
-    selectedDayId,
-    targetExpenseId,
-    today,
-    tripId,
-  });
-  if (viewModel.status === 'empty') {
-    return <TripStateCard helper={viewModel.helper} title={viewModel.emptyTitle} />;
-  }
-
-  const section = viewModel.selectedSection;
-
-  return (
-    <TripListCard>
-      <View style={styles.expenseHistoryHeader}>
-        <Text style={styles.sectionTitle}>{viewModel.title}</Text>
-        <Text style={styles.sectionHelper}>{viewModel.helper}</Text>
-      </View>
-      {viewModel.targetExpenseUnavailableMessage ? (
-        <View style={styles.expenseHistoryNotice}>
-          <Text style={styles.expenseHistoryNoticeText}>{viewModel.targetExpenseUnavailableMessage}</Text>
-        </View>
-      ) : null}
-      <View style={styles.expenseDayChips}>
-        <DayChips days={viewModel.dayChips} selectedDayId={viewModel.selectedDayId} onSelectDay={onSelectDay} />
-      </View>
-      <View style={styles.expenseDaySection}>
-        <View style={styles.expenseDayHeader}>
-          <Text style={styles.expenseDayTitle}>{section.title}</Text>
-          <Text style={styles.sectionHelper}>{section.helper}</Text>
-        </View>
-        {section.rows.length === 0 ? (
-          <View style={styles.expenseDayEmpty}>
-            <Text style={styles.expenseDayEmptyTitle}>{section.emptyTitle}</Text>
-            {section.emptyHelper ? <Text style={styles.sectionHelper}>{section.emptyHelper}</Text> : null}
-          </View>
-        ) : (
-          <View style={styles.expenseRowList}>
-            {section.rows.map((row, index) => {
-              const editRoute = row.editRoute;
-              return (
-                <ExpenseRow
-                  accessibilityLabel={row.accessibilityLabel}
-                  amount={row.amountMinor}
-                  category={row.category}
-                  currency={row.currency}
-                  first={index === 0}
-                  key={row.id}
-                  onPress={editRoute ? () => router.push(editRoute) : undefined}
-                  payerLabel={row.payerLabel}
-                  settlementLabel={row.settlementLabel}
-                  splitLabel={row.splitLabel}
-                  title={row.placeName}
-                />
-              );
-            })}
-          </View>
-        )}
-      </View>
-    </TripListCard>
+      <SettlementRequestButton detailLink={tripSettlementDetailPath(tripId)} tripName={tripName} viewModel={viewModel} />
+    </>
   );
 }
 
 function SettlementRequestButton({
+  detailLink,
   tripName,
   viewModel,
 }: {
+  detailLink: string;
   tripName: string;
   viewModel: SettlementTransferViewModel;
 }) {
-  const message = buildSettlementRequestMessage(viewModel, tripName);
+  const message = buildSettlementRequestMessage(viewModel, tripName, detailLink);
   const disabled = viewModel.requestAction.disabled || !message;
 
   return (
     <SecondaryButton
-      accessibilityLabel={
-        disabled ? '보낼 정산 내역이 없어 정산 요청을 보낼 수 없어요.' : viewModel.requestAction.label
-      }
+      accessibilityLabel={disabled ? '보낼 정산 내역이 없어 정산 요청을 보낼 수 없어요.' : viewModel.requestAction.label}
       disabled={disabled}
       label={viewModel.requestAction.label}
       onPress={() => {
@@ -550,13 +263,10 @@ function settleFailureState(error: unknown): TripSettleState {
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: theme.color.bg,
-  },
   balanceList: {
     gap: theme.space[3],
     paddingBottom: theme.space[4],
+    paddingHorizontal: theme.space[5],
   },
   balanceMetric: {
     backgroundColor: theme.color.surfaceSunken,
@@ -603,7 +313,6 @@ const styles = StyleSheet.create({
     borderTopColor: theme.color.borderSubtle,
     borderTopWidth: StyleSheet.hairlineWidth,
     gap: theme.space[3],
-    paddingHorizontal: theme.space[1],
     paddingTop: theme.space[4],
   },
   balanceRowHeader: {
@@ -612,97 +321,39 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: theme.space[3],
   },
-  currencyRuleBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: theme.color.primarySoft,
-    borderRadius: theme.radius.pill,
-    paddingHorizontal: theme.space[3],
-    paddingVertical: theme.space[2],
-  },
-  currencyRuleBadgeText: {
+  formulaText: {
     color: theme.color.primary,
-    fontFamily: theme.font.family.semibold,
-    fontSize: theme.font.size.micro,
-    fontWeight: theme.font.weight.semibold,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.label,
+    fontWeight: theme.font.weight.bold,
   },
-  currencyRuleHelper: {
+  noticeCardContent: {
+    gap: theme.space[2],
+    paddingHorizontal: theme.space[5],
+    paddingVertical: theme.space[5],
+  },
+  noticeHelper: {
     color: theme.color.textMuted,
     fontFamily: theme.font.family.regular,
     fontSize: theme.font.size.body,
     lineHeight: theme.font.size.body * theme.font.leading.normal,
   },
-  currencyRuleNotice: {
-    gap: theme.space[3],
-    paddingHorizontal: theme.space[1],
-    paddingVertical: theme.space[4],
-  },
-  currencyRuleTitle: {
+  noticeTitle: {
     color: theme.color.textStrong,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.subhead,
     fontWeight: theme.font.weight.bold,
   },
-  expenseDayChips: {
-    marginHorizontal: -theme.space[5],
-  },
-  expenseDayEmpty: {
-    gap: theme.space[1],
-    paddingHorizontal: theme.space[1],
-    paddingVertical: theme.space[4],
-  },
-  expenseDayEmptyTitle: {
-    color: theme.color.textStrong,
-    fontFamily: theme.font.family.semibold,
-    fontSize: theme.font.size.body,
-    fontWeight: theme.font.weight.semibold,
-  },
-  expenseDayHeader: {
-    gap: theme.space[1],
-    paddingHorizontal: theme.space[1],
-    paddingTop: theme.space[4],
-  },
-  expenseDaySection: {
-    borderTopColor: theme.color.borderSubtle,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    gap: theme.space[2],
-    paddingBottom: theme.space[2],
-  },
-  expenseDayTitle: {
-    color: theme.color.textStrong,
-    fontFamily: theme.font.family.semibold,
-    fontSize: theme.font.size.body,
-    fontWeight: theme.font.weight.semibold,
-  },
-  expenseHistoryHeader: {
-    gap: theme.space[1],
-    paddingHorizontal: theme.space[1],
-    paddingVertical: theme.space[4],
-  },
-  expenseHistoryNotice: {
-    backgroundColor: theme.color.accentSoft,
-    borderRadius: theme.radius.md,
-    marginBottom: theme.space[3],
-    paddingHorizontal: theme.space[4],
-    paddingVertical: theme.space[3],
-  },
-  expenseHistoryNoticeText: {
-    color: theme.color.textBody,
-    fontFamily: theme.font.family.semibold,
-    fontSize: theme.font.size.caption,
-    lineHeight: 20,
-  },
-  expenseRowList: {
-    gap: 0,
-  },
   sectionHeader: {
-    gap: theme.space[1],
-    paddingHorizontal: theme.space[1],
+    gap: theme.space[2],
+    paddingHorizontal: theme.space[5],
     paddingVertical: theme.space[4],
   },
   sectionHelper: {
     color: theme.color.textMuted,
     fontFamily: theme.font.family.regular,
-    fontSize: theme.font.size.caption,
+    fontSize: theme.font.size.body,
+    lineHeight: theme.font.size.body * theme.font.leading.normal,
   },
   sectionTitle: {
     color: theme.color.textStrong,
@@ -710,118 +361,21 @@ const styles = StyleSheet.create({
     fontSize: theme.font.size.subhead,
     fontWeight: theme.font.weight.bold,
   },
-  totalSpendAmount: {
-    color: theme.color.textStrong,
-    fontFamily: theme.font.family.bold,
-    fontSize: theme.font.size.headline,
-    fontWeight: theme.font.weight.bold,
-  },
-  totalSpendBar: {
-    backgroundColor: theme.color.surfaceSunken,
-    borderRadius: theme.radius.pill,
-    flexDirection: 'row',
-    height: 12,
-    overflow: 'hidden',
-  },
-  totalSpendBarSegment: {
-    flexBasis: 0,
-  },
-  totalSpendCurrencyHeader: {
-    alignItems: 'flex-start',
-    flexDirection: 'row',
-    gap: theme.space[4],
-    justifyContent: 'space-between',
-  },
-  totalSpendCurrencySection: {
-    borderTopColor: theme.color.borderSubtle,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    gap: theme.space[4],
-    paddingHorizontal: theme.space[1],
-    paddingVertical: theme.space[4],
-  },
-  totalSpendCurrencyTitle: {
-    color: theme.color.textStrong,
-    fontFamily: theme.font.family.semibold,
-    fontSize: theme.font.size.body,
-    fontWeight: theme.font.weight.semibold,
-  },
-  totalSpendCurrencyTitleGroup: {
-    flex: 1,
-    gap: theme.space[1],
-  },
-  totalSpendEmpty: {
-    borderTopColor: theme.color.borderSubtle,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    gap: theme.space[1],
-    paddingHorizontal: theme.space[1],
-    paddingVertical: theme.space[4],
-  },
-  totalSpendEmptyTitle: {
-    color: theme.color.textStrong,
-    fontFamily: theme.font.family.semibold,
-    fontSize: theme.font.size.body,
-    fontWeight: theme.font.weight.semibold,
-  },
-  totalSpendLegendAmount: {
-    color: theme.color.textStrong,
-    fontFamily: theme.font.family.semibold,
-    fontSize: theme.font.size.caption,
-    fontWeight: theme.font.weight.semibold,
-    marginLeft: 'auto',
-  },
-  totalSpendLegendLabel: {
-    color: theme.color.textBody,
-    flexShrink: 1,
-    fontFamily: theme.font.family.regular,
-    fontSize: theme.font.size.caption,
-  },
-  totalSpendLegendList: {
-    gap: theme.space[3],
-  },
-  totalSpendLegendMarker: {
-    borderRadius: theme.radius.pill,
-    height: 10,
-    width: 10,
-  },
-  totalSpendLegendPercent: {
-    color: theme.color.textMuted,
-    fontFamily: theme.font.family.regular,
-    fontSize: theme.font.size.caption,
-    minWidth: 38,
-    textAlign: 'right',
-  },
-  totalSpendLegendRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: theme.space[3],
-  },
-  totalSpendSectionList: {
-    gap: 0,
-  },
-  totalSpendZeroBar: {
-    backgroundColor: theme.color.surfaceSunken,
-    borderRadius: theme.radius.pill,
-    height: 12,
-  },
   statusBadge: {
     backgroundColor: theme.color.surfaceSunken,
     borderRadius: theme.radius.pill,
     paddingHorizontal: theme.space[3],
-    paddingVertical: theme.space[2],
+    paddingVertical: theme.space[1],
   },
   statusBadgeText: {
     color: theme.color.textMuted,
-    fontFamily: theme.font.family.semibold,
+    fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.micro,
-    fontWeight: theme.font.weight.semibold,
-  },
-  successStack: {
-    gap: theme.space[4],
-    maxWidth: theme.layout.cardMaxW,
-    width: '100%',
+    fontWeight: theme.font.weight.bold,
   },
   transferList: {
     gap: theme.space[3],
     paddingBottom: theme.space[4],
+    paddingHorizontal: theme.space[5],
   },
 });
