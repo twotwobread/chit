@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { ensurePushRegistration, type PushRegistrationDeps } from './push-registration.ts';
+import {
+  ensurePushRegistration,
+  loadOptionalExpoNotifications,
+  type PushRegistrationDeps,
+} from './push-registration.ts';
 
 test('registers an Expo push token after permission is granted', async () => {
   const calls: string[] = [];
@@ -61,4 +65,12 @@ test('reports unsupported platforms without requesting permission', async () => 
 
   assert.deepEqual(result, { status: 'unsupported' });
   assert.equal(requested, false);
+});
+
+test('treats missing expo-notifications native modules as optional for Expo Go', async () => {
+  const result = await loadOptionalExpoNotifications(async () => {
+    throw new Error("Your JavaScript code tried to access a native module that doesn't exist.");
+  });
+
+  assert.equal(result, null);
 });
