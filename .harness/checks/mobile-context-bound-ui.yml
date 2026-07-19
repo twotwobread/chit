@@ -1,0 +1,11 @@
+id: mobile-context-bound-ui
+type: command
+severity: blocking
+command: node .harness/scripts/check-mobile-context-bound-ui.mjs --repo-root .
+applies_to:
+  contracts:
+    - implementation.execute
+    - evaluation.checklist
+    - pr.create
+evidence:
+  write_to: artifacts/checks/mobile-context-bound-ui.log
