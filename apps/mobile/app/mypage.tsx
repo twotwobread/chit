@@ -1,9 +1,9 @@
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ProfileCard, SettingRow, SettingsList } from '../lib/account-ui/AccountRows';
-import { theme } from '../lib/design';
+import { PrimaryButton, SecondaryButton, theme } from '../lib/design';
 import { BottomMenu } from '../lib/navigation/BottomMenu';
 import { getRootScreenContentTopPadding } from '../lib/navigation/root-screen-layout';
 import {
@@ -53,9 +53,7 @@ export default function MyPageScreen() {
         {state.status === 'needsLogin' ? (
           <View style={styles.card}>
             <Text style={styles.message}>{state.message ?? '로그인이 필요합니다.'}</Text>
-            <Pressable accessibilityRole="button" onPress={() => router.replace('/login')} style={styles.button}>
-              <Text style={styles.buttonText}>로그인하기</Text>
-            </Pressable>
+            <PrimaryButton label="로그인하기" onPress={() => router.replace('/login')} />
           </View>
         ) : null}
 
@@ -63,9 +61,7 @@ export default function MyPageScreen() {
           <View style={styles.card}>
             <Text style={styles.errorTitle}>마이페이지를 불러올 수 없어요.</Text>
             <Text style={styles.message}>다시 시도해주세요.</Text>
-            <Pressable accessibilityRole="button" onPress={load} style={styles.button}>
-              <Text style={styles.buttonText}>다시 시도</Text>
-            </Pressable>
+            <SecondaryButton label="다시 시도" onPress={load} />
           </View>
         ) : null}
 

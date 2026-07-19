@@ -109,9 +109,6 @@ export const styles = StyleSheet.create({
     gap: theme.space[3],
     width: '100%',
   },
-  scheduleAddTrayButtonDisabled: {
-    opacity: 0.5,
-  },
   scheduleAddChipScroller: {
     marginHorizontal: -theme.space[1],
   },
@@ -156,22 +153,6 @@ export const styles = StyleSheet.create({
     fontFamily: theme.font.family.semibold,
     fontSize: theme.font.size.caption,
     fontWeight: theme.font.weight.semibold,
-  },
-  scheduleAddSubmitButton: {
-    alignItems: 'center',
-    backgroundColor: theme.color.primary,
-    borderRadius: theme.radius.md,
-    flexDirection: 'row',
-    gap: theme.space[2],
-    justifyContent: 'center',
-    minHeight: theme.layout.controlH,
-    paddingHorizontal: theme.space[5],
-    width: '100%',
-  },
-  scheduleAddSubmitButtonText: {
-    color: theme.color.onPrimary,
-    fontFamily: theme.font.family.bold,
-    fontWeight: theme.font.weight.bold,
   },
   scheduleMarkerDetailCard: {
     backgroundColor: theme.color.surfaceSunken,

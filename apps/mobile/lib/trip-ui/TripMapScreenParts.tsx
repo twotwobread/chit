@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { router } from 'expo-router';
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 
-import { theme } from '../design';
+import { PrimaryButton, theme } from '../design';
 import {
   type GooglePlaceAddViewState,
   type GooglePlaceSearchRowViewModel,
@@ -228,9 +228,11 @@ function MapScheduleAddTray({
         </View>
       ) : null}
       {feedbackMessage ? <Text style={styles.scheduleAddFeedback}>{feedbackMessage}</Text> : null}
-      <Pressable
-        accessibilityRole="button"
+      <PrimaryButton
         disabled={isSubmitting || (choosingDay && !targetDay)}
+        label={submitLabel}
+        loading={isSubmitting}
+        loadingLabel="등록 중..."
         onPress={() => {
           if (!choosingDay) {
             setChoosingDay(true);
@@ -240,14 +242,7 @@ function MapScheduleAddTray({
             onSubmit(targetDay.id);
           }
         }}
-        style={[
-          styles.scheduleAddSubmitButton,
-          isSubmitting || (choosingDay && !targetDay) ? styles.scheduleAddTrayButtonDisabled : null,
-        ]}
-      >
-        {isSubmitting ? <ActivityIndicator color={theme.color.onPrimary} /> : null}
-        <Text style={styles.scheduleAddSubmitButtonText}>{submitLabel}</Text>
-      </Pressable>
+      />
     </View>
   );
 }

@@ -92,7 +92,7 @@ export function ActiveTripCard({
       ) : null}
       {nextPlaceLabel ? (
         <View style={styles.heroNextRow}>
-          <MapPin color={theme.color.green[300]} size={16} strokeWidth={2} />
+          <MapPin color={theme.color.primary} size={16} strokeWidth={2} />
           <Text numberOfLines={1} style={styles.heroNext}>
             다음 <Text style={styles.heroNextStrong}>{nextPlaceLabel}</Text>
             {nextTimeLabel ? ` · ${nextTimeLabel}` : ''}
@@ -113,7 +113,7 @@ export function ActiveTripCard({
 
       <View style={styles.heroCta}>
         <Text style={styles.heroCtaText}>{ctaLabel}</Text>
-        <ChevronRight color={theme.color.green[800]} size={18} strokeWidth={2.4} />
+        <ChevronRight color={theme.color.onPrimary} size={18} strokeWidth={2.4} />
       </View>
     </Pressable>
   );
@@ -167,11 +167,7 @@ export function UpcomingTripRow({
         ) : null}
         {statusLabel ? <Badge label={statusLabel} tone={statusTone === 'success' ? 'success' : statusTone} /> : null}
       </View>
-      <ChevronRight
-        color={isHomeHeroSurface ? theme.color.onPrimary : theme.color.textFaint}
-        size={20}
-        strokeWidth={2}
-      />
+      <ChevronRight color={isHomeHeroSurface ? theme.color.primary : theme.color.textFaint} size={20} strokeWidth={2} />
     </Pressable>
   );
 }
@@ -241,20 +237,22 @@ const styles = StyleSheet.create({
     letterSpacing: -0.4,
   },
   fill: {
-    backgroundColor: theme.color.green[400],
+    backgroundColor: theme.color.primary,
     borderRadius: theme.radius.pill,
     height: '100%',
   },
   hero: {
-    backgroundColor: theme.color.green[900],
+    backgroundColor: theme.color.chit.charcoal,
+    borderColor: theme.color.chit.charcoalElevated,
     borderRadius: theme.radius['2xl'],
+    borderWidth: 1,
     padding: theme.space[6],
     width: '100%',
-    ...theme.shadow.lg,
+    ...theme.shadow.md,
   },
   heroCta: {
     alignItems: 'center',
-    backgroundColor: theme.color.onPrimary,
+    backgroundColor: theme.color.primary,
     borderRadius: theme.radius.lg,
     flexDirection: 'row',
     gap: theme.space[2],
@@ -263,25 +261,25 @@ const styles = StyleSheet.create({
     marginTop: theme.space[5],
   },
   heroCtaText: {
-    color: theme.color.green[800],
+    color: theme.color.onPrimary,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.subhead,
     fontWeight: theme.font.weight.bold,
   },
   heroDate: {
-    color: theme.color.green[100],
+    color: theme.color.chit.acidLimeSofter,
     fontFamily: theme.font.family.regular,
     fontSize: theme.font.size.label,
     marginTop: theme.space[2],
   },
   heroDayBadge: {
-    backgroundColor: theme.color.green[800],
+    backgroundColor: theme.color.chit.charcoalElevated,
     borderRadius: theme.radius.pill,
     paddingHorizontal: theme.space[3],
     paddingVertical: theme.space[2],
   },
   heroDayText: {
-    color: theme.color.onPrimary,
+    color: theme.color.primary,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.caption,
     fontWeight: theme.font.weight.bold,
@@ -292,13 +290,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   heroMeta: {
-    color: theme.color.green[100],
+    color: theme.color.chit.acidLimeSofter,
     fontFamily: theme.font.family.regular,
     fontSize: theme.font.size.label,
     marginTop: theme.space[1],
   },
   heroMetaPill: {
-    color: theme.color.onPrimary,
+    color: theme.color.textOnDark,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.caption,
     fontWeight: theme.font.weight.bold,
@@ -310,7 +308,7 @@ const styles = StyleSheet.create({
     marginTop: theme.space[3],
   },
   heroName: {
-    color: theme.color.onPrimary,
+    color: theme.color.textOnDark,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.titleLg,
     fontWeight: theme.font.weight.bold,
@@ -318,7 +316,7 @@ const styles = StyleSheet.create({
     marginTop: theme.space[4],
   },
   heroNext: {
-    color: theme.color.green[100],
+    color: theme.color.chit.acidLimeSofter,
     fontFamily: theme.font.family.regular,
     fontSize: theme.font.size.label,
     marginTop: theme.space[3],
@@ -330,7 +328,7 @@ const styles = StyleSheet.create({
     marginTop: theme.space[3],
   },
   heroNextStrong: {
-    color: theme.color.onPrimary,
+    color: theme.color.textOnDark,
     fontFamily: theme.font.family.bold,
     fontWeight: theme.font.weight.bold,
   },
@@ -378,7 +376,7 @@ const styles = StyleSheet.create({
     marginTop: theme.space[4],
   },
   progressText: {
-    color: theme.color.green[100],
+    color: theme.color.chit.acidLimeSofter,
     fontFamily: theme.font.family.semibold,
     fontSize: theme.font.size.caption,
     fontWeight: theme.font.weight.semibold,
@@ -390,7 +388,7 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.bold,
   },
   rowMetaLabelOnHero: {
-    color: theme.color.onPrimary,
+    color: theme.color.textOnDark,
   },
   rowMetaWrap: {
     flexDirection: 'row',
@@ -413,7 +411,7 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.bold,
   },
   track: {
-    backgroundColor: theme.color.green[800],
+    backgroundColor: theme.color.chit.charcoalElevated,
     borderRadius: theme.radius.pill,
     flex: 1,
     height: 6,
@@ -437,8 +435,8 @@ const styles = StyleSheet.create({
     gap: theme.space[2],
   },
   upcomingHomeHero: {
-    backgroundColor: theme.color.green[900],
-    borderColor: theme.color.green[800],
+    backgroundColor: theme.color.chit.charcoal,
+    borderColor: theme.color.chit.charcoalElevated,
   },
   upcomingMeta: {
     color: theme.color.textMuted,
@@ -446,7 +444,7 @@ const styles = StyleSheet.create({
     fontSize: theme.font.size.caption,
   },
   upcomingMetaOnHero: {
-    color: theme.color.green[100],
+    color: theme.color.chit.acidLimeSofter,
   },
   upcomingName: {
     color: theme.color.textStrong,
@@ -455,6 +453,6 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.bold,
   },
   upcomingNameOnHero: {
-    color: theme.color.onPrimary,
+    color: theme.color.textOnDark,
   },
 });
