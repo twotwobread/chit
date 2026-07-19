@@ -19,6 +19,7 @@ The app should feel like a hip fintech settlement product: Matte Charcoal create
 Use **B안: Dark Shell + Off-white Content**.
 
 - App shell/background: Matte Charcoal / Charcoal.
+- Background treatment: Matte Charcoal base with subtle Acid Lime ambient/radial gradient accents, especially near the top/right brand area.
 - Hero/brand/settlement moments: Charcoal Elevated / Charcoal + Acid Lime.
 - Dense content surfaces: clean off-white or white cards/shelves.
 - Forms/lists: clean off-white/white for readability, inside the dark shell.
@@ -62,6 +63,9 @@ Dark Shell + Off-white Content makes the brand color visible, reduces visual fra
 
 ### Color
 
+- Core screen background uses Matte Charcoal (`#191B1F`) or Charcoal (`#111315`) as the base.
+- Add a subtle Acid Lime ambient/radial gradient over the dark shell to echo the HTML mockup: low-opacity, atmospheric, not a loud neon wash.
+- Suggested gradient behavior: `rgba(200,255,0,0.10-0.18)` near the top/right or brand-header area, fading to transparent before dense content begins.
 - Retire warm Paper (`#F5F1E8`) from app backgrounds and core content cards.
 - Use a cleaner off-white family instead: target base `#F7F7F2`, elevated `#FCFCF8`, subtle/sunken `#F0F0EA`, border `#E4E3DA`.
 - Acid Lime is a fill/accent on dark shell, not small text on Off-white/White.
@@ -77,6 +81,7 @@ Dark Shell + Off-white Content makes the brand color visible, reduces visual fra
   - dark/hero card: Charcoal surface with Acid Lime accents;
   - shelf/group surface: subtle container for stacked content cards.
 - Buttons need polished pressed/disabled states without layout shift.
+- Background gradient should be tokenized or centralized; do not recreate ad-hoc gradient constants in every screen.
 - Tabs and app bars should feel attached to the dark shell.
 - Lists and rows remain scannable; amounts use tabular numerals.
 
@@ -90,6 +95,7 @@ Dark Shell + Off-white Content makes the brand color visible, reduces visual fra
 ## Acceptance Criteria
 
 - [ ] Core app screens use Matte Charcoal/Charcoal as the default shell background.
+- [ ] Core shell includes a subtle Acid Lime ambient/radial gradient treatment matching the approved HTML B mockup, without overpowering content.
 - [ ] Warm Paper (`#F5F1E8`) is not used for core backgrounds/cards; clean off-white/white is used for readable content surfaces.
 - [ ] Shared `Card` and button primitives visually match the approved B direction.
 - [ ] Login, Home, Today, Expenses, Settlement, New Trip, and Map/Search feel visually coherent under one Chit surface strategy.
