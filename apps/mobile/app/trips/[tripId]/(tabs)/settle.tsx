@@ -71,7 +71,10 @@ export default function TripSettleTabScreen() {
     <TripScreen>
       {state.status === 'loading' ? <TripStateCard loading title="정산을 불러오는 중..." /> : null}
       {state.status === 'auth' ? (
-        <TripStateCard primaryAction={{ label: '로그인하기', onPress: () => router.replace('/login') }} title="다시 로그인해주세요." />
+        <TripStateCard
+          primaryAction={{ label: '로그인하기', onPress: () => router.replace('/login') }}
+          title="다시 로그인해주세요."
+        />
       ) : null}
       {state.status === 'notFound' ? (
         <TripStateCard
@@ -168,7 +171,11 @@ function SettlementContent({
         </TripListCard>
       ))}
 
-      <SettlementRequestButton detailLink={tripSettlementDetailDeepLink(tripId)} tripName={tripName} viewModel={viewModel} />
+      <SettlementRequestButton
+        detailLink={tripSettlementDetailDeepLink(tripId)}
+        tripName={tripName}
+        viewModel={viewModel}
+      />
     </>
   );
 }
@@ -187,7 +194,9 @@ function SettlementRequestButton({
 
   return (
     <SecondaryButton
-      accessibilityLabel={disabled ? '보낼 정산 내역이 없어 정산 요청을 보낼 수 없어요.' : viewModel.requestAction.label}
+      accessibilityLabel={
+        disabled ? '보낼 정산 내역이 없어 정산 요청을 보낼 수 없어요.' : viewModel.requestAction.label
+      }
       disabled={disabled}
       label={viewModel.requestAction.label}
       onPress={() => {

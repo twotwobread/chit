@@ -106,7 +106,11 @@ export type QuickExpenseEntryChoiceViewModel = {
   verificationCopy: string;
 };
 
-export function buildQuickExpenseEntryChoiceViewModel({ hasTripId }: { hasTripId: boolean }): QuickExpenseEntryChoiceViewModel {
+export function buildQuickExpenseEntryChoiceViewModel({
+  hasTripId,
+}: {
+  hasTripId: boolean;
+}): QuickExpenseEntryChoiceViewModel {
   return {
     title: '지출을 어떻게 추가할까요?',
     helper: '영수증을 먼저 촬영하면 입력할 내용을 줄일 수 있어요.',

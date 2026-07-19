@@ -8,12 +8,7 @@ import type { ListTripExpensesResponse } from '@i-um/api-contract';
 import { SecondaryButton, theme } from '../../../../lib/design';
 import { ExpenseRow } from '../../../../lib/trip-ui/ExpenseRow';
 import { TripRootFab } from '../../../../lib/trip-ui/TripRootFab';
-import {
-  TripListCard,
-  TripScreen,
-  TripScreenHeader,
-  TripStateCard,
-} from '../../../../lib/trip-ui/TripScreenScaffold';
+import { TripListCard, TripScreen, TripScreenHeader, TripStateCard } from '../../../../lib/trip-ui/TripScreenScaffold';
 import { listTripExpenses } from '../../../../lib/trips/expense-api';
 import {
   buildExpenseCategoryBrowserViewModel,
@@ -95,7 +90,10 @@ export default function TripExpensesTabScreen() {
       <TripScreen contentContainerStyle={showFab ? fabLayout.scrollContent : undefined}>
         {state.status === 'loading' ? <TripStateCard loading title="지출을 불러오는 중..." /> : null}
         {state.status === 'auth' ? (
-          <TripStateCard primaryAction={{ label: '로그인하기', onPress: () => router.replace('/login') }} title="다시 로그인해주세요." />
+          <TripStateCard
+            primaryAction={{ label: '로그인하기', onPress: () => router.replace('/login') }}
+            title="다시 로그인해주세요."
+          />
         ) : null}
         {state.status === 'notFound' ? (
           <TripStateCard
@@ -165,7 +163,12 @@ function ExpenseContent({
   onCategorySelect: (category: string) => void;
 }) {
   if (mode === 'days') {
-    const viewModel = buildExpenseDayBrowserViewModel({ tripId, days: tripDays, response, selectedSectionId: selectedDayId });
+    const viewModel = buildExpenseDayBrowserViewModel({
+      tripId,
+      days: tripDays,
+      response,
+      selectedSectionId: selectedDayId,
+    });
     return <ExpenseDayBrowserContent onBack={onBack} onSelectDay={onDaySelect} viewModel={viewModel} />;
   }
 
@@ -174,15 +177,11 @@ function ExpenseContent({
       tripId,
       days: tripDays,
       response,
-      selectedCategory: selectedCategory as Parameters<typeof buildExpenseCategoryBrowserViewModel>[0]['selectedCategory'],
+      selectedCategory: selectedCategory as Parameters<
+        typeof buildExpenseCategoryBrowserViewModel
+      >[0]['selectedCategory'],
     });
-    return (
-      <ExpenseCategoryBrowserContent
-        onBack={onBack}
-        onSelectCategory={onCategorySelect}
-        viewModel={viewModel}
-      />
-    );
+    return <ExpenseCategoryBrowserContent onBack={onBack} onSelectCategory={onCategorySelect} viewModel={viewModel} />;
   }
 
   const viewModel = buildExpenseDashboardViewModel({ tripId, days: tripDays, response });
@@ -276,7 +275,10 @@ function ExpenseCategorySummaryCard({
                 accessibilityLabel={row.accessibilityLabel}
                 accessible
                 key={row.category}
-                style={[styles.categoryBarSegment, { backgroundColor: row.color, flexGrow: Math.max(row.percentage, 1) }]}
+                style={[
+                  styles.categoryBarSegment,
+                  { backgroundColor: row.color, flexGrow: Math.max(row.percentage, 1) },
+                ]}
               />
             ))}
           </View>
@@ -310,7 +312,13 @@ function ExpenseDayBrowserContent({
   onSelectDay: (dayId: string) => void;
 }) {
   if (viewModel.status === 'empty') {
-    return <TripStateCard helper={viewModel.helper} primaryAction={{ label: '지출로 돌아가기', onPress: onBack }} title={viewModel.emptyTitle} />;
+    return (
+      <TripStateCard
+        helper={viewModel.helper}
+        primaryAction={{ label: '지출로 돌아가기', onPress: onBack }}
+        title={viewModel.emptyTitle}
+      />
+    );
   }
 
   return (
@@ -347,7 +355,13 @@ function ExpenseCategoryBrowserContent({
   onSelectCategory: (category: string) => void;
 }) {
   if (viewModel.status === 'empty') {
-    return <TripStateCard helper={viewModel.helper} primaryAction={{ label: '지출로 돌아가기', onPress: onBack }} title={viewModel.emptyTitle} />;
+    return (
+      <TripStateCard
+        helper={viewModel.helper}
+        primaryAction={{ label: '지출로 돌아가기', onPress: onBack }}
+        title={viewModel.emptyTitle}
+      />
+    );
   }
 
   return (
@@ -457,7 +471,11 @@ function FilterChip({
       accessibilityRole="button"
       accessibilityState={{ selected }}
       onPress={onPress}
-      style={({ pressed }) => [styles.filterChip, selected ? styles.filterChipSelected : null, pressed ? styles.pressed : null]}
+      style={({ pressed }) => [
+        styles.filterChip,
+        selected ? styles.filterChipSelected : null,
+        pressed ? styles.pressed : null,
+      ]}
     >
       <Text style={[styles.filterChipText, selected ? styles.filterChipTextSelected : null]}>{label}</Text>
       {statusLabel ? <Text style={styles.filterChipStatus}>{statusLabel}</Text> : null}

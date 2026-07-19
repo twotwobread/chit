@@ -78,12 +78,14 @@ test('builds expense dashboard summary with category amounts counts and percenta
 
   assert.equal(viewModel.status, 'success');
   if (viewModel.status !== 'success') return;
-  assert.deepEqual(viewModel.totalSections.map((section) => [section.currency, section.totalAmountLabel]), [
-    ['KRW', '160,000원'],
-  ]);
-  assert.deepEqual(viewModel.totalSections.map((section) => [section.includedAmountLabel, section.excludedCountLabel]), [
-    ['150,000원', '1건 제외'],
-  ]);
+  assert.deepEqual(
+    viewModel.totalSections.map((section) => [section.currency, section.totalAmountLabel]),
+    [['KRW', '160,000원']],
+  );
+  assert.deepEqual(
+    viewModel.totalSections.map((section) => [section.includedAmountLabel, section.excludedCountLabel]),
+    [['150,000원', '1건 제외']],
+  );
   assert.deepEqual(
     viewModel.categorySections[0].rows.map((row) => [
       row.category,
@@ -119,14 +121,20 @@ test('keeps multi-currency totals and category summaries separate without conver
 
   assert.equal(viewModel.status, 'success');
   if (viewModel.status !== 'success') return;
-  assert.deepEqual(viewModel.totalSections.map((section) => [section.currency, section.totalAmountLabel]), [
-    ['JPY', '1,000엔'],
-    ['KRW', '10,000원'],
-  ]);
-  assert.deepEqual(viewModel.categorySections.map((section) => [section.currency, section.totalAmountLabel]), [
-    ['JPY', '1,000엔'],
-    ['KRW', '10,000원'],
-  ]);
+  assert.deepEqual(
+    viewModel.totalSections.map((section) => [section.currency, section.totalAmountLabel]),
+    [
+      ['JPY', '1,000엔'],
+      ['KRW', '10,000원'],
+    ],
+  );
+  assert.deepEqual(
+    viewModel.categorySections.map((section) => [section.currency, section.totalAmountLabel]),
+    [
+      ['JPY', '1,000엔'],
+      ['KRW', '10,000원'],
+    ],
+  );
 });
 
 test('builds day browser with trip-level bucket before Day tabs', () => {
@@ -161,9 +169,10 @@ test('builds day browser with trip-level bucket before Day tabs', () => {
     ],
   );
   assert.equal(viewModel.selectedSection.id, '__trip_expenses__');
-  assert.deepEqual(viewModel.selectedSection.rows.map((row) => [row.id, row.contextLabel, row.editRoute]), [
-    ['flight-a', '여행 전체', '/trips/trip-a/expenses/flight-a/edit'],
-  ]);
+  assert.deepEqual(
+    viewModel.selectedSection.rows.map((row) => [row.id, row.contextLabel, row.editRoute]),
+    [['flight-a', '여행 전체', '/trips/trip-a/expenses/flight-a/edit']],
+  );
 });
 
 test('builds category browser filtering selected category', () => {
@@ -186,14 +195,18 @@ test('builds category browser filtering selected category', () => {
 
   assert.equal(viewModel.status, 'success');
   if (viewModel.status !== 'success') return;
-  assert.deepEqual(viewModel.categoryChips.map((chip) => [chip.category, chip.label, chip.selected]), [
-    ['food', '식당', true],
-    ['transport', '교통', false],
-  ]);
+  assert.deepEqual(
+    viewModel.categoryChips.map((chip) => [chip.category, chip.label, chip.selected]),
+    [
+      ['food', '식당', true],
+      ['transport', '교통', false],
+    ],
+  );
   assert.equal(viewModel.selectedCategorySummary.amountLabel, '84,000원');
   assert.equal(viewModel.selectedCategorySummary.expenseCountLabel, '1건');
   assert.equal(viewModel.selectedCategorySummary.percentageLabel, '77.8%');
-  assert.deepEqual(viewModel.rows.map((row) => [row.id, row.categoryLabel, row.contextLabel]), [
-    ['food-a', '식당', '1일차'],
-  ]);
+  assert.deepEqual(
+    viewModel.rows.map((row) => [row.id, row.categoryLabel, row.contextLabel]),
+    [['food-a', '식당', '1일차']],
+  );
 });

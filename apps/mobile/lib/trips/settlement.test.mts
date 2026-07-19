@@ -991,7 +991,11 @@ test('builds latest settlement detail view model with balances transfers and exp
               netMinor: 63000,
             },
             {
-              participant: { participantId: 'participant-b', displayName: '지영', participantStatus: 'current' as const },
+              participant: {
+                participantId: 'participant-b',
+                displayName: '지영',
+                participantStatus: 'current' as const,
+              },
               paidMinor: 0,
               shareMinor: 21000,
               netMinor: -21000,
@@ -999,7 +1003,11 @@ test('builds latest settlement detail view model with balances transfers and exp
           ],
           suggestedTransfers: [
             {
-              fromParticipant: { participantId: 'participant-b', displayName: '지영', participantStatus: 'current' as const },
+              fromParticipant: {
+                participantId: 'participant-b',
+                displayName: '지영',
+                participantStatus: 'current' as const,
+              },
               toParticipant: { participantId: 'payer-a', displayName: '민수', participantStatus: 'current' as const },
               amountMinor: 21000,
             },
@@ -1042,29 +1050,42 @@ test('builds latest settlement detail view model with balances transfers and exp
   assert.equal(viewModel.latestNotice, '현재 여행 지출 기준으로 계산된 최신 정산이에요.');
   assert.equal(viewModel.formulaCopy, '결제 금액 - 부담 금액 = 받을/보낼 금액');
   assert.deepEqual(
-    viewModel.currencySections.map((section) => [section.currency, section.totalPaidAmountLabel, section.totalShareAmountLabel]),
+    viewModel.currencySections.map((section) => [
+      section.currency,
+      section.totalPaidAmountLabel,
+      section.totalShareAmountLabel,
+    ]),
     [['KRW', '102,000원', '102,000원']],
   );
   assert.deepEqual(
-    viewModel.currencySections[0].balanceRows.map((row) => [row.displayName, row.paidAmountLabel, row.shareAmountLabel, row.netLabel, row.netAmountLabel]),
+    viewModel.currencySections[0].balanceRows.map((row) => [
+      row.displayName,
+      row.paidAmountLabel,
+      row.shareAmountLabel,
+      row.netLabel,
+      row.netAmountLabel,
+    ]),
     [
       ['민수', '84,000원', '21,000원', '받을 금액', '63,000원'],
       ['지영', '0원', '21,000원', '보낼 금액', '21,000원'],
     ],
   );
-  assert.deepEqual(viewModel.currencySections[0].transferRows.map((row) => [row.fromName, row.toName, row.amountLabel]), [
-    ['지영', '민수', '21,000원'],
-  ]);
-  assert.deepEqual(viewModel.currencySections[0].includedExpenses.map((row) => [row.id, row.contextLabel, row.settlementLabel]), [
-    ['included-a', '1일차', '정산 포함'],
-  ]);
-  assert.deepEqual(viewModel.currencySections[0].excludedExpenses.map((row) => [row.id, row.title, row.settlementLabel]), [
-    ['excluded-a', '택시 선결제', '최종 정산 제외'],
-  ]);
-  assert.deepEqual(viewModel.currencySections[0].includedExpenses[0].splitRows.map((row) => row.amountLabel), [
-    '42,000원',
-    '42,000원',
-  ]);
+  assert.deepEqual(
+    viewModel.currencySections[0].transferRows.map((row) => [row.fromName, row.toName, row.amountLabel]),
+    [['지영', '민수', '21,000원']],
+  );
+  assert.deepEqual(
+    viewModel.currencySections[0].includedExpenses.map((row) => [row.id, row.contextLabel, row.settlementLabel]),
+    [['included-a', '1일차', '정산 포함']],
+  );
+  assert.deepEqual(
+    viewModel.currencySections[0].excludedExpenses.map((row) => [row.id, row.title, row.settlementLabel]),
+    [['excluded-a', '택시 선결제', '최종 정산 제외']],
+  );
+  assert.deepEqual(
+    viewModel.currencySections[0].includedExpenses[0].splitRows.map((row) => row.amountLabel),
+    ['42,000원', '42,000원'],
+  );
 });
 
 test('builds latest settlement detail sections for multiple currencies without conversion', () => {
@@ -1079,15 +1100,24 @@ test('builds latest settlement detail sections for multiple currencies without c
       ],
     },
     expenseDays: [
-      { day: tripDay({ id: 'day-1', date: '2026-07-10', dayOrder: 1 }), expenses: [dayExpense({ currency: 'JPY', amountMinor: 1000 })] },
-      { day: tripDay({ id: 'day-2', date: '2026-07-11', dayOrder: 2 }), expenses: [dayExpense({ currency: 'KRW', amountMinor: 10000 })] },
+      {
+        day: tripDay({ id: 'day-1', date: '2026-07-10', dayOrder: 1 }),
+        expenses: [dayExpense({ currency: 'JPY', amountMinor: 1000 })],
+      },
+      {
+        day: tripDay({ id: 'day-2', date: '2026-07-11', dayOrder: 2 }),
+        expenses: [dayExpense({ currency: 'KRW', amountMinor: 10000 })],
+      },
     ],
   });
 
-  assert.deepEqual(viewModel.currencySections.map((section) => [section.currency, section.totalPaidAmountLabel]), [
-    ['JPY', '1,000엔'],
-    ['KRW', '10,000원'],
-  ]);
+  assert.deepEqual(
+    viewModel.currencySections.map((section) => [section.currency, section.totalPaidAmountLabel]),
+    [
+      ['JPY', '1,000엔'],
+      ['KRW', '10,000원'],
+    ],
+  );
 });
 
 test('builds Kakao settlement request template from the same share message', () => {

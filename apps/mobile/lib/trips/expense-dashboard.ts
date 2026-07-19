@@ -214,8 +214,7 @@ export function buildExpenseCategoryBrowserViewModel({
     selectedCategory && allCategoryRows.some((row) => row.category === selectedCategory)
       ? selectedCategory
       : (allCategoryRows[0]?.category ?? 'etc');
-  const selectedCategorySummary = allCategoryRows.find((row) => row.category === activeCategory) ??
-    allCategoryRows[0];
+  const selectedCategorySummary = allCategoryRows.find((row) => row.category === activeCategory) ?? allCategoryRows[0];
   const categoryEntries = entries.filter((entry) => entry.expense.expenseCategory === activeCategory);
 
   return {
@@ -266,7 +265,10 @@ function flattenExpenses({
 }
 
 function buildTotalSections(entries: FlattenedExpense[]): ExpenseDashboardTotalSectionViewModel[] {
-  const summaries = new Map<SupportedCurrency, { total: number; included: number; excludedCount: number; count: number }>();
+  const summaries = new Map<
+    SupportedCurrency,
+    { total: number; included: number; excludedCount: number; count: number }
+  >();
   for (const { expense } of entries) {
     const summary = summaries.get(expense.currency) ?? { total: 0, included: 0, excludedCount: 0, count: 0 };
     summary.total += expense.amountMinor;
@@ -279,33 +281,29 @@ function buildTotalSections(entries: FlattenedExpense[]): ExpenseDashboardTotalS
     summaries.set(expense.currency, summary);
   }
 
-  return [...summaries]
-    .sort(compareCurrencyEntries)
-    .map(([currency, summary]) => ({
-      currency,
-      totalMinor: summary.total,
-      totalAmountLabel: formatMoney(summary.total, currency),
-      includedMinor: summary.included,
-      includedAmountLabel: formatMoney(summary.included, currency),
-      excludedExpenseCount: summary.excludedCount,
-      excludedCountLabel: summary.excludedCount > 0 ? `${summary.excludedCount}건 제외` : '제외 없음',
-      expenseCount: summary.count,
-    }));
+  return [...summaries].sort(compareCurrencyEntries).map(([currency, summary]) => ({
+    currency,
+    totalMinor: summary.total,
+    totalAmountLabel: formatMoney(summary.total, currency),
+    includedMinor: summary.included,
+    includedAmountLabel: formatMoney(summary.included, currency),
+    excludedExpenseCount: summary.excludedCount,
+    excludedCountLabel: summary.excludedCount > 0 ? `${summary.excludedCount}건 제외` : '제외 없음',
+    expenseCount: summary.count,
+  }));
 }
 
 function buildCategorySections(entries: FlattenedExpense[]): ExpenseDashboardCategorySectionViewModel[] {
   const entriesByCurrency = groupByCurrency(entries);
-  return [...entriesByCurrency]
-    .sort(compareCurrencyEntries)
-    .map(([currency, currencyEntries]) => {
-      const totalMinor = sumEntries(currencyEntries);
-      return {
-        currency,
-        totalMinor,
-        totalAmountLabel: formatMoney(totalMinor, currency),
-        rows: buildCategoryRows(currencyEntries, totalMinor, currency),
-      };
-    });
+  return [...entriesByCurrency].sort(compareCurrencyEntries).map(([currency, currencyEntries]) => {
+    const totalMinor = sumEntries(currencyEntries);
+    return {
+      currency,
+      totalMinor,
+      totalAmountLabel: formatMoney(totalMinor, currency),
+      rows: buildCategoryRows(currencyEntries, totalMinor, currency),
+    };
+  });
 }
 
 function buildCombinedCategoryRows(entries: FlattenedExpense[]): ExpenseDashboardCategoryRowViewModel[] {
@@ -373,7 +371,9 @@ function buildDaySections({
 }): ExpenseDayBrowserSectionViewModel[] {
   const sections: ExpenseDayBrowserSectionViewModel[] = [];
   const tripEntries = entries.filter((entry) => entry.contextId === tripExpenseBucketId);
-  sections.push(daySection({ id: tripExpenseBucketId, title: '여행 전체', dateLabel: null, entries: tripEntries, tripId }));
+  sections.push(
+    daySection({ id: tripExpenseBucketId, title: '여행 전체', dateLabel: null, entries: tripEntries, tripId }),
+  );
 
   for (const day of days) {
     const dayEntries = entries.filter((entry) => entry.contextId === day.id);

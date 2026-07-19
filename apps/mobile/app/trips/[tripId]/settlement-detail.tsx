@@ -178,7 +178,13 @@ function SettlementDetailCurrencySection({ section }: { section: SettlementDetai
   );
 }
 
-function SettlementDetailExpenseSection({ rows, title }: { title: string; rows: SettlementDetailExpenseRowViewModel[] }) {
+function SettlementDetailExpenseSection({
+  rows,
+  title,
+}: {
+  title: string;
+  rows: SettlementDetailExpenseRowViewModel[];
+}) {
   return (
     <TripListCard>
       <View style={styles.sectionHeader}>

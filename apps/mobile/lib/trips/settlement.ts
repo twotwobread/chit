@@ -633,7 +633,8 @@ function buildSettlementDetailExpenseRows(
   currency: SupportedCurrency,
 ): SettlementDetailExpenseRowViewModel[] {
   return expenseDays.flatMap((dayInput) => {
-    const contextLabel = dayInput.day.id === tripExpenseSectionId ? '여행 전체' : formatTripDayLabel(dayInput.day.dayOrder);
+    const contextLabel =
+      dayInput.day.id === tripExpenseSectionId ? '여행 전체' : formatTripDayLabel(dayInput.day.dayOrder);
     return dayInput.expenses
       .filter((expense) => expense.currency === currency)
       .map((expense) => settlementDetailExpenseRow(expense, contextLabel));
