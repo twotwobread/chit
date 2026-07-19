@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -902,6 +903,7 @@ func (s *Store) ListDayExpensesByTripDay(ctx context.Context, tripID string, tri
 			SplitPolicy:         expenseRow.SplitPolicy,
 			Splits:              []trip.DayExpenseSplitListItem{},
 			IncludeInSettlement: expenseRow.IncludeInSettlement,
+			Receipt:             receiptSummary(expenseRow.ReceiptExists, expenseRow.ReceiptContentType, expenseRow.ReceiptByteSize, expenseRow.ReceiptUploadedAt),
 			CreatedAt:           expenseRow.CreatedAt.Time,
 		})
 	}
@@ -948,6 +950,7 @@ func (s *Store) ListTripExpenses(ctx context.Context, tripID string) (trip.ListT
 			SplitPolicy:         expenseRow.SplitPolicy,
 			Splits:              []trip.DayExpenseSplitListItem{},
 			IncludeInSettlement: expenseRow.IncludeInSettlement,
+			Receipt:             receiptSummary(expenseRow.ReceiptExists, expenseRow.ReceiptContentType, expenseRow.ReceiptByteSize, expenseRow.ReceiptUploadedAt),
 			CreatedAt:           expenseRow.CreatedAt.Time,
 		}
 		if expenseRow.AnchorType == "trip" {
@@ -1408,7 +1411,16 @@ func (s *Store) UpdateTripExpense(ctx context.Context, record trip.UpdateExpense
 }
 
 func (s *Store) DeleteTripExpenseByID(ctx context.Context, tripID string, expenseID string) (bool, error) {
-	_, err := s.queries.DeleteTripExpenseByID(ctx, db.DeleteTripExpenseByIDParams{
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback(ctx)
+	qtx := s.queries.WithTx(tx)
+	if err := qtx.EnqueueExpenseReceiptDeletionJobForExpense(ctx, db.EnqueueExpenseReceiptDeletionJobForExpenseParams{Reason: "expense_deleted", TripID: mustUUID(tripID), ExpenseID: mustUUID(expenseID)}); err != nil {
+		return false, err
+	}
+	_, err = qtx.DeleteTripExpenseByID(ctx, db.DeleteTripExpenseByIDParams{
 		TripID:    mustUUID(tripID),
 		ExpenseID: mustUUID(expenseID),
 	})
@@ -1418,11 +1430,23 @@ func (s *Store) DeleteTripExpenseByID(ctx context.Context, tripID string, expens
 	if err != nil {
 		return false, err
 	}
+	if err := tx.Commit(ctx); err != nil {
+		return false, err
+	}
 	return true, nil
 }
 
 func (s *Store) DeleteExpenseByTripDayAndID(ctx context.Context, tripID string, tripDayID string, expenseID string) (bool, error) {
-	_, err := s.queries.DeleteExpenseByTripDayAndID(ctx, db.DeleteExpenseByTripDayAndIDParams{
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback(ctx)
+	qtx := s.queries.WithTx(tx)
+	if err := qtx.EnqueueExpenseReceiptDeletionJobForExpense(ctx, db.EnqueueExpenseReceiptDeletionJobForExpenseParams{Reason: "expense_deleted", TripID: mustUUID(tripID), ExpenseID: mustUUID(expenseID)}); err != nil {
+		return false, err
+	}
+	_, err = qtx.DeleteExpenseByTripDayAndID(ctx, db.DeleteExpenseByTripDayAndIDParams{
 		TripID:    mustUUID(tripID),
 		TripDayID: mustUUID(tripDayID),
 		ExpenseID: mustUUID(expenseID),
@@ -1431,6 +1455,9 @@ func (s *Store) DeleteExpenseByTripDayAndID(ctx context.Context, tripID string, 
 		return false, nil
 	}
 	if err != nil {
+		return false, err
+	}
+	if err := tx.Commit(ctx); err != nil {
 		return false, err
 	}
 	return true, nil
@@ -1541,6 +1568,14 @@ func (s *Store) CreateQuickExpense(ctx context.Context, record trip.CreateQuickE
 		})
 	}
 
+	receipt := receiptSummary(expenseRow.ReceiptExists, expenseRow.ReceiptContentType, expenseRow.ReceiptByteSize, expenseRow.ReceiptUploadedAt)
+	if record.ReceiptDraftID != nil {
+		receipt, err = attachExpenseReceiptDraft(ctx, qtx, record.TripID, record.CreatedBy, expenseRow.ID, *record.ReceiptDraftID)
+		if err != nil {
+			return trip.CreateQuickExpenseResult{}, err
+		}
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return trip.CreateQuickExpenseResult{}, err
 	}
@@ -1562,6 +1597,7 @@ func (s *Store) CreateQuickExpense(ctx context.Context, record trip.CreateQuickE
 		SplitPolicy:         expenseRow.SplitPolicy,
 		Splits:              splits,
 		IncludeInSettlement: expenseRow.IncludeInSettlement,
+		Receipt:             receipt,
 		CreatedAt:           expenseRow.CreatedAt.Time,
 	}}, nil
 }
@@ -1693,11 +1729,21 @@ func (s *Store) CreateTripExpense(ctx context.Context, record trip.CreateTripExp
 		})
 	}
 
+	receipt := receiptSummary(expenseRow.ReceiptExists, expenseRow.ReceiptContentType, expenseRow.ReceiptByteSize, expenseRow.ReceiptUploadedAt)
+	if record.ReceiptDraftID != nil {
+		receipt, err = attachExpenseReceiptDraft(ctx, qtx, record.TripID, record.CreatedBy, expenseRow.ID, *record.ReceiptDraftID)
+		if err != nil {
+			return trip.CreateTripExpenseResult{}, err
+		}
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return trip.CreateTripExpenseResult{}, err
 	}
 
-	return trip.CreateTripExpenseResult{Expense: expenseFromInsertRow(expenseRow, splits, placeSource)}, nil
+	expense := expenseFromInsertRow(expenseRow, splits, placeSource)
+	expense.Receipt = receipt
+	return trip.CreateTripExpenseResult{Expense: expense}, nil
 }
 
 func (s *Store) GetScheduleItemByTripDayAndID(ctx context.Context, tripID string, tripDayID string, itemID string) (trip.ScheduleItem, bool, error) {
@@ -3192,6 +3238,279 @@ func timeTextPtrToSQL(value *string) pgtype.Time {
 	return pgtype.Time{Microseconds: microseconds, Valid: true}
 }
 
+type expenseReceiptObjectJSON struct {
+	Role        string    `json:"role"`
+	Bucket      string    `json:"bucket"`
+	ObjectKey   string    `json:"objectKey"`
+	Generation  string    `json:"generation"`
+	ContentType string    `json:"contentType"`
+	ByteSize    int       `json:"byteSize"`
+	UploadedAt  time.Time `json:"uploadedAt"`
+}
+
+func marshalExpenseReceiptObjects(objects []trip.ExpenseReceiptObject) ([]byte, string, int32, int32, pgtype.Timestamptz, error) {
+	if len(objects) == 0 || len(objects) > 2 {
+		return nil, "", 0, 0, pgtype.Timestamptz{}, trip.ErrValidation
+	}
+	jsonObjects := make([]expenseReceiptObjectJSON, 0, len(objects))
+	totalBytes := 0
+	for _, object := range objects {
+		jsonObjects = append(jsonObjects, expenseReceiptObjectJSON{
+			Role:        strings.TrimSpace(string(object.Role)),
+			Bucket:      strings.TrimSpace(object.Bucket),
+			ObjectKey:   strings.TrimSpace(object.ObjectKey),
+			Generation:  strings.TrimSpace(object.Generation),
+			ContentType: strings.TrimSpace(object.ContentType),
+			ByteSize:    object.ByteSize,
+			UploadedAt:  object.UploadedAt.UTC(),
+		})
+		totalBytes += object.ByteSize
+	}
+	data, err := json.Marshal(jsonObjects)
+	if err != nil {
+		return nil, "", 0, 0, pgtype.Timestamptz{}, err
+	}
+	return data, strings.TrimSpace(objects[0].ContentType), int32(len(objects)), int32(totalBytes), timestamptzValue(objects[0].UploadedAt), nil
+}
+
+func unmarshalExpenseReceiptObjects(data []byte) ([]trip.ExpenseReceiptObject, error) {
+	if len(data) == 0 {
+		return nil, nil
+	}
+	var jsonObjects []expenseReceiptObjectJSON
+	if err := json.Unmarshal(data, &jsonObjects); err != nil {
+		return nil, err
+	}
+	objects := make([]trip.ExpenseReceiptObject, 0, len(jsonObjects))
+	for _, object := range jsonObjects {
+		objects = append(objects, trip.ExpenseReceiptObject{
+			Role:        trip.ReceiptImageRole(object.Role),
+			Bucket:      object.Bucket,
+			ObjectKey:   object.ObjectKey,
+			Generation:  object.Generation,
+			ContentType: object.ContentType,
+			ByteSize:    object.ByteSize,
+			UploadedAt:  object.UploadedAt,
+		})
+	}
+	return objects, nil
+}
+
+func attachExpenseReceiptDraft(ctx context.Context, queries *db.Queries, tripID string, userID string, expenseID string, receiptDraftID string) (trip.ExpenseReceiptSummary, error) {
+	draft, err := queries.GetExpenseReceiptDraftForUpdate(ctx, db.GetExpenseReceiptDraftForUpdateParams{ReceiptDraftID: mustUUID(receiptDraftID), TripID: mustUUID(tripID), CreatedByUserID: mustUUID(userID)})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return trip.ExpenseReceiptSummary{}, trip.ErrNotFound
+	}
+	if err != nil {
+		return trip.ExpenseReceiptSummary{}, err
+	}
+	if draft.Status != "draft" || !timeFromTimestamptz(draft.ExpiresAt).After(time.Now().UTC()) {
+		return trip.ExpenseReceiptSummary{}, trip.ErrNotFound
+	}
+	row, err := queries.UpsertExpenseReceipt(ctx, db.UpsertExpenseReceiptParams{
+		ExpenseID:        mustUUID(expenseID),
+		TripID:           mustUUID(tripID),
+		UploadedByUserID: mustUUID(userID),
+		ObjectsJson:      draft.ObjectsJson,
+		ImageCount:       draft.ImageCount,
+		ContentType:      draft.ContentType,
+		ByteSize:         draft.ByteSize,
+		UploadedAt:       draft.UploadedAt,
+	})
+	if err != nil {
+		return trip.ExpenseReceiptSummary{}, err
+	}
+	if err := queries.MarkExpenseReceiptDraftUsed(ctx, db.MarkExpenseReceiptDraftUsedParams{ExpenseID: mustUUID(expenseID), ReceiptDraftID: mustUUID(receiptDraftID), TripID: mustUUID(tripID), CreatedByUserID: mustUUID(userID)}); err != nil {
+		return trip.ExpenseReceiptSummary{}, err
+	}
+	return receiptSummary(row.Exists, row.ContentType, row.ByteSize, row.UploadedAt), nil
+}
+
+func (s *Store) CreateExpenseReceiptDraft(ctx context.Context, record trip.CreateExpenseReceiptDraftRecord) (trip.CreateExpenseReceiptDraftResult, error) {
+	extractionJSON, err := json.Marshal(record.Extraction)
+	if err != nil {
+		return trip.CreateExpenseReceiptDraftResult{}, err
+	}
+	objectsJSON, contentType, imageCount, byteSize, uploadedAt, err := marshalExpenseReceiptObjects(record.Objects)
+	if err != nil {
+		return trip.CreateExpenseReceiptDraftResult{}, err
+	}
+	row, err := s.queries.InsertExpenseReceiptDraft(ctx, db.InsertExpenseReceiptDraftParams{
+		TripID:          mustUUID(record.TripID),
+		CreatedByUserID: mustUUID(record.CreatedByUserID),
+		CaptureMode:     string(record.CaptureMode),
+		ObjectsJson:     objectsJSON,
+		ImageCount:      imageCount,
+		ContentType:     contentType,
+		ByteSize:        byteSize,
+		UploadedAt:      uploadedAt,
+		ExtractionJson:  extractionJSON,
+		Confidence:      record.Extraction.Confidence,
+		Warnings:        record.Extraction.Warnings,
+		ExpiresAt:       timestamptzValue(record.ExpiresAt),
+	})
+	if err != nil {
+		return trip.CreateExpenseReceiptDraftResult{}, err
+	}
+	return trip.CreateExpenseReceiptDraftResult{Draft: trip.ExpenseReceiptDraft{
+		ID:          row.ID,
+		TripID:      row.TripID,
+		CaptureMode: trip.ReceiptCaptureMode(row.CaptureMode),
+		ImageCount:  int(row.ImageCount),
+		ContentType: row.ContentType,
+		ByteSize:    int(row.ByteSize),
+		Extraction:  record.Extraction,
+		ExpiresAt:   timeFromTimestamptz(row.ExpiresAt),
+		CreatedAt:   timeFromTimestamptz(row.CreatedAt),
+	}}, nil
+}
+
+func (s *Store) CancelExpenseReceiptDraft(ctx context.Context, tripID string, userID string, receiptDraftID string) ([]trip.ExpenseReceiptObject, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+	qtx := s.queries.WithTx(tx)
+	rows, err := qtx.CancelExpenseReceiptDraft(ctx, db.CancelExpenseReceiptDraftParams{
+		ReceiptDraftID:  mustUUID(receiptDraftID),
+		TripID:          mustUUID(tripID),
+		CreatedByUserID: mustUUID(userID),
+	})
+	if err != nil {
+		return nil, err
+	}
+	objects := make([]trip.ExpenseReceiptObject, 0, len(rows))
+	for _, objectsJSON := range rows {
+		draftObjects, err := unmarshalExpenseReceiptObjects(objectsJSON)
+		if err != nil {
+			return nil, err
+		}
+		for _, object := range draftObjects {
+			if err := createExpenseReceiptStorageObjectDeletionJob(ctx, qtx, object, "receipt_draft_cancelled"); err != nil {
+				return nil, err
+			}
+			objects = append(objects, object)
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	return objects, nil
+}
+
+func (s *Store) UpsertExpenseReceipt(ctx context.Context, record trip.UpsertExpenseReceiptRecord) (trip.UpsertExpenseReceiptResult, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return trip.UpsertExpenseReceiptResult{}, err
+	}
+	defer tx.Rollback(ctx)
+	qtx := s.queries.WithTx(tx)
+
+	oldObjects := []trip.ExpenseReceiptObject{}
+	locked, err := qtx.LockExpenseReceiptForUpdate(ctx, db.LockExpenseReceiptForUpdateParams{TripID: mustUUID(record.TripID), ExpenseID: mustUUID(record.ExpenseID)})
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return trip.UpsertExpenseReceiptResult{}, err
+	}
+	if err == nil {
+		oldObjects, err = unmarshalExpenseReceiptObjects(locked.ObjectsJson)
+		if err != nil {
+			return trip.UpsertExpenseReceiptResult{}, err
+		}
+	}
+
+	objects := []trip.ExpenseReceiptObject{record.Object}
+	objectsJSON, contentType, imageCount, byteSize, uploadedAt, err := marshalExpenseReceiptObjects(objects)
+	if err != nil {
+		return trip.UpsertExpenseReceiptResult{}, err
+	}
+	row, err := qtx.UpsertExpenseReceipt(ctx, db.UpsertExpenseReceiptParams{
+		ExpenseID:        mustUUID(record.ExpenseID),
+		TripID:           mustUUID(record.TripID),
+		UploadedByUserID: mustUUID(record.UploadedByUserID),
+		ObjectsJson:      objectsJSON,
+		ImageCount:       imageCount,
+		ContentType:      contentType,
+		ByteSize:         byteSize,
+		UploadedAt:       uploadedAt,
+	})
+	if err != nil {
+		if isForeignKeyViolation(err) {
+			return trip.UpsertExpenseReceiptResult{}, trip.ErrNotFound
+		}
+		return trip.UpsertExpenseReceiptResult{}, err
+	}
+	for _, oldObject := range oldObjects {
+		if err := createExpenseReceiptStorageObjectDeletionJob(ctx, qtx, oldObject, "receipt_replaced"); err != nil {
+			return trip.UpsertExpenseReceiptResult{}, err
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return trip.UpsertExpenseReceiptResult{}, err
+	}
+	return trip.UpsertExpenseReceiptResult{Receipt: receiptSummary(row.Exists, row.ContentType, row.ByteSize, row.UploadedAt), OldObjects: oldObjects}, nil
+}
+
+func (s *Store) ClearExpenseReceipt(ctx context.Context, tripID string, expenseID string) ([]trip.ExpenseReceiptObject, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+	qtx := s.queries.WithTx(tx)
+	rows, err := qtx.ClearExpenseReceipt(ctx, db.ClearExpenseReceiptParams{TripID: mustUUID(tripID), ExpenseID: mustUUID(expenseID)})
+	if err != nil {
+		return nil, err
+	}
+	objects := make([]trip.ExpenseReceiptObject, 0, len(rows))
+	for _, objectsJSON := range rows {
+		clearedObjects, err := unmarshalExpenseReceiptObjects(objectsJSON)
+		if err != nil {
+			return nil, err
+		}
+		for _, object := range clearedObjects {
+			if err := createExpenseReceiptStorageObjectDeletionJob(ctx, qtx, object, "receipt_deleted"); err != nil {
+				return nil, err
+			}
+			objects = append(objects, object)
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	return objects, nil
+}
+
+func (s *Store) GetExpenseReceiptObject(ctx context.Context, tripID string, expenseID string) (trip.ExpenseReceiptObject, error) {
+	row, err := s.queries.GetExpenseReceiptObject(ctx, db.GetExpenseReceiptObjectParams{TripID: mustUUID(tripID), ExpenseID: mustUUID(expenseID)})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return trip.ExpenseReceiptObject{}, trip.ErrNotFound
+	}
+	if err != nil {
+		return trip.ExpenseReceiptObject{}, err
+	}
+	objects, err := unmarshalExpenseReceiptObjects(row.ObjectsJson)
+	if err != nil {
+		return trip.ExpenseReceiptObject{}, err
+	}
+	if len(objects) == 0 {
+		return trip.ExpenseReceiptObject{}, trip.ErrNotFound
+	}
+	object := objects[0]
+	object.ContentType = row.ContentType
+	object.ByteSize = int(row.ByteSize)
+	object.UploadedAt = timeFromTimestamptz(row.UploadedAt)
+	return object, nil
+}
+
+func createExpenseReceiptStorageObjectDeletionJob(ctx context.Context, queries *db.Queries, object trip.ExpenseReceiptObject, reason string) error {
+	_, err := queries.CreateStorageObjectDeletionJob(ctx, db.CreateStorageObjectDeletionJobParams{Bucket: object.Bucket, ObjectKey: object.ObjectKey, ObjectGeneration: textPtrToSQL(&object.Generation), Reason: reason})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	return err
+}
+
 func (s *Store) listExpenseSplits(ctx context.Context, queries *db.Queries, expenseID string) ([]trip.ExpenseSplit, error) {
 	splitRows, err := queries.ListExpenseSplitsByExpenseID(ctx, mustUUID(expenseID))
 	if err != nil {
@@ -3225,6 +3544,7 @@ func expenseFromGetRow(row db.GetExpenseByTripDayAndIDRow) trip.Expense {
 		SplitPolicy:         row.SplitPolicy,
 		Splits:              []trip.ExpenseSplit{},
 		IncludeInSettlement: row.IncludeInSettlement,
+		Receipt:             receiptSummary(row.ReceiptExists, row.ReceiptContentType, row.ReceiptByteSize, row.ReceiptUploadedAt),
 		CreatedAt:           row.CreatedAt.Time,
 	}
 }
@@ -3247,6 +3567,7 @@ func expenseFromTripGetRow(row db.GetTripExpenseByIDRow) trip.Expense {
 		SplitPolicy:         row.SplitPolicy,
 		Splits:              []trip.ExpenseSplit{},
 		IncludeInSettlement: row.IncludeInSettlement,
+		Receipt:             receiptSummary(row.ReceiptExists, row.ReceiptContentType, row.ReceiptByteSize, row.ReceiptUploadedAt),
 		CreatedAt:           row.CreatedAt.Time,
 	}
 }
@@ -3273,6 +3594,7 @@ func expenseFromUpdateRow(row db.UpdateExpenseRow) trip.Expense {
 		SplitPolicy:         row.SplitPolicy,
 		Splits:              []trip.ExpenseSplit{},
 		IncludeInSettlement: row.IncludeInSettlement,
+		Receipt:             receiptSummary(row.ReceiptExists, row.ReceiptContentType, row.ReceiptByteSize, row.ReceiptUploadedAt),
 		CreatedAt:           row.CreatedAt.Time,
 	}
 }
@@ -3299,6 +3621,7 @@ func expenseFromUpdateTripRow(row db.UpdateTripExpenseRow) trip.Expense {
 		SplitPolicy:         row.SplitPolicy,
 		Splits:              []trip.ExpenseSplit{},
 		IncludeInSettlement: row.IncludeInSettlement,
+		Receipt:             receiptSummary(row.ReceiptExists, row.ReceiptContentType, row.ReceiptByteSize, row.ReceiptUploadedAt),
 		CreatedAt:           row.CreatedAt.Time,
 	}
 }
@@ -3321,8 +3644,19 @@ func expenseFromInsertRow(row db.InsertExpenseRow, splits []trip.ExpenseSplit, p
 		SplitPolicy:         row.SplitPolicy,
 		Splits:              splits,
 		IncludeInSettlement: row.IncludeInSettlement,
+		Receipt:             receiptSummary(row.ReceiptExists, row.ReceiptContentType, row.ReceiptByteSize, row.ReceiptUploadedAt),
 		CreatedAt:           row.CreatedAt.Time,
 	}
+}
+
+func receiptSummary(exists bool, contentTypeValue string, byteSizeValue int32, uploadedAtValue pgtype.Timestamptz) trip.ExpenseReceiptSummary {
+	if !exists {
+		return trip.ExpenseReceiptSummary{Exists: false}
+	}
+	contentType := contentTypeValue
+	byteSize := int(byteSizeValue)
+	uploadedAt := timeFromTimestamptz(uploadedAtValue)
+	return trip.ExpenseReceiptSummary{Exists: true, ContentType: &contentType, ByteSize: &byteSize, UploadedAt: &uploadedAt}
 }
 
 func expenseDisplayTitle(title pgtype.Text, fallback string) string {

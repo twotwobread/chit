@@ -18,11 +18,13 @@ const (
 )
 
 type Service struct {
-	repo                Repository
-	today               func() time.Time
-	now                 func() time.Time
-	generateInviteToken func() (string, error)
-	inviteBaseURL       string
+	repo                 Repository
+	today                func() time.Time
+	now                  func() time.Time
+	generateInviteToken  func() (string, error)
+	inviteBaseURL        string
+	receiptObjectStore   ExpenseReceiptObjectStore
+	receiptModelProvider ReceiptModelProvider
 }
 
 type tripSettlementInputsRepository interface {
@@ -49,6 +51,14 @@ func WithToday(today func() time.Time) ServiceOption {
 			s.today = today
 		}
 	}
+}
+
+func WithExpenseReceiptObjectStore(store ExpenseReceiptObjectStore) ServiceOption {
+	return func(s *Service) { s.receiptObjectStore = store }
+}
+
+func WithReceiptModelProvider(provider ReceiptModelProvider) ServiceOption {
+	return func(s *Service) { s.receiptModelProvider = provider }
 }
 
 func NewService(repo Repository, options ...ServiceOption) *Service {
@@ -824,6 +834,10 @@ func (s *Service) CreateQuickExpense(ctx context.Context, userID string, tripID 
 	if err != nil {
 		return CreateQuickExpenseResult{}, err
 	}
+	receiptDraftID, err := normalizeOptionalReceiptDraftID(input.ReceiptDraftID)
+	if err != nil {
+		return CreateQuickExpenseResult{}, err
+	}
 	if !isUUID(scheduleItemID) || !isUUID(payerParticipantID) || input.AmountMinor < 1 {
 		return CreateQuickExpenseResult{}, ErrValidation
 	}
@@ -841,6 +855,7 @@ func (s *Service) CreateQuickExpense(ctx context.Context, userID string, tripID 
 		ParticipantIDs:      participantIDs,
 		ManualSplits:        manualSplits,
 		IncludeInSettlement: includeInSettlementDefaultTrue(input.IncludeInSettlement),
+		ReceiptDraftID:      receiptDraftID,
 		CreatedBy:           userID,
 	})
 }
@@ -892,6 +907,10 @@ func (s *Service) CreateTripExpense(ctx context.Context, userID string, tripID s
 	if err != nil {
 		return CreateTripExpenseResult{}, err
 	}
+	receiptDraftID, err := normalizeOptionalReceiptDraftID(input.ReceiptDraftID)
+	if err != nil {
+		return CreateTripExpenseResult{}, err
+	}
 
 	_, ok, err := s.repo.GetTripByID(ctx, tripID)
 	if err != nil {
@@ -928,6 +947,7 @@ func (s *Service) CreateTripExpense(ctx context.Context, userID string, tripID s
 		ManualSplits:        manualSplits,
 		Memo:                memo,
 		IncludeInSettlement: includeInSettlementDefaultTrue(input.IncludeInSettlement),
+		ReceiptDraftID:      receiptDraftID,
 		CreatedBy:           userID,
 	})
 }

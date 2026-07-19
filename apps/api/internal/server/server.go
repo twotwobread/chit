@@ -61,6 +61,12 @@ func NewRouterWithConfig(readiness readinessChecker, config Config) http.Handler
 		if provider, ok := readiness.(tripTodayProvider); ok {
 			options = append(options, trip.WithToday(provider.TripToday))
 		}
+		if config.ExpenseReceiptObjectStore != nil {
+			options = append(options, trip.WithExpenseReceiptObjectStore(config.ExpenseReceiptObjectStore))
+		}
+		if config.ReceiptModelProvider != nil {
+			options = append(options, trip.WithReceiptModelProvider(config.ReceiptModelProvider))
+		}
 		tripService = trip.NewService(repo, options...)
 	}
 

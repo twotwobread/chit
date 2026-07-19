@@ -7,6 +7,7 @@ import (
 	"github.com/twotwobread/i-um/apps/api/internal/flight"
 	"github.com/twotwobread/i-um/apps/api/internal/place"
 	"github.com/twotwobread/i-um/apps/api/internal/route"
+	"github.com/twotwobread/i-um/apps/api/internal/trip"
 )
 
 type Config struct {
@@ -26,6 +27,8 @@ type Config struct {
 	PlaceProvider                       place.Provider
 	RouteProvider                       route.Provider
 	BoardingPassObjectStore             flight.BoardingPassObjectStore
+	ExpenseReceiptObjectStore           trip.ExpenseReceiptObjectStore
+	ReceiptModelProvider                trip.ReceiptModelProvider
 }
 
 func ConfigFromEnv() Config {
@@ -43,7 +46,16 @@ func ConfigFromEnv() Config {
 		InviteAndroidSHA256CertFingerprints: splitCommaValues(os.Getenv("INVITE_ANDROID_SHA256_CERT_FINGERPRINTS")),
 		AppStoreURL:                         os.Getenv("INVITE_APP_STORE_URL"),
 		PlayStoreURL:                        os.Getenv("INVITE_PLAY_STORE_URL"),
+		ReceiptModelProvider:                receiptModelProviderFromEnv(),
 	}
+}
+
+func receiptModelProviderFromEnv() trip.ReceiptModelProvider {
+	apiKey := strings.TrimSpace(os.Getenv("OPENAI_API_KEY"))
+	if apiKey == "" {
+		return nil
+	}
+	return trip.NewOpenAIReceiptModelProvider(apiKey, firstNonEmpty(os.Getenv("RECEIPT_OPENAI_MODEL"), "gpt-4o-mini"))
 }
 
 func firstNonEmpty(values ...string) string {

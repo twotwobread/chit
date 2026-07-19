@@ -30,4 +30,8 @@ export type CreateQuickExpenseRequest = {
      * Whether to include the expense in final settlement calculations. Defaults to true when omitted.
      */
     includeInSettlement?: boolean;
+    /**
+     * Optional reviewed receipt draft to promote as the saved expense receipt. Must belong to the same trip and authenticated user.
+     */
+    receiptDraftId?: string | null;
 };

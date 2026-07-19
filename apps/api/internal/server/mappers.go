@@ -349,6 +349,7 @@ func dayExpenseListItemToOpenAPI(expense trip.DayExpenseListItem) openapi.DayExp
 		SplitPolicy:         openapi.ExpenseSplitPolicy(expense.SplitPolicy),
 		Splits:              splits,
 		IncludeInSettlement: expense.IncludeInSettlement,
+		Receipt:             expenseReceiptSummaryToOpenAPI(expense.Receipt),
 		CreatedAt:           expense.CreatedAt.UTC(),
 	}
 }
@@ -378,7 +379,76 @@ func expenseToOpenAPI(expense trip.Expense) openapi.Expense {
 		SplitPolicy:         openapi.ExpenseSplitPolicy(expense.SplitPolicy),
 		Splits:              splits,
 		IncludeInSettlement: expense.IncludeInSettlement,
+		Receipt:             expenseReceiptSummaryToOpenAPI(expense.Receipt),
 		CreatedAt:           expense.CreatedAt.UTC(),
+	}
+}
+
+func expenseReceiptSummaryToOpenAPI(summary trip.ExpenseReceiptSummary) openapi.ExpenseReceiptSummary {
+	var contentType *openapi.ReceiptImageContentType
+	if summary.ContentType != nil {
+		value := openapi.ReceiptImageContentType(*summary.ContentType)
+		contentType = &value
+	}
+	var uploadedAt *time.Time
+	if summary.UploadedAt != nil {
+		value := summary.UploadedAt.UTC()
+		uploadedAt = &value
+	}
+	return openapi.ExpenseReceiptSummary{
+		Exists:      summary.Exists,
+		ContentType: contentType,
+		ByteSize:    summary.ByteSize,
+		UploadedAt:  uploadedAt,
+	}
+}
+
+func expenseReceiptDraftToOpenAPI(draft trip.ExpenseReceiptDraft) openapi.ExpenseReceiptDraft {
+	return openapi.ExpenseReceiptDraft{
+		Id:          draft.ID,
+		TripId:      draft.TripID,
+		CaptureMode: openapi.ReceiptCaptureMode(draft.CaptureMode),
+		ImageCount:  draft.ImageCount,
+		ContentType: openapi.ReceiptImageContentType(draft.ContentType),
+		ByteSize:    draft.ByteSize,
+		Extraction:  expenseReceiptExtractionToOpenAPI(draft.Extraction),
+		ExpiresAt:   draft.ExpiresAt.UTC(),
+		CreatedAt:   draft.CreatedAt.UTC(),
+	}
+}
+
+func expenseReceiptExtractionToOpenAPI(extraction trip.ExpenseReceiptExtraction) openapi.ExpenseReceiptExtraction {
+	lineItems := make([]openapi.ExpenseReceiptLineItemDraft, 0, len(extraction.LineItems))
+	for _, item := range extraction.LineItems {
+		var quantity *float32
+		if item.Quantity != nil {
+			value := float32(*item.Quantity)
+			quantity = &value
+		}
+		lineItems = append(lineItems, openapi.ExpenseReceiptLineItemDraft{Name: item.Name, AmountMinor: item.AmountMinor, Quantity: quantity})
+	}
+	var currency *openapi.SupportedCurrency
+	if extraction.Currency != nil {
+		value := openapi.SupportedCurrency(*extraction.Currency)
+		currency = &value
+	}
+	var expenseDate *openapi_types.Date
+	if extraction.ExpenseDate != nil {
+		value := dateToOpenAPI(*extraction.ExpenseDate)
+		expenseDate = &value
+	}
+	return openapi.ExpenseReceiptExtraction{
+		MerchantName:       extraction.MerchantName,
+		ExpenseTitle:       extraction.ExpenseTitle,
+		ExpenseDate:        expenseDate,
+		ExpenseTime:        extraction.ExpenseTime,
+		Currency:           currency,
+		TotalAmountMinor:   extraction.TotalAmountMinor,
+		TaxAmountMinor:     extraction.TaxAmountMinor,
+		ServiceChargeMinor: extraction.ServiceChargeMinor,
+		LineItems:          lineItems,
+		Confidence:         openapi.ExpenseReceiptConfidence(extraction.Confidence),
+		Warnings:           extraction.Warnings,
 	}
 }
 

@@ -68,6 +68,39 @@ type Expense struct {
 	UpdatedAt           pgtype.Timestamptz
 }
 
+type ExpenseReceipt struct {
+	ExpenseID        pgtype.UUID
+	TripID           pgtype.UUID
+	UploadedByUserID pgtype.UUID
+	ObjectsJson      []byte
+	ImageCount       int32
+	ContentType      string
+	ByteSize         int32
+	UploadedAt       pgtype.Timestamptz
+	CreatedAt        pgtype.Timestamptz
+	UpdatedAt        pgtype.Timestamptz
+}
+
+type ExpenseReceiptDraft struct {
+	ID              pgtype.UUID
+	TripID          pgtype.UUID
+	CreatedByUserID pgtype.UUID
+	CaptureMode     string
+	ObjectsJson     []byte
+	ImageCount      int32
+	ContentType     string
+	ByteSize        int32
+	UploadedAt      pgtype.Timestamptz
+	ExtractionJson  []byte
+	Confidence      string
+	Warnings        []string
+	Status          string
+	ExpiresAt       pgtype.Timestamptz
+	UsedExpenseID   pgtype.UUID
+	CreatedAt       pgtype.Timestamptz
+	UpdatedAt       pgtype.Timestamptz
+}
+
 type ExpenseSplit struct {
 	ID                     pgtype.UUID
 	ExpenseID              pgtype.UUID

@@ -1,7 +1,11 @@
 package server
 
 import (
+	"encoding/json"
+	"io"
+	"mime/multipart"
 	"net/http"
+	"strings"
 
 	"github.com/twotwobread/i-um/apps/api/internal/openapi"
 	"github.com/twotwobread/i-um/apps/api/internal/route"
@@ -404,6 +408,7 @@ func (s apiServer) CreateTripExpense(w http.ResponseWriter, r *http.Request, tri
 		ManualSplits:        manualExpenseSplitsFromOpenAPI(body.Splits),
 		Memo:                body.Memo,
 		IncludeInSettlement: body.IncludeInSettlement,
+		ReceiptDraftID:      body.ReceiptDraftId,
 	})
 	if err != nil {
 		writeQuickExpenseError(w, err)
@@ -565,6 +570,7 @@ func (s apiServer) CreateQuickExpense(w http.ResponseWriter, r *http.Request, tr
 		ParticipantIDs:      optionalStringSlice(body.ParticipantIds),
 		ManualSplits:        manualExpenseSplitsFromOpenAPI(body.Splits),
 		IncludeInSettlement: body.IncludeInSettlement,
+		ReceiptDraftID:      body.ReceiptDraftId,
 	})
 	if err != nil {
 		writeQuickExpenseError(w, err)
@@ -572,6 +578,171 @@ func (s apiServer) CreateQuickExpense(w http.ResponseWriter, r *http.Request, tr
 	}
 
 	writeJSON(w, http.StatusCreated, createQuickExpenseResponseToOpenAPI(result))
+}
+
+func (s apiServer) CreateExpenseReceiptDraft(w http.ResponseWriter, r *http.Request, tripId string) {
+	if s.auth == nil || s.trips == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "receipt draft creation is not configured", nil)
+		return
+	}
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+	input, ok := decodeExpenseReceiptDraftMultipart(w, r)
+	if !ok {
+		return
+	}
+	result, err := s.trips.CreateExpenseReceiptDraft(r.Context(), authContext.UserID, tripId, input)
+	if err != nil {
+		writeExpenseReceiptError(w, err)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, http.StatusCreated, openapi.CreateExpenseReceiptDraftResponse{Draft: expenseReceiptDraftToOpenAPI(result.Draft)})
+}
+
+func (s apiServer) CancelExpenseReceiptDraft(w http.ResponseWriter, r *http.Request, tripId string, receiptDraftId string) {
+	if s.auth == nil || s.trips == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "receipt draft cancellation is not configured", nil)
+		return
+	}
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+	if err := s.trips.CancelExpenseReceiptDraft(r.Context(), authContext.UserID, tripId, receiptDraftId); err != nil {
+		writeExpenseReceiptError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s apiServer) UploadExpenseReceipt(w http.ResponseWriter, r *http.Request, tripId string, expenseId string) {
+	if s.auth == nil || s.trips == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "expense receipt upload is not configured", nil)
+		return
+	}
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+	data, err := io.ReadAll(io.LimitReader(r.Body, int64(trip.MaxExpenseReceiptBytes)+1))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid upload body", nil)
+		return
+	}
+	receipt, err := s.trips.UploadExpenseReceipt(r.Context(), authContext.UserID, tripId, expenseId, strings.TrimSpace(r.Header.Get("Content-Type")), data)
+	if err != nil {
+		writeExpenseReceiptError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, openapi.UploadExpenseReceiptResponse{Receipt: expenseReceiptSummaryToOpenAPI(receipt)})
+}
+
+func (s apiServer) DeleteExpenseReceipt(w http.ResponseWriter, r *http.Request, tripId string, expenseId string) {
+	if s.auth == nil || s.trips == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "expense receipt deletion is not configured", nil)
+		return
+	}
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+	if err := s.trips.DeleteExpenseReceipt(r.Context(), authContext.UserID, tripId, expenseId); err != nil {
+		writeExpenseReceiptError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s apiServer) OpenExpenseReceipt(w http.ResponseWriter, r *http.Request, tripId string, expenseId string) {
+	if s.auth == nil || s.trips == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "expense receipt open is not configured", nil)
+		return
+	}
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+	result, err := s.trips.OpenExpenseReceipt(r.Context(), authContext.UserID, tripId, expenseId)
+	if err != nil {
+		writeExpenseReceiptError(w, err)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, http.StatusOK, openapi.OpenExpenseReceiptResponse{Url: result.URL, ExpiresAt: result.ExpiresAt.UTC(), ContentType: openapi.ReceiptImageContentType(result.ContentType), ByteSize: result.ByteSize})
+}
+
+type expenseReceiptOCRTextPartForm struct {
+	Role string `json:"role"`
+	Text string `json:"text"`
+}
+
+func decodeExpenseReceiptDraftMultipart(w http.ResponseWriter, r *http.Request) (trip.CreateExpenseReceiptDraftInput, bool) {
+	const maxReceiptDraftMultipartBytes = int64(2*trip.MaxExpenseReceiptBytes + 1024*1024)
+	r.Body = http.MaxBytesReader(w, r.Body, maxReceiptDraftMultipartBytes)
+	if err := r.ParseMultipartForm(maxReceiptDraftMultipartBytes); err != nil {
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid receipt draft form", nil)
+		return trip.CreateExpenseReceiptDraftInput{}, false
+	}
+
+	captureMode := trip.ReceiptCaptureMode(strings.TrimSpace(r.FormValue("captureMode")))
+	ocrLanguage := trip.ReceiptOCRLanguage(strings.TrimSpace(r.FormValue("ocrLanguage")))
+	var formParts []expenseReceiptOCRTextPartForm
+	if err := json.Unmarshal([]byte(r.FormValue("ocrTextParts")), &formParts); err != nil {
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid OCR text parts", nil)
+		return trip.CreateExpenseReceiptDraftInput{}, false
+	}
+	textParts := make([]trip.ExpenseReceiptOCRTextPart, 0, len(formParts))
+	for _, part := range formParts {
+		textParts = append(textParts, trip.ExpenseReceiptOCRTextPart{Role: trip.ReceiptImageRole(strings.TrimSpace(part.Role)), Text: part.Text})
+	}
+
+	images := make([]trip.ExpenseReceiptImageUpload, 0, 2)
+	switch captureMode {
+	case trip.ReceiptCaptureModeSingle:
+		image, ok := readExpenseReceiptFormImage(w, r.MultipartForm, "image", trip.ReceiptImageRoleSingle)
+		if !ok {
+			return trip.CreateExpenseReceiptDraftInput{}, false
+		}
+		images = append(images, image)
+	case trip.ReceiptCaptureModeSplit:
+		headerImage, ok := readExpenseReceiptFormImage(w, r.MultipartForm, "headerImage", trip.ReceiptImageRoleHeader)
+		if !ok {
+			return trip.CreateExpenseReceiptDraftInput{}, false
+		}
+		totalImage, ok := readExpenseReceiptFormImage(w, r.MultipartForm, "totalImage", trip.ReceiptImageRoleTotal)
+		if !ok {
+			return trip.CreateExpenseReceiptDraftInput{}, false
+		}
+		images = append(images, headerImage, totalImage)
+	default:
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid receipt capture mode", nil)
+		return trip.CreateExpenseReceiptDraftInput{}, false
+	}
+
+	return trip.CreateExpenseReceiptDraftInput{CaptureMode: captureMode, OCRLanguage: ocrLanguage, OCRTextParts: textParts, Images: images}, true
+}
+
+func readExpenseReceiptFormImage(w http.ResponseWriter, form *multipart.Form, fieldName string, role trip.ReceiptImageRole) (trip.ExpenseReceiptImageUpload, bool) {
+	if form == nil || len(form.File[fieldName]) != 1 {
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "missing receipt image", nil)
+		return trip.ExpenseReceiptImageUpload{}, false
+	}
+	fileHeader := form.File[fieldName][0]
+	file, err := fileHeader.Open()
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid receipt image", nil)
+		return trip.ExpenseReceiptImageUpload{}, false
+	}
+	defer file.Close()
+	data, err := io.ReadAll(io.LimitReader(file, int64(trip.MaxExpenseReceiptBytes)+1))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid receipt image", nil)
+		return trip.ExpenseReceiptImageUpload{}, false
+	}
+	return trip.ExpenseReceiptImageUpload{Role: role, ContentType: strings.TrimSpace(fileHeader.Header.Get("Content-Type")), Data: data}, true
 }
 
 func optionalStringSlice(value *[]string) []string {

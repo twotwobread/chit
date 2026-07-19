@@ -3,6 +3,7 @@
 /* tslint:disable */
 /* eslint-disable */
 import type { AcceptTripInviteResponse } from '../models/AcceptTripInviteResponse';
+import type { CreateExpenseReceiptDraftResponse } from '../models/CreateExpenseReceiptDraftResponse';
 import type { CreateManualDayLodgingPlaceRequest } from '../models/CreateManualDayLodgingPlaceRequest';
 import type { CreateManualScheduleItemRequest } from '../models/CreateManualScheduleItemRequest';
 import type { CreateManualScheduleItemResponse } from '../models/CreateManualScheduleItemResponse';
@@ -28,6 +29,9 @@ import type { MarkScheduleItemArrivedResponse } from '../models/MarkScheduleItem
 import type { MarkScheduleItemSkippedResponse } from '../models/MarkScheduleItemSkippedResponse';
 import type { MoveScheduleItemToDayRequest } from '../models/MoveScheduleItemToDayRequest';
 import type { MoveScheduleItemToDayResponse } from '../models/MoveScheduleItemToDayResponse';
+import type { OpenExpenseReceiptResponse } from '../models/OpenExpenseReceiptResponse';
+import type { ReceiptCaptureMode } from '../models/ReceiptCaptureMode';
+import type { ReceiptOCRLanguage } from '../models/ReceiptOCRLanguage';
 import type { ReorderScheduleItemsRequest } from '../models/ReorderScheduleItemsRequest';
 import type { ReorderScheduleItemsResponse } from '../models/ReorderScheduleItemsResponse';
 import type { RestoreScheduleItemResponse } from '../models/RestoreScheduleItemResponse';
@@ -40,6 +44,7 @@ import type { UpdateScheduleItemRequest } from '../models/UpdateScheduleItemRequ
 import type { UpdateScheduleItemResponse } from '../models/UpdateScheduleItemResponse';
 import type { UpdateTripRequest } from '../models/UpdateTripRequest';
 import type { UpdateTripResponse } from '../models/UpdateTripResponse';
+import type { UploadExpenseReceiptResponse } from '../models/UploadExpenseReceiptResponse';
 import type { CancelablePromise } from '../core/CancelablePromise';
 import { OpenAPI } from '../core/OpenAPI';
 import { request as __request } from '../core/request';
@@ -239,6 +244,87 @@ export class TripsService {
         });
     }
     /**
+     * Create an expense draft from Korean receipt OCR text and image capture
+     * Stores one private receipt image, or header/total images for long receipts, validates client-provided Korean OCR text, asks the model for strict JSON normalization, and returns a draft that must be reviewed before saving an expense. This endpoint never creates an expense and never returns object keys or signed URLs.
+     * @param tripId
+     * @param formData
+     * @returns CreateExpenseReceiptDraftResponse Receipt draft created.
+     * @throws ApiError
+     */
+    public static createExpenseReceiptDraft(
+        tripId: string,
+        formData: {
+            captureMode: ReceiptCaptureMode;
+            ocrLanguage: ReceiptOCRLanguage;
+            /**
+             * JSON array of ReceiptOCRTextPart. Single capture requires role `single`; split capture requires roles `header` and `total`.
+             */
+            ocrTextParts: string;
+            /**
+             * Required when captureMode is `single`.
+             */
+            image?: Blob;
+            /**
+             * Required when captureMode is `split`.
+             */
+            headerImage?: Blob;
+            /**
+             * Required when captureMode is `split`.
+             */
+            totalImage?: Blob;
+        },
+    ): CancelablePromise<CreateExpenseReceiptDraftResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/trips/{tripId}/expense-receipt-drafts',
+            path: {
+                'tripId': tripId,
+            },
+            formData: formData,
+            mediaType: 'multipart/form-data',
+            errors: {
+                400: `Validation error or invalid extraction JSON.`,
+                401: `Unauthorized.`,
+                403: `Forbidden.`,
+                404: `Trip not found.`,
+                413: `Receipt image exceeds 10 MiB.`,
+                415: `Unsupported receipt image media type.`,
+                422: `Korean receipt text could not be validated.`,
+                429: `Receipt draft provider or cost rate limit reached.`,
+                500: `Unexpected server error.`,
+                502: `OCR or model provider unavailable, timed out, or returned invalid output.`,
+                503: `Receipt object storage unavailable.`,
+            },
+        });
+    }
+    /**
+     * Cancel an unused receipt draft
+     * Marks an unused receipt draft as cancelled and schedules private object cleanup. Cancelling a missing, expired, or already-used draft is idempotent for clients.
+     * @param tripId
+     * @param receiptDraftId
+     * @returns void
+     * @throws ApiError
+     */
+    public static cancelExpenseReceiptDraft(
+        tripId: string,
+        receiptDraftId: string,
+    ): CancelablePromise<void> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/trips/{tripId}/expense-receipt-drafts/{receiptDraftId}',
+            path: {
+                'tripId': tripId,
+                'receiptDraftId': receiptDraftId,
+            },
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                403: `Forbidden.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
      * List expenses for a trip
      * Returns read-only expense rows grouped by trip context in one request. Trip-level rows are returned separately, and day rows are ordered by day then newest expense first.
      * @param tripId
@@ -290,6 +376,98 @@ export class TripsService {
                 404: `Trip, Day, schedule item, payer, or split participant not found.`,
                 409: `Participant or schedule state changed during creation.`,
                 500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
+     * Upload or replace a saved expense receipt image
+     * Stores one private receipt image for an existing expense. The image is stored in private object storage; list/detail responses never return object keys or signed URLs.
+     * @param tripId
+     * @param expenseId
+     * @param requestBody
+     * @returns UploadExpenseReceiptResponse Receipt uploaded or replaced.
+     * @throws ApiError
+     */
+    public static uploadExpenseReceipt(
+        tripId: string,
+        expenseId: string,
+        requestBody: Blob,
+    ): CancelablePromise<UploadExpenseReceiptResponse> {
+        return __request(OpenAPI, {
+            method: 'PUT',
+            url: '/trips/{tripId}/expenses/{expenseId}/receipt',
+            path: {
+                'tripId': tripId,
+                'expenseId': expenseId,
+            },
+            body: requestBody,
+            mediaType: 'image/jpeg',
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                403: `Forbidden.`,
+                404: `Trip or expense not found.`,
+                413: `Receipt image exceeds 10 MiB.`,
+                415: `Unsupported receipt image media type.`,
+                500: `Unexpected server error.`,
+                503: `Receipt object storage unavailable.`,
+            },
+        });
+    }
+    /**
+     * Delete a saved expense receipt image
+     * Deletes receipt metadata and schedules private object cleanup. Deleting a missing receipt is a no-op.
+     * @param tripId
+     * @param expenseId
+     * @returns void
+     * @throws ApiError
+     */
+    public static deleteExpenseReceipt(
+        tripId: string,
+        expenseId: string,
+    ): CancelablePromise<void> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/trips/{tripId}/expenses/{expenseId}/receipt',
+            path: {
+                'tripId': tripId,
+                'expenseId': expenseId,
+            },
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                403: `Forbidden.`,
+                404: `Trip or expense not found.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
+     * Create a short-lived URL for an expense receipt
+     * Authorizes the authenticated trip participant and returns a short-lived signed URL for an existing saved receipt image. The URL must not be persisted by clients.
+     * @param tripId
+     * @param expenseId
+     * @returns OpenExpenseReceiptResponse Short-lived receipt URL.
+     * @throws ApiError
+     */
+    public static openExpenseReceipt(
+        tripId: string,
+        expenseId: string,
+    ): CancelablePromise<OpenExpenseReceiptResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/trips/{tripId}/expenses/{expenseId}/receipt/open-url',
+            path: {
+                'tripId': tripId,
+                'expenseId': expenseId,
+            },
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                403: `Forbidden.`,
+                404: `Trip, expense, or receipt not found.`,
+                500: `Unexpected server error.`,
+                503: `Receipt object storage unavailable.`,
             },
         });
     }

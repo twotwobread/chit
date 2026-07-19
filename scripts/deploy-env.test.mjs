@@ -74,6 +74,9 @@ describe('buildStageConfig', () => {
     assert.equal(config.apiEnv.APPLE_BUNDLE_ID, 'com.twotwobread.ium.staging');
     assert.equal(config.apiEnv.BOARDING_PASS_GCS_BUCKET, 'boarding-pass-bucket');
     assert.equal(config.apiEnv.BOARDING_PASS_GCS_SIGNING_ACCESS_ID, 'signer@i-um-488511.iam.gserviceaccount.com');
+    assert.equal(config.apiEnv.EXPENSE_RECEIPT_GCS_BUCKET, 'boarding-pass-bucket');
+    assert.equal(config.apiEnv.EXPENSE_RECEIPT_GCS_SIGNING_ACCESS_ID, 'signer@i-um-488511.iam.gserviceaccount.com');
+    assert.equal(config.apiEnv.RECEIPT_OPENAI_MODEL, 'gpt-4o-mini');
     assert.equal(config.eas.env.EXPO_PUBLIC_AUTH_DEV_MODE, 'false');
     assert.equal(config.apiEnv.INVITE_BASE_URL, undefined);
     assert.equal(config.eas.env.EXPO_PUBLIC_INVITE_LINK_HOST, undefined);
@@ -82,7 +85,7 @@ describe('buildStageConfig', () => {
   it('requires server, boarding pass storage, and mobile credentials for real Apple/Kakao staging login', () => {
     assert.throws(
       () => buildStageConfig({ env: { DATABASE_URL: 'postgresql://u:p@example.test/db' } }),
-      /AUTH_TOKEN_SECRET, GOOGLE_PLACES_API_KEY, GOOGLE_ROUTES_API_KEY, BOARDING_PASS_GCS_BUCKET, BOARDING_PASS_GCS_SIGNING_ACCESS_ID, BOARDING_PASS_GCS_SIGNING_PRIVATE_KEY, EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY/,
+      /AUTH_TOKEN_SECRET, GOOGLE_PLACES_API_KEY, GOOGLE_ROUTES_API_KEY, BOARDING_PASS_GCS_BUCKET, BOARDING_PASS_GCS_SIGNING_ACCESS_ID, BOARDING_PASS_GCS_SIGNING_PRIVATE_KEY, EXPENSE_RECEIPT_GCS_BUCKET, EXPENSE_RECEIPT_GCS_SIGNING_ACCESS_ID, EXPENSE_RECEIPT_GCS_SIGNING_PRIVATE_KEY, OPENAI_API_KEY, EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY/,
     );
   });
 
@@ -164,6 +167,8 @@ describe('createSecretSpecs', () => {
         ['GOOGLE_PLACES_API_KEY', 'i-um-staging-google-places-api-key', 'places-key'],
         ['GOOGLE_ROUTES_API_KEY', 'i-um-staging-google-routes-api-key', 'routes-key'],
         ['BOARDING_PASS_GCS_SIGNING_PRIVATE_KEY', 'i-um-staging-boarding-pass-gcs-signing-private-key', 'private-key-pem'],
+        ['OPENAI_API_KEY', 'i-um-staging-openai-api-key', 'openai-key'],
+        ['EXPENSE_RECEIPT_GCS_SIGNING_PRIVATE_KEY', 'i-um-staging-expense-receipt-gcs-signing-private-key', 'private-key-pem'],
       ],
     );
   });
@@ -202,6 +207,7 @@ function requiredStageEnv(overrides = {}) {
     BOARDING_PASS_GCS_BUCKET: 'boarding-pass-bucket',
     BOARDING_PASS_GCS_SIGNING_ACCESS_ID: 'signer@i-um-488511.iam.gserviceaccount.com',
     BOARDING_PASS_GCS_SIGNING_PRIVATE_KEY: 'private-key-pem',
+    OPENAI_API_KEY: 'openai-key',
     EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY: 'kakao-key',
     ...overrides,
   };
