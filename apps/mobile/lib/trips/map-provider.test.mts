@@ -29,11 +29,15 @@ describe('map provider policy helpers', () => {
     );
     assert.equal(
       buildNaverMapsSearchUrl('제주공항', '제주시 공항로 2'),
-      'https://map.naver.com/v5/search/%EC%A0%9C%EC%A3%BC%EA%B3%B5%ED%95%AD%20%EC%A0%9C%EC%A3%BC%EC%8B%9C%20%EA%B3%B5%ED%95%AD%EB%A1%9C%202',
+      'nmap://search?query=%EC%A0%9C%EC%A3%BC%EC%8B%9C%20%EA%B3%B5%ED%95%AD%EB%A1%9C%202&appname=com.twotwobread.ium',
+    );
+    assert.equal(
+      buildNaverMapsSearchUrl('국립중앙박물관', 'KR 서울 용산구 서빙고로 137'),
+      'nmap://search?query=%EC%84%9C%EC%9A%B8%20%EC%9A%A9%EC%82%B0%EA%B5%AC%20%EC%84%9C%EB%B9%99%EA%B3%A0%EB%A1%9C%20137&appname=com.twotwobread.ium',
     );
     assert.equal(
       buildNaverMapsSearchUrl('제주공항', '   '),
-      'https://map.naver.com/v5/search/%EC%A0%9C%EC%A3%BC%EA%B3%B5%ED%95%AD',
+      'nmap://search?query=%EC%A0%9C%EC%A3%BC%EA%B3%B5%ED%95%AD&appname=com.twotwobread.ium',
     );
   });
 
@@ -60,7 +64,7 @@ describe('map provider policy helpers', () => {
         },
         'naverMaps',
       ),
-      'https://map.naver.com/v5/search/%EC%A0%9C%EC%A3%BC%EA%B3%B5%ED%95%AD%20%EC%A0%9C%EC%A3%BC%EC%8B%9C%20%EA%B3%B5%ED%95%AD%EB%A1%9C%202',
+      'nmap://search?query=%EC%A0%9C%EC%A3%BC%EC%8B%9C%20%EA%B3%B5%ED%95%AD%EB%A1%9C%202&appname=com.twotwobread.ium',
     );
   });
 });

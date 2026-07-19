@@ -15,7 +15,7 @@ export const externalMapDetailLabel = '지도에서 자세히';
 export const naverMapsAppName = 'com.twotwobread.ium';
 
 const googleMapsSearchBaseUrl = 'https://www.google.com/maps/search/?api=1&query=';
-const naverMapsSearchBaseUrl = 'https://map.naver.com/v5/search/';
+const naverMapsSearchBaseUrl = 'nmap://search?query=';
 
 export function resolveMapProvider(destinations: readonly MapProviderTripDestination[]): MapProvider {
   if (destinations.length === 0) {
@@ -31,7 +31,9 @@ export function buildGoogleMapsSearchUrl(placeName: string, address?: string | n
 }
 
 export function buildNaverMapsSearchUrl(placeName: string, address?: string | null): string {
-  return `${naverMapsSearchBaseUrl}${encodeURIComponent(buildExternalMapSearchQuery(placeName, address))}`;
+  return `${naverMapsSearchBaseUrl}${encodeURIComponent(buildNaverMapsSearchQuery(placeName, address))}&appname=${encodeURIComponent(
+    naverMapsAppName,
+  )}`;
 }
 
 export function buildExternalMapUrl(input: ExternalMapPlace, provider: MapProvider = 'googleMaps'): string {
@@ -48,4 +50,35 @@ function buildExternalMapSearchQuery(placeName: string, address?: string | null)
     .map((value) => value.trim())
     .filter(Boolean)
     .join(' ');
+}
+
+function buildNaverMapsSearchQuery(placeName: string, address?: string | null): string {
+  const normalizedAddress = normalizeNaverMapsAddress(address);
+  return normalizedAddress || placeName.trim();
+}
+
+function normalizeNaverMapsAddress(address?: string | null): string {
+  const rawAddress = address?.trim() ?? '';
+
+  if (!rawAddress) {
+    return '';
+  }
+
+  return rawAddress
+    .split(',')
+    .map((part) => stripKoreaCountryToken(part.trim()))
+    .filter(Boolean)
+    .join(' ')
+    .trim();
+}
+
+function stripKoreaCountryToken(value: string): string {
+  if (/^(?:KR|KOR|대한민국|South Korea)$/i.test(value)) {
+    return '';
+  }
+
+  return value
+    .replace(/^(?:KR|KOR|대한민국|South Korea)[\s,]+/i, '')
+    .replace(/[\s,]+(?:KR|KOR|대한민국|South Korea)$/i, '')
+    .trim();
 }
