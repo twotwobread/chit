@@ -11,7 +11,7 @@ import {
   type ScrollView,
 } from 'react-native';
 
-import { Card, PrimaryButton, SecondaryButton, theme } from '../../../../../../lib/design';
+import { Card, PrimaryButton, ScreenBackground, SecondaryButton, theme } from '../../../../../../lib/design';
 import {
   QUICK_EXPENSE_MEMO_KEYBOARD_MIN_CLEARANCE,
   buildFocusedMemoScrollTarget,
@@ -157,7 +157,7 @@ export default function QuickExpenseScreen() {
   const showStickyActions = state.status === 'success' && !savedSummary && Boolean(viewModel) && Boolean(submitState);
 
   return (
-    <View style={styles.screenRoot}>
+    <ScreenBackground style={styles.screenRoot}>
       <KeyboardAwareFormScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardFixedBottomOffset={footerLayout.keyboardFixedBottomOffset}
@@ -268,6 +268,6 @@ export default function QuickExpenseScreen() {
           <SecondaryButton disabled={saving} label="돌아가기" onPress={backToDay} />
         </StickyActionFooter>
       ) : null}
-    </View>
+    </ScreenBackground>
   );
 }

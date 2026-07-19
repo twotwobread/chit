@@ -6,7 +6,7 @@ import { ApiError } from '@i-um/api-contract';
 
 import { MobileAuthError } from '../../../lib/auth/client';
 import { getStoredSession } from '../../../lib/auth/session';
-import { Card, PrimaryButton, SecondaryButton, theme } from '../../../lib/design';
+import { Card, PrimaryButton, ScreenBackground, SecondaryButton, theme } from '../../../lib/design';
 import { KeyboardAwareFormScrollView } from '../../../lib/trip-ui/KeyboardAwareFormScrollView';
 import { StickyActionFooter, useStickyActionFooterLayout } from '../../../lib/trip-ui/StickyActionFooter';
 import { updateTrip } from '../../../lib/trips/trip-api';
@@ -181,7 +181,7 @@ export default function EditTripScreen() {
   };
 
   return (
-    <View style={styles.screenRoot}>
+    <ScreenBackground style={styles.screenRoot}>
       <KeyboardAwareFormScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardFixedBottomOffset={footerLayout.keyboardFixedBottomOffset}
@@ -346,7 +346,7 @@ export default function EditTripScreen() {
           <SecondaryButton disabled={submitting} label="취소" onPress={returnToDetail} />
         </StickyActionFooter>
       ) : null}
-    </View>
+    </ScreenBackground>
   );
 }
 
@@ -356,12 +356,10 @@ function editTripShellFailureState(status: 'auth' | 'notFound' | 'error'): LoadS
 
 const styles = StyleSheet.create({
   screenRoot: {
-    backgroundColor: theme.color.bg,
     flex: 1,
   },
   scroll: {
     flex: 1,
-    backgroundColor: theme.color.bg,
   },
   scrollContent: {
     alignItems: 'center',
@@ -375,7 +373,7 @@ const styles = StyleSheet.create({
     marginBottom: theme.space[7],
   },
   title: {
-    color: theme.color.textStrong,
+    color: theme.color.textOnShell,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.titleLg,
     fontWeight: theme.font.weight.bold,
@@ -383,7 +381,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   subtitle: {
-    color: theme.color.textMuted,
+    color: theme.color.textOnShellMuted,
     fontFamily: theme.font.family.regular,
     textAlign: 'center',
   },
@@ -420,7 +418,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.space[5],
   },
   currencyChipSelected: {
-    backgroundColor: theme.color.primarySoft,
+    backgroundColor: theme.color.primary,
     borderColor: theme.color.primary,
   },
   currencyText: {
@@ -429,7 +427,7 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.bold,
   },
   currencyTextSelected: {
-    color: theme.color.primary,
+    color: theme.color.onPrimary,
   },
   helperText: {
     color: theme.color.textMuted,

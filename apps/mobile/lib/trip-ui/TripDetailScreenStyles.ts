@@ -5,7 +5,6 @@ import { theme } from '../design';
 export const styles = StyleSheet.create({
   scroll: {
     flex: 1,
-    backgroundColor: theme.color.bg,
   },
   scrollContent: {
     alignItems: 'center',
@@ -19,7 +18,7 @@ export const styles = StyleSheet.create({
     marginBottom: theme.space[7],
   },
   screenTitle: {
-    color: theme.color.textStrong,
+    color: theme.color.textOnShell,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.titleLg,
     fontWeight: theme.font.weight.bold,
@@ -95,7 +94,7 @@ export const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   dayLabel: {
-    color: theme.color.primary,
+    color: theme.color.primaryTextOnLight,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.body,
     fontWeight: theme.font.weight.bold,
@@ -146,7 +145,7 @@ export const styles = StyleSheet.create({
     width: 34,
   },
   participantAvatarText: {
-    color: theme.color.primary,
+    color: theme.color.primaryTextOnLight,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.caption,
     fontWeight: theme.font.weight.bold,
@@ -231,7 +230,7 @@ export const styles = StyleSheet.create({
     paddingVertical: theme.space[4],
   },
   secondaryButtonText: {
-    color: theme.color.primary,
+    color: theme.color.primaryTextOnLight,
     fontFamily: theme.font.family.bold,
     fontWeight: theme.font.weight.bold,
     textAlign: 'center',

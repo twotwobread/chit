@@ -216,21 +216,21 @@ export function PastTripRow({
 const styles = StyleSheet.create({
   ddayBadge: {
     alignItems: 'center',
-    backgroundColor: theme.color.primarySoft,
+    backgroundColor: theme.color.primary,
     borderRadius: theme.radius.md,
     height: 52,
     justifyContent: 'center',
     width: 54,
   },
   ddayCaption: {
-    color: theme.color.primary,
+    color: theme.color.onPrimary,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.micro,
     fontWeight: theme.font.weight.bold,
     letterSpacing: 0.4,
   },
   ddayText: {
-    color: theme.color.primary,
+    color: theme.color.onPrimary,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.headline,
     fontWeight: theme.font.weight.bold,

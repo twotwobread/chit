@@ -10,17 +10,25 @@ test('maps semantic mobile tokens to the approved Chit palette', () => {
 
   assert.equal(color.chit.acidLime, '#C8FF00');
   assert.equal(color.chit.charcoal, '#111315');
-  assert.equal(color.chit.paper, '#F5F1E8');
-  assert.equal(color.chit.surface, '#FFFFFF');
+  assert.equal(color.chit.matteCharcoal, '#191B1F');
+  assert.equal(color.chit.offWhite, '#F7F7F2');
+  assert.equal(color.chit.offWhiteElevated, '#FCFCF8');
+  assert.equal(color.chit.offWhiteSubtle, '#F0F0EA');
+  assert.equal(color.chit.offWhiteBorder, '#E4E3DA');
+  assert.equal(color.chit.warmPaper, '#F5F1E8');
   assert.equal(color.chit.fintechBlue, '#2F6BFF');
   assert.equal(color.chit.punchRed, '#FF4D5E');
   assert.equal(color.chit.stampCoral, '#FF4F2E');
 
   assert.equal(color.primary, color.chit.acidLime);
   assert.equal(color.onPrimary, color.chit.charcoal);
-  assert.equal(color.bg, color.chit.paper);
-  assert.equal(color.surface, color.chit.surface);
+  assert.equal(color.bg, color.chit.matteCharcoal);
+  assert.equal(color.surface, color.chit.offWhiteElevated);
+  assert.equal(color.surfaceSunken, color.chit.offWhiteSubtle);
+  assert.equal(color.borderDefault, color.chit.offWhiteBorder);
   assert.equal(color.textStrong, color.chit.charcoal);
+  assert.equal(color.textOnShell, color.chit.surface);
+  assert.equal(color.shellGlow, 'rgba(200,255,0,0.16)');
   assert.equal(color.textLink, color.chit.fintechBlue);
   assert.equal(color.info, color.chit.fintechBlue);
   assert.equal(color.danger, color.chit.punchRed);

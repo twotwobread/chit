@@ -33,7 +33,7 @@ export function AppBar({
         <Text numberOfLines={1} style={styles.title}>
           {tripName}
         </Text>
-        {onPressTitle ? <ChevronDown color={theme.color.textMuted} size={17} strokeWidth={2.4} /> : null}
+        {onPressTitle ? <ChevronDown color={theme.color.textOnShellMuted} size={17} strokeWidth={2.4} /> : null}
       </View>
       {caption ? <Text style={styles.caption}>{caption}</Text> : null}
     </>
@@ -51,7 +51,7 @@ export function AppBar({
         onPress={onBack ?? (() => router.replace('/'))}
         style={({ pressed }) => [styles.side, pressed ? styles.pressed : null]}
       >
-        <LeadingIcon color={theme.color.textBody} size={leadingAction === 'home' ? 23 : 26} strokeWidth={2.2} />
+        <LeadingIcon color={theme.color.textOnShell} size={leadingAction === 'home' ? 23 : 26} strokeWidth={2.2} />
       </Pressable>
 
       {onPressTitle ? (
@@ -76,7 +76,7 @@ export function AppBar({
             onPress={onPressTickets}
             style={({ pressed }) => [styles.ticketButton, pressed ? styles.pressed : null]}
           >
-            <Ticket color={theme.color.textBody} size={23} strokeWidth={2.2} />
+            <Ticket color={theme.color.textOnShell} size={23} strokeWidth={2.2} />
             <Text style={styles.ticketLabel}>항공권</Text>
           </Pressable>
         ) : null}
@@ -101,8 +101,8 @@ export function AppBar({
 const styles = StyleSheet.create({
   bar: {
     alignItems: 'center',
-    backgroundColor: theme.color.bg,
-    borderBottomColor: theme.color.borderSubtle,
+    backgroundColor: theme.color.shell,
+    borderBottomColor: theme.color.shellRaised,
     borderBottomWidth: 1,
     flexDirection: 'row',
     gap: theme.space[2],
@@ -111,7 +111,7 @@ const styles = StyleSheet.create({
     paddingVertical: theme.space[2],
   },
   caption: {
-    color: theme.color.textMuted,
+    color: theme.color.textOnShellMuted,
     fontFamily: theme.font.family.regular,
     fontSize: theme.font.size.caption,
   },
@@ -132,8 +132,8 @@ const styles = StyleSheet.create({
   },
   ticketButton: {
     alignItems: 'center',
-    backgroundColor: theme.color.surface,
-    borderColor: theme.color.borderSubtle,
+    backgroundColor: theme.color.shellElevated,
+    borderColor: theme.color.shellRaised,
     borderRadius: theme.radius.md,
     borderWidth: 1,
     gap: 1,
@@ -142,13 +142,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.space[2],
   },
   ticketLabel: {
-    color: theme.color.textMuted,
+    color: theme.color.textOnShellMuted,
     fontFamily: theme.font.family.bold,
-    fontSize: 10,
+    fontSize: theme.font.size.micro,
     fontWeight: theme.font.weight.bold,
   },
   title: {
-    color: theme.color.textStrong,
+    color: theme.color.textOnShell,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.subhead,
     fontWeight: theme.font.weight.bold,

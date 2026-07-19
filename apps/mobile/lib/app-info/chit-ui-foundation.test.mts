@@ -42,6 +42,53 @@ test('Chit foundation components do not introduce raw hex colors outside theme t
   }
 });
 
+test('Issue 385 theme exposes dark shell, lime glow, and clean off-white content tokens', () => {
+  assert.equal(theme.color.bg, theme.color.chit.matteCharcoal);
+  assert.equal(theme.color.surface, theme.color.chit.offWhiteElevated);
+  assert.equal(theme.color.surfaceSunken, theme.color.chit.offWhiteSubtle);
+  assert.equal(theme.color.borderDefault, theme.color.chit.offWhiteBorder);
+  assert.equal(theme.color.shellGlow, 'rgba(200,255,0,0.16)');
+  assert.equal(theme.color.primaryTextOnLight, theme.color.chit.charcoal);
+  assert.notEqual(theme.color.surface, theme.color.chit.warmPaper);
+});
+
+test('Issue 385 shared components provide BrandStamp, ScreenBackground, and card variants', () => {
+  const source = readMobileSource('../design/components.tsx');
+  const indexSource = readMobileSource('../design/index.ts');
+
+  assert.match(source, /export type CardVariant = 'content' \| 'hero' \| 'dark' \| 'shelf'/);
+  assert.match(source, /variant = 'content'/);
+  assert.match(source, /cardHero:/);
+  assert.match(source, /cardDark:/);
+  assert.match(source, /cardShelf:/);
+  assert.match(source, /export function BrandStamp/);
+  assert.match(source, /styles\.brandStamp/);
+  assert.match(source, /transform: \[\{ rotate: '-3deg' \}\]/);
+  assert.match(source, /export function ScreenBackground/);
+  assert.match(source, /styles\.shellGlow/);
+  assert.match(source, /backgroundColor: theme\.color\.shellGlow/);
+  assert.match(indexSource, /BrandStamp/);
+  assert.match(indexSource, /ScreenBackground/);
+});
+
+test('Issue 385 core screens adopt dark shell and brand stamp primitives', () => {
+  const loginSource = readMobileSource('../../app/login.tsx');
+  const homeSource = readMobileSource('../../app/index.tsx');
+  const mypageSource = readMobileSource('../../app/mypage.tsx');
+  const tripScreenSource = readMobileSource('../trip-ui/TripScreenScaffold.tsx');
+
+  assert.match(loginSource, /import \{ BrandStamp, Card, PrimaryButton, SecondaryButton, ScreenBackground, theme \}/);
+  assert.match(loginSource, /<ScreenBackground/);
+  assert.match(loginSource, /<BrandStamp/);
+  assert.match(homeSource, /import \{ BrandStamp, Card, PrimaryButton, ScreenBackground, SecondaryButton, theme \}/);
+  assert.match(homeSource, /<ScreenBackground/);
+  assert.match(homeSource, /<BrandStamp/);
+  assert.match(mypageSource, /import \{ PrimaryButton, ScreenBackground, SecondaryButton, theme \}/);
+  assert.match(mypageSource, /<ScreenBackground/);
+  assert.match(tripScreenSource, /import \{ Card, PrimaryButton, ScreenBackground, SecondaryButton, theme \}/);
+  assert.match(tripScreenSource, /<ScreenBackground/);
+});
+
 test('shared primary and secondary buttons use enterprise Chit action hierarchy', () => {
   const source = readMobileSource('../design/components.tsx');
 
@@ -135,7 +182,10 @@ test('Issue 372 My Page uses foundation buttons for simple state and section act
   const screenSource = readMobileSource('../../app/mypage.tsx');
   const partsSource = readMobileSource('../trip-ui/MyPageParts.tsx');
 
-  assert.match(screenSource, /import \{ PrimaryButton, SecondaryButton, theme \} from '\.\.\/lib\/design';/);
+  assert.match(
+    screenSource,
+    /import \{ PrimaryButton, ScreenBackground, SecondaryButton, theme \} from '\.\.\/lib\/design';/,
+  );
   assert.match(screenSource, /<PrimaryButton[\s\S]*label="로그인하기"[\s\S]*router\.replace\('\/login'\)/);
   assert.match(screenSource, /<SecondaryButton[\s\S]*label="다시 시도"[\s\S]*onPress=\{load\}/);
 

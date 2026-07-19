@@ -15,7 +15,7 @@ import { ApiError } from '@i-um/api-contract';
 
 import { MobileAuthError } from '../lib/auth/client';
 import { clearStoredSession, readStoredSession } from '../lib/auth/session';
-import { Card, PrimaryButton, SecondaryButton, theme } from '../lib/design';
+import { BrandStamp, Card, PrimaryButton, ScreenBackground, SecondaryButton, theme } from '../lib/design';
 import { ActiveTripCard, PastTripRow, UpcomingTripRow } from '../lib/home-ui/TripCards';
 import { BottomMenu } from '../lib/navigation/BottomMenu';
 import { getRootScreenContentTopPadding } from '../lib/navigation/root-screen-layout';
@@ -94,7 +94,7 @@ export default function HomeScreen() {
   );
 
   return (
-    <View style={styles.screen}>
+    <ScreenBackground style={styles.screen}>
       <ScrollView
         contentContainerStyle={[styles.content, { paddingTop: getRootScreenContentTopPadding(insets.top) }]}
         style={styles.scroll}
@@ -103,7 +103,7 @@ export default function HomeScreen() {
       </ScrollView>
 
       {state.showBottomMenu ? <BottomMenu selected="home" /> : null}
-    </View>
+    </ScreenBackground>
   );
 }
 
@@ -159,8 +159,13 @@ function HomeScreenContent({ onRetry, state }: { onRetry: () => void; state: Hom
 function HomeHeader() {
   return (
     <View style={styles.header}>
-      <Text style={styles.title}>홈</Text>
-      <Text style={styles.subtitle}>내 여행을 확인하고 관리해요.</Text>
+      <View style={styles.headerTop}>
+        <View style={styles.headerCopy}>
+          <Text style={styles.title}>홈</Text>
+          <Text style={styles.subtitle}>내 여행을 확인하고 관리해요.</Text>
+        </View>
+        <BrandStamp decorative size="sm" />
+      </View>
     </View>
   );
 }
@@ -343,7 +348,7 @@ const styles = StyleSheet.create({
     padding: theme.space[7],
   },
   carouselCounter: {
-    color: theme.color.textMuted,
+    color: theme.color.textOnShellMuted,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.caption,
     fontWeight: theme.font.weight.bold,
@@ -382,6 +387,17 @@ const styles = StyleSheet.create({
     maxWidth: theme.layout.cardMaxW,
     width: '100%',
   },
+  headerCopy: {
+    flex: 1,
+    gap: theme.space[2],
+  },
+  headerTop: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: theme.space[4],
+    justifyContent: 'space-between',
+    width: '100%',
+  },
   homeBody: {
     gap: theme.space[4],
     maxWidth: theme.layout.cardMaxW,
@@ -402,7 +418,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   screen: {
-    backgroundColor: theme.color.bg,
     flex: 1,
   },
   scroll: {
@@ -416,11 +431,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   subtitle: {
-    color: theme.color.textMuted,
+    color: theme.color.textOnShellMuted,
     fontFamily: theme.font.family.regular,
   },
   title: {
-    color: theme.color.textStrong,
+    color: theme.color.textOnShell,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.titleLg,
     fontWeight: theme.font.weight.bold,
@@ -436,7 +451,7 @@ const styles = StyleSheet.create({
     gap: theme.space[3],
   },
   tripSectionTitle: {
-    color: theme.color.textBody,
+    color: theme.color.textOnShell,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.label,
     fontWeight: theme.font.weight.bold,

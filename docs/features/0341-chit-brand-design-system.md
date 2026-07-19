@@ -47,45 +47,54 @@ Chit은 여행 지출과 정산을 위한 `hip fintech settlement app`이다.
 
 ### System structure
 
-Chit 디자인은 3단 구조를 사용한다.
+Chit 디자인은 `Dark Shell + Off-white Content`를 기본 앱 구조로 사용한다.
 
-1. `Paper Fintech` — 기본 앱 UI.
-2. `Dark Acid` — 앱 아이콘, 스플래시, 키비주얼, 정산 완료 히어로.
-3. `Stamp Pop` — 온보딩, 빈 상태, 완료 상태, 캠페인 장식.
+1. `Dark Shell` — Matte Charcoal 앱 배경/네비게이션/상단 쉘, 미세한 Acid Lime ambient glow.
+2. `Off-white Content` — 카드, 리스트, 폼, 시트는 깨끗한 오프화이트 표면 위에 배치.
+3. `Dark Acid Hero` — 앱 아이콘, 로그인/홈 브랜드 헤더, 정산 히어로, 완료/빈 상태 등 고임팩트 순간.
+4. `Stamp Pop` — BrandStamp, 온보딩, 빈 상태, 완료 상태, 캠페인 장식.
 
-기본 화면은 오래 사용해도 피로하지 않아야 하므로 `Paper Fintech`를 기본으로 한다. 브랜드 임팩트가 필요한 순간에만 `Dark Acid`와 `Stamp Pop`을 제한적으로 쓴다.
+Warm Paper는 더 이상 핵심 앱 배경/카드 표면으로 쓰지 않는다. 다크 쉘 위 오프화이트 콘텐츠가 기본이며, Acid Lime은 어두운 쉘/CTA/선택 상태에서 선명하게 보이도록 제한적으로 사용한다.
 
 ### Color tokens
 
-| Role | Name | Hex | Usage |
+| Role | Name | Hex / Value | Usage |
 |---|---|---:|---|
-| Core dark | Charcoal | `#111315` | 다크 히어로, 로고 박스, 주요 텍스트, 강한 CTA 대체 배경 |
-| Dark surface | Matte Charcoal | `#191B1F` | 다크 모드 배경, 스플래시 배경 |
-| Dark elevated | Charcoal Elevated | `#24272C` | 다크 카드, 다크 리스트 row |
-| Primary accent | Acid Lime | `#C8FF00` | 주요 CTA, 핵심 금액, 선택 상태, 완료 상태 |
-| Background | Paper | `#F5F1E8` | 기본 앱 배경, 종이/전표 감성 |
-| Surface | White | `#FFFFFF` | 카드, 리스트, 입력 필드 |
-| Border | Paper Border | `#DDD5C8` | 라이트 카드/row 경계 |
+| Core dark | Charcoal | `#111315` | BrandStamp 박스, 다크 히어로, 강한 카드 |
+| App shell | Matte Charcoal | `#191B1F` | 기본 앱 배경, root shell, 스플래시 배경 |
+| Dark elevated | Charcoal Elevated | `#24272C` | AppBar, tab bar, 다크 카드, shell elevated surface |
+| Dark raised | Charcoal Raised | `#30343A` | 다크 쉘 경계/분리선 |
+| Primary accent | Acid Lime | `#C8FF00` | 주요 CTA fill, 선택 상태, 큰/핵심 금액, BrandStamp offset |
+| Shell glow | Acid Lime Ambient | `rgba(200,255,0,0.10-0.18)` | 다크 쉘 상단/우측 브랜드 glow, 콘텐츠 진입 전 fade |
+| Content base | Off-white | `#F7F7F2` | 기본 라이트 콘텐츠 베이스 |
+| Content elevated | Off-white Elevated | `#FCFCF8` | 카드, 리스트, 폼, sheet 표면 |
+| Content sunken | Off-white Subtle | `#F0F0EA` | 입력/내부 패널/눌린 표면 |
+| Content border | Off-white Border | `#E4E3DA` | 라이트 카드/row 경계 |
+| Legacy retired | Warm Paper | `#F5F1E8` | 핵심 앱 배경/카드에는 사용 금지; 이력/마케팅 참고 전용 |
 | Info | Fintech Blue | `#2F6BFF` | 링크, 최신 계산 안내, 보조 정보 |
 | Danger | Punch Red | `#FF4D5E` | 오류, 삭제, 위험 액션 |
 | Warning/Review | Stamp Coral | `#FF4F2E` | 검토 필요, 영수증 초안, 장식적 강조 |
 
 ### Color rules
 
+- App root/shell은 Matte Charcoal을 기본으로 한다.
+- 핵심 카드/리스트/입력/시트는 Off-white Elevated/Subtle 계열만 사용한다.
+- Warm Paper `#F5F1E8`는 핵심 UI 배경/카드에서 retired 상태다.
 - Acid Lime은 브랜드의 기억점이지만 과다 사용하지 않는다.
 - Acid Lime 허용 위치:
   - primary CTA 배경.
-  - 큰 금액 숫자.
+  - 큰/핵심 금액 숫자 또는 다크 히어로의 큰 강조.
   - 선택된 탭/칩 상태.
+  - BrandStamp offset/shadow.
   - 정산 완료/성공 상태.
-  - 다크 히어로의 핵심 강조.
+  - 다크 쉘 ambient glow.
 - Acid Lime 금지 위치:
   - 긴 본문.
-  - 작은 보조 텍스트.
+  - 라이트/오프화이트 표면 위 작은 보조 텍스트.
   - 오류/위험 의미.
   - 색상만으로 상태를 전달하는 경우.
+- 다크 쉘 glow는 중앙화된 토큰/컴포넌트로만 구현한다. 화면별 ad-hoc radial/rgba 값을 만들지 않는다.
 - Charcoal은 순수 블랙 대신 사용한다.
-- 기본 사용 화면은 Paper 배경 + White surface + Charcoal text를 우선한다.
 - Fintech Blue는 신뢰/정보 보조색으로 제한한다. 브랜드 primary로 쓰지 않는다.
 
 ## Logo Direction
@@ -94,6 +103,7 @@ Chit 디자인은 3단 구조를 사용한다.
 
 - 공식 로고/워드마크: `B1 Stamp Lockup`.
 - 앱 아이콘/스플래시: `B4 Dark Stamp Icon`.
+- 앱 내 재사용 컴포넌트: `BrandStamp` — Charcoal rounded square + Acid Lime `칫` + slight rotation + Acid Lime offset/shadow.
 
 ### Logo principles
 
@@ -109,7 +119,7 @@ Chit 디자인은 3단 구조를 사용한다.
 |---|---|
 | App icon | Dark Stamp Icon: Charcoal background + Acid Lime accent + `칫` |
 | Splash | Dark Stamp Icon with `CHIT` sublabel |
-| App header | Simple `칫` text mark |
+| App header | `BrandStamp` or simple `칫` text mark depending on density |
 | Onboarding hero | Stamp Lockup |
 | Marketing image | Stamp Lockup + short tagline |
 | Legal/plain text | `칫 Chit` |
@@ -137,16 +147,17 @@ Use `Pretendard Punch`.
 
 ### Cards
 
-- Default cards use White surface on Paper background.
-- Critical settlement summary cards may use Charcoal background with Acid Lime amount.
+- Default cards use Off-white Elevated on Matte Charcoal shell.
+- Internal panels/input wells use Off-white Subtle.
+- Critical settlement summary cards may use Charcoal background with Acid Lime amount/accent.
 - Rounded cards stay modern and soft, but not bubbly.
-- Borders are preferred over heavy shadows for everyday surfaces.
-- Stamp-style hard shadow is reserved for onboarding/empty/completion states, not dense lists.
+- Borders are preferred over heavy shadows for everyday dense surfaces.
+- Stamp-style offset/shadow is reserved for BrandStamp, onboarding/empty/completion states, not dense lists.
 
 ### Buttons
 
 - Primary CTA: Acid Lime background + Charcoal text.
-- Secondary CTA: White/Paper background + Charcoal border/text.
+- Secondary CTA: Off-white background + off-white border family + Charcoal text.
 - Destructive CTA: Danger token, never Acid Lime.
 - Pressed states should be fast and tactile, without layout shift.
 
@@ -159,8 +170,9 @@ Use `Pretendard Punch`.
 
 ### Navigation
 
-- Bottom tab remains text + vector icon.
-- Current tab may use Charcoal active capsule or Acid Lime active accent depending on surface.
+- Bottom tab remains text + vector icon on dark elevated shell surface.
+- Current tab uses Acid Lime active capsule with Charcoal icon/text.
+- AppBar and trip tabs use Charcoal Elevated/Charcoal Raised shell surfaces, not off-white bars.
 - Do not exceed five top-level trip tabs.
 
 ## Copy Voice
@@ -204,7 +216,7 @@ Avoid:
 ## Accessibility and Usability
 
 - Normal text contrast must meet WCAG AA where applicable.
-- Acid Lime on Paper/White can be low legibility for text; use it mostly as fill behind Charcoal text or as large accent.
+- Acid Lime on Off-white can be low legibility for text; use it mostly as fill behind Charcoal text or as large/dark-surface accent.
 - Minimum touch target: 44pt.
 - Do not communicate settlement status by color alone.
 - Support Dynamic Type as much as current app patterns allow.
@@ -248,12 +260,16 @@ Avoid:
 - [ ] Existing green/amber i-um primary visual language no longer appears in core app surfaces except where semantically required by category/status tokens.
 - [ ] New brand assets replace `apps/mobile/assets/brand/*` and app icons.
 - [ ] Primary CTA uses Acid Lime with accessible Charcoal text.
-- [ ] Settlement summary screens use Paper Fintech by default and Dark Acid for high-emphasis summary/complete states.
+- [ ] Core screens use Matte Charcoal shell with clean Off-white content surfaces.
+- [ ] Warm Paper `#F5F1E8` is not visible in core app backgrounds/cards.
+- [ ] Shell Acid Lime glow is centralized in tokens/components, not duplicated per screen.
+- [ ] BrandStamp appears only in approved brand/header/empty/loading/settlement moments.
+- [ ] Settlement summary screens use Off-white content by default and Dark Acid for high-emphasis summary/complete states.
 - [ ] Copy follows short Chit voice while preserving clear recovery text for errors.
 - [ ] iOS and Android smoke checks cover login, home, trip tabs, expense add, settlement summary, and app icon/splash.
 
 ## Open Questions
 
 - Exact final SVG path/lettering for B1 Stamp Lockup and B4 Dark Stamp Icon.
-- Whether to add a dedicated dark mode in the first rebrand implementation or ship dark-key surfaces inside the current automatic theme behavior first.
+- Whether to add a user-selectable dedicated dark mode later; current direction uses dark shell as the default visual shell.
 - Whether legal-site branding changes should happen in the same PR or a separate public-site PR.

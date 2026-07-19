@@ -10,7 +10,7 @@ import type {
 } from '@i-um/api-contract';
 
 import { MobileAuthError } from '../../lib/auth/client';
-import { Card, PrimaryButton, SecondaryButton, theme } from '../../lib/design';
+import { Card, PrimaryButton, ScreenBackground, SecondaryButton, theme } from '../../lib/design';
 import {
   addTripDestination,
   buildCreateTripDestinations,
@@ -253,7 +253,7 @@ export default function NewTripScreen() {
   };
 
   return (
-    <View style={styles.screenRoot}>
+    <ScreenBackground style={styles.screenRoot}>
       <KeyboardAwareFormScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardFixedBottomOffset={footerLayout.keyboardFixedBottomOffset}
@@ -430,7 +430,7 @@ export default function NewTripScreen() {
           onPress={isReviewStep ? () => void submit() : goNext}
         />
       </StickyActionFooter>
-    </View>
+    </ScreenBackground>
   );
 }
 
@@ -774,12 +774,10 @@ function validateSettings(form: Pick<FormState, 'defaultCurrency' | 'defaultTrav
 
 const styles = StyleSheet.create({
   screenRoot: {
-    backgroundColor: theme.color.bg,
     flex: 1,
   },
   scroll: {
     flex: 1,
-    backgroundColor: theme.color.bg,
   },
   scrollContent: {
     alignItems: 'center',
@@ -810,7 +808,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   stepEyebrow: {
-    color: theme.color.primary,
+    color: theme.color.primaryTextOnLight,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.micro,
     fontWeight: theme.font.weight.bold,
@@ -825,7 +823,7 @@ const styles = StyleSheet.create({
     paddingVertical: theme.space[2],
   },
   stepBadgeText: {
-    color: theme.color.primary,
+    color: theme.color.primaryTextOnLight,
     fontFamily: theme.font.family.semibold,
     fontSize: theme.font.size.micro,
     fontWeight: theme.font.weight.semibold,
@@ -883,7 +881,7 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.semibold,
   },
   stepSummaryLabelActive: {
-    color: theme.color.primary,
+    color: theme.color.primaryTextOnLight,
   },
   stepSummaryValue: {
     color: theme.color.textBody,
@@ -954,7 +952,7 @@ const styles = StyleSheet.create({
     paddingVertical: theme.space[2],
   },
   searchCountText: {
-    color: theme.color.primary,
+    color: theme.color.primaryTextOnLight,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.caption,
     fontWeight: theme.font.weight.bold,
@@ -1017,7 +1015,7 @@ const styles = StyleSheet.create({
     gap: theme.space[3],
   },
   destinationChip: {
-    backgroundColor: theme.color.primarySoft,
+    backgroundColor: theme.color.primary,
     borderColor: theme.color.primary,
     borderRadius: theme.radius.pill,
     borderWidth: 1,
@@ -1026,7 +1024,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.space[4],
   },
   destinationChipText: {
-    color: theme.color.primary,
+    color: theme.color.onPrimary,
     fontFamily: theme.font.family.semibold,
     fontWeight: theme.font.weight.semibold,
   },
@@ -1061,7 +1059,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.space[5],
   },
   optionChipSelected: {
-    backgroundColor: theme.color.primarySoft,
+    backgroundColor: theme.color.primary,
     borderColor: theme.color.primary,
   },
   optionText: {
@@ -1070,7 +1068,7 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.bold,
   },
   optionTextSelected: {
-    color: theme.color.primary,
+    color: theme.color.onPrimary,
   },
   summaryBox: {
     backgroundColor: theme.color.surfaceSunken,
@@ -1216,7 +1214,7 @@ const styles = StyleSheet.create({
     borderColor: theme.color.borderDefault,
   },
   addResultButtonText: {
-    color: theme.color.primary,
+    color: theme.color.primaryTextOnLight,
     fontFamily: theme.font.family.semibold,
     fontWeight: theme.font.weight.semibold,
   },

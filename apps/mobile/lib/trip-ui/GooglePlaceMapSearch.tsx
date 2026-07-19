@@ -2001,7 +2001,7 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.semibold,
   },
   sheetTabTextSelected: {
-    color: theme.color.primary,
+    color: theme.color.primaryTextOnLight,
   },
   sheetTitle: {
     color: theme.color.textStrong,
@@ -2045,7 +2045,7 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.semibold,
   },
   destinationChipTextSelected: {
-    color: theme.color.primary,
+    color: theme.color.primaryTextOnLight,
   },
   searchRow: {
     flexDirection: 'row',
@@ -2217,7 +2217,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   photoPlaceholderText: {
-    color: theme.color.primary,
+    color: theme.color.primaryTextOnLight,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.label,
     fontWeight: theme.font.weight.bold,
@@ -2295,12 +2295,12 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.bold,
   },
   resultPrimaryActionTextSelected: {
-    color: theme.color.primary,
+    color: theme.color.primaryTextOnLight,
   },
   categoryPill: {
     backgroundColor: theme.color.primarySoft,
     borderRadius: theme.radius.pill,
-    color: theme.color.primary,
+    color: theme.color.primaryTextOnLight,
     fontFamily: theme.font.family.semibold,
     fontSize: theme.font.size.micro,
     fontWeight: theme.font.weight.semibold,

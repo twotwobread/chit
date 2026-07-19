@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
-import { Card, PrimaryButton, SecondaryButton, theme } from '../design';
+import { Card, PrimaryButton, ScreenBackground, SecondaryButton, theme } from '../design';
 import { KeyboardAwareFormScrollView } from './KeyboardAwareFormScrollView';
 import { StickyActionFooter, useStickyActionFooterLayout } from './StickyActionFooter';
 
@@ -21,7 +21,7 @@ export function TripScreen({
   const footerLayout = useStickyActionFooterLayout({ actionCount: footerActionCount });
 
   return (
-    <View style={styles.root}>
+    <ScreenBackground style={styles.root}>
       {keyboardAware ? (
         <KeyboardAwareFormScrollView
           contentContainerStyle={[styles.content, contentContainerStyle]}
@@ -41,7 +41,7 @@ export function TripScreen({
           {footer}
         </StickyActionFooter>
       ) : null}
-    </View>
+    </ScreenBackground>
   );
 }
 
@@ -109,7 +109,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   helper: {
-    color: theme.color.textMuted,
+    color: theme.color.textOnShellMuted,
     fontFamily: theme.font.family.regular,
     fontSize: theme.font.size.body,
     lineHeight: theme.font.size.body * theme.font.leading.normal,
@@ -120,15 +120,13 @@ const styles = StyleSheet.create({
     paddingVertical: theme.space[2],
   },
   root: {
-    backgroundColor: theme.color.bg,
     flex: 1,
   },
   scroll: {
-    backgroundColor: theme.color.bg,
     flex: 1,
   },
   title: {
-    color: theme.color.textStrong,
+    color: theme.color.textOnShell,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.title,
     fontWeight: theme.font.weight.bold,

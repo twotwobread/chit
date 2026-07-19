@@ -6,11 +6,9 @@ import { DAY_ITINERARY_EDIT_MEMO_INPUT_MIN_HEIGHT } from '../trips/day-itinerary
 export const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: theme.color.bg,
   },
   scroll: {
     flex: 1,
-    backgroundColor: theme.color.bg,
   },
   scrollContent: {
     alignItems: 'center',
@@ -29,7 +27,7 @@ export const styles = StyleSheet.create({
     maxWidth: theme.layout.cardMaxW,
   },
   screenTitle: {
-    color: theme.color.textStrong,
+    color: theme.color.textOnShell,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.titleLg,
     fontWeight: theme.font.weight.bold,
@@ -167,7 +165,7 @@ export const styles = StyleSheet.create({
     gap: theme.space[2],
   },
   dayLabel: {
-    color: theme.color.primary,
+    color: theme.color.primaryTextOnLight,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.title,
     fontWeight: theme.font.weight.bold,
@@ -394,7 +392,7 @@ export const styles = StyleSheet.create({
     fontSize: theme.font.size.caption,
   },
   timeLabel: {
-    color: theme.color.primary,
+    color: theme.color.primaryTextOnLight,
     fontFamily: theme.font.family.semibold,
     fontSize: theme.font.size.caption,
     fontWeight: theme.font.weight.semibold,
@@ -500,7 +498,7 @@ export const styles = StyleSheet.create({
     fontWeight: theme.font.weight.bold,
   },
   expenseAmount: {
-    color: theme.color.primary,
+    color: theme.color.primaryTextOnLight,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.subhead,
     fontWeight: theme.font.weight.bold,

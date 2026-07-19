@@ -7,7 +7,7 @@ import type { AuthProvider } from '@i-um/api-contract';
 import { loginWithOAuth, MobileAuthError } from '../lib/auth/client';
 import { createLoginAttemptGate } from '../lib/auth/login-attempt';
 import { getOAuthCredential, getVisibleOAuthProviderConfigs } from '../lib/auth/oauth';
-import { Card, PrimaryButton, SecondaryButton, theme } from '../lib/design';
+import { BrandStamp, Card, PrimaryButton, SecondaryButton, ScreenBackground, theme } from '../lib/design';
 import {
   clearPendingInviteLoginHandoff,
   consumeInviteLoginRedirectPath,
@@ -55,9 +55,9 @@ export default function LoginScreen() {
   const isLoading = state.status === 'loading';
 
   return (
-    <View style={styles.container}>
+    <ScreenBackground style={styles.container}>
       <View style={styles.hero}>
-        <Text style={styles.brandBadge}>CHIT</Text>
+        <BrandStamp size="lg" />
         <Text style={styles.title}>칫 Chit</Text>
         <Text style={styles.subtitle}>{subtitle}</Text>
       </View>
@@ -110,7 +110,7 @@ export default function LoginScreen() {
           </View>
         ) : null}
       </Card>
-    </View>
+    </ScreenBackground>
   );
 }
 
@@ -131,19 +131,6 @@ function errorState(error: unknown): LoginState {
 }
 
 const styles = StyleSheet.create({
-  brandBadge: {
-    alignSelf: 'center',
-    backgroundColor: theme.color.textStrong,
-    borderRadius: theme.radius.pill,
-    color: theme.color.primary,
-    fontFamily: theme.font.family.bold,
-    fontSize: theme.font.size.micro,
-    fontWeight: theme.font.weight.bold,
-    letterSpacing: 1.4,
-    overflow: 'hidden',
-    paddingHorizontal: theme.space[3],
-    paddingVertical: theme.space[2],
-  },
   card: {
     gap: theme.space[5],
   },
@@ -166,7 +153,6 @@ const styles = StyleSheet.create({
   },
   container: {
     alignItems: 'center',
-    backgroundColor: theme.color.bg,
     flex: 1,
     justifyContent: 'center',
     padding: theme.space[7],
@@ -203,7 +189,7 @@ const styles = StyleSheet.create({
   },
   providerButton: {
     alignItems: 'center',
-    borderRadius: theme.radius.md,
+    borderRadius: theme.radius.lg,
     justifyContent: 'center',
     minHeight: theme.layout.controlH,
     paddingHorizontal: theme.space[5],
@@ -218,14 +204,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   subtitle: {
-    color: theme.color.textMuted,
+    color: theme.color.textOnShellMuted,
     fontFamily: theme.font.family.regular,
     fontSize: theme.font.size.body,
     lineHeight: theme.font.size.body * theme.font.leading.normal,
     textAlign: 'center',
   },
   title: {
-    color: theme.color.textStrong,
+    color: theme.color.textOnShell,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.display,
     fontWeight: theme.font.weight.bold,

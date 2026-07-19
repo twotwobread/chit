@@ -5,7 +5,6 @@ import { theme } from '../design';
 export const styles = StyleSheet.create({
   scroll: {
     flex: 1,
-    backgroundColor: theme.color.bg,
   },
   scrollContent: {
     alignItems: 'center',
@@ -20,7 +19,7 @@ export const styles = StyleSheet.create({
     marginBottom: theme.space[7],
   },
   screenTitle: {
-    color: theme.color.textStrong,
+    color: theme.color.textOnShell,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.titleLg,
     fontWeight: theme.font.weight.bold,
@@ -100,7 +99,7 @@ export const styles = StyleSheet.create({
     paddingVertical: theme.space[2],
   },
   ownerBadgeText: {
-    color: theme.color.primary,
+    color: theme.color.primaryTextOnLight,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.caption,
     fontWeight: theme.font.weight.bold,
@@ -189,7 +188,7 @@ export const styles = StyleSheet.create({
     textAlign: 'center',
   },
   successMessage: {
-    color: theme.color.success,
+    color: theme.color.primaryTextOnLight,
     fontFamily: theme.font.family.semibold,
     fontWeight: theme.font.weight.semibold,
     textAlign: 'center',
