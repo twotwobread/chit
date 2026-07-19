@@ -5,6 +5,7 @@ import {
   buildDayItineraryDirtyClosePrompt,
   resolveDayItinerarySheetCloseAction,
   resolveDayItinerarySheetMode,
+  resolveDayItineraryTimelineItemPress,
   shouldDismissDayItinerarySheet,
 } from './day-itinerary-sheet';
 
@@ -33,6 +34,26 @@ describe('day itinerary sheet state helpers', () => {
         editStatus: 'saving',
       }),
       { kind: 'editPlace' },
+    );
+  });
+
+  it('opens the editable schedule sheet immediately when a timeline item is pressed from the idle schedule list', () => {
+    assert.deepEqual(
+      resolveDayItineraryTimelineItemPress({
+        editStatus: 'idle',
+        itemId: 'item-1',
+      }),
+      { kind: 'openEdit', itemId: 'item-1' },
+    );
+  });
+
+  it('ignores timeline item presses while the edit sheet is active', () => {
+    assert.deepEqual(
+      resolveDayItineraryTimelineItemPress({
+        editStatus: 'editing',
+        itemId: 'item-1',
+      }),
+      { kind: 'none' },
     );
   });
 

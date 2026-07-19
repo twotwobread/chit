@@ -4,6 +4,8 @@ export type DayItinerarySheetStatus = 'idle' | 'editing' | 'saving' | 'error';
 
 export type DayItinerarySheetCloseAction = { kind: 'blocked' } | { kind: 'close' } | { kind: 'promptSave' };
 
+export type DayItineraryTimelineItemPressAction = { kind: 'none' } | { kind: 'openEdit'; itemId: string };
+
 export type DayItineraryDirtyClosePrompt = {
   title: string;
   buttons: (
@@ -40,6 +42,17 @@ export function resolveDayItinerarySheetMode(input: {
 
 export function shouldDismissDayItinerarySheet(input: { editStatus: DayItinerarySheetStatus }): boolean {
   return input.editStatus !== 'saving';
+}
+
+export function resolveDayItineraryTimelineItemPress(input: {
+  editStatus: DayItinerarySheetStatus;
+  itemId: string | null;
+}): DayItineraryTimelineItemPressAction {
+  if (!input.itemId || isActiveSheetFormStatus(input.editStatus)) {
+    return { kind: 'none' };
+  }
+
+  return { kind: 'openEdit', itemId: input.itemId };
 }
 
 export function resolveDayItinerarySheetCloseAction(input: {

@@ -13,6 +13,7 @@ export type BottomSheetProps = {
   children: ReactNode;
   footer?: ReactNode;
   footerActionCount?: number;
+  footerKeyboardMinClearance?: number;
   scrollable?: boolean;
   showCloseButton?: boolean;
 };
@@ -21,19 +22,29 @@ export function BottomSheet({
   children,
   footer,
   footerActionCount = 1,
+  footerKeyboardMinClearance,
   onClose,
   scrollable = false,
   showCloseButton = true,
   visible,
 }: BottomSheetProps) {
   const insets = useSafeAreaInsets();
-  const footerLayout = useStickyActionFooterLayout({ actionCount: footerActionCount });
+  const footerLayout = useStickyActionFooterLayout({
+    actionCount: footerActionCount,
+    minClearance: footerKeyboardMinClearance,
+  });
 
   return (
     <Modal animationType="slide" onRequestClose={onClose} transparent visible={visible}>
       <View style={styles.root}>
         <Pressable accessibilityLabel="닫기" accessibilityRole="button" onPress={onClose} style={styles.scrim} />
-        <View style={[styles.sheet, { paddingBottom: footer ? 0 : Math.max(insets.bottom, theme.space[6]) }]}>
+        <View
+          style={[
+            styles.sheet,
+            scrollable ? styles.scrollableSheet : null,
+            { paddingBottom: footer ? 0 : Math.max(insets.bottom, theme.space[6]) },
+          ]}
+        >
           {showCloseButton ? (
             <Pressable
               accessibilityLabel="닫기"
@@ -53,6 +64,7 @@ export function BottomSheet({
               keyboardFixedBottomOffset={footer ? footerLayout.keyboardFixedBottomOffset : undefined}
               keyboardMinClearance={footer ? footerLayout.keyboardMinClearance : undefined}
               showsVerticalScrollIndicator={false}
+              style={styles.scrollArea}
             >
               {children}
             </KeyboardAwareFormScrollView>
@@ -98,6 +110,9 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-end',
   },
+  scrollArea: {
+    flex: 1,
+  },
   scrollContent: {
     paddingBottom: theme.space[2],
   },
@@ -114,5 +129,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.space[6],
     paddingTop: theme.space[4],
     ...theme.shadow.lg,
+  },
+  scrollableSheet: {
+    height: '86%',
   },
 });

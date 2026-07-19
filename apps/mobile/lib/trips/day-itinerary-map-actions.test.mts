@@ -74,7 +74,7 @@ describe('day itinerary map action helpers', () => {
         map: {
           label: '지도',
           accessibilityLabel: '제주공항 지도 열기',
-          url: 'https://map.naver.com/v5/search/%EC%A0%9C%EC%A3%BC%EA%B3%B5%ED%95%AD%20%EC%A0%9C%EC%A3%BC%EC%8B%9C%20%EA%B3%B5%ED%95%AD%EB%A1%9C%202',
+          url: 'nmap://search?query=%EC%A0%9C%EC%A3%BC%EC%8B%9C%20%EA%B3%B5%ED%95%AD%EB%A1%9C%202&appname=com.twotwobread.ium',
           successFeedback: null,
           failureFeedback: '지도를 열 수 없어요. 잠시 후 다시 시도해주세요.',
         },

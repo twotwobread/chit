@@ -9,6 +9,7 @@ import {
   type DayItineraryViewModel,
 } from '../trips/day-itinerary';
 import { buildDayItineraryDetailPanel } from '../trips/day-itinerary-detail-panel';
+import { DAY_ITINERARY_EDIT_SHEET_KEYBOARD_MIN_CLEARANCE } from '../trips/day-itinerary-sheet-layout';
 import {
   buildDayItineraryEditSubmitState,
   hasDayItineraryEditFormChanges,
@@ -22,6 +23,7 @@ import {
   buildDayItineraryDirtyClosePrompt,
   resolveDayItinerarySheetCloseAction,
   resolveDayItinerarySheetMode,
+  resolveDayItineraryTimelineItemPress,
 } from '../trips/day-itinerary-sheet';
 import { buildDayItineraryReorderAction, buildDayItineraryReorderSubmitState } from '../trips/reorder-itinerary';
 import {
@@ -237,7 +239,12 @@ export function DayItineraryContent({
 
   const handlePressTimelineItem = (timelineItem: ItineraryTimelineItem) => {
     const item = resolveTimelineItem(timelineItem);
-    if (item) {
+    const action = resolveDayItineraryTimelineItemPress({
+      editStatus: editState.status,
+      itemId: item?.id ?? null,
+    });
+
+    if (action.kind === 'openEdit' && item) {
       setSelectedDetailItemId(null);
       onEditPlace(item);
     }
@@ -596,6 +603,7 @@ function DayItineraryItemSheet({
           </>
         }
         footerActionCount={2}
+        footerKeyboardMinClearance={DAY_ITINERARY_EDIT_SHEET_KEYBOARD_MIN_CLEARANCE}
         onClose={onClose}
         scrollable
         visible

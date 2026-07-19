@@ -466,7 +466,7 @@ describe('google place search helpers', () => {
       ...result,
       description: undefined,
       mapSearchLabel: '지도에서 보기',
-      mapUrl: 'https://map.naver.com/v5/search/%EC%9A%B0%EB%A9%94%EB%8B%A4%20%EC%B9%B4%ED%8E%98%20Umeda',
+      mapUrl: 'nmap://search?query=Umeda&appname=com.twotwobread.ium',
     });
   });
 
@@ -1285,7 +1285,7 @@ describe('google place search helpers', () => {
     });
     assert.deepEqual(
       buildGooglePlaceDetailsSuccessState(result, undefined, 'naverMaps').detail.mapUrl,
-      'https://map.naver.com/v5/search/%EC%9A%B0%EB%A9%94%EB%8B%A4%20%EC%B9%B4%ED%8E%98%20Umeda',
+      'nmap://search?query=Umeda&appname=com.twotwobread.ium',
     );
     assert.deepEqual(buildGooglePlaceDetailsErrorState('google-1'), {
       status: 'error',

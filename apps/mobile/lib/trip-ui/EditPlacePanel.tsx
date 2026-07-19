@@ -1,7 +1,11 @@
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 
 import { Card, PrimaryButton, SecondaryButton, theme } from '../design';
-import { buildDayItineraryEditSubmitState, type DayItineraryEditFormValues } from '../trips/day-itinerary-edit';
+import {
+  buildDayItineraryEditPlaceSummary,
+  buildDayItineraryEditSubmitState,
+  type DayItineraryEditFormValues,
+} from '../trips/day-itinerary-edit';
 import { manualPlaceTypeOptions } from '../trips/manual-place';
 import { styles } from './DayItineraryEditorStyles';
 import type { EditPlacePanelState } from './DayItineraryEditorTypes';
@@ -26,11 +30,25 @@ export function EditPlacePanel({
 }) {
   const isSaving = editState.status === 'saving';
   const submitView = buildDayItineraryEditSubmitState(isSaving);
+  const placeSummary = buildDayItineraryEditPlaceSummary(editState.item);
   const update = (patch: Partial<DayItineraryEditFormValues>) => onUpdateValues({ ...editState.values, ...patch });
 
   const content = (
     <>
-      <Text style={styles.panelTitle}>장소 수정</Text>
+      <Text style={styles.panelTitle}>일정 상세 · 수정</Text>
+      <View style={styles.detailAddressBox}>
+        <View style={styles.fieldGroup}>
+          <Text style={styles.label}>장소명</Text>
+          <Text style={styles.detailAddressText}>{placeSummary.placeName}</Text>
+        </View>
+        {placeSummary.address ? (
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>주소</Text>
+            <Text style={styles.detailAddressText}>{placeSummary.address}</Text>
+          </View>
+        ) : null}
+      </View>
+
       <View style={styles.fieldGroup}>
         <Text style={styles.label}>장소 타입</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.compactChipList}>
