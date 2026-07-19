@@ -6,15 +6,15 @@ import {
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from 'react-native';
 
 import { theme } from '../design';
 import {
-  DEFAULT_SCHEDULE_TIME_WHEEL_ITEM_HEIGHT,
-  DEFAULT_SCHEDULE_TIME_WHEEL_VISIBLE_ITEMS,
-  buildScheduleTimeWheelContentPadding,
+  buildScheduleTimeWheelLayout,
   buildScheduleTimeWheelOffset,
   buildScheduleTimeWheelSelectedIndex,
+  type ScheduleTimeWheelLayout,
 } from '../trips/schedule-time-wheel-layout';
 import {
   buildScheduleTimeText,
@@ -23,13 +23,6 @@ import {
   scheduleTimeMinuteOptions,
   type PlaceScheduleTimePickerValue,
 } from '../places/place-schedule-detail';
-
-const wheelItemHeight = DEFAULT_SCHEDULE_TIME_WHEEL_ITEM_HEIGHT;
-const wheelVisibleItems = DEFAULT_SCHEDULE_TIME_WHEEL_VISIBLE_ITEMS;
-const wheelContentPadding = buildScheduleTimeWheelContentPadding({
-  itemHeight: wheelItemHeight,
-  visibleItems: wheelVisibleItems,
-});
 
 export function ScheduleTimeWheel({
   disabled,
@@ -42,6 +35,8 @@ export function ScheduleTimeWheel({
   onChangeTime: (time: string) => void;
   value: string;
 }) {
+  const { fontScale } = useWindowDimensions();
+  const wheelLayout = buildScheduleTimeWheelLayout({ fontScale });
   const pickerValue = parseScheduleTimePickerValue(value);
   const update = (patch: Partial<PlaceScheduleTimePickerValue>) => {
     onChangeTime(buildScheduleTimeText({ ...pickerValue, ...patch }));
@@ -50,13 +45,16 @@ export function ScheduleTimeWheel({
   return (
     <View style={styles.timeWheelCard}>
       <View style={styles.timeWheelHeader}>
-        <Text style={styles.timeWheelLabel}>{label}</Text>
-        <Text style={styles.timeWheelValue}>{formatScheduleTimeDisplay(pickerValue)}</Text>
+        <Text style={[styles.timeWheelLabel, { lineHeight: wheelLayout.optionLineHeight }]}>{label}</Text>
+        <Text style={[styles.timeWheelValue, { lineHeight: wheelLayout.optionLineHeight }]}>
+          {formatScheduleTimeDisplay(pickerValue)}
+        </Text>
       </View>
       <View style={styles.timeWheelRow}>
         <TimeWheelColumn
           disabled={disabled}
           labelForOption={(hour) => `${hour}시`}
+          layout={wheelLayout}
           onChange={(hour) => update({ hour })}
           options={scheduleTimeHourOptions}
           value={pickerValue.hour}
@@ -64,6 +62,7 @@ export function ScheduleTimeWheel({
         <TimeWheelColumn
           disabled={disabled}
           labelForOption={(minute) => `${minute}분`}
+          layout={wheelLayout}
           onChange={(minute) => update({ minute })}
           options={scheduleTimeMinuteOptions}
           value={pickerValue.minute}
@@ -76,22 +75,24 @@ export function ScheduleTimeWheel({
 function TimeWheelColumn<T extends string>({
   disabled,
   labelForOption,
+  layout,
   onChange,
   options,
   value,
 }: {
   disabled: boolean;
   labelForOption: (option: T) => string;
+  layout: ScheduleTimeWheelLayout;
   onChange: (option: T) => void;
   options: T[];
   value: T;
 }) {
   const selectedIndex = Math.max(0, options.indexOf(value));
   const contentOffsetY = buildScheduleTimeWheelOffset({
-    itemHeight: wheelItemHeight,
+    itemHeight: layout.itemHeight,
     optionCount: options.length,
     selectedIndex,
-    visibleItems: wheelVisibleItems,
+    visibleItems: layout.visibleItems,
   });
   const selectByOffset = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     if (disabled) {
@@ -99,24 +100,30 @@ function TimeWheelColumn<T extends string>({
     }
     const index = buildScheduleTimeWheelSelectedIndex({
       contentOffsetY: event.nativeEvent.contentOffset.y,
-      itemHeight: wheelItemHeight,
+      itemHeight: layout.itemHeight,
       optionCount: options.length,
     });
     onChange(options[index]);
   };
 
   return (
-    <View style={styles.timeWheelColumn}>
-      <View pointerEvents="none" style={styles.timeWheelSelectionFrame} />
+    <View style={[styles.timeWheelColumn, { height: layout.viewportHeight }]}>
+      <View
+        pointerEvents="none"
+        style={[
+          styles.timeWheelSelectionFrame,
+          { height: layout.itemHeight, top: layout.itemHeight * Math.floor(layout.visibleItems / 2) },
+        ]}
+      />
       <ScrollView
-        contentContainerStyle={styles.timeWheelContent}
+        contentContainerStyle={[styles.timeWheelContent, { paddingVertical: layout.contentPadding }]}
         contentOffset={{ x: 0, y: contentOffsetY }}
         decelerationRate="fast"
         key={value}
         nestedScrollEnabled
         onMomentumScrollEnd={selectByOffset}
         showsVerticalScrollIndicator={false}
-        snapToInterval={wheelItemHeight}
+        snapToInterval={layout.itemHeight}
         style={styles.timeWheelList}
       >
         {options.map((item) => {
@@ -128,9 +135,15 @@ function TimeWheelColumn<T extends string>({
               key={item}
               onPress={() => onChange(item)}
               accessibilityState={{ selected }}
-              style={styles.timeWheelOption}
+              style={[styles.timeWheelOption, { height: layout.itemHeight }]}
             >
-              <Text style={[styles.timeWheelOptionText, selected ? styles.timeWheelOptionTextSelected : null]}>
+              <Text
+                style={[
+                  styles.timeWheelOptionText,
+                  { lineHeight: layout.optionLineHeight },
+                  selected ? styles.timeWheelOptionTextSelected : null,
+                ]}
+              >
                 {labelForOption(item)}
               </Text>
             </Pressable>
@@ -157,8 +170,9 @@ const styles = StyleSheet.create({
   timeWheelHeader: {
     alignItems: 'center',
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexWrap: 'wrap',
     gap: theme.space[3],
+    justifyContent: 'space-between',
   },
   timeWheelLabel: {
     color: theme.color.textBody,
@@ -182,12 +196,9 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.md,
     borderWidth: 1,
     flex: 1,
-    height: wheelItemHeight * wheelVisibleItems,
     overflow: 'hidden',
   },
-  timeWheelContent: {
-    paddingVertical: wheelContentPadding,
-  },
+  timeWheelContent: {},
   timeWheelList: {
     borderRadius: theme.radius.md,
   },
@@ -196,15 +207,12 @@ const styles = StyleSheet.create({
     borderColor: theme.color.primary,
     borderRadius: theme.radius.sm,
     borderWidth: 1,
-    height: wheelItemHeight,
     left: theme.space[1],
     position: 'absolute',
     right: theme.space[1],
-    top: wheelItemHeight * Math.floor(wheelVisibleItems / 2),
   },
   timeWheelOption: {
     alignItems: 'center',
-    height: wheelItemHeight,
     justifyContent: 'center',
   },
   timeWheelOptionText: {

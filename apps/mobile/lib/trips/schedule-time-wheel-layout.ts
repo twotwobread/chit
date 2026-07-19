@@ -1,5 +1,34 @@
+import { buildResponsiveLineHeight } from '../design/responsive-text';
+import { theme } from '../design/theme';
+
 export const DEFAULT_SCHEDULE_TIME_WHEEL_ITEM_HEIGHT = 36;
 export const DEFAULT_SCHEDULE_TIME_WHEEL_VISIBLE_ITEMS = 5;
+
+export type ScheduleTimeWheelLayout = {
+  contentPadding: number;
+  itemHeight: number;
+  optionLineHeight: number;
+  viewportHeight: number;
+  visibleItems: number;
+};
+
+export function buildScheduleTimeWheelLayout({ fontScale = 1 }: { fontScale?: number } = {}): ScheduleTimeWheelLayout {
+  const optionLineHeight = buildResponsiveLineHeight({
+    fontSize: theme.font.size.body,
+    fontScale,
+  });
+  const itemHeight = Math.max(DEFAULT_SCHEDULE_TIME_WHEEL_ITEM_HEIGHT, optionLineHeight + theme.space[3]);
+  const visibleItems = DEFAULT_SCHEDULE_TIME_WHEEL_VISIBLE_ITEMS;
+  const contentPadding = buildScheduleTimeWheelContentPadding({ itemHeight, visibleItems });
+
+  return {
+    contentPadding,
+    itemHeight,
+    optionLineHeight,
+    viewportHeight: itemHeight * visibleItems,
+    visibleItems,
+  };
+}
 
 export function buildScheduleTimeWheelOffset({
   itemHeight = DEFAULT_SCHEDULE_TIME_WHEEL_ITEM_HEIGHT,
