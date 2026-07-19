@@ -6,6 +6,7 @@ import {
   buildDayItineraryDeleteConfirmation,
   buildDayItineraryDeleteSubmitState,
   buildDayItineraryEditForm,
+  buildDayItineraryEditPlaceSummary,
   buildDayItineraryEditSubmitState,
   dayItineraryMutationFailureState,
   hasDayItineraryEditFormChanges,
@@ -34,6 +35,19 @@ describe('day itinerary edit/delete helpers', () => {
       startTime: '09:30',
       endTime: '11:00',
       memo: '강가 걷기',
+    });
+  });
+
+  it('builds read-only place context for the edit sheet without adding editable fields', () => {
+    assert.deepEqual(
+      buildDayItineraryEditPlaceSummary({ ...item, placeName: ' 우메다 공중정원 ', address: ' Umeda ' }),
+      {
+        placeName: '우메다 공중정원',
+        address: 'Umeda',
+      },
+    );
+    assert.deepEqual(buildDayItineraryEditPlaceSummary({ ...item, address: '   ' }), {
+      placeName: '우메다 공중정원',
     });
   });
 

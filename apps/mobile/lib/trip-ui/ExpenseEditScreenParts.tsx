@@ -79,6 +79,8 @@ export function ExpenseEditForm({
   onAmountChange,
   onDelete,
   onMemoChange,
+  onMemoFocus,
+  onMemoLayout,
   onPayerChange,
   onSettlementIncludeChange,
   onClearTripDay,
@@ -105,6 +107,8 @@ export function ExpenseEditForm({
   onAmountChange: (value: string) => void;
   onDelete: () => void;
   onMemoChange: (value: string) => void;
+  onMemoFocus?: () => void;
+  onMemoLayout?: (layout: { height: number; y: number }) => void;
   onPayerChange: (value: string) => void;
   onSettlementIncludeChange: (value: boolean) => void;
   onClearTripDay: () => void;
@@ -221,11 +225,12 @@ export function ExpenseEditForm({
           showItemSelector={viewModel.showPlaceField}
         />
 
-        <View style={styles.fieldGroup}>
+        <View onLayout={(event) => onMemoLayout?.(event.nativeEvent.layout)} style={styles.fieldGroup}>
           <Text style={styles.label}>메모</Text>
           <TextInput
             multiline
             onChangeText={onMemoChange}
+            onFocus={onMemoFocus}
             placeholder="메모를 입력해주세요."
             placeholderTextColor={theme.color.textFaint}
             style={[styles.input, styles.memoInput, errors.memo ? styles.inputError : null]}

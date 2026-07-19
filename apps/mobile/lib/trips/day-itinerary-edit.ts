@@ -28,6 +28,11 @@ export type DayItineraryMutationFailureViewModel = {
   helper: string;
 };
 
+export type DayItineraryEditPlaceSummary = {
+  placeName: string;
+  address?: string;
+};
+
 export type DayItineraryDeleteModalStatus = 'idle' | 'confirming' | 'deleting';
 
 export type DayItineraryDeleteConfirmationViewModel = {
@@ -48,6 +53,16 @@ export function buildDayItineraryEditForm(item: DayItineraryRowViewModel): DayIt
     startTime: item.startTime ?? '',
     endTime: item.endTime ?? '',
     memo: item.placeMemo ?? '',
+  };
+}
+
+export function buildDayItineraryEditPlaceSummary(item: DayItineraryRowViewModel): DayItineraryEditPlaceSummary {
+  const placeName = item.placeName.trim();
+  const address = item.address.trim();
+
+  return {
+    placeName,
+    ...(address ? { address } : {}),
   };
 }
 

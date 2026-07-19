@@ -1,6 +1,21 @@
-import { ActivityIndicator, Text, View } from 'react-native';
+import { useCallback, useEffect, useRef } from 'react';
+import {
+  ActivityIndicator,
+  Keyboard,
+  Text,
+  View,
+  type KeyboardEvent,
+  type LayoutChangeEvent,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+  type ScrollView,
+} from 'react-native';
 
 import { Card, PrimaryButton, SecondaryButton, theme } from '../../../../../../../lib/design';
+import {
+  QUICK_EXPENSE_MEMO_KEYBOARD_MIN_CLEARANCE,
+  buildFocusedMemoScrollTarget,
+} from '../../../../../../../lib/trips/quick-expense-keyboard-layout';
 import {
   ExpenseEditForm,
   buildExpenseEditFormSubmitState,
@@ -40,7 +55,71 @@ export default function ExpenseEditScreen() {
     updateManualSplitInput,
     viewModel,
   } = useExpenseEditController();
-  const footerLayout = useStickyActionFooterLayout({ actionCount: 1 });
+  const scrollViewRef = useRef<ScrollView>(null);
+  const scrollMetricsRef = useRef({ currentScrollY: 0, keyboardHeight: 0, viewportHeight: 0 });
+  const memoLayoutRef = useRef<{ height: number; y: number } | null>(null);
+  const footerLayout = useStickyActionFooterLayout({
+    actionCount: 1,
+    minClearance: QUICK_EXPENSE_MEMO_KEYBOARD_MIN_CLEARANCE,
+  });
+
+  useEffect(() => {
+    const updateKeyboardHeight = (event: KeyboardEvent) => {
+      scrollMetricsRef.current.keyboardHeight = Math.max(0, event.endCoordinates.height);
+    };
+    const clearKeyboardHeight = () => {
+      scrollMetricsRef.current.keyboardHeight = 0;
+    };
+    const subscriptions = [
+      Keyboard.addListener('keyboardWillShow', updateKeyboardHeight),
+      Keyboard.addListener('keyboardDidShow', updateKeyboardHeight),
+      Keyboard.addListener('keyboardWillHide', clearKeyboardHeight),
+      Keyboard.addListener('keyboardDidHide', clearKeyboardHeight),
+    ];
+
+    return () => {
+      subscriptions.forEach((subscription) => subscription.remove());
+    };
+  }, []);
+
+  const handleScrollLayout = useCallback((event: LayoutChangeEvent) => {
+    scrollMetricsRef.current.viewportHeight = event.nativeEvent.layout.height;
+  }, []);
+
+  const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    scrollMetricsRef.current.currentScrollY = event.nativeEvent.contentOffset.y;
+  }, []);
+
+  const handleMemoLayout = useCallback((layout: { height: number; y: number }) => {
+    memoLayoutRef.current = layout;
+  }, []);
+
+  const scrollMemoInputIntoView = useCallback(() => {
+    const scroll = () => {
+      const memoLayout = memoLayoutRef.current;
+      if (!memoLayout) {
+        return;
+      }
+
+      const target = buildFocusedMemoScrollTarget({
+        currentScrollY: scrollMetricsRef.current.currentScrollY,
+        fieldHeight: memoLayout.height,
+        fieldY: memoLayout.y,
+        keyboardHeight: scrollMetricsRef.current.keyboardHeight,
+        viewportHeight: scrollMetricsRef.current.viewportHeight,
+      });
+
+      if (!target) {
+        return;
+      }
+
+      scrollMetricsRef.current.currentScrollY = target.targetY;
+      scrollViewRef.current?.scrollTo({ y: target.targetY, animated: true });
+    };
+
+    requestAnimationFrame(scroll);
+    setTimeout(scroll, 320);
+  }, []);
   const submitState = viewModel
     ? buildExpenseEditFormSubmitState({
         amountInput,
@@ -62,6 +141,10 @@ export default function ExpenseEditScreen() {
         contentContainerStyle={styles.container}
         keyboardFixedBottomOffset={footerLayout.keyboardFixedBottomOffset}
         keyboardMinClearance={footerLayout.keyboardMinClearance}
+        onLayout={handleScrollLayout}
+        onScroll={handleScroll}
+        ref={scrollViewRef}
+        scrollEventThrottle={16}
       >
         <Text style={styles.screenTitle}>지출 수정</Text>
 
@@ -107,6 +190,8 @@ export default function ExpenseEditScreen() {
             onAmountChange={setAmountInput}
             onDelete={confirmDelete}
             onMemoChange={setMemoInput}
+            onMemoFocus={scrollMemoInputIntoView}
+            onMemoLayout={handleMemoLayout}
             onPayerChange={setPayerParticipantId}
             onSettlementIncludeChange={setIncludeInSettlement}
             onClearTripDay={clearTripDay}

@@ -114,6 +114,8 @@ export function QuickExpenseForm({
   onUpdateMemo,
   onUpdateManualSplitInput,
   onUpdateTitle,
+  onMemoFocus,
+  onMemoLayout,
   onReceiptDraftCreated,
   payerParticipantId,
   receiptBusy,
@@ -154,6 +156,8 @@ export function QuickExpenseForm({
   onUpdateMemo: (value: string) => void;
   onUpdateManualSplitInput: (participantId: string, amount: string) => void;
   onUpdateTitle: (value: string) => void;
+  onMemoFocus?: () => void;
+  onMemoLayout?: (layout: { height: number; y: number }) => void;
   payerParticipantId: string | null;
   receiptBusy: boolean;
   receiptDraft: ExpenseReceiptDraft | null;
@@ -396,12 +400,13 @@ export function QuickExpenseForm({
           value={settlementSummary}
         />
 
-        <View style={styles.fieldGroup}>
+        <View onLayout={(event) => onMemoLayout?.(event.nativeEvent.layout)} style={styles.fieldGroup}>
           <Text style={styles.label}>메모</Text>
           <TextInput
             editable={!saving && !viewModel.emptyMessage}
             multiline
             onChangeText={onUpdateMemo}
+            onFocus={onMemoFocus}
             placeholder="선택 입력"
             placeholderTextColor={theme.color.textFaint}
             style={[styles.input, styles.memoInput]}

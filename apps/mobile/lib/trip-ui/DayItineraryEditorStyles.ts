@@ -1,6 +1,7 @@
 import { StyleSheet } from 'react-native';
 
 import { theme } from '../design';
+import { DAY_ITINERARY_EDIT_MEMO_INPUT_MIN_HEIGHT } from '../trips/day-itinerary-sheet-layout';
 
 export const styles = StyleSheet.create({
   root: {
@@ -574,7 +575,8 @@ export const styles = StyleSheet.create({
     paddingVertical: theme.space[3],
   },
   addressInput: {
-    minHeight: theme.layout.controlHLg,
+    minHeight: DAY_ITINERARY_EDIT_MEMO_INPUT_MIN_HEIGHT,
+    textAlignVertical: 'top',
   },
   timeFieldRow: {
     flexDirection: 'row',

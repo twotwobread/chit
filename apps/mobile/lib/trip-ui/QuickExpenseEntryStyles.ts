@@ -1,6 +1,7 @@
 import { StyleSheet } from 'react-native';
 
 import { theme } from '../design';
+import { QUICK_EXPENSE_MEMO_INPUT_MIN_HEIGHT } from '../trips/quick-expense-keyboard-layout';
 
 export const styles = StyleSheet.create({
   screenRoot: {
@@ -195,7 +196,7 @@ export const styles = StyleSheet.create({
     gap: theme.space[3],
   },
   memoInput: {
-    minHeight: 88,
+    minHeight: QUICK_EXPENSE_MEMO_INPUT_MIN_HEIGHT,
     paddingTop: theme.space[3],
   },
   modeRow: {
