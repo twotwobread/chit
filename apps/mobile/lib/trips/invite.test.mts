@@ -67,19 +67,24 @@ test('invite response maps to copyable view model with created/reused status', (
   assert.equal(reused.statusLabel, '기존 초대 링크를 불러왔어요.');
 });
 
-test('copy and share helpers use inviteUrl rather than the raw token', () => {
+test('copy and share helpers use Chit invite copy and inviteUrl rather than the raw token', () => {
   const input = { tripName: '제주 여행', inviteUrl: inviteResponse.invite.inviteUrl };
 
   assert.equal(buildInviteCopyText(input.inviteUrl), input.inviteUrl);
 
   const kakaoPayload = buildKakaoInviteTemplate(input);
+  assert.equal(kakaoPayload.text, `여행 초대가 왔어요.\n제주 여행\n칫에서 함께 일정을 확인해요.\n${input.inviteUrl}`);
   assert.equal(kakaoPayload.link.mobileWebUrl, input.inviteUrl);
+  assert.equal(kakaoPayload.buttons?.[0]?.title, '칫에서 참여하기');
   assert.equal(kakaoPayload.buttons?.[0]?.link.webUrl, input.inviteUrl);
-  assert.equal(kakaoPayload.text.endsWith(input.inviteUrl), true);
 
   const fallbackPayload = buildFallbackShareContent(input);
+  assert.equal(fallbackPayload.title, '칫 여행 초대');
+  assert.equal(
+    fallbackPayload.message,
+    `여행 초대가 왔어요.\n제주 여행\n칫에서 함께 일정을 확인해요.\n${input.inviteUrl}`,
+  );
   assert.equal(fallbackPayload.url, input.inviteUrl);
-  assert.equal(String(fallbackPayload.message).includes(input.inviteUrl), true);
 });
 
 test('Kakao installed-app callback carries the invite token back to the invite route', () => {

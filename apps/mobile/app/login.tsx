@@ -56,7 +56,7 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>이음</Text>
+      <Text style={styles.title}>칫 Chit</Text>
       <Text style={styles.subtitle}>{subtitle}</Text>
 
       <View style={styles.card}>

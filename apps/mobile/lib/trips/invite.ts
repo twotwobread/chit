@@ -167,7 +167,7 @@ export function getInviteAcceptErrorViewModel(error: unknown): InviteAcceptViewM
 }
 
 export function buildKakaoInviteTemplate(input: InviteShareInput): TextTemplateType {
-  const text = `${input.tripName} 여행에 초대받았어요.\n이음에서 함께 일정을 확인해보세요.\n${input.inviteUrl}`;
+  const text = `여행 초대가 왔어요.\n${input.tripName}\n칫에서 함께 일정을 확인해요.\n${input.inviteUrl}`;
   const link = buildKakaoInviteLink(input.inviteUrl);
 
   return {
@@ -175,7 +175,7 @@ export function buildKakaoInviteTemplate(input: InviteShareInput): TextTemplateT
     link,
     buttons: [
       {
-        title: '이음에서 참여하기',
+        title: '칫에서 참여하기',
         link,
       },
     ],
@@ -191,8 +191,8 @@ export function toKakaoInviteRedirectPath(
 
 export function buildFallbackShareContent(input: InviteShareInput): ShareContent {
   return {
-    title: '이음 여행 초대',
-    message: `${input.tripName} 여행에 초대받았어요.\n${input.inviteUrl}`,
+    title: '칫 여행 초대',
+    message: `여행 초대가 왔어요.\n${input.tripName}\n칫에서 함께 일정을 확인해요.\n${input.inviteUrl}`,
     url: input.inviteUrl,
   };
 }

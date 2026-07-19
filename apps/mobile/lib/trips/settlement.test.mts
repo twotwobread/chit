@@ -939,7 +939,7 @@ test('builds settlement request message from suggested transfers', () => {
 
   assert.equal(
     buildSettlementRequestMessage(viewModel, '오사카 여행'),
-    '[i-um] 오사카 여행 정산 요청\n유나님 → 민수님 18,500원\n확인 후 송금 부탁드려요.',
+    '[칫] 오사카 여행 정산 요청\n유나님 → 민수님 18,500원\n확인 후 송금 부탁드려요.',
   );
 });
 
@@ -968,7 +968,7 @@ test('builds settlement request message with latest detail link', () => {
 
   assert.equal(
     buildSettlementRequestMessage(viewModel, '오사카 여행', '/trips/trip-1/settlement-detail'),
-    '[i-um] 오사카 여행 정산 요청\n유나님 → 민수님 18,500원\n최신 정산 상세: /trips/trip-1/settlement-detail\n현재 여행 지출 기준으로 계산된 최신 정산이에요.\n확인 후 송금 부탁드려요.',
+    '[칫] 오사카 여행 정산 요청\n유나님 → 민수님 18,500원\n최신 정산 상세: /trips/trip-1/settlement-detail\n최신 지출 기준으로 다시 계산했어요.\n확인 후 송금 부탁드려요.',
   );
 });
 
@@ -1122,10 +1122,10 @@ test('builds latest settlement detail sections for multiple currencies without c
 
 test('builds Kakao settlement request template from the same share message', () => {
   const template = buildKakaoSettlementRequestTemplate(
-    '[i-um] 오사카 여행 정산 요청\n유나님 → 민수님 18,500원\n확인 후 송금 부탁드려요.',
+    '[칫] 오사카 여행 정산 요청\n유나님 → 민수님 18,500원\n확인 후 송금 부탁드려요.',
   );
 
-  assert.equal(template.text, '[i-um] 오사카 여행 정산 요청\n유나님 → 민수님 18,500원\n확인 후 송금 부탁드려요.');
+  assert.equal(template.text, '[칫] 오사카 여행 정산 요청\n유나님 → 민수님 18,500원\n확인 후 송금 부탁드려요.');
   assert.equal(template.link.webUrl, 'https://i-um.app');
   assert.equal(template.link.mobileWebUrl, 'https://i-um.app');
 });
