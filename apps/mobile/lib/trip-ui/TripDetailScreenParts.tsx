@@ -5,7 +5,7 @@ import { router } from 'expo-router';
 import { type GetTripDetailResponse, type TripParticipantListItem } from '@i-um/api-contract';
 
 import { apiErrorStatus, isMobileAuthSessionError } from '../auth/errors';
-import { Badge, theme } from '../design';
+import { Badge, PrimaryButton, SecondaryButton, theme } from '../design';
 import {
   beginTripDelete,
   cancelTripDelete,
@@ -77,18 +77,10 @@ export function TripDetailCard({
         loadFailed={participantsLoadFailed}
         participants={participants}
       />
-      <Pressable accessibilityRole="button" onPress={() => router.push(primaryAction.route)} style={styles.button}>
-        <Text style={styles.buttonText}>{primaryAction.label}</Text>
-      </Pressable>
+      <PrimaryButton label={primaryAction.label} onPress={() => router.push(primaryAction.route)} />
       {canManage ? (
         <>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => router.push(`/trips/${detail.trip.id}/edit`)}
-            style={styles.secondaryButton}
-          >
-            <Text style={styles.secondaryButtonText}>여행 정보 수정</Text>
-          </Pressable>
+          <SecondaryButton label="여행 정보 수정" onPress={() => router.push(`/trips/${detail.trip.id}/edit`)} />
           {deleteState.status === 'idle' ? (
             <Pressable
               accessibilityRole="button"
@@ -109,13 +101,11 @@ export function TripDetailCard({
                 <Text style={styles.deleteTitle}>여행을 삭제할까요?</Text>
                 <Text style={styles.message}>이 여행은 모든 참여자에게서 삭제되고 되돌릴 수 없어요.</Text>
                 <View style={styles.actionRow}>
-                  <Pressable
-                    accessibilityRole="button"
+                  <SecondaryButton
+                    label="취소"
                     onPress={() => setDeleteState(cancelTripDelete(deleteState))}
                     style={styles.secondaryActionButton}
-                  >
-                    <Text style={styles.secondaryButtonText}>취소</Text>
-                  </Pressable>
+                  />
                   <Pressable
                     accessibilityRole="button"
                     onPress={() => void confirmDelete()}
@@ -136,29 +126,22 @@ export function TripDetailCard({
           {deleteState.status === 'auth' ? (
             <View style={styles.dangerPanel}>
               <Text style={styles.errorTitle}>{deleteState.message}</Text>
-              <Pressable accessibilityRole="button" onPress={() => router.replace('/login')} style={styles.button}>
-                <Text style={styles.buttonText}>로그인하기</Text>
-              </Pressable>
+              <PrimaryButton label="로그인하기" onPress={() => router.replace('/login')} />
             </View>
           ) : null}
           {deleteState.status === 'safeFailure' ? (
             <View style={styles.dangerPanel}>
               <Text style={styles.errorTitle}>{deleteState.message}</Text>
-              <Pressable accessibilityRole="button" onPress={() => router.replace('/mypage')} style={styles.button}>
-                <Text style={styles.buttonText}>마이페이지로</Text>
-              </Pressable>
+              <PrimaryButton label="마이페이지로" onPress={() => router.replace('/mypage')} />
             </View>
           ) : null}
           {deleteState.status === 'error' ? (
             <View style={styles.dangerPanel}>
               <Text style={styles.errorTitle}>{deleteState.message}</Text>
-              <Pressable
-                accessibilityRole="button"
+              <SecondaryButton
+                label="다시 시도"
                 onPress={() => setDeleteState(openTripDeleteConfirmation(deleteState))}
-                style={styles.secondaryButton}
-              >
-                <Text style={styles.secondaryButtonText}>다시 시도</Text>
-              </Pressable>
+              />
             </View>
           ) : null}
         </>

@@ -186,6 +186,7 @@ export default function NewFlightScreen() {
             <Pressable
               accessibilityLabel={`${participant.displayName} 탑승자 ${selected ? '해제' : '선택'}`}
               accessibilityRole="button"
+              accessibilityState={{ disabled: saving, selected }}
               disabled={saving}
               key={participant.participantId}
               onPress={() =>
@@ -197,6 +198,7 @@ export default function NewFlightScreen() {
               }
               style={({ pressed }) => [
                 styles.passengerRow,
+                selected ? styles.passengerRowSelected : null,
                 pressed ? styles.pressed : null,
                 saving ? styles.disabled : null,
               ]}
@@ -565,9 +567,18 @@ const styles = StyleSheet.create({
   },
   passengerRow: {
     alignItems: 'center',
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
+    minHeight: theme.layout.tapMin,
+    paddingHorizontal: theme.space[4],
     paddingVertical: theme.space[3],
+  },
+  passengerRowSelected: {
+    backgroundColor: theme.color.primarySoft,
+    borderColor: theme.color.primary,
   },
   passengerState: {
     color: theme.color.textMuted,

@@ -155,9 +155,9 @@ const styles = StyleSheet.create({
     borderColor: theme.color.borderSubtle,
     borderRadius: theme.radius.md,
     borderWidth: 1,
-    height: 38,
+    height: theme.layout.tapMin,
     justifyContent: 'center',
-    width: 38,
+    width: theme.layout.tapMin,
   },
   group: {
     backgroundColor: theme.color.surface,

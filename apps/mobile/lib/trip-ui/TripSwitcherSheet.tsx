@@ -198,6 +198,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: theme.space[4],
     marginTop: theme.space[2],
+    minHeight: theme.layout.tapMin,
     padding: theme.space[3] + 1,
   },
   newText: {
@@ -218,6 +219,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: theme.space[4],
     marginBottom: theme.space[1] + 1,
+    minHeight: theme.layout.tapMin,
     padding: theme.space[3] + 1,
   },
   rowCurrent: {
