@@ -12,6 +12,8 @@ export type DayItineraryAddPlaceReturnNavigation =
 
 const dayItineraryAddPlaceReturnParamName = 'returnTo';
 const dayItineraryAddPlaceReturnToDayValue = 'itinerary-tab';
+const dayItineraryInitialActionParamName = 'initialAction';
+export const dayItineraryLodgingInitialActionValue = 'lodging';
 
 export function buildDayItineraryAddPlaceSearchRoute(tripId: string, date: string): Href {
   const searchRoute = buildGooglePlaceSearchRoute(tripId, date);
@@ -22,6 +24,10 @@ export function buildDayItineraryAddPlaceSearchRoute(tripId: string, date: strin
 export function buildDayItineraryLodgingPlaceSearchRoute(tripId: string, date: string): Href {
   const returnParam = `${dayItineraryAddPlaceReturnParamName}=${dayItineraryAddPlaceReturnToDayValue}`;
   return `/trips/${tripId}/days/${date}/place-search?${returnParam}&mode=lodging` as Href;
+}
+
+export function buildDayItineraryLodgingManagementRoute(tripId: string, date: string): Href {
+  return `${tripItineraryDayPath(tripId, date)}&${dayItineraryInitialActionParamName}=${dayItineraryLodgingInitialActionValue}` as Href;
 }
 
 export function isDayItineraryAddPlaceReturnToDay(returnTo: DayItineraryAddPlaceReturnParam): boolean {

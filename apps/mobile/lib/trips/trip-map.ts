@@ -20,13 +20,13 @@ import { orderScheduleItemsByDisplayTime } from './schedule-item-ordering';
 
 export type TripMapSearchLayout = {
   screenMode: 'fullScreen';
-  dayChipsPlacement: 'mapOverlay';
+  dayChipsPlacement: 'searchOverlay';
   showSheetItineraryList: boolean;
 };
 
 export function buildTripMapSearchLayout(): TripMapSearchLayout {
   return {
-    dayChipsPlacement: 'mapOverlay',
+    dayChipsPlacement: 'searchOverlay',
     screenMode: 'fullScreen',
     showSheetItineraryList: false,
   };
@@ -43,9 +43,40 @@ export function buildTripMapDayChips(days: TripDay[]): DayChip[] {
     }));
 }
 
-export type TripMapRouteLayerChipId = 'all' | `day:${string}`;
+export function buildTripMapLodgingResults(days: TripDay[]): GooglePlaceSearchRowViewModel[] {
+  const rowsByGooglePlaceId = new Map<string, GooglePlaceSearchRowViewModel>();
+  for (const day of days.slice().sort((left, right) => left.dayOrder - right.dayOrder)) {
+    const lodging = day.lodgingPlace;
+    const routablePlace = lodging?.routablePlace;
+    const googlePlaceId = routablePlace?.googlePlaceId?.trim();
+    if (!lodging || !googlePlaceId) {
+      continue;
+    }
+    const dayLabel = formatTripDayLabel(day.dayOrder);
+    const existing = rowsByGooglePlaceId.get(googlePlaceId);
+    if (existing) {
+      rowsByGooglePlaceId.set(googlePlaceId, {
+        ...existing,
+        metadataLabels: [...(existing.metadataLabels ?? []), dayLabel],
+      });
+      continue;
+    }
+    rowsByGooglePlaceId.set(googlePlaceId, {
+      id: googlePlaceId,
+      placeName: lodging.name,
+      address: lodging.address,
+      typeHint: '숙소',
+      latitude: routablePlace?.latitude,
+      longitude: routablePlace?.longitude,
+      metadataLabels: ['숙소', dayLabel],
+    });
+  }
+  return [...rowsByGooglePlaceId.values()];
+}
 
-export type TripMapRouteLayerSelection = { kind: 'none' } | { kind: 'all' } | { kind: 'day'; dayId: string };
+export type TripMapRouteLayerChipId = `day:${string}`;
+
+export type TripMapRouteLayerSelection = { kind: 'none' } | { kind: 'days'; dayIds: string[] };
 
 export type TripMapRouteNotice = {
   title: string;
@@ -131,38 +162,40 @@ const tripMapRouteLayerColors = [
 
 export function buildTripMapRouteLayerChips(days: TripDay[]): DayChip[] {
   const orderedDays = days.slice().sort((left, right) => left.dayOrder - right.dayOrder);
-  return [
-    { id: 'all', label: '전체' },
-    ...orderedDays.map((day, index) => ({
-      id: tripMapDayRouteChipId(day.id),
-      label: formatTripDayLabel(day.dayOrder),
-      dateLabel: formatTripDayDate(day.date),
-      legendColor: tripMapRouteLayerColor(index),
-    })),
-  ];
+  return orderedDays.map((day, index) => ({
+    id: tripMapDayRouteChipId(day.id),
+    label: formatTripDayLabel(day.dayOrder),
+    dateLabel: formatTripDayDate(day.date),
+    legendColor: tripMapRouteLayerColor(index),
+  }));
 }
 
-export function tripMapRouteLayerChipId(layer: TripMapRouteLayerSelection): TripMapRouteLayerChipId | null {
-  if (layer.kind === 'all') {
-    return 'all';
+export function tripMapRouteLayerChipIds(layer: TripMapRouteLayerSelection): TripMapRouteLayerChipId[] {
+  if (layer.kind !== 'days') {
+    return [];
   }
-  if (layer.kind === 'day') {
-    return tripMapDayRouteChipId(layer.dayId);
-  }
-  return null;
+  return layer.dayIds.map(tripMapDayRouteChipId);
 }
 
 export function toggleTripMapRouteLayer(
   current: TripMapRouteLayerSelection,
   chipId: TripMapRouteLayerChipId,
 ): TripMapRouteLayerSelection {
-  if (tripMapRouteLayerChipId(current) === chipId) {
-    return emptyTripMapRouteLayerSelection;
+  const dayId = chipId.slice('day:'.length);
+  if (current.kind !== 'days') {
+    return { dayIds: [dayId], kind: 'days' };
   }
-  if (chipId === 'all') {
-    return { kind: 'all' };
+  const selected = new Set(current.dayIds);
+  if (selected.has(dayId)) {
+    selected.delete(dayId);
+  } else {
+    selected.add(dayId);
   }
-  return { dayId: chipId.slice('day:'.length), kind: 'day' };
+  const dayIds = current.dayIds.filter((id) => selected.has(id));
+  if (selected.has(dayId) && !dayIds.includes(dayId)) {
+    dayIds.push(dayId);
+  }
+  return dayIds.length > 0 ? { dayIds, kind: 'days' } : emptyTripMapRouteLayerSelection;
 }
 
 export function buildTripItinerariesFromTripScheduleItems(
@@ -347,11 +380,9 @@ function buildTripMapRoutePolylines(dayId: string, places: RouteMapPlace[], colo
 }
 
 function selectTripMapRouteLayers(dayRoutes: TripMapDayRoute[], layer: TripMapRouteLayerSelection): TripMapDayRoute[] {
-  if (layer.kind === 'all') {
-    return dayRoutes;
-  }
-  if (layer.kind === 'day') {
-    return dayRoutes.filter((route) => route.dayId === layer.dayId);
+  if (layer.kind === 'days') {
+    const selectedDayIds = new Set(layer.dayIds);
+    return dayRoutes.filter((route) => selectedDayIds.has(route.dayId));
   }
   return [];
 }
@@ -361,7 +392,7 @@ function buildTripMapRouteNotice(
   places: RouteMapPlace[],
   polylines: RouteMapPolyline[],
 ): TripMapRouteNotice | null {
-  if (layer.kind === 'none') {
+  if (layer.kind === 'none' || layer.dayIds.length !== 1) {
     return null;
   }
   if (places.length === 0) {

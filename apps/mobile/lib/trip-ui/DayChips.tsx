@@ -12,7 +12,8 @@ export type DayChip = {
 
 export type DayChipsProps = {
   days: DayChip[];
-  selectedDayId: string | null;
+  selectedDayId?: string | null;
+  selectedDayIds?: string[];
   onSelectDay: (dayId: string) => void;
   emptyLabel?: string;
   edgePadding?: number;
@@ -23,7 +24,8 @@ export function DayChips({
   edgePadding = theme.layout.gutter,
   emptyLabel = '선택할 Day가 없어요',
   onSelectDay,
-  selectedDayId,
+  selectedDayId = null,
+  selectedDayIds,
 }: DayChipsProps) {
   if (days.length === 0) {
     return (
@@ -40,7 +42,7 @@ export function DayChips({
       contentContainerStyle={[styles.row, { paddingHorizontal: edgePadding }]}
     >
       {days.map((day) => {
-        const selected = day.id === selectedDayId;
+        const selected = selectedDayIds ? selectedDayIds.includes(day.id) : day.id === selectedDayId;
         return (
           <Pressable
             accessibilityRole="tab"

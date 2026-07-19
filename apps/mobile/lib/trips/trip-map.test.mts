@@ -25,6 +25,7 @@ import {
   buildTripMapDayRoutes,
   buildTripMapBookmarkLayerViewModel,
   buildTripMapInitialRegion,
+  buildTripMapLodgingResults,
   buildTripMapRouteLayerChips,
   buildTripMapRouteLayerViewModel,
   buildTripMapSearchLayout,
@@ -33,7 +34,7 @@ import {
   resolveTripMapBookmarkRefreshFailure,
   resolveTripMapSelectedDay,
   toggleTripMapRouteLayer,
-  tripMapRouteLayerChipId,
+  tripMapRouteLayerChipIds,
 } from './trip-map';
 
 function day(overrides: Partial<TripDay>): TripDay {
@@ -163,37 +164,75 @@ test('builds ordered day chips from trip days', () => {
   );
 });
 
-test('builds route layer chips with an all toggle and day color dots', () => {
+test('builds lodging candidates from Day lodging places without duplicating the same Google place', () => {
+  assert.deepEqual(
+    buildTripMapLodgingResults([
+      day({
+        id: 'day-2',
+        dayOrder: 2,
+        lodgingPlace: {
+          id: 'place-hotel',
+          name: '오사카 호텔',
+          placeType: 'lodging',
+          address: 'Namba',
+          routablePlace: { provider: 'google', googlePlaceId: 'google-hotel', latitude: 34.66, longitude: 135.5 },
+        },
+      }),
+      day({
+        id: 'day-1',
+        dayOrder: 1,
+        lodgingPlace: {
+          id: 'place-hotel',
+          name: '오사카 호텔',
+          placeType: 'lodging',
+          address: 'Namba',
+          routablePlace: { provider: 'google', googlePlaceId: 'google-hotel', latitude: 34.66, longitude: 135.5 },
+        },
+      }),
+    ]),
+    [
+      {
+        id: 'google-hotel',
+        placeName: '오사카 호텔',
+        address: 'Namba',
+        typeHint: '숙소',
+        latitude: 34.66,
+        longitude: 135.5,
+        metadataLabels: ['숙소', '1일차', '2일차'],
+      },
+    ],
+  );
+});
+
+test('builds route layer chips with only Day toggles and day color dots', () => {
   const chips = buildTripMapRouteLayerChips([
     day({ id: 'day-2', dayOrder: 2, date: '2026-07-11' }),
     day({ id: 'day-1', dayOrder: 1, date: '2026-07-10' }),
   ]);
 
-  assert.equal(chips[0]?.id, 'all');
-  assert.equal(chips[0]?.label, '전체');
-  assert.equal(chips[0]?.legendColor, undefined);
-  assert.equal(chips[1]?.id, 'day:day-1');
-  assert.equal(chips[1]?.label, '1일차');
-  assert.equal(chips[1]?.dateLabel, '2026.07.10');
-  assert.equal(chips[1]?.legendColor, theme.color.green[600]);
-  assert.equal(chips[2]?.id, 'day:day-2');
-  assert.equal(chips[2]?.label, '2일차');
-  assert.equal(chips[2]?.dateLabel, '2026.07.11');
-  assert.equal(chips[2]?.legendColor, theme.color.blue[600]);
+  assert.deepEqual(
+    chips.map((chip) => [chip.id, chip.label, chip.dateLabel, chip.legendColor]),
+    [
+      ['day:day-1', '1일차', '2026.07.10', theme.color.green[600]],
+      ['day:day-2', '2일차', '2026.07.11', theme.color.blue[600]],
+    ],
+  );
 });
 
-test('toggles route layer chips as none all or one selected day', () => {
+test('toggles route layer chips as a multi-select route-only layer', () => {
   assert.deepEqual(emptyTripMapRouteLayerSelection, { kind: 'none' });
 
-  const dayLayer = toggleTripMapRouteLayer(emptyTripMapRouteLayerSelection, 'day:day-1');
-  assert.deepEqual(dayLayer, { dayId: 'day-1', kind: 'day' });
-  assert.equal(tripMapRouteLayerChipId(dayLayer), 'day:day-1');
-  assert.deepEqual(toggleTripMapRouteLayer(dayLayer, 'day:day-1'), { kind: 'none' });
+  const firstLayer = toggleTripMapRouteLayer(emptyTripMapRouteLayerSelection, 'day:day-1');
+  assert.deepEqual(firstLayer, { dayIds: ['day-1'], kind: 'days' });
+  assert.deepEqual(tripMapRouteLayerChipIds(firstLayer), ['day:day-1']);
 
-  const allLayer = toggleTripMapRouteLayer(dayLayer, 'all');
-  assert.deepEqual(allLayer, { kind: 'all' });
-  assert.equal(tripMapRouteLayerChipId(allLayer), 'all');
-  assert.deepEqual(toggleTripMapRouteLayer(allLayer, 'all'), { kind: 'none' });
+  const twoDayLayer = toggleTripMapRouteLayer(firstLayer, 'day:day-2');
+  assert.deepEqual(twoDayLayer, { dayIds: ['day-1', 'day-2'], kind: 'days' });
+  assert.deepEqual(tripMapRouteLayerChipIds(twoDayLayer), ['day:day-1', 'day:day-2']);
+
+  const removedFirst = toggleTripMapRouteLayer(twoDayLayer, 'day:day-1');
+  assert.deepEqual(removedFirst, { dayIds: ['day-2'], kind: 'days' });
+  assert.deepEqual(toggleTripMapRouteLayer(removedFirst, 'day:day-2'), { kind: 'none' });
 });
 
 const bookmarkResult: GooglePlaceSearchRowViewModel = {
@@ -254,7 +293,7 @@ test('builds visible route data for a selected day with one itinerary-order conn
     }),
   ]);
 
-  const viewModel = buildTripMapRouteLayerViewModel(routes, { dayId: 'day-1', kind: 'day' });
+  const viewModel = buildTripMapRouteLayerViewModel(routes, { dayIds: ['day-1'], kind: 'days' });
 
   assert.deepEqual(
     viewModel.places.map((place) => [place.id, place.order, place.name]),
@@ -294,7 +333,7 @@ test('builds selected day route data in timed order while preserving untimed pos
     ),
   ]);
 
-  const viewModel = buildTripMapRouteLayerViewModel(routes, { dayId: 'day-1', kind: 'day' });
+  const viewModel = buildTripMapRouteLayerViewModel(routes, { dayIds: ['day-1'], kind: 'days' });
 
   assert.deepEqual(
     viewModel.places.map((place) => [place.id, place.order, place.name]),
@@ -340,7 +379,7 @@ test('decorates day route places with day color and highlights the first active 
   );
 });
 
-test('builds all route layer with independent per-day connectors and no cross-day line', () => {
+test('builds multi-day route layer with independent per-day connectors and no cross-day line', () => {
   const routes = buildTripMapDayRoutes([
     itinerary(
       [
@@ -358,7 +397,7 @@ test('builds all route layer with independent per-day connectors and no cross-da
     ),
   ]);
 
-  const viewModel = buildTripMapRouteLayerViewModel(routes, { kind: 'all' });
+  const viewModel = buildTripMapRouteLayerViewModel(routes, { dayIds: ['day-1', 'day-2'], kind: 'days' });
 
   assert.deepEqual(
     viewModel.places.map((place) => place.id),
@@ -400,7 +439,7 @@ test('builds an insufficient route notice when the selected layer has fewer than
     ),
   ]);
 
-  const viewModel = buildTripMapRouteLayerViewModel(routes, { dayId: 'day-1', kind: 'day' });
+  const viewModel = buildTripMapRouteLayerViewModel(routes, { dayIds: ['day-1'], kind: 'days' });
 
   assert.deepEqual(
     viewModel.places.map((place) => place.id),
@@ -479,9 +518,9 @@ test('resolves map route sheet state from vertical gestures', () => {
   assert.equal(resolveMapRouteSheetState('expanded', 6), 'expanded');
 });
 
-test('uses full-screen map search layout with overlay Day chips and no sheet itinerary list', () => {
+test('uses full-screen map search layout with search-overlay Day chips and no sheet itinerary list', () => {
   assert.deepEqual(buildTripMapSearchLayout(), {
-    dayChipsPlacement: 'mapOverlay',
+    dayChipsPlacement: 'searchOverlay',
     screenMode: 'fullScreen',
     showSheetItineraryList: false,
   });

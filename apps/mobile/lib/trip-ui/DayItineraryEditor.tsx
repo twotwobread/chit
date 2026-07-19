@@ -61,7 +61,6 @@ export function DayItineraryEditor({
     moveFeedback,
     moveState,
     moveReorderItem,
-    openLodgingPlaceSelection,
     openLodgingSearchRegister,
     openPlaceMap,
     reorderFeedback,
@@ -153,7 +152,6 @@ export function DayItineraryEditor({
               onOpenMap={(item) => void openPlaceMap(item)}
               onReorderDragActiveChange={setReorderDragActive}
               onReorderDragMove={requestReorderAutoScroll}
-              onOpenLodgingPlaceSelection={() => void openLodgingPlaceSelection()}
               onOpenLodgingSearchRegister={openLodgingSearchRegister}
               onSaveReorder={() => void submitReorder()}
               onSelectLodgingPlace={(option) => void submitSelectLodgingPlace(option)}

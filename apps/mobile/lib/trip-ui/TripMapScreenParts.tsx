@@ -1,7 +1,6 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { router } from 'expo-router';
-import { Pressable, Text, View } from 'react-native';
-import { Heart } from 'lucide-react-native';
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { theme } from '../design';
 import {
@@ -9,9 +8,11 @@ import {
   type GooglePlaceSearchRowViewModel,
   type GooglePlaceTripDestination,
 } from '../places/google-search';
+import { buildDayItineraryLodgingManagementRoute } from '../trips/day-itinerary-add-place-navigation';
 import { type DayItineraryMapActionFeedback } from '../trips/day-itinerary-map-actions';
 import {
   buildTripMapBookmarkLayerViewModel,
+  buildTripMapDayChips,
   buildTripMapInitialRegion,
   buildTripMapRouteLayerChips,
   buildTripMapSearchLayout,
@@ -29,44 +30,58 @@ import { styles } from './TripMapScreenStyles';
 export function MapContent({
   allBookmarkResults,
   bookmarkActionState,
-  bookmarkLayerVisible,
   feedback,
+  lodgingResults,
   mapPlaces,
   onBookmarkSelect,
   onBookmarkDelete,
   onClearRoutePlaceSelection,
+  onRemoveScheduleResult,
+  onResetScheduleAddState,
   onRoutePlacePress,
-  onToggleBookmarkLayer,
+  onScheduleSelect,
+  onSubmitScheduleBatch,
   onToggleRouteLayer,
   routeChips,
   routeNotice,
   routePolylines,
+  scheduleAddState,
+  scheduleFeedbackMessage,
   scheduleMarkerDetail,
+  scheduleTargetDayChips,
   selectedDayId,
-  selectedRouteLayerChipId,
+  selectedRouteLayerChipIds,
   selectedRoutePlaceId,
+  selectedScheduleResults,
   tripDestinations,
   tripId,
 }: {
   allBookmarkResults: GooglePlaceSearchRowViewModel[];
   bookmarkActionState: GooglePlaceAddViewState;
-  bookmarkLayerVisible: boolean;
+  lodgingResults: GooglePlaceSearchRowViewModel[];
   mapPlaces: RouteMapPlace[];
   routePolylines: RouteMapPolyline[];
   tripId: string;
   routeChips: ReturnType<typeof buildTripMapRouteLayerChips>;
   routeNotice: TripMapRouteNotice | null;
+  scheduleAddState: GooglePlaceAddViewState;
+  scheduleFeedbackMessage: string | null;
+  scheduleTargetDayChips: ReturnType<typeof buildTripMapDayChips>;
   selectedDayId: string;
-  selectedRouteLayerChipId: TripMapRouteLayerChipId | null;
+  selectedRouteLayerChipIds: TripMapRouteLayerChipId[];
   tripDestinations: GooglePlaceTripDestination[];
   feedback: DayItineraryMapActionFeedback | null;
   scheduleMarkerDetail: TripMapScheduleMarkerDetail | null;
   selectedRoutePlaceId: string | null;
+  selectedScheduleResults: GooglePlaceSearchRowViewModel[];
   onBookmarkSelect: (result: GooglePlaceSearchRowViewModel) => void;
   onBookmarkDelete: (result: GooglePlaceSearchRowViewModel) => void;
   onClearRoutePlaceSelection: () => void;
+  onRemoveScheduleResult: (googlePlaceId: string) => void;
+  onResetScheduleAddState: () => void;
   onRoutePlacePress: (place: RouteMapPlace) => void;
-  onToggleBookmarkLayer: () => void;
+  onScheduleSelect: (result: GooglePlaceSearchRowViewModel) => void;
+  onSubmitScheduleBatch: (targetDayId: string) => void;
   onToggleRouteLayer: (chipId: TripMapRouteLayerChipId) => void;
 }) {
   const initialRegion = useMemo(
@@ -74,64 +89,65 @@ export function MapContent({
     [mapPlaces, tripDestinations],
   );
   const layout = buildTripMapSearchLayout();
-  const bookmarkLayer = buildTripMapBookmarkLayerViewModel(allBookmarkResults, bookmarkLayerVisible);
-  const showDayChipsOverlay = layout.dayChipsPlacement === 'mapOverlay';
+  const bookmarkLayer = buildTripMapBookmarkLayerViewModel(allBookmarkResults, true);
   const mapStyle = layout.screenMode === 'fullScreen' ? styles.mapSearchFullScreen : styles.mapSearch;
-  const sheetTopInset = theme.space[4] + theme.layout.controlHSm + theme.space[4];
-  const mapSearchKey = `${selectedDayId}:${selectedRouteLayerChipId ?? 'none'}`;
+  const routeChipInset = layout.dayChipsPlacement === 'searchOverlay' && routeChips.length > 0 ? 72 : 0;
+  const sheetTopInset = theme.space[4] + theme.layout.controlHSm + theme.space[4] + routeChipInset;
+  const selectedSchedulePlaceIds = useMemo(
+    () => selectedScheduleResults.map((result) => result.id),
+    [selectedScheduleResults],
+  );
+  const mapSearchKey = selectedDayId;
 
   return (
     <View style={styles.mapFullScreenRoot}>
       <GooglePlaceMapSearch
-        actionMode="bookmark"
-        actionState={bookmarkActionState}
-        bookmarkMarkerResults={bookmarkLayer.bookmarkMarkerResults}
+        actionMode="scheduleAdd"
+        actionState={scheduleAddState}
+        bookmarkMarkerResults={bookmarkLayer.allBookmarkResults}
         bookmarkResults={bookmarkLayer.allBookmarkResults}
         bottomSheetFooter={scheduleMarkerDetail ? <ScheduleMarkerDetailCard detail={scheduleMarkerDetail} /> : null}
         dayId={selectedDayId}
+        favoriteActionState={bookmarkActionState}
         initialRegion={initialRegion}
         key={mapSearchKey}
+        lodgingResults={lodgingResults}
+        lodgingEmptyAction={{
+          label: '숙소 등록하러 가기',
+          onPress: () => router.push(buildDayItineraryLodgingManagementRoute(tripId, selectedDayId)),
+        }}
         minimizedSheetBaseHeight={40}
-        onBookmarkSelectResult={onBookmarkSelect}
         onBookmarkDeleteResult={onBookmarkDelete}
+        onBookmarkSelectResult={onBookmarkSelect}
         onClearRoutePlaceSelection={onClearRoutePlaceSelection}
+        onPrimaryAction={(result) => onScheduleSelect(result)}
+        onResetActionState={onResetScheduleAddState}
+        onRouteChipPress={(chipId) => onToggleRouteLayer(chipId as TripMapRouteLayerChipId)}
         onRoutePlacePress={onRoutePlacePress}
+        routeChips={routeChips}
         routePlaces={mapPlaces}
         routePolylines={routePolylines}
+        selectedBatchPlaceIds={selectedSchedulePlaceIds}
+        selectedRouteChipIds={selectedRouteLayerChipIds}
         selectedRoutePlaceId={selectedRoutePlaceId}
         sheetTopInset={sheetTopInset}
+        stickyFooter={
+          selectedScheduleResults.length > 0 ? (
+            <MapScheduleAddTray
+              actionState={scheduleAddState}
+              feedbackMessage={scheduleFeedbackMessage}
+              onRemoveResult={onRemoveScheduleResult}
+              onSubmit={onSubmitScheduleBatch}
+              results={selectedScheduleResults}
+              targetDays={scheduleTargetDayChips}
+            />
+          ) : null
+        }
+        stickyFooterHeight={selectedScheduleResults.length > 0 ? 220 : 0}
         style={mapStyle}
-        topSearchTrailingInset={44 + theme.space[2]}
         tripDestinations={tripDestinations}
         tripId={tripId}
       />
-      {showDayChipsOverlay ? (
-        <View pointerEvents="box-none" style={styles.dayChipsOverlay}>
-          <DayChips
-            days={routeChips}
-            edgePadding={theme.space[4]}
-            selectedDayId={selectedRouteLayerChipId}
-            onSelectDay={(chipId) => onToggleRouteLayer(chipId as TripMapRouteLayerChipId)}
-          />
-        </View>
-      ) : null}
-      <Pressable
-        accessibilityLabel={bookmarkLayerVisible ? '찜한 장소 숨기기' : '찜한 장소 보이기'}
-        accessibilityRole="button"
-        accessibilityState={{ selected: bookmarkLayerVisible }}
-        onPress={onToggleBookmarkLayer}
-        style={[
-          styles.bookmarkLayerFloatingButton,
-          bookmarkLayerVisible ? styles.bookmarkLayerFloatingButtonSelected : null,
-        ]}
-      >
-        <Heart
-          color={bookmarkLayerVisible ? theme.color.onPrimary : theme.color.accent}
-          fill={bookmarkLayerVisible ? theme.color.onPrimary : 'transparent'}
-          size={21}
-          strokeWidth={2.6}
-        />
-      </Pressable>
       {routeNotice ? (
         <View pointerEvents="box-none" style={styles.routeNoticeOverlay}>
           <TripStateCard helper={routeNotice.helper} title={routeNotice.title} />
@@ -142,6 +158,96 @@ export function MapContent({
           <TripStateCard helper={feedback.kind === 'error' ? undefined : feedback.message} title={feedback.message} />
         </View>
       ) : null}
+    </View>
+  );
+}
+
+function MapScheduleAddTray({
+  actionState,
+  feedbackMessage,
+  onRemoveResult,
+  onSubmit,
+  results,
+  targetDays,
+}: {
+  actionState: GooglePlaceAddViewState;
+  feedbackMessage: string | null;
+  results: GooglePlaceSearchRowViewModel[];
+  targetDays: ReturnType<typeof buildTripMapDayChips>;
+  onRemoveResult: (googlePlaceId: string) => void;
+  onSubmit: (targetDayId: string) => void;
+}) {
+  const [choosingDay, setChoosingDay] = useState(false);
+  const [targetDayId, setTargetDayId] = useState<string | null>(null);
+  const isSubmitting = actionState.status === 'adding' && actionState.googlePlaceId === 'batch';
+  const targetDay = targetDays.find((day) => day.id === targetDayId) ?? null;
+
+  useEffect(() => {
+    if (results.length === 0) {
+      setChoosingDay(false);
+      setTargetDayId(null);
+    }
+  }, [results.length]);
+
+  if (results.length === 0) {
+    return null;
+  }
+
+  const submitLabel = isSubmitting
+    ? '등록 중...'
+    : choosingDay
+      ? targetDay
+        ? `${targetDay.label}에 일정 등록`
+        : '등록할 Day 선택'
+      : '선택된 장소 일정 등록';
+
+  return (
+    <View style={styles.scheduleAddTray}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scheduleAddChipScroller}>
+        <View style={styles.scheduleAddChipRow}>
+          {results.map((result) => (
+            <Pressable
+              accessibilityLabel={`${result.placeName} 제거`}
+              accessibilityRole="button"
+              disabled={isSubmitting}
+              key={`map-selected-${result.id}`}
+              onPress={() => onRemoveResult(result.id)}
+              style={[styles.scheduleAddChip, isSubmitting ? styles.scheduleAddChipDisabled : null]}
+            >
+              <Text numberOfLines={1} style={styles.scheduleAddChipText}>
+                {result.placeName}
+              </Text>
+              <Text style={styles.scheduleAddChipRemove}>×</Text>
+            </Pressable>
+          ))}
+        </View>
+      </ScrollView>
+      {choosingDay ? (
+        <View style={styles.scheduleAddTargetWrap}>
+          <DayChips days={targetDays} edgePadding={0} onSelectDay={setTargetDayId} selectedDayId={targetDayId} />
+        </View>
+      ) : null}
+      {feedbackMessage ? <Text style={styles.scheduleAddFeedback}>{feedbackMessage}</Text> : null}
+      <Pressable
+        accessibilityRole="button"
+        disabled={isSubmitting || (choosingDay && !targetDay)}
+        onPress={() => {
+          if (!choosingDay) {
+            setChoosingDay(true);
+            return;
+          }
+          if (targetDay) {
+            onSubmit(targetDay.id);
+          }
+        }}
+        style={[
+          styles.scheduleAddSubmitButton,
+          isSubmitting || (choosingDay && !targetDay) ? styles.scheduleAddTrayButtonDisabled : null,
+        ]}
+      >
+        {isSubmitting ? <ActivityIndicator color={theme.color.onPrimary} /> : null}
+        <Text style={styles.scheduleAddSubmitButtonText}>{submitLabel}</Text>
+      </Pressable>
     </View>
   );
 }

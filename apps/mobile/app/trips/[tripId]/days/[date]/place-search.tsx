@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 
@@ -10,6 +10,8 @@ import { GooglePlaceMapSearch } from '../../../../../lib/trip-ui/GooglePlaceMapS
 import {
   createGoogleDayLodgingPlace,
   createGooglePlaceScheduleItemsBatch,
+  createGoogleTripPlaceBookmark,
+  deleteTripPlaceBookmark,
   listTripPlaceBookmarks,
 } from '../../../../../lib/places/client';
 import { tripPlaceBookmarkToGoogleSearchRow } from '../../../../../lib/places/bookmarks';
@@ -18,7 +20,6 @@ import {
   buildCreateGooglePlaceScheduleItemsBatchRequest,
   errorGooglePlaceAddState,
   googlePlaceAddFailureMessage,
-  googlePlaceScheduleBatchMaxSelectionCount,
   idleGooglePlaceAddState,
   removeGooglePlaceScheduleBatchSelection,
   toggleGooglePlaceScheduleBatchSelection,
@@ -31,8 +32,12 @@ import {
   parsePlaceScheduleDetailParams,
   selectedPlaceFromGoogleSearchResult,
 } from '../../../../../lib/places/place-schedule-detail';
-import { resolveDayItineraryAddPlaceReturnNavigation } from '../../../../../lib/trips/day-itinerary-add-place-navigation';
+import {
+  buildDayItineraryLodgingManagementRoute,
+  resolveDayItineraryAddPlaceReturnNavigation,
+} from '../../../../../lib/trips/day-itinerary-add-place-navigation';
 import { buildGoogleDayLodgingPlaceRequest } from '../../../../../lib/trips/lodging-place';
+import { buildTripMapLodgingResults } from '../../../../../lib/trips/trip-map';
 import { useTripShellState } from '../../../../../lib/trips/trip-shell-context';
 
 export default function GooglePlaceSearchScreen() {
@@ -72,6 +77,7 @@ export default function GooglePlaceSearchScreen() {
   const isLodgingMode = mode === 'lodging';
   const isScheduleAddMode = !isSelectorMode && !isLodgingMode;
   const [addState, setAddState] = useState<GooglePlaceAddViewState>(idleGooglePlaceAddState());
+  const [bookmarkActionState, setBookmarkActionState] = useState<GooglePlaceAddViewState>(idleGooglePlaceAddState());
   const [bookmarkResults, setBookmarkResults] = useState<GooglePlaceSearchRowViewModel[]>([]);
   const [selectedBatchResults, setSelectedBatchResults] = useState<GooglePlaceSearchRowViewModel[]>([]);
   const [batchFeedbackMessage, setBatchFeedbackMessage] = useState<string | null>(null);
@@ -82,18 +88,24 @@ export default function GooglePlaceSearchScreen() {
     }
     return tripShellState.detail.trip.destinations;
   }, [tripId, tripShellState]);
+  const lodgingResults = useMemo(() => {
+    if (tripShellState?.status !== 'success' || tripShellState.tripId !== tripId) {
+      return [];
+    }
+    return buildTripMapLodgingResults(tripShellState.detail.days);
+  }, [tripId, tripShellState]);
   const selectedBatchPlaceIds = useMemo(() => selectedBatchResults.map((result) => result.id), [selectedBatchResults]);
   const isSubmittingBatch = addState.status === 'adding' && addState.googlePlaceId === 'batch';
 
-  useEffect(() => {
-    let cancelled = false;
-    if (!tripId) {
-      setBookmarkResults([]);
-      return;
-    }
-    listTripPlaceBookmarks(tripId)
-      .then((response) => {
-        if (cancelled) {
+  const refreshBookmarks = useCallback(
+    async (cancelled: () => boolean = () => false) => {
+      if (!tripId) {
+        setBookmarkResults([]);
+        return;
+      }
+      try {
+        const response = await listTripPlaceBookmarks(tripId);
+        if (cancelled()) {
           return;
         }
         setBookmarkResults(
@@ -102,16 +114,22 @@ export default function GooglePlaceSearchScreen() {
             return row ? [row] : [];
           }),
         );
-      })
-      .catch(() => {
-        if (!cancelled) {
+      } catch {
+        if (!cancelled()) {
           setBookmarkResults([]);
         }
-      });
+      }
+    },
+    [tripId],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    void refreshBookmarks(() => cancelled);
     return () => {
       cancelled = true;
     };
-  }, [tripId]);
+  }, [refreshBookmarks]);
 
   const returnToDay = () => {
     if (!tripId || !date) {
@@ -130,6 +148,34 @@ export default function GooglePlaceSearchScreen() {
   const resetAddState = () => {
     setAddState(idleGooglePlaceAddState());
     setBatchFeedbackMessage(null);
+  };
+
+  const createBookmark = async (result: GooglePlaceSearchRowViewModel) => {
+    if (!tripId || bookmarkActionState.status === 'adding') {
+      return;
+    }
+    setBookmarkActionState(addingGooglePlaceState(result.id));
+    try {
+      await createGoogleTripPlaceBookmark(tripId, { googlePlaceId: result.id });
+      setBookmarkActionState(idleGooglePlaceAddState());
+      await refreshBookmarks();
+    } catch {
+      setBookmarkActionState(errorGooglePlaceAddState());
+    }
+  };
+
+  const deleteBookmark = async (result: GooglePlaceSearchRowViewModel) => {
+    if (!tripId || !result.bookmarkId || bookmarkActionState.status === 'adding') {
+      return;
+    }
+    setBookmarkActionState(addingGooglePlaceState(result.id));
+    try {
+      await deleteTripPlaceBookmark(tripId, result.bookmarkId);
+      setBookmarkActionState(idleGooglePlaceAddState());
+      await refreshBookmarks();
+    } catch {
+      setBookmarkActionState(errorGooglePlaceAddState());
+    }
   };
 
   const selectBatchResult = (result: GooglePlaceSearchRowViewModel) => {
@@ -240,22 +286,18 @@ export default function GooglePlaceSearchScreen() {
     }
   };
 
-  const batchFooter = isScheduleAddMode ? (
-    <View style={styles.batchFooter}>
-      <View style={styles.batchFooterHeader}>
-        <Text style={styles.batchFooterTitle}>선택한 장소 {selectedBatchResults.length}개</Text>
-        <Text style={styles.batchFooterMeta}>최대 {googlePlaceScheduleBatchMaxSelectionCount}개</Text>
-      </View>
-      {selectedBatchResults.length > 0 ? (
+  const batchFooter =
+    isScheduleAddMode && selectedBatchResults.length > 0 ? (
+      <View style={styles.batchFooter}>
         <ScrollView
           contentContainerStyle={styles.batchChipList}
           horizontal
           showsHorizontalScrollIndicator={false}
           style={styles.batchChipScroll}
         >
-          {selectedBatchResults.map((result, index) => (
+          {selectedBatchResults.map((result) => (
             <Pressable
-              accessibilityLabel={`${index + 1}번째 선택 장소 ${result.placeName} 제거`}
+              accessibilityLabel={`${result.placeName} 제거`}
               accessibilityRole="button"
               disabled={isSubmittingBatch}
               key={`selected-batch-${result.id}`}
@@ -266,7 +308,6 @@ export default function GooglePlaceSearchScreen() {
                 isSubmittingBatch ? styles.batchChipDisabled : null,
               ]}
             >
-              <Text style={styles.batchChipIndex}>{index + 1}</Text>
               <Text numberOfLines={1} style={styles.batchChipText}>
                 {result.placeName}
               </Text>
@@ -274,30 +315,21 @@ export default function GooglePlaceSearchScreen() {
             </Pressable>
           ))}
         </ScrollView>
-      ) : (
-        <Text style={styles.batchHint}>검색 결과에서 일정에 담을 장소를 선택해 주세요.</Text>
-      )}
-      {batchFeedbackMessage ? <Text style={styles.batchFeedback}>{batchFeedbackMessage}</Text> : null}
-      <Pressable
-        accessibilityRole="button"
-        disabled={isSubmittingBatch || selectedBatchResults.length === 0}
-        onPress={() => void submitBatch()}
-        style={({ pressed }) => [
-          styles.batchSubmitButton,
-          (isSubmittingBatch || selectedBatchResults.length === 0) && styles.batchSubmitButtonDisabled,
-          pressed && !isSubmittingBatch && selectedBatchResults.length > 0 ? styles.batchSubmitButtonPressed : null,
-        ]}
-      >
-        <Text style={styles.batchSubmitButtonText}>
-          {isSubmittingBatch
-            ? '등록 중...'
-            : selectedBatchResults.length > 0
-              ? `${selectedBatchResults.length}개 일정에 등록`
-              : '장소를 선택해 주세요'}
-        </Text>
-      </Pressable>
-    </View>
-  ) : null;
+        {batchFeedbackMessage ? <Text style={styles.batchFeedback}>{batchFeedbackMessage}</Text> : null}
+        <Pressable
+          accessibilityRole="button"
+          disabled={isSubmittingBatch}
+          onPress={() => void submitBatch()}
+          style={({ pressed }) => [
+            styles.batchSubmitButton,
+            isSubmittingBatch ? styles.batchSubmitButtonDisabled : null,
+            pressed && !isSubmittingBatch ? styles.batchSubmitButtonPressed : null,
+          ]}
+        >
+          <Text style={styles.batchSubmitButtonText}>{isSubmittingBatch ? '등록 중...' : '선택된 장소 일정 등록'}</Text>
+        </Pressable>
+      </View>
+    ) : null;
 
   if (!tripId || !date) {
     return (
@@ -318,12 +350,25 @@ export default function GooglePlaceSearchScreen() {
       actionMode={isSelectorMode ? 'scheduleSelect' : isLodgingMode ? 'lodgingRegister' : 'scheduleAdd'}
       actionState={addState}
       bookmarkResults={bookmarkResults}
-      bottomSheetFooter={batchFooter}
       dayId={date}
+      favoriteActionState={bookmarkActionState}
+      lodgingResults={lodgingResults}
+      lodgingEmptyAction={
+        !isLodgingMode
+          ? {
+              label: '숙소 등록하러 가기',
+              onPress: () => router.push(buildDayItineraryLodgingManagementRoute(tripId, date)),
+            }
+          : undefined
+      }
       notFoundAction={{ label: '일정으로', onPress: returnToDay }}
+      onBookmarkDeleteResult={(result) => void deleteBookmark(result)}
+      onBookmarkSelectResult={(result) => void createBookmark(result)}
       onPrimaryAction={(result, duplicateConfirmed) => void submitAdd(result, duplicateConfirmed)}
       onResetActionState={resetAddState}
       selectedBatchPlaceIds={isScheduleAddMode ? selectedBatchPlaceIds : []}
+      stickyFooter={batchFooter}
+      stickyFooterHeight={168}
       tripDestinations={tripDestinations}
       tripId={tripId}
     />
@@ -384,28 +429,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   batchFooter: {
-    borderTopColor: theme.color.borderSubtle,
-    borderTopWidth: 1,
-    gap: theme.space[4],
-    paddingHorizontal: theme.space[5],
-    paddingTop: theme.space[5],
-    paddingBottom: theme.space[6],
-  },
-  batchFooterHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  batchFooterTitle: {
-    color: theme.color.textStrong,
-    fontFamily: theme.font.family.bold,
-    fontSize: theme.font.size.body,
-    fontWeight: theme.font.weight.bold,
-  },
-  batchFooterMeta: {
-    color: theme.color.textMuted,
-    fontFamily: theme.font.family.regular,
-    fontSize: theme.font.size.caption,
+    gap: theme.space[3],
+    width: '100%',
   },
   batchChipScroll: {
     marginHorizontal: -theme.space[1],
@@ -431,12 +456,6 @@ const styles = StyleSheet.create({
   },
   batchChipDisabled: {
     opacity: 0.48,
-  },
-  batchChipIndex: {
-    color: theme.color.primary,
-    fontFamily: theme.font.family.bold,
-    fontSize: theme.font.size.caption,
-    fontWeight: theme.font.weight.bold,
   },
   batchChipText: {
     color: theme.color.textStrong,
@@ -470,6 +489,7 @@ const styles = StyleSheet.create({
     minHeight: theme.layout.controlH,
     paddingHorizontal: theme.space[5],
     paddingVertical: theme.space[4],
+    width: '100%',
   },
   batchSubmitButtonPressed: {
     backgroundColor: theme.color.primaryPressed,

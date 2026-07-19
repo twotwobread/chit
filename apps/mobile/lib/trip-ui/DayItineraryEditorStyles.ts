@@ -187,6 +187,11 @@ export const styles = StyleSheet.create({
     paddingHorizontal: theme.space[4],
     paddingVertical: theme.space[3],
   },
+  lodgingSummaryHighlighted: {
+    backgroundColor: theme.color.primarySoft,
+    borderColor: theme.color.primary,
+    borderWidth: 2,
+  },
   lodgingSummaryTextGroup: {
     alignItems: 'center',
     flex: 1,

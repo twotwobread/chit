@@ -119,6 +119,12 @@ describe('day lodging place helpers', () => {
     });
   });
 
+  it('uses direct map-search actions for initial lodging assignment', () => {
+    assert.deepEqual(buildDayLodgingManagementActions(buildDayLodgingPanel(null).sheet), [
+      { kind: 'searchRegister', label: '숙소 검색해서 등록' },
+    ]);
+  });
+
   it('orders existing lodging management actions with clear directly below address copy', () => {
     const sheet = buildDayLodgingPanel({
       id: 'place-1',
@@ -131,7 +137,6 @@ describe('day lodging place helpers', () => {
       { kind: 'copyAddress', label: '주소 복사' },
       { kind: 'clear', label: '숙소 해제', destructive: true },
       { kind: 'change', label: '다른 숙소로 변경' },
-      { kind: 'searchRegister', label: '숙소 검색해서 등록' },
     ]);
   });
 
@@ -155,10 +160,7 @@ describe('day lodging place helpers', () => {
       },
       {
         id: 'management-actions',
-        actions: [
-          { kind: 'change', label: '다른 숙소로 변경' },
-          { kind: 'searchRegister', label: '숙소 검색해서 등록' },
-        ],
+        actions: [{ kind: 'change', label: '다른 숙소로 변경' }],
       },
     ]);
   });

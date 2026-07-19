@@ -71,7 +71,6 @@ export function DayItineraryContent({
   onEnterReorderMode,
   onExitReorderMode,
   onMoveReorderItem,
-  onOpenLodgingPlaceSelection,
   onOpenLodgingSearchRegister,
   onOpenMap,
   onReorderDragActiveChange,
@@ -109,7 +108,6 @@ export function DayItineraryContent({
   onEnterReorderMode: () => void;
   onExitReorderMode: () => void;
   onMoveReorderItem: (fromIndex: number, toIndex: number) => void;
-  onOpenLodgingPlaceSelection: () => void;
   onOpenLodgingSearchRegister: () => void;
   onOpenMap: (item: DayItineraryRowViewModel) => void;
   onReorderDragActiveChange: (isActive: boolean) => void;
@@ -137,7 +135,9 @@ export function DayItineraryContent({
     ? buildDayItineraryReorderSubmitState(reorderState.status === 'saving', reorderState.draft)
     : null;
   const [isLodgingSheetVisible, setIsLodgingSheetVisible] = useState(false);
+  const [isLodgingSummaryHighlighted, setIsLodgingSummaryHighlighted] = useState(false);
   const emptyStateRef = useRef<View>(null);
+  const lodgingSummaryRef = useRef<View>(null);
   const rowRefs = useRef<Record<string, Text | null>>({});
   const deleteTriggerRefs = useRef<Record<string, View | null>>({});
   const [selectedDetailItemId, setSelectedDetailItemId] = useState<string | null>(null);
@@ -191,9 +191,26 @@ export function DayItineraryContent({
       return;
     }
 
+    if (focusRequest.target.kind === 'lodgingPanel') {
+      setIsLodgingSummaryHighlighted(true);
+      if (!focusAccessibilityNode(lodgingSummaryRef.current)) {
+        focusFallback();
+      }
+      onFocusRequestHandled();
+      return;
+    }
+
     focusFallback();
     onFocusRequestHandled();
   }, [focusRequest, onFocusRequestHandled, viewModel]);
+
+  useEffect(() => {
+    if (!isLodgingSummaryHighlighted) {
+      return;
+    }
+    const highlightTimeout = setTimeout(() => setIsLodgingSummaryHighlighted(false), 1800);
+    return () => clearTimeout(highlightTimeout);
+  }, [isLodgingSummaryHighlighted]);
 
   const resolveTimelineItem = (timelineItem: ItineraryTimelineItem): DayItineraryRowViewModel | null =>
     itineraryItemsById.get(timelineItem.id) ?? null;
@@ -299,7 +316,10 @@ export function DayItineraryContent({
     );
   };
 
-  const openLodgingSheet = () => setIsLodgingSheetVisible(true);
+  const openLodgingSheet = () => {
+    setIsLodgingSummaryHighlighted(false);
+    setIsLodgingSheetVisible(true);
+  };
   const closeLodgingSheet = () => setIsLodgingSheetVisible(false);
   const copyCurrentLodgingAddress = () => {
     if (!viewModel.lodgingPlace) {
@@ -316,6 +336,7 @@ export function DayItineraryContent({
   return (
     <View style={styles.card}>
       <DayLodgingPanel
+        highlighted={isLodgingSummaryHighlighted}
         isSheetVisible={isLodgingSheetVisible}
         lodgingState={lodgingState}
         onCancelPicker={onCancelLodgingPicker}
@@ -323,8 +344,10 @@ export function DayItineraryContent({
         onCloseSheet={closeLodgingSheet}
         onCopyAddress={copyCurrentLodgingAddress}
         onOpenSearchRegister={openLodgingSearchRegisterFromSheet}
-        onOpenSelection={onOpenLodgingPlaceSelection}
         onOpenSheet={openLodgingSheet}
+        onSummaryRef={(node) => {
+          lodgingSummaryRef.current = node;
+        }}
         onSelectPlace={onSelectLodgingPlace}
         pickerState={lodgingPickerState}
         viewModel={buildDayLodgingPanel(viewModel.lodgingPlace)}

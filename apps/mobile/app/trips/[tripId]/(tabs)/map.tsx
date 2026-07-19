@@ -12,9 +12,15 @@ export default function TripMapTabScreen() {
     goHome,
     goLogin,
     load,
+    removeScheduleResult,
+    resetScheduleAddState,
+    scheduleAddState,
+    scheduleFeedbackMessage,
     selectRoutePlace,
+    selectScheduleResult,
+    selectedScheduleResults,
     state,
-    toggleBookmarkLayer,
+    submitScheduleBatch,
     toggleRouteLayer,
     tripId,
   } = useTripMapController();
@@ -24,22 +30,29 @@ export default function TripMapTabScreen() {
       <MapContent
         allBookmarkResults={state.allBookmarkResults}
         bookmarkActionState={bookmarkActionState}
-        bookmarkLayerVisible={state.bookmarkLayerVisible}
         feedback={feedback}
+        lodgingResults={state.lodgingResults}
         mapPlaces={state.mapPlaces}
         onBookmarkSelect={(result) => void createBookmark(result)}
         onBookmarkDelete={(result) => void deleteBookmark(result)}
         onClearRoutePlaceSelection={clearRoutePlaceSelection}
+        onRemoveScheduleResult={removeScheduleResult}
+        onResetScheduleAddState={resetScheduleAddState}
         onRoutePlacePress={selectRoutePlace}
-        onToggleBookmarkLayer={toggleBookmarkLayer}
+        onScheduleSelect={(result) => selectScheduleResult(result)}
+        onSubmitScheduleBatch={(targetDayId) => void submitScheduleBatch(targetDayId)}
         onToggleRouteLayer={toggleRouteLayer}
         routeChips={state.routeChips}
         routeNotice={state.routeNotice}
         routePolylines={state.routePolylines}
+        scheduleAddState={scheduleAddState}
+        scheduleFeedbackMessage={scheduleFeedbackMessage}
         scheduleMarkerDetail={state.scheduleMarkerDetail}
+        scheduleTargetDayChips={state.scheduleTargetDayChips}
         selectedDayId={state.selectedDayId}
-        selectedRouteLayerChipId={state.selectedRouteLayerChipId}
+        selectedRouteLayerChipIds={state.selectedRouteLayerChipIds}
         selectedRoutePlaceId={state.selectedRoutePlaceId}
+        selectedScheduleResults={selectedScheduleResults}
         tripDestinations={state.tripDestinations}
         tripId={tripId ?? ''}
       />
