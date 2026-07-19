@@ -35,7 +35,7 @@ variable "artifact_registry_repository" {
 }
 
 variable "database_secret_name" {
-  description = "Existing Secret Manager secret id containing the Neon DATABASE_URL."
+  description = "Existing Secret Manager secret id containing the staging PostgreSQL DATABASE_URL."
   type        = string
   default     = "i-um-staging-database-url"
 }

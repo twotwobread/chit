@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 
 import {
@@ -8,6 +9,7 @@ import {
   deriveDirectDatabaseUrl,
   deriveInviteLinkHost,
   easEnvSpecs,
+  legacyCloudRunEnvNames,
   parseDeployArgs,
   parseDotenv,
   resolvePublicEndpoints,
@@ -71,21 +73,19 @@ describe('buildStageConfig', () => {
     assert.equal(config.cloudRun.service, 'i-um-api-staging');
     assert.equal(config.deploy.branch, 'develop');
     assert.equal(config.apiEnv.AUTH_ALLOW_DEV_OAUTH, 'false');
-    assert.equal(config.apiEnv.APPLE_BUNDLE_ID, 'com.twotwobread.ium.staging');
-    assert.equal(config.apiEnv.BOARDING_PASS_GCS_BUCKET, 'boarding-pass-bucket');
-    assert.equal(config.apiEnv.BOARDING_PASS_GCS_SIGNING_ACCESS_ID, 'signer@i-um-488511.iam.gserviceaccount.com');
-    assert.equal(config.apiEnv.EXPENSE_RECEIPT_GCS_BUCKET, 'boarding-pass-bucket');
-    assert.equal(config.apiEnv.EXPENSE_RECEIPT_GCS_SIGNING_ACCESS_ID, 'signer@i-um-488511.iam.gserviceaccount.com');
+    assert.equal(config.apiEnv.APPLE_CLIENT_ID, 'com.twotwobread.ium.staging');
+    assert.equal(config.apiEnv.GCS_BUCKET, 'shared-gcs-bucket');
+    assert.equal(config.apiEnv.GCS_SIGNING_ACCESS_ID, 'signer@i-um-488511.iam.gserviceaccount.com');
     assert.equal(config.apiEnv.RECEIPT_OPENAI_MODEL, 'gpt-4o-mini');
     assert.equal(config.eas.env.EXPO_PUBLIC_AUTH_DEV_MODE, 'false');
     assert.equal(config.apiEnv.INVITE_BASE_URL, undefined);
     assert.equal(config.eas.env.EXPO_PUBLIC_INVITE_LINK_HOST, undefined);
   });
 
-  it('requires server, boarding pass storage, and mobile credentials for real Apple/Kakao staging login', () => {
+  it('requires server, shared GCS storage, and mobile credentials for real Apple/Kakao staging login', () => {
     assert.throws(
       () => buildStageConfig({ env: { DATABASE_URL: 'postgresql://u:p@example.test/db' } }),
-      /AUTH_TOKEN_SECRET, GOOGLE_PLACES_API_KEY, GOOGLE_ROUTES_API_KEY, BOARDING_PASS_GCS_BUCKET, BOARDING_PASS_GCS_SIGNING_ACCESS_ID, BOARDING_PASS_GCS_SIGNING_PRIVATE_KEY, EXPENSE_RECEIPT_GCS_BUCKET, EXPENSE_RECEIPT_GCS_SIGNING_ACCESS_ID, EXPENSE_RECEIPT_GCS_SIGNING_PRIVATE_KEY, OPENAI_API_KEY, EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY/,
+      /AUTH_TOKEN_SECRET, GOOGLE_MAPS_API_KEY, GCS_BUCKET, GCS_SIGNING_ACCESS_ID, GCS_SIGNING_PRIVATE_KEY, OPENAI_API_KEY, EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY/,
     );
   });
 
@@ -155,6 +155,41 @@ describe('resolvePublicEndpoints', () => {
   });
 });
 
+describe('env examples', () => {
+  it('keeps local and staging runtime keys aligned while keeping deploy-only keys in staging', () => {
+    const localEnv = parseDotenv(readFileSync('.env.example', 'utf8'));
+    const stageEnv = parseDotenv(readFileSync('.env.stage.example', 'utf8'));
+    const runtimeKeys = [
+      'DATABASE_URL',
+      'AUTH_TOKEN_SECRET',
+      'AUTH_ALLOW_DEV_OAUTH',
+      'APPLE_CLIENT_ID',
+      'GOOGLE_MAPS_API_KEY',
+      'GCS_BUCKET',
+      'GCS_SIGNING_ACCESS_ID',
+      'GCS_SIGNING_PRIVATE_KEY',
+      'OPENAI_API_KEY',
+      'RECEIPT_OPENAI_MODEL',
+      'INVITE_BASE_URL',
+      'INVITE_APP_SCHEME',
+      'INVITE_APP_STORE_URL',
+      'INVITE_PLAY_STORE_URL',
+      'EXPO_PUBLIC_AUTH_DEV_MODE',
+      'EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY',
+      'EXPO_PUBLIC_GOOGLE_MAPS_ANDROID_API_KEY',
+      'EXPO_PUBLIC_INVITE_LINK_HOST',
+    ];
+
+    for (const key of runtimeKeys) {
+      assert.ok(key in localEnv, `${key} missing from .env.example`);
+      assert.ok(key in stageEnv, `${key} missing from .env.stage.example`);
+    }
+
+    assert.ok(!('OPENAI_API_KEY_SECRET_NAME' in localEnv), 'local env example must not include deploy-only secret names');
+    assert.equal(stageEnv.OPENAI_API_KEY_SECRET_NAME, 'i-um-staging-openai-api-key');
+  });
+});
+
 describe('createSecretSpecs', () => {
   it('maps required values to stable Secret Manager names', () => {
     const specs = createSecretSpecs(buildStageConfig({ env: requiredStageEnv() }));
@@ -164,13 +199,27 @@ describe('createSecretSpecs', () => {
       [
         ['DATABASE_URL', 'i-um-staging-database-url', 'postgresql://user:pass@ep-test-pooler.ap-northeast-1.aws.neon.tech/ium?sslmode=require'],
         ['AUTH_TOKEN_SECRET', 'i-um-staging-auth-token-secret', 'long-secret'],
-        ['GOOGLE_PLACES_API_KEY', 'i-um-staging-google-places-api-key', 'places-key'],
-        ['GOOGLE_ROUTES_API_KEY', 'i-um-staging-google-routes-api-key', 'routes-key'],
-        ['BOARDING_PASS_GCS_SIGNING_PRIVATE_KEY', 'i-um-staging-boarding-pass-gcs-signing-private-key', 'private-key-pem'],
+        ['GOOGLE_MAPS_API_KEY', 'i-um-staging-google-maps-api-key', 'maps-key'],
+        ['GCS_SIGNING_PRIVATE_KEY', 'i-um-staging-gcs-signing-private-key', 'private-key-pem'],
         ['OPENAI_API_KEY', 'i-um-staging-openai-api-key', 'openai-key'],
-        ['EXPENSE_RECEIPT_GCS_SIGNING_PRIVATE_KEY', 'i-um-staging-expense-receipt-gcs-signing-private-key', 'private-key-pem'],
       ],
     );
+  });
+});
+
+describe('legacyCloudRunEnvNames', () => {
+  it('lists old env names removed from Cloud Run after canonical env consolidation', () => {
+    assert.deepEqual(legacyCloudRunEnvNames(), [
+      'APPLE_BUNDLE_ID',
+      'GOOGLE_PLACES_API_KEY',
+      'GOOGLE_ROUTES_API_KEY',
+      'BOARDING_PASS_GCS_BUCKET',
+      'BOARDING_PASS_GCS_SIGNING_ACCESS_ID',
+      'BOARDING_PASS_GCS_SIGNING_PRIVATE_KEY',
+      'EXPENSE_RECEIPT_GCS_BUCKET',
+      'EXPENSE_RECEIPT_GCS_SIGNING_ACCESS_ID',
+      'EXPENSE_RECEIPT_GCS_SIGNING_PRIVATE_KEY',
+    ]);
   });
 });
 
@@ -202,11 +251,10 @@ function requiredStageEnv(overrides = {}) {
   return {
     DATABASE_URL: 'postgresql://user:pass@ep-test-pooler.ap-northeast-1.aws.neon.tech/ium?sslmode=require',
     AUTH_TOKEN_SECRET: 'long-secret',
-    GOOGLE_PLACES_API_KEY: 'places-key',
-    GOOGLE_ROUTES_API_KEY: 'routes-key',
-    BOARDING_PASS_GCS_BUCKET: 'boarding-pass-bucket',
-    BOARDING_PASS_GCS_SIGNING_ACCESS_ID: 'signer@i-um-488511.iam.gserviceaccount.com',
-    BOARDING_PASS_GCS_SIGNING_PRIVATE_KEY: 'private-key-pem',
+    GOOGLE_MAPS_API_KEY: 'maps-key',
+    GCS_BUCKET: 'shared-gcs-bucket',
+    GCS_SIGNING_ACCESS_ID: 'signer@i-um-488511.iam.gserviceaccount.com',
+    GCS_SIGNING_PRIVATE_KEY: 'private-key-pem',
     OPENAI_API_KEY: 'openai-key',
     EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY: 'kakao-key',
     ...overrides,

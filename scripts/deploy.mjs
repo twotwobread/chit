@@ -9,6 +9,7 @@ import {
   createSecretSpecs,
   deriveDirectDatabaseUrl,
   easEnvSpecs,
+  legacyCloudRunEnvNames,
   parseDeployArgs,
   readDotenvFile,
   resolvePublicEndpoints,
@@ -113,14 +114,12 @@ function updateCloudRunEnvironment(runner, config) {
     `--update-secrets=${cloudRunSecretMapping(config)}`,
     `--update-env-vars=${cloudRunEnvMapping(config.apiEnv)}`,
   ];
-  if (!config.apiEnv.APPLE_CLIENT_ID) {
-    args.push('--remove-env-vars=APPLE_CLIENT_ID');
-  }
+  args.push(`--remove-env-vars=${legacyCloudRunEnvNames().join(',')}`);
   runner.run('gcloud', args);
 }
 
 function runDatabaseMigration(runner, config) {
-  console.log('Run staging DB migration with direct Neon URL.');
+  console.log('Run staging DB migration with configured database URL.');
   runner.run('pnpm', ['db:migrate'], {
     env: { ...process.env, DATABASE_URL: deriveDirectDatabaseUrl(config.secrets.DATABASE_URL) },
   });

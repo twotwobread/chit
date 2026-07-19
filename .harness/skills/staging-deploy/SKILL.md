@@ -21,7 +21,7 @@ GitHub develop branch
   -> Docker build from apps/api/Dockerfile
   -> Artifact Registry
   -> Cloud Run: i-um-api-staging
-  -> Neon Postgres via Secret Manager DATABASE_URL
+  -> Cloud SQL/PostgreSQL via Secret Manager DATABASE_URL
 
 Expo EAS preview iOS build
   -> EXPO_PUBLIC_API_BASE_URL=https://<cloud-run-url>
@@ -72,9 +72,9 @@ gcloud storage buckets update gs://i-um-488511-terraform-state \
   --versioning
 ```
 
-### 3. Neon DATABASE_URL secret
+### 3. DATABASE_URL secret
 
-The Secret Manager secret is pre-created and contains the Neon connection string as version `1`.
+The Secret Manager secret is pre-created and contains the staging PostgreSQL connection string as version `1`.
 
 If the value needs rotation, do not paste it into git, GitHub issues, or chat. Add a new secret version locally:
 
@@ -130,26 +130,13 @@ printf '%s\n' "$CLOUD_RUN_URL"
 
 ## Staging DB migration
 
-F-003 added PostgreSQL migrations and `/ready`. Apply migrations to Neon before checking `/ready`.
+F-003 added PostgreSQL migrations and `/ready`. Apply migrations before checking `/ready`.
 
-Cloud Run runtime uses the pooled Neon URL from Secret Manager. Goose migrations should use a direct Neon connection because pooled/PgBouncer URLs can fail with prepared statement conflicts.
-
-Derive the direct migration URL locally without printing it:
+For Cloud SQL, either run migrations from an environment that can use the configured `DATABASE_URL`, or start Cloud SQL Auth Proxy locally and set `DATABASE_URL` to the local proxy URL for the migration command. Do not paste the URL value into chat or logs.
 
 ```bash
-DATABASE_URL="$(gcloud secrets versions access latest \
-  --secret=i-um-staging-database-url \
-  --project=i-um-488511 | python3 -c 'import sys; print(sys.stdin.read().strip().replace("-pooler.", "."))')" \
-  pnpm db:migrate
-```
-
-Check migration status with the same direct URL derivation:
-
-```bash
-DATABASE_URL="$(gcloud secrets versions access latest \
-  --secret=i-um-staging-database-url \
-  --project=i-um-488511 | python3 -c 'import sys; print(sys.stdin.read().strip().replace("-pooler.", "."))')" \
-  pnpm db:status
+DATABASE_URL='<local-or-runtime-postgresql-url>' pnpm db:migrate
+DATABASE_URL='<local-or-runtime-postgresql-url>' pnpm db:status
 ```
 
 ## Deploy API to Cloud Run
