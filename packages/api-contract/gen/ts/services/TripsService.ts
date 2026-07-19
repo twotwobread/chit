@@ -219,7 +219,7 @@ export class TripsService {
     }
     /**
      * Get trip settlement calculation
-     * Returns authoritative per-currency participant balances and deterministic suggested transfers for an authenticated current trip participant.
+     * Returns the current/latest per-currency participant balances and deterministic suggested transfers for an authenticated current trip participant. This response is not a historical settlement-request snapshot.
      * @param tripId
      * @returns GetTripSettlementResponse Trip settlement calculation.
      * @throws ApiError
