@@ -21,6 +21,7 @@ Use **B안: Dark Shell + Off-white Content**.
 - App shell/background: Matte Charcoal / Charcoal.
 - Background treatment: Matte Charcoal base with subtle Acid Lime ambient/radial gradient accents, especially near the top/right brand area.
 - Hero/brand/settlement moments: Charcoal Elevated / Charcoal + Acid Lime.
+- In-app logo treatment: adopt the HTML mockup stamp logo as a reusable `BrandStamp` component for brand-entry and top-level moments.
 - Dense content surfaces: clean off-white or white cards/shelves.
 - Forms/lists: clean off-white/white for readability, inside the dark shell.
 - Navigation: dark shell aligned, selected state uses Acid Lime or high-contrast capsule.
@@ -39,6 +40,7 @@ Dark Shell + Off-white Content makes the brand color visible, reduces visual fra
 - Update `docs/features/0341-chit-brand-design-system.md` and `.harness/rules/code/mobile-ui.md` so source-of-truth rules match the approved B direction.
 - Update `apps/mobile/lib/design/theme.ts` with dark shell, content surface, and high-contrast semantic tokens.
 - Upgrade shared primitives in `apps/mobile/lib/design/components.tsx` and `apps/mobile/lib/design/primitives.tsx`.
+- Add a reusable `BrandStamp` / optional `BrandHeader` primitive based on the HTML mockup logo treatment.
 - Apply the new surface strategy to core mobile surfaces:
   - root shell;
   - login;
@@ -76,6 +78,12 @@ Dark Shell + Off-white Content makes the brand color visible, reduces visual fra
 
 ### Components
 
+- Adopt the HTML mockup logo as the in-app brand stamp:
+  - reusable component name: `BrandStamp`;
+  - optional composite: `BrandHeader` for login/home/empty or completion states;
+  - visual: Charcoal rounded square, Acid Lime `칫`, slight stamp rotation, subtle Acid Lime offset/shadow;
+  - use on login/onboarding, home header, mypage brand accent, settlement completion/hero, empty states, and brand-forward loading states;
+  - do not use in bottom tabs, dense list rows, repeated forms, or every Trip detail app bar where trip context should lead.
 - Cards need surface variants:
   - content card: clean off-white/white surface inside dark shell;
   - dark/hero card: Charcoal surface with Acid Lime accents;
@@ -97,6 +105,7 @@ Dark Shell + Off-white Content makes the brand color visible, reduces visual fra
 - [ ] Core app screens use Matte Charcoal/Charcoal as the default shell background.
 - [ ] Core shell includes a subtle Acid Lime ambient/radial gradient treatment matching the approved HTML B mockup, without overpowering content.
 - [ ] Warm Paper (`#F5F1E8`) is not used for core backgrounds/cards; clean off-white/white is used for readable content surfaces.
+- [ ] Shared `BrandStamp` component implements the HTML mockup stamp logo treatment and is used only in approved brand-forward surfaces.
 - [ ] Shared `Card` and button primitives visually match the approved B direction.
 - [ ] Login, Home, Today, Expenses, Settlement, New Trip, and Map/Search feel visually coherent under one Chit surface strategy.
 - [ ] Bright-surface Acid Lime text usage is removed or replaced with high-contrast semantic tokens.
@@ -113,6 +122,7 @@ Dark Shell + Off-white Content makes the brand color visible, reduces visual fra
 | Existing brand doc | `docs/features/0341-chit-brand-design-system.md` |
 | Mobile UI rule | `.harness/rules/code/mobile-ui.md` |
 | Tokens | `apps/mobile/lib/design/theme.ts` |
+| Brand stamp primitive | `apps/mobile/lib/design/components.tsx` or narrow `apps/mobile/lib/design/brand.tsx` if split during implementation |
 | Shared primitives | `apps/mobile/lib/design/components.tsx`, `apps/mobile/lib/design/primitives.tsx` |
 | Navigation shell | `apps/mobile/lib/navigation/*`, `apps/mobile/lib/trip-ui/AppBar.tsx`, `apps/mobile/lib/trip-ui/TripScreenScaffold.tsx` |
 
