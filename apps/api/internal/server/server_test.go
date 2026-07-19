@@ -948,6 +948,7 @@ func TestCreateTripHandler(t *testing.T) {
 		"startDate":"2026-07-10",
 		"endDate":"2026-07-13",
 		"defaultCurrency":"JPY",
+		"defaultTravelMode":"driving",
 		"destinations":[{
 			"cityName":"오사카",
 			"countryName":"일본",
@@ -973,12 +974,13 @@ func TestCreateTripHandler(t *testing.T) {
 
 	var body struct {
 		Trip struct {
-			Name            string `json:"name"`
-			StartDate       string `json:"startDate"`
-			EndDate         string `json:"endDate"`
-			DefaultCurrency string `json:"defaultCurrency"`
-			CreatedBy       string `json:"createdBy"`
-			Destinations    []struct {
+			Name              string `json:"name"`
+			StartDate         string `json:"startDate"`
+			EndDate           string `json:"endDate"`
+			DefaultCurrency   string `json:"defaultCurrency"`
+			DefaultTravelMode string `json:"defaultTravelMode"`
+			CreatedBy         string `json:"createdBy"`
+			Destinations      []struct {
 				DisplayName     string `json:"displayName"`
 				ProviderPlaceID string `json:"providerPlaceId"`
 				SortOrder       int    `json:"sortOrder"`
@@ -1001,6 +1003,9 @@ func TestCreateTripHandler(t *testing.T) {
 	}
 	if body.Trip.DefaultCurrency != "JPY" {
 		t.Fatalf("expected JPY, got %q", body.Trip.DefaultCurrency)
+	}
+	if body.Trip.DefaultTravelMode != "driving" {
+		t.Fatalf("expected driving, got %q", body.Trip.DefaultTravelMode)
 	}
 	if body.Trip.CreatedBy != "user-1" {
 		t.Fatalf("expected createdBy user-1, got %q", body.Trip.CreatedBy)
@@ -1045,7 +1050,8 @@ func TestCreateTripValidation(t *testing.T) {
 		"name":"오사카",
 		"startDate":"2026-07-13",
 		"endDate":"2026-07-10",
-		"defaultCurrency":"JPY"
+		"defaultCurrency":"JPY",
+		"defaultTravelMode":"transit"
 	}`)))
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Authorization", "Bearer "+accessToken)
@@ -5348,6 +5354,7 @@ func createTestTrip(t *testing.T, backend *fakeAuthBackend, accessToken string) 
 		"startDate":"2026-07-10",
 		"endDate":"2026-07-13",
 		"defaultCurrency":"JPY",
+		"defaultTravelMode":"transit",
 		"destinations":[{
 			"cityName":"오사카",
 			"countryName":"일본",
@@ -5633,15 +5640,16 @@ func (b *fakeAuthBackend) CreateTripWithOwner(_ context.Context, record tripdoma
 		})
 	}
 	createdTrip := tripdomain.Trip{
-		ID:              tripID,
-		Name:            record.Name,
-		StartDate:       record.StartDate.Format("2006-01-02"),
-		EndDate:         record.EndDate.Format("2006-01-02"),
-		DefaultCurrency: record.DefaultCurrency,
-		CreatedBy:       record.CreatedBy,
-		CreatedAt:       now,
-		UpdatedAt:       now,
-		Destinations:    destinations,
+		ID:                tripID,
+		Name:              record.Name,
+		StartDate:         record.StartDate.Format("2006-01-02"),
+		EndDate:           record.EndDate.Format("2006-01-02"),
+		DefaultCurrency:   record.DefaultCurrency,
+		DefaultTravelMode: record.DefaultTravelMode,
+		CreatedBy:         record.CreatedBy,
+		CreatedAt:         now,
+		UpdatedAt:         now,
+		Destinations:      destinations,
 	}
 	owner := tripdomain.Participant{
 		ID:          participantID,
@@ -5718,6 +5726,7 @@ func (b *fakeAuthBackend) UpdateTripBasicInfo(_ context.Context, record tripdoma
 	updatedTrip.StartDate = record.StartDate.Format("2006-01-02")
 	updatedTrip.EndDate = record.EndDate.Format("2006-01-02")
 	updatedTrip.DefaultCurrency = record.DefaultCurrency
+	updatedTrip.DefaultTravelMode = record.DefaultTravelMode
 	updatedTrip.UpdatedAt = updatedTrip.UpdatedAt.Add(time.Hour)
 	b.trips[record.ID] = updatedTrip
 	return updatedTrip, nil
@@ -7154,16 +7163,17 @@ func (b *fakeAuthBackend) ListTripsByParticipantUser(_ context.Context, userID s
 			}
 			foundTrip := b.trips[tripID]
 			trips = append(trips, tripdomain.ListItem{
-				ID:               foundTrip.ID,
-				ParticipantID:    participant.ID,
-				Name:             foundTrip.Name,
-				StartDate:        foundTrip.StartDate,
-				EndDate:          foundTrip.EndDate,
-				DefaultCurrency:  foundTrip.DefaultCurrency,
-				JoinedAt:         participant.JoinedAt,
-				CreatedAt:        foundTrip.CreatedAt,
-				MyRole:           participant.Role,
-				ParticipantCount: len(participants),
+				ID:                foundTrip.ID,
+				ParticipantID:     participant.ID,
+				Name:              foundTrip.Name,
+				StartDate:         foundTrip.StartDate,
+				EndDate:           foundTrip.EndDate,
+				DefaultCurrency:   foundTrip.DefaultCurrency,
+				DefaultTravelMode: foundTrip.DefaultTravelMode,
+				JoinedAt:          participant.JoinedAt,
+				CreatedAt:         foundTrip.CreatedAt,
+				MyRole:            participant.Role,
+				ParticipantCount:  len(participants),
 			})
 		}
 	}

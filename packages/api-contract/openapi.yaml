@@ -4465,6 +4465,11 @@ components:
         - JPY
         - USD
         - EUR
+    TripDefaultTravelMode:
+      type: string
+      enum:
+        - transit
+        - driving
     TripParticipantRole:
       type: string
       enum:
@@ -4863,6 +4868,10 @@ components:
           example: '2026-07-13'
         defaultCurrency:
           $ref: '#/components/schemas/SupportedCurrency'
+        defaultTravelMode:
+          allOf:
+            - $ref: '#/components/schemas/TripDefaultTravelMode'
+          default: transit
         destinations:
           type: array
           minItems: 1
@@ -4960,6 +4969,7 @@ components:
         - startDate
         - endDate
         - defaultCurrency
+        - defaultTravelMode
         - createdBy
         - createdAt
         - updatedAt
@@ -4977,6 +4987,8 @@ components:
           format: date
         defaultCurrency:
           $ref: '#/components/schemas/SupportedCurrency'
+        defaultTravelMode:
+          $ref: '#/components/schemas/TripDefaultTravelMode'
         createdBy:
           type: string
         createdAt:
@@ -6537,6 +6549,8 @@ components:
           example: '2026-07-14'
         defaultCurrency:
           $ref: '#/components/schemas/SupportedCurrency'
+        defaultTravelMode:
+          $ref: '#/components/schemas/TripDefaultTravelMode'
         confirmOutOfRangeDayArchive:
           type: boolean
           description: Set true after showing the shrink impact summary when a date range change archives out-of-range days.
@@ -6555,6 +6569,7 @@ components:
         - startDate
         - endDate
         - defaultCurrency
+        - defaultTravelMode
         - joinedAt
         - createdAt
         - myRole
@@ -6572,6 +6587,8 @@ components:
           format: date
         defaultCurrency:
           $ref: '#/components/schemas/SupportedCurrency'
+        defaultTravelMode:
+          $ref: '#/components/schemas/TripDefaultTravelMode'
         joinedAt:
           type: string
           format: date-time

@@ -3,6 +3,7 @@
 /* tslint:disable */
 /* eslint-disable */
 import type { SupportedCurrency } from './SupportedCurrency';
+import type { TripDefaultTravelMode } from './TripDefaultTravelMode';
 export type UpdateTripRequest = {
     name?: string;
     /**
@@ -14,6 +15,7 @@ export type UpdateTripRequest = {
      */
     endDate?: string;
     defaultCurrency?: SupportedCurrency;
+    defaultTravelMode?: TripDefaultTravelMode;
     /**
      * Set true after showing the shrink impact summary when a date range change archives out-of-range days.
      */

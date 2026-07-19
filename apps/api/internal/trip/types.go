@@ -41,11 +41,12 @@ type Creator struct {
 }
 
 type CreateInput struct {
-	Name            string
-	StartDate       string
-	EndDate         string
-	DefaultCurrency string
-	Destinations    []CreateDestinationInput
+	Name              string
+	StartDate         string
+	EndDate           string
+	DefaultCurrency   string
+	DefaultTravelMode string
+	Destinations      []CreateDestinationInput
 }
 
 type CreateDestinationInput struct {
@@ -65,6 +66,7 @@ type UpdateInput struct {
 	StartDate                   *string
 	EndDate                     *string
 	DefaultCurrency             *string
+	DefaultTravelMode           *string
 	ConfirmOutOfRangeDayArchive *bool
 }
 
@@ -157,13 +159,14 @@ type ReorderScheduleItemTimeUpdateInput struct {
 }
 
 type CreateRecord struct {
-	Name             string
-	StartDate        time.Time
-	EndDate          time.Time
-	DefaultCurrency  string
-	CreatedBy        string
-	OwnerDisplayName string
-	Destinations     []CreateDestinationRecord
+	Name              string
+	StartDate         time.Time
+	EndDate           time.Time
+	DefaultCurrency   string
+	DefaultTravelMode string
+	CreatedBy         string
+	OwnerDisplayName  string
+	Destinations      []CreateDestinationRecord
 }
 
 type CreateDestinationRecord struct {
@@ -180,11 +183,12 @@ type CreateDestinationRecord struct {
 }
 
 type UpdateRecord struct {
-	ID              string
-	Name            string
-	StartDate       time.Time
-	EndDate         time.Time
-	DefaultCurrency string
+	ID                string
+	Name              string
+	StartDate         time.Time
+	EndDate           time.Time
+	DefaultCurrency   string
+	DefaultTravelMode string
 }
 
 type CreateManualScheduleItemRecord struct {
@@ -355,15 +359,16 @@ type AcceptTripInviteRecord struct {
 }
 
 type Trip struct {
-	ID              string
-	Name            string
-	StartDate       string
-	EndDate         string
-	DefaultCurrency string
-	CreatedBy       string
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
-	Destinations    []TripDestination
+	ID                string
+	Name              string
+	StartDate         string
+	EndDate           string
+	DefaultCurrency   string
+	DefaultTravelMode string
+	CreatedBy         string
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+	Destinations      []TripDestination
 }
 
 type TripDestination struct {
@@ -920,16 +925,17 @@ type SettlementSplitInput struct {
 }
 
 type ListItem struct {
-	ID               string
-	ParticipantID    string
-	Name             string
-	StartDate        string
-	EndDate          string
-	DefaultCurrency  string
-	JoinedAt         time.Time
-	CreatedAt        time.Time
-	MyRole           string
-	ParticipantCount int
+	ID                string
+	ParticipantID     string
+	Name              string
+	StartDate         string
+	EndDate           string
+	DefaultCurrency   string
+	DefaultTravelMode string
+	JoinedAt          time.Time
+	CreatedAt         time.Time
+	MyRole            string
+	ParticipantCount  int
 }
 
 type Repository interface {

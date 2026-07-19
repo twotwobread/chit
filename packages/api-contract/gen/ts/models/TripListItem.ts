@@ -3,6 +3,7 @@
 /* tslint:disable */
 /* eslint-disable */
 import type { SupportedCurrency } from './SupportedCurrency';
+import type { TripDefaultTravelMode } from './TripDefaultTravelMode';
 import type { TripParticipantRole } from './TripParticipantRole';
 export type TripListItem = {
     id: string;
@@ -10,6 +11,7 @@ export type TripListItem = {
     startDate: string;
     endDate: string;
     defaultCurrency: SupportedCurrency;
+    defaultTravelMode: TripDefaultTravelMode;
     joinedAt: string;
     createdAt: string;
     myRole: TripParticipantRole;

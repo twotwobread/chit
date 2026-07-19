@@ -230,14 +230,15 @@ type StorageObjectDeletionJob struct {
 }
 
 type Trip struct {
-	ID              pgtype.UUID
-	Name            string
-	StartDate       pgtype.Date
-	EndDate         pgtype.Date
-	DefaultCurrency string
-	CreatedBy       pgtype.UUID
-	CreatedAt       pgtype.Timestamptz
-	UpdatedAt       pgtype.Timestamptz
+	ID                pgtype.UUID
+	Name              string
+	StartDate         pgtype.Date
+	EndDate           pgtype.Date
+	DefaultCurrency   string
+	DefaultTravelMode string
+	CreatedBy         pgtype.UUID
+	CreatedAt         pgtype.Timestamptz
+	UpdatedAt         pgtype.Timestamptz
 }
 
 type TripDay struct {

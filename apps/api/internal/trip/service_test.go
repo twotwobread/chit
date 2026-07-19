@@ -184,15 +184,16 @@ func (r *fakeRepository) CreateTripWithOwner(_ context.Context, record CreateRec
 	r.created = record
 	return CreateResult{
 		Trip: Trip{
-			ID:              testTripID,
-			Name:            record.Name,
-			StartDate:       record.StartDate.Format(dateLayout),
-			EndDate:         record.EndDate.Format(dateLayout),
-			DefaultCurrency: record.DefaultCurrency,
-			CreatedBy:       record.CreatedBy,
-			CreatedAt:       time.Date(2026, 6, 21, 15, 0, 0, 0, time.UTC),
-			UpdatedAt:       time.Date(2026, 6, 21, 15, 0, 0, 0, time.UTC),
-			Destinations:    destinationRecordsToTripDestinations(testTripID, record.Destinations),
+			ID:                testTripID,
+			Name:              record.Name,
+			StartDate:         record.StartDate.Format(dateLayout),
+			EndDate:           record.EndDate.Format(dateLayout),
+			DefaultCurrency:   record.DefaultCurrency,
+			DefaultTravelMode: record.DefaultTravelMode,
+			CreatedBy:         record.CreatedBy,
+			CreatedAt:         time.Date(2026, 6, 21, 15, 0, 0, 0, time.UTC),
+			UpdatedAt:         time.Date(2026, 6, 21, 15, 0, 0, 0, time.UTC),
+			Destinations:      destinationRecordsToTripDestinations(testTripID, record.Destinations),
 		},
 		OwnerParticipant: Participant{
 			ID:          "participant-1",
@@ -221,14 +222,15 @@ func (r *fakeRepository) UpdateTripBasicInfo(_ context.Context, record UpdateRec
 	r.updated = record
 	r.updatedCalled = true
 	return Trip{
-		ID:              record.ID,
-		Name:            record.Name,
-		StartDate:       record.StartDate.Format(dateLayout),
-		EndDate:         record.EndDate.Format(dateLayout),
-		DefaultCurrency: record.DefaultCurrency,
-		CreatedBy:       r.trip.CreatedBy,
-		CreatedAt:       r.trip.CreatedAt,
-		UpdatedAt:       time.Date(2026, 6, 22, 9, 0, 0, 0, time.UTC),
+		ID:                record.ID,
+		Name:              record.Name,
+		StartDate:         record.StartDate.Format(dateLayout),
+		EndDate:           record.EndDate.Format(dateLayout),
+		DefaultCurrency:   record.DefaultCurrency,
+		DefaultTravelMode: record.DefaultTravelMode,
+		CreatedBy:         r.trip.CreatedBy,
+		CreatedAt:         r.trip.CreatedAt,
+		UpdatedAt:         time.Date(2026, 6, 22, 9, 0, 0, 0, time.UTC),
 	}, nil
 }
 
@@ -803,11 +805,12 @@ func TestServiceCreate(t *testing.T) {
 	service := newTestService(repo)
 
 	result, err := service.Create(context.Background(), "user-1", CreateInput{
-		Name:            "  오사카 3박 4일  ",
-		StartDate:       "2026-07-10",
-		EndDate:         "2026-07-13",
-		DefaultCurrency: "JPY",
-		Destinations:    validCreateDestinations(),
+		Name:              "  오사카 3박 4일  ",
+		StartDate:         "2026-07-10",
+		EndDate:           "2026-07-13",
+		DefaultCurrency:   "JPY",
+		DefaultTravelMode: "driving",
+		Destinations:      validCreateDestinations(),
 	})
 	if err != nil {
 		t.Fatalf("Create returned error: %v", err)
@@ -828,6 +831,9 @@ func TestServiceCreate(t *testing.T) {
 	if repo.created.Name != "오사카 3박 4일" {
 		t.Fatalf("expected repository to receive trimmed name, got %q", repo.created.Name)
 	}
+	if repo.created.DefaultTravelMode != "driving" || result.Trip.DefaultTravelMode != "driving" {
+		t.Fatalf("expected driving default travel mode, record=%q result=%q", repo.created.DefaultTravelMode, result.Trip.DefaultTravelMode)
+	}
 	if len(repo.created.Destinations) != 1 || repo.created.Destinations[0].SortOrder != 0 || repo.created.Destinations[0].DisplayName != "오사카, 일본" {
 		t.Fatalf("expected normalized destination record, got %#v", repo.created.Destinations)
 	}
@@ -836,9 +842,29 @@ func TestServiceCreate(t *testing.T) {
 	}
 }
 
+func TestServiceCreateDefaultsTravelModeToTransit(t *testing.T) {
+	repo := &fakeRepository{creator: Creator{ID: "user-1", DisplayName: "민수"}, creatorFound: true}
+	service := newTestService(repo)
+
+	result, err := service.Create(context.Background(), "user-1", CreateInput{
+		Name:            "오사카",
+		StartDate:       "2026-07-10",
+		EndDate:         "2026-07-13",
+		DefaultCurrency: "JPY",
+		Destinations:    validCreateDestinations(),
+	})
+	if err != nil {
+		t.Fatalf("Create returned error: %v", err)
+	}
+
+	if repo.created.DefaultTravelMode != "transit" || result.Trip.DefaultTravelMode != "transit" {
+		t.Fatalf("expected transit default travel mode, record=%q result=%q", repo.created.DefaultTravelMode, result.Trip.DefaultTravelMode)
+	}
+}
+
 func TestServiceCreateDestinationValidation(t *testing.T) {
 	service := newTestService(&fakeRepository{creator: Creator{ID: "user-1", DisplayName: "민수"}, creatorFound: true})
-	base := CreateInput{Name: "오사카", StartDate: "2026-07-10", EndDate: "2026-07-13", DefaultCurrency: "JPY", Destinations: validCreateDestinations()}
+	base := CreateInput{Name: "오사카", StartDate: "2026-07-10", EndDate: "2026-07-13", DefaultCurrency: "JPY", DefaultTravelMode: "transit", Destinations: validCreateDestinations()}
 	tests := []struct {
 		name         string
 		destinations []CreateDestinationInput
@@ -868,11 +894,12 @@ func TestServiceCreateValidation(t *testing.T) {
 		name  string
 		input CreateInput
 	}{
-		{name: "empty name", input: CreateInput{Name: " ", StartDate: "2026-07-10", EndDate: "2026-07-13", DefaultCurrency: "JPY", Destinations: validCreateDestinations()}},
-		{name: "invalid start date", input: CreateInput{Name: "오사카", StartDate: "2026/07/10", EndDate: "2026-07-13", DefaultCurrency: "JPY", Destinations: validCreateDestinations()}},
-		{name: "end before start", input: CreateInput{Name: "오사카", StartDate: "2026-07-13", EndDate: "2026-07-10", DefaultCurrency: "JPY", Destinations: validCreateDestinations()}},
-		{name: "past start date", input: CreateInput{Name: "오사카", StartDate: "2026-06-20", EndDate: "2026-07-13", DefaultCurrency: "JPY", Destinations: validCreateDestinations()}},
-		{name: "unsupported currency", input: CreateInput{Name: "오사카", StartDate: "2026-07-10", EndDate: "2026-07-13", DefaultCurrency: "GBP", Destinations: validCreateDestinations()}},
+		{name: "empty name", input: CreateInput{Name: " ", StartDate: "2026-07-10", EndDate: "2026-07-13", DefaultCurrency: "JPY", DefaultTravelMode: "transit", Destinations: validCreateDestinations()}},
+		{name: "invalid start date", input: CreateInput{Name: "오사카", StartDate: "2026/07/10", EndDate: "2026-07-13", DefaultCurrency: "JPY", DefaultTravelMode: "transit", Destinations: validCreateDestinations()}},
+		{name: "end before start", input: CreateInput{Name: "오사카", StartDate: "2026-07-13", EndDate: "2026-07-10", DefaultCurrency: "JPY", DefaultTravelMode: "transit", Destinations: validCreateDestinations()}},
+		{name: "past start date", input: CreateInput{Name: "오사카", StartDate: "2026-06-20", EndDate: "2026-07-13", DefaultCurrency: "JPY", DefaultTravelMode: "transit", Destinations: validCreateDestinations()}},
+		{name: "unsupported currency", input: CreateInput{Name: "오사카", StartDate: "2026-07-10", EndDate: "2026-07-13", DefaultCurrency: "GBP", DefaultTravelMode: "transit", Destinations: validCreateDestinations()}},
+		{name: "walking travel mode", input: CreateInput{Name: "오사카", StartDate: "2026-07-10", EndDate: "2026-07-13", DefaultCurrency: "JPY", DefaultTravelMode: "walking", Destinations: validCreateDestinations()}},
 	}
 
 	for _, tt := range tests {
@@ -889,11 +916,12 @@ func TestServiceCreateRequiresCreator(t *testing.T) {
 	service := newTestService(&fakeRepository{})
 
 	_, err := service.Create(context.Background(), "user-1", CreateInput{
-		Name:            "오사카",
-		StartDate:       "2026-07-10",
-		EndDate:         "2026-07-13",
-		DefaultCurrency: "JPY",
-		Destinations:    validCreateDestinations(),
+		Name:              "오사카",
+		StartDate:         "2026-07-10",
+		EndDate:           "2026-07-13",
+		DefaultCurrency:   "JPY",
+		DefaultTravelMode: "transit",
+		Destinations:      validCreateDestinations(),
 	})
 	if !errors.Is(err, ErrUnauthorized) {
 		t.Fatalf("expected ErrUnauthorized, got %v", err)
@@ -931,14 +959,15 @@ func TestServiceListRequiresAuth(t *testing.T) {
 func TestServiceUpdate(t *testing.T) {
 	repo := &fakeRepository{
 		trip: Trip{
-			ID:              testTripID,
-			Name:            "오사카 3박 4일",
-			StartDate:       "2026-07-10",
-			EndDate:         "2026-07-13",
-			DefaultCurrency: "JPY",
-			CreatedBy:       "user-1",
-			CreatedAt:       time.Date(2026, 6, 21, 15, 0, 0, 0, time.UTC),
-			UpdatedAt:       time.Date(2026, 6, 21, 15, 0, 0, 0, time.UTC),
+			ID:                testTripID,
+			Name:              "오사카 3박 4일",
+			StartDate:         "2026-07-10",
+			EndDate:           "2026-07-13",
+			DefaultCurrency:   "JPY",
+			DefaultTravelMode: "transit",
+			CreatedBy:         "user-1",
+			CreatedAt:         time.Date(2026, 6, 21, 15, 0, 0, 0, time.UTC),
+			UpdatedAt:         time.Date(2026, 6, 21, 15, 0, 0, 0, time.UTC),
 		},
 		tripFound: true,
 		isOwner:   true,
@@ -955,7 +984,7 @@ func TestServiceUpdate(t *testing.T) {
 	if result.Trip.Name != "오사카 4박 5일" {
 		t.Fatalf("expected trimmed updated name, got %q", result.Trip.Name)
 	}
-	if result.Trip.StartDate != "2026-07-10" || result.Trip.EndDate != "2026-07-13" || result.Trip.DefaultCurrency != "JPY" {
+	if result.Trip.StartDate != "2026-07-10" || result.Trip.EndDate != "2026-07-13" || result.Trip.DefaultCurrency != "JPY" || result.Trip.DefaultTravelMode != "transit" {
 		t.Fatalf("expected unchanged fields to be preserved, got %#v", result.Trip)
 	}
 	if repo.updated.Name != "오사카 4박 5일" {
@@ -963,9 +992,28 @@ func TestServiceUpdate(t *testing.T) {
 	}
 }
 
+func TestServiceUpdateDefaultTravelMode(t *testing.T) {
+	repo := &fakeRepository{
+		trip:      Trip{ID: testTripID, Name: "오사카", StartDate: "2026-07-10", EndDate: "2026-07-13", DefaultCurrency: "JPY", DefaultTravelMode: "transit"},
+		tripFound: true,
+		isOwner:   true,
+	}
+	service := newTestService(repo)
+
+	result, err := service.Update(context.Background(), "user-1", testTripID, UpdateInput{
+		DefaultTravelMode: stringPtr("driving"),
+	})
+	if err != nil {
+		t.Fatalf("Update returned error: %v", err)
+	}
+	if result.Trip.DefaultTravelMode != "driving" || repo.updated.DefaultTravelMode != "driving" {
+		t.Fatalf("expected driving default travel mode, record=%q result=%q", repo.updated.DefaultTravelMode, result.Trip.DefaultTravelMode)
+	}
+}
+
 func TestServiceUpdateAllowsPastDates(t *testing.T) {
 	repo := &fakeRepository{
-		trip:      Trip{ID: testTripID, Name: "오사카", StartDate: "2026-07-10", EndDate: "2026-07-13", DefaultCurrency: "JPY"},
+		trip:      Trip{ID: testTripID, Name: "오사카", StartDate: "2026-07-10", EndDate: "2026-07-13", DefaultCurrency: "JPY", DefaultTravelMode: "transit"},
 		tripFound: true,
 		isOwner:   true,
 	}
@@ -984,7 +1032,7 @@ func TestServiceUpdateAllowsPastDates(t *testing.T) {
 }
 
 func TestServiceUpdateValidation(t *testing.T) {
-	baseTrip := Trip{ID: testTripID, Name: "오사카", StartDate: "2026-07-10", EndDate: "2026-07-13", DefaultCurrency: "JPY"}
+	baseTrip := Trip{ID: testTripID, Name: "오사카", StartDate: "2026-07-10", EndDate: "2026-07-13", DefaultCurrency: "JPY", DefaultTravelMode: "transit"}
 	tests := []struct {
 		name  string
 		input UpdateInput
@@ -996,6 +1044,7 @@ func TestServiceUpdateValidation(t *testing.T) {
 		{name: "invalid end date", input: UpdateInput{EndDate: stringPtr("2026/07/13")}},
 		{name: "merged end before start", input: UpdateInput{StartDate: stringPtr("2026-07-14")}},
 		{name: "unsupported currency", input: UpdateInput{DefaultCurrency: stringPtr("GBP")}},
+		{name: "unsupported travel mode", input: UpdateInput{DefaultTravelMode: stringPtr("walking")}},
 	}
 
 	for _, tt := range tests {
@@ -1015,7 +1064,7 @@ func TestServiceUpdateValidation(t *testing.T) {
 
 func TestServiceUpdateRequiresOwner(t *testing.T) {
 	repo := &fakeRepository{
-		trip:      Trip{ID: testTripID, Name: "오사카", StartDate: "2026-07-10", EndDate: "2026-07-13", DefaultCurrency: "JPY"},
+		trip:      Trip{ID: testTripID, Name: "오사카", StartDate: "2026-07-10", EndDate: "2026-07-13", DefaultCurrency: "JPY", DefaultTravelMode: "transit"},
 		tripFound: true,
 		isOwner:   false,
 	}

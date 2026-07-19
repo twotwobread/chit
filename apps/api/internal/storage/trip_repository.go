@@ -108,11 +108,12 @@ func (s *Store) CreateTripWithOwner(ctx context.Context, record trip.CreateRecor
 
 	qtx := s.queries.WithTx(tx)
 	createdTrip, err := qtx.CreateTrip(ctx, db.CreateTripParams{
-		Name:            record.Name,
-		StartDate:       dateValue(record.StartDate),
-		EndDate:         dateValue(record.EndDate),
-		DefaultCurrency: record.DefaultCurrency,
-		Column5:         mustUUID(record.CreatedBy),
+		Name:              record.Name,
+		StartDate:         dateValue(record.StartDate),
+		EndDate:           dateValue(record.EndDate),
+		DefaultCurrency:   record.DefaultCurrency,
+		DefaultTravelMode: record.DefaultTravelMode,
+		Column6:           mustUUID(record.CreatedBy),
 	})
 	if err != nil {
 		return trip.CreateResult{}, err
@@ -159,15 +160,16 @@ func (s *Store) CreateTripWithOwner(ctx context.Context, record trip.CreateRecor
 
 	return trip.CreateResult{
 		Trip: trip.Trip{
-			ID:              createdTrip.ID,
-			Name:            createdTrip.Name,
-			StartDate:       dateString(createdTrip.StartDate),
-			EndDate:         dateString(createdTrip.EndDate),
-			DefaultCurrency: createdTrip.DefaultCurrency,
-			CreatedBy:       createdTrip.CreatedBy,
-			CreatedAt:       createdTrip.CreatedAt.Time,
-			UpdatedAt:       createdTrip.UpdatedAt.Time,
-			Destinations:    destinations,
+			ID:                createdTrip.ID,
+			Name:              createdTrip.Name,
+			StartDate:         dateString(createdTrip.StartDate),
+			EndDate:           dateString(createdTrip.EndDate),
+			DefaultCurrency:   createdTrip.DefaultCurrency,
+			DefaultTravelMode: createdTrip.DefaultTravelMode,
+			CreatedBy:         createdTrip.CreatedBy,
+			CreatedAt:         createdTrip.CreatedAt.Time,
+			UpdatedAt:         createdTrip.UpdatedAt.Time,
+			Destinations:      destinations,
 		},
 		OwnerParticipant: trip.Participant{
 			ID:          owner.ID,
@@ -195,15 +197,16 @@ func (s *Store) GetTripByID(ctx context.Context, tripID string) (trip.Trip, bool
 	}
 
 	return trip.Trip{
-		ID:              row.ID,
-		Name:            row.Name,
-		StartDate:       dateString(row.StartDate),
-		EndDate:         dateString(row.EndDate),
-		DefaultCurrency: row.DefaultCurrency,
-		CreatedBy:       row.CreatedBy,
-		CreatedAt:       row.CreatedAt.Time,
-		UpdatedAt:       row.UpdatedAt.Time,
-		Destinations:    destinations,
+		ID:                row.ID,
+		Name:              row.Name,
+		StartDate:         dateString(row.StartDate),
+		EndDate:           dateString(row.EndDate),
+		DefaultCurrency:   row.DefaultCurrency,
+		DefaultTravelMode: row.DefaultTravelMode,
+		CreatedBy:         row.CreatedBy,
+		CreatedAt:         row.CreatedAt.Time,
+		UpdatedAt:         row.UpdatedAt.Time,
+		Destinations:      destinations,
 	}, true, nil
 }
 
@@ -290,11 +293,12 @@ func (s *Store) UpdateTripBasicInfo(ctx context.Context, record trip.UpdateRecor
 
 	qtx := s.queries.WithTx(tx)
 	row, err := qtx.UpdateTripBasicInfo(ctx, db.UpdateTripBasicInfoParams{
-		Column1:         mustUUID(record.ID),
-		Name:            record.Name,
-		StartDate:       dateValue(record.StartDate),
-		EndDate:         dateValue(record.EndDate),
-		DefaultCurrency: record.DefaultCurrency,
+		Column1:           mustUUID(record.ID),
+		Name:              record.Name,
+		StartDate:         dateValue(record.StartDate),
+		EndDate:           dateValue(record.EndDate),
+		DefaultCurrency:   record.DefaultCurrency,
+		DefaultTravelMode: record.DefaultTravelMode,
 	})
 	if err != nil {
 		return trip.Trip{}, err
@@ -312,15 +316,16 @@ func (s *Store) UpdateTripBasicInfo(ctx context.Context, record trip.UpdateRecor
 	}
 
 	return trip.Trip{
-		ID:              row.ID,
-		Name:            row.Name,
-		StartDate:       dateString(row.StartDate),
-		EndDate:         dateString(row.EndDate),
-		DefaultCurrency: row.DefaultCurrency,
-		CreatedBy:       row.CreatedBy,
-		CreatedAt:       row.CreatedAt.Time,
-		UpdatedAt:       row.UpdatedAt.Time,
-		Destinations:    destinations,
+		ID:                row.ID,
+		Name:              row.Name,
+		StartDate:         dateString(row.StartDate),
+		EndDate:           dateString(row.EndDate),
+		DefaultCurrency:   row.DefaultCurrency,
+		DefaultTravelMode: row.DefaultTravelMode,
+		CreatedBy:         row.CreatedBy,
+		CreatedAt:         row.CreatedAt.Time,
+		UpdatedAt:         row.UpdatedAt.Time,
+		Destinations:      destinations,
 	}, nil
 }
 
@@ -568,16 +573,17 @@ func (s *Store) ListTripsByParticipantUser(ctx context.Context, userID string) (
 	trips := make([]trip.ListItem, 0, len(rows))
 	for _, row := range rows {
 		trips = append(trips, trip.ListItem{
-			ID:               row.ID,
-			ParticipantID:    row.ParticipantID,
-			Name:             row.Name,
-			StartDate:        dateString(row.StartDate),
-			EndDate:          dateString(row.EndDate),
-			DefaultCurrency:  row.DefaultCurrency,
-			JoinedAt:         row.JoinedAt.Time,
-			CreatedAt:        row.CreatedAt.Time,
-			MyRole:           row.MyRole,
-			ParticipantCount: int(row.ParticipantCount),
+			ID:                row.ID,
+			ParticipantID:     row.ParticipantID,
+			Name:              row.Name,
+			StartDate:         dateString(row.StartDate),
+			EndDate:           dateString(row.EndDate),
+			DefaultCurrency:   row.DefaultCurrency,
+			DefaultTravelMode: row.DefaultTravelMode,
+			JoinedAt:          row.JoinedAt.Time,
+			CreatedAt:         row.CreatedAt.Time,
+			MyRole:            row.MyRole,
+			ParticipantCount:  int(row.ParticipantCount),
 		})
 	}
 	return trips, nil

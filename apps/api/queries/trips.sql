@@ -4,13 +4,15 @@ INSERT INTO trips (
   start_date,
   end_date,
   default_currency,
+  default_travel_mode,
   created_by
 ) VALUES (
   $1,
   $2,
   $3,
   $4,
-  $5::uuid
+  $5,
+  $6::uuid
 )
 RETURNING
   id::text,
@@ -18,6 +20,7 @@ RETURNING
   start_date,
   end_date,
   default_currency,
+  default_travel_mode,
   created_by::text,
   created_at,
   updated_at;
@@ -107,6 +110,7 @@ SELECT
   start_date,
   end_date,
   default_currency,
+  default_travel_mode,
   created_by::text,
   created_at,
   updated_at
@@ -218,6 +222,7 @@ SELECT
   t.start_date,
   t.end_date,
   t.default_currency,
+  t.default_travel_mode,
   tp.joined_at,
   t.created_at,
   tp.role AS my_role,
@@ -238,6 +243,7 @@ SET
   start_date = $3,
   end_date = $4,
   default_currency = $5,
+  default_travel_mode = $6,
   updated_at = now()
 WHERE id = $1::uuid
 RETURNING
@@ -246,6 +252,7 @@ RETURNING
   start_date,
   end_date,
   default_currency,
+  default_travel_mode,
   created_by::text,
   created_at,
   updated_at;

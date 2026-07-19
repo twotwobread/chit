@@ -3,6 +3,7 @@
 /* tslint:disable */
 /* eslint-disable */
 import type { SupportedCurrency } from './SupportedCurrency';
+import type { TripDefaultTravelMode } from './TripDefaultTravelMode';
 import type { TripDestination } from './TripDestination';
 export type Trip = {
     id: string;
@@ -10,6 +11,7 @@ export type Trip = {
     startDate: string;
     endDate: string;
     defaultCurrency: SupportedCurrency;
+    defaultTravelMode: TripDefaultTravelMode;
     createdBy: string;
     createdAt: string;
     updatedAt: string;
