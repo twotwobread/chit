@@ -579,7 +579,7 @@ const styles = StyleSheet.create({
     paddingVertical: theme.space[4],
   },
   rowButton: {
-    minHeight: 36,
+    minHeight: theme.layout.tapMin,
     paddingHorizontal: theme.space[3],
     paddingVertical: theme.space[2],
   },

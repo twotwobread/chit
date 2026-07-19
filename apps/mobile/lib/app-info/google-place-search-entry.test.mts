@@ -130,6 +130,13 @@ describe('google place search native module entry setup', () => {
     assert.doesNotMatch(mapSearchSource, /styles\.searchResultsCloseButton/);
   });
 
+  it('keeps icon-only map search actions at the 44pt touch target floor', () => {
+    assertStyleContains(mapSearchSource, 'topSearchClearButton', /minHeight: theme\.layout\.tapMin/);
+    assertStyleContains(mapSearchSource, 'topSearchClearButton', /minWidth: theme\.layout\.tapMin/);
+    assertStyleContains(mapSearchSource, 'favoriteButton', /minHeight: theme\.layout\.tapMin/);
+    assertStyleContains(mapSearchSource, 'favoriteButton', /minWidth: theme\.layout\.tapMin/);
+  });
+
   it('keeps the top search margin equal to the horizontal screen margin', () => {
     assert.match(mapSearchSource, /paddingHorizontal: theme\.space\[3\]/);
     assert.match(mapSearchSource, /paddingTop: theme\.space\[3\]/);
@@ -198,3 +205,11 @@ describe('google place search native module entry setup', () => {
     assert.doesNotMatch(placeSearchSource, /batchFooterHeader/);
   });
 });
+
+function assertStyleContains(source: string, styleName: string, expected: RegExp): void {
+  const stylePattern = new RegExp(`${styleName}: \\{[\\s\\S]*?\\n  \\},`);
+  const match = source.match(stylePattern);
+
+  assert.ok(match, `${styleName} style should exist`);
+  assert.match(match[0], expected);
+}

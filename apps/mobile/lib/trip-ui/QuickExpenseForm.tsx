@@ -923,6 +923,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     flexDirection: 'row',
     gap: theme.space[2],
+    minHeight: theme.layout.tapMin,
     paddingLeft: theme.space[2],
     paddingRight: theme.space[4],
     paddingVertical: theme.space[2],
