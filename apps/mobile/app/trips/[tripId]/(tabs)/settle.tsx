@@ -5,7 +5,7 @@ import KakaoShareLink from 'react-native-kakao-share-link';
 
 import { SecondaryButton, theme } from '../../../../lib/design';
 import { TransferRow } from '../../../../lib/trip-ui/TransferRow';
-import { TripListCard, TripScreen, TripScreenHeader, TripStateCard } from '../../../../lib/trip-ui/TripScreenScaffold';
+import { TripListCard, TripScreen, TripStateCard } from '../../../../lib/trip-ui/TripScreenScaffold';
 import { getTripSettlement } from '../../../../lib/trips/settlement-api';
 import {
   buildKakaoSettlementRequestTemplate,
@@ -105,7 +105,6 @@ function SettlementContent({
 }) {
   return (
     <>
-      <TripScreenHeader helper="누가 누구에게 얼마를 보내면 되는지 확인해요." title="정산" />
       <TripListCard>
         <View style={styles.noticeCardContent}>
           <Text style={styles.noticeTitle}>현재 지출 기준 최신 정산이에요.</Text>

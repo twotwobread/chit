@@ -201,7 +201,6 @@ function ExpenseDashboardContent({
   if (viewModel.status === 'empty') {
     return (
       <>
-        <TripScreenHeader helper={viewModel.helper} title={viewModel.title} />
         <TripStateCard helper={viewModel.helper} title={viewModel.emptyTitle} />
       </>
     );
@@ -209,7 +208,6 @@ function ExpenseDashboardContent({
 
   return (
     <>
-      <TripScreenHeader helper={viewModel.helper} title={viewModel.title} />
       <ExpenseTotalCard viewModel={viewModel} />
       <ExpenseCategorySummaryCard categorySections={viewModel.categorySections} onOpenCategories={onOpenCategories} />
       <ExpenseRowsCard
