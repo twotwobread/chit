@@ -117,7 +117,13 @@ export function readDotenvFile(path) {
 export function buildStageConfig({ env }) {
   const merged = { ...env };
   const googleMapsApiKey = valueOrFallback(merged.GOOGLE_MAPS_API_KEY, merged.GOOGLE_PLACES_API_KEY, merged.GOOGLE_ROUTES_API_KEY);
-  const gcsBucket = valueOrFallback(merged.GCS_BUCKET, merged.BOARDING_PASS_GCS_BUCKET, merged.EXPENSE_RECEIPT_GCS_BUCKET);
+  const objectStorageProvider = valueOrDefault(merged.OBJECT_STORAGE_PROVIDER, 'gcs');
+  const objectStorageBucket = valueOrFallback(
+    merged.OBJECT_STORAGE_BUCKET,
+    merged.GCS_BUCKET,
+    merged.BOARDING_PASS_GCS_BUCKET,
+    merged.EXPENSE_RECEIPT_GCS_BUCKET,
+  );
   const gcsSigningAccessId = valueOrFallback(
     merged.GCS_SIGNING_ACCESS_ID,
     merged.BOARDING_PASS_GCS_SIGNING_ACCESS_ID,
@@ -150,7 +156,7 @@ export function buildStageConfig({ env }) {
     ['DATABASE_URL', merged.DATABASE_URL],
     ['AUTH_TOKEN_SECRET', merged.AUTH_TOKEN_SECRET],
     ['GOOGLE_MAPS_API_KEY', googleMapsApiKey],
-    ['GCS_BUCKET', gcsBucket],
+    ['OBJECT_STORAGE_BUCKET', objectStorageBucket],
     ['GCS_SIGNING_ACCESS_ID', gcsSigningAccessId],
     ['GCS_SIGNING_PRIVATE_KEY', gcsSigningPrivateKey],
     ['OPENAI_API_KEY', merged.OPENAI_API_KEY],
@@ -164,7 +170,8 @@ export function buildStageConfig({ env }) {
   const apiEnv = compactObject({
     AUTH_ALLOW_DEV_OAUTH: 'false',
     APPLE_CLIENT_ID: valueOrDefault(merged.APPLE_CLIENT_ID, appleBundleId),
-    GCS_BUCKET: optionalValue(gcsBucket),
+    OBJECT_STORAGE_PROVIDER: valueOrDefault(objectStorageProvider, 'gcs'),
+    OBJECT_STORAGE_BUCKET: optionalValue(objectStorageBucket),
     GCS_SIGNING_ACCESS_ID: optionalValue(gcsSigningAccessId),
     RECEIPT_OPENAI_MODEL: valueOrDefault(merged.RECEIPT_OPENAI_MODEL, 'gpt-4o-mini'),
     INVITE_BASE_URL: inviteBaseUrl,
@@ -302,6 +309,7 @@ export function legacyCloudRunEnvNames() {
     'APPLE_BUNDLE_ID',
     'GOOGLE_PLACES_API_KEY',
     'GOOGLE_ROUTES_API_KEY',
+    'GCS_BUCKET',
     'BOARDING_PASS_GCS_BUCKET',
     'BOARDING_PASS_GCS_SIGNING_ACCESS_ID',
     'BOARDING_PASS_GCS_SIGNING_PRIVATE_KEY',

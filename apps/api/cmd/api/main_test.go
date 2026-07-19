@@ -6,8 +6,30 @@ import (
 	"testing"
 )
 
-func TestGCSRuntimeConfigUsesCanonicalValuesForBothStores(t *testing.T) {
-	t.Setenv("GCS_BUCKET", "shared-bucket")
+func TestObjectStorageRuntimeConfigUsesCanonicalMinIOValues(t *testing.T) {
+	t.Setenv("OBJECT_STORAGE_PROVIDER", "minio")
+	t.Setenv("OBJECT_STORAGE_BUCKET", "ium-dev-objects")
+	t.Setenv("OBJECT_STORAGE_ENDPOINT", "http://localhost:9000")
+	t.Setenv("OBJECT_STORAGE_PUBLIC_ENDPOINT", "http://10.0.2.2:9000")
+	t.Setenv("OBJECT_STORAGE_ACCESS_KEY", "minioadmin")
+	t.Setenv("OBJECT_STORAGE_SECRET_KEY", "minioadmin")
+	t.Setenv("OBJECT_STORAGE_REGION", "us-east-1")
+	t.Setenv("OBJECT_STORAGE_FORCE_PATH_STYLE", "true")
+
+	config := objectStorageConfigFromEnv()
+
+	if config.Provider != "minio" || config.Bucket != "ium-dev-objects" || config.Endpoint != "http://localhost:9000" || config.PublicEndpoint != "http://10.0.2.2:9000" {
+		t.Fatalf("canonical MinIO config not applied: %#v", config)
+	}
+	if config.AccessKey != "minioadmin" || config.SecretKey != "minioadmin" || config.Region != "us-east-1" || !config.ForcePathStyle {
+		t.Fatalf("canonical MinIO credentials/options not applied: %#v", config)
+	}
+}
+
+func TestGCSRuntimeConfigUsesCanonicalBucketAndLegacySigningForBothStores(t *testing.T) {
+	t.Setenv("OBJECT_STORAGE_PROVIDER", "gcs")
+	t.Setenv("OBJECT_STORAGE_BUCKET", "shared-bucket")
+	t.Setenv("GCS_BUCKET", "legacy-bucket")
 	t.Setenv("GCS_SIGNING_ACCESS_ID", "signer@example.iam.gserviceaccount.com")
 	t.Setenv("GCS_SIGNING_PRIVATE_KEY", "private-key")
 	t.Setenv("BOARDING_PASS_GCS_BUCKET", "")
@@ -22,7 +44,7 @@ func TestGCSRuntimeConfigUsesCanonicalValuesForBothStores(t *testing.T) {
 
 	for name, config := range map[string]gcsObjectStoreEnvConfig{"boarding pass": boardingPass, "expense receipt": receipt} {
 		if config.Bucket != "shared-bucket" || config.SigningAccessID != "signer@example.iam.gserviceaccount.com" || config.SigningPrivateKey != "private-key" {
-			t.Fatalf("%s config did not use canonical GCS env: %#v", name, config)
+			t.Fatalf("%s config did not use canonical bucket with legacy GCS signing env: %#v", name, config)
 		}
 	}
 }

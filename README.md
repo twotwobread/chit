@@ -128,10 +128,16 @@ F-003부터 API 서버는 PostgreSQL `DATABASE_URL`을 사용합니다.
 export DATABASE_URL='postgres://ium:ium@localhost:5432/ium?sslmode=disable'
 ```
 
-로컬 PostgreSQL 실행:
+로컬 PostgreSQL만 실행:
 
 ```bash
 pnpm db:up
+```
+
+로컬 DB와 파일 업로드용 MinIO를 함께 실행:
+
+```bash
+pnpm dev:infra
 ```
 
 migration 적용/상태 확인/rollback:
@@ -142,11 +148,35 @@ DATABASE_URL='postgres://ium:ium@localhost:5432/ium?sslmode=disable' pnpm db:sta
 DATABASE_URL='postgres://ium:ium@localhost:5432/ium?sslmode=disable' pnpm db:rollback
 ```
 
-로컬 DB 중지:
+로컬 DB/MinIO 중지:
 
 ```bash
 pnpm db:down
 ```
+
+## Local Object Storage
+
+Local dev file uploads use docker-compose MinIO instead of real GCS credentials. `.env.example` defaults to:
+
+```bash
+export OBJECT_STORAGE_PROVIDER=minio
+export OBJECT_STORAGE_BUCKET=ium-dev-objects
+export OBJECT_STORAGE_ENDPOINT=http://localhost:9000
+export OBJECT_STORAGE_ACCESS_KEY=minioadmin
+export OBJECT_STORAGE_SECRET_KEY=minioadmin
+export OBJECT_STORAGE_REGION=us-east-1
+export OBJECT_STORAGE_FORCE_PATH_STYLE=true
+```
+
+Start only MinIO and bucket initialization when PostgreSQL is already running:
+
+```bash
+pnpm storage:up
+```
+
+MinIO console is available at `http://localhost:9001`. If a mobile client cannot open signed URLs from `localhost`, set `OBJECT_STORAGE_PUBLIC_ENDPOINT` to a client-reachable origin such as `http://10.0.2.2:9000` for Android Emulator.
+
+Staging/prod keep using GCS with `OBJECT_STORAGE_PROVIDER=gcs`, `OBJECT_STORAGE_BUCKET`, `GCS_SIGNING_ACCESS_ID`, and `GCS_SIGNING_PRIVATE_KEY`.
 
 ## Run API
 
@@ -259,4 +289,4 @@ pnpm run deploy stage --only mobile --platform android
 pnpm run deploy stage --only eas-env
 ```
 
-Do not commit `.env.stage` or paste its secret values into chat, issues, git, or logs. Server-side file upload/opening features use shared `GCS_BUCKET`, `GCS_SIGNING_ACCESS_ID`, and `GCS_SIGNING_PRIVATE_KEY`; the bucket must grant the Cloud Run runtime service account object read/write/delete access.
+Do not commit `.env.stage` or paste its secret values into chat, issues, git, or logs. Server-side file upload/opening features use shared `OBJECT_STORAGE_PROVIDER=gcs`, `OBJECT_STORAGE_BUCKET`, `GCS_SIGNING_ACCESS_ID`, and `GCS_SIGNING_PRIVATE_KEY`; the bucket must grant the Cloud Run runtime service account object read/write/delete access.

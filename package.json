@@ -6,6 +6,8 @@
     "generate": "pnpm --filter @i-um/api-contract generate && pnpm --filter @i-um/api generate",
     "dev:api": "pnpm --filter @i-um/api dev",
     "dev:mobile": "pnpm --filter @i-um/mobile start",
+    "dev:infra": "docker compose up -d db minio minio-init",
+    "storage:up": "docker compose up -d minio minio-init",
     "db:up": "docker compose up -d db",
     "db:down": "docker compose down",
     "db:migrate": "pnpm --filter @i-um/api db:migrate",
