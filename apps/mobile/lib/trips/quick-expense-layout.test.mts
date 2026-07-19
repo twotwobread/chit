@@ -29,3 +29,15 @@ test('Today quick expense legacy form uses shared Chit actions and accessible am
   assert.match(quickExpenseFormSource, /accessibilityLabel="영수증 다시 촬영"/, 'expected receipt retry action label');
   assert.match(quickExpenseFormSource, /accessibilityLabel="영수증 초안 해제"/, 'expected receipt clear action label');
 });
+
+test('quick expense participant chips preserve the 44pt touch target floor', () => {
+  assertStyleContains(quickExpenseFormSource, 'participantChip', /minHeight: theme\.layout\.tapMin/);
+});
+
+function assertStyleContains(source: string, styleName: string, expected: RegExp): void {
+  const stylePattern = new RegExp(`${styleName}: \\{[\\s\\S]*?\\n  \\},`);
+  const match = source.match(stylePattern);
+
+  assert.ok(match, `${styleName} style should exist`);
+  assert.match(match[0], expected);
+}

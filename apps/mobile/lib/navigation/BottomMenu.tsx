@@ -28,6 +28,7 @@ export function BottomMenu({ selected }: BottomMenuProps) {
 
         return (
           <Pressable
+            accessibilityLabel={tab.label}
             accessibilityRole="button"
             accessibilityState={{ selected: focused }}
             key={tab.id}

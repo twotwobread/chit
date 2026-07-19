@@ -45,6 +45,7 @@ export function DayChips({
         const selected = selectedDayIds ? selectedDayIds.includes(day.id) : day.id === selectedDayId;
         return (
           <Pressable
+            accessibilityLabel={buildDayChipAccessibilityLabel(day)}
             accessibilityRole="tab"
             accessibilityState={{ selected }}
             key={day.id}
@@ -78,6 +79,10 @@ export function DayChips({
       })}
     </ScrollView>
   );
+}
+
+function buildDayChipAccessibilityLabel(day: DayChip): string {
+  return [day.label, day.dateLabel, day.statusLabel].filter(Boolean).join(' ');
 }
 
 const styles = StyleSheet.create({

@@ -59,6 +59,7 @@ export function TripTabBar({ navigation, state }: TripTabBarProps) {
 
         return (
           <Pressable
+            accessibilityLabel={label}
             accessibilityRole="tab"
             accessibilityState={{ selected: focused }}
             key={route.key}

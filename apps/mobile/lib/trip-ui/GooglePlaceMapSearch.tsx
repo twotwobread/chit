@@ -1870,9 +1870,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: theme.color.surfaceSunken,
     borderRadius: theme.radius.pill,
-    height: 30,
     justifyContent: 'center',
-    width: 30,
+    minHeight: theme.layout.tapMin,
+    minWidth: theme.layout.tapMin,
   },
   topSearchClearButtonDisabled: {
     opacity: 0.45,
@@ -2259,9 +2259,9 @@ const styles = StyleSheet.create({
     borderColor: theme.color.borderSubtle,
     borderRadius: theme.radius.pill,
     borderWidth: 1,
-    height: 36,
     justifyContent: 'center',
-    width: 36,
+    minHeight: theme.layout.tapMin,
+    minWidth: theme.layout.tapMin,
   },
   favoriteButtonDisabled: {
     opacity: 0.48,

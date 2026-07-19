@@ -59,6 +59,7 @@ export function Chip({
 }) {
   return (
     <Pressable
+      accessibilityLabel={label}
       accessibilityRole="button"
       accessibilityState={{ selected }}
       onPress={onPress}
@@ -307,6 +308,7 @@ export function SegmentedControl({
 
         return (
           <Pressable
+            accessibilityLabel={option}
             accessibilityRole="tab"
             accessibilityState={{ disabled, selected: active }}
             disabled={disabled}
@@ -499,6 +501,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.pill,
     flex: 1,
     justifyContent: 'center',
+    minHeight: theme.layout.tapMin,
     paddingVertical: theme.space[3],
   },
   segmentItemActive: {

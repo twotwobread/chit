@@ -1250,7 +1250,7 @@ describe('google place search helpers', () => {
       topInset: theme.space[4] + theme.layout.controlHSm + theme.space[4],
     });
 
-    assert.deepEqual(buildGooglePlaceSearchSheetSnapPoints(metrics), [40, 157, 208]);
+    assert.deepEqual(buildGooglePlaceSearchSheetSnapPoints(metrics), [40, 157, 200]);
   });
 
   it('builds a current-location marker after locating the user', () => {

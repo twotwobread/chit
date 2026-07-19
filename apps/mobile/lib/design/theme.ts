@@ -172,7 +172,7 @@ export const layout = {
   padCard: 16,
   padCardLg: 20,
   tapMin: 44,
-  controlHSm: 36,
+  controlHSm: 44,
   controlH: 48,
   controlHLg: 56,
   screenMax: 420,

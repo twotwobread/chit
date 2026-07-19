@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
+import { theme } from '../design/theme';
+
 const componentSources = [
   '../design/components.tsx',
   '../design/primitives.tsx',
@@ -50,6 +52,16 @@ test('shared primary and secondary buttons use enterprise Chit action hierarchy'
   assert.match(source, /secondaryButtonText:[\s\S]*color: theme\.color\.textStrong/);
 });
 
+test('compact interactive controls keep the 44pt Chit touch target floor', () => {
+  const primitivesSource = readMobileSource('../design/primitives.tsx');
+
+  assert.ok(
+    theme.layout.controlHSm >= theme.layout.tapMin,
+    `compact controls must be at least ${theme.layout.tapMin}pt, got ${theme.layout.controlHSm}pt`,
+  );
+  assertStyleContains(primitivesSource, 'segmentItem', /minHeight: theme\.layout\.tapMin/);
+});
+
 test('selected bottom and trip tab surfaces use Acid fill with on-primary icon and label contrast', () => {
   const tabSelectionSource = readMobileSource('../navigation/tab-selection.ts');
   const bottomMenuSource = readMobileSource('../navigation/BottomMenu.tsx');
@@ -61,6 +73,22 @@ test('selected bottom and trip tab surfaces use Acid fill with on-primary icon a
   assert.match(bottomMenuSource, /selectedLabel:[\s\S]*color: theme\.color\.onPrimary/);
   assert.match(tripTabBarSource, /focused \? theme\.color\.onPrimary : theme\.color\.textFaint/);
   assert.match(tripTabBarSource, /labelActive:[\s\S]*color: theme\.color\.onPrimary/);
+});
+
+test('key tab and chip primitives expose explicit accessibility labels with selected state', () => {
+  const bottomMenuSource = readMobileSource('../navigation/BottomMenu.tsx');
+  const tripTabBarSource = readMobileSource('../navigation/TripTabBar.tsx');
+  const primitivesSource = readMobileSource('../design/primitives.tsx');
+  const dayChipsSource = readMobileSource('../trip-ui/DayChips.tsx');
+
+  assert.match(bottomMenuSource, /accessibilityLabel=\{tab\.label\}/);
+  assert.match(bottomMenuSource, /accessibilityState=\{\{ selected: focused \}\}/);
+  assert.match(tripTabBarSource, /accessibilityLabel=\{label\}/);
+  assert.match(tripTabBarSource, /accessibilityState=\{\{ selected: focused \}\}/);
+  assert.match(primitivesSource, /accessibilityLabel=\{label\}/);
+  assert.match(primitivesSource, /accessibilityLabel=\{option\}/);
+  assert.match(dayChipsSource, /accessibilityLabel=\{buildDayChipAccessibilityLabel\(day\)\}/);
+  assert.match(dayChipsSource, /accessibilityState=\{\{ selected \}\}/);
 });
 
 test('Issue 372 core journey surfaces do not introduce raw hex colors outside theme tokens', () => {
@@ -95,6 +123,12 @@ test('Issue 372 Today spend summary uses Paper Fintech surface and foundation ac
   assert.doesNotMatch(source, /card:\s*\{[\s\S]*?backgroundColor: theme\.color\.accentSoft/);
   assert.doesNotMatch(source, /theme\.color\.amber\[700\]/);
   assert.match(source, /<PrimaryButton[\s\S]*label=\{addLabel\}[\s\S]*onPress=\{onPressAdd\}/);
+});
+
+test('Today tab compact row actions preserve the 44pt touch target floor', () => {
+  const source = readMobileSource('../../app/trips/[tripId]/(tabs)/today.tsx');
+
+  assertStyleContains(source, 'rowButton', /minHeight: theme\.layout\.tapMin/);
 });
 
 test('Issue 372 My Page uses foundation buttons for simple state and section actions', () => {
