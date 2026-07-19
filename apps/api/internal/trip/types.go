@@ -142,6 +142,14 @@ type ReorderDayScheduleMoveInput struct {
 	ClientVersion int
 }
 
+type ReorderScheduleItemTimeUpdateInput struct {
+	ItemID            string
+	ExpectedStartTime *string
+	ExpectedEndTime   *string
+	StartTime         *string
+	EndTime           *string
+}
+
 type CreateRecord struct {
 	Name             string
 	StartDate        time.Time
@@ -200,10 +208,19 @@ type ReorderDayScheduleMoveRecord struct {
 	ClientVersion int
 }
 
+type ReorderScheduleItemTimeUpdateRecord struct {
+	ItemID            string
+	ExpectedStartTime *string
+	ExpectedEndTime   *string
+	StartTime         *string
+	EndTime           *string
+}
+
 type ReorderScheduleItemsRecord struct {
-	TripID    string
-	TripDayID string
-	Moves     []ReorderDayScheduleMoveRecord
+	TripID      string
+	TripDayID   string
+	Moves       []ReorderDayScheduleMoveRecord
+	TimeUpdates []ReorderScheduleItemTimeUpdateRecord
 }
 
 type MoveScheduleItemToDayInput struct {

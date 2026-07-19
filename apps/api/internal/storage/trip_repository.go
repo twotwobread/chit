@@ -2188,10 +2188,18 @@ func (s *Store) ReorderScheduleItems(ctx context.Context, record trip.ReorderSch
 	if err != nil {
 		return nil, err
 	}
+	if err := validateReorderScheduleItemTimeUpdateExpectations(current, record.TimeUpdates); err != nil {
+		return nil, err
+	}
 
 	for _, move := range record.Moves {
 		current, err = applyReorderMove(ctx, tx, record.TripID, record.TripDayID, current, move)
 		if err != nil {
+			return nil, err
+		}
+	}
+	for _, update := range record.TimeUpdates {
+		if err := updateScheduleItemTimesInReorder(ctx, tx, record.TripID, record.TripDayID, update); err != nil {
 			return nil, err
 		}
 	}
@@ -2548,9 +2556,11 @@ func (s *Store) DeleteScheduleItem(ctx context.Context, tripID string, tripDayID
 }
 
 type orderedScheduleRow struct {
-	ID      string
-	Rank    string
-	Version int
+	ID        string
+	Rank      string
+	Version   int
+	StartTime pgtype.Time
+	EndTime   pgtype.Time
 }
 
 type executionScheduleRow struct {
@@ -2590,7 +2600,7 @@ func loadExecutionScheduleRowsForUpdate(ctx context.Context, tx pgx.Tx, tripID s
 
 func loadOrderedScheduleRowsForUpdate(ctx context.Context, tx pgx.Tx, tripID string, date string) ([]orderedScheduleRow, error) {
 	rows, err := tx.Query(ctx, `
-		SELECT id::text, rank, version
+		SELECT id::text, rank, version, start_time, end_time
 		FROM schedule_items
 		WHERE trip_id = $1::uuid
 		  AND trip_day_id = $2::uuid
@@ -2606,7 +2616,7 @@ func loadOrderedScheduleRowsForUpdate(ctx context.Context, tx pgx.Tx, tripID str
 	ordered := make([]orderedScheduleRow, 0)
 	for rows.Next() {
 		var item orderedScheduleRow
-		if err := rows.Scan(&item.ID, &item.Rank, &item.Version); err != nil {
+		if err := rows.Scan(&item.ID, &item.Rank, &item.Version, &item.StartTime, &item.EndTime); err != nil {
 			return nil, err
 		}
 		ordered = append(ordered, item)
@@ -2615,6 +2625,51 @@ func loadOrderedScheduleRowsForUpdate(ctx context.Context, tx pgx.Tx, tripID str
 		return nil, err
 	}
 	return ordered, nil
+}
+
+func validateReorderScheduleItemTimeUpdateExpectations(current []orderedScheduleRow, updates []trip.ReorderScheduleItemTimeUpdateRecord) error {
+	if len(updates) == 0 {
+		return nil
+	}
+	for _, update := range updates {
+		index := indexOrderedScheduleItem(current, update.ItemID)
+		if index < 0 {
+			return trip.ErrConflict
+		}
+		row := current[index]
+		if !timeTextPtrEqualsSQL(row.StartTime, update.ExpectedStartTime) || !timeTextPtrEqualsSQL(row.EndTime, update.ExpectedEndTime) {
+			return trip.ErrConflict
+		}
+	}
+	return nil
+}
+
+func updateScheduleItemTimesInReorder(ctx context.Context, tx pgx.Tx, tripID string, tripDayID string, update trip.ReorderScheduleItemTimeUpdateRecord) error {
+	commandTag, err := tx.Exec(ctx, `
+		UPDATE schedule_items
+		SET start_time = $4::time,
+		    end_time = $5::time,
+		    updated_at = now()
+		WHERE trip_id = $1::uuid
+		  AND trip_day_id = $2::uuid
+		  AND id = $3::uuid
+		  AND deleted_at IS NULL
+	`, mustUUID(tripID), mustUUID(tripDayID), mustUUID(update.ItemID), timeTextPtrToSQL(update.StartTime), timeTextPtrToSQL(update.EndTime))
+	if err != nil {
+		return err
+	}
+	if commandTag.RowsAffected() != 1 {
+		return trip.ErrConflict
+	}
+	return nil
+}
+
+func timeTextPtrEqualsSQL(current pgtype.Time, expected *string) bool {
+	currentText := timeTextPtrFromSQL(current)
+	if currentText == nil || expected == nil {
+		return currentText == nil && expected == nil
+	}
+	return *currentText == *expected
 }
 
 type reorderMovePlan struct {

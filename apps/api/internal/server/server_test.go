@@ -3670,6 +3670,36 @@ func TestReorderScheduleItemsValidation(t *testing.T) {
 	}
 }
 
+func TestReorderScheduleItemsMapsTimeUpdates(t *testing.T) {
+	backend := newFakeAuthBackend()
+	ownerToken := loginTestUser(t, backend)
+	tripID := createTestTrip(t, backend, ownerToken)
+	first := createTestScheduleItem(t, backend, ownerToken, tripID, "2026-07-11", `{"name":"우메다","address":"Umeda","placeType":"sights"}`)
+	second := createTestScheduleItem(t, backend, ownerToken, tripID, "2026-07-11", `{"name":"도톤보리","address":"Dotonbori","placeType":"food"}`)
+
+	body := fmt.Sprintf(`{
+		"moves":[{"scheduleItemId":%q,"beforeScheduleItemId":%q,"afterScheduleItemId":null,"clientVersion":1}],
+		"timeUpdates":[{"scheduleItemId":%q,"expectedStartTime":"13:00","expectedEndTime":"15:00","startTime":"09:00","endTime":"11:00"}]
+	}`, second.ID, first.ID, second.ID)
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPatch, "/trips/"+tripID+"/days/2026-07-11/schedule-items/order", bytes.NewReader([]byte(body)))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", "Bearer "+ownerToken)
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusOK, recorder.Code, recorder.Body.String())
+	}
+	if len(backend.reorderRecord.TimeUpdates) != 1 {
+		t.Fatalf("expected one mapped time update, got %#v", backend.reorderRecord.TimeUpdates)
+	}
+	mapped := backend.reorderRecord.TimeUpdates[0]
+	if mapped.ItemID != second.ID || *mapped.ExpectedStartTime != "13:00" || *mapped.ExpectedEndTime != "15:00" || *mapped.StartTime != "09:00" || *mapped.EndTime != "11:00" {
+		t.Fatalf("unexpected mapped time update: %#v", mapped)
+	}
+}
+
 func TestReorderScheduleItemsNotFoundForbiddenAndConflict(t *testing.T) {
 	backend := newFakeAuthBackend()
 	ownerToken := loginTestUser(t, backend)
@@ -5095,6 +5125,7 @@ type fakeAuthBackend struct {
 	flights           map[string]flightdomain.FlightDetail
 	personalDetails   map[string]flightdomain.PersonalDetail
 	reorderErr        error
+	reorderRecord     tripdomain.ReorderScheduleItemsRecord
 	moveErr           error
 	arrivalErr        error
 	skipErr           error
@@ -6653,6 +6684,7 @@ func (b *fakeAuthBackend) GetScheduleItemByTripDayAndID(_ context.Context, tripI
 }
 
 func (b *fakeAuthBackend) ReorderScheduleItems(_ context.Context, record tripdomain.ReorderScheduleItemsRecord) ([]tripdomain.ScheduleItem, error) {
+	b.reorderRecord = record
 	if b.reorderErr != nil {
 		return nil, b.reorderErr
 	}

@@ -5930,6 +5930,40 @@ components:
           minimum: 1
           description: The moved item's optimistic locking version observed by the client.
       description: Ordered move operation. The server applies moves sequentially inside one transaction. `beforeScheduleItemId` and `afterScheduleItemId` cannot both be null, and all present ids must be distinct.
+    ReorderScheduleItemTimeUpdate:
+      type: object
+      additionalProperties: false
+      required:
+        - scheduleItemId
+        - expectedStartTime
+        - expectedEndTime
+        - startTime
+        - endTime
+      properties:
+        scheduleItemId:
+          type: string
+          description: Schedule item whose time range should be updated in the same reorder transaction.
+        expectedStartTime:
+          type: string
+          nullable: true
+          pattern: '^([01]\\d|2[0-3]):[0-5]\\d$'
+          description: Client-observed current local start time in HH:mm. Null means the item was untimed when observed.
+        expectedEndTime:
+          type: string
+          nullable: true
+          pattern: '^([01]\\d|2[0-3]):[0-5]\\d$'
+          description: Client-observed current local end time in HH:mm. Null means the item had no end time when observed.
+        startTime:
+          type: string
+          nullable: true
+          pattern: '^([01]\\d|2[0-3]):[0-5]\\d$'
+          description: Target local start time in HH:mm. Null clears both start and end time.
+        endTime:
+          type: string
+          nullable: true
+          pattern: '^([01]\\d|2[0-3]):[0-5]\\d$'
+          description: Target local end time in HH:mm. Must be later than startTime when present.
+      description: Optional schedule time update applied atomically with a Day reorder. Expected times must still match the current row before the update is applied.
     ReorderScheduleItemsRequest:
       type: object
       additionalProperties: false
@@ -5942,6 +5976,11 @@ components:
           description: Ordered same-Day move operations. Applying them sequentially must produce the client's final local order.
           items:
             $ref: '#/components/schemas/ReorderDayScheduleMove'
+        timeUpdates:
+          type: array
+          description: Optional time updates to apply atomically after the reorder moves. Used by timed-range drag reorder to preserve item durations and existing gaps.
+          items:
+            $ref: '#/components/schemas/ReorderScheduleItemTimeUpdate'
     ReorderScheduleItemsResponse:
       type: object
       required:

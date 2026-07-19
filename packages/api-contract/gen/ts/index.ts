@@ -116,6 +116,7 @@ export type { RefreshTokenRequest } from './models/RefreshTokenRequest';
 export type { ReorderDayScheduleMove } from './models/ReorderDayScheduleMove';
 export type { ReorderScheduleItemsRequest } from './models/ReorderScheduleItemsRequest';
 export type { ReorderScheduleItemsResponse } from './models/ReorderScheduleItemsResponse';
+export type { ReorderScheduleItemTimeUpdate } from './models/ReorderScheduleItemTimeUpdate';
 export type { RestoreScheduleItemResponse } from './models/RestoreScheduleItemResponse';
 export type { RoutablePlace } from './models/RoutablePlace';
 export type { RoutePreviewMap } from './models/RoutePreviewMap';

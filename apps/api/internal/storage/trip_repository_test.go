@@ -1512,6 +1512,90 @@ func TestReorderScheduleItemsAppliesMovesSequentiallyAndReturnsLatestOrder(t *te
 	}
 }
 
+func TestReorderScheduleItemsAppliesTimeUpdatesInSameTransaction(t *testing.T) {
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("DATABASE_URL is required for storage integration test")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	store, err := Open(ctx, databaseURL)
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer store.Close()
+
+	fixture := createReorderTimeUpdateFixture(t, ctx, store, "성공")
+
+	reordered, err := store.ReorderScheduleItems(ctx, trip.ReorderScheduleItemsRecord{
+		TripID:    fixture.tripID,
+		TripDayID: fixture.dayID,
+		Moves: []trip.ReorderDayScheduleMoveRecord{
+			{ItemID: fixture.itemIDs[1], AfterItemID: stringPtr(fixture.itemIDs[0]), ClientVersion: 1},
+		},
+		TimeUpdates: []trip.ReorderScheduleItemTimeUpdateRecord{
+			{ItemID: fixture.itemIDs[1], ExpectedStartTime: stringPtr("13:00"), ExpectedEndTime: stringPtr("15:00"), StartTime: stringPtr("09:00"), EndTime: stringPtr("11:00")},
+			{ItemID: fixture.itemIDs[0], ExpectedStartTime: stringPtr("09:00"), ExpectedEndTime: stringPtr("10:00"), StartTime: stringPtr("14:00"), EndTime: stringPtr("15:00")},
+		},
+	})
+	if err != nil {
+		t.Fatalf("reorder with time updates: %v", err)
+	}
+
+	if len(reordered) != 2 || reordered[0].ID != fixture.itemIDs[1] || reordered[1].ID != fixture.itemIDs[0] {
+		t.Fatalf("unexpected reordered response: %#v", reordered)
+	}
+	if reordered[0].StartTime == nil || *reordered[0].StartTime != "09:00" || reordered[0].EndTime == nil || *reordered[0].EndTime != "11:00" {
+		t.Fatalf("expected moved item updated time, got %#v", reordered[0])
+	}
+	if reordered[1].StartTime == nil || *reordered[1].StartTime != "14:00" || reordered[1].EndTime == nil || *reordered[1].EndTime != "15:00" {
+		t.Fatalf("expected second item updated time, got %#v", reordered[1])
+	}
+	assertPersistedReorderTimes(t, ctx, store, fixture.tripID, fixture.dayID, []persistedReorderTime{
+		{id: fixture.itemIDs[1], startTime: "09:00", endTime: "11:00"},
+		{id: fixture.itemIDs[0], startTime: "14:00", endTime: "15:00"},
+	})
+}
+
+func TestReorderScheduleItemsRejectsStaleTimeUpdateAndRollsBackMove(t *testing.T) {
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("DATABASE_URL is required for storage integration test")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	store, err := Open(ctx, databaseURL)
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer store.Close()
+
+	fixture := createReorderTimeUpdateFixture(t, ctx, store, "스테일")
+
+	_, err = store.ReorderScheduleItems(ctx, trip.ReorderScheduleItemsRecord{
+		TripID:    fixture.tripID,
+		TripDayID: fixture.dayID,
+		Moves: []trip.ReorderDayScheduleMoveRecord{
+			{ItemID: fixture.itemIDs[1], AfterItemID: stringPtr(fixture.itemIDs[0]), ClientVersion: 1},
+		},
+		TimeUpdates: []trip.ReorderScheduleItemTimeUpdateRecord{
+			{ItemID: fixture.itemIDs[1], ExpectedStartTime: stringPtr("12:00"), ExpectedEndTime: stringPtr("15:00"), StartTime: stringPtr("09:00"), EndTime: stringPtr("11:00")},
+		},
+	})
+	if !errors.Is(err, trip.ErrConflict) {
+		t.Fatalf("expected stale time update conflict, got %v", err)
+	}
+
+	assertPersistedReorderTimes(t, ctx, store, fixture.tripID, fixture.dayID, []persistedReorderTime{
+		{id: fixture.itemIDs[0], startTime: "09:00", endTime: "10:00"},
+		{id: fixture.itemIDs[1], startTime: "13:00", endTime: "15:00"},
+	})
+}
+
 func TestMoveScheduleItemToDayAppendsToTargetResetsStatusAndReanchorsExpenses(t *testing.T) {
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
@@ -3546,6 +3630,112 @@ func createReorderDayScheduleFixture(t *testing.T, ctx context.Context, store *S
 	}
 
 	return tripID, itemIDs, initialRanks
+}
+
+type reorderTimeUpdateFixture struct {
+	tripID  string
+	dayID   string
+	itemIDs []string
+}
+
+type persistedReorderTime struct {
+	id        string
+	startTime string
+	endTime   string
+}
+
+func createReorderTimeUpdateFixture(t *testing.T, ctx context.Context, store *Store, suffix string) reorderTimeUpdateFixture {
+	t.Helper()
+
+	var userID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO users (display_name)
+		VALUES ($1)
+		RETURNING id::text
+	`, "순서 시간 변경 테스트 "+suffix).Scan(&userID); err != nil {
+		t.Fatalf("insert user: %v", err)
+	}
+	t.Cleanup(func() { _, _ = store.pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1::uuid`, userID) })
+
+	var tripID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO trips (name, start_date, end_date, default_currency, created_by)
+		VALUES ($1, '2026-07-10', '2026-07-13', 'JPY', $2::uuid)
+		RETURNING id::text
+	`, "순서 시간 변경 테스트 여행 "+suffix, userID).Scan(&tripID); err != nil {
+		t.Fatalf("insert trip: %v", err)
+	}
+	dayID := tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-11")
+
+	items := []struct {
+		name      string
+		startTime string
+		endTime   string
+	}{
+		{name: "아침", startTime: "09:00", endTime: "10:00"},
+		{name: "오후", startTime: "13:00", endTime: "15:00"},
+	}
+	itemIDs := make([]string, 0, len(items))
+	for index, item := range items {
+		var placeID string
+		if err := store.pool.QueryRow(ctx, `
+			INSERT INTO trip_places (trip_id, name, address, place_type)
+			VALUES ($1::uuid, $2, $3, 'sights')
+			RETURNING id::text
+		`, tripID, item.name, item.name+" 주소").Scan(&placeID); err != nil {
+			t.Fatalf("insert trip place %d: %v", index, err)
+		}
+
+		var itemID string
+		rank := 1024 * (index + 1)
+		if err := store.pool.QueryRow(ctx, `
+			INSERT INTO schedule_items (trip_id, trip_day_id, trip_place_id, place_title, item_order, rank, version, start_time, end_time)
+			VALUES ($1::uuid, $2::uuid, $3::uuid, '장소 일정', $4, lpad($5::int::text, 19, '0'), 1, $6::time, $7::time)
+			RETURNING id::text
+		`, tripID, dayID, placeID, index+1, rank, item.startTime, item.endTime).Scan(&itemID); err != nil {
+			t.Fatalf("insert schedule item %d: %v", index, err)
+		}
+		itemIDs = append(itemIDs, itemID)
+	}
+
+	return reorderTimeUpdateFixture{tripID: tripID, dayID: dayID, itemIDs: itemIDs}
+}
+
+func assertPersistedReorderTimes(t *testing.T, ctx context.Context, store *Store, tripID string, dayID string, want []persistedReorderTime) {
+	t.Helper()
+
+	rows, err := store.pool.Query(ctx, `
+		SELECT id::text, to_char(start_time, 'HH24:MI'), to_char(end_time, 'HH24:MI')
+		FROM schedule_items
+		WHERE trip_id = $1::uuid
+		  AND trip_day_id = $2::uuid
+		  AND deleted_at IS NULL
+		ORDER BY rank ASC, id ASC
+	`, tripID, dayID)
+	if err != nil {
+		t.Fatalf("query persisted reorder times: %v", err)
+	}
+	defer rows.Close()
+
+	got := make([]persistedReorderTime, 0, len(want))
+	for rows.Next() {
+		var row persistedReorderTime
+		if err := rows.Scan(&row.id, &row.startTime, &row.endTime); err != nil {
+			t.Fatalf("scan persisted reorder times: %v", err)
+		}
+		got = append(got, row)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("iterate persisted reorder times: %v", err)
+	}
+	if len(got) != len(want) {
+		t.Fatalf("expected %d persisted rows, got %#v", len(want), got)
+	}
+	for index := range want {
+		if got[index] != want[index] {
+			t.Fatalf("unexpected persisted row %d: got %#v want %#v", index, got[index], want[index])
+		}
+	}
 }
 
 func installForcedReorderRankCollision(t *testing.T, ctx context.Context, store *Store, itemID string, collisionCount int) {

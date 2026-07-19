@@ -803,8 +803,21 @@ func (s apiServer) ReorderScheduleItems(w http.ResponseWriter, r *http.Request, 
 			ClientVersion: move.ClientVersion,
 		})
 	}
+	timeUpdates := []trip.ReorderScheduleItemTimeUpdateInput(nil)
+	if body.TimeUpdates != nil {
+		timeUpdates = make([]trip.ReorderScheduleItemTimeUpdateInput, 0, len(*body.TimeUpdates))
+		for _, update := range *body.TimeUpdates {
+			timeUpdates = append(timeUpdates, trip.ReorderScheduleItemTimeUpdateInput{
+				ItemID:            update.ScheduleItemId,
+				ExpectedStartTime: update.ExpectedStartTime,
+				ExpectedEndTime:   update.ExpectedEndTime,
+				StartTime:         update.StartTime,
+				EndTime:           update.EndTime,
+			})
+		}
+	}
 
-	result, err := s.trips.ReorderScheduleItems(r.Context(), authContext.UserID, tripId, tripDayId, moves)
+	result, err := s.trips.ReorderScheduleItems(r.Context(), authContext.UserID, tripId, tripDayId, moves, timeUpdates)
 	if err != nil {
 		writeDayScheduleReorderError(w, err)
 		return
