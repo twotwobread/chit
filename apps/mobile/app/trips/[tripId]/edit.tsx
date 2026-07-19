@@ -8,6 +8,7 @@ import { MobileAuthError } from '../../../lib/auth/client';
 import { getStoredSession } from '../../../lib/auth/session';
 import { Card, PrimaryButton, SecondaryButton, theme } from '../../../lib/design';
 import { KeyboardAwareFormScrollView } from '../../../lib/trip-ui/KeyboardAwareFormScrollView';
+import { StickyActionFooter, useStickyActionFooterLayout } from '../../../lib/trip-ui/StickyActionFooter';
 import { updateTrip } from '../../../lib/trips/trip-api';
 import { dateFromString, monthStringFromDate, todayString } from '../../../lib/trips/date';
 import { tripDetailPath } from '../../../lib/trips/routes';
@@ -97,6 +98,7 @@ export default function EditTripScreen() {
 
   const validationError = form ? validateTripBasicInfoForm(form) : null;
   const canSave = form ? canSubmitTripBasicInfoUpdate({ original, current: form, submitting }) : false;
+  const footerLayout = useStickyActionFooterLayout({ actionCount: 2 });
 
   const openDatePicker = (field: DateField) => {
     if (!form) {
@@ -179,145 +181,161 @@ export default function EditTripScreen() {
   };
 
   return (
-    <KeyboardAwareFormScrollView contentContainerStyle={styles.scrollContent} style={styles.scroll}>
-      <View style={styles.header}>
-        <Text style={styles.title}>여행 정보 수정</Text>
-        <Text style={styles.subtitle}>이름, 기간, 기본 통화와 이동 방식을 바꿀 수 있어요.</Text>
-      </View>
+    <View style={styles.screenRoot}>
+      <KeyboardAwareFormScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardFixedBottomOffset={footerLayout.keyboardFixedBottomOffset}
+        keyboardMinClearance={footerLayout.keyboardMinClearance}
+        style={styles.scroll}
+      >
+        <View style={styles.header}>
+          <Text style={styles.title}>여행 정보 수정</Text>
+          <Text style={styles.subtitle}>이름, 기간, 기본 통화와 이동 방식을 바꿀 수 있어요.</Text>
+        </View>
 
-      {loadState === 'loading' ? (
-        <Card>
-          <ActivityIndicator color={theme.color.primary} />
-          <Text style={styles.message}>여행 정보를 불러오는 중...</Text>
-        </Card>
-      ) : null}
+        {loadState === 'loading' ? (
+          <Card>
+            <ActivityIndicator color={theme.color.primary} />
+            <Text style={styles.message}>여행 정보를 불러오는 중...</Text>
+          </Card>
+        ) : null}
 
-      {loadState === 'auth' ? (
-        <Card>
-          <Text style={styles.errorTitle}>다시 로그인해주세요.</Text>
-          <PrimaryButton label="로그인하기" onPress={() => router.replace('/login')} />
-        </Card>
-      ) : null}
+        {loadState === 'auth' ? (
+          <Card>
+            <Text style={styles.errorTitle}>다시 로그인해주세요.</Text>
+            <PrimaryButton label="로그인하기" onPress={() => router.replace('/login')} />
+          </Card>
+        ) : null}
 
-      {loadState === 'notFound' ? (
-        <Card>
-          <Text style={styles.errorTitle}>여행을 찾을 수 없어요.</Text>
-          <Text style={styles.message}>삭제되었거나 접근할 수 없는 여행이에요.</Text>
-          <PrimaryButton label="홈으로" onPress={() => router.replace('/')} />
-        </Card>
-      ) : null}
+        {loadState === 'notFound' ? (
+          <Card>
+            <Text style={styles.errorTitle}>여행을 찾을 수 없어요.</Text>
+            <Text style={styles.message}>삭제되었거나 접근할 수 없는 여행이에요.</Text>
+            <PrimaryButton label="홈으로" onPress={() => router.replace('/')} />
+          </Card>
+        ) : null}
 
-      {loadState === 'error' ? (
-        <Card>
-          <Text style={styles.errorTitle}>여행 정보를 불러올 수 없어요.</Text>
-          <Text style={styles.message}>잠시 후 다시 시도해주세요.</Text>
-          <PrimaryButton label="다시 시도" onPress={() => void load()} />
-        </Card>
-      ) : null}
+        {loadState === 'error' ? (
+          <Card>
+            <Text style={styles.errorTitle}>여행 정보를 불러올 수 없어요.</Text>
+            <Text style={styles.message}>잠시 후 다시 시도해주세요.</Text>
+            <PrimaryButton label="다시 시도" onPress={() => void load()} />
+          </Card>
+        ) : null}
 
-      {loadState === 'ready' && form ? (
-        <Card>
-          <TripFormField label="여행 이름">
-            <TextInput
-              editable={!submitting}
-              onChangeText={(name) => {
-                setForm((current) => (current ? { ...current, name } : current));
-                setSaveError(null);
-              }}
-              placeholder="예: 오사카 3박 4일"
-              placeholderTextColor={theme.color.textFaint}
-              style={styles.input}
-              value={form.name}
-            />
-          </TripFormField>
+        {loadState === 'ready' && form ? (
+          <Card>
+            <TripFormField label="여행 이름">
+              <TextInput
+                editable={!submitting}
+                onChangeText={(name) => {
+                  setForm((current) => (current ? { ...current, name } : current));
+                  setSaveError(null);
+                }}
+                placeholder="예: 오사카 3박 4일"
+                placeholderTextColor={theme.color.textFaint}
+                style={styles.input}
+                value={form.name}
+              />
+            </TripFormField>
 
-          <TripFormField label="시작일">
-            <TripDateFieldButton
-              disabled={submitting}
-              onPress={() => openDatePicker('startDate')}
-              value={form.startDate}
-            />
-          </TripFormField>
+            <TripFormField label="시작일">
+              <TripDateFieldButton
+                disabled={submitting}
+                onPress={() => openDatePicker('startDate')}
+                value={form.startDate}
+              />
+            </TripFormField>
 
-          <TripFormField label="종료일">
-            <TripDateFieldButton disabled={submitting} onPress={() => openDatePicker('endDate')} value={form.endDate} />
-          </TripFormField>
+            <TripFormField label="종료일">
+              <TripDateFieldButton
+                disabled={submitting}
+                onPress={() => openDatePicker('endDate')}
+                value={form.endDate}
+              />
+            </TripFormField>
 
-          {activeDateField ? (
-            <TripDatePicker
-              helperText="기간은 시작일이 종료일보다 늦지 않게 저장돼요."
-              label={activeDateField === 'startDate' ? '시작일 선택' : '종료일 선택'}
-              month={calendarMonth}
-              onClose={() => setActiveDateField(null)}
-              onMonthChange={setCalendarMonth}
-              onSelect={selectDate}
-              selectedDate={activeDateField === 'startDate' ? form.startDate : form.endDate}
-              yearOptionRadius={yearOptionRadius}
-            />
-          ) : null}
+            {activeDateField ? (
+              <TripDatePicker
+                helperText="기간은 시작일이 종료일보다 늦지 않게 저장돼요."
+                label={activeDateField === 'startDate' ? '시작일 선택' : '종료일 선택'}
+                month={calendarMonth}
+                onClose={() => setActiveDateField(null)}
+                onMonthChange={setCalendarMonth}
+                onSelect={selectDate}
+                selectedDate={activeDateField === 'startDate' ? form.startDate : form.endDate}
+                yearOptionRadius={yearOptionRadius}
+              />
+            ) : null}
 
-          <View style={styles.field}>
-            <Text style={styles.label}>기본 통화</Text>
-            <View style={styles.currencyRow}>
-              {supportedCurrencies.map((currency) => {
-                const selected = form.defaultCurrency === currency;
-                return (
+            <View style={styles.field}>
+              <Text style={styles.label}>기본 통화</Text>
+              <View style={styles.currencyRow}>
+                {supportedCurrencies.map((currency) => {
+                  const selected = form.defaultCurrency === currency;
+                  return (
+                    <Pressable
+                      accessibilityRole="button"
+                      disabled={submitting}
+                      key={currency}
+                      onPress={() => {
+                        setForm((current) => (current ? { ...current, defaultCurrency: currency } : current));
+                        setSaveError(null);
+                      }}
+                      style={[
+                        styles.currencyChip,
+                        selected ? styles.currencyChipSelected : null,
+                        submitting ? styles.disabledButton : null,
+                      ]}
+                    >
+                      <Text style={[styles.currencyText, selected ? styles.currencyTextSelected : null]}>
+                        {currency}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+
+            <View style={styles.field}>
+              <Text style={styles.label}>이동 방식</Text>
+              <Text style={styles.fieldHelperText}>일정 이동 시간 계산에 기본으로 사용할 방식을 선택해요.</Text>
+              <View style={styles.currencyRow}>
+                {buildTripDefaultTravelModeSelectorViewModel(form.defaultTravelMode).options.map((option) => (
                   <Pressable
+                    accessibilityLabel={option.accessibilityLabel}
                     accessibilityRole="button"
+                    accessibilityState={option.accessibilityState}
                     disabled={submitting}
-                    key={currency}
+                    key={option.mode}
                     onPress={() => {
-                      setForm((current) => (current ? { ...current, defaultCurrency: currency } : current));
+                      setForm((current) => (current ? { ...current, defaultTravelMode: option.mode } : current));
                       setSaveError(null);
                     }}
                     style={[
                       styles.currencyChip,
-                      selected ? styles.currencyChipSelected : null,
+                      option.selected ? styles.currencyChipSelected : null,
                       submitting ? styles.disabledButton : null,
                     ]}
                   >
-                    <Text style={[styles.currencyText, selected ? styles.currencyTextSelected : null]}>{currency}</Text>
+                    <Text style={[styles.currencyText, option.selected ? styles.currencyTextSelected : null]}>
+                      {option.label}
+                    </Text>
                   </Pressable>
-                );
-              })}
+                ))}
+              </View>
             </View>
-          </View>
 
-          <View style={styles.field}>
-            <Text style={styles.label}>이동 방식</Text>
-            <Text style={styles.fieldHelperText}>일정 이동 시간 계산에 기본으로 사용할 방식을 선택해요.</Text>
-            <View style={styles.currencyRow}>
-              {buildTripDefaultTravelModeSelectorViewModel(form.defaultTravelMode).options.map((option) => (
-                <Pressable
-                  accessibilityLabel={option.accessibilityLabel}
-                  accessibilityRole="button"
-                  accessibilityState={option.accessibilityState}
-                  disabled={submitting}
-                  key={option.mode}
-                  onPress={() => {
-                    setForm((current) => (current ? { ...current, defaultTravelMode: option.mode } : current));
-                    setSaveError(null);
-                  }}
-                  style={[
-                    styles.currencyChip,
-                    option.selected ? styles.currencyChipSelected : null,
-                    submitting ? styles.disabledButton : null,
-                  ]}
-                >
-                  <Text style={[styles.currencyText, option.selected ? styles.currencyTextSelected : null]}>
-                    {option.label}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
-
-          {validationError ? <Text style={styles.errorText}>{validationError}</Text> : null}
-          {!validationError && original && !canSave ? (
-            <Text style={styles.helperText}>변경된 내용이 없어요.</Text>
-          ) : null}
-          {saveError ? <Text style={styles.errorText}>{saveError}</Text> : null}
-
+            {validationError ? <Text style={styles.errorText}>{validationError}</Text> : null}
+            {!validationError && original && !canSave ? (
+              <Text style={styles.helperText}>변경된 내용이 없어요.</Text>
+            ) : null}
+            {saveError ? <Text style={styles.errorText}>{saveError}</Text> : null}
+          </Card>
+        ) : null}
+      </KeyboardAwareFormScrollView>
+      {loadState === 'ready' && form ? (
+        <StickyActionFooter actionCount={2} layout={footerLayout}>
           <PrimaryButton
             disabled={!canSave}
             label="저장하기"
@@ -325,11 +343,10 @@ export default function EditTripScreen() {
             loadingLabel="저장하는 중..."
             onPress={() => void submit()}
           />
-
           <SecondaryButton disabled={submitting} label="취소" onPress={returnToDetail} />
-        </Card>
+        </StickyActionFooter>
       ) : null}
-    </KeyboardAwareFormScrollView>
+    </View>
   );
 }
 
@@ -338,6 +355,10 @@ function editTripShellFailureState(status: 'auth' | 'notFound' | 'error'): LoadS
 }
 
 const styles = StyleSheet.create({
+  screenRoot: {
+    backgroundColor: theme.color.bg,
+    flex: 1,
+  },
   scroll: {
     flex: 1,
     backgroundColor: theme.color.bg,

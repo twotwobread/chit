@@ -1,9 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 
 import type { AuthMeResponse, AuthProvider } from '@i-um/api-contract';
 
+import { AccountDeletionSection } from '../lib/auth/account-deletion-section';
+import {
+  createAccountDeletionFlow,
+  type AccountDeletionFlow,
+  type AccountDeletionStatus,
+} from '../lib/auth/account-deletion-flow';
 import {
   deleteAccountWithRefresh,
   getMeWithRefresh,
@@ -12,16 +18,11 @@ import {
   MobileAuthError,
   updateDisplayNameWithRefresh,
 } from '../lib/auth/client';
-import { AccountDeletionSection } from '../lib/auth/account-deletion-section';
-import {
-  createAccountDeletionFlow,
-  type AccountDeletionFlow,
-  type AccountDeletionStatus,
-} from '../lib/auth/account-deletion-flow';
 import { normalizeDisplayNameInput } from '../lib/auth/display-name';
 import { createLogoutFlow, type LogoutFlow } from '../lib/auth/logout-flow';
 import { getOAuthCredential, getVisibleOAuthProviderConfigs } from '../lib/auth/oauth';
-import { theme } from '../lib/design';
+import { ProfileCard, SettingRow, SettingsList, type AccountProvider } from '../lib/account-ui/AccountRows';
+import { Card, PrimaryButton, SecondaryButton, theme } from '../lib/design';
 import { KeyboardAwareFormScrollView } from '../lib/trip-ui/KeyboardAwareFormScrollView';
 
 type AccountState =
@@ -89,7 +90,7 @@ export default function AccountScreen() {
       const credential = await getOAuthCredential(provider);
       await linkOAuthProvider(provider, credential);
       const me = await getMeWithRefresh();
-      setState({ status: 'ready', me, message: '로그인 방법이 연결되었습니다.' });
+      setState({ status: 'ready', me, message: '로그인 방법이 연결되었어요.' });
     } catch (error) {
       setState({ status: 'ready', me: state.me, message: linkErrorMessage(error) });
     }
@@ -204,30 +205,43 @@ export default function AccountScreen() {
 
   return (
     <KeyboardAwareFormScrollView contentContainerStyle={styles.container} style={styles.screen}>
-      <Text style={styles.title}>계정</Text>
+      <View style={styles.header}>
+        <Text style={styles.eyebrow}>ACCOUNT</Text>
+        <Text style={styles.title}>계정</Text>
+        <Text style={styles.subtitle}>로그인 방법과 내 정보를 한눈에 확인해요.</Text>
+      </View>
 
       {state.status === 'loading' ? (
-        <View style={styles.card}>
+        <Card>
           <ActivityIndicator color={theme.color.primary} />
-          <Text style={styles.message}>계정 정보를 확인 중...</Text>
-        </View>
+          <Text style={styles.message}>계정 정보를 확인 중이에요.</Text>
+        </Card>
       ) : null}
 
       {state.status === 'error' ? (
-        <View style={styles.card}>
+        <Card>
           <Text style={styles.errorTitle}>{state.message}</Text>
-          <Pressable accessibilityRole="button" onPress={() => router.replace('/login')} style={styles.button}>
-            <Text style={styles.buttonText}>로그인하기</Text>
-          </Pressable>
-        </View>
+          <Text style={styles.message}>계정 설정을 보려면 로그인이 필요해요.</Text>
+          <PrimaryButton label="로그인하기" onPress={() => router.replace('/login')} />
+        </Card>
       ) : null}
 
       {state.status === 'ready' ? (
-        <View style={styles.card}>
-          <View style={styles.nameSection}>
-            <Text style={styles.sectionTitle}>내 이름</Text>
-            {isEditingName ? (
-              <>
+        <View style={styles.readyStack}>
+          <ProfileCard
+            helperLabel={linkedProvidersSummary(state.me.linkedProviders)}
+            name={state.me.user.displayName}
+            onEdit={startEditingName}
+            provider={primaryAccountProvider(state.me.linkedProviders)}
+          />
+
+          {isEditingName ? (
+            <Card style={styles.formCard}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>내 이름 수정</Text>
+                <Text style={styles.helperText}>여행 참여자와 정산 화면에 표시되는 이름이에요.</Text>
+              </View>
+              <View style={styles.fieldGroup}>
                 <Text style={styles.inputLabel}>이름</Text>
                 <TextInput
                   accessibilityLabel="이름"
@@ -239,67 +253,59 @@ export default function AccountScreen() {
                   value={draftDisplayName}
                 />
                 {nameError ? <Text style={styles.errorMessage}>{nameError}</Text> : null}
-                <View style={styles.row}>
-                  <Pressable
-                    accessibilityRole="button"
-                    disabled={isSavingName}
-                    onPress={() => void saveDisplayName()}
-                    style={[styles.button, isSavingName ? styles.disabledButton : null]}
-                  >
-                    <Text style={styles.buttonText}>{isSavingName ? '저장 중...' : '저장'}</Text>
-                  </Pressable>
-                  <Pressable
-                    accessibilityRole="button"
-                    disabled={isSavingName}
-                    onPress={cancelEditingName}
-                    style={[styles.secondaryButton, isSavingName ? styles.disabledButton : null]}
-                  >
-                    <Text style={styles.secondaryButtonText}>취소</Text>
-                  </Pressable>
-                </View>
-              </>
-            ) : (
-              <>
-                <Text style={styles.profileName}>{state.me.user.displayName}</Text>
-                <Pressable accessibilityRole="button" onPress={startEditingName} style={styles.secondaryButton}>
-                  <Text style={styles.secondaryButtonText}>이름 수정</Text>
-                </Pressable>
-              </>
-            )}
-          </View>
+              </View>
+              <View style={styles.actionRow}>
+                <PrimaryButton
+                  disabled={isSavingName}
+                  label="저장"
+                  loading={isSavingName}
+                  loadingLabel="저장 중..."
+                  onPress={() => void saveDisplayName()}
+                  style={styles.actionButton}
+                />
+                <SecondaryButton
+                  disabled={isSavingName}
+                  label="취소"
+                  onPress={cancelEditingName}
+                  style={styles.actionButton}
+                />
+              </View>
+            </Card>
+          ) : null}
 
-          <Text style={styles.message}>연결된 로그인: {state.me.linkedProviders.join(', ')}</Text>
+          {state.message ? (
+            <Card style={styles.noticeCard}>
+              <Text accessibilityLiveRegion="polite" style={styles.message}>
+                {state.message}
+              </Text>
+            </Card>
+          ) : null}
 
-          {providers.map((provider) => {
-            const linked = state.me.linkedProviders.includes(provider.id);
-            return (
-              <Pressable
-                accessibilityRole="button"
-                disabled={linked}
-                key={provider.id}
-                onPress={() => void linkProvider(provider.id)}
-                style={[styles.secondaryButton, linked ? styles.disabledButton : null]}
-              >
-                <Text style={styles.secondaryButtonText}>{provider.linkLabel(provider, linked)}</Text>
-              </Pressable>
-            );
-          })}
+          <SettingsList title="로그인 방법">
+            {providers.map((provider, index) => {
+              const linked = state.me.linkedProviders.includes(provider.id);
+              return (
+                <SettingRow
+                  affordance={linked ? '연결됨' : '연결하기'}
+                  disabled={linked}
+                  first={index === 0}
+                  key={provider.id}
+                  label={provider.linkLabel(provider, linked)}
+                  onPress={linked ? () => undefined : () => void linkProvider(provider.id)}
+                />
+              );
+            })}
+          </SettingsList>
 
-          {state.message ? <Text style={styles.message}>{state.message}</Text> : null}
-
-          <View style={styles.row}>
-            <Pressable accessibilityRole="button" onPress={() => router.back()} style={styles.secondaryButton}>
-              <Text style={styles.secondaryButtonText}>뒤로</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
+          <SettingsList title="계정 작업">
+            <SettingRow first label="이전 화면" onPress={() => router.back()} />
+            <SettingRow
+              affordance={isLoggingOut ? '진행 중' : '로그아웃'}
               disabled={isLoggingOut}
+              label="로그아웃"
               onPress={() => void logout()}
-              style={[styles.button, isLoggingOut ? styles.disabledButton : null]}
-            >
-              <Text style={styles.buttonText}>{isLoggingOut ? '로그아웃 중...' : '로그아웃'}</Text>
-            </Pressable>
-          </View>
+            />
+          </SettingsList>
 
           <AccountDeletionSection
             error={deletionError}
@@ -314,93 +320,63 @@ export default function AccountScreen() {
   );
 }
 
+function primaryAccountProvider(linkedProviders: AuthProvider[]): AccountProvider {
+  if (linkedProviders.includes('apple')) {
+    return 'apple';
+  }
+  return 'kakao';
+}
+
+function linkedProvidersSummary(linkedProviders: AuthProvider[]): string {
+  if (linkedProviders.length === 0) {
+    return '연결된 로그인 방법이 없어요.';
+  }
+  return `연결된 로그인 ${linkedProviders.map(providerLabel).join(' · ')}`;
+}
+
+function providerLabel(provider: AuthProvider): string {
+  if (provider === 'apple') {
+    return 'Apple';
+  }
+  if (provider === 'kakao') {
+    return '카카오';
+  }
+  return provider;
+}
+
 function linkErrorMessage(error: unknown): string {
   if (error instanceof MobileAuthError) {
     if (error.code === 'PROVIDER_ALREADY_LINKED') {
-      return '이미 다른 계정에 연결된 로그인 방법입니다.';
+      return '이미 다른 계정에 연결된 로그인 방법이에요.';
     }
     if (error.code === 'INVALID_PROVIDER_TOKEN') {
       return '로그인 정보를 확인할 수 없어요. 다시 시도해주세요.';
     }
   }
-  return '로그인 방법 연결에 실패했어요. 다시 시도해주세요.';
+  return '로그인 방법 연결에 실패했어요. 잠시 후 다시 시도해주세요.';
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    backgroundColor: theme.color.bg,
+  actionButton: {
+    flex: 1,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    gap: theme.space[3],
   },
   container: {
-    flexGrow: 1,
     alignItems: 'center',
-    justifyContent: 'center',
     backgroundColor: theme.color.bg,
-    padding: theme.space[7],
+    flexGrow: 1,
+    gap: theme.space[5],
+    padding: theme.space[5],
+    paddingBottom: theme.space[8],
+    paddingTop: theme.space[7],
   },
-  title: {
-    color: theme.color.textStrong,
-    fontFamily: theme.font.family.bold,
-    fontSize: theme.font.size.titleLg,
-    fontWeight: theme.font.weight.bold,
-    marginBottom: theme.space[7],
-  },
-  card: {
-    width: '100%',
-    maxWidth: theme.layout.cardMaxW,
-    alignItems: 'center',
-    backgroundColor: theme.color.surface,
-    borderColor: theme.color.borderSubtle,
-    borderRadius: theme.radius.lg,
-    borderWidth: 1,
-    gap: theme.layout.gapCard,
-    padding: theme.space[7],
-    ...theme.shadow.sm,
-  },
-  row: {
-    flexDirection: 'row',
-    gap: theme.space[4],
-  },
-  nameSection: {
-    alignItems: 'center',
-    gap: theme.space[3],
-    width: '100%',
-  },
-  sectionTitle: {
-    color: theme.color.textStrong,
-    fontFamily: theme.font.family.bold,
-    fontSize: theme.font.size.headline,
-    fontWeight: theme.font.weight.bold,
-    textAlign: 'center',
-  },
-  profileName: {
-    color: theme.color.textStrong,
-    fontFamily: theme.font.family.bold,
-    fontSize: theme.font.size.title,
-    fontWeight: theme.font.weight.bold,
-    textAlign: 'center',
-  },
-  inputLabel: {
-    alignSelf: 'stretch',
-    color: theme.color.textBody,
-    fontFamily: theme.font.family.bold,
-    fontWeight: theme.font.weight.bold,
-  },
-  input: {
-    alignSelf: 'stretch',
-    backgroundColor: theme.color.surfaceSunken,
-    borderColor: theme.color.borderDefault,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    color: theme.color.textStrong,
+  errorMessage: {
+    color: theme.color.danger,
     fontFamily: theme.font.family.regular,
-    minHeight: theme.layout.controlH,
-    paddingHorizontal: theme.space[4],
-    paddingVertical: theme.space[3],
-  },
-  message: {
-    color: theme.color.textBody,
-    fontFamily: theme.font.family.regular,
-    textAlign: 'center',
+    lineHeight: theme.font.size.body * theme.font.leading.normal,
   },
   errorTitle: {
     color: theme.color.danger,
@@ -409,41 +385,88 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.bold,
     textAlign: 'center',
   },
-  errorMessage: {
-    color: theme.color.danger,
-    fontFamily: theme.font.family.regular,
-    textAlign: 'center',
-  },
-  button: {
-    backgroundColor: theme.color.primary,
-    borderRadius: theme.radius.md,
-    justifyContent: 'center',
-    minHeight: theme.layout.controlH,
-    paddingHorizontal: theme.space[5],
-    paddingVertical: theme.space[3],
-  },
-  buttonText: {
-    color: theme.color.onPrimary,
+  eyebrow: {
+    color: theme.color.textMuted,
     fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.micro,
     fontWeight: theme.font.weight.bold,
+    letterSpacing: 1.2,
     textAlign: 'center',
   },
-  secondaryButton: {
-    borderColor: theme.color.primary,
+  fieldGroup: {
+    gap: theme.space[2],
+  },
+  formCard: {
+    maxWidth: theme.layout.cardMaxW,
+  },
+  header: {
+    gap: theme.space[2],
+    maxWidth: theme.layout.cardMaxW,
+    width: '100%',
+  },
+  helperText: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.body,
+    lineHeight: theme.font.size.body * theme.font.leading.normal,
+  },
+  input: {
+    backgroundColor: theme.color.surfaceSunken,
+    borderColor: theme.color.borderDefault,
     borderRadius: theme.radius.md,
     borderWidth: 1,
-    justifyContent: 'center',
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.body,
     minHeight: theme.layout.controlH,
-    paddingHorizontal: theme.space[5],
+    paddingHorizontal: theme.space[4],
     paddingVertical: theme.space[3],
   },
-  secondaryButtonText: {
-    color: theme.color.primary,
+  inputLabel: {
+    color: theme.color.textBody,
     fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.label,
     fontWeight: theme.font.weight.bold,
+  },
+  message: {
+    color: theme.color.textBody,
+    fontFamily: theme.font.family.regular,
+    lineHeight: theme.font.size.body * theme.font.leading.normal,
     textAlign: 'center',
   },
-  disabledButton: {
-    opacity: 0.5,
+  noticeCard: {
+    paddingVertical: theme.space[4],
+  },
+  readyStack: {
+    alignItems: 'center',
+    gap: theme.space[5],
+    width: '100%',
+  },
+  screen: {
+    backgroundColor: theme.color.bg,
+  },
+  sectionHeader: {
+    gap: theme.space[2],
+  },
+  sectionTitle: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.subhead,
+    fontWeight: theme.font.weight.bold,
+  },
+  subtitle: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.body,
+    lineHeight: theme.font.size.body * theme.font.leading.normal,
+    textAlign: 'center',
+  },
+  title: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.titleLg,
+    fontWeight: theme.font.weight.bold,
+    letterSpacing: -0.4,
+    textAlign: 'center',
   },
 });

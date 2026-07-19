@@ -448,7 +448,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: theme.space[2],
     maxWidth: 220,
-    minHeight: theme.layout.controlHSm,
+    minHeight: theme.layout.tapMin,
     paddingHorizontal: theme.space[3],
   },
   batchChipPressed: {

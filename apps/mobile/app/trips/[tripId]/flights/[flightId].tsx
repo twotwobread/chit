@@ -484,6 +484,7 @@ export default function FlightDetailScreen() {
                     <Pressable
                       accessibilityLabel={`${option.displayName} 탑승자 ${option.selected ? '해제' : '선택'}`}
                       accessibilityRole="button"
+                      accessibilityState={{ disabled: addingPassengers, selected: option.selected }}
                       disabled={addingPassengers}
                       key={option.participantId}
                       onPress={() =>
