@@ -41,6 +41,13 @@ Use when changing Expo screens, mobile UI state, styling, copy, or navigation.
 - Move formatting, sorting, grouping, URL building, and API-response-to-view-state logic to `apps/mobile/lib/**` helpers.
 - Use generated API types/client when available.
 
+## Native/context-bound UI primitives
+
+- Treat bottom sheets, modals, portals, gesture-handler/reanimated wrappers, map overlays, keyboard-aware inputs, and safe-area/inset helpers as potentially provider- or context-bound.
+- When moving UI between a provider-owned tree and an external overlay/sibling tree, re-check whether reused primitives depend on provider context; type compatibility is not enough.
+- Use plain React Native primitives for external overlays unless the wrapper is documented as safe outside its provider.
+- If a context-bound native UI primitive must be used, keep it inside its provider tree and add/keep a source guard or render/smoke check for that boundary.
+
 ## Platform parity
 
 - Treat Android and iOS as simultaneous development targets for mobile work. Do not design, implement, or verify a mobile change for only one platform unless the task is explicitly platform-specific.
@@ -50,6 +57,7 @@ Use when changing Expo screens, mobile UI state, styling, copy, or navigation.
 ## Verification
 
 ```bash
+node .harness/scripts/check-mobile-context-bound-ui.mjs --repo-root .
 pnpm --filter @i-um/mobile test
 pnpm --filter @i-um/mobile typecheck
 ```

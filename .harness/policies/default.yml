@@ -55,6 +55,7 @@ tiers:
     checks:
       - adapter-sync
       - worktree-isolation
+      - mobile-context-bound-ui
       - bugfix-scenario-coverage
   normal:
     when: "size == 'normal' and risk in ['low', 'medium'] and ambiguity in ['low', 'medium'] and product_direction_unclear == false"
@@ -71,6 +72,7 @@ tiers:
     checks:
       - adapter-sync
       - worktree-isolation
+      - mobile-context-bound-ui
       - bugfix-scenario-coverage
       - lint
   strict:
@@ -92,6 +94,7 @@ tiers:
     checks:
       - adapter-sync
       - worktree-isolation
+      - mobile-context-bound-ui
       - bugfix-scenario-coverage
       - lint
       - verify-generated
