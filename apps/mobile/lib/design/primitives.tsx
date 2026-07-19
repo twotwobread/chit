@@ -10,10 +10,10 @@ export type BadgeTone = 'primary' | 'amber' | 'neutral' | 'success' | 'danger';
 type ToneColors = { bg: string; fg: string };
 
 const BADGE_TONES: Record<BadgeTone, ToneColors> = {
-  primary: { bg: theme.color.primarySoft, fg: theme.color.primary },
+  primary: { bg: theme.color.primarySoft, fg: theme.color.textStrong },
   amber: { bg: theme.color.accentSoft, fg: theme.color.amber[700] },
   neutral: { bg: theme.color.surfaceSunken, fg: theme.color.textMuted },
-  success: { bg: theme.color.green[50], fg: theme.color.green[700] },
+  success: { bg: theme.color.primarySoft, fg: theme.color.textStrong },
   danger: { bg: theme.color.red[100], fg: theme.color.danger },
 };
 
@@ -62,7 +62,11 @@ export function Chip({
       accessibilityRole="button"
       accessibilityState={{ selected }}
       onPress={onPress}
-      style={[styles.chip, selected ? styles.chipSelected : styles.chipIdle]}
+      style={({ pressed }) => [
+        styles.chip,
+        selected ? styles.chipSelected : styles.chipIdle,
+        pressed ? styles.chipPressed : null,
+      ]}
     >
       {leading}
       <Text style={[styles.chipText, selected ? styles.chipTextSelected : null]}>{label}</Text>
@@ -269,7 +273,11 @@ export function ListRow({
 
   if (onPress) {
     return (
-      <Pressable accessibilityRole="button" onPress={onPress} style={rowStyle}>
+      <Pressable
+        accessibilityRole="button"
+        onPress={onPress}
+        style={({ pressed }) => [...rowStyle, pressed ? styles.listRowPressed : null]}
+      >
         {content}
       </Pressable>
     );
@@ -381,9 +389,13 @@ const styles = StyleSheet.create({
     backgroundColor: theme.color.surface,
     borderColor: theme.color.borderDefault,
   },
+  chipPressed: {
+    opacity: 0.78,
+  },
   chipSelected: {
-    backgroundColor: theme.color.primarySoft,
-    borderColor: theme.color.primary,
+    backgroundColor: theme.color.primary,
+    borderColor: theme.color.primaryPressed,
+    ...theme.shadow.xs,
   },
   chipText: {
     color: theme.color.textBody,
@@ -392,7 +404,7 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.semibold,
   },
   chipTextSelected: {
-    color: theme.color.primary,
+    color: theme.color.onPrimary,
     fontFamily: theme.font.family.bold,
   },
   listRow: {
@@ -410,6 +422,9 @@ const styles = StyleSheet.create({
   listRowDivider: {
     borderTopColor: theme.color.borderSubtle,
     borderTopWidth: 1,
+  },
+  listRowPressed: {
+    backgroundColor: theme.color.surfaceSunken,
   },
   listRowSubtitle: {
     color: theme.color.textMuted,
@@ -487,7 +502,7 @@ const styles = StyleSheet.create({
     paddingVertical: theme.space[3],
   },
   segmentItemActive: {
-    backgroundColor: theme.color.surface,
+    backgroundColor: theme.color.primary,
     ...theme.shadow.xs,
   },
   segmentItemActiveDark: {
@@ -503,7 +518,7 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.bold,
   },
   segmentTextActive: {
-    color: theme.color.primary,
+    color: theme.color.onPrimary,
   },
   segmentTextActiveDark: {
     color: theme.color.green[800],

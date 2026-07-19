@@ -114,7 +114,7 @@ function ExpenseRowContent({
         accessible
         style={[styles.icon, { backgroundColor: categoryMeta.color }]}
       >
-        <CategoryIcon color={theme.color.onPrimary} size={18} strokeWidth={2.4} />
+        <CategoryIcon color={theme.color.surface} size={18} strokeWidth={2.4} />
       </View>
       <View style={styles.body}>
         <Text numberOfLines={1} style={styles.title}>
@@ -145,9 +145,9 @@ const styles = StyleSheet.create({
   icon: {
     alignItems: 'center',
     borderRadius: theme.radius.md,
-    height: 36,
+    height: 40,
     justifyContent: 'center',
-    width: 36,
+    width: 40,
   },
   meta: {
     color: theme.color.textMuted,
@@ -161,7 +161,7 @@ const styles = StyleSheet.create({
     gap: theme.space[2],
   },
   pressed: {
-    opacity: 0.72,
+    backgroundColor: theme.color.surfaceSunken,
   },
   row: {
     alignItems: 'center',

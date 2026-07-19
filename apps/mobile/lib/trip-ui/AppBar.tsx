@@ -102,6 +102,8 @@ const styles = StyleSheet.create({
   bar: {
     alignItems: 'center',
     backgroundColor: theme.color.bg,
+    borderBottomColor: theme.color.borderSubtle,
+    borderBottomWidth: 1,
     flexDirection: 'row',
     gap: theme.space[2],
     minHeight: theme.layout.headerH,
@@ -117,7 +119,7 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   side: {
-    height: 44,
+    height: theme.layout.tapMin,
     justifyContent: 'center',
     width: 54,
   },
@@ -130,7 +132,14 @@ const styles = StyleSheet.create({
   },
   ticketButton: {
     alignItems: 'center',
+    backgroundColor: theme.color.surface,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
     gap: 1,
+    minHeight: theme.layout.tapMin,
+    minWidth: theme.layout.tapMin,
+    paddingHorizontal: theme.space[2],
   },
   ticketLabel: {
     color: theme.color.textMuted,
