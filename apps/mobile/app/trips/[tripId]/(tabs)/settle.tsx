@@ -56,12 +56,18 @@ type TripSettleState =
   | { status: 'error'; error: Extract<SettlementTransferFailureViewModel, { status: 'error' }> };
 
 export default function TripSettleTabScreen() {
-  const { tripId: tripIdParam, expenseDayId: expenseDayIdParam } = useLocalSearchParams<{
+  const {
+    tripId: tripIdParam,
+    expenseDayId: expenseDayIdParam,
+    expenseId: expenseIdParam,
+  } = useLocalSearchParams<{
     tripId?: string | string[];
     expenseDayId?: string | string[];
+    expenseId?: string | string[];
   }>();
   const tripId = Array.isArray(tripIdParam) ? tripIdParam[0] : tripIdParam;
   const routeExpenseDayId = Array.isArray(expenseDayIdParam) ? expenseDayIdParam[0] : expenseDayIdParam;
+  const routeExpenseId = Array.isArray(expenseIdParam) ? expenseIdParam[0] : expenseIdParam;
   const shellState = useTripShellState();
   const [selectedExpenseDayId, setSelectedExpenseDayId] = useState<string | null>(null);
   const [state, setState] = useState<TripSettleState>({ status: 'loading' });
@@ -171,6 +177,7 @@ export default function TripSettleTabScreen() {
             onRetryExpenseHistory={() => void load()}
             onSelectExpenseDay={setSelectedExpenseDayId}
             selectedExpenseDayId={selectedExpenseDayId}
+            targetExpenseId={selectedExpenseDayId ? null : routeExpenseId}
             today={localDateString()}
             tripId={tripId ?? ''}
             tripName={state.tripName}
@@ -195,6 +202,7 @@ function SettlementContent({
   onRetryExpenseHistory,
   onSelectExpenseDay,
   selectedExpenseDayId,
+  targetExpenseId,
   today,
   tripId,
   tripName,
@@ -204,6 +212,7 @@ function SettlementContent({
   onRetryExpenseHistory: () => void;
   onSelectExpenseDay: (dayId: string) => void;
   selectedExpenseDayId: string | null;
+  targetExpenseId?: string | null;
   today: string;
   tripId: string;
   tripName: string;
@@ -246,6 +255,7 @@ function SettlementContent({
         onRetry={onRetryExpenseHistory}
         onSelectDay={onSelectExpenseDay}
         selectedDayId={selectedExpenseDayId}
+        targetExpenseId={targetExpenseId}
         today={today}
         tripId={tripId}
       />
@@ -365,6 +375,7 @@ function ExpenseHistoryContent({
   onRetry,
   onSelectDay,
   selectedDayId,
+  targetExpenseId,
   today,
   tripId,
 }: {
@@ -372,6 +383,7 @@ function ExpenseHistoryContent({
   onRetry: () => void;
   onSelectDay: (dayId: string) => void;
   selectedDayId: string | null;
+  targetExpenseId?: string | null;
   today: string;
   tripId: string;
 }) {
@@ -388,6 +400,7 @@ function ExpenseHistoryContent({
   const viewModel = buildSettlementExpenseHistoryViewModel({
     days: expenseHistory.days,
     selectedDayId,
+    targetExpenseId,
     today,
     tripId,
   });
@@ -403,6 +416,11 @@ function ExpenseHistoryContent({
         <Text style={styles.sectionTitle}>{viewModel.title}</Text>
         <Text style={styles.sectionHelper}>{viewModel.helper}</Text>
       </View>
+      {viewModel.targetExpenseUnavailableMessage ? (
+        <View style={styles.expenseHistoryNotice}>
+          <Text style={styles.expenseHistoryNoticeText}>{viewModel.targetExpenseUnavailableMessage}</Text>
+        </View>
+      ) : null}
       <View style={styles.expenseDayChips}>
         <DayChips days={viewModel.dayChips} selectedDayId={viewModel.selectedDayId} onSelectDay={onSelectDay} />
       </View>
@@ -659,6 +677,19 @@ const styles = StyleSheet.create({
     gap: theme.space[1],
     paddingHorizontal: theme.space[1],
     paddingVertical: theme.space[4],
+  },
+  expenseHistoryNotice: {
+    backgroundColor: theme.color.accentSoft,
+    borderRadius: theme.radius.md,
+    marginBottom: theme.space[3],
+    paddingHorizontal: theme.space[4],
+    paddingVertical: theme.space[3],
+  },
+  expenseHistoryNoticeText: {
+    color: theme.color.textBody,
+    fontFamily: theme.font.family.semibold,
+    fontSize: theme.font.size.caption,
+    lineHeight: 20,
   },
   expenseRowList: {
     gap: 0,

@@ -83,7 +83,8 @@ export default function MyPageScreen() {
             <MyTripsSection state={tripState} onRetry={loadTrips} />
 
             <SettingsList title="설정">
-              <SettingRow first label="계정 관리" onPress={() => router.push('/account')} />
+              <SettingRow first label="알림" onPress={() => router.push('/notifications')} />
+              <SettingRow label="계정 관리" onPress={() => router.push('/account')} />
               <AppInfoLegalRows state={legalLinkState} onOpen={openLegalLinkRow} />
               <SettingRow
                 danger

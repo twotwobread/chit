@@ -19,6 +19,7 @@ import { Card, PrimaryButton, SecondaryButton, theme } from '../lib/design';
 import { ActiveTripCard, PastTripRow, UpcomingTripRow } from '../lib/home-ui/TripCards';
 import { BottomMenu } from '../lib/navigation/BottomMenu';
 import { getRootScreenContentTopPadding } from '../lib/navigation/root-screen-layout';
+import { registerDeviceForPushNotifications } from '../lib/notifications/runtime';
 import { listMyTrips } from '../lib/trips/trip-api';
 import {
   buildHomeRootRefreshFailureViewModel,
@@ -35,6 +36,7 @@ import { consumeExplicitHomeIntent } from '../lib/trips/home-intent';
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const explicitHomeVisitRef = useRef(false);
+  const pushRegistrationAttemptedRef = useRef(false);
   const [state, setState] = useState<HomeRootViewModel>(() => buildHomeRootViewModel({ status: 'loading' }));
 
   const resolveExplicitHomeIntent = useCallback(() => {
@@ -52,13 +54,20 @@ export default function HomeScreen() {
       const stored = await readStoredSession();
       if (stored.status === 'missing') {
         explicitHomeVisitRef.current = false;
+        pushRegistrationAttemptedRef.current = false;
         setState(buildHomeRootViewModel({ status: 'needsLogin' }));
         return;
       }
       if (stored.status === 'corrupt') {
         explicitHomeVisitRef.current = false;
+        pushRegistrationAttemptedRef.current = false;
         setState(buildHomeRootViewModel({ message: '다시 로그인해주세요.', status: 'needsLogin' }));
         return;
+      }
+
+      if (!pushRegistrationAttemptedRef.current) {
+        pushRegistrationAttemptedRef.current = true;
+        void registerDeviceForPushNotifications();
       }
 
       const response = await listMyTrips();
@@ -67,6 +76,7 @@ export default function HomeScreen() {
     } catch (error) {
       if (await handleAuthError(error)) {
         explicitHomeVisitRef.current = false;
+        pushRegistrationAttemptedRef.current = false;
         setState(buildHomeRootViewModel({ message: '다시 로그인해주세요.', status: 'needsLogin' }));
         return;
       }

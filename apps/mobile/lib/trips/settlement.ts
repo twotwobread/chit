@@ -78,6 +78,7 @@ export type SettlementExpenseHistoryViewModel =
       dayChips: DayChip[];
       selectedDayId: string;
       selectedSection: SettlementExpenseHistoryDaySectionViewModel;
+      targetExpenseUnavailableMessage: string | null;
     }
   | {
       status: 'empty';
@@ -95,12 +96,14 @@ export type SettlementExpenseHistoryFailureViewModel = {
 export function buildSettlementExpenseHistoryViewModel({
   days,
   selectedDayId,
+  targetExpenseId,
   today,
   tripId,
 }: {
   tripId: string;
   days: SettlementExpenseHistoryDayInput[];
   selectedDayId?: string | null;
+  targetExpenseId?: string | null;
   today?: string | null;
 }): SettlementExpenseHistoryViewModel {
   const sections = days.map((dayInput): SettlementExpenseHistoryDaySectionViewModel => {
@@ -155,7 +158,11 @@ export function buildSettlementExpenseHistoryViewModel({
   }
 
   const totalExpenseCount = sections.reduce((total, section) => total + section.expenseCount, 0);
-  const selectedSection = resolveSelectedExpenseHistorySection({ days, sections, selectedDayId, today });
+  const targetSection = resolveTargetExpenseHistorySection({ sections, targetExpenseId });
+  const selectedSection =
+    targetSection ?? resolveSelectedExpenseHistorySection({ days, sections, selectedDayId, today });
+  const targetExpenseUnavailableMessage =
+    targetExpenseId && !targetSection ? '지출을 더 이상 볼 수 없어요. 지출 내역으로 이동했어요.' : null;
 
   return {
     status: 'success',
@@ -173,6 +180,7 @@ export function buildSettlementExpenseHistoryViewModel({
     })),
     selectedDayId: selectedSection.dayId,
     selectedSection,
+    targetExpenseUnavailableMessage,
   };
 }
 
@@ -242,6 +250,20 @@ function compactSplitLabel(splitCount: number): string {
 
 function normalizeDisplayName(value: string): string {
   return value.trim() || '여행자';
+}
+
+function resolveTargetExpenseHistorySection({
+  sections,
+  targetExpenseId,
+}: {
+  sections: SettlementExpenseHistoryDaySectionViewModel[];
+  targetExpenseId?: string | null;
+}): SettlementExpenseHistoryDaySectionViewModel | null {
+  const normalizedTargetExpenseId = targetExpenseId?.trim() ?? '';
+  if (!normalizedTargetExpenseId) {
+    return null;
+  }
+  return sections.find((section) => section.rows.some((row) => row.id === normalizedTargetExpenseId)) ?? null;
 }
 
 function resolveSelectedExpenseHistorySection({
