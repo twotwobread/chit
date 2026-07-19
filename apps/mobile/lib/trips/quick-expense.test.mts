@@ -102,6 +102,16 @@ test('infers the first pending itinerary item by item order', () => {
   assert.equal(current?.id, 'item-next');
 });
 
+test('infers the earliest timed pending itinerary item while preserving untimed positions', () => {
+  const current = inferCurrentQuickExpenseItem([
+    item({ id: 'item-late', itemOrder: 1, startTime: '18:00', endTime: '19:00' }),
+    item({ id: 'item-untimed', itemOrder: 2, startTime: null, endTime: null }),
+    item({ id: 'item-early', itemOrder: 3, startTime: '09:00', endTime: '10:00' }),
+  ]);
+
+  assert.equal(current?.id, 'item-early');
+});
+
 test('resolves initial quick expense item from a valid preferred item before inferring current item', () => {
   const resolved = resolveInitialQuickExpenseItemId(
     [item({ id: 'item-current', itemOrder: 1 }), item({ id: 'item-preferred', itemOrder: 2 })],
@@ -264,7 +274,7 @@ test('builds settlement day tabs and filters schedule options to the selected da
   );
   assert.deepEqual(
     viewModel.itemOptions.map((option) => [option.itemId, option.tripDayId, option.dayLabel, option.orderLabel]),
-    [['item-b', 'day-2', '2일차', '2']],
+    [['item-b', 'day-2', '2일차', '1']],
   );
   assert.equal(viewModel.selectedItem?.tripDayId, 'day-2');
 });
@@ -349,6 +359,29 @@ test('builds schedule item options with time labels and marks selected item', ()
   );
   assert.equal(viewModel.itemOptions[1].selected, true);
   assert.equal(viewModel.payerOptions[0].displayName, '민수');
+});
+
+test('orders schedule item selector options by timed display order while preserving untimed positions', () => {
+  const viewModel = buildQuickExpenseViewModel({
+    currency: 'JPY',
+    itinerary: itinerary([
+      item({ id: 'item-late', itemOrder: 1, startTime: '18:00', endTime: '19:00' }),
+      item({ id: 'item-untimed', itemOrder: 2, startTime: null, endTime: null }),
+      item({ id: 'item-early', itemOrder: 3, startTime: '09:00', endTime: '10:00' }),
+    ]),
+    participants: [participant({ participantId: 'participant-a' })],
+    selectedItemId: null,
+    shouldChooseItem: false,
+  });
+
+  assert.deepEqual(
+    viewModel.itemOptions.map((option) => [option.itemId, option.orderLabel]),
+    [
+      ['item-early', '1'],
+      ['item-untimed', '2'],
+      ['item-late', '3'],
+    ],
+  );
 });
 
 test('keeps repeated same-place occurrences selectable by itinerary item id', () => {

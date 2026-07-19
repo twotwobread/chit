@@ -128,6 +128,45 @@ describe('reorder itinerary helpers', () => {
     });
   });
 
+  it('explains that timed range reorder preserves durations and gaps', () => {
+    const viewModel: DayItineraryViewModel = {
+      status: 'success',
+      dayLabel: '1일차',
+      formattedDate: '2026.07.10',
+      items: [
+        {
+          id: 'item-timed',
+          version: 1,
+          orderLabel: '1',
+          placeName: '아침',
+          placeType: 'cafe',
+          placeTypeLabel: '카페',
+          address: 'Umeda',
+          startTime: '09:00',
+          endTime: '10:00',
+        },
+        {
+          id: 'item-untimed',
+          version: 1,
+          orderLabel: '2',
+          placeName: '시간 미정',
+          placeType: 'etc',
+          placeTypeLabel: '기타',
+          address: 'Osaka',
+          startTime: null,
+          endTime: null,
+        },
+      ],
+    };
+
+    const draft = buildDayItineraryReorderDraft(viewModel);
+    assert.ok(draft);
+    assert.equal(
+      draft.helper,
+      '시간 범위가 있는 일정은 순서를 바꾸면 각 일정의 길이와 기존 빈 시간을 유지해 시작/종료 시간이 함께 조정돼요.',
+    );
+  });
+
   it('reorders the draft, enables save, and builds sequential move operations', () => {
     const viewModel: DayItineraryViewModel = {
       status: 'success',
@@ -189,6 +228,146 @@ describe('reorder itinerary helpers', () => {
           scheduleItemId: 'item-3',
           beforeScheduleItemId: null,
           afterScheduleItemId: 'item-1',
+          clientVersion: 8,
+        },
+      ],
+    });
+  });
+
+  it('builds duration-and-gap-preserving time updates for reordered timed ranges', () => {
+    const viewModel: DayItineraryViewModel = {
+      status: 'success',
+      dayLabel: '1일차',
+      formattedDate: '2026.07.10',
+      items: [
+        {
+          id: 'item-a',
+          version: 3,
+          orderLabel: '1',
+          placeName: '아침',
+          placeType: 'cafe',
+          placeTypeLabel: '카페',
+          address: 'Umeda',
+          startTime: '09:00',
+          endTime: '10:00',
+        },
+        {
+          id: 'item-b',
+          version: 5,
+          orderLabel: '2',
+          placeName: '오후',
+          placeType: 'sights',
+          placeTypeLabel: '관광지',
+          address: 'Osaka',
+          startTime: '13:00',
+          endTime: '15:00',
+        },
+        {
+          id: 'item-untimed',
+          version: 8,
+          orderLabel: '3',
+          placeName: '시간 미정',
+          placeType: 'etc',
+          placeTypeLabel: '기타',
+          address: 'Namba',
+          startTime: null,
+          endTime: null,
+        },
+      ],
+    };
+
+    const draft = buildDayItineraryReorderDraft(viewModel);
+    assert.ok(draft);
+    const reorderedDraft = moveDayItineraryReorderItem(draft, 1, 0);
+
+    assert.deepEqual(buildReorderScheduleItemsRequest(reorderedDraft), {
+      moves: [
+        {
+          scheduleItemId: 'item-b',
+          beforeScheduleItemId: null,
+          afterScheduleItemId: 'item-a',
+          clientVersion: 5,
+        },
+      ],
+      timeUpdates: [
+        {
+          scheduleItemId: 'item-b',
+          expectedStartTime: '13:00',
+          expectedEndTime: '15:00',
+          startTime: '09:00',
+          endTime: '11:00',
+        },
+        {
+          scheduleItemId: 'item-a',
+          expectedStartTime: '09:00',
+          expectedEndTime: '10:00',
+          startTime: '14:00',
+          endTime: '15:00',
+        },
+      ],
+    });
+  });
+
+  it('allows untimed rows to move between timed rows without sending time updates', () => {
+    const viewModel: DayItineraryViewModel = {
+      status: 'success',
+      dayLabel: '1일차',
+      formattedDate: '2026.07.10',
+      items: [
+        {
+          id: 'item-a',
+          version: 3,
+          orderLabel: '1',
+          placeName: '아침',
+          placeType: 'cafe',
+          placeTypeLabel: '카페',
+          address: 'Umeda',
+          startTime: '09:00',
+          endTime: '10:00',
+        },
+        {
+          id: 'item-b',
+          version: 5,
+          orderLabel: '2',
+          placeName: '오후',
+          placeType: 'sights',
+          placeTypeLabel: '관광지',
+          address: 'Osaka',
+          startTime: '13:00',
+          endTime: '15:00',
+        },
+        {
+          id: 'item-untimed',
+          version: 8,
+          orderLabel: '3',
+          placeName: '시간 미정',
+          placeType: 'etc',
+          placeTypeLabel: '기타',
+          address: 'Namba',
+          startTime: null,
+          endTime: null,
+        },
+      ],
+    };
+
+    const draft = buildDayItineraryReorderDraft(viewModel);
+    assert.ok(draft);
+    const reorderedDraft = moveDayItineraryReorderItem(draft, 2, 1);
+
+    assert.deepEqual(
+      reorderedDraft.items.map((item) => [item.id, item.orderLabel]),
+      [
+        ['item-a', '1'],
+        ['item-untimed', '2'],
+        ['item-b', '3'],
+      ],
+    );
+    assert.deepEqual(buildReorderScheduleItemsRequest(reorderedDraft), {
+      moves: [
+        {
+          scheduleItemId: 'item-untimed',
+          beforeScheduleItemId: 'item-a',
+          afterScheduleItemId: 'item-b',
           clientVersion: 8,
         },
       ],

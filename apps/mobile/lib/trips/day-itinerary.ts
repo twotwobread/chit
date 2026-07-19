@@ -2,6 +2,7 @@ import type { GetDayScheduleItemsResponse, ScheduleItem, TripPlaceSummary, TripP
 
 import { theme } from '../design/theme';
 import { formatTripDayDate, formatTripDayLabel } from './days';
+import { orderScheduleItemsByDisplayTime } from './schedule-item-ordering';
 
 export type PlaceBackedScheduleItem = ScheduleItem;
 
@@ -76,9 +77,9 @@ export function buildDayItineraryViewModel(response: GetDayScheduleItemsResponse
     dayLabel,
     formattedDate,
     lodgingPlace: response.day.lodgingPlace,
-    items: [...scheduleItems]
-      .sort((left, right) => left.itemOrder - right.itemOrder)
-      .map(scheduleItemToDayItineraryRow),
+    items: orderScheduleItemsByDisplayTime(scheduleItems).map((item, index) =>
+      scheduleItemToDayItineraryRow(item, index + 1),
+    ),
   };
 }
 
@@ -101,14 +102,17 @@ function buildScheduleItemStatusLabel(item: ScheduleItem): string | undefined {
   return undefined;
 }
 
-function scheduleItemToDayItineraryRow(item: PlaceBackedScheduleItem): DayItineraryRowViewModel {
+function scheduleItemToDayItineraryRow(
+  item: PlaceBackedScheduleItem,
+  displayOrder = item.itemOrder,
+): DayItineraryRowViewModel {
   const statusLabel = buildScheduleItemStatusLabel(item);
   const placeScheduleTitle = item.placeSchedule?.title?.trim();
   const placeScheduleMemo = item.placeSchedule?.memo?.trim();
   return {
     id: item.id,
     version: item.version,
-    orderLabel: String(item.itemOrder),
+    orderLabel: String(displayOrder),
     isLodging: item.isLodging,
     ...(statusLabel ? { statusLabel } : {}),
     startTime: item.startTime,

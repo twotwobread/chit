@@ -14,6 +14,7 @@ import { getPlaceTypeLabel, getScheduleItems, type PlaceBackedScheduleItem } fro
 import { formatTripDayDate, formatTripDayLabel } from './days';
 import { tripDetailPath } from './mypage';
 import { tripItineraryDayPath } from './routes';
+import { orderScheduleItemsByDisplayTime } from './schedule-item-ordering';
 import { buildQuickExpenseRoute } from './quick-expense';
 import { groupTripsByStatus } from './status';
 import {
@@ -290,6 +291,7 @@ export function buildTodayExecutionViewModel({
     };
   }
 
+  const displayOrderByItemId = new Map(orderedItems.map((item, index) => [item.id, index + 1]));
   const pendingItems = orderedItems.filter(isPendingItem);
   const skippedItems = orderedItems.filter(isSkippedItem);
   const nextItem = pendingItems[0];
@@ -300,7 +302,7 @@ export function buildTodayExecutionViewModel({
         ...common,
         title: '진행할 장소가 없어요.',
         helper: '스킵한 장소를 복구하면 다시 진행할 수 있어요.',
-        skippedSection: buildSkippedSection(skippedItems, selectedTrip.id, currentDay.id),
+        skippedSection: buildSkippedSection(skippedItems, selectedTrip.id, currentDay.id, displayOrderByItemId),
       };
     }
 
@@ -321,8 +323,8 @@ export function buildTodayExecutionViewModel({
     ...common,
     nextPlace: {
       itemId: nextItem.id,
-      order: nextItem.itemOrder,
-      orderLabel: String(nextItem.itemOrder),
+      order: displayOrderByItemId.get(nextItem.id) ?? nextItem.itemOrder,
+      orderLabel: String(displayOrderByItemId.get(nextItem.id) ?? nextItem.itemOrder),
       placeName: placeBackedNext.name,
       placeType: placeBackedNext.placeType,
       placeTypeLabel: getPlaceTypeLabel(placeBackedNext.placeType),
@@ -338,7 +340,10 @@ export function buildTodayExecutionViewModel({
       ),
       travelModeSelector: buildTravelModeSelectorViewModel(travelMode),
     },
-    skippedSection: skippedItems.length > 0 ? buildSkippedSection(skippedItems, selectedTrip.id, currentDay.id) : null,
+    skippedSection:
+      skippedItems.length > 0
+        ? buildSkippedSection(skippedItems, selectedTrip.id, currentDay.id, displayOrderByItemId)
+        : null,
     arrivalAction: arriveAction(selectedTrip.id, currentDay.id, nextItem.id),
     quickExpenseAction: routeAction('지출 등록', buildQuickExpenseRoute(selectedTrip.id, currentDay.id, nextItem.id)),
     skipAction: skipAction(selectedTrip.id, currentDay.id, nextItem.id),
@@ -424,7 +429,7 @@ export function findTodayTripDay(days: TripDay[], today: string): TripDay | null
 }
 
 function orderedItineraryItems(items: PlaceBackedScheduleItem[]): PlaceBackedScheduleItem[] {
-  return [...items].sort((left, right) => left.itemOrder - right.itemOrder);
+  return orderScheduleItemsByDisplayTime(items);
 }
 
 function isPendingItem(item: PlaceBackedScheduleItem): boolean {
@@ -439,13 +444,14 @@ function buildSkippedSection(
   items: PlaceBackedScheduleItem[],
   tripId: string,
   date: string,
+  displayOrderByItemId = new Map<string, number>(),
 ): TodaySkippedPlacesSectionViewModel {
   return {
     title: '스킵한 장소',
     countLabel: `${items.length}곳을 나중에 다시 볼 수 있어요.`,
     items: items.map((item) => ({
       itemId: item.id,
-      orderLabel: String(item.itemOrder),
+      orderLabel: String(displayOrderByItemId.get(item.id) ?? item.itemOrder),
       placeName: item.place.name,
       placeTypeLabel: getPlaceTypeLabel(item.place.placeType),
       address: item.place.address,

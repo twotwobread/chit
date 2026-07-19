@@ -276,6 +276,41 @@ test('builds visible route data for a selected day with one itinerary-order conn
   assert.equal(viewModel.notice, null);
 });
 
+test('builds selected day route data in timed order while preserving untimed positions', () => {
+  const routes = buildTripMapDayRoutes([
+    itinerary(
+      [
+        {
+          ...routeItem({ id: 'late', itemOrder: 1, latitude: 34.7, longitude: 135.49, name: '저녁' }),
+          startTime: '18:00',
+        },
+        routeItem({ id: 'untimed', itemOrder: 2, latitude: 34.69, longitude: 135.5, name: '시간 미정' }),
+        {
+          ...routeItem({ id: 'early', itemOrder: 3, latitude: 34.6687, longitude: 135.5013, name: '아침' }),
+          startTime: '09:00',
+        },
+      ],
+      { id: 'day-1', dayOrder: 1, date: '2026-07-10' },
+    ),
+  ]);
+
+  const viewModel = buildTripMapRouteLayerViewModel(routes, { dayId: 'day-1', kind: 'day' });
+
+  assert.deepEqual(
+    viewModel.places.map((place) => [place.id, place.order, place.name]),
+    [
+      ['early', 1, '아침'],
+      ['untimed', 2, '시간 미정'],
+      ['late', 3, '저녁'],
+    ],
+  );
+  assert.deepEqual(viewModel.polylines[0]?.coordinates, [
+    { latitude: 34.6687, longitude: 135.5013 },
+    { latitude: 34.69, longitude: 135.5 },
+    { latitude: 34.7, longitude: 135.49 },
+  ]);
+});
+
 test('decorates day route places with day color and highlights the first active item', () => {
   const routes = buildTripMapDayRoutes([
     itinerary(
@@ -531,7 +566,7 @@ test('builds route map places from valid routable items while preserving duplica
         latitude: 34.1,
         longitude: 135.1,
         name: '우메다 재방문',
-        order: 4,
+        order: 2,
         status: 'skipped',
         type: 'food',
       },

@@ -8,9 +8,11 @@ import {
   type DayItineraryEditFormValues,
 } from '../trips/day-itinerary-edit';
 import { updateScheduleItem } from '../trips/itinerary-api';
+import { resolvePreviousTimedEndTimeDefault } from '../trips/schedule-item-ordering';
 import {
   type DayItineraryLoad,
   type DayItineraryMutationFailureHandler,
+  type DayItineraryState,
   type DeleteState,
   type EditState,
   type LodgingState,
@@ -27,6 +29,7 @@ type DayItineraryEditActionContext = {
   setDeleteState: Dispatch<SetStateAction<DeleteState>>;
   setEditState: Dispatch<SetStateAction<EditState>>;
   setLodgingState: Dispatch<SetStateAction<LodgingState>>;
+  state: DayItineraryState;
   tripId?: string;
 };
 
@@ -41,6 +44,7 @@ export function createDayItineraryEditActions({
   setDeleteState,
   setEditState,
   setLodgingState,
+  state,
   tripId,
 }: DayItineraryEditActionContext) {
   const beginEdit = (item: DayItineraryRowViewModel) => {
@@ -51,7 +55,19 @@ export function createDayItineraryEditActions({
     clearMapActionFeedback();
 
     const values = buildDayItineraryEditForm(item);
-    setEditState({ status: 'editing', item, original: values, values, errors: {} });
+    const defaultStartTime =
+      state.status === 'success' && state.viewModel.status === 'success'
+        ? resolvePreviousTimedEndTimeDefault(
+            state.viewModel.items.map((row, index) => ({
+              id: row.id,
+              itemOrder: index + 1,
+              startTime: row.startTime,
+              endTime: row.endTime,
+            })),
+            item.id,
+          )
+        : null;
+    setEditState({ status: 'editing', item, original: values, values, errors: {}, defaultStartTime });
   };
 
   const updateEditValues = (values: DayItineraryEditFormValues) => {

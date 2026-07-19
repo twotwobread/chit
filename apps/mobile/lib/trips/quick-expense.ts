@@ -19,6 +19,7 @@ import {
 } from './day-itinerary';
 import { formatTripDayDate, formatTripDayLabel } from './days';
 import { tripItineraryDayPath, tripSettlePath } from './routes';
+import { orderScheduleItemsByDisplayTime } from './schedule-item-ordering';
 
 export type QuickExpenseFormErrors = {
   title?: string;
@@ -387,7 +388,9 @@ export function buildQuickExpenseViewModel({
 }): QuickExpenseViewModel {
   const itineraryList = itineraries && itineraries.length > 0 ? orderedItineraries(itineraries) : [itinerary];
   const allItemOptions = itineraryList.flatMap((optionItinerary) =>
-    orderedItems(getScheduleItems(optionItinerary)).map((item) => toItemOption(item, optionItinerary, selectedItemId)),
+    orderedItems(getScheduleItems(optionItinerary)).map((item, index) =>
+      toItemOption(item, optionItinerary, selectedItemId, index + 1),
+    ),
   );
   const isAllDayMode = itineraryList.length > 1;
   const selectedItemFromAllDays = allItemOptions.find((item) => item.selected) ?? null;
@@ -846,6 +849,7 @@ function toItemOption(
   item: PlaceBackedScheduleItem,
   itinerary: GetDayScheduleItemsResponse,
   selectedItemId: string | null,
+  displayOrder = item.itemOrder,
 ): QuickExpenseItemOption {
   const dayFields = {
     tripDayId: itinerary.day.id,
@@ -855,7 +859,7 @@ function toItemOption(
   return {
     itemId: item.id,
     ...dayFields,
-    orderLabel: String(item.itemOrder),
+    orderLabel: String(displayOrder),
     placeName: item.place.name,
     placeTypeLabel: getPlaceTypeLabel(item.place.placeType),
     address: item.place.address,
@@ -889,7 +893,7 @@ function itineraryDateRangeLabel(itineraries: GetDayScheduleItemsResponse[]): st
 }
 
 function orderedItems<T extends ScheduleItem>(items: T[]): T[] {
-  return [...items].sort((left, right) => left.itemOrder - right.itemOrder);
+  return orderScheduleItemsByDisplayTime(items);
 }
 
 function parseManualSplitAmountInput(

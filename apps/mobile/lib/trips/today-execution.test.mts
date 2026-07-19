@@ -367,6 +367,48 @@ test('uses Naver Maps provider and coordinates for Korea-only Today navigation a
   });
 });
 
+test('selects the earliest timed pending item while preserving untimed positions in Today order', () => {
+  const viewModel = buildTodayExecutionViewModel({
+    selectedTrip: trip({ id: 'trip-current' }),
+    tripDetail: tripDetail(),
+    itinerary: itinerary({
+      items: [
+        item({
+          id: 'item-late',
+          itemOrder: 1,
+          startTime: '18:00',
+          endTime: '19:00',
+          place: { id: 'place-late', name: '저녁', placeType: 'food', address: 'Dotonbori' },
+        }),
+        item({
+          id: 'item-early',
+          itemOrder: 3,
+          startTime: '09:00',
+          endTime: '10:00',
+          place: { id: 'place-early', name: '아침', placeType: 'cafe', address: 'Umeda' },
+        }),
+        item({ id: 'item-untimed', itemOrder: 2, startTime: null, endTime: null }),
+      ],
+    }),
+    today: '2026-07-10',
+    ongoingTripCount: 1,
+  });
+
+  assert.equal(viewModel.status, 'success');
+  if (viewModel.status !== 'success') {
+    return;
+  }
+  assert.equal(viewModel.nextPlace.itemId, 'item-early');
+  assert.equal(viewModel.nextPlace.order, 1);
+  assert.equal(viewModel.nextPlace.orderLabel, '1');
+  assert.equal(viewModel.arrivalAction.itemId, 'item-early');
+  assert.deepEqual(viewModel.quickExpenseAction, {
+    kind: 'route',
+    label: '지출 등록',
+    route: '/trips/trip-current/days/2026-07-10/expenses/quick?itemId=item-early',
+  });
+});
+
 test('maps the first ordered itinerary item to the next place without exposing subsequent places on Today', () => {
   const viewModel = buildTodayExecutionViewModel({
     selectedTrip: trip({ id: 'trip-current' }),

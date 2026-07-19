@@ -482,6 +482,7 @@ export function useDayItineraryEditorController({
     setDeleteState,
     setEditState,
     setLodgingState,
+    state,
     tripId,
   });
 
