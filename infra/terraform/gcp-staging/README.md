@@ -9,7 +9,7 @@ This module manages the GCP resources for the i-um staging API deployment.
 - Cloud Build manual deploy trigger
 - Cloud Run runtime service account and IAM
 - Cloud Build deploy service account and IAM
-- Secret Manager IAM access for the pre-created Neon `DATABASE_URL` secret
+- Secret Manager IAM access for the pre-created staging PostgreSQL `DATABASE_URL` secret
 
 ## Pre-created resources
 
@@ -19,7 +19,7 @@ These are bootstrapped manually before Terraform runs:
 - Secret Manager secret and version: `i-um-staging-database-url`
 - Cloud Build GitHub connection: `i-um-github`
 - Cloud Build repository link: `twotwobread-i-um`
-- Neon Postgres database and connection string
+- Staging PostgreSQL database and connection string
 
 Secret values are not stored in Terraform state.
 

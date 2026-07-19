@@ -42,9 +42,9 @@ func run(ctx context.Context, envPath string, apply bool, limit int, useDirectUR
 	if useDirectURL {
 		databaseURL = directDatabaseURL(databaseURL)
 	}
-	apiKey := envValue(values, "GOOGLE_PLACES_API_KEY")
+	apiKey := googleAPIKey(values)
 	if apiKey == "" {
-		return errors.New("GOOGLE_PLACES_API_KEY is required")
+		return errors.New("GOOGLE_MAPS_API_KEY is required")
 	}
 
 	pool, err := pgxpool.New(ctx, databaseURL)
@@ -74,6 +74,19 @@ func run(ctx context.Context, envPath string, apply bool, limit int, useDirectUR
 
 func envValue(values map[string]string, key string) string {
 	return strings.TrimSpace(values[key])
+}
+
+func googleAPIKey(values map[string]string) string {
+	return firstNonEmpty(envValue(values, "GOOGLE_PLACES_API_KEY"), envValue(values, "GOOGLE_MAPS_API_KEY"))
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
 }
 
 func loadDotenvFile(path string) (map[string]string, error) {

@@ -57,6 +57,20 @@ func TestLoadDotenvFileFindsRepositoryRootEnvFromWorktreeAppDirectory(t *testing
 	}
 }
 
+func TestGoogleAPIKeyUsesCanonicalMapsKeyWhenSpecificPlacesKeyIsUnset(t *testing.T) {
+	values := map[string]string{"GOOGLE_MAPS_API_KEY": "maps-key"}
+	if got := googleAPIKey(values); got != "maps-key" {
+		t.Fatalf("googleAPIKey() = %q, want canonical maps key", got)
+	}
+}
+
+func TestGoogleAPIKeyPrefersSpecificPlacesOverride(t *testing.T) {
+	values := map[string]string{"GOOGLE_MAPS_API_KEY": "maps-key", "GOOGLE_PLACES_API_KEY": "places-key"}
+	if got := googleAPIKey(values); got != "places-key" {
+		t.Fatalf("googleAPIKey() = %q, want places override", got)
+	}
+}
+
 func TestEnvValuePrefersDotenvFileOverAmbientEnvironment(t *testing.T) {
 	oldValue, hadOldValue := os.LookupEnv("DATABASE_URL")
 	if err := os.Setenv("DATABASE_URL", "postgresql://ambient.example.test/other"); err != nil {

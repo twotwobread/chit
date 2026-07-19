@@ -36,7 +36,7 @@ func ConfigFromEnv() Config {
 		AuthTokenSecret:                     os.Getenv("AUTH_TOKEN_SECRET"),
 		AppleAudience:                       firstNonEmpty(os.Getenv("APPLE_CLIENT_ID"), os.Getenv("APPLE_BUNDLE_ID")),
 		AllowDevOAuth:                       envBool(os.Getenv("AUTH_ALLOW_DEV_OAUTH")),
-		GooglePlacesAPIKey:                  os.Getenv("GOOGLE_PLACES_API_KEY"),
+		GooglePlacesAPIKey:                  firstNonEmpty(os.Getenv("GOOGLE_PLACES_API_KEY"), os.Getenv("GOOGLE_MAPS_API_KEY")),
 		GooglePlacesPhotoTokenSecret:        firstNonEmpty(os.Getenv("GOOGLE_PLACES_PHOTO_TOKEN_SECRET"), os.Getenv("AUTH_TOKEN_SECRET")),
 		GoogleRoutesAPIKey:                  firstNonEmpty(os.Getenv("GOOGLE_ROUTES_API_KEY"), os.Getenv("GOOGLE_MAPS_API_KEY")),
 		InviteBaseURL:                       os.Getenv("INVITE_BASE_URL"),

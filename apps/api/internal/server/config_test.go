@@ -17,6 +17,17 @@ func TestConfigFromEnvDoesNotUsePlacesOnlyKeyForRoutePreview(t *testing.T) {
 	}
 }
 
+func TestConfigFromEnvUsesMapsKeyForPlacesWhenSpecificKeyIsUnset(t *testing.T) {
+	t.Setenv("GOOGLE_MAPS_API_KEY", "maps-key")
+	t.Setenv("GOOGLE_PLACES_API_KEY", "")
+
+	config := ConfigFromEnv()
+
+	if config.GooglePlacesAPIKey != "maps-key" {
+		t.Fatalf("expected maps key fallback for Places provider, got %q", config.GooglePlacesAPIKey)
+	}
+}
+
 func TestConfigFromEnvUsesRoutesOrMapsKeyForRoutePreview(t *testing.T) {
 	t.Setenv("GOOGLE_ROUTES_API_KEY", " routes-key ")
 	t.Setenv("GOOGLE_MAPS_API_KEY", "maps-key")

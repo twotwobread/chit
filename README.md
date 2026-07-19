@@ -157,16 +157,16 @@ F-005부터 auth 기능은 다음 env를 사용합니다.
 
 ```bash
 export AUTH_TOKEN_SECRET='<long-random-secret>'
-export APPLE_CLIENT_ID='com.twotwobread.ium.staging' # 또는 APPLE_BUNDLE_ID
+export APPLE_CLIENT_ID='com.twotwobread.ium.staging'
 export AUTH_ALLOW_DEV_OAUTH=true                    # local/internal smoke only
 ```
 
 `AUTH_ALLOW_DEV_OAUTH=true`일 때만 Apple/Kakao provider token 대신 `devSubject` credential을 local/internal smoke test에 사용할 수 있습니다. 실제 provider access token이나 identity token은 저장하지 않습니다.
 
-F-027부터 Google Places 검색은 API 서버가 호출하며 다음 env를 사용합니다. 모바일 앱에는 Google API key를 설정하지 않습니다.
+F-027부터 Google Places/Routes 호출은 API 서버가 수행하며 다음 shared server-side env를 사용합니다. 모바일 앱에 노출되는 Android Maps SDK key는 `EXPO_PUBLIC_GOOGLE_MAPS_ANDROID_API_KEY`로 별도 관리합니다.
 
 ```bash
-export GOOGLE_PLACES_API_KEY='<google-places-api-key>'
+export GOOGLE_MAPS_API_KEY='<server-side-google-maps-api-key>'
 ```
 
 기본 주소는 `http://localhost:8080`입니다.
@@ -258,4 +258,4 @@ pnpm run deploy stage --only mobile --platform android
 pnpm run deploy stage --only eas-env
 ```
 
-Do not commit `.env.stage` or paste its secret values into chat, issues, git, or logs. Boarding pass image upload/opening requires `BOARDING_PASS_GCS_BUCKET`, `BOARDING_PASS_GCS_SIGNING_ACCESS_ID`, and `BOARDING_PASS_GCS_SIGNING_PRIVATE_KEY`; the bucket must grant the Cloud Run runtime service account object read/write/delete access.
+Do not commit `.env.stage` or paste its secret values into chat, issues, git, or logs. Server-side file upload/opening features use shared `GCS_BUCKET`, `GCS_SIGNING_ACCESS_ID`, and `GCS_SIGNING_PRIVATE_KEY`; the bucket must grant the Cloud Run runtime service account object read/write/delete access.

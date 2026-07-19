@@ -23,6 +23,12 @@ func main() {
 	}
 }
 
+type gcsObjectStoreEnvConfig struct {
+	Bucket            string
+	SigningAccessID   string
+	SigningPrivateKey string
+}
+
 func firstNonEmpty(values ...string) string {
 	for _, value := range values {
 		if value != "" {
@@ -30,6 +36,22 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func boardingPassGCSConfigFromEnv() gcsObjectStoreEnvConfig {
+	return gcsObjectStoreEnvConfig{
+		Bucket:            firstNonEmpty(os.Getenv("BOARDING_PASS_GCS_BUCKET"), os.Getenv("GCS_BUCKET")),
+		SigningAccessID:   firstNonEmpty(os.Getenv("BOARDING_PASS_GCS_SIGNING_ACCESS_ID"), os.Getenv("GCS_SIGNING_ACCESS_ID")),
+		SigningPrivateKey: firstNonEmpty(os.Getenv("BOARDING_PASS_GCS_SIGNING_PRIVATE_KEY"), os.Getenv("GCS_SIGNING_PRIVATE_KEY")),
+	}
+}
+
+func expenseReceiptGCSConfigFromEnv() gcsObjectStoreEnvConfig {
+	return gcsObjectStoreEnvConfig{
+		Bucket:            firstNonEmpty(os.Getenv("EXPENSE_RECEIPT_GCS_BUCKET"), os.Getenv("GCS_BUCKET")),
+		SigningAccessID:   firstNonEmpty(os.Getenv("EXPENSE_RECEIPT_GCS_SIGNING_ACCESS_ID"), os.Getenv("GCS_SIGNING_ACCESS_ID")),
+		SigningPrivateKey: firstNonEmpty(os.Getenv("EXPENSE_RECEIPT_GCS_SIGNING_PRIVATE_KEY"), os.Getenv("GCS_SIGNING_PRIVATE_KEY")),
+	}
 }
 
 func run() error {
@@ -43,16 +65,18 @@ func run() error {
 	defer store.Close()
 
 	config := server.ConfigFromEnv()
-	if bucket := os.Getenv("BOARDING_PASS_GCS_BUCKET"); bucket != "" {
-		boardingPassStore, err := flight.NewGCSBoardingPassObjectStore(ctx, bucket, os.Getenv("BOARDING_PASS_GCS_SIGNING_ACCESS_ID"), os.Getenv("BOARDING_PASS_GCS_SIGNING_PRIVATE_KEY"))
+	boardingPassGCS := boardingPassGCSConfigFromEnv()
+	if boardingPassGCS.Bucket != "" {
+		boardingPassStore, err := flight.NewGCSBoardingPassObjectStore(ctx, boardingPassGCS.Bucket, boardingPassGCS.SigningAccessID, boardingPassGCS.SigningPrivateKey)
 		if err != nil {
 			return err
 		}
 		defer boardingPassStore.Close()
 		config.BoardingPassObjectStore = boardingPassStore
 	}
-	if bucket := os.Getenv("EXPENSE_RECEIPT_GCS_BUCKET"); bucket != "" {
-		receiptStore, err := trip.NewGCSExpenseReceiptObjectStore(ctx, bucket, firstNonEmpty(os.Getenv("EXPENSE_RECEIPT_GCS_SIGNING_ACCESS_ID"), os.Getenv("BOARDING_PASS_GCS_SIGNING_ACCESS_ID")), firstNonEmpty(os.Getenv("EXPENSE_RECEIPT_GCS_SIGNING_PRIVATE_KEY"), os.Getenv("BOARDING_PASS_GCS_SIGNING_PRIVATE_KEY")))
+	expenseReceiptGCS := expenseReceiptGCSConfigFromEnv()
+	if expenseReceiptGCS.Bucket != "" {
+		receiptStore, err := trip.NewGCSExpenseReceiptObjectStore(ctx, expenseReceiptGCS.Bucket, expenseReceiptGCS.SigningAccessID, expenseReceiptGCS.SigningPrivateKey)
 		if err != nil {
 			return err
 		}

@@ -11,11 +11,9 @@ const DEFAULTS = Object.freeze({
   runtimeServiceAccount: 'i-um-api-staging-run@i-um-488511.iam.gserviceaccount.com',
   databaseUrlSecretName: 'i-um-staging-database-url',
   authTokenSecretName: 'i-um-staging-auth-token-secret',
-  googlePlacesSecretName: 'i-um-staging-google-places-api-key',
-  googleRoutesSecretName: 'i-um-staging-google-routes-api-key',
-  boardingPassGcsSigningPrivateKeySecretName: 'i-um-staging-boarding-pass-gcs-signing-private-key',
+  googleMapsSecretName: 'i-um-staging-google-maps-api-key',
+  gcsSigningPrivateKeySecretName: 'i-um-staging-gcs-signing-private-key',
   openAIApiKeySecretName: 'i-um-staging-openai-api-key',
-  expenseReceiptGcsSigningPrivateKeySecretName: 'i-um-staging-expense-receipt-gcs-signing-private-key',
   appleBundleId: 'com.twotwobread.ium.staging',
   androidPackage: 'com.twotwobread.ium',
   inviteAppScheme: 'ium',
@@ -107,10 +105,18 @@ export function readDotenvFile(path) {
 
 export function buildStageConfig({ env }) {
   const merged = { ...env };
-  const routesApiKey = valueOrFallback(merged.GOOGLE_ROUTES_API_KEY, merged.GOOGLE_MAPS_API_KEY);
-  const expenseReceiptGcsBucket = valueOrFallback(merged.EXPENSE_RECEIPT_GCS_BUCKET, merged.BOARDING_PASS_GCS_BUCKET);
-  const expenseReceiptGcsSigningAccessId = valueOrFallback(merged.EXPENSE_RECEIPT_GCS_SIGNING_ACCESS_ID, merged.BOARDING_PASS_GCS_SIGNING_ACCESS_ID);
-  const expenseReceiptGcsSigningPrivateKey = valueOrFallback(merged.EXPENSE_RECEIPT_GCS_SIGNING_PRIVATE_KEY, merged.BOARDING_PASS_GCS_SIGNING_PRIVATE_KEY);
+  const googleMapsApiKey = valueOrFallback(merged.GOOGLE_MAPS_API_KEY, merged.GOOGLE_PLACES_API_KEY, merged.GOOGLE_ROUTES_API_KEY);
+  const gcsBucket = valueOrFallback(merged.GCS_BUCKET, merged.BOARDING_PASS_GCS_BUCKET, merged.EXPENSE_RECEIPT_GCS_BUCKET);
+  const gcsSigningAccessId = valueOrFallback(
+    merged.GCS_SIGNING_ACCESS_ID,
+    merged.BOARDING_PASS_GCS_SIGNING_ACCESS_ID,
+    merged.EXPENSE_RECEIPT_GCS_SIGNING_ACCESS_ID,
+  );
+  const gcsSigningPrivateKey = valueOrFallback(
+    merged.GCS_SIGNING_PRIVATE_KEY,
+    merged.BOARDING_PASS_GCS_SIGNING_PRIVATE_KEY,
+    merged.EXPENSE_RECEIPT_GCS_SIGNING_PRIVATE_KEY,
+  );
   const authAllowDevOauth = valueOrDefault(merged.AUTH_ALLOW_DEV_OAUTH, 'false');
   const expoAuthDevMode = valueOrDefault(merged.EXPO_PUBLIC_AUTH_DEV_MODE, 'false');
   const appleBundleId = valueOrDefault(merged.APPLE_BUNDLE_ID, valueOrDefault(merged.IOS_BUNDLE_IDENTIFIER, DEFAULTS.appleBundleId));
@@ -131,14 +137,10 @@ export function buildStageConfig({ env }) {
   const required = [
     ['DATABASE_URL', merged.DATABASE_URL],
     ['AUTH_TOKEN_SECRET', merged.AUTH_TOKEN_SECRET],
-    ['GOOGLE_PLACES_API_KEY', merged.GOOGLE_PLACES_API_KEY],
-    ['GOOGLE_ROUTES_API_KEY', routesApiKey],
-    ['BOARDING_PASS_GCS_BUCKET', merged.BOARDING_PASS_GCS_BUCKET],
-    ['BOARDING_PASS_GCS_SIGNING_ACCESS_ID', merged.BOARDING_PASS_GCS_SIGNING_ACCESS_ID],
-    ['BOARDING_PASS_GCS_SIGNING_PRIVATE_KEY', merged.BOARDING_PASS_GCS_SIGNING_PRIVATE_KEY],
-    ['EXPENSE_RECEIPT_GCS_BUCKET', expenseReceiptGcsBucket],
-    ['EXPENSE_RECEIPT_GCS_SIGNING_ACCESS_ID', expenseReceiptGcsSigningAccessId],
-    ['EXPENSE_RECEIPT_GCS_SIGNING_PRIVATE_KEY', expenseReceiptGcsSigningPrivateKey],
+    ['GOOGLE_MAPS_API_KEY', googleMapsApiKey],
+    ['GCS_BUCKET', gcsBucket],
+    ['GCS_SIGNING_ACCESS_ID', gcsSigningAccessId],
+    ['GCS_SIGNING_PRIVATE_KEY', gcsSigningPrivateKey],
     ['OPENAI_API_KEY', merged.OPENAI_API_KEY],
     ['EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY', merged.EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY],
   ];
@@ -149,12 +151,9 @@ export function buildStageConfig({ env }) {
 
   const apiEnv = compactObject({
     AUTH_ALLOW_DEV_OAUTH: 'false',
-    APPLE_BUNDLE_ID: appleBundleId,
-    APPLE_CLIENT_ID: optionalValue(merged.APPLE_CLIENT_ID),
-    BOARDING_PASS_GCS_BUCKET: optionalValue(merged.BOARDING_PASS_GCS_BUCKET),
-    BOARDING_PASS_GCS_SIGNING_ACCESS_ID: optionalValue(merged.BOARDING_PASS_GCS_SIGNING_ACCESS_ID),
-    EXPENSE_RECEIPT_GCS_BUCKET: optionalValue(expenseReceiptGcsBucket),
-    EXPENSE_RECEIPT_GCS_SIGNING_ACCESS_ID: optionalValue(expenseReceiptGcsSigningAccessId),
+    APPLE_CLIENT_ID: valueOrDefault(merged.APPLE_CLIENT_ID, appleBundleId),
+    GCS_BUCKET: optionalValue(gcsBucket),
+    GCS_SIGNING_ACCESS_ID: optionalValue(gcsSigningAccessId),
     RECEIPT_OPENAI_MODEL: valueOrDefault(merged.RECEIPT_OPENAI_MODEL, 'gpt-4o-mini'),
     INVITE_BASE_URL: inviteBaseUrl,
     INVITE_APP_SCHEME: valueOrDefault(merged.INVITE_APP_SCHEME, DEFAULTS.inviteAppScheme),
@@ -185,26 +184,16 @@ export function buildStageConfig({ env }) {
     secretNames: {
       DATABASE_URL: valueOrDefault(merged.DATABASE_URL_SECRET_NAME, DEFAULTS.databaseUrlSecretName),
       AUTH_TOKEN_SECRET: valueOrDefault(merged.AUTH_TOKEN_SECRET_NAME, DEFAULTS.authTokenSecretName),
-      GOOGLE_PLACES_API_KEY: valueOrDefault(merged.GOOGLE_PLACES_API_KEY_SECRET_NAME, DEFAULTS.googlePlacesSecretName),
-      GOOGLE_ROUTES_API_KEY: valueOrDefault(merged.GOOGLE_ROUTES_API_KEY_SECRET_NAME, DEFAULTS.googleRoutesSecretName),
-      BOARDING_PASS_GCS_SIGNING_PRIVATE_KEY: valueOrDefault(
-        merged.BOARDING_PASS_GCS_SIGNING_PRIVATE_KEY_SECRET_NAME,
-        DEFAULTS.boardingPassGcsSigningPrivateKeySecretName,
-      ),
+      GOOGLE_MAPS_API_KEY: valueOrDefault(merged.GOOGLE_MAPS_API_KEY_SECRET_NAME, DEFAULTS.googleMapsSecretName),
+      GCS_SIGNING_PRIVATE_KEY: valueOrDefault(merged.GCS_SIGNING_PRIVATE_KEY_SECRET_NAME, DEFAULTS.gcsSigningPrivateKeySecretName),
       OPENAI_API_KEY: valueOrDefault(merged.OPENAI_API_KEY_SECRET_NAME, DEFAULTS.openAIApiKeySecretName),
-      EXPENSE_RECEIPT_GCS_SIGNING_PRIVATE_KEY: valueOrDefault(
-        merged.EXPENSE_RECEIPT_GCS_SIGNING_PRIVATE_KEY_SECRET_NAME,
-        DEFAULTS.expenseReceiptGcsSigningPrivateKeySecretName,
-      ),
     },
     secrets: {
       DATABASE_URL: merged.DATABASE_URL,
       AUTH_TOKEN_SECRET: merged.AUTH_TOKEN_SECRET,
-      GOOGLE_PLACES_API_KEY: merged.GOOGLE_PLACES_API_KEY,
-      GOOGLE_ROUTES_API_KEY: routesApiKey,
-      BOARDING_PASS_GCS_SIGNING_PRIVATE_KEY: merged.BOARDING_PASS_GCS_SIGNING_PRIVATE_KEY,
+      GOOGLE_MAPS_API_KEY: googleMapsApiKey,
+      GCS_SIGNING_PRIVATE_KEY: gcsSigningPrivateKey,
       OPENAI_API_KEY: merged.OPENAI_API_KEY,
-      EXPENSE_RECEIPT_GCS_SIGNING_PRIVATE_KEY: expenseReceiptGcsSigningPrivateKey,
     },
     apiEnv,
     eas: {
@@ -264,6 +253,20 @@ export function deriveInviteLinkHost(inviteBaseUrl) {
   } catch {
     return '';
   }
+}
+
+export function legacyCloudRunEnvNames() {
+  return [
+    'APPLE_BUNDLE_ID',
+    'GOOGLE_PLACES_API_KEY',
+    'GOOGLE_ROUTES_API_KEY',
+    'BOARDING_PASS_GCS_BUCKET',
+    'BOARDING_PASS_GCS_SIGNING_ACCESS_ID',
+    'BOARDING_PASS_GCS_SIGNING_PRIVATE_KEY',
+    'EXPENSE_RECEIPT_GCS_BUCKET',
+    'EXPENSE_RECEIPT_GCS_SIGNING_ACCESS_ID',
+    'EXPENSE_RECEIPT_GCS_SIGNING_PRIVATE_KEY',
+  ];
 }
 
 export function cloudRunSecretMapping(config) {
