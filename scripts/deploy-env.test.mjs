@@ -4,12 +4,16 @@ import { describe, it } from 'node:test';
 
 import {
   buildStageConfig,
+  artifactImageUri,
   cloudRunEnvMapping,
   createSecretSpecs,
   deriveDirectDatabaseUrl,
   deriveInviteLinkHost,
   easEnvSpecs,
   legacyCloudRunEnvNames,
+  notificationWorkerEnvMapping,
+  notificationWorkerRunUri,
+  notificationWorkerSecretMapping,
   parseDeployArgs,
   parseDotenv,
   resolvePublicEndpoints,
@@ -54,6 +58,14 @@ describe('parseDeployArgs', () => {
       wait: false,
     });
 
+    assert.deepEqual(parseDeployArgs(['stage', '--only', 'notifications', '--platform', 'none']), {
+      command: 'stage',
+      dryRun: false,
+      only: 'notifications',
+      platform: 'none',
+      wait: true,
+    });
+
     assert.deepEqual(parseDeployArgs(['stage', '--', '--dry-run']), {
       command: 'stage',
       dryRun: true,
@@ -71,7 +83,13 @@ describe('buildStageConfig', () => {
     assert.equal(config.gcp.projectId, 'i-um-488511');
     assert.equal(config.gcp.region, 'asia-northeast3');
     assert.equal(config.cloudRun.service, 'i-um-api-staging');
+    assert.equal(config.cloudRun.artifactRepository, 'i-um-staging');
+    assert.equal(config.cloudRun.imageName, 'api');
     assert.equal(config.deploy.branch, 'develop');
+    assert.equal(config.notificationWorker.jobName, 'i-um-notification-worker-staging');
+    assert.equal(config.notificationWorker.schedulerJobName, 'i-um-notification-worker-staging-every-minute');
+    assert.equal(config.notificationWorker.schedule, '* * * * *');
+    assert.equal(config.notificationWorker.schedulerServiceAccount, 'i-um-notify-scheduler@i-um-488511.iam.gserviceaccount.com');
     assert.equal(config.apiEnv.AUTH_ALLOW_DEV_OAUTH, 'false');
     assert.equal(config.apiEnv.APPLE_CLIENT_ID, 'com.twotwobread.ium.staging');
     assert.equal(config.apiEnv.GCS_BUCKET, 'shared-gcs-bucket');
@@ -187,6 +205,8 @@ describe('env examples', () => {
 
     assert.ok(!('OPENAI_API_KEY_SECRET_NAME' in localEnv), 'local env example must not include deploy-only secret names');
     assert.equal(stageEnv.OPENAI_API_KEY_SECRET_NAME, 'i-um-staging-openai-api-key');
+    assert.equal(stageEnv.NOTIFICATION_WORKER_JOB, 'i-um-notification-worker-staging');
+    assert.equal(stageEnv.NOTIFICATION_WORKER_SCHEDULER_JOB, 'i-um-notification-worker-staging-every-minute');
   });
 });
 
@@ -204,6 +224,15 @@ describe('createSecretSpecs', () => {
         ['OPENAI_API_KEY', 'i-um-staging-openai-api-key', 'openai-key'],
       ],
     );
+  });
+
+  it('includes the optional Expo push access token secret only when configured', () => {
+    const specs = createSecretSpecs(
+      buildStageConfig({ env: requiredStageEnv({ EXPO_PUSH_ACCESS_TOKEN: 'expo-token' }) }),
+    );
+
+    assert.ok(specs.some((spec) => spec.envName === 'EXPO_PUSH_ACCESS_TOKEN'));
+    assert.ok(!createSecretSpecs(buildStageConfig({ env: requiredStageEnv() })).some((spec) => spec.envName === 'EXPO_PUSH_ACCESS_TOKEN'));
   });
 });
 
@@ -228,6 +257,29 @@ describe('cloudRunEnvMapping', () => {
     assert.equal(
       cloudRunEnvMapping({ AUTH_ALLOW_DEV_OAUTH: 'false', INVITE_IOS_APP_IDS: 'TEAM.one,TEAM.two' }),
       '^|^AUTH_ALLOW_DEV_OAUTH=false|INVITE_IOS_APP_IDS=TEAM.one,TEAM.two',
+    );
+  });
+});
+
+describe('notification worker deploy config', () => {
+  it('builds image, job secret/env mappings, and scheduler run URI', () => {
+    const config = buildStageConfig({ env: requiredStageEnv({ EXPO_PUSH_ACCESS_TOKEN: 'expo-token' }) });
+
+    assert.equal(
+      artifactImageUri(config),
+      'asia-northeast3-docker.pkg.dev/i-um-488511/i-um-staging/api:latest',
+    );
+    assert.equal(
+      notificationWorkerSecretMapping(config),
+      'DATABASE_URL=i-um-staging-database-url:latest,EXPO_PUSH_ACCESS_TOKEN=i-um-staging-expo-push-access-token:latest',
+    );
+    assert.equal(
+      notificationWorkerEnvMapping(config),
+      '^|^NOTIFICATION_WORKER_BATCH_SIZE=50|NOTIFICATION_WORKER_MAX_ATTEMPTS=8|NOTIFICATION_WORKER_STALE_RUNNING_MINUTES=10|NOTIFICATION_WORKER_MAX_BATCHES=20',
+    );
+    assert.equal(
+      notificationWorkerRunUri(config),
+      'https://run.googleapis.com/v2/projects/i-um-488511/locations/asia-northeast3/jobs/i-um-notification-worker-staging:run',
     );
   });
 });

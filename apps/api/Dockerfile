@@ -8,7 +8,8 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . ./
-RUN CGO_ENABLED=0 GOOS=linux go build -buildvcs=false -o /out/api ./cmd/api
+RUN CGO_ENABLED=0 GOOS=linux go build -buildvcs=false -o /out/api ./cmd/api \
+  && CGO_ENABLED=0 GOOS=linux go build -buildvcs=false -o /out/notification-worker ./cmd/notification-worker
 
 FROM alpine:3.20
 
@@ -18,6 +19,7 @@ RUN apk add --no-cache ca-certificates \
 
 WORKDIR /app
 COPY --from=build /out/api /app/api
+COPY --from=build /out/notification-worker /app/notification-worker
 
 ENV PORT=8080
 EXPOSE 8080

@@ -33,6 +33,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   const plugins: NonNullable<ExpoConfig['plugins']> = [
     'expo-router',
     'expo-secure-store',
+    'expo-notifications',
     [
       'expo-location',
       {

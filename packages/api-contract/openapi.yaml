@@ -4088,6 +4088,181 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /me/push-tokens:
+    post:
+      operationId: registerPushToken
+      summary: Register the current app installation push token
+      description: Registers or refreshes the authenticated user's Expo push token for the current app installation. Registering the same active token for the current user supersedes stale ownership from other users/installations.
+      tags:
+        - Auth
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterPushTokenRequest'
+      responses:
+        '200':
+          description: Push token registered or refreshed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PushTokenResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /me/push-tokens/{installationId}:
+    delete:
+      operationId: revokePushToken
+      summary: Revoke the current installation push token
+      description: Idempotently revokes the authenticated user's push token for the given app installation.
+      tags:
+        - Auth
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: installationId
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 8
+            maxLength: 120
+      responses:
+        '204':
+          description: Push token revoked or already inactive.
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /me/notifications:
+    get:
+      operationId: listNotifications
+      summary: List current user's notifications
+      description: Returns current user's in-app notification history, newest first.
+      tags:
+        - Auth
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 200
+      responses:
+        '200':
+          description: Current user's notification history.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListNotificationsResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /me/notifications/{notificationId}/read:
+    patch:
+      operationId: markNotificationRead
+      summary: Mark a notification as read
+      description: Marks one notification belonging to the authenticated user as read.
+      tags:
+        - Auth
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: notificationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Notification after read marking.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarkNotificationReadResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Notification not found for the current user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /me:
     get:
       operationId: getMe
@@ -6930,6 +7105,136 @@ components:
           minLength: 1
           maxLength: 20
           description: Server trims leading/trailing whitespace, counts Unicode code points after trim, then validates and persists the value.
+    PushPlatform:
+      type: string
+      enum:
+        - ios
+        - android
+    PushTokenStatus:
+      type: string
+      enum:
+        - active
+        - revoked
+        - invalid
+    RegisterPushTokenRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - installationId
+        - expoPushToken
+        - platform
+      properties:
+        installationId:
+          type: string
+          minLength: 8
+          maxLength: 120
+          description: Stable app-installation identifier generated by the mobile client.
+        expoPushToken:
+          type: string
+          minLength: 20
+          maxLength: 255
+          description: Expo push token for the current installation.
+        platform:
+          $ref: '#/components/schemas/PushPlatform'
+    PushTokenResponse:
+      type: object
+      required:
+        - installationId
+        - platform
+        - status
+        - lastRegisteredAt
+      properties:
+        installationId:
+          type: string
+        platform:
+          $ref: '#/components/schemas/PushPlatform'
+        status:
+          $ref: '#/components/schemas/PushTokenStatus'
+        lastRegisteredAt:
+          type: string
+          format: date-time
+    NotificationEventType:
+      type: string
+      enum:
+        - expense.created
+    NotificationSnapshot:
+      type: object
+      additionalProperties: false
+      required:
+        - tripId
+        - expenseId
+        - actorDisplayName
+        - expenseTitle
+        - amountMinor
+        - currency
+      properties:
+        tripId:
+          type: string
+        expenseId:
+          type: string
+        actorDisplayName:
+          type: string
+        expenseTitle:
+          type: string
+        amountMinor:
+          type: integer
+          format: int64
+        currency:
+          $ref: '#/components/schemas/SupportedCurrency'
+    UserNotificationListItem:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - eventType
+        - title
+        - body
+        - actionPath
+        - snapshot
+        - createdAt
+        - readAt
+      properties:
+        id:
+          type: string
+        eventType:
+          $ref: '#/components/schemas/NotificationEventType'
+        title:
+          type: string
+        body:
+          type: string
+        actionPath:
+          type: string
+        snapshot:
+          $ref: '#/components/schemas/NotificationSnapshot'
+        createdAt:
+          type: string
+          format: date-time
+        readAt:
+          type: string
+          format: date-time
+          nullable: true
+    ListNotificationsResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - notifications
+        - nextCursor
+      properties:
+        notifications:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserNotificationListItem'
+        nextCursor:
+          type: string
+          nullable: true
+    MarkNotificationReadResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - notification
+      properties:
+        notification:
+          $ref: '#/components/schemas/UserNotificationListItem'
     AuthMeResponse:
       type: object
       required:

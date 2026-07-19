@@ -9,6 +9,7 @@ import { getMeWithRefresh, logoutCurrentSession } from '../auth/client';
 import { isMobileAuthSessionError } from '../auth/errors';
 import { createLogoutFlow, type LogoutFlow } from '../auth/logout-flow';
 import { clearStoredSession, readStoredSession } from '../auth/session';
+import { revokeDevicePushRegistration } from '../notifications/runtime';
 import { getMySettlementSummary } from '../trips/settlement-api';
 import { beginStaleWhileRevalidate, resolveStaleWhileRevalidateFailure } from '../trips/stale-refresh';
 import { listMyTrips } from '../trips/trip-api';
@@ -158,6 +159,11 @@ export function useMyPageController() {
 
     setIsLoggingOut(true);
     try {
+      try {
+        await revokeDevicePushRegistration();
+      } catch {
+        // Local logout should proceed even when push token revocation cannot be confirmed.
+      }
       await logoutFlow.run();
     } finally {
       setIsLoggingOut(false);

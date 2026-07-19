@@ -4,6 +4,7 @@ import { View, type ViewProps } from 'react-native';
 
 import { useDesignFonts } from '../lib/design';
 import { rootStackScreenOptions } from '../lib/navigation/root-stack-options';
+import { useNotificationResponseRouting } from '../lib/notifications/runtime';
 import { KeyboardControllerProvider } from '../lib/trip-ui/KeyboardControllerProvider';
 
 type GestureHandlerModule = {
@@ -23,6 +24,7 @@ function resolveGestureHandlerRootView(): ComponentType<ViewProps> {
 const AppRootView = resolveGestureHandlerRootView();
 
 export default function RootLayout() {
+  useNotificationResponseRouting();
   const [fontsLoaded, fontError] = useDesignFonts();
 
   if (!fontsLoaded && !fontError) {

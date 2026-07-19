@@ -484,6 +484,7 @@ func (q *Queries) GetExpenseReceiptObject(ctx context.Context, arg GetExpenseRec
 const getQuickExpensePayerParticipant = `-- name: GetQuickExpensePayerParticipant :one
 SELECT
   id::text,
+  user_id::text,
   display_name,
   joined_at
 FROM trip_participants
@@ -498,6 +499,7 @@ type GetQuickExpensePayerParticipantParams struct {
 
 type GetQuickExpensePayerParticipantRow struct {
 	ID          string
+	UserID      string
 	DisplayName string
 	JoinedAt    pgtype.Timestamptz
 }
@@ -505,7 +507,12 @@ type GetQuickExpensePayerParticipantRow struct {
 func (q *Queries) GetQuickExpensePayerParticipant(ctx context.Context, arg GetQuickExpensePayerParticipantParams) (GetQuickExpensePayerParticipantRow, error) {
 	row := q.db.QueryRow(ctx, getQuickExpensePayerParticipant, arg.TripID, arg.PayerParticipantID)
 	var i GetQuickExpensePayerParticipantRow
-	err := row.Scan(&i.ID, &i.DisplayName, &i.JoinedAt)
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.DisplayName,
+		&i.JoinedAt,
+	)
 	return i, err
 }
 
@@ -1351,6 +1358,7 @@ func (q *Queries) ListExpenseSplitsByExpenseID(ctx context.Context, expenseID pg
 const listQuickExpenseSplitParticipants = `-- name: ListQuickExpenseSplitParticipants :many
 SELECT
   id::text,
+  user_id::text,
   display_name,
   joined_at
 FROM trip_participants
@@ -1360,6 +1368,7 @@ ORDER BY joined_at ASC, id ASC
 
 type ListQuickExpenseSplitParticipantsRow struct {
 	ID          string
+	UserID      string
 	DisplayName string
 	JoinedAt    pgtype.Timestamptz
 }
@@ -1373,7 +1382,12 @@ func (q *Queries) ListQuickExpenseSplitParticipants(ctx context.Context, tripID 
 	var items []ListQuickExpenseSplitParticipantsRow
 	for rows.Next() {
 		var i ListQuickExpenseSplitParticipantsRow
-		if err := rows.Scan(&i.ID, &i.DisplayName, &i.JoinedAt); err != nil {
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.DisplayName,
+			&i.JoinedAt,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

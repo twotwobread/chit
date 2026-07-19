@@ -6,6 +6,8 @@ const DEFAULTS = Object.freeze({
   gcpRegion: 'asia-northeast3',
   cloudBuildRegion: 'asia-northeast3',
   cloudRunService: 'i-um-api-staging',
+  artifactRepository: 'i-um-staging',
+  imageName: 'api',
   cloudBuildTrigger: 'i-um-api-staging-deploy',
   deployBranch: 'develop',
   runtimeServiceAccount: 'i-um-api-staging-run@i-um-488511.iam.gserviceaccount.com',
@@ -14,6 +16,15 @@ const DEFAULTS = Object.freeze({
   googleMapsSecretName: 'i-um-staging-google-maps-api-key',
   gcsSigningPrivateKeySecretName: 'i-um-staging-gcs-signing-private-key',
   openAIApiKeySecretName: 'i-um-staging-openai-api-key',
+  expoPushAccessTokenSecretName: 'i-um-staging-expo-push-access-token',
+  notificationWorkerJob: 'i-um-notification-worker-staging',
+  notificationWorkerSchedulerJob: 'i-um-notification-worker-staging-every-minute',
+  notificationWorkerSchedule: '* * * * *',
+  notificationWorkerTimeZone: 'Asia/Seoul',
+  notificationWorkerBatchSize: '50',
+  notificationWorkerMaxAttempts: '8',
+  notificationWorkerStaleRunningMinutes: '10',
+  notificationWorkerMaxBatches: '20',
   appleBundleId: 'com.twotwobread.ium.staging',
   androidPackage: 'com.twotwobread.ium',
   inviteAppScheme: 'ium',
@@ -22,7 +33,7 @@ const DEFAULTS = Object.freeze({
   easBuildProfile: 'preview',
 });
 
-const VALID_ONLY = new Set(['all', 'api', 'mobile', 'secrets', 'db', 'smoke', 'eas-env']);
+const VALID_ONLY = new Set(['all', 'api', 'mobile', 'secrets', 'db', 'smoke', 'eas-env', 'notifications']);
 const VALID_PLATFORMS = new Set(['ios', 'android', 'all', 'none']);
 const PLACEHOLDER_PATTERN = /replace-with|change-me|todo|tbd|<[^>]+>/i;
 
@@ -128,6 +139,7 @@ export function buildStageConfig({ env }) {
     merged.CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT,
     DEFAULTS.runtimeServiceAccount.replace(`@${DEFAULTS.gcpProjectId}.`, `@${projectId}.`),
   );
+  const defaultNotificationSchedulerServiceAccount = `i-um-notify-scheduler@${projectId}.iam.gserviceaccount.com`;
 
   assertFalse('AUTH_ALLOW_DEV_OAUTH', authAllowDevOauth);
   assertFalse('EXPO_PUBLIC_AUTH_DEV_MODE', expoAuthDevMode);
@@ -174,6 +186,8 @@ export function buildStageConfig({ env }) {
     },
     cloudRun: {
       service: valueOrDefault(merged.CLOUD_RUN_SERVICE, DEFAULTS.cloudRunService),
+      artifactRepository: valueOrDefault(merged.ARTIFACT_REPOSITORY, DEFAULTS.artifactRepository),
+      imageName: valueOrDefault(merged.IMAGE_NAME, DEFAULTS.imageName),
     },
     cloudBuild: {
       trigger: valueOrDefault(merged.CLOUD_BUILD_TRIGGER, DEFAULTS.cloudBuildTrigger),
@@ -187,6 +201,7 @@ export function buildStageConfig({ env }) {
       GOOGLE_MAPS_API_KEY: valueOrDefault(merged.GOOGLE_MAPS_API_KEY_SECRET_NAME, DEFAULTS.googleMapsSecretName),
       GCS_SIGNING_PRIVATE_KEY: valueOrDefault(merged.GCS_SIGNING_PRIVATE_KEY_SECRET_NAME, DEFAULTS.gcsSigningPrivateKeySecretName),
       OPENAI_API_KEY: valueOrDefault(merged.OPENAI_API_KEY_SECRET_NAME, DEFAULTS.openAIApiKeySecretName),
+      EXPO_PUSH_ACCESS_TOKEN: valueOrDefault(merged.EXPO_PUSH_ACCESS_TOKEN_SECRET_NAME, DEFAULTS.expoPushAccessTokenSecretName),
     },
     secrets: {
       DATABASE_URL: merged.DATABASE_URL,
@@ -194,8 +209,29 @@ export function buildStageConfig({ env }) {
       GOOGLE_MAPS_API_KEY: googleMapsApiKey,
       GCS_SIGNING_PRIVATE_KEY: gcsSigningPrivateKey,
       OPENAI_API_KEY: merged.OPENAI_API_KEY,
+      EXPO_PUSH_ACCESS_TOKEN: optionalValue(merged.EXPO_PUSH_ACCESS_TOKEN),
     },
     apiEnv,
+    notificationWorker: {
+      jobName: valueOrDefault(merged.NOTIFICATION_WORKER_JOB, DEFAULTS.notificationWorkerJob),
+      schedulerJobName: valueOrDefault(merged.NOTIFICATION_WORKER_SCHEDULER_JOB, DEFAULTS.notificationWorkerSchedulerJob),
+      schedule: valueOrDefault(merged.NOTIFICATION_WORKER_SCHEDULE, DEFAULTS.notificationWorkerSchedule),
+      timeZone: valueOrDefault(merged.NOTIFICATION_WORKER_TIME_ZONE, DEFAULTS.notificationWorkerTimeZone),
+      schedulerServiceAccount: valueOrDefault(
+        merged.NOTIFICATION_WORKER_SCHEDULER_SERVICE_ACCOUNT,
+        defaultNotificationSchedulerServiceAccount,
+      ),
+      env: compactObject({
+        NOTIFICATION_WORKER_BATCH_SIZE: valueOrDefault(merged.NOTIFICATION_WORKER_BATCH_SIZE, DEFAULTS.notificationWorkerBatchSize),
+        NOTIFICATION_WORKER_MAX_ATTEMPTS: valueOrDefault(merged.NOTIFICATION_WORKER_MAX_ATTEMPTS, DEFAULTS.notificationWorkerMaxAttempts),
+        NOTIFICATION_WORKER_STALE_RUNNING_MINUTES: valueOrDefault(
+          merged.NOTIFICATION_WORKER_STALE_RUNNING_MINUTES,
+          DEFAULTS.notificationWorkerStaleRunningMinutes,
+        ),
+        NOTIFICATION_WORKER_MAX_BATCHES: valueOrDefault(merged.NOTIFICATION_WORKER_MAX_BATCHES, DEFAULTS.notificationWorkerMaxBatches),
+        EXPO_PUSH_ENDPOINT: optionalValue(merged.EXPO_PUSH_ENDPOINT),
+      }),
+    },
     eas: {
       projectDir: valueOrDefault(merged.EAS_PROJECT_DIR, DEFAULTS.easProjectDir),
       environment: valueOrDefault(merged.EAS_ENVIRONMENT, DEFAULTS.easEnvironment),
@@ -236,11 +272,17 @@ export function resolvePublicEndpoints(config, cloudRunUrl) {
 }
 
 export function createSecretSpecs(config) {
-  return Object.entries(config.secrets).map(([envName, value]) => ({
-    envName,
-    secretName: config.secretNames[envName],
-    value,
-  }));
+  return Object.entries(config.secrets)
+    .filter(([, value]) => isUsableValue(value))
+    .map(([envName, value]) => ({
+      envName,
+      secretName: config.secretNames[envName],
+      value,
+    }));
+}
+
+export function artifactImageUri(config, tag = 'latest') {
+  return `${config.gcp.region}-docker.pkg.dev/${config.gcp.projectId}/${config.cloudRun.artifactRepository}/${config.cloudRun.imageName}:${tag}`;
 }
 
 export function deriveDirectDatabaseUrl(databaseUrl) {
@@ -271,14 +313,28 @@ export function legacyCloudRunEnvNames() {
 
 export function cloudRunSecretMapping(config) {
   return createSecretSpecs(config)
+    .filter((spec) => spec.envName !== 'EXPO_PUSH_ACCESS_TOKEN')
     .map((spec) => `${spec.envName}=${spec.secretName}:latest`)
     .join(',');
 }
 
+export function notificationWorkerSecretMapping(config) {
+  return createSecretSpecs(config)
+    .filter((spec) => ['DATABASE_URL', 'EXPO_PUSH_ACCESS_TOKEN'].includes(spec.envName))
+    .map((spec) => `${spec.envName}=${spec.secretName}:latest`)
+    .join(',');
+}
+
+export function notificationWorkerEnvMapping(config) {
+  return delimitedEnvMapping(config.notificationWorker.env);
+}
+
+export function notificationWorkerRunUri(config) {
+  return `https://run.googleapis.com/v2/projects/${config.gcp.projectId}/locations/${config.gcp.region}/jobs/${config.notificationWorker.jobName}:run`;
+}
+
 export function cloudRunEnvMapping(apiEnv) {
-  return `^|^${Object.entries(apiEnv)
-    .map(([name, value]) => `${name}=${value}`)
-    .join('|')}`;
+  return delimitedEnvMapping(apiEnv);
 }
 
 export function easEnvSpecs(config, apiBaseUrl) {
@@ -292,6 +348,12 @@ export function easEnvSpecs(config, apiBaseUrl) {
       value,
       visibility: ['EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY', 'EXPO_PUBLIC_GOOGLE_MAPS_ANDROID_API_KEY'].includes(name) ? 'sensitive' : 'plaintext',
     }));
+}
+
+function delimitedEnvMapping(env) {
+  return `^|^${Object.entries(env)
+    .map(([name, value]) => `${name}=${value}`)
+    .join('|')}`;
 }
 
 function stripInlineComment(value) {

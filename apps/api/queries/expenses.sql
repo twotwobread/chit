@@ -51,6 +51,7 @@ WHERE si.trip_id = sqlc.arg(trip_id)::uuid
 -- name: GetQuickExpensePayerParticipant :one
 SELECT
   id::text,
+  user_id::text,
   display_name,
   joined_at
 FROM trip_participants
@@ -60,6 +61,7 @@ WHERE trip_id = sqlc.arg(trip_id)::uuid
 -- name: ListQuickExpenseSplitParticipants :many
 SELECT
   id::text,
+  user_id::text,
   display_name,
   joined_at
 FROM trip_participants

@@ -222,6 +222,38 @@ test('builds day-tabbed settlement expense history with selected-day editable ro
   );
 });
 
+test('selects the section containing a notification target expense', () => {
+  const viewModel = buildSettlementExpenseHistoryViewModel({
+    tripId: 'trip-a',
+    targetExpenseId: 'expense-target',
+    days: [
+      { day: tripDay({ id: 'day-1', date: '2026-07-10', dayOrder: 1 }), expenses: [] },
+      {
+        day: tripDay({ id: 'day-2', date: '2026-07-11', dayOrder: 2 }),
+        expenses: [dayExpense({ id: 'expense-target', tripDayId: 'day-2', expenseDate: '2026-07-11' })],
+      },
+    ],
+  });
+
+  assert.equal(viewModel.status, 'success');
+  if (viewModel.status !== 'success') return;
+  assert.equal(viewModel.selectedDayId, 'day-2');
+  assert.equal(viewModel.targetExpenseUnavailableMessage, null);
+});
+
+test('shows unavailable copy when notification target expense is missing', () => {
+  const viewModel = buildSettlementExpenseHistoryViewModel({
+    tripId: 'trip-a',
+    targetExpenseId: 'deleted-expense',
+    days: [{ day: tripDay({ id: 'day-1', date: '2026-07-10', dayOrder: 1 }), expenses: [dayExpense()] }],
+  });
+
+  assert.equal(viewModel.status, 'success');
+  if (viewModel.status !== 'success') return;
+  assert.equal(viewModel.selectedDayId, 'day-1');
+  assert.equal(viewModel.targetExpenseUnavailableMessage, '지출을 더 이상 볼 수 없어요. 지출 내역으로 이동했어요.');
+});
+
 test('summarizes multi-currency settlement expense history totals without conversion', () => {
   const viewModel = buildSettlementExpenseHistoryViewModel({
     tripId: 'trip-a',

@@ -162,6 +162,39 @@ type FlightPersonalDetail struct {
 	UpdatedAt               pgtype.Timestamptz
 }
 
+type NotificationEvent struct {
+	ID             pgtype.UUID
+	EventType      string
+	TripID         pgtype.UUID
+	ActorUserID    pgtype.UUID
+	EntityType     string
+	EntityID       pgtype.UUID
+	IdempotencyKey string
+	PayloadJson    []byte
+	CreatedAt      pgtype.Timestamptz
+}
+
+type NotificationPushOutbox struct {
+	ID                    pgtype.UUID
+	NotificationID        pgtype.UUID
+	PushTokenID           pgtype.UUID
+	UserID                pgtype.UUID
+	Provider              string
+	ExpoPushTokenSnapshot string
+	Title                 string
+	Body                  string
+	DataJson              []byte
+	Status                string
+	Attempts              int32
+	NextAttemptAt         pgtype.Timestamptz
+	ClaimedAt             pgtype.Timestamptz
+	LastError             pgtype.Text
+	ProviderMessageID     pgtype.Text
+	ProcessedAt           pgtype.Timestamptz
+	CreatedAt             pgtype.Timestamptz
+	UpdatedAt             pgtype.Timestamptz
+}
+
 type ScheduleItem struct {
 	ID          pgtype.UUID
 	TripID      pgtype.UUID
@@ -289,4 +322,32 @@ type User struct {
 	DeletedAt       pgtype.Timestamptz
 	CreatedAt       pgtype.Timestamptz
 	UpdatedAt       pgtype.Timestamptz
+}
+
+type UserNotification struct {
+	ID              pgtype.UUID
+	EventID         pgtype.UUID
+	UserID          pgtype.UUID
+	TripID          pgtype.UUID
+	RecipientReason string
+	Title           string
+	Body            string
+	ActionPath      string
+	SnapshotJson    []byte
+	ReadAt          pgtype.Timestamptz
+	CreatedAt       pgtype.Timestamptz
+}
+
+type UserPushToken struct {
+	ID               pgtype.UUID
+	UserID           pgtype.UUID
+	InstallationID   string
+	ExpoPushToken    string
+	Platform         string
+	Status           string
+	LastRegisteredAt pgtype.Timestamptz
+	RevokedAt        pgtype.Timestamptz
+	InvalidatedAt    pgtype.Timestamptz
+	CreatedAt        pgtype.Timestamptz
+	UpdatedAt        pgtype.Timestamptz
 }
