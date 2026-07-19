@@ -125,6 +125,10 @@ RETURNING
   payer_display_name,
   memo,
   include_in_settlement,
+  false::boolean AS receipt_exists,
+  ''::text AS receipt_content_type,
+  0::integer AS receipt_byte_size,
+  NULL::timestamptz AS receipt_uploaded_at,
   created_at;
 
 -- name: ListDayExpensesByTripDay :many
@@ -154,8 +158,15 @@ SELECT
   END::text AS payer_source,
   e.split_policy,
   e.include_in_settlement,
+  (er.expense_id IS NOT NULL)::boolean AS receipt_exists,
+  COALESCE(er.content_type, '')::text AS receipt_content_type,
+  COALESCE(er.byte_size, 0)::integer AS receipt_byte_size,
+  er.uploaded_at AS receipt_uploaded_at,
   e.created_at
 FROM expenses e
+LEFT JOIN expense_receipts er
+  ON er.expense_id = e.id
+ AND er.trip_id = e.trip_id
 LEFT JOIN schedule_items si
   ON e.anchor_type = 'schedule_item'
  AND si.id = e.schedule_item_id
@@ -200,8 +211,15 @@ SELECT
   END::text AS payer_source,
   e.split_policy,
   e.include_in_settlement,
+  (er.expense_id IS NOT NULL)::boolean AS receipt_exists,
+  COALESCE(er.content_type, '')::text AS receipt_content_type,
+  COALESCE(er.byte_size, 0)::integer AS receipt_byte_size,
+  er.uploaded_at AS receipt_uploaded_at,
   e.created_at
 FROM expenses e
+LEFT JOIN expense_receipts er
+  ON er.expense_id = e.id
+ AND er.trip_id = e.trip_id
 LEFT JOIN schedule_items si
   ON e.anchor_type = 'schedule_item'
  AND si.id = e.schedule_item_id
@@ -346,8 +364,15 @@ SELECT
   e.memo,
   e.split_policy,
   e.include_in_settlement,
+  (er.expense_id IS NOT NULL)::boolean AS receipt_exists,
+  COALESCE(er.content_type, '')::text AS receipt_content_type,
+  COALESCE(er.byte_size, 0)::integer AS receipt_byte_size,
+  er.uploaded_at AS receipt_uploaded_at,
   e.created_at
 FROM expenses e
+LEFT JOIN expense_receipts er
+  ON er.expense_id = e.id
+ AND er.trip_id = e.trip_id
 LEFT JOIN schedule_items si
   ON e.anchor_type = 'schedule_item'
  AND si.id = e.schedule_item_id
@@ -394,8 +419,15 @@ SELECT
   e.memo,
   e.split_policy,
   e.include_in_settlement,
+  (er.expense_id IS NOT NULL)::boolean AS receipt_exists,
+  COALESCE(er.content_type, '')::text AS receipt_content_type,
+  COALESCE(er.byte_size, 0)::integer AS receipt_byte_size,
+  er.uploaded_at AS receipt_uploaded_at,
   e.created_at
 FROM expenses e
+LEFT JOIN expense_receipts er
+  ON er.expense_id = e.id
+ AND er.trip_id = e.trip_id
 LEFT JOIN trip_participants payer
   ON payer.id = e.payer_participant_id
  AND payer.trip_id = e.trip_id
@@ -464,6 +496,10 @@ RETURNING
   payer_display_name,
   memo,
   include_in_settlement,
+  EXISTS(SELECT 1 FROM expense_receipts er WHERE er.expense_id = expenses.id)::boolean AS receipt_exists,
+  COALESCE((SELECT er.content_type FROM expense_receipts er WHERE er.expense_id = expenses.id), '')::text AS receipt_content_type,
+  COALESCE((SELECT er.byte_size FROM expense_receipts er WHERE er.expense_id = expenses.id), 0)::integer AS receipt_byte_size,
+  (SELECT er.uploaded_at FROM expense_receipts er WHERE er.expense_id = expenses.id) AS receipt_uploaded_at,
   created_at;
 
 -- name: UpdateTripExpense :one
@@ -501,6 +537,10 @@ RETURNING
   payer_display_name,
   memo,
   include_in_settlement,
+  EXISTS(SELECT 1 FROM expense_receipts er WHERE er.expense_id = expenses.id)::boolean AS receipt_exists,
+  COALESCE((SELECT er.content_type FROM expense_receipts er WHERE er.expense_id = expenses.id), '')::text AS receipt_content_type,
+  COALESCE((SELECT er.byte_size FROM expense_receipts er WHERE er.expense_id = expenses.id), 0)::integer AS receipt_byte_size,
+  (SELECT er.uploaded_at FROM expense_receipts er WHERE er.expense_id = expenses.id) AS receipt_uploaded_at,
   created_at;
 
 -- name: DeleteExpenseSplitsByExpenseID :exec
@@ -545,3 +585,215 @@ RETURNING
   participant_display_name,
   amount_minor,
   split_order;
+
+-- name: InsertExpenseReceiptDraft :one
+INSERT INTO expense_receipt_drafts (
+  trip_id,
+  created_by_user_id,
+  capture_mode,
+  objects_json,
+  image_count,
+  content_type,
+  byte_size,
+  uploaded_at,
+  extraction_json,
+  confidence,
+  warnings,
+  expires_at
+) VALUES (
+  sqlc.arg(trip_id)::uuid,
+  sqlc.arg(created_by_user_id)::uuid,
+  sqlc.arg(capture_mode),
+  sqlc.arg(objects_json)::jsonb,
+  sqlc.arg(image_count),
+  sqlc.arg(content_type),
+  sqlc.arg(byte_size),
+  sqlc.arg(uploaded_at),
+  sqlc.arg(extraction_json)::jsonb,
+  sqlc.arg(confidence),
+  sqlc.arg(warnings),
+  sqlc.arg(expires_at)
+)
+RETURNING
+  id::text,
+  trip_id::text,
+  created_by_user_id::text,
+  capture_mode,
+  objects_json,
+  image_count,
+  content_type,
+  byte_size,
+  uploaded_at,
+  extraction_json,
+  confidence,
+  warnings,
+  status,
+  expires_at,
+  COALESCE(used_expense_id::text, '')::text AS used_expense_id,
+  created_at,
+  updated_at;
+
+-- name: GetExpenseReceiptDraftForUpdate :one
+SELECT
+  id::text,
+  trip_id::text,
+  created_by_user_id::text,
+  capture_mode,
+  objects_json,
+  image_count,
+  content_type,
+  byte_size,
+  uploaded_at,
+  extraction_json,
+  confidence,
+  warnings,
+  status,
+  expires_at,
+  COALESCE(used_expense_id::text, '')::text AS used_expense_id,
+  created_at,
+  updated_at
+FROM expense_receipt_drafts
+WHERE id = sqlc.arg(receipt_draft_id)::uuid
+  AND trip_id = sqlc.arg(trip_id)::uuid
+  AND created_by_user_id = sqlc.arg(created_by_user_id)::uuid
+FOR UPDATE;
+
+-- name: MarkExpenseReceiptDraftUsed :exec
+UPDATE expense_receipt_drafts
+SET status = 'used',
+    used_expense_id = sqlc.arg(expense_id)::uuid,
+    updated_at = now()
+WHERE id = sqlc.arg(receipt_draft_id)::uuid
+  AND trip_id = sqlc.arg(trip_id)::uuid
+  AND created_by_user_id = sqlc.arg(created_by_user_id)::uuid
+  AND status = 'draft'
+  AND expires_at > now();
+
+-- name: CancelExpenseReceiptDraft :many
+UPDATE expense_receipt_drafts
+SET status = 'cancelled',
+    updated_at = now()
+WHERE id = sqlc.arg(receipt_draft_id)::uuid
+  AND trip_id = sqlc.arg(trip_id)::uuid
+  AND created_by_user_id = sqlc.arg(created_by_user_id)::uuid
+  AND status = 'draft'
+RETURNING
+  objects_json;
+
+-- name: ExpireExpenseReceiptDrafts :many
+UPDATE expense_receipt_drafts
+SET status = 'expired',
+    updated_at = now()
+WHERE id IN (
+  SELECT id
+  FROM expense_receipt_drafts
+  WHERE status = 'draft'
+    AND expires_at <= now()
+  ORDER BY expires_at ASC, id ASC
+  LIMIT sqlc.arg(limit_count)
+  FOR UPDATE SKIP LOCKED
+)
+RETURNING
+  id::text,
+  objects_json;
+
+-- name: LockExpenseReceiptForUpdate :one
+SELECT
+  objects_json,
+  image_count,
+  content_type,
+  byte_size,
+  uploaded_at
+FROM expense_receipts
+WHERE trip_id = sqlc.arg(trip_id)::uuid
+  AND expense_id = sqlc.arg(expense_id)::uuid
+FOR UPDATE;
+
+-- name: UpsertExpenseReceipt :one
+INSERT INTO expense_receipts (
+  expense_id,
+  trip_id,
+  uploaded_by_user_id,
+  objects_json,
+  image_count,
+  content_type,
+  byte_size,
+  uploaded_at
+) VALUES (
+  sqlc.arg(expense_id)::uuid,
+  sqlc.arg(trip_id)::uuid,
+  sqlc.arg(uploaded_by_user_id)::uuid,
+  sqlc.arg(objects_json)::jsonb,
+  sqlc.arg(image_count),
+  sqlc.arg(content_type),
+  sqlc.arg(byte_size),
+  sqlc.arg(uploaded_at)
+)
+ON CONFLICT (expense_id) DO UPDATE
+SET uploaded_by_user_id = EXCLUDED.uploaded_by_user_id,
+    objects_json = EXCLUDED.objects_json,
+    image_count = EXCLUDED.image_count,
+    content_type = EXCLUDED.content_type,
+    byte_size = EXCLUDED.byte_size,
+    uploaded_at = EXCLUDED.uploaded_at,
+    updated_at = now()
+RETURNING
+  true::boolean AS exists,
+  content_type,
+  byte_size,
+  uploaded_at;
+
+-- name: ClearExpenseReceipt :many
+DELETE FROM expense_receipts
+WHERE trip_id = sqlc.arg(trip_id)::uuid
+  AND expense_id = sqlc.arg(expense_id)::uuid
+RETURNING
+  objects_json;
+
+-- name: GetExpenseReceiptObject :one
+SELECT
+  er.objects_json,
+  er.content_type,
+  er.byte_size,
+  er.uploaded_at
+FROM expense_receipts er
+JOIN expenses e
+  ON e.id = er.expense_id
+ AND e.trip_id = er.trip_id
+WHERE er.trip_id = sqlc.arg(trip_id)::uuid
+  AND er.expense_id = sqlc.arg(expense_id)::uuid;
+
+-- name: EnqueueExpenseReceiptDeletionJobForExpense :exec
+INSERT INTO storage_object_deletion_jobs (
+  bucket,
+  object_key,
+  object_generation,
+  reason
+)
+SELECT
+  receipt_object->>'bucket',
+  receipt_object->>'objectKey',
+  receipt_object->>'generation',
+  sqlc.arg(reason)
+FROM expense_receipts er
+CROSS JOIN LATERAL jsonb_array_elements(er.objects_json) AS receipt_object
+WHERE er.trip_id = sqlc.arg(trip_id)::uuid
+  AND er.expense_id = sqlc.arg(expense_id)::uuid
+ON CONFLICT DO NOTHING;
+
+-- name: EnqueueExpenseReceiptDeletionJobsForTrip :exec
+INSERT INTO storage_object_deletion_jobs (
+  bucket,
+  object_key,
+  object_generation,
+  reason
+)
+SELECT
+  receipt_object->>'bucket',
+  receipt_object->>'objectKey',
+  receipt_object->>'generation',
+  sqlc.arg(reason)
+FROM expense_receipts er
+CROSS JOIN LATERAL jsonb_array_elements(er.objects_json) AS receipt_object
+WHERE er.trip_id = sqlc.arg(trip_id)::uuid
+ON CONFLICT DO NOTHING;

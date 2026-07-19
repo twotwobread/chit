@@ -25,6 +25,14 @@ var (
 	ErrSettlementSummaryUnavailable = errors.New("settlement summary unavailable")
 	ErrInviteNotFound               = errors.New("invite not found")
 	ErrInviteExpired                = errors.New("invite expired")
+	ErrUploadTooLarge               = errors.New("upload too large")
+	ErrUnsupportedMediaType         = errors.New("unsupported media type")
+	ErrStorageUnavailable           = errors.New("storage unavailable")
+	ErrReceiptProviderUnavailable   = errors.New("receipt provider unavailable")
+	ErrReceiptProviderRateLimited   = errors.New("receipt provider rate limited")
+	ErrReceiptExtractionInvalid     = errors.New("receipt extraction invalid")
+	ErrReceiptTextUnreadable        = errors.New("receipt text unreadable")
+	ErrUnsupportedReceiptLanguage   = errors.New("unsupported receipt language")
 )
 
 type Creator struct {
@@ -83,6 +91,7 @@ type CreateQuickExpenseInput struct {
 	ParticipantIDs      []string
 	ManualSplits        []ManualExpenseSplitInput
 	IncludeInSettlement *bool
+	ReceiptDraftID      *string
 }
 
 type CreateTripExpenseInput struct {
@@ -97,6 +106,7 @@ type CreateTripExpenseInput struct {
 	ManualSplits        []ManualExpenseSplitInput
 	Memo                *string
 	IncludeInSettlement *bool
+	ReceiptDraftID      *string
 }
 
 type UpdateExpenseInput struct {
@@ -250,6 +260,7 @@ type CreateQuickExpenseRecord struct {
 	ParticipantIDs      []string
 	ManualSplits        []ManualExpenseSplitInput
 	IncludeInSettlement bool
+	ReceiptDraftID      *string
 	CreatedBy           string
 }
 
@@ -266,6 +277,7 @@ type CreateTripExpenseRecord struct {
 	ManualSplits        []ManualExpenseSplitInput
 	Memo                *string
 	IncludeInSettlement bool
+	ReceiptDraftID      *string
 	CreatedBy           string
 }
 
@@ -532,7 +544,146 @@ const (
 	ExpenseDisplaySourceFallback = "fallback"
 	ExpenseSplitPolicyEqual      = "equal"
 	ExpenseSplitPolicyManual     = "manual"
+
+	ExpenseReceiptConfidenceHigh   = "high"
+	ExpenseReceiptConfidenceMedium = "medium"
+	ExpenseReceiptConfidenceLow    = "low"
+
+	ReceiptCaptureModeSingle = "single"
+	ReceiptCaptureModeSplit  = "split"
+
+	ReceiptImageRoleSingle = "single"
+	ReceiptImageRoleHeader = "header"
+	ReceiptImageRoleTotal  = "total"
+
+	ReceiptOCRLanguageKorean = "ko"
 )
+
+type ExpenseReceiptLineItemDraft struct {
+	Name        string   `json:"name"`
+	AmountMinor *int64   `json:"amountMinor"`
+	Quantity    *float64 `json:"quantity"`
+}
+
+type ExpenseReceiptExtraction struct {
+	MerchantName       *string                       `json:"merchantName"`
+	ExpenseTitle       *string                       `json:"expenseTitle"`
+	ExpenseDate        *string                       `json:"expenseDate"`
+	ExpenseTime        *string                       `json:"expenseTime"`
+	Currency           *string                       `json:"currency"`
+	TotalAmountMinor   *int64                        `json:"totalAmountMinor"`
+	TaxAmountMinor     *int64                        `json:"taxAmountMinor"`
+	ServiceChargeMinor *int64                        `json:"serviceChargeMinor"`
+	LineItems          []ExpenseReceiptLineItemDraft `json:"lineItems"`
+	Confidence         string                        `json:"confidence"`
+	Warnings           []string                      `json:"warnings"`
+}
+
+type ReceiptCaptureMode string
+
+type ReceiptImageRole string
+
+type ReceiptOCRLanguage string
+
+type ExpenseReceiptOCRTextPart struct {
+	Role ReceiptImageRole
+	Text string
+}
+
+type ExpenseReceiptImageUpload struct {
+	Role        ReceiptImageRole
+	ContentType string
+	Data        []byte
+}
+
+type ExpenseReceiptObject struct {
+	Role        ReceiptImageRole
+	Bucket      string
+	ObjectKey   string
+	Generation  string
+	ContentType string
+	ByteSize    int
+	UploadedAt  time.Time
+}
+
+type SignedExpenseReceiptURL struct {
+	URL         string
+	ExpiresAt   time.Time
+	ContentType string
+	ByteSize    int
+}
+
+type ExpenseReceiptSummary struct {
+	Exists      bool
+	ContentType *string
+	ByteSize    *int
+	UploadedAt  *time.Time
+}
+
+type ExpenseReceiptDraft struct {
+	ID          string
+	TripID      string
+	CaptureMode ReceiptCaptureMode
+	ImageCount  int
+	ContentType string
+	ByteSize    int
+	Extraction  ExpenseReceiptExtraction
+	ExpiresAt   time.Time
+	CreatedAt   time.Time
+}
+
+type CreateExpenseReceiptDraftInput struct {
+	CaptureMode  ReceiptCaptureMode
+	OCRLanguage  ReceiptOCRLanguage
+	OCRTextParts []ExpenseReceiptOCRTextPart
+	Images       []ExpenseReceiptImageUpload
+}
+
+type CreateExpenseReceiptDraftRecord struct {
+	TripID          string
+	CreatedByUserID string
+	CaptureMode     ReceiptCaptureMode
+	Objects         []ExpenseReceiptObject
+	Extraction      ExpenseReceiptExtraction
+	ExpiresAt       time.Time
+}
+
+type CreateExpenseReceiptDraftResult struct {
+	Draft ExpenseReceiptDraft
+}
+
+type UpsertExpenseReceiptRecord struct {
+	TripID           string
+	ExpenseID        string
+	UploadedByUserID string
+	Object           ExpenseReceiptObject
+}
+
+type UpsertExpenseReceiptResult struct {
+	Receipt    ExpenseReceiptSummary
+	OldObjects []ExpenseReceiptObject
+}
+
+type ExpenseReceiptObjectStore interface {
+	UploadExpenseReceipt(ctx context.Context, objectKey string, contentType string, data []byte) (ExpenseReceiptObject, error)
+	DeleteObject(ctx context.Context, object ExpenseReceiptObject) error
+	SignedGetURL(ctx context.Context, object ExpenseReceiptObject, ttl time.Duration) (SignedExpenseReceiptURL, error)
+}
+
+type ReceiptModelProvider interface {
+	ExtractExpenseReceiptDraft(ctx context.Context, ocrText string) (ExpenseReceiptExtraction, error)
+}
+
+type ExpenseReceiptDraftRepository interface {
+	CreateExpenseReceiptDraft(ctx context.Context, record CreateExpenseReceiptDraftRecord) (CreateExpenseReceiptDraftResult, error)
+}
+
+type ExpenseReceiptRepository interface {
+	CancelExpenseReceiptDraft(ctx context.Context, tripID string, userID string, receiptDraftID string) ([]ExpenseReceiptObject, error)
+	UpsertExpenseReceipt(ctx context.Context, record UpsertExpenseReceiptRecord) (UpsertExpenseReceiptResult, error)
+	ClearExpenseReceipt(ctx context.Context, tripID string, expenseID string) ([]ExpenseReceiptObject, error)
+	GetExpenseReceiptObject(ctx context.Context, tripID string, expenseID string) (ExpenseReceiptObject, error)
+}
 
 type ExpensePlaceDisplay struct {
 	TripPlaceID *string
@@ -570,6 +721,7 @@ type Expense struct {
 	SplitPolicy         string
 	Splits              []ExpenseSplit
 	IncludeInSettlement bool
+	Receipt             ExpenseReceiptSummary
 	CreatedAt           time.Time
 }
 
@@ -609,6 +761,7 @@ type DayExpenseListItem struct {
 	SplitPolicy         string
 	Splits              []DayExpenseSplitListItem
 	IncludeInSettlement bool
+	Receipt             ExpenseReceiptSummary
 	CreatedAt           time.Time
 }
 

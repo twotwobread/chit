@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Text, TextInput, View } from 'react-native';
 
+import { type ExpenseReceiptDraft } from '@i-um/api-contract';
+
 import { Card, PrimaryButton, SecondaryButton, theme } from '../design';
 import { dateFromString, isValidDate, monthStringFromDate } from '../trips/date';
 import { TripDateFieldButton, TripDatePicker } from '../trips/date-picker';
@@ -23,6 +25,7 @@ import {
   ExpenseSettlementOptionSheet,
   ExpenseSplitRowsSection,
 } from './ExpenseFormSharedParts';
+import { ReceiptCaptureScanner } from './ReceiptCaptureScanner';
 import { styles } from './QuickExpenseEntryStyles';
 
 export type QuickExpenseFormSubmitStateInput = {
@@ -97,6 +100,7 @@ export function QuickExpenseForm({
   includeInSettlement,
   mode,
   onBack,
+  onClearReceiptDraft,
   onClearTripDay,
   onSelectItem,
   onSelectPayer,
@@ -110,7 +114,11 @@ export function QuickExpenseForm({
   onUpdateMemo,
   onUpdateManualSplitInput,
   onUpdateTitle,
+  onReceiptDraftCreated,
   payerParticipantId,
+  receiptBusy,
+  receiptDraft,
+  receiptMessage,
   saving,
   selectedItemId,
   selectedSplitParticipantIds,
@@ -119,6 +127,7 @@ export function QuickExpenseForm({
   manualSplitInputs,
   memoInput,
   titleInput,
+  tripId,
   tripName,
   viewModel,
 }: {
@@ -146,6 +155,11 @@ export function QuickExpenseForm({
   onUpdateManualSplitInput: (participantId: string, amount: string) => void;
   onUpdateTitle: (value: string) => void;
   payerParticipantId: string | null;
+  receiptBusy: boolean;
+  receiptDraft: ExpenseReceiptDraft | null;
+  receiptMessage: string | null;
+  onClearReceiptDraft: () => void;
+  onReceiptDraftCreated: (draft: ExpenseReceiptDraft) => void;
   saving: boolean;
   selectedItemId: string | null;
   selectedSplitParticipantIds: string[];
@@ -154,6 +168,7 @@ export function QuickExpenseForm({
   manualSplitInputs: QuickExpenseManualSplitInput[];
   memoInput: string;
   titleInput: string;
+  tripId: string;
   tripName: string;
   viewModel: QuickExpenseViewModel;
 }) {
@@ -177,6 +192,8 @@ export function QuickExpenseForm({
     selected: option.participantId === payerParticipantId,
   }));
   const [activeSheet, setActiveSheet] = useState<'split' | 'settlement' | null>(null);
+  const [entryMode, setEntryMode] = useState<'choice' | 'manual'>(receiptDraft ? 'manual' : 'choice');
+  const [scannerVisible, setScannerVisible] = useState(false);
   const [paymentDatePickerOpen, setPaymentDatePickerOpen] = useState(false);
   const [paymentCalendarMonth, setPaymentCalendarMonth] = useState(() => monthStringFromDate(new Date()));
   const showDayContext = viewModel.dayLabel === '전체 일정';
@@ -205,6 +222,38 @@ export function QuickExpenseForm({
   const settlementDetail = settlementStatusSummaryDetail(includeInSettlement);
   const splitErrorMessage =
     errors.payer ?? errors.participants ?? viewModel.splitParticipantError ?? viewModel.splitPreviewMessage;
+  const handleReceiptDraftCreated = (draft: ExpenseReceiptDraft) => {
+    setScannerVisible(false);
+    setEntryMode('manual');
+    onReceiptDraftCreated(draft);
+  };
+  const handleDirectInput = () => {
+    setScannerVisible(false);
+    setEntryMode('manual');
+  };
+
+  if (entryMode === 'choice' && !receiptDraft) {
+    return (
+      <>
+        <Card>
+          <View style={styles.fieldGroup}>
+            <Text style={styles.screenTitle}>지출을 어떻게 입력할까요?</Text>
+            <Text style={styles.helper}>직접 입력하거나 영수증을 촬영해 금액 초안을 채울 수 있어요.</Text>
+          </View>
+          <PrimaryButton label="직접 입력" onPress={handleDirectInput} />
+          <SecondaryButton disabled={!tripId} label="영수증 촬영" onPress={() => setScannerVisible(true)} />
+          <SecondaryButton label="돌아가기" onPress={onBack} />
+        </Card>
+        <ReceiptCaptureScanner
+          onClose={() => setScannerVisible(false)}
+          onDirectInput={handleDirectInput}
+          onDraftCreated={handleReceiptDraftCreated}
+          tripId={tripId}
+          visible={scannerVisible}
+        />
+      </>
+    );
+  }
 
   return (
     <>
@@ -302,6 +351,35 @@ export function QuickExpenseForm({
           {errors.amount ? <Text style={styles.errorMessage}>{errors.amount}</Text> : null}
         </View>
 
+        <View style={styles.fieldGroup}>
+          <Text style={styles.label}>영수증</Text>
+          <View style={styles.noticeBox}>
+            <Text style={styles.helper}>
+              영수증을 촬영하면 금액/날짜/지출명 초안을 채워줘요. 저장 전 직접 확인해야 해요.
+            </Text>
+            {receiptDraft ? (
+              <Text style={styles.helper}>
+                첨부된 초안 · 신뢰도 {receiptConfidenceLabel(receiptDraft.extraction.confidence)}
+              </Text>
+            ) : null}
+            {receiptMessage ? <Text style={styles.helper}>{receiptMessage}</Text> : null}
+            <View style={styles.amountRow}>
+              <SecondaryButton
+                disabled={saving || receiptBusy || Boolean(viewModel.emptyMessage) || !tripId}
+                label={receiptDraft ? '다른 영수증 촬영' : '영수증 촬영'}
+                onPress={() => setScannerVisible(true)}
+              />
+              {receiptDraft ? (
+                <SecondaryButton
+                  disabled={saving || receiptBusy}
+                  label={receiptBusy ? '해제 중...' : '초안 해제'}
+                  onPress={onClearReceiptDraft}
+                />
+              ) : null}
+            </View>
+          </View>
+        </View>
+
         <ExpenseFormSummaryActionRow
           disabled={saving || Boolean(viewModel.emptyMessage)}
           onPress={() => setActiveSheet('split')}
@@ -378,8 +456,25 @@ export function QuickExpenseForm({
         }}
         visible={activeSheet === 'settlement'}
       />
+      <ReceiptCaptureScanner
+        onClose={() => setScannerVisible(false)}
+        onDirectInput={handleDirectInput}
+        onDraftCreated={handleReceiptDraftCreated}
+        tripId={tripId}
+        visible={scannerVisible}
+      />
     </>
   );
+}
+
+function receiptConfidenceLabel(confidence: string): string {
+  if (confidence === 'high') {
+    return '높음';
+  }
+  if (confidence === 'medium') {
+    return '보통';
+  }
+  return '낮음';
 }
 
 export function QuickExpenseSavedSummaryCard({

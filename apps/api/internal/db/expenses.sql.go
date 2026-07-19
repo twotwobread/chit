@@ -11,6 +11,77 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const cancelExpenseReceiptDraft = `-- name: CancelExpenseReceiptDraft :many
+UPDATE expense_receipt_drafts
+SET status = 'cancelled',
+    updated_at = now()
+WHERE id = $1::uuid
+  AND trip_id = $2::uuid
+  AND created_by_user_id = $3::uuid
+  AND status = 'draft'
+RETURNING
+  objects_json
+`
+
+type CancelExpenseReceiptDraftParams struct {
+	ReceiptDraftID  pgtype.UUID
+	TripID          pgtype.UUID
+	CreatedByUserID pgtype.UUID
+}
+
+func (q *Queries) CancelExpenseReceiptDraft(ctx context.Context, arg CancelExpenseReceiptDraftParams) ([][]byte, error) {
+	rows, err := q.db.Query(ctx, cancelExpenseReceiptDraft, arg.ReceiptDraftID, arg.TripID, arg.CreatedByUserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items [][]byte
+	for rows.Next() {
+		var objects_json []byte
+		if err := rows.Scan(&objects_json); err != nil {
+			return nil, err
+		}
+		items = append(items, objects_json)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const clearExpenseReceipt = `-- name: ClearExpenseReceipt :many
+DELETE FROM expense_receipts
+WHERE trip_id = $1::uuid
+  AND expense_id = $2::uuid
+RETURNING
+  objects_json
+`
+
+type ClearExpenseReceiptParams struct {
+	TripID    pgtype.UUID
+	ExpenseID pgtype.UUID
+}
+
+func (q *Queries) ClearExpenseReceipt(ctx context.Context, arg ClearExpenseReceiptParams) ([][]byte, error) {
+	rows, err := q.db.Query(ctx, clearExpenseReceipt, arg.TripID, arg.ExpenseID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items [][]byte
+	for rows.Next() {
+		var objects_json []byte
+		if err := rows.Scan(&objects_json); err != nil {
+			return nil, err
+		}
+		items = append(items, objects_json)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const deleteExpenseByTripDayAndID = `-- name: DeleteExpenseByTripDayAndID :one
 DELETE FROM expenses
 WHERE trip_id = $1::uuid
@@ -65,6 +136,107 @@ func (q *Queries) DeleteTripExpenseByID(ctx context.Context, arg DeleteTripExpen
 	return id, err
 }
 
+const enqueueExpenseReceiptDeletionJobForExpense = `-- name: EnqueueExpenseReceiptDeletionJobForExpense :exec
+INSERT INTO storage_object_deletion_jobs (
+  bucket,
+  object_key,
+  object_generation,
+  reason
+)
+SELECT
+  receipt_object->>'bucket',
+  receipt_object->>'objectKey',
+  receipt_object->>'generation',
+  $1
+FROM expense_receipts er
+CROSS JOIN LATERAL jsonb_array_elements(er.objects_json) AS receipt_object
+WHERE er.trip_id = $2::uuid
+  AND er.expense_id = $3::uuid
+ON CONFLICT DO NOTHING
+`
+
+type EnqueueExpenseReceiptDeletionJobForExpenseParams struct {
+	Reason    string
+	TripID    pgtype.UUID
+	ExpenseID pgtype.UUID
+}
+
+func (q *Queries) EnqueueExpenseReceiptDeletionJobForExpense(ctx context.Context, arg EnqueueExpenseReceiptDeletionJobForExpenseParams) error {
+	_, err := q.db.Exec(ctx, enqueueExpenseReceiptDeletionJobForExpense, arg.Reason, arg.TripID, arg.ExpenseID)
+	return err
+}
+
+const enqueueExpenseReceiptDeletionJobsForTrip = `-- name: EnqueueExpenseReceiptDeletionJobsForTrip :exec
+INSERT INTO storage_object_deletion_jobs (
+  bucket,
+  object_key,
+  object_generation,
+  reason
+)
+SELECT
+  receipt_object->>'bucket',
+  receipt_object->>'objectKey',
+  receipt_object->>'generation',
+  $1
+FROM expense_receipts er
+CROSS JOIN LATERAL jsonb_array_elements(er.objects_json) AS receipt_object
+WHERE er.trip_id = $2::uuid
+ON CONFLICT DO NOTHING
+`
+
+type EnqueueExpenseReceiptDeletionJobsForTripParams struct {
+	Reason string
+	TripID pgtype.UUID
+}
+
+func (q *Queries) EnqueueExpenseReceiptDeletionJobsForTrip(ctx context.Context, arg EnqueueExpenseReceiptDeletionJobsForTripParams) error {
+	_, err := q.db.Exec(ctx, enqueueExpenseReceiptDeletionJobsForTrip, arg.Reason, arg.TripID)
+	return err
+}
+
+const expireExpenseReceiptDrafts = `-- name: ExpireExpenseReceiptDrafts :many
+UPDATE expense_receipt_drafts
+SET status = 'expired',
+    updated_at = now()
+WHERE id IN (
+  SELECT id
+  FROM expense_receipt_drafts
+  WHERE status = 'draft'
+    AND expires_at <= now()
+  ORDER BY expires_at ASC, id ASC
+  LIMIT $1
+  FOR UPDATE SKIP LOCKED
+)
+RETURNING
+  id::text,
+  objects_json
+`
+
+type ExpireExpenseReceiptDraftsRow struct {
+	ID          string
+	ObjectsJson []byte
+}
+
+func (q *Queries) ExpireExpenseReceiptDrafts(ctx context.Context, limitCount int32) ([]ExpireExpenseReceiptDraftsRow, error) {
+	rows, err := q.db.Query(ctx, expireExpenseReceiptDrafts, limitCount)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ExpireExpenseReceiptDraftsRow
+	for rows.Next() {
+		var i ExpireExpenseReceiptDraftsRow
+		if err := rows.Scan(&i.ID, &i.ObjectsJson); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getExpenseByTripDayAndID = `-- name: GetExpenseByTripDayAndID :one
 SELECT
   e.id::text AS id,
@@ -95,8 +267,15 @@ SELECT
   e.memo,
   e.split_policy,
   e.include_in_settlement,
+  (er.expense_id IS NOT NULL)::boolean AS receipt_exists,
+  COALESCE(er.content_type, '')::text AS receipt_content_type,
+  COALESCE(er.byte_size, 0)::integer AS receipt_byte_size,
+  er.uploaded_at AS receipt_uploaded_at,
   e.created_at
 FROM expenses e
+LEFT JOIN expense_receipts er
+  ON er.expense_id = e.id
+ AND er.trip_id = e.trip_id
 LEFT JOIN schedule_items si
   ON e.anchor_type = 'schedule_item'
  AND si.id = e.schedule_item_id
@@ -143,6 +322,10 @@ type GetExpenseByTripDayAndIDRow struct {
 	Memo                pgtype.Text
 	SplitPolicy         string
 	IncludeInSettlement bool
+	ReceiptExists       bool
+	ReceiptContentType  string
+	ReceiptByteSize     int32
+	ReceiptUploadedAt   pgtype.Timestamptz
 	CreatedAt           pgtype.Timestamptz
 }
 
@@ -171,7 +354,126 @@ func (q *Queries) GetExpenseByTripDayAndID(ctx context.Context, arg GetExpenseBy
 		&i.Memo,
 		&i.SplitPolicy,
 		&i.IncludeInSettlement,
+		&i.ReceiptExists,
+		&i.ReceiptContentType,
+		&i.ReceiptByteSize,
+		&i.ReceiptUploadedAt,
 		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getExpenseReceiptDraftForUpdate = `-- name: GetExpenseReceiptDraftForUpdate :one
+SELECT
+  id::text,
+  trip_id::text,
+  created_by_user_id::text,
+  capture_mode,
+  objects_json,
+  image_count,
+  content_type,
+  byte_size,
+  uploaded_at,
+  extraction_json,
+  confidence,
+  warnings,
+  status,
+  expires_at,
+  COALESCE(used_expense_id::text, '')::text AS used_expense_id,
+  created_at,
+  updated_at
+FROM expense_receipt_drafts
+WHERE id = $1::uuid
+  AND trip_id = $2::uuid
+  AND created_by_user_id = $3::uuid
+FOR UPDATE
+`
+
+type GetExpenseReceiptDraftForUpdateParams struct {
+	ReceiptDraftID  pgtype.UUID
+	TripID          pgtype.UUID
+	CreatedByUserID pgtype.UUID
+}
+
+type GetExpenseReceiptDraftForUpdateRow struct {
+	ID              string
+	TripID          string
+	CreatedByUserID string
+	CaptureMode     string
+	ObjectsJson     []byte
+	ImageCount      int32
+	ContentType     string
+	ByteSize        int32
+	UploadedAt      pgtype.Timestamptz
+	ExtractionJson  []byte
+	Confidence      string
+	Warnings        []string
+	Status          string
+	ExpiresAt       pgtype.Timestamptz
+	UsedExpenseID   string
+	CreatedAt       pgtype.Timestamptz
+	UpdatedAt       pgtype.Timestamptz
+}
+
+func (q *Queries) GetExpenseReceiptDraftForUpdate(ctx context.Context, arg GetExpenseReceiptDraftForUpdateParams) (GetExpenseReceiptDraftForUpdateRow, error) {
+	row := q.db.QueryRow(ctx, getExpenseReceiptDraftForUpdate, arg.ReceiptDraftID, arg.TripID, arg.CreatedByUserID)
+	var i GetExpenseReceiptDraftForUpdateRow
+	err := row.Scan(
+		&i.ID,
+		&i.TripID,
+		&i.CreatedByUserID,
+		&i.CaptureMode,
+		&i.ObjectsJson,
+		&i.ImageCount,
+		&i.ContentType,
+		&i.ByteSize,
+		&i.UploadedAt,
+		&i.ExtractionJson,
+		&i.Confidence,
+		&i.Warnings,
+		&i.Status,
+		&i.ExpiresAt,
+		&i.UsedExpenseID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getExpenseReceiptObject = `-- name: GetExpenseReceiptObject :one
+SELECT
+  er.objects_json,
+  er.content_type,
+  er.byte_size,
+  er.uploaded_at
+FROM expense_receipts er
+JOIN expenses e
+  ON e.id = er.expense_id
+ AND e.trip_id = er.trip_id
+WHERE er.trip_id = $1::uuid
+  AND er.expense_id = $2::uuid
+`
+
+type GetExpenseReceiptObjectParams struct {
+	TripID    pgtype.UUID
+	ExpenseID pgtype.UUID
+}
+
+type GetExpenseReceiptObjectRow struct {
+	ObjectsJson []byte
+	ContentType string
+	ByteSize    int32
+	UploadedAt  pgtype.Timestamptz
+}
+
+func (q *Queries) GetExpenseReceiptObject(ctx context.Context, arg GetExpenseReceiptObjectParams) (GetExpenseReceiptObjectRow, error) {
+	row := q.db.QueryRow(ctx, getExpenseReceiptObject, arg.TripID, arg.ExpenseID)
+	var i GetExpenseReceiptObjectRow
+	err := row.Scan(
+		&i.ObjectsJson,
+		&i.ContentType,
+		&i.ByteSize,
+		&i.UploadedAt,
 	)
 	return i, err
 }
@@ -307,8 +609,15 @@ SELECT
   e.memo,
   e.split_policy,
   e.include_in_settlement,
+  (er.expense_id IS NOT NULL)::boolean AS receipt_exists,
+  COALESCE(er.content_type, '')::text AS receipt_content_type,
+  COALESCE(er.byte_size, 0)::integer AS receipt_byte_size,
+  er.uploaded_at AS receipt_uploaded_at,
   e.created_at
 FROM expenses e
+LEFT JOIN expense_receipts er
+  ON er.expense_id = e.id
+ AND er.trip_id = e.trip_id
 LEFT JOIN trip_participants payer
   ON payer.id = e.payer_participant_id
  AND payer.trip_id = e.trip_id
@@ -346,6 +655,10 @@ type GetTripExpenseByIDRow struct {
 	Memo                pgtype.Text
 	SplitPolicy         string
 	IncludeInSettlement bool
+	ReceiptExists       bool
+	ReceiptContentType  string
+	ReceiptByteSize     int32
+	ReceiptUploadedAt   pgtype.Timestamptz
 	CreatedAt           pgtype.Timestamptz
 }
 
@@ -374,6 +687,10 @@ func (q *Queries) GetTripExpenseByID(ctx context.Context, arg GetTripExpenseByID
 		&i.Memo,
 		&i.SplitPolicy,
 		&i.IncludeInSettlement,
+		&i.ReceiptExists,
+		&i.ReceiptContentType,
+		&i.ReceiptByteSize,
+		&i.ReceiptUploadedAt,
 		&i.CreatedAt,
 	)
 	return i, err
@@ -490,6 +807,10 @@ RETURNING
   payer_display_name,
   memo,
   include_in_settlement,
+  false::boolean AS receipt_exists,
+  ''::text AS receipt_content_type,
+  0::integer AS receipt_byte_size,
+  NULL::timestamptz AS receipt_uploaded_at,
   created_at
 `
 
@@ -533,6 +854,10 @@ type InsertExpenseRow struct {
 	PayerDisplayName    string
 	Memo                pgtype.Text
 	IncludeInSettlement bool
+	ReceiptExists       bool
+	ReceiptContentType  string
+	ReceiptByteSize     int32
+	ReceiptUploadedAt   pgtype.Timestamptz
 	CreatedAt           pgtype.Timestamptz
 }
 
@@ -577,7 +902,132 @@ func (q *Queries) InsertExpense(ctx context.Context, arg InsertExpenseParams) (I
 		&i.PayerDisplayName,
 		&i.Memo,
 		&i.IncludeInSettlement,
+		&i.ReceiptExists,
+		&i.ReceiptContentType,
+		&i.ReceiptByteSize,
+		&i.ReceiptUploadedAt,
 		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const insertExpenseReceiptDraft = `-- name: InsertExpenseReceiptDraft :one
+INSERT INTO expense_receipt_drafts (
+  trip_id,
+  created_by_user_id,
+  capture_mode,
+  objects_json,
+  image_count,
+  content_type,
+  byte_size,
+  uploaded_at,
+  extraction_json,
+  confidence,
+  warnings,
+  expires_at
+) VALUES (
+  $1::uuid,
+  $2::uuid,
+  $3,
+  $4::jsonb,
+  $5,
+  $6,
+  $7,
+  $8,
+  $9::jsonb,
+  $10,
+  $11,
+  $12
+)
+RETURNING
+  id::text,
+  trip_id::text,
+  created_by_user_id::text,
+  capture_mode,
+  objects_json,
+  image_count,
+  content_type,
+  byte_size,
+  uploaded_at,
+  extraction_json,
+  confidence,
+  warnings,
+  status,
+  expires_at,
+  COALESCE(used_expense_id::text, '')::text AS used_expense_id,
+  created_at,
+  updated_at
+`
+
+type InsertExpenseReceiptDraftParams struct {
+	TripID          pgtype.UUID
+	CreatedByUserID pgtype.UUID
+	CaptureMode     string
+	ObjectsJson     []byte
+	ImageCount      int32
+	ContentType     string
+	ByteSize        int32
+	UploadedAt      pgtype.Timestamptz
+	ExtractionJson  []byte
+	Confidence      string
+	Warnings        []string
+	ExpiresAt       pgtype.Timestamptz
+}
+
+type InsertExpenseReceiptDraftRow struct {
+	ID              string
+	TripID          string
+	CreatedByUserID string
+	CaptureMode     string
+	ObjectsJson     []byte
+	ImageCount      int32
+	ContentType     string
+	ByteSize        int32
+	UploadedAt      pgtype.Timestamptz
+	ExtractionJson  []byte
+	Confidence      string
+	Warnings        []string
+	Status          string
+	ExpiresAt       pgtype.Timestamptz
+	UsedExpenseID   string
+	CreatedAt       pgtype.Timestamptz
+	UpdatedAt       pgtype.Timestamptz
+}
+
+func (q *Queries) InsertExpenseReceiptDraft(ctx context.Context, arg InsertExpenseReceiptDraftParams) (InsertExpenseReceiptDraftRow, error) {
+	row := q.db.QueryRow(ctx, insertExpenseReceiptDraft,
+		arg.TripID,
+		arg.CreatedByUserID,
+		arg.CaptureMode,
+		arg.ObjectsJson,
+		arg.ImageCount,
+		arg.ContentType,
+		arg.ByteSize,
+		arg.UploadedAt,
+		arg.ExtractionJson,
+		arg.Confidence,
+		arg.Warnings,
+		arg.ExpiresAt,
+	)
+	var i InsertExpenseReceiptDraftRow
+	err := row.Scan(
+		&i.ID,
+		&i.TripID,
+		&i.CreatedByUserID,
+		&i.CaptureMode,
+		&i.ObjectsJson,
+		&i.ImageCount,
+		&i.ContentType,
+		&i.ByteSize,
+		&i.UploadedAt,
+		&i.ExtractionJson,
+		&i.Confidence,
+		&i.Warnings,
+		&i.Status,
+		&i.ExpiresAt,
+		&i.UsedExpenseID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
@@ -726,8 +1176,15 @@ SELECT
   END::text AS payer_source,
   e.split_policy,
   e.include_in_settlement,
+  (er.expense_id IS NOT NULL)::boolean AS receipt_exists,
+  COALESCE(er.content_type, '')::text AS receipt_content_type,
+  COALESCE(er.byte_size, 0)::integer AS receipt_byte_size,
+  er.uploaded_at AS receipt_uploaded_at,
   e.created_at
 FROM expenses e
+LEFT JOIN expense_receipts er
+  ON er.expense_id = e.id
+ AND er.trip_id = e.trip_id
 LEFT JOIN schedule_items si
   ON e.anchor_type = 'schedule_item'
  AND si.id = e.schedule_item_id
@@ -770,6 +1227,10 @@ type ListDayExpensesByTripDayRow struct {
 	PayerSource         string
 	SplitPolicy         string
 	IncludeInSettlement bool
+	ReceiptExists       bool
+	ReceiptContentType  string
+	ReceiptByteSize     int32
+	ReceiptUploadedAt   pgtype.Timestamptz
 	CreatedAt           pgtype.Timestamptz
 }
 
@@ -801,6 +1262,10 @@ func (q *Queries) ListDayExpensesByTripDay(ctx context.Context, arg ListDayExpen
 			&i.PayerSource,
 			&i.SplitPolicy,
 			&i.IncludeInSettlement,
+			&i.ReceiptExists,
+			&i.ReceiptContentType,
+			&i.ReceiptByteSize,
+			&i.ReceiptUploadedAt,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -1160,8 +1625,15 @@ SELECT
   END::text AS payer_source,
   e.split_policy,
   e.include_in_settlement,
+  (er.expense_id IS NOT NULL)::boolean AS receipt_exists,
+  COALESCE(er.content_type, '')::text AS receipt_content_type,
+  COALESCE(er.byte_size, 0)::integer AS receipt_byte_size,
+  er.uploaded_at AS receipt_uploaded_at,
   e.created_at
 FROM expenses e
+LEFT JOIN expense_receipts er
+  ON er.expense_id = e.id
+ AND er.trip_id = e.trip_id
 LEFT JOIN schedule_items si
   ON e.anchor_type = 'schedule_item'
  AND si.id = e.schedule_item_id
@@ -1202,6 +1674,10 @@ type ListTripExpensesByTripRow struct {
 	PayerSource         string
 	SplitPolicy         string
 	IncludeInSettlement bool
+	ReceiptExists       bool
+	ReceiptContentType  string
+	ReceiptByteSize     int32
+	ReceiptUploadedAt   pgtype.Timestamptz
 	CreatedAt           pgtype.Timestamptz
 }
 
@@ -1233,6 +1709,10 @@ func (q *Queries) ListTripExpensesByTrip(ctx context.Context, tripID pgtype.UUID
 			&i.PayerSource,
 			&i.SplitPolicy,
 			&i.IncludeInSettlement,
+			&i.ReceiptExists,
+			&i.ReceiptContentType,
+			&i.ReceiptByteSize,
+			&i.ReceiptUploadedAt,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -1243,6 +1723,74 @@ func (q *Queries) ListTripExpensesByTrip(ctx context.Context, tripID pgtype.UUID
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockExpenseReceiptForUpdate = `-- name: LockExpenseReceiptForUpdate :one
+SELECT
+  objects_json,
+  image_count,
+  content_type,
+  byte_size,
+  uploaded_at
+FROM expense_receipts
+WHERE trip_id = $1::uuid
+  AND expense_id = $2::uuid
+FOR UPDATE
+`
+
+type LockExpenseReceiptForUpdateParams struct {
+	TripID    pgtype.UUID
+	ExpenseID pgtype.UUID
+}
+
+type LockExpenseReceiptForUpdateRow struct {
+	ObjectsJson []byte
+	ImageCount  int32
+	ContentType string
+	ByteSize    int32
+	UploadedAt  pgtype.Timestamptz
+}
+
+func (q *Queries) LockExpenseReceiptForUpdate(ctx context.Context, arg LockExpenseReceiptForUpdateParams) (LockExpenseReceiptForUpdateRow, error) {
+	row := q.db.QueryRow(ctx, lockExpenseReceiptForUpdate, arg.TripID, arg.ExpenseID)
+	var i LockExpenseReceiptForUpdateRow
+	err := row.Scan(
+		&i.ObjectsJson,
+		&i.ImageCount,
+		&i.ContentType,
+		&i.ByteSize,
+		&i.UploadedAt,
+	)
+	return i, err
+}
+
+const markExpenseReceiptDraftUsed = `-- name: MarkExpenseReceiptDraftUsed :exec
+UPDATE expense_receipt_drafts
+SET status = 'used',
+    used_expense_id = $1::uuid,
+    updated_at = now()
+WHERE id = $2::uuid
+  AND trip_id = $3::uuid
+  AND created_by_user_id = $4::uuid
+  AND status = 'draft'
+  AND expires_at > now()
+`
+
+type MarkExpenseReceiptDraftUsedParams struct {
+	ExpenseID       pgtype.UUID
+	ReceiptDraftID  pgtype.UUID
+	TripID          pgtype.UUID
+	CreatedByUserID pgtype.UUID
+}
+
+func (q *Queries) MarkExpenseReceiptDraftUsed(ctx context.Context, arg MarkExpenseReceiptDraftUsedParams) error {
+	_, err := q.db.Exec(ctx, markExpenseReceiptDraftUsed,
+		arg.ExpenseID,
+		arg.ReceiptDraftID,
+		arg.TripID,
+		arg.CreatedByUserID,
+	)
+	return err
 }
 
 const updateExpense = `-- name: UpdateExpense :one
@@ -1285,6 +1833,10 @@ RETURNING
   payer_display_name,
   memo,
   include_in_settlement,
+  EXISTS(SELECT 1 FROM expense_receipts er WHERE er.expense_id = expenses.id)::boolean AS receipt_exists,
+  COALESCE((SELECT er.content_type FROM expense_receipts er WHERE er.expense_id = expenses.id), '')::text AS receipt_content_type,
+  COALESCE((SELECT er.byte_size FROM expense_receipts er WHERE er.expense_id = expenses.id), 0)::integer AS receipt_byte_size,
+  (SELECT er.uploaded_at FROM expense_receipts er WHERE er.expense_id = expenses.id) AS receipt_uploaded_at,
   created_at
 `
 
@@ -1326,6 +1878,10 @@ type UpdateExpenseRow struct {
 	PayerDisplayName    string
 	Memo                pgtype.Text
 	IncludeInSettlement bool
+	ReceiptExists       bool
+	ReceiptContentType  string
+	ReceiptByteSize     int32
+	ReceiptUploadedAt   pgtype.Timestamptz
 	CreatedAt           pgtype.Timestamptz
 }
 
@@ -1368,6 +1924,10 @@ func (q *Queries) UpdateExpense(ctx context.Context, arg UpdateExpenseParams) (U
 		&i.PayerDisplayName,
 		&i.Memo,
 		&i.IncludeInSettlement,
+		&i.ReceiptExists,
+		&i.ReceiptContentType,
+		&i.ReceiptByteSize,
+		&i.ReceiptUploadedAt,
 		&i.CreatedAt,
 	)
 	return i, err
@@ -1408,6 +1968,10 @@ RETURNING
   payer_display_name,
   memo,
   include_in_settlement,
+  EXISTS(SELECT 1 FROM expense_receipts er WHERE er.expense_id = expenses.id)::boolean AS receipt_exists,
+  COALESCE((SELECT er.content_type FROM expense_receipts er WHERE er.expense_id = expenses.id), '')::text AS receipt_content_type,
+  COALESCE((SELECT er.byte_size FROM expense_receipts er WHERE er.expense_id = expenses.id), 0)::integer AS receipt_byte_size,
+  (SELECT er.uploaded_at FROM expense_receipts er WHERE er.expense_id = expenses.id) AS receipt_uploaded_at,
   created_at
 `
 
@@ -1442,6 +2006,10 @@ type UpdateTripExpenseRow struct {
 	PayerDisplayName    string
 	Memo                pgtype.Text
 	IncludeInSettlement bool
+	ReceiptExists       bool
+	ReceiptContentType  string
+	ReceiptByteSize     int32
+	ReceiptUploadedAt   pgtype.Timestamptz
 	CreatedAt           pgtype.Timestamptz
 }
 
@@ -1477,7 +2045,85 @@ func (q *Queries) UpdateTripExpense(ctx context.Context, arg UpdateTripExpensePa
 		&i.PayerDisplayName,
 		&i.Memo,
 		&i.IncludeInSettlement,
+		&i.ReceiptExists,
+		&i.ReceiptContentType,
+		&i.ReceiptByteSize,
+		&i.ReceiptUploadedAt,
 		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const upsertExpenseReceipt = `-- name: UpsertExpenseReceipt :one
+INSERT INTO expense_receipts (
+  expense_id,
+  trip_id,
+  uploaded_by_user_id,
+  objects_json,
+  image_count,
+  content_type,
+  byte_size,
+  uploaded_at
+) VALUES (
+  $1::uuid,
+  $2::uuid,
+  $3::uuid,
+  $4::jsonb,
+  $5,
+  $6,
+  $7,
+  $8
+)
+ON CONFLICT (expense_id) DO UPDATE
+SET uploaded_by_user_id = EXCLUDED.uploaded_by_user_id,
+    objects_json = EXCLUDED.objects_json,
+    image_count = EXCLUDED.image_count,
+    content_type = EXCLUDED.content_type,
+    byte_size = EXCLUDED.byte_size,
+    uploaded_at = EXCLUDED.uploaded_at,
+    updated_at = now()
+RETURNING
+  true::boolean AS exists,
+  content_type,
+  byte_size,
+  uploaded_at
+`
+
+type UpsertExpenseReceiptParams struct {
+	ExpenseID        pgtype.UUID
+	TripID           pgtype.UUID
+	UploadedByUserID pgtype.UUID
+	ObjectsJson      []byte
+	ImageCount       int32
+	ContentType      string
+	ByteSize         int32
+	UploadedAt       pgtype.Timestamptz
+}
+
+type UpsertExpenseReceiptRow struct {
+	Exists      bool
+	ContentType string
+	ByteSize    int32
+	UploadedAt  pgtype.Timestamptz
+}
+
+func (q *Queries) UpsertExpenseReceipt(ctx context.Context, arg UpsertExpenseReceiptParams) (UpsertExpenseReceiptRow, error) {
+	row := q.db.QueryRow(ctx, upsertExpenseReceipt,
+		arg.ExpenseID,
+		arg.TripID,
+		arg.UploadedByUserID,
+		arg.ObjectsJson,
+		arg.ImageCount,
+		arg.ContentType,
+		arg.ByteSize,
+		arg.UploadedAt,
+	)
+	var i UpsertExpenseReceiptRow
+	err := row.Scan(
+		&i.Exists,
+		&i.ContentType,
+		&i.ByteSize,
+		&i.UploadedAt,
 	)
 	return i, err
 }

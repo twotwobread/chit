@@ -1114,6 +1114,177 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /trips/{tripId}/expense-receipt-drafts:
+    post:
+      operationId: createExpenseReceiptDraft
+      summary: Create an expense draft from Korean receipt OCR text and image capture
+      description: Stores one private receipt image, or header/total images for long receipts, validates client-provided Korean OCR text, asks the model for strict JSON normalization, and returns a draft that must be reviewed before saving an expense. This endpoint never creates an expense and never returns object keys or signed URLs.
+      tags:
+        - Trips
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - captureMode
+                - ocrLanguage
+                - ocrTextParts
+              properties:
+                captureMode:
+                  $ref: '#/components/schemas/ReceiptCaptureMode'
+                ocrLanguage:
+                  $ref: '#/components/schemas/ReceiptOCRLanguage'
+                ocrTextParts:
+                  type: string
+                  description: JSON array of ReceiptOCRTextPart. Single capture requires role `single`; split capture requires roles `header` and `total`.
+                image:
+                  type: string
+                  format: binary
+                  description: Required when captureMode is `single`.
+                headerImage:
+                  type: string
+                  format: binary
+                  description: Required when captureMode is `split`.
+                totalImage:
+                  type: string
+                  format: binary
+                  description: Required when captureMode is `split`.
+      responses:
+        '201':
+          description: Receipt draft created.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: API response should be `no-store`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateExpenseReceiptDraftResponse'
+        '400':
+          description: Validation error or invalid extraction JSON.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Receipt image exceeds 10 MiB.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '415':
+          description: Unsupported receipt image media type.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Korean receipt text could not be validated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Receipt draft provider or cost rate limit reached.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: OCR or model provider unavailable, timed out, or returned invalid output.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Receipt object storage unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /trips/{tripId}/expense-receipt-drafts/{receiptDraftId}:
+    delete:
+      operationId: cancelExpenseReceiptDraft
+      summary: Cancel an unused receipt draft
+      description: Marks an unused receipt draft as cancelled and schedules private object cleanup. Cancelling a missing, expired, or already-used draft is idempotent for clients.
+      tags:
+        - Trips
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: receiptDraftId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Draft cancelled or already not usable.
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /trips/{tripId}/expenses:
     get:
       operationId: listTripExpenses
@@ -1219,6 +1390,216 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '409':
           description: Participant or schedule state changed during creation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /trips/{tripId}/expenses/{expenseId}/receipt:
+    put:
+      operationId: uploadExpenseReceipt
+      summary: Upload or replace a saved expense receipt image
+      description: Stores one private receipt image for an existing expense. The image is stored in private object storage; list/detail responses never return object keys or signed URLs.
+      tags:
+        - Trips
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: expenseId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          image/jpeg:
+            schema:
+              type: string
+              format: binary
+          image/png:
+            schema:
+              type: string
+              format: binary
+          image/webp:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '200':
+          description: Receipt uploaded or replaced.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadExpenseReceiptResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip or expense not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Receipt image exceeds 10 MiB.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '415':
+          description: Unsupported receipt image media type.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Receipt object storage unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      operationId: deleteExpenseReceipt
+      summary: Delete a saved expense receipt image
+      description: Deletes receipt metadata and schedules private object cleanup. Deleting a missing receipt is a no-op.
+      tags:
+        - Trips
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: expenseId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Receipt deleted or already absent.
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip or expense not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /trips/{tripId}/expenses/{expenseId}/receipt/open-url:
+    post:
+      operationId: openExpenseReceipt
+      summary: Create a short-lived URL for an expense receipt
+      description: Authorizes the authenticated trip participant and returns a short-lived signed URL for an existing saved receipt image. The URL must not be persisted by clients.
+      tags:
+        - Trips
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: expenseId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Short-lived receipt URL.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: API response should be `no-store`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpenExpenseReceiptResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip, expense, or receipt not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Receipt object storage unavailable.
           content:
             application/json:
               schema:
@@ -3910,6 +4291,46 @@ components:
         - image/jpeg
         - image/png
         - image/webp
+    ReceiptImageContentType:
+      type: string
+      enum:
+        - image/jpeg
+        - image/png
+        - image/webp
+    ReceiptCaptureMode:
+      type: string
+      enum:
+        - single
+        - split
+    ReceiptImageRole:
+      type: string
+      enum:
+        - single
+        - header
+        - total
+    ReceiptOCRLanguage:
+      type: string
+      enum:
+        - ko
+    ReceiptOCRTextPart:
+      type: object
+      additionalProperties: false
+      required:
+        - role
+        - text
+      properties:
+        role:
+          $ref: '#/components/schemas/ReceiptImageRole'
+        text:
+          type: string
+          minLength: 1
+          maxLength: 12000
+    ExpenseReceiptConfidence:
+      type: string
+      enum:
+        - high
+        - medium
+        - low
     FlightEndpointInput:
       type: object
       required:
@@ -4781,6 +5202,7 @@ components:
         - splitPolicy
         - splits
         - includeInSettlement
+        - receipt
         - createdAt
       properties:
         id:
@@ -4821,6 +5243,8 @@ components:
         includeInSettlement:
           type: boolean
           description: Whether this expense is included in final settlement calculations. False means it was settled on-site and remains in history/total spend only.
+        receipt:
+          $ref: '#/components/schemas/ExpenseReceiptSummary'
         createdAt:
           type: string
           format: date-time
@@ -4841,6 +5265,192 @@ components:
           type: integer
           format: int64
           minimum: 0
+    ExpenseReceiptSummary:
+      type: object
+      required:
+        - exists
+        - contentType
+        - byteSize
+        - uploadedAt
+      additionalProperties: false
+      properties:
+        exists:
+          type: boolean
+        contentType:
+          allOf:
+            - $ref: '#/components/schemas/ReceiptImageContentType'
+          nullable: true
+        byteSize:
+          type: integer
+          nullable: true
+          minimum: 1
+          maximum: 10485760
+        uploadedAt:
+          type: string
+          format: date-time
+          nullable: true
+    ExpenseReceiptLineItemDraft:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - amountMinor
+        - quantity
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        amountMinor:
+          type: integer
+          format: int64
+          minimum: 0
+          nullable: true
+        quantity:
+          type: number
+          nullable: true
+          minimum: 0
+    ExpenseReceiptExtraction:
+      type: object
+      additionalProperties: false
+      required:
+        - merchantName
+        - expenseTitle
+        - expenseDate
+        - expenseTime
+        - currency
+        - totalAmountMinor
+        - taxAmountMinor
+        - serviceChargeMinor
+        - lineItems
+        - confidence
+        - warnings
+      properties:
+        merchantName:
+          type: string
+          nullable: true
+          maxLength: 120
+        expenseTitle:
+          type: string
+          nullable: true
+          maxLength: 120
+        expenseDate:
+          type: string
+          format: date
+          nullable: true
+        expenseTime:
+          type: string
+          nullable: true
+          pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$'
+        currency:
+          allOf:
+            - $ref: '#/components/schemas/SupportedCurrency'
+          nullable: true
+        totalAmountMinor:
+          type: integer
+          format: int64
+          minimum: 0
+          nullable: true
+        taxAmountMinor:
+          type: integer
+          format: int64
+          minimum: 0
+          nullable: true
+        serviceChargeMinor:
+          type: integer
+          format: int64
+          minimum: 0
+          nullable: true
+        lineItems:
+          type: array
+          maxItems: 50
+          items:
+            $ref: '#/components/schemas/ExpenseReceiptLineItemDraft'
+        confidence:
+          $ref: '#/components/schemas/ExpenseReceiptConfidence'
+        warnings:
+          type: array
+          maxItems: 10
+          items:
+            type: string
+            maxLength: 160
+    ExpenseReceiptDraft:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - tripId
+        - captureMode
+        - imageCount
+        - contentType
+        - byteSize
+        - extraction
+        - expiresAt
+        - createdAt
+      properties:
+        id:
+          type: string
+        tripId:
+          type: string
+        captureMode:
+          $ref: '#/components/schemas/ReceiptCaptureMode'
+        imageCount:
+          type: integer
+          minimum: 1
+          maximum: 2
+        contentType:
+          $ref: '#/components/schemas/ReceiptImageContentType'
+          description: Content type of the first stored capture image.
+        byteSize:
+          type: integer
+          minimum: 1
+          maximum: 20971520
+        extraction:
+          $ref: '#/components/schemas/ExpenseReceiptExtraction'
+        expiresAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+    CreateExpenseReceiptDraftResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - draft
+      properties:
+        draft:
+          $ref: '#/components/schemas/ExpenseReceiptDraft'
+    UploadExpenseReceiptResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - receipt
+      properties:
+        receipt:
+          $ref: '#/components/schemas/ExpenseReceiptSummary'
+    OpenExpenseReceiptResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - url
+        - expiresAt
+        - contentType
+        - byteSize
+      properties:
+        url:
+          type: string
+          format: uri
+          description: Short-lived signed URL. Clients must not persist it.
+        expiresAt:
+          type: string
+          format: date-time
+        contentType:
+          $ref: '#/components/schemas/ReceiptImageContentType'
+        byteSize:
+          type: integer
+          minimum: 1
+          maximum: 10485760
     GetExpenseResponse:
       type: object
       additionalProperties: false
@@ -4979,6 +5589,10 @@ components:
         includeInSettlement:
           type: boolean
           description: Whether to include the expense in final settlement calculations. Defaults to true when omitted.
+        receiptDraftId:
+          type: string
+          nullable: true
+          description: Optional reviewed receipt draft to promote as the saved expense receipt. Must belong to the same trip and authenticated user.
     CreateTripExpenseResponse:
       type: object
       additionalProperties: false
@@ -5025,6 +5639,10 @@ components:
         includeInSettlement:
           type: boolean
           description: Whether to include the expense in final settlement calculations. Defaults to true when omitted.
+        receiptDraftId:
+          type: string
+          nullable: true
+          description: Optional reviewed receipt draft to promote as the saved expense receipt. Must belong to the same trip and authenticated user.
     CreateQuickExpenseResponse:
       type: object
       additionalProperties: false
@@ -5053,6 +5671,7 @@ components:
         - splitPolicy
         - splits
         - includeInSettlement
+        - receipt
         - createdAt
       properties:
         id:
@@ -5105,6 +5724,8 @@ components:
         includeInSettlement:
           type: boolean
           description: Whether this expense is included in final settlement calculations. False means it was settled on-site and remains in history/total spend only.
+        receipt:
+          $ref: '#/components/schemas/ExpenseReceiptSummary'
         createdAt:
           type: string
           format: date-time

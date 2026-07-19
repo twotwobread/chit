@@ -685,6 +685,7 @@ export function buildCreateQuickExpenseRequest({
   manualSplitInputs,
   payerParticipantId,
   includeInSettlement,
+  receiptDraftId,
 }: {
   amountInput: string;
   currency: SupportedCurrency;
@@ -694,6 +695,7 @@ export function buildCreateQuickExpenseRequest({
   manualSplitInputs: QuickExpenseManualSplitInput[];
   payerParticipantId: string | null;
   includeInSettlement?: boolean;
+  receiptDraftId?: string | null;
 }): { ok: true; request: CreateQuickExpenseRequest } | { ok: false; errors: QuickExpenseFormErrors } {
   const validation = validateExpenseAmountPayerAndSplits({
     amountInput,
@@ -726,6 +728,7 @@ export function buildCreateQuickExpenseRequest({
         splitPolicy,
         participantIds,
         ...(includeInSettlement !== undefined ? { includeInSettlement } : {}),
+        ...(receiptDraftId ? { receiptDraftId } : {}),
       },
     };
   }
@@ -739,6 +742,7 @@ export function buildCreateQuickExpenseRequest({
       splitPolicy,
       splits: validation.manualSummary.requestSplits,
       ...(includeInSettlement !== undefined ? { includeInSettlement } : {}),
+      ...(receiptDraftId ? { receiptDraftId } : {}),
     },
   };
 }
@@ -756,6 +760,7 @@ export function buildCreateTripExpenseRequest({
   payerParticipantId,
   memoInput,
   includeInSettlement,
+  receiptDraftId,
 }: {
   titleInput: string;
   expenseDate: string;
@@ -769,6 +774,7 @@ export function buildCreateTripExpenseRequest({
   payerParticipantId: string | null;
   memoInput: string;
   includeInSettlement?: boolean;
+  receiptDraftId?: string | null;
 }): { ok: true; request: CreateTripExpenseRequest } | { ok: false; errors: QuickExpenseFormErrors } {
   const validation = validateExpenseAmountPayerAndSplits({
     amountInput,
@@ -801,6 +807,7 @@ export function buildCreateTripExpenseRequest({
     splitPolicy,
     memo: memo === '' ? null : memo,
     ...(includeInSettlement !== undefined ? { includeInSettlement } : {}),
+    ...(receiptDraftId ? { receiptDraftId } : {}),
   };
 
   if (splitPolicy === 'equal') {

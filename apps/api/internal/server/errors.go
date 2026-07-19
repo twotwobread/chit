@@ -139,6 +139,37 @@ func writeQuickExpenseError(w http.ResponseWriter, err error) {
 	}
 }
 
+func writeExpenseReceiptError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, trip.ErrValidation):
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid receipt request", nil)
+	case errors.Is(err, trip.ErrUnauthorized):
+		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "unauthorized", nil)
+	case errors.Is(err, trip.ErrForbidden):
+		writeError(w, http.StatusForbidden, "FORBIDDEN", "forbidden", nil)
+	case errors.Is(err, trip.ErrNotFound):
+		writeError(w, http.StatusNotFound, "NOT_FOUND", "receipt not found", nil)
+	case errors.Is(err, trip.ErrUploadTooLarge):
+		writeError(w, http.StatusRequestEntityTooLarge, "UPLOAD_TOO_LARGE", "receipt image is too large", nil)
+	case errors.Is(err, trip.ErrUnsupportedMediaType):
+		writeError(w, http.StatusUnsupportedMediaType, "UNSUPPORTED_RECEIPT_MEDIA_TYPE", "unsupported receipt image media type", nil)
+	case errors.Is(err, trip.ErrUnsupportedReceiptLanguage):
+		writeError(w, http.StatusUnprocessableEntity, "UNSUPPORTED_RECEIPT_LANGUAGE", "Korean receipt text is required", nil)
+	case errors.Is(err, trip.ErrReceiptTextUnreadable):
+		writeError(w, http.StatusBadRequest, "RECEIPT_TEXT_UNREADABLE", "receipt text is unreadable", nil)
+	case errors.Is(err, trip.ErrReceiptProviderRateLimited):
+		writeError(w, http.StatusTooManyRequests, "RECEIPT_PROVIDER_RATE_LIMITED", "receipt extraction is rate limited", nil)
+	case errors.Is(err, trip.ErrReceiptExtractionInvalid):
+		writeError(w, http.StatusBadGateway, "RECEIPT_EXTRACTION_INVALID", "receipt extraction result is invalid", nil)
+	case errors.Is(err, trip.ErrReceiptProviderUnavailable):
+		writeError(w, http.StatusBadGateway, "RECEIPT_PROVIDER_UNAVAILABLE", "receipt extraction provider is unavailable", nil)
+	case errors.Is(err, trip.ErrStorageUnavailable):
+		writeError(w, http.StatusServiceUnavailable, "RECEIPT_STORAGE_UNAVAILABLE", "receipt storage is unavailable", nil)
+	default:
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error", nil)
+	}
+}
+
 func writeDayLodgingPlaceError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, trip.ErrValidation):

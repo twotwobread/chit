@@ -373,6 +373,7 @@ function QuickExpenseOverlaySheet({
               name: participant.displayName,
             }))}
             submitting={state.status === 'saving'}
+            tripId={state.target.tripId}
           />
         ) : null}
       </KeyboardAwareFormScrollView>

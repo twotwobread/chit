@@ -6,6 +6,7 @@ import type { DayExpenseSplitListItem } from './DayExpenseSplitListItem';
 import type { ExpenseAnchorType } from './ExpenseAnchorType';
 import type { ExpenseParticipantDisplay } from './ExpenseParticipantDisplay';
 import type { ExpensePlaceDisplay } from './ExpensePlaceDisplay';
+import type { ExpenseReceiptSummary } from './ExpenseReceiptSummary';
 import type { ExpenseSplitPolicy } from './ExpenseSplitPolicy';
 import type { SupportedCurrency } from './SupportedCurrency';
 export type DayExpenseListItem = {
@@ -28,5 +29,6 @@ export type DayExpenseListItem = {
      * Whether this expense is included in final settlement calculations. False means it was settled on-site and remains in history/total spend only.
      */
     includeInSettlement: boolean;
+    receipt: ExpenseReceiptSummary;
     createdAt: string;
 };

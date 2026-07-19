@@ -62,6 +62,13 @@ const (
 	Live     ExpenseDisplaySource = "live"
 )
 
+// Defines values for ExpenseReceiptConfidence.
+const (
+	High   ExpenseReceiptConfidence = "high"
+	Low    ExpenseReceiptConfidence = "low"
+	Medium ExpenseReceiptConfidence = "medium"
+)
+
 // Defines values for ExpenseSplitPolicy.
 const (
 	Equal  ExpenseSplitPolicy = "equal"
@@ -70,9 +77,9 @@ const (
 
 // Defines values for FlightImageContentType.
 const (
-	Imagejpeg FlightImageContentType = "image/jpeg"
-	Imagepng  FlightImageContentType = "image/png"
-	Imagewebp FlightImageContentType = "image/webp"
+	FlightImageContentTypeImagejpeg FlightImageContentType = "image/jpeg"
+	FlightImageContentTypeImagepng  FlightImageContentType = "image/png"
+	FlightImageContentTypeImagewebp FlightImageContentType = "image/webp"
 )
 
 // Defines values for HealthResponseStatus.
@@ -104,6 +111,24 @@ const (
 // Defines values for ReadinessResponseStatus.
 const (
 	ReadinessResponseStatusOk ReadinessResponseStatus = "ok"
+)
+
+// Defines values for ReceiptCaptureMode.
+const (
+	Single ReceiptCaptureMode = "single"
+	Split  ReceiptCaptureMode = "split"
+)
+
+// Defines values for ReceiptImageContentType.
+const (
+	ReceiptImageContentTypeImagejpeg ReceiptImageContentType = "image/jpeg"
+	ReceiptImageContentTypeImagepng  ReceiptImageContentType = "image/png"
+	ReceiptImageContentTypeImagewebp ReceiptImageContentType = "image/webp"
+)
+
+// Defines values for ReceiptOCRLanguage.
+const (
+	Ko ReceiptOCRLanguage = "ko"
 )
 
 // Defines values for RoutablePlaceProvider.
@@ -234,6 +259,11 @@ type AuthUser struct {
 	Id          string  `json:"id"`
 }
 
+// CreateExpenseReceiptDraftResponse defines model for CreateExpenseReceiptDraftResponse.
+type CreateExpenseReceiptDraftResponse struct {
+	Draft ExpenseReceiptDraft `json:"draft"`
+}
+
 // CreateGoogleDayLodgingPlaceRequest defines model for CreateGoogleDayLodgingPlaceRequest.
 type CreateGoogleDayLodgingPlaceRequest struct {
 	GooglePlaceId string `json:"googlePlaceId"`
@@ -328,6 +358,9 @@ type CreateQuickExpenseRequest struct {
 	// PayerParticipantId Active trip participant who paid the expense.
 	PayerParticipantId string `json:"payerParticipantId"`
 
+	// ReceiptDraftId Optional reviewed receipt draft to promote as the saved expense receipt. Must belong to the same trip and authenticated user.
+	ReceiptDraftId *string `json:"receiptDraftId"`
+
 	// ScheduleItemId Required schedule item for the selected Day. Must belong to tripId/tripDayId.
 	ScheduleItemId string `json:"scheduleItemId"`
 
@@ -363,6 +396,9 @@ type CreateTripExpenseRequest struct {
 	// ParticipantIds Required only when splitPolicy is equal. Must be omitted for manual.
 	ParticipantIds     *[]string `json:"participantIds,omitempty"`
 	PayerParticipantId string    `json:"payerParticipantId"`
+
+	// ReceiptDraftId Optional reviewed receipt draft to promote as the saved expense receipt. Must belong to the same trip and authenticated user.
+	ReceiptDraftId *string `json:"receiptDraftId"`
 
 	// ScheduleItemId Optional related schedule item.
 	ScheduleItemId *string `json:"scheduleItemId"`
@@ -445,6 +481,7 @@ type DayExpenseListItem struct {
 	IncludeInSettlement bool                      `json:"includeInSettlement"`
 	Payer               ExpenseParticipantDisplay `json:"payer"`
 	Place               *ExpensePlaceDisplay      `json:"place"`
+	Receipt             ExpenseReceiptSummary     `json:"receipt"`
 	ScheduleItemId      *string                   `json:"scheduleItemId"`
 
 	// SplitPolicy Persisted split policy for current quick expenses.
@@ -498,6 +535,7 @@ type Expense struct {
 	Memo                *string                   `json:"memo"`
 	Payer               ExpenseParticipantDisplay `json:"payer"`
 	Place               *ExpensePlaceDisplay      `json:"place"`
+	Receipt             ExpenseReceiptSummary     `json:"receipt"`
 
 	// ScheduleItemId Source schedule item. Present for schedule-item expenses; may become null if later detached to trip-level.
 	ScheduleItemId *string `json:"scheduleItemId"`
@@ -536,6 +574,52 @@ type ExpensePlaceDisplay struct {
 	// Source Display value source for diagnostics and tests. Do not render this as user-visible copy.
 	Source      ExpenseDisplaySource `json:"source"`
 	TripPlaceId *string              `json:"tripPlaceId"`
+}
+
+// ExpenseReceiptConfidence defines model for ExpenseReceiptConfidence.
+type ExpenseReceiptConfidence string
+
+// ExpenseReceiptDraft defines model for ExpenseReceiptDraft.
+type ExpenseReceiptDraft struct {
+	ByteSize    int                      `json:"byteSize"`
+	CaptureMode ReceiptCaptureMode       `json:"captureMode"`
+	ContentType ReceiptImageContentType  `json:"contentType"`
+	CreatedAt   time.Time                `json:"createdAt"`
+	ExpiresAt   time.Time                `json:"expiresAt"`
+	Extraction  ExpenseReceiptExtraction `json:"extraction"`
+	Id          string                   `json:"id"`
+	ImageCount  int                      `json:"imageCount"`
+	TripId      string                   `json:"tripId"`
+}
+
+// ExpenseReceiptExtraction defines model for ExpenseReceiptExtraction.
+type ExpenseReceiptExtraction struct {
+	Confidence         ExpenseReceiptConfidence      `json:"confidence"`
+	Currency           *SupportedCurrency            `json:"currency"`
+	ExpenseDate        *openapi_types.Date           `json:"expenseDate"`
+	ExpenseTime        *string                       `json:"expenseTime"`
+	ExpenseTitle       *string                       `json:"expenseTitle"`
+	LineItems          []ExpenseReceiptLineItemDraft `json:"lineItems"`
+	MerchantName       *string                       `json:"merchantName"`
+	ServiceChargeMinor *int64                        `json:"serviceChargeMinor"`
+	TaxAmountMinor     *int64                        `json:"taxAmountMinor"`
+	TotalAmountMinor   *int64                        `json:"totalAmountMinor"`
+	Warnings           []string                      `json:"warnings"`
+}
+
+// ExpenseReceiptLineItemDraft defines model for ExpenseReceiptLineItemDraft.
+type ExpenseReceiptLineItemDraft struct {
+	AmountMinor *int64   `json:"amountMinor"`
+	Name        string   `json:"name"`
+	Quantity    *float32 `json:"quantity"`
+}
+
+// ExpenseReceiptSummary defines model for ExpenseReceiptSummary.
+type ExpenseReceiptSummary struct {
+	ByteSize    *int                     `json:"byteSize"`
+	ContentType *ReceiptImageContentType `json:"contentType"`
+	Exists      bool                     `json:"exists"`
+	UploadedAt  *time.Time               `json:"uploadedAt"`
 }
 
 // ExpenseSplit defines model for ExpenseSplit.
@@ -897,6 +981,16 @@ type OAuthLoginRequest struct {
 	Provider   AuthProvider    `json:"provider"`
 }
 
+// OpenExpenseReceiptResponse defines model for OpenExpenseReceiptResponse.
+type OpenExpenseReceiptResponse struct {
+	ByteSize    int                     `json:"byteSize"`
+	ContentType ReceiptImageContentType `json:"contentType"`
+	ExpiresAt   time.Time               `json:"expiresAt"`
+
+	// Url Short-lived signed URL. Clients must not persist it.
+	Url string `json:"url"`
+}
+
 // OpenMyFlightBoardingPassResponse defines model for OpenMyFlightBoardingPassResponse.
 type OpenMyFlightBoardingPassResponse struct {
 	ByteSize    int                    `json:"byteSize"`
@@ -938,6 +1032,15 @@ type ReadinessResponse struct {
 
 // ReadinessResponseStatus defines model for ReadinessResponse.Status.
 type ReadinessResponseStatus string
+
+// ReceiptCaptureMode defines model for ReceiptCaptureMode.
+type ReceiptCaptureMode string
+
+// ReceiptImageContentType defines model for ReceiptImageContentType.
+type ReceiptImageContentType string
+
+// ReceiptOCRLanguage defines model for ReceiptOCRLanguage.
+type ReceiptOCRLanguage string
 
 // RefreshTokenRequest defines model for RefreshTokenRequest.
 type RefreshTokenRequest struct {
@@ -1347,6 +1450,11 @@ type UpdateTripResponse struct {
 	Trip Trip `json:"trip"`
 }
 
+// UploadExpenseReceiptResponse defines model for UploadExpenseReceiptResponse.
+type UploadExpenseReceiptResponse struct {
+	Receipt ExpenseReceiptSummary `json:"receipt"`
+}
+
 // UploadMyFlightBoardingPassResponse defines model for UploadMyFlightBoardingPassResponse.
 type UploadMyFlightBoardingPassResponse struct {
 	PersonalDetail MyFlightPersonalDetail `json:"personalDetail"`
@@ -1394,6 +1502,24 @@ type SearchGooglePlacesParams struct {
 
 	// RadiusMeters Search bias radius in meters. Requires latitude and longitude when provided.
 	RadiusMeters *float64 `form:"radiusMeters,omitempty" json:"radiusMeters,omitempty"`
+}
+
+// CreateExpenseReceiptDraftMultipartBody defines parameters for CreateExpenseReceiptDraft.
+type CreateExpenseReceiptDraftMultipartBody struct {
+	CaptureMode ReceiptCaptureMode `json:"captureMode"`
+
+	// HeaderImage Required when captureMode is `split`.
+	HeaderImage *openapi_types.File `json:"headerImage,omitempty"`
+
+	// Image Required when captureMode is `single`.
+	Image       *openapi_types.File `json:"image,omitempty"`
+	OcrLanguage ReceiptOCRLanguage  `json:"ocrLanguage"`
+
+	// OcrTextParts JSON array of ReceiptOCRTextPart. Single capture requires role `single`; split capture requires roles `header` and `total`.
+	OcrTextParts string `json:"ocrTextParts"`
+
+	// TotalImage Required when captureMode is `split`.
+	TotalImage *openapi_types.File `json:"totalImage,omitempty"`
 }
 
 // LinkOAuthProviderJSONRequestBody defines body for LinkOAuthProvider for application/json ContentType.
@@ -1449,6 +1575,9 @@ type MoveScheduleItemToDayJSONRequestBody = MoveScheduleItemToDayRequest
 
 // CreateRoutePreviewJSONRequestBody defines body for CreateRoutePreview for application/json ContentType.
 type CreateRoutePreviewJSONRequestBody = CreateRoutePreviewRequest
+
+// CreateExpenseReceiptDraftMultipartRequestBody defines body for CreateExpenseReceiptDraft for multipart/form-data ContentType.
+type CreateExpenseReceiptDraftMultipartRequestBody CreateExpenseReceiptDraftMultipartBody
 
 // CreateTripExpenseJSONRequestBody defines body for CreateTripExpense for application/json ContentType.
 type CreateTripExpenseJSONRequestBody = CreateTripExpenseRequest
@@ -1599,6 +1728,12 @@ type ServerInterface interface {
 	// Mark a trip day schedule item skipped
 	// (POST /trips/{tripId}/days/{tripDayId}/schedule-items/{scheduleItemId}/skip)
 	MarkScheduleItemSkipped(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string, scheduleItemId string)
+	// Create an expense draft from Korean receipt OCR text and image capture
+	// (POST /trips/{tripId}/expense-receipt-drafts)
+	CreateExpenseReceiptDraft(w http.ResponseWriter, r *http.Request, tripId string)
+	// Cancel an unused receipt draft
+	// (DELETE /trips/{tripId}/expense-receipt-drafts/{receiptDraftId})
+	CancelExpenseReceiptDraft(w http.ResponseWriter, r *http.Request, tripId string, receiptDraftId string)
 	// List expenses for a trip
 	// (GET /trips/{tripId}/expenses)
 	ListTripExpenses(w http.ResponseWriter, r *http.Request, tripId string)
@@ -1614,6 +1749,15 @@ type ServerInterface interface {
 	// Update a trip-level expense
 	// (PATCH /trips/{tripId}/expenses/{expenseId})
 	UpdateTripExpense(w http.ResponseWriter, r *http.Request, tripId string, expenseId string)
+	// Delete a saved expense receipt image
+	// (DELETE /trips/{tripId}/expenses/{expenseId}/receipt)
+	DeleteExpenseReceipt(w http.ResponseWriter, r *http.Request, tripId string, expenseId string)
+	// Upload or replace a saved expense receipt image
+	// (PUT /trips/{tripId}/expenses/{expenseId}/receipt)
+	UploadExpenseReceipt(w http.ResponseWriter, r *http.Request, tripId string, expenseId string)
+	// Create a short-lived URL for an expense receipt
+	// (POST /trips/{tripId}/expenses/{expenseId}/receipt/open-url)
+	OpenExpenseReceipt(w http.ResponseWriter, r *http.Request, tripId string, expenseId string)
 	// List trip flights
 	// (GET /trips/{tripId}/flights)
 	ListTripFlights(w http.ResponseWriter, r *http.Request, tripId string)
@@ -1926,6 +2070,18 @@ func (_ Unimplemented) MarkScheduleItemSkipped(w http.ResponseWriter, r *http.Re
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// Create an expense draft from Korean receipt OCR text and image capture
+// (POST /trips/{tripId}/expense-receipt-drafts)
+func (_ Unimplemented) CreateExpenseReceiptDraft(w http.ResponseWriter, r *http.Request, tripId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Cancel an unused receipt draft
+// (DELETE /trips/{tripId}/expense-receipt-drafts/{receiptDraftId})
+func (_ Unimplemented) CancelExpenseReceiptDraft(w http.ResponseWriter, r *http.Request, tripId string, receiptDraftId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // List expenses for a trip
 // (GET /trips/{tripId}/expenses)
 func (_ Unimplemented) ListTripExpenses(w http.ResponseWriter, r *http.Request, tripId string) {
@@ -1953,6 +2109,24 @@ func (_ Unimplemented) GetTripExpense(w http.ResponseWriter, r *http.Request, tr
 // Update a trip-level expense
 // (PATCH /trips/{tripId}/expenses/{expenseId})
 func (_ Unimplemented) UpdateTripExpense(w http.ResponseWriter, r *http.Request, tripId string, expenseId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Delete a saved expense receipt image
+// (DELETE /trips/{tripId}/expenses/{expenseId}/receipt)
+func (_ Unimplemented) DeleteExpenseReceipt(w http.ResponseWriter, r *http.Request, tripId string, expenseId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Upload or replace a saved expense receipt image
+// (PUT /trips/{tripId}/expenses/{expenseId}/receipt)
+func (_ Unimplemented) UploadExpenseReceipt(w http.ResponseWriter, r *http.Request, tripId string, expenseId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Create a short-lived URL for an expense receipt
+// (POST /trips/{tripId}/expenses/{expenseId}/receipt/open-url)
+func (_ Unimplemented) OpenExpenseReceipt(w http.ResponseWriter, r *http.Request, tripId string, expenseId string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -3610,6 +3784,77 @@ func (siw *ServerInterfaceWrapper) MarkScheduleItemSkipped(w http.ResponseWriter
 	handler.ServeHTTP(w, r)
 }
 
+// CreateExpenseReceiptDraft operation middleware
+func (siw *ServerInterfaceWrapper) CreateExpenseReceiptDraft(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateExpenseReceiptDraft(w, r, tripId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CancelExpenseReceiptDraft operation middleware
+func (siw *ServerInterfaceWrapper) CancelExpenseReceiptDraft(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "receiptDraftId" -------------
+	var receiptDraftId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "receiptDraftId", chi.URLParam(r, "receiptDraftId"), &receiptDraftId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "receiptDraftId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CancelExpenseReceiptDraft(w, r, tripId, receiptDraftId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListTripExpenses operation middleware
 func (siw *ServerInterfaceWrapper) ListTripExpenses(w http.ResponseWriter, r *http.Request) {
 
@@ -3783,6 +4028,126 @@ func (siw *ServerInterfaceWrapper) UpdateTripExpense(w http.ResponseWriter, r *h
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateTripExpense(w, r, tripId, expenseId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteExpenseReceipt operation middleware
+func (siw *ServerInterfaceWrapper) DeleteExpenseReceipt(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "expenseId" -------------
+	var expenseId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "expenseId", chi.URLParam(r, "expenseId"), &expenseId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "expenseId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteExpenseReceipt(w, r, tripId, expenseId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UploadExpenseReceipt operation middleware
+func (siw *ServerInterfaceWrapper) UploadExpenseReceipt(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "expenseId" -------------
+	var expenseId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "expenseId", chi.URLParam(r, "expenseId"), &expenseId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "expenseId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UploadExpenseReceipt(w, r, tripId, expenseId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// OpenExpenseReceipt operation middleware
+func (siw *ServerInterfaceWrapper) OpenExpenseReceipt(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "expenseId" -------------
+	var expenseId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "expenseId", chi.URLParam(r, "expenseId"), &expenseId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "expenseId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.OpenExpenseReceipt(w, r, tripId, expenseId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -4671,6 +5036,12 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/trips/{tripId}/days/{tripDayId}/schedule-items/{scheduleItemId}/skip", wrapper.MarkScheduleItemSkipped)
 	})
 	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/trips/{tripId}/expense-receipt-drafts", wrapper.CreateExpenseReceiptDraft)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/trips/{tripId}/expense-receipt-drafts/{receiptDraftId}", wrapper.CancelExpenseReceiptDraft)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/trips/{tripId}/expenses", wrapper.ListTripExpenses)
 	})
 	r.Group(func(r chi.Router) {
@@ -4684,6 +5055,15 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Patch(options.BaseURL+"/trips/{tripId}/expenses/{expenseId}", wrapper.UpdateTripExpense)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/trips/{tripId}/expenses/{expenseId}/receipt", wrapper.DeleteExpenseReceipt)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/trips/{tripId}/expenses/{expenseId}/receipt", wrapper.UploadExpenseReceipt)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/trips/{tripId}/expenses/{expenseId}/receipt/open-url", wrapper.OpenExpenseReceipt)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/trips/{tripId}/flights", wrapper.ListTripFlights)
