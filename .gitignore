@@ -47,6 +47,10 @@ pnpm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# Python cache
+__pycache__/
+*.py[cod]
+
 # OS/editor
 .DS_Store
 .vscode/
