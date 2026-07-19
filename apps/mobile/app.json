@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "이음(i-um)",
+    "name": "칫 Chit",
     "slug": "i-um",
     "scheme": "ium",
     "version": "0.1.0",
@@ -33,7 +33,7 @@
       "package": "com.twotwobread.ium",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#F8F5EF"
+        "backgroundColor": "#111315"
       }
     },
     "experiments": {

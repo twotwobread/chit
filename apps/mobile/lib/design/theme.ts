@@ -1,49 +1,71 @@
+const chit = {
+  charcoal: '#111315',
+  matteCharcoal: '#191B1F',
+  charcoalElevated: '#24272C',
+  acidLime: '#C8FF00',
+  acidLimeHover: '#B8F000',
+  acidLimePressed: '#A6DB00',
+  acidLimeSoft: '#F1FFC2',
+  acidLimeSofter: '#F8FFE0',
+  paper: '#F5F1E8',
+  paperElevated: '#FAF7F0',
+  surface: '#FFFFFF',
+  paperBorder: '#DDD5C8',
+  fintechBlue: '#2F6BFF',
+  fintechBlueSoft: '#E3EAFF',
+  punchRed: '#FF4D5E',
+  punchRedSoft: '#FFE5E9',
+  stampCoral: '#FF4F2E',
+  stampCoralSoft: '#FFE4DD',
+} as const;
+
 const green = {
-  50: '#e7f7f0',
-  100: '#c4ecdc',
-  200: '#93ddc1',
-  300: '#57c9a3',
-  400: '#23b187',
-  500: '#0e9c72',
-  600: '#098563',
-  700: '#086e53',
-  800: '#0a5743',
-  900: '#0a4537',
+  50: chit.acidLimeSofter,
+  100: chit.acidLimeSoft,
+  200: '#E7FF75',
+  300: '#DCFF4A',
+  400: '#D2FF25',
+  500: chit.acidLime,
+  600: '#A6DB00',
+  700: '#7EA600',
+  800: '#587300',
+  900: '#334200',
 } as const;
 
 const amber = {
-  50: '#fff6e6',
-  100: '#ffe8bf',
-  200: '#ffd485',
-  300: '#ffbe4d',
-  400: '#fba91c',
-  500: '#f08c00',
-  600: '#d97606',
-  700: '#b65d07',
+  50: '#FFF1DC',
+  100: '#FFE1BF',
+  200: '#FFC48F',
+  300: '#FFA160',
+  400: '#FF7A3F',
+  500: chit.stampCoral,
+  600: '#E63F22',
+  700: '#BA321B',
 } as const;
 
 const ink = {
-  0: '#ffffff',
-  25: '#fafaf7',
-  50: '#f4f4ef',
-  100: '#e9e9e2',
-  200: '#d8d8cf',
-  300: '#bfbfb4',
-  400: '#9a9a8e',
-  500: '#74746a',
-  600: '#56564e',
-  700: '#3c3c36',
-  800: '#2a2a26',
-  900: '#1a1a17',
+  0: chit.surface,
+  25: chit.paperElevated,
+  50: chit.paper,
+  100: '#EAE3D6',
+  200: chit.paperBorder,
+  300: '#C8BDAE',
+  400: '#928A80',
+  500: '#716A62',
+  600: '#524D47',
+  700: '#383A36',
+  800: chit.charcoalElevated,
+  900: chit.charcoal,
 } as const;
 
-const red = { 100: '#ffe3e3', 500: '#fa5252', 600: '#e03131' } as const;
-const blue = { 100: '#d7e7ff', 500: '#3b82f6', 600: '#2563eb' } as const;
-const violet = { 500: '#7048e8' } as const;
-const pink = { 500: '#e64980' } as const;
-const yellow = { 100: '#fff3bf', 500: '#f7b500' } as const;
+const red = { 100: chit.punchRedSoft, 500: chit.punchRed, 600: chit.punchRed } as const;
+const blue = { 100: chit.fintechBlueSoft, 500: chit.fintechBlue, 600: chit.fintechBlue } as const;
+const violet = { 500: '#7C5CFF' } as const;
+const pink = { 500: '#FF5CA8' } as const;
+const yellow = { 100: '#FFF5B8', 500: chit.stampCoral } as const;
 
 export const color = {
+  chit,
   green,
   amber,
   ink,
@@ -53,48 +75,48 @@ export const color = {
   pink,
   yellow,
 
-  primary: green[600],
-  primaryHover: green[700],
-  primaryPressed: green[800],
-  primarySoft: green[50],
-  onPrimary: ink[0],
-  accent: amber[500],
-  accentSoft: amber[50],
+  primary: chit.acidLime,
+  primaryHover: chit.acidLimeHover,
+  primaryPressed: chit.acidLimePressed,
+  primarySoft: chit.acidLimeSoft,
+  onPrimary: chit.charcoal,
+  accent: chit.stampCoral,
+  accentSoft: chit.stampCoralSoft,
 
-  bg: ink[25],
-  surface: ink[0],
-  surfaceSunken: ink[50],
-  surfaceSoft: green[50],
+  bg: chit.paper,
+  surface: chit.surface,
+  surfaceSunken: chit.paperElevated,
+  surfaceSoft: chit.acidLimeSofter,
 
-  textStrong: ink[900],
+  textStrong: chit.charcoal,
   textBody: ink[700],
   textMuted: ink[500],
   textFaint: ink[400],
-  textOnDark: ink[0],
-  textLink: green[700],
+  textOnDark: chit.surface,
+  textLink: chit.fintechBlue,
 
-  borderSubtle: ink[100],
-  borderDefault: ink[200],
+  borderSubtle: '#EAE3D6',
+  borderDefault: chit.paperBorder,
   borderStrong: ink[300],
 
-  success: green[600],
-  danger: red[600],
-  warning: yellow[500],
-  info: blue[600],
+  success: chit.acidLime,
+  danger: chit.punchRed,
+  warning: chit.stampCoral,
+  info: chit.fintechBlue,
 
-  credit: green[600],
-  debit: red[600],
+  credit: chit.fintechBlue,
+  debit: chit.punchRed,
 } as const;
 
 export const providerColor = {
-  appleBg: ink[900],
-  appleText: ink[0],
+  appleBg: chit.charcoal,
+  appleText: chit.surface,
   kakaoBg: '#fee500',
-  kakaoText: ink[900],
+  kakaoText: chit.charcoal,
 } as const;
 
 export const placeType = {
-  sights: { label: '관광지', color: green[500] },
+  sights: { label: '관광지', color: green[600] },
   food: { label: '식당', color: red[500] },
   lodging: { label: '숙소', color: violet[500] },
   cafe: { label: '카페', color: amber[600] },
@@ -171,28 +193,28 @@ export const radius = {
 
 export const shadow = {
   xs: {
-    shadowColor: ink[900],
+    shadowColor: chit.charcoal,
     shadowOpacity: 0.06,
     shadowRadius: 2,
     shadowOffset: { width: 0, height: 1 },
     elevation: 1,
   },
   sm: {
-    shadowColor: ink[900],
+    shadowColor: chit.charcoal,
     shadowOpacity: 0.08,
     shadowRadius: 3,
     shadowOffset: { width: 0, height: 1 },
     elevation: 2,
   },
   md: {
-    shadowColor: ink[900],
+    shadowColor: chit.charcoal,
     shadowOpacity: 0.1,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
     elevation: 5,
   },
   lg: {
-    shadowColor: ink[900],
+    shadowColor: chit.charcoal,
     shadowOpacity: 0.14,
     shadowRadius: 28,
     shadowOffset: { width: 0, height: 12 },
