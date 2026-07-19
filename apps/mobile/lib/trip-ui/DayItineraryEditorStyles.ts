@@ -55,6 +55,67 @@ export const styles = StyleSheet.create({
     fontSize: theme.font.size.headline,
     fontWeight: theme.font.weight.bold,
   },
+  defaultTravelModeCard: {
+    width: '100%',
+    maxWidth: theme.layout.cardMaxW,
+    backgroundColor: theme.color.surface,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    gap: theme.space[4],
+    marginBottom: theme.space[5],
+    padding: theme.space[5],
+    ...theme.shadow.xs,
+  },
+  defaultTravelModeTextGroup: {
+    gap: theme.space[2],
+  },
+  defaultTravelModeTitle: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.subhead,
+    fontWeight: theme.font.weight.bold,
+  },
+  defaultTravelModeHelper: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.caption,
+    lineHeight: 18,
+  },
+  defaultTravelModeOptions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.space[3],
+  },
+  defaultTravelModeChip: {
+    borderColor: theme.color.borderDefault,
+    borderRadius: theme.radius.pill,
+    borderWidth: 1,
+    justifyContent: 'center',
+    minHeight: theme.layout.tapMin,
+    paddingHorizontal: theme.space[4],
+  },
+  defaultTravelModeChipSelected: {
+    backgroundColor: theme.color.primarySoft,
+    borderColor: theme.color.primary,
+  },
+  defaultTravelModeChipDisabled: {
+    opacity: 0.55,
+  },
+  defaultTravelModeChipText: {
+    color: theme.color.textBody,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.caption,
+    fontWeight: theme.font.weight.bold,
+  },
+  defaultTravelModeChipTextSelected: {
+    color: theme.color.primary,
+  },
+  defaultTravelModeFeedback: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.caption,
+  },
   modalBackdrop: {
     alignItems: 'center',
     backgroundColor: theme.color.bg,

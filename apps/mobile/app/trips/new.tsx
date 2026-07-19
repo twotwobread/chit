@@ -1,16 +1,19 @@
 import { useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import type { DestinationSearchResult, SupportedCurrency, TripDestinationInput } from '@i-um/api-contract';
+import type {
+  DestinationSearchResult,
+  SupportedCurrency,
+  TripDefaultTravelMode,
+  TripDestinationInput,
+} from '@i-um/api-contract';
 
 import { MobileAuthError } from '../../lib/auth/client';
 import { Card, PrimaryButton, SecondaryButton, theme } from '../../lib/design';
 import {
   addTripDestination,
   buildCreateTripDestinations,
-  buildDestinationSearchContentTopPadding,
   destinationCountryMismatchConfirmation,
   destinationKey,
   destinationSearchSubmitState,
@@ -26,17 +29,32 @@ import { TripDateRangeEditor } from '../../lib/trip-ui/TripDateRangeEditor';
 import { dateFromString, isValidDate, monthStringFromDate, todayString } from '../../lib/trips/date';
 import { TripFormField } from '../../lib/trips/date-picker';
 import {
+  applySuggestedTripName,
+  createTripWizardSteps,
+  nextCreateTripWizardStep,
+  previousCreateTripWizardStep,
+  suggestTripName,
+  type CreateTripWizardStep,
+} from '../../lib/trips/create-trip-wizard';
+import {
   keepTripDateRangePickerFieldAfterSelect,
   minDateForTripDateRangeField,
   selectTripDateRangeDate,
   type TripDateRangeField,
 } from '../../lib/trips/trip-date-range-editor';
+import {
+  buildTripDefaultTravelModeSelectorViewModel,
+  defaultTripTravelMode,
+  isTripDefaultTravelMode,
+  travelModeDisplayLabel,
+} from '../../lib/trips/travel-mode';
 
 type FormState = {
   name: string;
   startDate: string;
   endDate: string;
   defaultCurrency: SupportedCurrency;
+  defaultTravelMode: TripDefaultTravelMode;
 };
 
 const currencies: SupportedCurrency[] = ['KRW', 'JPY', 'USD', 'EUR'];
@@ -47,16 +65,41 @@ const initialForm: FormState = {
   startDate: '',
   endDate: '',
   defaultCurrency: 'KRW',
+  defaultTravelMode: defaultTripTravelMode,
+};
+
+const stepCopy: Record<CreateTripWizardStep, { title: string; subtitle: string; kicker: string }> = {
+  destinations: {
+    kicker: '여행의 기준 도시',
+    title: '어디로 떠나나요?',
+    subtitle: '장소 검색과 지도 추천에 사용할 도시를 먼저 정해요.',
+  },
+  dates: {
+    kicker: '여행 기간',
+    title: '언제 머무르나요?',
+    subtitle: '시작일과 종료일을 선택하면 Day 일정이 자동으로 준비돼요.',
+  },
+  settings: {
+    kicker: '기본 설정',
+    title: '어떤 기준으로 볼까요?',
+    subtitle: '지출 통화와 길찾기 기본 이동 방식을 여행에 저장해요.',
+  },
+  review: {
+    kicker: '최종 확인',
+    title: '준비한 내용을 확인해요',
+    subtitle: '추천 이름을 그대로 쓰거나 원하는 이름으로 바꿀 수 있어요.',
+  },
 };
 
 export default function NewTripScreen() {
   const [form, setForm] = useState<FormState>(initialForm);
   const [destinations, setDestinations] = useState<TripDestinationInput[]>([]);
+  const [wizardStep, setWizardStep] = useState<CreateTripWizardStep>('destinations');
+  const [nameEdited, setNameEdited] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeDateField, setActiveDateField] = useState<TripDateRangeField | null>(null);
   const [calendarMonth, setCalendarMonth] = useState(() => monthStringFromDate(new Date()));
-  const [destinationSearchOpen, setDestinationSearchOpen] = useState(false);
   const [destinationQuery, setDestinationQuery] = useState('');
   const [destinationResults, setDestinationResults] = useState<DestinationSearchResult[]>([]);
   const [destinationLoading, setDestinationLoading] = useState(false);
@@ -64,6 +107,16 @@ export default function NewTripScreen() {
   const [destinationSearched, setDestinationSearched] = useState(false);
   const destinationSearchRequestId = useRef(0);
   const today = todayString();
+  const destinationStatus = destinationSelectionStatus(destinations);
+  const suggestedName = suggestTripName(destinations, form.startDate, form.endDate);
+  const effectiveTripName = applySuggestedTripName(form.name, suggestedName, nameEdited);
+  const stepIndex = createTripWizardSteps.indexOf(wizardStep);
+  const isFirstStep = wizardStep === 'destinations';
+  const isReviewStep = wizardStep === 'review';
+  const footerLayout = useStickyActionFooterLayout({ actionCount: isFirstStep ? 1 : 2 });
+  const travelModeSelector = buildTripDefaultTravelModeSelectorViewModel(form.defaultTravelMode);
+  const destinationSummary = buildDestinationSummary(destinations);
+  const dateSummary = form.startDate && form.endDate ? `${form.startDate} ~ ${form.endDate}` : '기간 선택 전';
 
   const updateDestinationQuery = (query: string) => {
     destinationSearchRequestId.current += 1;
@@ -122,10 +175,52 @@ export default function NewTripScreen() {
 
     setForm((current) => selectTripDateRangeDate(current, activeDateField, date));
     setActiveDateField(keepTripDateRangePickerFieldAfterSelect(activeDateField));
+    setError(null);
+  };
+
+  const addDestination = (result: DestinationSearchResult) => {
+    setDestinations((current) => addTripDestination(current, tripDestinationInputFromSearchResult(result)));
+    setError(null);
+  };
+
+  const validateStep = (step: CreateTripWizardStep): string | null => {
+    if (step === 'destinations') {
+      return validateTripDestinations(destinations);
+    }
+    if (step === 'dates') {
+      return validateDateRange(form, today);
+    }
+    if (step === 'settings') {
+      return validateSettings(form);
+    }
+    return validateForm(form, today, effectiveTripName) ?? validateTripDestinations(destinations);
+  };
+
+  const goNext = () => {
+    const validationError = validateStep(wizardStep);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+    setError(null);
+    setWizardStep((current) => nextCreateTripWizardStep(current));
+  };
+
+  const goBack = () => {
+    setError(null);
+    setActiveDateField(null);
+    setWizardStep((current) => previousCreateTripWizardStep(current));
+  };
+
+  const resetNameToSuggestion = () => {
+    setForm((current) => ({ ...current, name: suggestedName }));
+    setNameEdited(false);
+    setError(null);
   };
 
   const submit = async () => {
-    const validationError = validateForm(form, today) ?? validateTripDestinations(destinations);
+    const resolvedName = effectiveTripName.trim();
+    const validationError = validateForm(form, today, resolvedName) ?? validateTripDestinations(destinations);
     if (validationError) {
       setError(validationError);
       return;
@@ -135,10 +230,11 @@ export default function NewTripScreen() {
     setError(null);
     try {
       await createTrip({
-        name: form.name,
+        name: resolvedName,
         startDate: form.startDate,
         endDate: form.endDate,
         defaultCurrency: form.defaultCurrency,
+        defaultTravelMode: form.defaultTravelMode,
         destinations: buildCreateTripDestinations(destinations),
       });
       router.replace('/');
@@ -156,31 +252,6 @@ export default function NewTripScreen() {
     }
   };
 
-  const addDestination = (result: DestinationSearchResult) => {
-    setDestinations((current) => addTripDestination(current, tripDestinationInputFromSearchResult(result)));
-  };
-
-  const destinationStatus = destinationSelectionStatus(destinations);
-  const footerLayout = useStickyActionFooterLayout({ actionCount: 1 });
-
-  if (destinationSearchOpen) {
-    return (
-      <DestinationSearchFlow
-        destinations={destinations}
-        error={destinationError}
-        loading={destinationLoading}
-        onAdd={addDestination}
-        onDone={() => setDestinationSearchOpen(false)}
-        onQueryChange={updateDestinationQuery}
-        onSearch={() => void runDestinationSearch()}
-        onRemove={(key) => setDestinations((current) => removeTripDestination(current, key))}
-        query={destinationQuery}
-        results={destinationResults}
-        searched={destinationSearched}
-      />
-    );
-  }
-
   return (
     <View style={styles.screenRoot}>
       <KeyboardAwareFormScrollView
@@ -189,142 +260,313 @@ export default function NewTripScreen() {
         keyboardMinClearance={footerLayout.keyboardMinClearance}
         style={styles.scroll}
       >
-        <View style={styles.header}>
-          <Text style={styles.title}>여행 생성</Text>
-          <Text style={styles.subtitle}>여행 도시와 이름, 기간을 정하면 바로 시작할 수 있어요.</Text>
-        </View>
-
-        <Card>
-          <View style={styles.field}>
-            <View style={styles.destinationHeaderRow}>
-              <View style={styles.destinationHeaderText}>
-                <Text style={styles.label}>여행 도시 *</Text>
-                <Text style={styles.helperText}>일정 장소를 검색할 기준 도시를 선택해 주세요.</Text>
+        <Card style={styles.wizardCard}>
+          <View style={styles.stepHero}>
+            <View style={styles.stepHeroTopRow}>
+              <Text style={styles.stepEyebrow}>STEP {stepIndex + 1} OF 4</Text>
+              <View style={styles.stepBadge}>
+                <Text style={styles.stepBadgeText}>{stepCopy[wizardStep].kicker}</Text>
               </View>
-              <SecondaryButton
-                disabled={submitting || !destinationStatus.canAddMore}
-                label="+ 도시 검색"
-                onPress={() => {
-                  setDestinationSearchOpen(true);
-                  setError(null);
-                }}
+            </View>
+            <Text style={styles.stepTitle}>{stepCopy[wizardStep].title}</Text>
+            <Text style={styles.stepSubtitle}>{stepCopy[wizardStep].subtitle}</Text>
+            <StepProgressSegments activeIndex={stepIndex} />
+          </View>
+
+          <View style={styles.stepSummaryStrip}>
+            <StepSummaryBadge active={wizardStep === 'destinations'} label="도시" value={destinationSummary} />
+            <StepSummaryBadge active={wizardStep === 'dates'} label="기간" value={dateSummary} />
+            <StepSummaryBadge active={wizardStep === 'settings'} label="설정" value={form.defaultCurrency} />
+          </View>
+
+          <View style={styles.stepDivider} />
+
+          {wizardStep === 'destinations' ? (
+            <DestinationStep
+              destinationError={destinationError}
+              destinationStatus={destinationStatus}
+              destinations={destinations}
+              loading={destinationLoading}
+              onAdd={addDestination}
+              onQueryChange={updateDestinationQuery}
+              onRemove={(key) => setDestinations((current) => removeTripDestination(current, key))}
+              onSearch={() => void runDestinationSearch()}
+              query={destinationQuery}
+              results={destinationResults}
+              searched={destinationSearched}
+              submitting={submitting}
+            />
+          ) : null}
+
+          {wizardStep === 'dates' ? (
+            <View style={styles.stepStack}>
+              <View style={styles.insightPanel}>
+                <Text style={styles.insightTitle}>선택한 기간</Text>
+                <Text style={styles.insightValue}>{dateSummary}</Text>
+                <Text style={styles.insightHelper}>오늘 이후 날짜만 선택할 수 있어요.</Text>
+              </View>
+              <TripDateRangeEditor
+                activeField={activeDateField}
+                calendarMonth={calendarMonth}
+                disabled={submitting}
+                onClosePicker={() => setActiveDateField(null)}
+                onMonthChange={setCalendarMonth}
+                onOpenField={openDatePicker}
+                onSelectDate={selectDate}
+                today={today}
+                values={form}
+                yearOptionCount={yearOptionCount}
               />
             </View>
-            {destinations.length > 0 ? (
-              <View style={styles.destinationChipRow}>
-                {destinations.map((destination, index) => (
-                  <Pressable
-                    accessibilityRole="button"
-                    disabled={submitting}
-                    key={destinationKey(destination)}
-                    onPress={() =>
-                      setDestinations((current) => removeTripDestination(current, destinationKey(destination)))
-                    }
-                    style={styles.destinationChip}
-                  >
-                    <Text style={styles.destinationChipText}>
-                      {destination.displayName}
-                      {index === 0 ? '  대표' : ''}
-                    </Text>
-                  </Pressable>
-                ))}
+          ) : null}
+
+          {wizardStep === 'settings' ? (
+            <View style={styles.stepStack}>
+              <View style={styles.optionCard}>
+                <View style={styles.optionCardHeader}>
+                  <Text style={styles.optionCardTitle}>기본 통화</Text>
+                  <Text style={styles.optionCardHelper}>여행 지출 입력의 기본값으로 사용돼요.</Text>
+                </View>
+                <View style={styles.optionRow}>
+                  {currencies.map((currency) => {
+                    const selected = form.defaultCurrency === currency;
+                    return (
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityState={{ selected }}
+                        disabled={submitting}
+                        key={currency}
+                        onPress={() => {
+                          setForm((current) => ({ ...current, defaultCurrency: currency }));
+                          setError(null);
+                        }}
+                        style={[styles.optionChip, selected ? styles.optionChipSelected : null]}
+                      >
+                        <Text style={[styles.optionText, selected ? styles.optionTextSelected : null]}>{currency}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
               </View>
-            ) : (
-              <Text style={styles.emptyDestinationText}>선택한 도시가 없어요.</Text>
-            )}
-            {destinationStatus.helperText ? (
-              <Text style={styles.helperText}>{destinationStatus.helperText}</Text>
-            ) : null}
-          </View>
 
-          <TripFormField label="여행 이름">
-            <TextInput
-              editable={!submitting}
-              onChangeText={(name) => setForm((current) => ({ ...current, name }))}
-              placeholder="예: 오사카 3박 4일"
-              placeholderTextColor={theme.color.textFaint}
-              style={styles.input}
-              value={form.name}
-            />
-          </TripFormField>
-
-          <TripDateRangeEditor
-            activeField={activeDateField}
-            calendarMonth={calendarMonth}
-            disabled={submitting}
-            onClosePicker={() => setActiveDateField(null)}
-            onMonthChange={setCalendarMonth}
-            onOpenField={openDatePicker}
-            onSelectDate={selectDate}
-            today={today}
-            values={form}
-            yearOptionCount={yearOptionCount}
-          />
-
-          <View style={styles.field}>
-            <Text style={styles.label}>기본 통화</Text>
-            <View style={styles.currencyRow}>
-              {currencies.map((currency) => {
-                const selected = form.defaultCurrency === currency;
-                return (
-                  <Pressable
-                    accessibilityRole="button"
-                    disabled={submitting}
-                    key={currency}
-                    onPress={() => setForm((current) => ({ ...current, defaultCurrency: currency }))}
-                    style={[styles.currencyChip, selected ? styles.currencyChipSelected : null]}
-                  >
-                    <Text style={[styles.currencyText, selected ? styles.currencyTextSelected : null]}>{currency}</Text>
-                  </Pressable>
-                );
-              })}
+              <View style={styles.optionCard}>
+                <View style={styles.optionCardHeader}>
+                  <Text style={styles.optionCardTitle}>{travelModeSelector.label}</Text>
+                  <Text style={styles.optionCardHelper}>오늘 화면과 일정 이동 시간 계산의 기본 기준이에요.</Text>
+                </View>
+                <View style={styles.optionRow}>
+                  {travelModeSelector.options.map((option) => (
+                    <Pressable
+                      accessibilityLabel={option.accessibilityLabel}
+                      accessibilityRole="button"
+                      accessibilityState={option.accessibilityState}
+                      disabled={submitting}
+                      key={option.mode}
+                      onPress={() => {
+                        setForm((current) => ({ ...current, defaultTravelMode: option.mode }));
+                        setError(null);
+                      }}
+                      style={[styles.optionChip, option.selected ? styles.optionChipSelected : null]}
+                    >
+                      <Text style={[styles.optionText, option.selected ? styles.optionTextSelected : null]}>
+                        {option.label}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+                <Text style={styles.inlineHint}>도보는 trip 기본값이 아니라 구간별 확인 옵션으로 유지돼요.</Text>
+              </View>
             </View>
-          </View>
+          ) : null}
+
+          {wizardStep === 'review' ? (
+            <View style={styles.stepStack}>
+              <View style={styles.optionCard}>
+                <TripFormField label="여행 이름">
+                  <TextInput
+                    editable={!submitting}
+                    onChangeText={(name) => {
+                      setForm((current) => ({ ...current, name }));
+                      setNameEdited(true);
+                      setError(null);
+                    }}
+                    placeholder="예: 오사카 3박 4일"
+                    placeholderTextColor={theme.color.textFaint}
+                    style={styles.input}
+                    value={effectiveTripName}
+                  />
+                </TripFormField>
+                {nameEdited ? (
+                  <SecondaryButton
+                    disabled={submitting}
+                    label="추천 이름으로 다시 채우기"
+                    onPress={resetNameToSuggestion}
+                  />
+                ) : null}
+              </View>
+
+              <View style={styles.summaryBox}>
+                <SummaryRow
+                  label="여행 도시"
+                  value={destinations.map((destination) => destination.displayName).join(' · ')}
+                />
+                <SummaryRow label="여행 기간" value={`${form.startDate} ~ ${form.endDate}`} />
+                <SummaryRow label="기본 통화" value={form.defaultCurrency} />
+                <SummaryRow label="이동 방식" value={travelModeDisplayLabel(form.defaultTravelMode)} />
+              </View>
+            </View>
+          ) : null}
 
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
         </Card>
       </KeyboardAwareFormScrollView>
-      <StickyActionFooter actionCount={1} layout={footerLayout}>
+      <StickyActionFooter actionCount={isFirstStep ? 1 : 2} layout={footerLayout}>
+        {!isFirstStep ? <SecondaryButton disabled={submitting} label="이전" onPress={goBack} /> : null}
         <PrimaryButton
           disabled={submitting}
-          label="여행 만들기"
+          label={isReviewStep ? '여행 만들기' : '다음'}
           loading={submitting}
           loadingLabel="여행 만드는 중..."
-          onPress={() => void submit()}
+          onPress={isReviewStep ? () => void submit() : goNext}
         />
       </StickyActionFooter>
     </View>
   );
 }
 
-type DestinationSearchFlowProps = {
+type StepProgressSegmentsProps = {
+  activeIndex: number;
+};
+
+function StepProgressSegments({ activeIndex }: StepProgressSegmentsProps) {
+  return (
+    <View accessibilityLabel={`여행 만들기 ${activeIndex + 1}단계`} style={styles.progressSegments}>
+      {createTripWizardSteps.map((step, index) => (
+        <View
+          accessibilityElementsHidden
+          importantForAccessibility="no"
+          key={step}
+          style={[styles.progressSegment, index <= activeIndex ? styles.progressSegmentActive : null]}
+        />
+      ))}
+    </View>
+  );
+}
+
+type StepSummaryBadgeProps = {
+  active: boolean;
+  label: string;
+  value: string;
+};
+
+function StepSummaryBadge({ active, label, value }: StepSummaryBadgeProps) {
+  return (
+    <View style={[styles.stepSummaryBadge, active ? styles.stepSummaryBadgeActive : null]}>
+      <Text style={[styles.stepSummaryLabel, active ? styles.stepSummaryLabelActive : null]}>{label}</Text>
+      <Text numberOfLines={1} style={[styles.stepSummaryValue, active ? styles.stepSummaryValueActive : null]}>
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+type DestinationStepProps = {
+  destinationError: string | null;
+  destinationStatus: ReturnType<typeof destinationSelectionStatus>;
   destinations: TripDestinationInput[];
-  error: string | null;
   loading: boolean;
   onAdd: (result: DestinationSearchResult) => void;
-  onDone: () => void;
   onQueryChange: (query: string) => void;
   onRemove: (key: string) => void;
   onSearch: () => void;
   query: string;
   results: DestinationSearchResult[];
   searched: boolean;
+  submitting: boolean;
 };
 
-function DestinationSearchFlow({
+function DestinationStep({
+  destinationError,
+  destinationStatus,
   destinations,
-  error,
   loading,
   onAdd,
-  onDone,
   onQueryChange,
   onRemove,
   onSearch,
   query,
   results,
   searched,
-}: DestinationSearchFlowProps) {
-  const insets = useSafeAreaInsets();
+  submitting,
+}: DestinationStepProps) {
+  return (
+    <View style={styles.stepStack}>
+      <View style={styles.insightPanel}>
+        <Text style={styles.insightTitle}>선택한 도시</Text>
+        <Text style={styles.insightValue}>{buildDestinationSummary(destinations)}</Text>
+        <Text style={styles.insightHelper}>첫 번째 도시가 대표 도시가 되고, 최대 5개까지 추가할 수 있어요.</Text>
+      </View>
+
+      {destinations.length > 0 ? (
+        <View style={styles.destinationChipRow}>
+          {destinations.map((destination, index) => (
+            <Pressable
+              accessibilityLabel={`${destination.displayName} 도시 삭제`}
+              accessibilityRole="button"
+              disabled={submitting}
+              key={destinationKey(destination)}
+              onPress={() => onRemove(destinationKey(destination))}
+              style={styles.destinationChip}
+            >
+              <Text style={styles.destinationChipText}>
+                {destination.displayName}
+                {index === 0 ? '  대표' : ''}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+
+      <InlineDestinationSearchPanel
+        destinations={destinations}
+        error={destinationError}
+        loading={loading}
+        onAdd={onAdd}
+        onQueryChange={onQueryChange}
+        onSearch={onSearch}
+        query={query}
+        results={results}
+        searched={searched}
+      />
+
+      {destinationStatus.helperText ? <Text style={styles.helperText}>{destinationStatus.helperText}</Text> : null}
+    </View>
+  );
+}
+
+type InlineDestinationSearchPanelProps = {
+  destinations: TripDestinationInput[];
+  error: string | null;
+  loading: boolean;
+  onAdd: (result: DestinationSearchResult) => void;
+  onQueryChange: (query: string) => void;
+  onSearch: () => void;
+  query: string;
+  results: DestinationSearchResult[];
+  searched: boolean;
+};
+
+function InlineDestinationSearchPanel({
+  destinations,
+  error,
+  loading,
+  onAdd,
+  onQueryChange,
+  onSearch,
+  query,
+  results,
+  searched,
+}: InlineDestinationSearchPanelProps) {
   const selectedKeys = new Set(destinations.map(destinationKey));
   const status = destinationSelectionStatus(destinations);
   const searchSubmitState = destinationSearchSubmitState(query, loading);
@@ -360,148 +602,151 @@ function DestinationSearchFlow({
   };
 
   return (
-    <KeyboardAwareFormScrollView
-      contentContainerStyle={[
-        styles.searchContent,
-        { paddingTop: buildDestinationSearchContentTopPadding(insets.top) },
-      ]}
-      style={styles.scroll}
-    >
-      <View style={styles.searchHeader}>
-        <Text style={styles.title}>도시 검색</Text>
-        <SecondaryButton label="완료" onPress={onDone} />
+    <View style={styles.searchPanel}>
+      <View style={styles.searchPanelHeader}>
+        <View style={styles.searchPanelTitleGroup}>
+          <Text style={styles.label}>도시 검색</Text>
+          <Text style={styles.helperText}>도시명이나 지역명을 입력하고 검색해요.</Text>
+        </View>
+        <View style={styles.searchCountBadge}>
+          <Text style={styles.searchCountText}>{destinations.length}/5</Text>
+        </View>
       </View>
 
-      <Card>
-        <View style={styles.field}>
-          <Text style={styles.label}>선택한 도시</Text>
-          {destinations.length > 0 ? (
-            <View style={styles.destinationChipRow}>
-              {destinations.map((destination) => (
-                <Pressable
-                  accessibilityRole="button"
-                  key={destinationKey(destination)}
-                  onPress={() => onRemove(destinationKey(destination))}
-                  style={styles.destinationChip}
-                >
-                  <Text style={styles.destinationChipText}>{destination.displayName}</Text>
-                </Pressable>
-              ))}
-            </View>
-          ) : (
-            <Text style={styles.emptyDestinationText}>아직 선택한 도시가 없어요.</Text>
-          )}
-          {status.helperText ? <Text style={styles.helperText}>{status.helperText}</Text> : null}
-        </View>
+      <View style={styles.destinationSearchRow}>
+        <TextInput
+          editable={!loading}
+          onChangeText={onQueryChange}
+          onSubmitEditing={() => {
+            if (searchSubmitState.canSearch) {
+              onSearch();
+            }
+          }}
+          placeholder="예: 오사카"
+          placeholderTextColor={theme.color.textFaint}
+          returnKeyType="search"
+          style={[styles.input, styles.destinationSearchInput]}
+          value={query}
+        />
+        <Pressable
+          accessibilityRole="button"
+          disabled={!searchSubmitState.canSearch}
+          onPress={onSearch}
+          style={[
+            styles.destinationSearchButton,
+            !searchSubmitState.canSearch ? styles.destinationSearchButtonDisabled : null,
+          ]}
+        >
+          {loading ? <ActivityIndicator color={theme.color.onPrimary} /> : null}
+          <Text style={styles.destinationSearchButtonText}>{searchSubmitState.buttonLabel}</Text>
+        </Pressable>
+      </View>
 
-        <View style={styles.field}>
-          <Text style={styles.label}>어느 도시를 여행하나요?</Text>
-          <View style={styles.destinationSearchRow}>
-            <TextInput
-              autoFocus
-              editable={!loading}
-              onChangeText={onQueryChange}
-              onSubmitEditing={() => {
-                if (searchSubmitState.canSearch) {
-                  onSearch();
-                }
-              }}
-              placeholder="예: 오사카"
-              placeholderTextColor={theme.color.textFaint}
-              returnKeyType="search"
-              style={[styles.input, styles.destinationSearchInput]}
-              value={query}
-            />
-            <Pressable
-              accessibilityRole="button"
-              disabled={!searchSubmitState.canSearch}
-              onPress={onSearch}
-              style={[
-                styles.destinationSearchButton,
-                !searchSubmitState.canSearch ? styles.destinationSearchButtonDisabled : null,
-              ]}
-            >
-              {loading ? <ActivityIndicator color={theme.color.onPrimary} /> : null}
-              <Text style={styles.destinationSearchButtonText}>{searchSubmitState.buttonLabel}</Text>
-            </Pressable>
+      <View style={styles.resultPanel}>
+        <Text style={styles.resultPanelTitle}>검색 결과</Text>
+        {searchSubmitState.helperText ? <Text style={styles.helperText}>{searchSubmitState.helperText}</Text> : null}
+        {loading ? <Text style={styles.helperText}>도시를 검색하는 중...</Text> : null}
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        {pendingCountryMismatchConfirmation ? (
+          <View style={styles.destinationWarningBox}>
+            <Text style={styles.destinationWarningTitle}>{pendingCountryMismatchConfirmation.title}</Text>
+            <Text style={styles.destinationWarningText}>{pendingCountryMismatchConfirmation.message}</Text>
+            <View style={styles.destinationWarningActions}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setPendingCountryMismatchResult(null)}
+                style={styles.destinationWarningSecondaryButton}
+              >
+                <Text style={styles.destinationWarningSecondaryText}>
+                  {pendingCountryMismatchConfirmation.cancelLabel}
+                </Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                onPress={confirmCountryMismatchAdd}
+                style={styles.destinationWarningPrimaryButton}
+              >
+                <Text style={styles.destinationWarningPrimaryText}>
+                  {pendingCountryMismatchConfirmation.confirmLabel}
+                </Text>
+              </Pressable>
+            </View>
           </View>
-        </View>
-
-        <View style={styles.field}>
-          <Text style={styles.label}>검색 결과</Text>
-          {searchSubmitState.helperText ? <Text style={styles.helperText}>{searchSubmitState.helperText}</Text> : null}
-          {loading ? <Text style={styles.helperText}>도시를 검색하는 중...</Text> : null}
-          {error ? <Text style={styles.errorText}>{error}</Text> : null}
-          {pendingCountryMismatchConfirmation ? (
-            <View style={styles.destinationWarningBox}>
-              <Text style={styles.destinationWarningTitle}>{pendingCountryMismatchConfirmation.title}</Text>
-              <Text style={styles.destinationWarningText}>{pendingCountryMismatchConfirmation.message}</Text>
-              <View style={styles.destinationWarningActions}>
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => setPendingCountryMismatchResult(null)}
-                  style={styles.destinationWarningSecondaryButton}
-                >
-                  <Text style={styles.destinationWarningSecondaryText}>
-                    {pendingCountryMismatchConfirmation.cancelLabel}
-                  </Text>
-                </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={confirmCountryMismatchAdd}
-                  style={styles.destinationWarningPrimaryButton}
-                >
-                  <Text style={styles.destinationWarningPrimaryText}>
-                    {pendingCountryMismatchConfirmation.confirmLabel}
-                  </Text>
-                </Pressable>
+        ) : null}
+        {!loading && trimmedQuery.length < 2 ? (
+          <Text style={styles.resultEmptyText}>두 글자 이상 입력하면 후보 도시를 찾을 수 있어요.</Text>
+        ) : null}
+        {!loading && trimmedQuery.length >= 2 && !error && !searched ? (
+          <Text style={styles.resultEmptyText}>검색 버튼을 눌러 도시를 찾아보세요.</Text>
+        ) : null}
+        {!loading && searched && trimmedQuery.length >= 2 && !error && results.length === 0 ? (
+          <Text style={styles.resultEmptyText}>검색 결과가 없어요.</Text>
+        ) : null}
+        {results.map((result) => {
+          const selected = selectedKeys.has(destinationKey(result));
+          const disabled = selected || !status.canAddMore;
+          return (
+            <View key={destinationKey(result)} style={styles.resultRow}>
+              <View style={styles.resultTextBox}>
+                <Text style={styles.resultTitle}>{result.displayName}</Text>
+                <Text style={styles.resultSubtitle}>
+                  {result.cityName}, {result.countryName}
+                </Text>
               </View>
+              <Pressable
+                accessibilityRole="button"
+                disabled={disabled}
+                onPress={() => requestAddResult(result)}
+                style={[styles.addResultButton, disabled ? styles.addResultButtonDisabled : null]}
+              >
+                <Text style={[styles.addResultButtonText, disabled ? styles.addResultButtonTextDisabled : null]}>
+                  {selected ? '추가됨' : '추가'}
+                </Text>
+              </Pressable>
             </View>
-          ) : null}
-          {!loading && trimmedQuery.length >= 2 && !error && !searched ? (
-            <Text style={styles.helperText}>검색 버튼을 눌러 도시를 찾아보세요.</Text>
-          ) : null}
-          {!loading && searched && trimmedQuery.length >= 2 && !error && results.length === 0 ? (
-            <Text style={styles.helperText}>검색 결과가 없어요.</Text>
-          ) : null}
-          {results.map((result) => {
-            const selected = selectedKeys.has(destinationKey(result));
-            const disabled = selected || !status.canAddMore;
-            return (
-              <View key={destinationKey(result)} style={styles.resultRow}>
-                <View style={styles.resultTextBox}>
-                  <Text style={styles.resultTitle}>{result.displayName}</Text>
-                  <Text style={styles.resultSubtitle}>
-                    {result.cityName}, {result.countryName}
-                  </Text>
-                </View>
-                <Pressable
-                  accessibilityRole="button"
-                  disabled={disabled}
-                  onPress={() => requestAddResult(result)}
-                  style={[styles.addResultButton, disabled ? styles.addResultButtonDisabled : null]}
-                >
-                  <Text style={[styles.addResultButtonText, disabled ? styles.addResultButtonTextDisabled : null]}>
-                    {selected ? '추가됨' : '추가'}
-                  </Text>
-                </Pressable>
-              </View>
-            );
-          })}
-        </View>
-      </Card>
-    </KeyboardAwareFormScrollView>
+          );
+        })}
+      </View>
+    </View>
   );
 }
 
-function validateForm(form: FormState, today: string): string | null {
-  const name = form.name.trim();
+type SummaryRowProps = {
+  label: string;
+  value: string;
+};
+
+function SummaryRow({ label, value }: SummaryRowProps) {
+  return (
+    <View style={styles.summaryRow}>
+      <Text style={styles.summaryLabel}>{label}</Text>
+      <Text style={styles.summaryValue}>{value}</Text>
+    </View>
+  );
+}
+
+function buildDestinationSummary(destinations: TripDestinationInput[]): string {
+  if (destinations.length === 0) {
+    return '도시 선택 전';
+  }
+  if (destinations.length === 1) {
+    return destinations[0].displayName;
+  }
+  return `${destinations[0].displayName} 외 ${destinations.length - 1}개`;
+}
+
+function validateForm(form: FormState, today: string, tripName: string): string | null {
+  const name = tripName.trim();
   if (name.length < 1) {
     return '여행 이름을 입력해주세요.';
   }
   if ([...name].length > 80) {
     return '여행 이름은 80자 이내로 입력해주세요.';
   }
+  return validateDateRange(form, today) ?? validateSettings(form);
+}
+
+function validateDateRange(form: Pick<FormState, 'startDate' | 'endDate'>, today: string): string | null {
   if (!form.startDate || !form.endDate) {
     return '날짜를 선택해주세요.';
   }
@@ -514,8 +759,15 @@ function validateForm(form: FormState, today: string): string | null {
   if (form.startDate < today || form.endDate < today) {
     return '오늘 또는 이후 날짜를 선택해주세요.';
   }
+  return null;
+}
+
+function validateSettings(form: Pick<FormState, 'defaultCurrency' | 'defaultTravelMode'>): string | null {
   if (!currencies.includes(form.defaultCurrency)) {
     return '지원하는 통화를 선택해주세요.';
+  }
+  if (!isTripDefaultTravelMode(form.defaultTravelMode)) {
+    return '지원하는 이동 방식을 선택해주세요.';
   }
   return null;
 }
@@ -532,48 +784,227 @@ const styles = StyleSheet.create({
   scrollContent: {
     alignItems: 'center',
     flexGrow: 1,
-    justifyContent: 'center',
-    padding: theme.space[7],
+    paddingHorizontal: theme.space[5],
+    paddingTop: theme.space[7],
   },
-  searchContent: {
-    flexGrow: 1,
-    gap: theme.space[6],
-    padding: theme.space[7],
+  wizardCard: {
+    borderColor: theme.color.borderDefault,
+    borderRadius: theme.radius['2xl'],
+    gap: theme.space[5],
+    maxWidth: theme.layout.screenMax,
+    padding: theme.space[6],
+    ...theme.shadow.md,
   },
-  searchHeader: {
+  stepHero: {
+    backgroundColor: theme.color.surfaceSoft,
+    borderColor: theme.color.green[100],
+    borderRadius: theme.radius.xl,
+    borderWidth: 1,
+    gap: theme.space[3],
+    padding: theme.space[5],
+  },
+  stepHeroTopRow: {
     alignItems: 'center',
     flexDirection: 'row',
+    gap: theme.space[3],
     justifyContent: 'space-between',
-    width: '100%',
-    maxWidth: theme.layout.cardMaxW,
-    alignSelf: 'center',
   },
-  header: {
-    width: '100%',
-    maxWidth: theme.layout.cardMaxW,
-    marginBottom: theme.space[7],
+  stepEyebrow: {
+    color: theme.color.primary,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.micro,
+    fontWeight: theme.font.weight.bold,
+    letterSpacing: 1.1,
   },
-  title: {
+  stepBadge: {
+    backgroundColor: theme.color.surface,
+    borderColor: theme.color.green[100],
+    borderRadius: theme.radius.pill,
+    borderWidth: 1,
+    paddingHorizontal: theme.space[3],
+    paddingVertical: theme.space[2],
+  },
+  stepBadgeText: {
+    color: theme.color.primary,
+    fontFamily: theme.font.family.semibold,
+    fontSize: theme.font.size.micro,
+    fontWeight: theme.font.weight.semibold,
+  },
+  stepTitle: {
     color: theme.color.textStrong,
     fontFamily: theme.font.family.bold,
-    fontSize: theme.font.size.titleLg,
+    fontSize: theme.font.size.title,
     fontWeight: theme.font.weight.bold,
-    marginBottom: theme.space[3],
-    textAlign: 'center',
+    letterSpacing: -0.3,
   },
-  subtitle: {
+  stepSubtitle: {
+    color: theme.color.textBody,
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.body,
+    lineHeight: 22,
+  },
+  progressSegments: {
+    flexDirection: 'row',
+    gap: theme.space[2],
+    marginTop: theme.space[2],
+  },
+  progressSegment: {
+    backgroundColor: theme.color.ink[100],
+    borderRadius: theme.radius.pill,
+    flex: 1,
+    height: 6,
+  },
+  progressSegmentActive: {
+    backgroundColor: theme.color.primary,
+  },
+  stepSummaryStrip: {
+    flexDirection: 'row',
+    gap: theme.space[2],
+  },
+  stepSummaryBadge: {
+    backgroundColor: theme.color.surfaceSunken,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    flex: 1,
+    gap: theme.space[1],
+    minHeight: 56,
+    paddingHorizontal: theme.space[3],
+    paddingVertical: theme.space[3],
+  },
+  stepSummaryBadgeActive: {
+    backgroundColor: theme.color.primarySoft,
+    borderColor: theme.color.green[200],
+  },
+  stepSummaryLabel: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.semibold,
+    fontSize: theme.font.size.micro,
+    fontWeight: theme.font.weight.semibold,
+  },
+  stepSummaryLabelActive: {
+    color: theme.color.primary,
+  },
+  stepSummaryValue: {
+    color: theme.color.textBody,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.caption,
+    fontWeight: theme.font.weight.bold,
+  },
+  stepSummaryValueActive: {
+    color: theme.color.textStrong,
+  },
+  stepDivider: {
+    backgroundColor: theme.color.borderSubtle,
+    height: 1,
+  },
+  stepStack: {
+    gap: theme.space[5],
+  },
+  insightPanel: {
+    backgroundColor: theme.color.surfaceSunken,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    gap: theme.space[2],
+    padding: theme.space[4],
+  },
+  insightTitle: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.semibold,
+    fontSize: theme.font.size.caption,
+    fontWeight: theme.font.weight.semibold,
+  },
+  insightValue: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.headline,
+    fontWeight: theme.font.weight.bold,
+  },
+  insightHelper: {
     color: theme.color.textMuted,
     fontFamily: theme.font.family.regular,
-    textAlign: 'center',
+    lineHeight: 20,
   },
-  field: {
-    gap: theme.space[3],
-  },
-  destinationHeaderRow: {
+  searchPanel: {
+    backgroundColor: theme.color.surface,
+    borderColor: theme.color.borderDefault,
+    borderRadius: theme.radius.xl,
+    borderWidth: 1,
     gap: theme.space[4],
+    padding: theme.space[4],
+    ...theme.shadow.xs,
   },
-  destinationHeaderText: {
+  searchPanelHeader: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: theme.space[3],
+    justifyContent: 'space-between',
+  },
+  searchPanelTitleGroup: {
+    flex: 1,
     gap: theme.space[2],
+  },
+  searchCountBadge: {
+    backgroundColor: theme.color.primarySoft,
+    borderColor: theme.color.green[100],
+    borderRadius: theme.radius.pill,
+    borderWidth: 1,
+    paddingHorizontal: theme.space[3],
+    paddingVertical: theme.space[2],
+  },
+  searchCountText: {
+    color: theme.color.primary,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.caption,
+    fontWeight: theme.font.weight.bold,
+  },
+  resultPanel: {
+    backgroundColor: theme.color.surfaceSunken,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    gap: theme.space[3],
+    padding: theme.space[4],
+  },
+  resultPanelTitle: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.label,
+    fontWeight: theme.font.weight.bold,
+  },
+  resultEmptyText: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.regular,
+    lineHeight: 20,
+  },
+  optionCard: {
+    backgroundColor: theme.color.surface,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.xl,
+    borderWidth: 1,
+    gap: theme.space[4],
+    padding: theme.space[4],
+  },
+  optionCardHeader: {
+    gap: theme.space[2],
+  },
+  optionCardTitle: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.subhead,
+    fontWeight: theme.font.weight.bold,
+  },
+  optionCardHelper: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.regular,
+    lineHeight: 20,
+  },
+  inlineHint: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.caption,
+    lineHeight: 18,
   },
   helperText: {
     color: theme.color.textMuted,
@@ -590,18 +1021,14 @@ const styles = StyleSheet.create({
     borderColor: theme.color.primary,
     borderRadius: theme.radius.pill,
     borderWidth: 1,
-    minHeight: theme.layout.tapMin,
     justifyContent: 'center',
+    minHeight: theme.layout.tapMin,
     paddingHorizontal: theme.space[4],
   },
   destinationChipText: {
     color: theme.color.primary,
     fontFamily: theme.font.family.semibold,
     fontWeight: theme.font.weight.semibold,
-  },
-  emptyDestinationText: {
-    color: theme.color.textMuted,
-    fontFamily: theme.font.family.regular,
   },
   label: {
     color: theme.color.textBody,
@@ -610,7 +1037,7 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.semibold,
   },
   input: {
-    backgroundColor: theme.color.surfaceSunken,
+    backgroundColor: theme.color.surface,
     borderColor: theme.color.borderDefault,
     borderRadius: theme.radius.md,
     borderWidth: 1,
@@ -618,6 +1045,58 @@ const styles = StyleSheet.create({
     fontFamily: theme.font.family.regular,
     minHeight: theme.layout.controlH,
     paddingHorizontal: theme.space[5],
+  },
+  optionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.space[3],
+  },
+  optionChip: {
+    backgroundColor: theme.color.surfaceSunken,
+    borderColor: theme.color.borderDefault,
+    borderRadius: theme.radius.pill,
+    borderWidth: 1,
+    justifyContent: 'center',
+    minHeight: theme.layout.tapMin,
+    paddingHorizontal: theme.space[5],
+  },
+  optionChipSelected: {
+    backgroundColor: theme.color.primarySoft,
+    borderColor: theme.color.primary,
+  },
+  optionText: {
+    color: theme.color.textBody,
+    fontFamily: theme.font.family.bold,
+    fontWeight: theme.font.weight.bold,
+  },
+  optionTextSelected: {
+    color: theme.color.primary,
+  },
+  summaryBox: {
+    backgroundColor: theme.color.surfaceSunken,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.xl,
+    borderWidth: 1,
+    gap: theme.space[3],
+    padding: theme.space[4],
+  },
+  summaryRow: {
+    backgroundColor: theme.color.surface,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    gap: theme.space[1],
+    padding: theme.space[3],
+  },
+  summaryLabel: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.caption,
+  },
+  summaryValue: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.semibold,
+    fontWeight: theme.font.weight.semibold,
   },
   destinationSearchRow: {
     alignItems: 'center',
@@ -645,34 +1124,10 @@ const styles = StyleSheet.create({
     fontFamily: theme.font.family.bold,
     fontWeight: theme.font.weight.bold,
   },
-  currencyRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: theme.space[3],
-  },
-  currencyChip: {
-    borderColor: theme.color.borderDefault,
-    borderRadius: theme.radius.pill,
-    borderWidth: 1,
-    minHeight: theme.layout.tapMin,
-    justifyContent: 'center',
-    paddingHorizontal: theme.space[5],
-  },
-  currencyChipSelected: {
-    backgroundColor: theme.color.primarySoft,
-    borderColor: theme.color.primary,
-  },
-  currencyText: {
-    color: theme.color.textBody,
-    fontFamily: theme.font.family.bold,
-    fontWeight: theme.font.weight.bold,
-  },
-  currencyTextSelected: {
-    color: theme.color.primary,
-  },
   errorText: {
     color: theme.color.danger,
     fontFamily: theme.font.family.regular,
+    lineHeight: 20,
     textAlign: 'center',
   },
   destinationWarningBox: {
@@ -703,8 +1158,8 @@ const styles = StyleSheet.create({
     borderColor: theme.color.borderDefault,
     borderRadius: theme.radius.md,
     borderWidth: 1,
-    minHeight: theme.layout.tapMin,
     justifyContent: 'center',
+    minHeight: theme.layout.tapMin,
     paddingHorizontal: theme.space[4],
   },
   destinationWarningSecondaryText: {
@@ -715,8 +1170,8 @@ const styles = StyleSheet.create({
   destinationWarningPrimaryButton: {
     backgroundColor: theme.color.primary,
     borderRadius: theme.radius.md,
-    minHeight: theme.layout.tapMin,
     justifyContent: 'center',
+    minHeight: theme.layout.tapMin,
     paddingHorizontal: theme.space[4],
   },
   destinationWarningPrimaryText: {
@@ -726,7 +1181,7 @@ const styles = StyleSheet.create({
   },
   resultRow: {
     alignItems: 'center',
-    backgroundColor: theme.color.surfaceSunken,
+    backgroundColor: theme.color.surface,
     borderColor: theme.color.borderSubtle,
     borderRadius: theme.radius.md,
     borderWidth: 1,
@@ -749,11 +1204,12 @@ const styles = StyleSheet.create({
     fontFamily: theme.font.family.regular,
   },
   addResultButton: {
+    backgroundColor: theme.color.surface,
     borderColor: theme.color.primary,
     borderRadius: theme.radius.pill,
     borderWidth: 1,
-    minHeight: theme.layout.tapMin,
     justifyContent: 'center',
+    minHeight: theme.layout.tapMin,
     paddingHorizontal: theme.space[4],
   },
   addResultButtonDisabled: {

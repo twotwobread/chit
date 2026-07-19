@@ -24,7 +24,7 @@ import {
 } from './today-navigation';
 import {
   buildTravelModeSelectorViewModel,
-  defaultTravelMode,
+  defaultTripTravelMode,
   type TravelMode,
   type TravelModeSelectorViewModel,
 } from './travel-mode';
@@ -246,7 +246,7 @@ export function buildTodayExecutionViewModel({
   itinerary,
   today,
   ongoingTripCount,
-  travelMode = defaultTravelMode,
+  travelMode,
 }: {
   selectedTrip: TripListItem;
   tripDetail: GetTripDetailResponse;
@@ -260,6 +260,7 @@ export function buildTodayExecutionViewModel({
   | TodayCompletedViewModel
   | TodayRecoverNeededViewModel
   | TodaySuccessViewModel {
+  const resolvedTravelMode: TravelMode = travelMode ?? tripDetail.trip.defaultTravelMode ?? defaultTripTravelMode;
   const currentDay = findTodayTripDay(tripDetail.days, today);
   if (!currentDay) {
     return buildTodayUnavailableViewModel(selectedTrip.id);
@@ -276,7 +277,7 @@ export function buildTodayExecutionViewModel({
     primaryAction: routeAction(orderedItems.length === 0 ? '오늘 일정 열기' : '오늘 일정 보기', dayRoute),
     lodgingNavigationAction: buildLodgingNavigationAction(
       lodgingSourceDay.lodgingPlace,
-      travelMode,
+      resolvedTravelMode,
       navigationProvider,
     ),
     multipleOngoingTripNotice: buildMultipleOngoingTripNotice(ongoingTripCount),
@@ -334,11 +335,11 @@ export function buildTodayExecutionViewModel({
         '길찾기',
         placeBackedNext.name,
         placeBackedNext.address,
-        travelMode,
+        resolvedTravelMode,
         navigationProvider,
         placeBackedNext.routablePlace ?? null,
       ),
-      travelModeSelector: buildTravelModeSelectorViewModel(travelMode),
+      travelModeSelector: buildTravelModeSelectorViewModel(resolvedTravelMode),
     },
     skippedSection:
       skippedItems.length > 0

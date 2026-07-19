@@ -4,9 +4,10 @@ import { describe, it } from 'node:test';
 
 const newTripSource = readFileSync(new URL('../../app/trips/new.tsx', import.meta.url), 'utf8');
 
-describe('trip destination search safe-area layout', () => {
-  it('adds the top safe-area inset to the travel-registration destination search content', () => {
-    assert.match(newTripSource, /useSafeAreaInsets/);
-    assert.match(newTripSource, /buildDestinationSearchContentTopPadding\(insets\.top\)/);
+describe('trip destination search inline layout', () => {
+  it('keeps destination search in the wizard card instead of adding a separate safe-area screen', () => {
+    assert.match(newTripSource, /InlineDestinationSearchPanel/);
+    assert.doesNotMatch(newTripSource, /useSafeAreaInsets/);
+    assert.doesNotMatch(newTripSource, /buildDestinationSearchContentTopPadding\(insets\.top\)/);
   });
 });

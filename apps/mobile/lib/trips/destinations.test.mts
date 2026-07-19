@@ -3,12 +3,10 @@ import assert from 'node:assert/strict';
 
 import type { DestinationSearchResult, TripDestinationInput } from '@i-um/api-contract';
 
-import { theme } from '../design/theme';
 import {
   addTripDestination,
   buildCreateTripDestinations,
   destinationCountryMismatchConfirmation,
-  buildDestinationSearchContentTopPadding,
   destinationKey,
   destinationSearchSubmitState,
   destinationSelectionStatus,
@@ -97,12 +95,6 @@ test('destinationSearchSubmitState enables an explicit search action only for tr
     buttonLabel: '검색 중',
     helperText: null,
   });
-});
-
-test('destination search content keeps the travel-registration search header below the top safe area', () => {
-  assert.equal(buildDestinationSearchContentTopPadding(0), theme.space[7]);
-  assert.equal(buildDestinationSearchContentTopPadding(47), theme.space[7] + 47);
-  assert.equal(buildDestinationSearchContentTopPadding(-8), theme.space[7]);
 });
 
 test('destinationCountryMismatchConfirmation warns when adding a city from another country without blocking it', () => {

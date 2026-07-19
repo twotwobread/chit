@@ -29,7 +29,7 @@ import {
   markScheduleItemSkipped,
   restoreScheduleItem,
 } from '../trips/itinerary-api';
-import { listTripParticipants } from '../trips/trip-api';
+import { listTripParticipants, updateTrip } from '../trips/trip-api';
 import { openTodayNavigationDestination } from '../trips/today-navigation';
 import { buildTodaySpendSummaryViewModel, type TodaySpendSummaryViewModel } from '../trips/today-spend';
 import {
@@ -47,7 +47,6 @@ import {
   buildTodayRoutePreviewSummarySuccessState,
   routePreviewEligibility,
   todayRoutePreviewLoadingState,
-  todayRoutePreviewModes,
   todayRoutePreviewPermissionNeededState,
   todayRoutePreviewUnsupportedState,
   type TodayRoutePreviewSummaryState,
@@ -66,7 +65,7 @@ import {
   type TripTabUnavailableViewModel,
   type TripTodayStatusLandingViewModel,
 } from '../trips/trip-tabs';
-import { readStoredTravelMode, saveSelectedTravelMode, travelModeFromDisplayLabel } from '../trips/travel-mode';
+import { isTripDefaultTravelMode, travelModeFromDisplayLabel } from '../trips/travel-mode';
 import { localDateString } from '../trips/status';
 import { resolveTripShellDetail } from '../trips/trip-shell-detail';
 import { useTripShellState } from '../trips/trip-shell-context';
@@ -134,10 +133,7 @@ export function useTripTodayController() {
 
     try {
       const detail = shellDetail.detail;
-      const [storedTravelMode, flightsResult] = await Promise.all([
-        readStoredTravelMode(),
-        listTripFlights(tripId).catch(() => null),
-      ]);
+      const flightsResult = await listTripFlights(tripId).catch(() => null);
       const todayFlightCard = flightsResult ? buildTodayFlightCard(flightsResult.flights, new Date()) : null;
       const today = localDateString();
       const statusLanding = buildTripTodayStatusLandingViewModel(detail, today);
@@ -165,7 +161,6 @@ export function useTripTodayController() {
         ongoingTripCount: 1,
         selectedTrip: selectedTripFromDetail(detail),
         today,
-        travelMode: storedTravelMode.mode,
         tripDetail: detail,
       });
 
@@ -205,9 +200,10 @@ export function useTripTodayController() {
   const routePreviewItemId = routePreviewTarget?.nextPlace.itemId ?? null;
   const routePreviewRoutablePlace = routePreviewTarget?.nextPlace.routablePlace ?? null;
   const routePreviewGooglePlaceId = routePreviewRoutablePlace?.googlePlaceId ?? null;
+  const routePreviewTravelMode = routePreviewTarget?.nextPlace.navigationAction.travelMode ?? null;
 
   useEffect(() => {
-    if (!tripId || !routePreviewTripDayId || !routePreviewItemId) {
+    if (!tripId || !routePreviewTripDayId || !routePreviewItemId || !routePreviewTravelMode) {
       setRoutePreviewState({ status: 'idle' });
       return;
     }
@@ -237,28 +233,24 @@ export function useTripTodayController() {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
         };
-        const results = await Promise.all(
-          todayRoutePreviewModes.map(async (mode) => {
-            try {
-              const response = await createRoutePreview(
-                tripId,
-                routePreviewTripDayId,
-                routePreviewItemId,
-                buildRoutePreviewRequest(origin, mode),
-              );
-              return { mode, response };
-            } catch {
-              return { mode, response: null };
-            }
-          }),
-        );
+        let response: Awaited<ReturnType<typeof createRoutePreview>> | null = null;
+        try {
+          response = await createRoutePreview(
+            tripId,
+            routePreviewTripDayId,
+            routePreviewItemId,
+            buildRoutePreviewRequest(origin, routePreviewTravelMode),
+          );
+        } catch {
+          response = null;
+        }
         if (!cancelled) {
-          setRoutePreviewState(buildTodayRoutePreviewSummarySuccessState(results));
+          setRoutePreviewState(buildTodayRoutePreviewSummarySuccessState([{ mode: routePreviewTravelMode, response }]));
         }
       } catch {
         if (!cancelled) {
           setRoutePreviewState(
-            buildTodayRoutePreviewSummarySuccessState(todayRoutePreviewModes.map((mode) => ({ mode, response: null }))),
+            buildTodayRoutePreviewSummarySuccessState([{ mode: routePreviewTravelMode, response: null }]),
           );
         }
       }
@@ -268,7 +260,7 @@ export function useTripTodayController() {
     return () => {
       cancelled = true;
     };
-  }, [routePreviewItemId, routePreviewRoutablePlace, routePreviewTripDayId, tripId]);
+  }, [routePreviewItemId, routePreviewRoutablePlace, routePreviewTravelMode, routePreviewTripDayId, tripId]);
 
   useEffect(() => {
     if (!tripId || !routePreviewTripDayId || !routePreviewItemId || !routePreviewGooglePlaceId) {
@@ -512,20 +504,32 @@ export function useTripTodayController() {
     [load, openQuickExpenseOverlay, tripId],
   );
 
-  const handleTravelMode = useCallback((label: string) => {
-    const travelMode = travelModeFromDisplayLabel(label);
-    if (!travelMode) {
-      return;
-    }
-
-    setState((current) => {
-      if (current.status !== 'ready') {
-        return current;
+  const handleTravelMode = useCallback(
+    (label: string) => {
+      const travelMode = travelModeFromDisplayLabel(label);
+      if (!tripId || !isTripDefaultTravelMode(travelMode)) {
+        return;
       }
-      return { ...current, viewModel: applyTravelModeToTodayViewModel(current.viewModel, travelMode) };
-    });
-    void saveSelectedTravelMode(travelMode);
-  }, []);
+
+      setActionMessage(null);
+      setState((current) => {
+        if (current.status !== 'ready') {
+          return current;
+        }
+        return { ...current, viewModel: applyTravelModeToTodayViewModel(current.viewModel, travelMode) };
+      });
+
+      void updateTrip(tripId, { defaultTravelMode: travelMode }).catch(async (error) => {
+        if (isAnyMobileAuthOrApiAuthError(error)) {
+          setState({ status: 'auth' });
+          return;
+        }
+        setActionMessage('기본 이동 방식을 저장할 수 없어요. 잠시 후 다시 시도해주세요.');
+        await load();
+      });
+    },
+    [load, tripId],
+  );
 
   const goToLogin = () => {
     router.replace('/login');
@@ -559,6 +563,7 @@ function selectedTripFromDetail(detail: GetTripDetailResponse): TripListItem {
     startDate: detail.trip.startDate,
     endDate: detail.trip.endDate,
     defaultCurrency: detail.trip.defaultCurrency,
+    defaultTravelMode: detail.trip.defaultTravelMode,
     joinedAt: detail.trip.createdAt,
     createdAt: detail.trip.createdAt,
     myRole: 'member',

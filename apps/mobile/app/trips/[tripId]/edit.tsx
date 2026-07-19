@@ -22,6 +22,7 @@ import {
   validateTripBasicInfoForm,
   type TripBasicInfoForm,
 } from '../../../lib/trips/update-form';
+import { buildTripDefaultTravelModeSelectorViewModel } from '../../../lib/trips/travel-mode';
 
 type DateField = 'startDate' | 'endDate';
 type LoadState = 'loading' | 'ready' | 'auth' | 'notFound' | 'error';
@@ -181,7 +182,7 @@ export default function EditTripScreen() {
     <KeyboardAwareFormScrollView contentContainerStyle={styles.scrollContent} style={styles.scroll}>
       <View style={styles.header}>
         <Text style={styles.title}>여행 정보 수정</Text>
-        <Text style={styles.subtitle}>이름, 기간, 기본 통화를 바꿀 수 있어요.</Text>
+        <Text style={styles.subtitle}>이름, 기간, 기본 통화와 이동 방식을 바꿀 수 있어요.</Text>
       </View>
 
       {loadState === 'loading' ? (
@@ -279,6 +280,35 @@ export default function EditTripScreen() {
                   </Pressable>
                 );
               })}
+            </View>
+          </View>
+
+          <View style={styles.field}>
+            <Text style={styles.label}>이동 방식</Text>
+            <Text style={styles.fieldHelperText}>일정 이동 시간 계산에 기본으로 사용할 방식을 선택해요.</Text>
+            <View style={styles.currencyRow}>
+              {buildTripDefaultTravelModeSelectorViewModel(form.defaultTravelMode).options.map((option) => (
+                <Pressable
+                  accessibilityLabel={option.accessibilityLabel}
+                  accessibilityRole="button"
+                  accessibilityState={option.accessibilityState}
+                  disabled={submitting}
+                  key={option.mode}
+                  onPress={() => {
+                    setForm((current) => (current ? { ...current, defaultTravelMode: option.mode } : current));
+                    setSaveError(null);
+                  }}
+                  style={[
+                    styles.currencyChip,
+                    option.selected ? styles.currencyChipSelected : null,
+                    submitting ? styles.disabledButton : null,
+                  ]}
+                >
+                  <Text style={[styles.currencyText, option.selected ? styles.currencyTextSelected : null]}>
+                    {option.label}
+                  </Text>
+                </Pressable>
+              ))}
             </View>
           </View>
 
@@ -385,6 +415,11 @@ const styles = StyleSheet.create({
     fontFamily: theme.font.family.regular,
     fontSize: theme.font.size.caption,
     textAlign: 'center',
+  },
+  fieldHelperText: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.regular,
+    lineHeight: 20,
   },
   message: {
     color: theme.color.textBody,

@@ -27,6 +27,7 @@ function trip(overrides: Partial<TripListItem>): TripListItem {
     startDate: '2026-07-10',
     endDate: '2026-07-12',
     defaultCurrency: 'JPY',
+    defaultTravelMode: 'transit',
     joinedAt: '2026-06-01T00:00:00Z',
     createdAt: '2026-06-01T00:00:00Z',
     myRole: 'owner',
@@ -43,6 +44,7 @@ function tripDetail(overrides: Partial<GetTripDetailResponse> = {}): GetTripDeta
       startDate: '2026-07-10',
       endDate: '2026-07-12',
       defaultCurrency: 'JPY',
+      defaultTravelMode: 'transit',
       createdBy: 'user-1',
       createdAt: '2026-06-01T00:00:00Z',
       updatedAt: '2026-06-01T00:00:00Z',
@@ -539,7 +541,25 @@ test('applies localized next-place display to Today copy and navigation destinat
   });
 });
 
-test('threads the selected travel mode into Today navigation and selector state', () => {
+test('uses the trip default travel mode for Today navigation and selector state', () => {
+  const viewModel = buildTodayExecutionViewModel({
+    selectedTrip: trip({ id: 'trip-current' }),
+    tripDetail: tripDetail({ trip: { ...tripDetail().trip, defaultTravelMode: 'driving' } }),
+    itinerary: itinerary({ items: [item({ id: 'item-next', itemOrder: 1 })] }),
+    today: '2026-07-10',
+    ongoingTripCount: 1,
+  });
+
+  assert.equal(viewModel.status, 'success');
+  if (viewModel.status !== 'success') {
+    return;
+  }
+
+  assert.equal(viewModel.nextPlace.navigationAction.travelMode, 'driving');
+  assert.deepEqual(viewModel.nextPlace.travelModeSelector, buildTravelModeSelectorViewModel('driving'));
+});
+
+test('threads an explicitly selected travel mode into Today navigation and selector state', () => {
   const viewModel = buildTodayExecutionViewModel({
     selectedTrip: trip({ id: 'trip-current' }),
     tripDetail: tripDetail(),

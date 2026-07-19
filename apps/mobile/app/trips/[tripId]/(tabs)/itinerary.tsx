@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 
-import type { TripDay } from '@i-um/api-contract';
+import type { TripDay, TripDefaultTravelMode } from '@i-um/api-contract';
 import { DayChips } from '../../../../lib/trip-ui/DayChips';
 import { DayItineraryEditor } from '../../../../lib/trip-ui/DayItineraryEditor';
 import { TripScreen, TripStateCard } from '../../../../lib/trip-ui/TripScreenScaffold';
@@ -9,6 +9,7 @@ import { tripDetailPath } from '../../../../lib/trips/routes';
 import { localDateString } from '../../../../lib/trips/status';
 import { resolveTripShellDetail } from '../../../../lib/trips/trip-shell-detail';
 import { useTripShellState } from '../../../../lib/trips/trip-shell-context';
+import { updateTrip } from '../../../../lib/trips/trip-api';
 import { buildTripMapDayChips, resolveTripMapSelectedDay } from '../../../../lib/trips/trip-map';
 
 type ItineraryState =
@@ -16,6 +17,7 @@ type ItineraryState =
   | {
       status: 'success';
       dayChips: ReturnType<typeof buildTripMapDayChips>;
+      defaultTravelMode: TripDefaultTravelMode;
       selectedDay: TripDay;
     }
   | { status: 'emptyDays'; tripId: string }
@@ -74,6 +76,7 @@ export default function TripItineraryTabScreen() {
       setState({
         status: 'success',
         dayChips: buildTripMapDayChips(detail.days),
+        defaultTravelMode: detail.trip.defaultTravelMode,
         selectedDay,
       });
     },
@@ -94,13 +97,26 @@ export default function TripItineraryTabScreen() {
     void load(dayId);
   };
 
+  const updateDefaultTravelMode = useCallback(
+    async (mode: TripDefaultTravelMode) => {
+      if (!tripId) {
+        throw new Error('Trip id is required.');
+      }
+      await updateTrip(tripId, { defaultTravelMode: mode });
+      setState((current) => (current.status === 'success' ? { ...current, defaultTravelMode: mode } : current));
+    },
+    [tripId],
+  );
+
   if (state.status === 'success') {
     return (
       <DayItineraryEditor
         date={state.selectedDay.id}
         headerContent={<DayChips days={state.dayChips} selectedDayId={state.selectedDay.id} onSelectDay={selectDay} />}
         initialAction={initialAction}
+        defaultTravelMode={state.defaultTravelMode}
         key={state.selectedDay.id}
+        onDefaultTravelModeChange={updateDefaultTravelMode}
         onRequestDayChange={selectDay}
         showHeader={false}
         tripDays={shellState?.status === 'success' ? shellState.detail.days : []}
