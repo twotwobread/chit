@@ -15,6 +15,7 @@ import (
 
 	"github.com/twotwobread/i-um/apps/api/internal/auth"
 	flightdomain "github.com/twotwobread/i-um/apps/api/internal/flight"
+	"github.com/twotwobread/i-um/apps/api/internal/notification"
 	placedomain "github.com/twotwobread/i-um/apps/api/internal/place"
 	routedomain "github.com/twotwobread/i-um/apps/api/internal/route"
 	tripdomain "github.com/twotwobread/i-um/apps/api/internal/trip"
@@ -652,6 +653,88 @@ func TestGetMeHandlerMatchesDeprecatedAuthMeUnauthorized(t *testing.T) {
 	}
 	if body.Error.Code != "UNAUTHORIZED" {
 		t.Fatalf("expected UNAUTHORIZED, got %q", body.Error.Code)
+	}
+}
+
+func TestRegisterPushTokenHandlerRegistersCurrentUserToken(t *testing.T) {
+	backend := newFakeAuthBackend()
+	accessToken := loginTestUser(t, backend)
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/me/push-tokens", bytes.NewReader([]byte(`{"installationId":"installation-123","expoPushToken":"ExpoPushToken[xxxxxxxxxxxxxxxxxxxx]","platform":"ios"}`)))
+	request.Header.Set("Authorization", "Bearer "+accessToken)
+	request.Header.Set("Content-Type", "application/json")
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d with body %s", http.StatusOK, recorder.Code, recorder.Body.String())
+	}
+	var body struct {
+		InstallationID string `json:"installationId"`
+		Platform       string `json:"platform"`
+		Status         string `json:"status"`
+	}
+	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.InstallationID != "installation-123" || body.Platform != "ios" || body.Status != "active" {
+		t.Fatalf("unexpected push token response: %#v", body)
+	}
+}
+
+func TestListAndMarkNotificationsHandler(t *testing.T) {
+	backend := newFakeAuthBackend()
+	session := loginTestUserSession(t, backend, "notification-user", "민수")
+	readAt := time.Date(2026, 7, 19, 10, 0, 0, 0, time.UTC)
+	backend.notifications[session.UserID] = []notification.UserNotification{{
+		ID:         testUUID(8801),
+		EventType:  notification.EventTypeExpenseCreated,
+		Title:      "민수님이 지출을 등록했어요",
+		Body:       "도톤보리 식사 18,500원",
+		ActionPath: "/trips/trip-1/settle?expenseId=expense-1",
+		Snapshot: notification.NotificationSnapshot{
+			TripID:           "trip-1",
+			ExpenseID:        "expense-1",
+			ActorDisplayName: "민수",
+			ExpenseTitle:     "도톤보리 식사",
+			AmountMinor:      18500,
+			Currency:         "KRW",
+		},
+		CreatedAt: time.Date(2026, 7, 19, 9, 0, 0, 0, time.UTC),
+	}}
+
+	listRecorder := httptest.NewRecorder()
+	listRequest := httptest.NewRequest(http.MethodGet, "/me/notifications?limit=10", nil)
+	listRequest.Header.Set("Authorization", "Bearer "+session.AccessToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(listRecorder, listRequest)
+	if listRecorder.Code != http.StatusOK {
+		t.Fatalf("expected list status %d, got %d with body %s", http.StatusOK, listRecorder.Code, listRecorder.Body.String())
+	}
+	var listBody struct {
+		Notifications []struct {
+			ID       string  `json:"id"`
+			ReadAt   *string `json:"readAt"`
+			Snapshot struct {
+				AmountMinor int64  `json:"amountMinor"`
+				Currency    string `json:"currency"`
+			} `json:"snapshot"`
+		} `json:"notifications"`
+	}
+	if err := json.NewDecoder(listRecorder.Body).Decode(&listBody); err != nil {
+		t.Fatalf("decode list response: %v", err)
+	}
+	if len(listBody.Notifications) != 1 || listBody.Notifications[0].Snapshot.AmountMinor != 18500 || listBody.Notifications[0].Snapshot.Currency != "KRW" || listBody.Notifications[0].ReadAt != nil {
+		t.Fatalf("unexpected notification list: %#v", listBody.Notifications)
+	}
+
+	backend.notifications[session.UserID][0].ReadAt = &readAt
+	markRecorder := httptest.NewRecorder()
+	markRequest := httptest.NewRequest(http.MethodPatch, "/me/notifications/"+backend.notifications[session.UserID][0].ID+"/read", nil)
+	markRequest.Header.Set("Authorization", "Bearer "+session.AccessToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(markRecorder, markRequest)
+	if markRecorder.Code != http.StatusOK {
+		t.Fatalf("expected mark status %d, got %d with body %s", http.StatusOK, markRecorder.Code, markRecorder.Body.String())
 	}
 }
 
@@ -5141,6 +5224,8 @@ type fakeAuthBackend struct {
 	tripExpenseDetail map[string]tripdomain.Expense
 	dayExpenses       map[string][]tripdomain.DayExpenseListItem
 	tripInvites       map[string]tripdomain.TripInvite
+	pushTokens        map[string]notification.PushToken
+	notifications     map[string][]notification.UserNotification
 	flights           map[string]flightdomain.FlightDetail
 	personalDetails   map[string]flightdomain.PersonalDetail
 	reorderErr        error
@@ -5361,6 +5446,8 @@ func newFakeAuthBackend() *fakeAuthBackend {
 		tripExpenseDetail: map[string]tripdomain.Expense{},
 		dayExpenses:       map[string][]tripdomain.DayExpenseListItem{},
 		tripInvites:       map[string]tripdomain.TripInvite{},
+		pushTokens:        map[string]notification.PushToken{},
+		notifications:     map[string][]notification.UserNotification{},
 		flights:           map[string]flightdomain.FlightDetail{},
 		personalDetails:   map[string]flightdomain.PersonalDetail{},
 	}
@@ -5479,6 +5566,40 @@ func (b *fakeAuthBackend) DeleteAccount(_ context.Context, userID string, _ time
 	b.users[userID] = user
 	b.deletedUsers[userID] = true
 	return nil
+}
+
+func (b *fakeAuthBackend) RegisterPushToken(_ context.Context, userID string, input notification.RegisterPushTokenInput) (notification.PushToken, error) {
+	key := userID + ":" + input.InstallationID
+	token := notification.PushToken{InstallationID: input.InstallationID, Platform: input.Platform, Status: notification.PushTokenStatusActive, LastRegisteredAt: time.Date(2026, 7, 19, 10, 0, 0, 0, time.UTC)}
+	b.pushTokens[key] = token
+	return token, nil
+}
+
+func (b *fakeAuthBackend) RevokePushToken(_ context.Context, userID string, installationID string) error {
+	delete(b.pushTokens, userID+":"+installationID)
+	return nil
+}
+
+func (b *fakeAuthBackend) ListNotifications(_ context.Context, userID string, input notification.ListNotificationsInput) (notification.ListNotificationsResult, error) {
+	items := append([]notification.UserNotification(nil), b.notifications[userID]...)
+	if input.Limit > 0 && len(items) > input.Limit {
+		items = items[:input.Limit]
+	}
+	return notification.ListNotificationsResult{Notifications: items}, nil
+}
+
+func (b *fakeAuthBackend) MarkNotificationRead(_ context.Context, userID string, notificationID string) (notification.UserNotification, error) {
+	items := b.notifications[userID]
+	for _, item := range items {
+		if item.ID == notificationID {
+			if item.ReadAt == nil {
+				now := time.Date(2026, 7, 19, 10, 0, 0, 0, time.UTC)
+				item.ReadAt = &now
+			}
+			return item, nil
+		}
+	}
+	return notification.UserNotification{}, notification.ErrNotFound
 }
 
 func (b *fakeAuthBackend) GetCreator(_ context.Context, userID string) (tripdomain.Creator, bool, error) {

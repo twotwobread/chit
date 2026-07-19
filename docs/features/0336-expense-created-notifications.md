@@ -125,7 +125,7 @@ Notification list item includes:
 
 ## DB Changes
 
-Add goose migration `00027_create_notifications.sql`.
+Add goose migration `00028_create_notifications.sql`.
 
 ### `notification_events`
 

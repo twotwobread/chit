@@ -327,12 +327,14 @@ type UpdateExpenseRecord struct {
 
 type ExpenseSplitParticipant struct {
 	ParticipantID string
+	UserID        string
 	DisplayName   string
 	JoinedAt      time.Time
 }
 
 type CreateExpenseSplitRecord struct {
 	ParticipantID          string
+	UserID                 string
 	ParticipantDisplayName string
 	AmountMinor            int64
 	SplitOrder             int

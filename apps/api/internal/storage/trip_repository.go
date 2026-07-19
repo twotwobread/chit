@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/twotwobread/i-um/apps/api/internal/db"
+	"github.com/twotwobread/i-um/apps/api/internal/notification"
 	"github.com/twotwobread/i-um/apps/api/internal/place"
 	"github.com/twotwobread/i-um/apps/api/internal/trip"
 )
@@ -1241,6 +1242,7 @@ func (s *Store) UpdateExpense(ctx context.Context, record trip.UpdateExpenseReco
 	for _, participantRow := range participantRows {
 		allParticipants = append(allParticipants, trip.ExpenseSplitParticipant{
 			ParticipantID: participantRow.ID,
+			UserID:        participantRow.UserID,
 			DisplayName:   participantRow.DisplayName,
 			JoinedAt:      participantRow.JoinedAt.Time,
 		})
@@ -1350,6 +1352,7 @@ func (s *Store) UpdateTripExpense(ctx context.Context, record trip.UpdateExpense
 	for _, participantRow := range participantRows {
 		allParticipants = append(allParticipants, trip.ExpenseSplitParticipant{
 			ParticipantID: participantRow.ID,
+			UserID:        participantRow.UserID,
 			DisplayName:   participantRow.DisplayName,
 			JoinedAt:      participantRow.JoinedAt.Time,
 		})
@@ -1516,6 +1519,7 @@ func (s *Store) CreateQuickExpense(ctx context.Context, record trip.CreateQuickE
 	for _, participantRow := range participantRows {
 		allParticipants = append(allParticipants, trip.ExpenseSplitParticipant{
 			ParticipantID: participantRow.ID,
+			UserID:        participantRow.UserID,
 			DisplayName:   participantRow.DisplayName,
 			JoinedAt:      participantRow.JoinedAt.Time,
 		})
@@ -1581,6 +1585,25 @@ func (s *Store) CreateQuickExpense(ctx context.Context, record trip.CreateQuickE
 		if err != nil {
 			return trip.CreateQuickExpenseResult{}, err
 		}
+	}
+
+	notificationParticipants := notificationParticipantsFromTripParticipants(allParticipants)
+	if err := createExpenseCreatedNotifications(ctx, tx, qtx, expenseCreatedNotificationInput{
+		TripID:           expenseRow.TripID,
+		ExpenseID:        expenseRow.ID,
+		CreatorUserID:    record.CreatedBy,
+		ActorDisplayName: notificationActorDisplayName(record.CreatedBy, notificationParticipants),
+		ExpenseTitle:     expenseDisplayTitle(expenseRow.Title, expenseRow.PlaceName),
+		AmountMinor:      expenseRow.AmountMinor,
+		Currency:         expenseRow.Currency,
+		Payer: notification.ExpenseCreatedParticipant{
+			ParticipantID: payerRow.ID,
+			UserID:        payerRow.UserID,
+			DisplayName:   payerRow.DisplayName,
+		},
+		Splits: notificationParticipantsFromSplitRecords(splitRecords),
+	}); err != nil {
+		return trip.CreateQuickExpenseResult{}, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {
@@ -1680,6 +1703,7 @@ func (s *Store) CreateTripExpense(ctx context.Context, record trip.CreateTripExp
 	for _, participantRow := range participantRows {
 		allParticipants = append(allParticipants, trip.ExpenseSplitParticipant{
 			ParticipantID: participantRow.ID,
+			UserID:        participantRow.UserID,
 			DisplayName:   participantRow.DisplayName,
 			JoinedAt:      participantRow.JoinedAt.Time,
 		})
@@ -1744,6 +1768,25 @@ func (s *Store) CreateTripExpense(ctx context.Context, record trip.CreateTripExp
 		if err != nil {
 			return trip.CreateTripExpenseResult{}, err
 		}
+	}
+
+	notificationParticipants := notificationParticipantsFromTripParticipants(allParticipants)
+	if err := createExpenseCreatedNotifications(ctx, tx, qtx, expenseCreatedNotificationInput{
+		TripID:           expenseRow.TripID,
+		ExpenseID:        expenseRow.ID,
+		CreatorUserID:    record.CreatedBy,
+		ActorDisplayName: notificationActorDisplayName(record.CreatedBy, notificationParticipants),
+		ExpenseTitle:     expenseDisplayTitle(expenseRow.Title, expenseRow.PlaceName),
+		AmountMinor:      expenseRow.AmountMinor,
+		Currency:         expenseRow.Currency,
+		Payer: notification.ExpenseCreatedParticipant{
+			ParticipantID: payerRow.ID,
+			UserID:        payerRow.UserID,
+			DisplayName:   payerRow.DisplayName,
+		},
+		Splits: notificationParticipantsFromSplitRecords(splitRecords),
+	}); err != nil {
+		return trip.CreateTripExpenseResult{}, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {

@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "go run ./cmd/api",
     "test": "go test ./...",
-    "build": "go build -buildvcs=false ./cmd/api",
+    "build": "tmpdir=$(mktemp -d) && trap 'rm -rf \"$tmpdir\"' EXIT && go build -buildvcs=false -o \"$tmpdir/api\" ./cmd/api && go build -buildvcs=false -o \"$tmpdir/notification-worker\" ./cmd/notification-worker",
     "lint": "go vet ./...",
     "format": "gofmt -w $(find . -type f -name '*.go')",
     "format:check": "files=$(gofmt -l $(find . -type f -name '*.go')); test -z \"$files\" || (echo \"$files\" && exit 1)",

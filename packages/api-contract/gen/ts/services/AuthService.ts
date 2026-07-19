@@ -8,9 +8,13 @@ import type { AuthLogoutResponse } from '../models/AuthLogoutResponse';
 import type { AuthMeResponse } from '../models/AuthMeResponse';
 import type { AuthRefreshResponse } from '../models/AuthRefreshResponse';
 import type { GetMySettlementSummaryResponse } from '../models/GetMySettlementSummaryResponse';
+import type { ListNotificationsResponse } from '../models/ListNotificationsResponse';
+import type { MarkNotificationReadResponse } from '../models/MarkNotificationReadResponse';
 import type { OAuthLinkRequest } from '../models/OAuthLinkRequest';
 import type { OAuthLoginRequest } from '../models/OAuthLoginRequest';
+import type { PushTokenResponse } from '../models/PushTokenResponse';
 import type { RefreshTokenRequest } from '../models/RefreshTokenRequest';
+import type { RegisterPushTokenRequest } from '../models/RegisterPushTokenRequest';
 import type { UpdateMeRequest } from '../models/UpdateMeRequest';
 import type { CancelablePromise } from '../core/CancelablePromise';
 import { OpenAPI } from '../core/OpenAPI';
@@ -109,6 +113,101 @@ export class AuthService {
             errors: {
                 401: `Unauthorized.`,
                 409: `Settlement summary cannot be calculated.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
+     * Register the current app installation push token
+     * Registers or refreshes the authenticated user's Expo push token for the current app installation. Registering the same active token for the current user supersedes stale ownership from other users/installations.
+     * @param requestBody
+     * @returns PushTokenResponse Push token registered or refreshed.
+     * @throws ApiError
+     */
+    public static registerPushToken(
+        requestBody: RegisterPushTokenRequest,
+    ): CancelablePromise<PushTokenResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/me/push-tokens',
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
+     * Revoke the current installation push token
+     * Idempotently revokes the authenticated user's push token for the given app installation.
+     * @param installationId
+     * @returns void
+     * @throws ApiError
+     */
+    public static revokePushToken(
+        installationId: string,
+    ): CancelablePromise<void> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/me/push-tokens/{installationId}',
+            path: {
+                'installationId': installationId,
+            },
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
+     * List current user's notifications
+     * Returns current user's in-app notification history, newest first.
+     * @param limit
+     * @param cursor
+     * @returns ListNotificationsResponse Current user's notification history.
+     * @throws ApiError
+     */
+    public static listNotifications(
+        limit: number = 20,
+        cursor?: string,
+    ): CancelablePromise<ListNotificationsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/me/notifications',
+            query: {
+                'limit': limit,
+                'cursor': cursor,
+            },
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
+     * Mark a notification as read
+     * Marks one notification belonging to the authenticated user as read.
+     * @param notificationId
+     * @returns MarkNotificationReadResponse Notification after read marking.
+     * @throws ApiError
+     */
+    public static markNotificationRead(
+        notificationId: string,
+    ): CancelablePromise<MarkNotificationReadResponse> {
+        return __request(OpenAPI, {
+            method: 'PATCH',
+            url: '/me/notifications/{notificationId}/read',
+            path: {
+                'notificationId': notificationId,
+            },
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                404: `Notification not found for the current user.`,
                 500: `Unexpected server error.`,
             },
         });

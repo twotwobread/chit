@@ -2388,6 +2388,7 @@ func BuildManualExpenseSplits(amountMinor int64, participants []ExpenseSplitPart
 		}
 		splitRecords = append(splitRecords, CreateExpenseSplitRecord{
 			ParticipantID:          participant.ParticipantID,
+			UserID:                 participant.UserID,
 			ParticipantDisplayName: participantDisplayName(participant.DisplayName),
 			AmountMinor:            amount,
 			SplitOrder:             len(splitRecords) + 1,
@@ -2427,6 +2428,7 @@ func AllocateEqualExpenseSplits(amountMinor int64, participants []ExpenseSplitPa
 		}
 		splits = append(splits, CreateExpenseSplitRecord{
 			ParticipantID:          participant.ParticipantID,
+			UserID:                 participant.UserID,
 			ParticipantDisplayName: participantDisplayName(participant.DisplayName),
 			AmountMinor:            amount,
 			SplitOrder:             index + 1,
