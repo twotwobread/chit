@@ -30,3 +30,17 @@ test('receipt capture instructions ask for clear information instead of box alig
   assert.match(scannerSource, /총액\/결제금액이 크게 보이도록 촬영해주세요\./);
   assert.doesNotMatch(scannerSource, /맞춘 뒤 직접 촬영/);
 });
+
+test('receipt capture flow uses branded verification recovery copy and accessible actions', () => {
+  const scannerSource = source('lib/trip-ui/ReceiptCaptureScanner.tsx');
+
+  assert.match(scannerSource, /칫 영수증 스캔/);
+  assert.match(scannerSource, /영수증 초안을 만들게요\./);
+  assert.match(scannerSource, /초안 만들기 전 확인/);
+  assert.match(scannerSource, /칫, 글자를 읽는 중/);
+  assert.match(scannerSource, /초안을 만들 수 없어요\./);
+  assert.match(scannerSource, /accessibilityLabel="영수증 촬영하기"/);
+  assert.match(scannerSource, /accessibilityLabel="영수증 이미지 인식하기"/);
+  assert.match(scannerSource, /accessibilityLabel="영수증 다시 촬영하기"/);
+  assert.match(scannerSource, /accessibilityLabel="영수증 직접 입력으로 전환"/);
+});

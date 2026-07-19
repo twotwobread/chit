@@ -548,8 +548,10 @@ export type SettlementDetailExpenseRowViewModel = {
   contextLabel: string;
   amountMinor: number;
   amountLabel: string;
+  currency: SupportedCurrency;
   payerLabel: string;
   splitRows: SettlementDetailExpenseSplitRowViewModel[];
+  category: ExpenseCategory;
   categoryLabel: string;
   settlementLabel: string;
   includeInSettlement: boolean;
@@ -614,7 +616,7 @@ function buildSettlementDetailBalanceRows(summary: ApiSettlementCurrencySummary)
       netMinor: balance.netMinor,
       netDirection: direction,
       netLabel: settlementNetLabel(direction),
-      netAmountLabel: formatMoney(Math.abs(balance.netMinor), summary.currency),
+      netAmountLabel: formatSettlementNetAmountLabel(balance.netMinor, summary.currency),
     };
   });
 }
@@ -652,6 +654,7 @@ function settlementDetailExpenseRow(
     contextLabel,
     amountMinor: expense.amountMinor,
     amountLabel: formatMoney(expense.amountMinor, expense.currency),
+    currency: expense.currency,
     payerLabel: `${normalizeDisplayName(expense.payer.displayName)} 결제`,
     splitRows: [...expense.splits]
       .sort((left, right) => left.splitOrder - right.splitOrder)
@@ -660,6 +663,7 @@ function settlementDetailExpenseRow(
         amountMinor: split.amountMinor,
         amountLabel: formatMoney(split.amountMinor, expense.currency),
       })),
+    category: expense.expenseCategory,
     categoryLabel: categoryMeta.label,
     settlementLabel: expense.includeInSettlement ? '정산 포함' : '최종 정산 제외',
     includeInSettlement: expense.includeInSettlement,
@@ -703,7 +707,7 @@ export function buildSettlementTransferViewModel({
           netMinor: balance.netMinor,
           netDirection,
           netLabel: settlementNetLabel(netDirection),
-          netAmountLabel: formatMoney(Math.abs(balance.netMinor), summary.currency),
+          netAmountLabel: formatSettlementNetAmountLabel(balance.netMinor, summary.currency),
         };
       });
 
@@ -794,6 +798,17 @@ function settlementNetLabel(direction: SettlementBalanceDirection): string {
     return '보낼 금액';
   }
   return '차액 없음';
+}
+
+function formatSettlementNetAmountLabel(netMinor: number, currency: SupportedCurrency): string {
+  const amountLabel = formatMoney(Math.abs(netMinor), currency);
+  if (netMinor > 0) {
+    return `+${amountLabel}`;
+  }
+  if (netMinor < 0) {
+    return `−${amountLabel}`;
+  }
+  return amountLabel;
 }
 
 export function buildSettlementRequestMessage(

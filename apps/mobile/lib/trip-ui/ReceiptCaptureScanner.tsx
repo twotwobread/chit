@@ -143,16 +143,24 @@ export function ReceiptCaptureScanner({
     <Modal animationType="slide" onRequestClose={onClose} presentationStyle="fullScreen" visible={visible}>
       <View style={scannerStyles.screen}>
         <View style={scannerStyles.header}>
-          <Text style={scannerStyles.title}>영수증 촬영</Text>
-          <SecondaryButton label="닫기" onPress={onClose} />
+          <Text style={scannerStyles.title}>칫 영수증 스캔</Text>
+          <SecondaryButton accessibilityLabel="영수증 촬영 닫기" label="닫기" onPress={onClose} />
         </View>
 
         {step === 'mode' ? (
           <View style={scannerStyles.card}>
-            <Text style={scannerStyles.cardTitle}>영수증을 어떻게 촬영할까요?</Text>
+            <Text style={scannerStyles.cardTitle}>영수증 초안을 만들게요.</Text>
             <Text style={scannerStyles.helper}>긴 영수증은 상단과 총액 부분을 나눠 크게 촬영해주세요.</Text>
-            <PrimaryButton label="한 번에 촬영" onPress={() => beginCapture('single')} />
-            <SecondaryButton label="긴 영수증 나눠찍기" onPress={() => beginCapture('split')} />
+            <PrimaryButton
+              accessibilityLabel="영수증 한 번에 촬영 시작"
+              label="한 번에 촬영"
+              onPress={() => beginCapture('single')}
+            />
+            <SecondaryButton
+              accessibilityLabel="긴 영수증 나눠찍기 시작"
+              label="긴 영수증 나눠찍기"
+              onPress={() => beginCapture('split')}
+            />
           </View>
         ) : null}
 
@@ -171,8 +179,10 @@ export function ReceiptCaptureScanner({
                   <Text style={scannerStyles.cardTitle}>{captureInstruction(mode, captureRole)}</Text>
                   <Text style={scannerStyles.helper}>빛 반사 없이 흔들리지 않게 촬영해주세요.</Text>
                   <PrimaryButton
+                    accessibilityLabel="영수증 촬영하기"
                     label={takingPicture ? '촬영 중...' : '촬영하기'}
                     loading={takingPicture}
+                    loadingLabel="촬영 중..."
                     onPress={() => void takePicture()}
                   />
                   <SecondaryButton label="이전" onPress={() => setStep('mode')} />
@@ -183,7 +193,11 @@ export function ReceiptCaptureScanner({
                 <Text style={scannerStyles.cardTitle}>카메라 권한이 필요해요.</Text>
                 <Text style={scannerStyles.helper}>영수증을 촬영하려면 카메라 접근을 허용해주세요.</Text>
                 <PrimaryButton label="권한 허용" onPress={() => void requestPermission()} />
-                <SecondaryButton label="직접 입력" onPress={useDirectInput} />
+                <SecondaryButton
+                  accessibilityLabel="영수증 직접 입력으로 전환"
+                  label="직접 입력"
+                  onPress={useDirectInput}
+                />
               </View>
             )}
           </View>
@@ -191,30 +205,40 @@ export function ReceiptCaptureScanner({
 
         {step === 'review' ? (
           <View style={scannerStyles.card}>
-            <Text style={scannerStyles.cardTitle}>촬영한 이미지를 확인해주세요.</Text>
-            <Text style={scannerStyles.helper}>글자가 흐리면 다시 촬영해주세요.</Text>
+            <Text style={scannerStyles.cardTitle}>초안 만들기 전 확인</Text>
+            <Text style={scannerStyles.helper}>글자가 흐리면 다시 촬영해주세요. 선명하면 바로 초안을 만들게요.</Text>
             <View style={scannerStyles.previewRow}>
               {capturedImages.map((image) => (
                 <Image key={image.role} source={{ uri: image.uri }} style={scannerStyles.previewImage} />
               ))}
             </View>
-            <PrimaryButton label="이미지 인식하기" onPress={() => void recognizeAndCreateDraft()} />
-            <SecondaryButton label="다시 촬영" onPress={retake} />
+            <PrimaryButton
+              accessibilityLabel="영수증 이미지 인식하기"
+              label="이미지 인식하기"
+              onPress={() => void recognizeAndCreateDraft()}
+            />
+            <SecondaryButton accessibilityLabel="영수증 다시 촬영하기" label="다시 촬영" onPress={retake} />
           </View>
         ) : null}
 
         {step === 'recognizing' ? (
           <View style={scannerStyles.card}>
             <ActivityIndicator color={theme.color.primary} />
-            <Text style={scannerStyles.cardTitle}>이미지를 인식 중입니다.</Text>
+            <Text style={scannerStyles.cardTitle}>칫, 글자를 읽는 중</Text>
+            <Text style={scannerStyles.helper}>금액과 날짜 초안을 만들고 있어요.</Text>
           </View>
         ) : null}
 
         {step === 'failure' ? (
           <View style={scannerStyles.card}>
-            <Text style={scannerStyles.cardTitle}>{failureMessage}</Text>
-            <PrimaryButton label="다시 촬영" onPress={retake} />
-            <SecondaryButton label="직접 입력" onPress={useDirectInput} />
+            <Text style={scannerStyles.cardTitle}>초안을 만들 수 없어요.</Text>
+            <Text style={scannerStyles.helper}>{failureMessage}</Text>
+            <PrimaryButton accessibilityLabel="영수증 다시 촬영하기" label="다시 촬영" onPress={retake} />
+            <SecondaryButton
+              accessibilityLabel="영수증 직접 입력으로 전환"
+              label="직접 입력"
+              onPress={useDirectInput}
+            />
           </View>
         ) : null}
       </View>

@@ -843,8 +843,8 @@ test('builds participant balance sections from authoritative API response withou
     ),
     [
       ['지영', null, '$12.34', '$12.34', '차액 없음', '$0.00', 'settled'],
-      ['민수', null, '50,000원', '31,500원', '받을 금액', '18,500원', 'receive'],
-      ['유나', null, '0원', '18,500원', '보낼 금액', '18,500원', 'send'],
+      ['민수', null, '50,000원', '31,500원', '받을 금액', '+18,500원', 'receive'],
+      ['유나', null, '0원', '18,500원', '보낼 금액', '−18,500원', 'send'],
       ['삭제된 친구', '이전 참여자', '0원', '0원', '차액 없음', '0원', 'settled'],
     ],
   );
@@ -1066,8 +1066,8 @@ test('builds latest settlement detail view model with balances transfers and exp
       row.netAmountLabel,
     ]),
     [
-      ['민수', '84,000원', '21,000원', '받을 금액', '63,000원'],
-      ['지영', '0원', '21,000원', '보낼 금액', '21,000원'],
+      ['민수', '84,000원', '21,000원', '받을 금액', '+63,000원'],
+      ['지영', '0원', '21,000원', '보낼 금액', '−21,000원'],
     ],
   );
   assert.deepEqual(
@@ -1075,8 +1075,14 @@ test('builds latest settlement detail view model with balances transfers and exp
     [['지영', '민수', '21,000원']],
   );
   assert.deepEqual(
-    viewModel.currencySections[0].includedExpenses.map((row) => [row.id, row.contextLabel, row.settlementLabel]),
-    [['included-a', '1일차', '정산 포함']],
+    viewModel.currencySections[0].includedExpenses.map((row) => [
+      row.id,
+      row.contextLabel,
+      row.category,
+      row.categoryLabel,
+      row.settlementLabel,
+    ]),
+    [['included-a', '1일차', 'food', '식당', '정산 포함']],
   );
   assert.deepEqual(
     viewModel.currencySections[0].excludedExpenses.map((row) => [row.id, row.title, row.settlementLabel]),
