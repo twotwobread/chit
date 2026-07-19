@@ -1,4 +1,4 @@
-# Feature Slice: Chit Dark Shell + Paper Content surface strategy
+# Feature Slice: Chit Dark Shell + Off-white Content surface strategy
 
 ## Metadata
 
@@ -10,25 +10,26 @@
 
 ## Goal
 
-Refactor Chit mobile UI from a Paper-first background to the approved **Dark Shell + Paper Content** visual strategy.
+Refactor Chit mobile UI from a Paper-first background to the approved **Dark Shell + Off-white Content** visual strategy.
 
-The app should feel like a hip fintech settlement product: Matte Charcoal creates the brand atmosphere, Acid Lime becomes the obvious brand/CTA anchor, and Paper/White surfaces remain as readable receipt-like content cards for dense travel, expense, settlement, and form information.
+The app should feel like a hip fintech settlement product: Matte Charcoal creates the brand atmosphere, Acid Lime becomes the obvious brand/CTA anchor, and clean off-white/white surfaces remain as readable content cards for dense travel, expense, settlement, and form information.
 
 ## Decision
 
-Use **B안: Dark Shell + Paper Content**.
+Use **B안: Dark Shell + Off-white Content**.
 
 - App shell/background: Matte Charcoal / Charcoal.
 - Hero/brand/settlement moments: Charcoal Elevated / Charcoal + Acid Lime.
-- Dense content surfaces: Paper or White cards/shelves.
-- Forms/lists: Paper/White for readability, inside the dark shell.
+- Dense content surfaces: clean off-white or white cards/shelves.
+- Forms/lists: clean off-white/white for readability, inside the dark shell.
 - Navigation: dark shell aligned, selected state uses Acid Lime or high-contrast capsule.
+- Warm Paper (`#F5F1E8`) is retired from core UI surfaces because it weakens the sharper Chit fintech mood.
 
 ## Why
 
-The previous Paper-first approach made black hero/cards feel like isolated objects on top of a paper background. Acid Lime also failed as small text on Paper/White and did not consistently read as the main brand color.
+The previous Paper-first approach made black hero/cards feel like isolated objects on top of a warm beige background. Acid Lime also failed as small text on light surfaces and did not consistently read as the main brand color.
 
-Dark Shell + Paper Content makes the brand color visible, reduces visual fragmentation, and keeps long information readable.
+Dark Shell + Off-white Content makes the brand color visible, reduces visual fragmentation, and keeps long information readable without the beige/warm Paper cast.
 
 ## Scope
 
@@ -61,16 +62,18 @@ Dark Shell + Paper Content makes the brand color visible, reduces visual fragmen
 
 ### Color
 
-- Acid Lime is a fill/accent on dark shell, not small text on Paper/White.
+- Retire warm Paper (`#F5F1E8`) from app backgrounds and core content cards.
+- Use a cleaner off-white family instead: target base `#F7F7F2`, elevated `#FCFCF8`, subtle/sunken `#F0F0EA`, border `#E4E3DA`.
+- Acid Lime is a fill/accent on dark shell, not small text on Off-white/White.
 - Primary CTA remains Acid Lime with Charcoal text.
-- Paper becomes a content surface, not the whole-app default background.
+- Off-white becomes a clean content surface, not the whole-app default background.
 - Use high-contrast semantic text tokens for labels, links, warnings, success, and danger on light surfaces.
 - Do not add raw hex colors in screen code.
 
 ### Components
 
 - Cards need surface variants:
-  - content card: Paper/White surface inside dark shell;
+  - content card: clean off-white/white surface inside dark shell;
   - dark/hero card: Charcoal surface with Acid Lime accents;
   - shelf/group surface: subtle container for stacked content cards.
 - Buttons need polished pressed/disabled states without layout shift.
@@ -87,7 +90,7 @@ Dark Shell + Paper Content makes the brand color visible, reduces visual fragmen
 ## Acceptance Criteria
 
 - [ ] Core app screens use Matte Charcoal/Charcoal as the default shell background.
-- [ ] Paper/White is retained for readable content surfaces.
+- [ ] Warm Paper (`#F5F1E8`) is not used for core backgrounds/cards; clean off-white/white is used for readable content surfaces.
 - [ ] Shared `Card` and button primitives visually match the approved B direction.
 - [ ] Login, Home, Today, Expenses, Settlement, New Trip, and Map/Search feel visually coherent under one Chit surface strategy.
 - [ ] Bright-surface Acid Lime text usage is removed or replaced with high-contrast semantic tokens.
