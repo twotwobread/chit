@@ -72,12 +72,14 @@ CREATE TABLE trips (
   start_date date NOT NULL,
   end_date date NOT NULL,
   default_currency text NOT NULL,
+  default_travel_mode text NOT NULL DEFAULT 'transit',
   created_by uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT trips_name_length_check CHECK (char_length(name) BETWEEN 1 AND 80),
   CONSTRAINT trips_date_range_check CHECK (start_date <= end_date),
-  CONSTRAINT trips_default_currency_check CHECK (default_currency IN ('KRW', 'JPY', 'USD', 'EUR'))
+  CONSTRAINT trips_default_currency_check CHECK (default_currency IN ('KRW', 'JPY', 'USD', 'EUR')),
+  CONSTRAINT trips_default_travel_mode_check CHECK (default_travel_mode IN ('transit', 'driving'))
 );
 
 CREATE INDEX trips_created_by_idx ON trips (created_by);

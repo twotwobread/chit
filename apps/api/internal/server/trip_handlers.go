@@ -69,11 +69,12 @@ func (s apiServer) CreateTrip(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result, err := s.trips.Create(r.Context(), authContext.UserID, trip.CreateInput{
-		Name:            body.Name,
-		StartDate:       dateFromOpenAPI(body.StartDate),
-		EndDate:         dateFromOpenAPI(body.EndDate),
-		DefaultCurrency: string(body.DefaultCurrency),
-		Destinations:    createDestinationsFromOpenAPI(body.Destinations),
+		Name:              body.Name,
+		StartDate:         dateFromOpenAPI(body.StartDate),
+		EndDate:           dateFromOpenAPI(body.EndDate),
+		DefaultCurrency:   string(body.DefaultCurrency),
+		DefaultTravelMode: tripDefaultTravelModeFromOpenAPI(body.DefaultTravelMode),
+		Destinations:      createDestinationsFromOpenAPI(body.Destinations),
 	})
 	if err != nil {
 		writeTripError(w, err)
@@ -1022,10 +1023,11 @@ func (s apiServer) UpdateTrip(w http.ResponseWriter, r *http.Request, tripId str
 	}
 
 	result, err := s.trips.Update(r.Context(), authContext.UserID, tripId, trip.UpdateInput{
-		Name:            body.Name,
-		StartDate:       optionalDateFromOpenAPI(body.StartDate),
-		EndDate:         optionalDateFromOpenAPI(body.EndDate),
-		DefaultCurrency: optionalCurrencyFromOpenAPI(body.DefaultCurrency),
+		Name:              body.Name,
+		StartDate:         optionalDateFromOpenAPI(body.StartDate),
+		EndDate:           optionalDateFromOpenAPI(body.EndDate),
+		DefaultCurrency:   optionalCurrencyFromOpenAPI(body.DefaultCurrency),
+		DefaultTravelMode: optionalTripDefaultTravelModeFromOpenAPI(body.DefaultTravelMode),
 	})
 	if err != nil {
 		writeTripUpdateError(w, err)

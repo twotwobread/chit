@@ -103,6 +103,13 @@ func (s *Service) Create(ctx context.Context, userID string, input CreateInput) 
 	if !isSupportedCurrency(input.DefaultCurrency) {
 		return CreateResult{}, ErrValidation
 	}
+	defaultTravelMode := input.DefaultTravelMode
+	if strings.TrimSpace(defaultTravelMode) == "" {
+		defaultTravelMode = "transit"
+	}
+	if !isSupportedDefaultTravelMode(defaultTravelMode) {
+		return CreateResult{}, ErrValidation
+	}
 
 	destinations, err := normalizeCreateDestinations(input.Destinations)
 	if err != nil {
@@ -118,13 +125,14 @@ func (s *Service) Create(ctx context.Context, userID string, input CreateInput) 
 	}
 
 	return s.repo.CreateTripWithOwner(ctx, CreateRecord{
-		Name:             name,
-		StartDate:        startDate,
-		EndDate:          endDate,
-		DefaultCurrency:  input.DefaultCurrency,
-		CreatedBy:        creator.ID,
-		OwnerDisplayName: creator.DisplayName,
-		Destinations:     destinations,
+		Name:              name,
+		StartDate:         startDate,
+		EndDate:           endDate,
+		DefaultCurrency:   input.DefaultCurrency,
+		DefaultTravelMode: defaultTravelMode,
+		CreatedBy:         creator.ID,
+		OwnerDisplayName:  creator.DisplayName,
+		Destinations:      destinations,
 	})
 }
 
@@ -1590,17 +1598,26 @@ func mergeUpdateInput(foundTrip Trip, input UpdateInput) (UpdateRecord, error) {
 		return UpdateRecord{}, ErrValidation
 	}
 
+	defaultTravelMode := foundTrip.DefaultTravelMode
+	if input.DefaultTravelMode != nil {
+		defaultTravelMode = *input.DefaultTravelMode
+	}
+	if !isSupportedDefaultTravelMode(defaultTravelMode) {
+		return UpdateRecord{}, ErrValidation
+	}
+
 	return UpdateRecord{
-		ID:              foundTrip.ID,
-		Name:            name,
-		StartDate:       startDate,
-		EndDate:         endDate,
-		DefaultCurrency: defaultCurrency,
+		ID:                foundTrip.ID,
+		Name:              name,
+		StartDate:         startDate,
+		EndDate:           endDate,
+		DefaultCurrency:   defaultCurrency,
+		DefaultTravelMode: defaultTravelMode,
 	}, nil
 }
 
 func isEmptyUpdate(input UpdateInput) bool {
-	return input.Name == nil && input.StartDate == nil && input.EndDate == nil && input.DefaultCurrency == nil && input.ConfirmOutOfRangeDayArchive == nil
+	return input.Name == nil && input.StartDate == nil && input.EndDate == nil && input.DefaultCurrency == nil && input.DefaultTravelMode == nil && input.ConfirmOutOfRangeDayArchive == nil
 }
 
 func isEmptyScheduleItemUpdate(input UpdateScheduleItemInput) bool {
@@ -1941,6 +1958,15 @@ func normalizeOptionalExpenseCategory(value *string) (*string, error) {
 		return nil, ErrValidation
 	}
 	return &trimmed, nil
+}
+
+func isSupportedDefaultTravelMode(value string) bool {
+	switch value {
+	case "transit", "driving":
+		return true
+	default:
+		return false
+	}
 }
 
 func isSupportedPlaceType(value string) bool {

@@ -146,6 +146,7 @@ export type { SettlementTransfer } from './models/SettlementTransfer';
 export type { SupportedCurrency } from './models/SupportedCurrency';
 export type { Trip } from './models/Trip';
 export type { TripDay } from './models/TripDay';
+export type { TripDefaultTravelMode } from './models/TripDefaultTravelMode';
 export type { TripDestination } from './models/TripDestination';
 export type { TripDestinationInput } from './models/TripDestinationInput';
 export type { TripExpenseDayListItem } from './models/TripExpenseDayListItem';

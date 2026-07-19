@@ -29,7 +29,7 @@ import {
   type TripTodayStatusLandingViewModel,
 } from '../../../../lib/trips/trip-tabs';
 import { tripFlightDetailPath } from '../../../../lib/trips/routes';
-import { travelModeDisplayLabel, travelModeDisplayOptions } from '../../../../lib/trips/travel-mode';
+import { travelModeDisplayLabel, tripDefaultTravelModeDisplayOptions } from '../../../../lib/trips/travel-mode';
 
 export default function TripTodayTabScreen() {
   const { tripId: tripIdParam } = useLocalSearchParams<{ tripId?: string | string[] }>();
@@ -217,7 +217,7 @@ function TodayReadyContent({
               ? travelModeDisplayLabel(viewModel.nextPlace.navigationAction.travelMode)
               : ''
           }
-          travelOptions={travelModeDisplayOptions}
+          travelOptions={tripDefaultTravelModeDisplayOptions}
         />
       ) : null}
 

@@ -8,6 +8,36 @@ type PermissionStatus = 'granted' | 'denied' | 'undetermined';
 
 type PermissionResponse = { status: PermissionStatus };
 
+export type ExpoNotificationResponse = {
+  notification?: {
+    request?: {
+      content?: {
+        data?: Record<string, unknown>;
+      };
+    };
+  };
+};
+
+export type ExpoNotificationsModule = {
+  AndroidImportance: { DEFAULT: unknown };
+  addNotificationResponseReceivedListener: (
+    listener: (response: ExpoNotificationResponse | null | undefined) => void,
+  ) => { remove: () => void };
+  getExpoPushTokenAsync: (options?: { projectId?: string }) => Promise<{ data: string }>;
+  getLastNotificationResponseAsync: () => Promise<ExpoNotificationResponse | null | undefined>;
+  getPermissionsAsync: () => Promise<unknown>;
+  requestPermissionsAsync: () => Promise<unknown>;
+  setNotificationChannelAsync: (channelId: string, channel: { importance: unknown; name: string }) => Promise<unknown>;
+  setNotificationHandler: (handler: {
+    handleNotification: () => Promise<{
+      shouldPlaySound: boolean;
+      shouldSetBadge: boolean;
+      shouldShowBanner: boolean;
+      shouldShowList: boolean;
+    }>;
+  }) => void;
+};
+
 export type PushRegistrationDeps = {
   platform: string;
   createInstallationId: () => string;
@@ -61,8 +91,21 @@ export async function revokeStoredPushToken(): Promise<void> {
   }
 }
 
-export async function defaultPushRegistrationDeps(): Promise<PushRegistrationDeps> {
-  const Notifications = await import('expo-notifications');
+export async function loadOptionalExpoNotifications(
+  loadNotifications: () => Promise<unknown> = () => import('expo-notifications'),
+): Promise<ExpoNotificationsModule | null> {
+  try {
+    return (await loadNotifications()) as ExpoNotificationsModule;
+  } catch {
+    return null;
+  }
+}
+
+export async function defaultPushRegistrationDeps(): Promise<PushRegistrationDeps | null> {
+  const Notifications = await loadOptionalExpoNotifications();
+  if (!Notifications) {
+    return null;
+  }
   const SecureStore = await import('expo-secure-store');
   const { Platform } = await import('react-native');
   return {

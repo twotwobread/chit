@@ -57,15 +57,16 @@ func listTripsResponseToOpenAPI(trips []trip.ListItem) openapi.ListTripsResponse
 	items := make([]openapi.TripListItem, 0, len(trips))
 	for _, item := range trips {
 		items = append(items, openapi.TripListItem{
-			Id:               item.ID,
-			Name:             item.Name,
-			StartDate:        dateToOpenAPI(item.StartDate),
-			EndDate:          dateToOpenAPI(item.EndDate),
-			DefaultCurrency:  openapi.SupportedCurrency(item.DefaultCurrency),
-			JoinedAt:         item.JoinedAt,
-			CreatedAt:        item.CreatedAt,
-			MyRole:           openapi.TripParticipantRole(item.MyRole),
-			ParticipantCount: item.ParticipantCount,
+			Id:                item.ID,
+			Name:              item.Name,
+			StartDate:         dateToOpenAPI(item.StartDate),
+			EndDate:           dateToOpenAPI(item.EndDate),
+			DefaultCurrency:   openapi.SupportedCurrency(item.DefaultCurrency),
+			DefaultTravelMode: openapi.TripDefaultTravelMode(item.DefaultTravelMode),
+			JoinedAt:          item.JoinedAt,
+			CreatedAt:         item.CreatedAt,
+			MyRole:            openapi.TripParticipantRole(item.MyRole),
+			ParticipantCount:  item.ParticipantCount,
 		})
 	}
 	return openapi.ListTripsResponse{Trips: items}
@@ -801,15 +802,16 @@ func tripDayToOpenAPI(day trip.TripDay) openapi.TripDay {
 
 func tripToOpenAPI(value trip.Trip) openapi.Trip {
 	return openapi.Trip{
-		Id:              value.ID,
-		Name:            value.Name,
-		StartDate:       dateToOpenAPI(value.StartDate),
-		EndDate:         dateToOpenAPI(value.EndDate),
-		DefaultCurrency: openapi.SupportedCurrency(value.DefaultCurrency),
-		CreatedBy:       value.CreatedBy,
-		CreatedAt:       value.CreatedAt,
-		UpdatedAt:       value.UpdatedAt,
-		Destinations:    tripDestinationsToOpenAPI(value.Destinations),
+		Id:                value.ID,
+		Name:              value.Name,
+		StartDate:         dateToOpenAPI(value.StartDate),
+		EndDate:           dateToOpenAPI(value.EndDate),
+		DefaultCurrency:   openapi.SupportedCurrency(value.DefaultCurrency),
+		DefaultTravelMode: openapi.TripDefaultTravelMode(value.DefaultTravelMode),
+		CreatedBy:         value.CreatedBy,
+		CreatedAt:         value.CreatedAt,
+		UpdatedAt:         value.UpdatedAt,
+		Destinations:      tripDestinationsToOpenAPI(value.Destinations),
 	}
 }
 
@@ -871,6 +873,21 @@ func optionalExpenseCategoryFromOpenAPI(value *openapi.ExpenseCategory) *string 
 	}
 	category := string(*value)
 	return &category
+}
+
+func tripDefaultTravelModeFromOpenAPI(value *openapi.TripDefaultTravelMode) string {
+	if value == nil {
+		return ""
+	}
+	return string(*value)
+}
+
+func optionalTripDefaultTravelModeFromOpenAPI(value *openapi.TripDefaultTravelMode) *string {
+	if value == nil {
+		return nil
+	}
+	mode := string(*value)
+	return &mode
 }
 
 func optionalPlaceTypeFromOpenAPI(value *openapi.TripPlaceType) *string {

@@ -1,6 +1,6 @@
-import { type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 
-import type { TripDay, TripDestination } from '@i-um/api-contract';
+import type { TripDay, TripDefaultTravelMode, TripDestination } from '@i-um/api-contract';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -10,6 +10,7 @@ import { DayItineraryContent, DeletePlaceConfirmationModal } from './DayItinerar
 import { KeyboardAwareFormScrollView } from './KeyboardAwareFormScrollView';
 import { styles } from './DayItineraryEditorStyles';
 import { TripRootFab } from './TripRootFab';
+import { buildTripDefaultTravelModeSelectorViewModel } from '../trips/travel-mode';
 import { useDayItineraryEditorController } from './useDayItineraryEditorController';
 
 export type DayItineraryEditorProps = {
@@ -20,6 +21,8 @@ export type DayItineraryEditorProps = {
   headerContent?: ReactNode;
   tripDays?: TripDay[];
   tripDestinations?: TripDestination[];
+  defaultTravelMode?: TripDefaultTravelMode;
+  onDefaultTravelModeChange?: (mode: TripDefaultTravelMode) => void | Promise<void>;
   onRequestDayChange?: (dayId: string) => void;
 };
 
@@ -31,6 +34,8 @@ export function DayItineraryEditor({
   headerContent,
   tripDays = [],
   tripDestinations = [],
+  defaultTravelMode,
+  onDefaultTravelModeChange,
   onRequestDayChange,
 }: DayItineraryEditorProps) {
   const {
@@ -83,6 +88,8 @@ export function DayItineraryEditor({
     updateScrollLayout,
     updateScrollOffset,
   } = useDayItineraryEditorController({ tripId, date, initialAction, tripDays, tripDestinations, onRequestDayChange });
+  const [travelModeSaving, setTravelModeSaving] = useState(false);
+  const [travelModeFeedback, setTravelModeFeedback] = useState<string | null>(null);
   const insets = useSafeAreaInsets();
   const addFabLayout = buildTripRootFabLayout({ bottomInset: insets.bottom, rightInset: insets.right });
   const canMovePlaces = Boolean(date && tripDays.some((day) => day.id !== date));
@@ -131,6 +138,28 @@ export function DayItineraryEditor({
 
         {state.status === 'success' ? (
           <>
+            {defaultTravelMode && onDefaultTravelModeChange ? (
+              <DefaultTravelModeQuickSelector
+                disabled={travelModeSaving}
+                feedback={travelModeFeedback}
+                mode={defaultTravelMode}
+                onSelect={async (mode) => {
+                  if (mode === defaultTravelMode) {
+                    return;
+                  }
+                  setTravelModeSaving(true);
+                  setTravelModeFeedback(null);
+                  try {
+                    await onDefaultTravelModeChange(mode);
+                    setTravelModeFeedback('기본 이동 방식을 저장했어요.');
+                  } catch {
+                    setTravelModeFeedback('기본 이동 방식을 저장할 수 없어요. 잠시 후 다시 시도해주세요.');
+                  } finally {
+                    setTravelModeSaving(false);
+                  }
+                }}
+              />
+            ) : null}
             <DayItineraryContent
               canMovePlaces={canMovePlaces}
               editState={editState}
@@ -216,6 +245,53 @@ export function DayItineraryEditor({
           onConfirm={() => void submitDelete()}
         />
       ) : null}
+    </View>
+  );
+}
+
+type DefaultTravelModeQuickSelectorProps = {
+  disabled: boolean;
+  feedback: string | null;
+  mode: TripDefaultTravelMode;
+  onSelect: (mode: TripDefaultTravelMode) => void;
+};
+
+function DefaultTravelModeQuickSelector({ disabled, feedback, mode, onSelect }: DefaultTravelModeQuickSelectorProps) {
+  const viewModel = buildTripDefaultTravelModeSelectorViewModel(mode);
+
+  return (
+    <View style={styles.defaultTravelModeCard}>
+      <View style={styles.defaultTravelModeTextGroup}>
+        <Text style={styles.defaultTravelModeTitle}>기본 이동 방식</Text>
+        <Text style={styles.defaultTravelModeHelper}>이 Day와 오늘 화면의 길찾기 기준으로 사용해요.</Text>
+      </View>
+      <View style={styles.defaultTravelModeOptions}>
+        {viewModel.options.map((option) => (
+          <Pressable
+            accessibilityLabel={option.accessibilityLabel}
+            accessibilityRole="button"
+            accessibilityState={option.accessibilityState}
+            disabled={disabled}
+            key={option.mode}
+            onPress={() => onSelect(option.mode)}
+            style={[
+              styles.defaultTravelModeChip,
+              option.selected ? styles.defaultTravelModeChipSelected : null,
+              disabled ? styles.defaultTravelModeChipDisabled : null,
+            ]}
+          >
+            <Text
+              style={[
+                styles.defaultTravelModeChipText,
+                option.selected ? styles.defaultTravelModeChipTextSelected : null,
+              ]}
+            >
+              {option.label}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+      {feedback ? <Text style={styles.defaultTravelModeFeedback}>{feedback}</Text> : null}
     </View>
   );
 }

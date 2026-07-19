@@ -3,20 +3,19 @@ import { router } from 'expo-router';
 
 import { markNotificationRead } from './api';
 import { resolveNotificationActionRoute } from './navigation';
-import { defaultPushRegistrationDeps, ensurePushRegistration, revokeStoredPushToken } from './push-registration';
-
-type NotificationResponse = {
-  notification?: {
-    request?: {
-      content?: {
-        data?: Record<string, unknown>;
-      };
-    };
-  };
-};
+import {
+  defaultPushRegistrationDeps,
+  ensurePushRegistration,
+  loadOptionalExpoNotifications,
+  revokeStoredPushToken,
+  type ExpoNotificationResponse,
+} from './push-registration';
 
 export async function registerDeviceForPushNotifications(): Promise<void> {
   const deps = await defaultPushRegistrationDeps();
+  if (!deps) {
+    return;
+  }
   await ensurePushRegistration(deps);
 }
 
@@ -30,8 +29,8 @@ export function useNotificationResponseRouting(): void {
     let subscription: { remove: () => void } | null = null;
 
     void (async () => {
-      const Notifications = await import('expo-notifications');
-      if (!mounted) {
+      const Notifications = await loadOptionalExpoNotifications();
+      if (!mounted || !Notifications) {
         return;
       }
 
@@ -44,7 +43,7 @@ export function useNotificationResponseRouting(): void {
         }),
       });
 
-      const handleResponse = (response: NotificationResponse | null | undefined) => {
+      const handleResponse = (response: ExpoNotificationResponse | null | undefined) => {
         const data = response?.notification?.request?.content?.data;
         const notificationId = data?.notificationId;
         if (typeof notificationId === 'string' && notificationId.trim()) {
@@ -62,7 +61,7 @@ export function useNotificationResponseRouting(): void {
 
       subscription = Notifications.addNotificationResponseReceivedListener(handleResponse);
       handleResponse(await Notifications.getLastNotificationResponseAsync());
-    })();
+    })().catch(() => undefined);
 
     return () => {
       mounted = false;

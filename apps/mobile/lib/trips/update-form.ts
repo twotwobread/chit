@@ -1,12 +1,14 @@
-import type { SupportedCurrency, Trip, UpdateTripRequest } from '@i-um/api-contract';
+import type { SupportedCurrency, Trip, TripDefaultTravelMode, UpdateTripRequest } from '@i-um/api-contract';
 
 import { isValidDate } from './date';
+import { isTripDefaultTravelMode } from './travel-mode';
 
 export type TripBasicInfoForm = {
   name: string;
   startDate: string;
   endDate: string;
   defaultCurrency: SupportedCurrency;
+  defaultTravelMode: TripDefaultTravelMode;
 };
 
 export const supportedCurrencies: SupportedCurrency[] = ['KRW', 'JPY', 'USD', 'EUR'];
@@ -17,6 +19,7 @@ export function tripToBasicInfoForm(trip: Trip): TripBasicInfoForm {
     startDate: trip.startDate,
     endDate: trip.endDate,
     defaultCurrency: trip.defaultCurrency,
+    defaultTravelMode: trip.defaultTravelMode,
   };
 }
 
@@ -40,6 +43,9 @@ export function validateTripBasicInfoForm(form: TripBasicInfoForm): string | nul
   if (!supportedCurrencies.includes(form.defaultCurrency)) {
     return '지원하는 통화를 선택해주세요.';
   }
+  if (!isTripDefaultTravelMode(form.defaultTravelMode)) {
+    return '지원하는 이동 방식을 선택해주세요.';
+  }
   return null;
 }
 
@@ -58,6 +64,9 @@ export function buildUpdateTripRequest(original: TripBasicInfoForm, current: Tri
   }
   if (current.defaultCurrency !== original.defaultCurrency) {
     request.defaultCurrency = current.defaultCurrency;
+  }
+  if (current.defaultTravelMode !== original.defaultTravelMode) {
+    request.defaultTravelMode = current.defaultTravelMode;
   }
 
   return request;

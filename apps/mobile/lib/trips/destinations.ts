@@ -1,7 +1,5 @@
 import type { DestinationSearchResult, TripDestinationInput } from '@i-um/api-contract';
 
-import { theme } from '../design/theme';
-
 export const tripDestinationMinCountCopy = '여행 도시를 1개 이상 선택해주세요.';
 export const tripDestinationMaxCountCopy = '여행 도시는 최대 5개까지 선택할 수 있어요.';
 export const tripDestinationSearchMinQueryCopy = '도시 이름을 2글자 이상 입력해주세요.';
@@ -67,10 +65,6 @@ export function destinationSearchSubmitState(query: string, loading: boolean): D
     buttonLabel: loading ? '검색 중' : '검색',
     helperText: hasMinimumQuery ? null : tripDestinationSearchMinQueryCopy,
   };
-}
-
-export function buildDestinationSearchContentTopPadding(topInset = 0): number {
-  return Math.max(0, topInset) + theme.space[7];
 }
 
 export function destinationCountryMismatchConfirmation(

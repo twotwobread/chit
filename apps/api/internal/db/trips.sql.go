@@ -187,13 +187,15 @@ INSERT INTO trips (
   start_date,
   end_date,
   default_currency,
+  default_travel_mode,
   created_by
 ) VALUES (
   $1,
   $2,
   $3,
   $4,
-  $5::uuid
+  $5,
+  $6::uuid
 )
 RETURNING
   id::text,
@@ -201,28 +203,31 @@ RETURNING
   start_date,
   end_date,
   default_currency,
+  default_travel_mode,
   created_by::text,
   created_at,
   updated_at
 `
 
 type CreateTripParams struct {
-	Name            string
-	StartDate       pgtype.Date
-	EndDate         pgtype.Date
-	DefaultCurrency string
-	Column5         pgtype.UUID
+	Name              string
+	StartDate         pgtype.Date
+	EndDate           pgtype.Date
+	DefaultCurrency   string
+	DefaultTravelMode string
+	Column6           pgtype.UUID
 }
 
 type CreateTripRow struct {
-	ID              string
-	Name            string
-	StartDate       pgtype.Date
-	EndDate         pgtype.Date
-	DefaultCurrency string
-	CreatedBy       string
-	CreatedAt       pgtype.Timestamptz
-	UpdatedAt       pgtype.Timestamptz
+	ID                string
+	Name              string
+	StartDate         pgtype.Date
+	EndDate           pgtype.Date
+	DefaultCurrency   string
+	DefaultTravelMode string
+	CreatedBy         string
+	CreatedAt         pgtype.Timestamptz
+	UpdatedAt         pgtype.Timestamptz
 }
 
 func (q *Queries) CreateTrip(ctx context.Context, arg CreateTripParams) (CreateTripRow, error) {
@@ -231,7 +236,8 @@ func (q *Queries) CreateTrip(ctx context.Context, arg CreateTripParams) (CreateT
 		arg.StartDate,
 		arg.EndDate,
 		arg.DefaultCurrency,
-		arg.Column5,
+		arg.DefaultTravelMode,
+		arg.Column6,
 	)
 	var i CreateTripRow
 	err := row.Scan(
@@ -240,6 +246,7 @@ func (q *Queries) CreateTrip(ctx context.Context, arg CreateTripParams) (CreateT
 		&i.StartDate,
 		&i.EndDate,
 		&i.DefaultCurrency,
+		&i.DefaultTravelMode,
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -969,6 +976,7 @@ SELECT
   start_date,
   end_date,
   default_currency,
+  default_travel_mode,
   created_by::text,
   created_at,
   updated_at
@@ -977,14 +985,15 @@ WHERE id = $1::uuid
 `
 
 type GetTripByIDRow struct {
-	ID              string
-	Name            string
-	StartDate       pgtype.Date
-	EndDate         pgtype.Date
-	DefaultCurrency string
-	CreatedBy       string
-	CreatedAt       pgtype.Timestamptz
-	UpdatedAt       pgtype.Timestamptz
+	ID                string
+	Name              string
+	StartDate         pgtype.Date
+	EndDate           pgtype.Date
+	DefaultCurrency   string
+	DefaultTravelMode string
+	CreatedBy         string
+	CreatedAt         pgtype.Timestamptz
+	UpdatedAt         pgtype.Timestamptz
 }
 
 func (q *Queries) GetTripByID(ctx context.Context, dollar_1 pgtype.UUID) (GetTripByIDRow, error) {
@@ -996,6 +1005,7 @@ func (q *Queries) GetTripByID(ctx context.Context, dollar_1 pgtype.UUID) (GetTri
 		&i.StartDate,
 		&i.EndDate,
 		&i.DefaultCurrency,
+		&i.DefaultTravelMode,
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -1699,6 +1709,7 @@ SELECT
   t.start_date,
   t.end_date,
   t.default_currency,
+  t.default_travel_mode,
   tp.joined_at,
   t.created_at,
   tp.role AS my_role,
@@ -1714,16 +1725,17 @@ ORDER BY tp.joined_at DESC, t.created_at DESC, t.id DESC
 `
 
 type ListTripsByParticipantUserRow struct {
-	ID               string
-	ParticipantID    string
-	Name             string
-	StartDate        pgtype.Date
-	EndDate          pgtype.Date
-	DefaultCurrency  string
-	JoinedAt         pgtype.Timestamptz
-	CreatedAt        pgtype.Timestamptz
-	MyRole           string
-	ParticipantCount int32
+	ID                string
+	ParticipantID     string
+	Name              string
+	StartDate         pgtype.Date
+	EndDate           pgtype.Date
+	DefaultCurrency   string
+	DefaultTravelMode string
+	JoinedAt          pgtype.Timestamptz
+	CreatedAt         pgtype.Timestamptz
+	MyRole            string
+	ParticipantCount  int32
 }
 
 func (q *Queries) ListTripsByParticipantUser(ctx context.Context, dollar_1 pgtype.UUID) ([]ListTripsByParticipantUserRow, error) {
@@ -1742,6 +1754,7 @@ func (q *Queries) ListTripsByParticipantUser(ctx context.Context, dollar_1 pgtyp
 			&i.StartDate,
 			&i.EndDate,
 			&i.DefaultCurrency,
+			&i.DefaultTravelMode,
 			&i.JoinedAt,
 			&i.CreatedAt,
 			&i.MyRole,
@@ -1895,6 +1908,7 @@ SET
   start_date = $3,
   end_date = $4,
   default_currency = $5,
+  default_travel_mode = $6,
   updated_at = now()
 WHERE id = $1::uuid
 RETURNING
@@ -1903,28 +1917,31 @@ RETURNING
   start_date,
   end_date,
   default_currency,
+  default_travel_mode,
   created_by::text,
   created_at,
   updated_at
 `
 
 type UpdateTripBasicInfoParams struct {
-	Column1         pgtype.UUID
-	Name            string
-	StartDate       pgtype.Date
-	EndDate         pgtype.Date
-	DefaultCurrency string
+	Column1           pgtype.UUID
+	Name              string
+	StartDate         pgtype.Date
+	EndDate           pgtype.Date
+	DefaultCurrency   string
+	DefaultTravelMode string
 }
 
 type UpdateTripBasicInfoRow struct {
-	ID              string
-	Name            string
-	StartDate       pgtype.Date
-	EndDate         pgtype.Date
-	DefaultCurrency string
-	CreatedBy       string
-	CreatedAt       pgtype.Timestamptz
-	UpdatedAt       pgtype.Timestamptz
+	ID                string
+	Name              string
+	StartDate         pgtype.Date
+	EndDate           pgtype.Date
+	DefaultCurrency   string
+	DefaultTravelMode string
+	CreatedBy         string
+	CreatedAt         pgtype.Timestamptz
+	UpdatedAt         pgtype.Timestamptz
 }
 
 func (q *Queries) UpdateTripBasicInfo(ctx context.Context, arg UpdateTripBasicInfoParams) (UpdateTripBasicInfoRow, error) {
@@ -1934,6 +1951,7 @@ func (q *Queries) UpdateTripBasicInfo(ctx context.Context, arg UpdateTripBasicIn
 		arg.StartDate,
 		arg.EndDate,
 		arg.DefaultCurrency,
+		arg.DefaultTravelMode,
 	)
 	var i UpdateTripBasicInfoRow
 	err := row.Scan(
@@ -1942,6 +1960,7 @@ func (q *Queries) UpdateTripBasicInfo(ctx context.Context, arg UpdateTripBasicIn
 		&i.StartDate,
 		&i.EndDate,
 		&i.DefaultCurrency,
+		&i.DefaultTravelMode,
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,

@@ -167,9 +167,9 @@ const (
 
 // Defines values for RoutePreviewMode.
 const (
-	Driving RoutePreviewMode = "driving"
-	Transit RoutePreviewMode = "transit"
-	Walking RoutePreviewMode = "walking"
+	RoutePreviewModeDriving RoutePreviewMode = "driving"
+	RoutePreviewModeTransit RoutePreviewMode = "transit"
+	RoutePreviewModeWalking RoutePreviewMode = "walking"
 )
 
 // Defines values for ScheduleItemType.
@@ -189,6 +189,12 @@ const (
 	JPY SupportedCurrency = "JPY"
 	KRW SupportedCurrency = "KRW"
 	USD SupportedCurrency = "USD"
+)
+
+// Defines values for TripDefaultTravelMode.
+const (
+	TripDefaultTravelModeDriving TripDefaultTravelMode = "driving"
+	TripDefaultTravelModeTransit TripDefaultTravelMode = "transit"
 )
 
 // Defines values for TripParticipantRole.
@@ -481,8 +487,9 @@ type CreateTripInviteResponse struct {
 
 // CreateTripRequest defines model for CreateTripRequest.
 type CreateTripRequest struct {
-	DefaultCurrency SupportedCurrency      `json:"defaultCurrency"`
-	Destinations    []TripDestinationInput `json:"destinations"`
+	DefaultCurrency   SupportedCurrency      `json:"defaultCurrency"`
+	DefaultTravelMode *TripDefaultTravelMode `json:"defaultTravelMode,omitempty"`
+	Destinations      []TripDestinationInput `json:"destinations"`
 
 	// EndDate End date in YYYY-MM-DD format. Must be today or later and not before startDate.
 	EndDate openapi_types.Date `json:"endDate"`
@@ -1321,15 +1328,16 @@ type SupportedCurrency string
 
 // Trip defines model for Trip.
 type Trip struct {
-	CreatedAt       time.Time          `json:"createdAt"`
-	CreatedBy       string             `json:"createdBy"`
-	DefaultCurrency SupportedCurrency  `json:"defaultCurrency"`
-	Destinations    []TripDestination  `json:"destinations"`
-	EndDate         openapi_types.Date `json:"endDate"`
-	Id              string             `json:"id"`
-	Name            string             `json:"name"`
-	StartDate       openapi_types.Date `json:"startDate"`
-	UpdatedAt       time.Time          `json:"updatedAt"`
+	CreatedAt         time.Time             `json:"createdAt"`
+	CreatedBy         string                `json:"createdBy"`
+	DefaultCurrency   SupportedCurrency     `json:"defaultCurrency"`
+	DefaultTravelMode TripDefaultTravelMode `json:"defaultTravelMode"`
+	Destinations      []TripDestination     `json:"destinations"`
+	EndDate           openapi_types.Date    `json:"endDate"`
+	Id                string                `json:"id"`
+	Name              string                `json:"name"`
+	StartDate         openapi_types.Date    `json:"startDate"`
+	UpdatedAt         time.Time             `json:"updatedAt"`
 }
 
 // TripDay defines model for TripDay.
@@ -1339,6 +1347,9 @@ type TripDay struct {
 	Id           string             `json:"id"`
 	LodgingPlace *TripPlaceSummary  `json:"lodgingPlace"`
 }
+
+// TripDefaultTravelMode defines model for TripDefaultTravelMode.
+type TripDefaultTravelMode string
 
 // TripDestination defines model for TripDestination.
 type TripDestination struct {
@@ -1393,15 +1404,16 @@ type TripInvite struct {
 
 // TripListItem defines model for TripListItem.
 type TripListItem struct {
-	CreatedAt        time.Time           `json:"createdAt"`
-	DefaultCurrency  SupportedCurrency   `json:"defaultCurrency"`
-	EndDate          openapi_types.Date  `json:"endDate"`
-	Id               string              `json:"id"`
-	JoinedAt         time.Time           `json:"joinedAt"`
-	MyRole           TripParticipantRole `json:"myRole"`
-	Name             string              `json:"name"`
-	ParticipantCount int                 `json:"participantCount"`
-	StartDate        openapi_types.Date  `json:"startDate"`
+	CreatedAt         time.Time             `json:"createdAt"`
+	DefaultCurrency   SupportedCurrency     `json:"defaultCurrency"`
+	DefaultTravelMode TripDefaultTravelMode `json:"defaultTravelMode"`
+	EndDate           openapi_types.Date    `json:"endDate"`
+	Id                string                `json:"id"`
+	JoinedAt          time.Time             `json:"joinedAt"`
+	MyRole            TripParticipantRole   `json:"myRole"`
+	Name              string                `json:"name"`
+	ParticipantCount  int                   `json:"participantCount"`
+	StartDate         openapi_types.Date    `json:"startDate"`
 }
 
 // TripParticipant defines model for TripParticipant.
@@ -1543,8 +1555,9 @@ type UpdateTripFlightResponse struct {
 // UpdateTripRequest defines model for UpdateTripRequest.
 type UpdateTripRequest struct {
 	// ConfirmOutOfRangeDayArchive Set true after showing the shrink impact summary when a date range change archives out-of-range days.
-	ConfirmOutOfRangeDayArchive *bool              `json:"confirmOutOfRangeDayArchive,omitempty"`
-	DefaultCurrency             *SupportedCurrency `json:"defaultCurrency,omitempty"`
+	ConfirmOutOfRangeDayArchive *bool                  `json:"confirmOutOfRangeDayArchive,omitempty"`
+	DefaultCurrency             *SupportedCurrency     `json:"defaultCurrency,omitempty"`
+	DefaultTravelMode           *TripDefaultTravelMode `json:"defaultTravelMode,omitempty"`
 
 	// EndDate End date in YYYY-MM-DD format. Must not be before the merged startDate.
 	EndDate *openapi_types.Date `json:"endDate,omitempty"`

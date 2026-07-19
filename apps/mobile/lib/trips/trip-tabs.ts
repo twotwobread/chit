@@ -84,6 +84,7 @@ export function buildTripTodayStatusLandingViewModel(
       startDate: trip.startDate,
       endDate: trip.endDate,
       defaultCurrency: trip.defaultCurrency,
+      defaultTravelMode: trip.defaultTravelMode,
       createdAt: trip.createdAt,
       joinedAt: trip.createdAt,
       myRole: 'member',
