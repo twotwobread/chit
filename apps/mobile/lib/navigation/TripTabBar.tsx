@@ -75,7 +75,7 @@ export function TripTabBar({ navigation, state }: TripTabBarProps) {
             style={({ pressed }) => [styles.item, focused ? styles.itemActive : null, pressed ? styles.pressed : null]}
           >
             <Icon
-              color={focused ? theme.color.primary : theme.color.textFaint}
+              color={focused ? theme.color.onPrimary : theme.color.textFaint}
               size={24}
               strokeWidth={focused ? 2.2 : 2}
             />
@@ -113,7 +113,7 @@ const styles = StyleSheet.create({
   },
   itemActive: SELECTED_NAV_TAB_SURFACE_STYLE,
   labelActive: {
-    color: theme.color.primary,
+    color: theme.color.onPrimary,
     fontFamily: theme.font.family.bold,
     fontWeight: theme.font.weight.bold,
   },
