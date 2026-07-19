@@ -2,8 +2,10 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
+import type { ExpenseCategory } from './ExpenseCategory';
 import type { ExpenseSplitPolicy } from './ExpenseSplitPolicy';
 import type { ManualExpenseSplitInput } from './ManualExpenseSplitInput';
+import type { SupportedCurrency } from './SupportedCurrency';
 export type UpdateExpenseRequest = {
     amountMinor: number;
     /**
@@ -31,6 +33,14 @@ export type UpdateExpenseRequest = {
      * Same-day schedule item to link, or null to clear the linked place.
      */
     scheduleItemId: string | null;
+    /**
+     * When provided, replaces the expense currency. Amount and split minor units are interpreted in this currency without FX conversion. Omit to keep the existing value.
+     */
+    currency?: SupportedCurrency;
+    /**
+     * When provided, replaces the expense category used for settlement analytics and row markers. Omit to keep the existing value.
+     */
+    expenseCategory?: ExpenseCategory;
     /**
      * When provided, updates whether the expense is included in final settlement calculations. Omit to keep the existing value.
      */

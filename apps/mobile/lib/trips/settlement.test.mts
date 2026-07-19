@@ -67,6 +67,7 @@ function dayExpense(overrides: Partial<DayExpenseListItem> = {}): DayExpenseList
     place: { tripPlaceId: 'place-a', name: '도톤보리', address: 'Dotonbori', placeType: 'food', source: 'live' },
     amountMinor: 1200,
     currency: 'JPY',
+    expenseCategory: 'food',
     payer: participant('민수', 'payer-a'),
     splitPolicy: 'equal',
     includeInSettlement: true,
@@ -405,6 +406,7 @@ test('builds total spend summary with category proportions and excluded expenses
             id: 'transit-a',
             amountMinor: 1000,
             currency: 'JPY',
+            expenseCategory: 'transport',
             displayTitle: '지하철',
             place: {
               tripPlaceId: 'place-transit',

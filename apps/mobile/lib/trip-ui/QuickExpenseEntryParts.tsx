@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { Text, TextInput, View } from 'react-native';
 
-import { type ExpenseReceiptDraft } from '@i-um/api-contract';
+import { type ExpenseReceiptDraft, type SupportedCurrency } from '@i-um/api-contract';
+
+import { type ExpenseCategory } from './expense-category-markers';
 
 import { Card, PrimaryButton, SecondaryButton, theme } from '../design';
 import { dateFromString, isValidDate, monthStringFromDate } from '../trips/date';
@@ -19,6 +21,8 @@ import {
   settlementStatusSummaryLabel,
 } from '../trips/quick-expense';
 import {
+  ExpenseCategorySelector,
+  ExpenseCurrencySelector,
   ExpenseFormScheduleSelector,
   ExpenseFormSummaryActionRow,
   ExpensePaymentSplitSheet,
@@ -30,6 +34,7 @@ import { styles } from './QuickExpenseEntryStyles';
 
 export type QuickExpenseFormSubmitStateInput = {
   amountInput: string;
+  expenseCategory: ExpenseCategory;
   expenseDateInput: string;
   includeInSettlement: boolean;
   manualSplitInputs: QuickExpenseManualSplitInput[];
@@ -46,6 +51,7 @@ export type QuickExpenseFormSubmitStateInput = {
 
 export function buildQuickExpenseFormSubmitState({
   amountInput,
+  expenseCategory,
   expenseDateInput,
   includeInSettlement,
   manualSplitInputs,
@@ -69,6 +75,7 @@ export function buildQuickExpenseFormSubmitState({
           expenseDate: expenseDateInput,
           amountInput,
           currency: viewModel.currency,
+          expenseCategory,
           selectedTripDayId: viewModel.selectedTripDayId,
           scheduleItemId: selectedItemId,
           splitPolicy,
@@ -81,6 +88,7 @@ export function buildQuickExpenseFormSubmitState({
       : buildCreateQuickExpenseRequest({
           amountInput,
           currency: viewModel.currency,
+          expenseCategory,
           scheduleItemId: selectedItemId,
           splitPolicy,
           participantIds: selectedSplitParticipantIds,
@@ -95,6 +103,7 @@ export function buildQuickExpenseFormSubmitState({
 export function QuickExpenseForm({
   amountInput,
   errors,
+  expenseCategory,
   expenseDateInput,
   formMessage,
   includeInSettlement,
@@ -102,6 +111,8 @@ export function QuickExpenseForm({
   onBack,
   onClearReceiptDraft,
   onClearTripDay,
+  onSelectCurrency,
+  onSelectExpenseCategory,
   onSelectItem,
   onSelectPayer,
   onSelectSplitPolicy,
@@ -135,12 +146,15 @@ export function QuickExpenseForm({
 }: {
   amountInput: string;
   errors: QuickExpenseFormErrors;
+  expenseCategory: ExpenseCategory;
   expenseDateInput: string;
   formMessage: string | null;
   includeInSettlement: boolean;
   mode: 'today' | 'settlement';
   onBack: () => void;
   onClearTripDay: () => void;
+  onSelectCurrency: (currency: SupportedCurrency) => void;
+  onSelectExpenseCategory: (expenseCategory: ExpenseCategory) => void;
   onSelectItem: (itemId: string) => void;
   onSelectPayer: (participantId: string) => void;
   onSelectSplitPolicy: (
@@ -178,6 +192,7 @@ export function QuickExpenseForm({
 }) {
   const submitState = buildQuickExpenseFormSubmitState({
     amountInput,
+    expenseCategory,
     expenseDateInput,
     includeInSettlement,
     manualSplitInputs,
@@ -354,6 +369,18 @@ export function QuickExpenseForm({
           </View>
           {errors.amount ? <Text style={styles.errorMessage}>{errors.amount}</Text> : null}
         </View>
+
+        <ExpenseCurrencySelector
+          currency={viewModel.currency}
+          disabled={saving || Boolean(viewModel.emptyMessage)}
+          onSelectCurrency={onSelectCurrency}
+        />
+
+        <ExpenseCategorySelector
+          disabled={saving || Boolean(viewModel.emptyMessage)}
+          expenseCategory={expenseCategory}
+          onSelectExpenseCategory={onSelectExpenseCategory}
+        />
 
         <View style={styles.fieldGroup}>
           <Text style={styles.label}>영수증</Text>

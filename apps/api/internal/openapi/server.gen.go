@@ -56,6 +56,17 @@ const (
 	ExpenseAnchorTypeTripDay      ExpenseAnchorType = "trip_day"
 )
 
+// Defines values for ExpenseCategory.
+const (
+	ExpenseCategoryCafe      ExpenseCategory = "cafe"
+	ExpenseCategoryEtc       ExpenseCategory = "etc"
+	ExpenseCategoryFood      ExpenseCategory = "food"
+	ExpenseCategoryLodging   ExpenseCategory = "lodging"
+	ExpenseCategoryShopping  ExpenseCategory = "shopping"
+	ExpenseCategorySights    ExpenseCategory = "sights"
+	ExpenseCategoryTransport ExpenseCategory = "transport"
+)
+
 // Defines values for ExpenseDisplaySource.
 const (
 	Fallback ExpenseDisplaySource = "fallback"
@@ -170,13 +181,13 @@ const (
 
 // Defines values for TripPlaceType.
 const (
-	Cafe      TripPlaceType = "cafe"
-	Etc       TripPlaceType = "etc"
-	Food      TripPlaceType = "food"
-	Lodging   TripPlaceType = "lodging"
-	Shopping  TripPlaceType = "shopping"
-	Sights    TripPlaceType = "sights"
-	Transport TripPlaceType = "transport"
+	TripPlaceTypeCafe      TripPlaceType = "cafe"
+	TripPlaceTypeEtc       TripPlaceType = "etc"
+	TripPlaceTypeFood      TripPlaceType = "food"
+	TripPlaceTypeLodging   TripPlaceType = "lodging"
+	TripPlaceTypeShopping  TripPlaceType = "shopping"
+	TripPlaceTypeSights    TripPlaceType = "sights"
+	TripPlaceTypeTransport TripPlaceType = "transport"
 )
 
 // AcceptTripInviteResponse defines model for AcceptTripInviteResponse.
@@ -347,7 +358,9 @@ type CreateManualScheduleItemResponse struct {
 // CreateQuickExpenseRequest defines model for CreateQuickExpenseRequest.
 type CreateQuickExpenseRequest struct {
 	// AmountMinor Positive amount in currency minor units.
-	AmountMinor int64 `json:"amountMinor"`
+	AmountMinor     int64              `json:"amountMinor"`
+	Currency        *SupportedCurrency `json:"currency,omitempty"`
+	ExpenseCategory *ExpenseCategory   `json:"expenseCategory,omitempty"`
 
 	// IncludeInSettlement Whether to include the expense in final settlement calculations. Defaults to true when omitted.
 	IncludeInSettlement *bool `json:"includeInSettlement,omitempty"`
@@ -384,7 +397,9 @@ type CreateRoutePreviewRequest struct {
 
 // CreateTripExpenseRequest defines model for CreateTripExpenseRequest.
 type CreateTripExpenseRequest struct {
-	AmountMinor int64 `json:"amountMinor"`
+	AmountMinor     int64              `json:"amountMinor"`
+	Currency        *SupportedCurrency `json:"currency,omitempty"`
+	ExpenseCategory *ExpenseCategory   `json:"expenseCategory,omitempty"`
 
 	// ExpenseDate Actual payment/business date. It may be outside the trip range.
 	ExpenseDate openapi_types.Date `json:"expenseDate"`
@@ -473,9 +488,10 @@ type DayExpenseListItem struct {
 	Currency    SupportedCurrency `json:"currency"`
 
 	// DisplayTitle User-facing title resolved by the server. For current schedule-item quick expenses this is the linked place/schedule display name or fallback place name.
-	DisplayTitle string             `json:"displayTitle"`
-	ExpenseDate  openapi_types.Date `json:"expenseDate"`
-	Id           string             `json:"id"`
+	DisplayTitle    string             `json:"displayTitle"`
+	ExpenseCategory ExpenseCategory    `json:"expenseCategory"`
+	ExpenseDate     openapi_types.Date `json:"expenseDate"`
+	Id              string             `json:"id"`
 
 	// IncludeInSettlement Whether this expense is included in final settlement calculations. False means it was settled on-site and remains in history/total spend only.
 	IncludeInSettlement bool                      `json:"includeInSettlement"`
@@ -526,9 +542,10 @@ type Expense struct {
 	Currency    SupportedCurrency `json:"currency"`
 
 	// DisplayTitle User-facing title resolved by the server.
-	DisplayTitle string             `json:"displayTitle"`
-	ExpenseDate  openapi_types.Date `json:"expenseDate"`
-	Id           string             `json:"id"`
+	DisplayTitle    string             `json:"displayTitle"`
+	ExpenseCategory ExpenseCategory    `json:"expenseCategory"`
+	ExpenseDate     openapi_types.Date `json:"expenseDate"`
+	Id              string             `json:"id"`
 
 	// IncludeInSettlement Whether this expense is included in final settlement calculations. False means it was settled on-site and remains in history/total spend only.
 	IncludeInSettlement bool                      `json:"includeInSettlement"`
@@ -552,6 +569,9 @@ type Expense struct {
 
 // ExpenseAnchorType defines model for ExpenseAnchorType.
 type ExpenseAnchorType string
+
+// ExpenseCategory defines model for ExpenseCategory.
+type ExpenseCategory string
 
 // ExpenseDisplaySource Display value source for diagnostics and tests. Do not render this as user-visible copy.
 type ExpenseDisplaySource string
@@ -1376,7 +1396,9 @@ type TripScheduleItemsDayListItem struct {
 
 // UpdateExpenseRequest defines model for UpdateExpenseRequest.
 type UpdateExpenseRequest struct {
-	AmountMinor int64 `json:"amountMinor"`
+	AmountMinor     int64              `json:"amountMinor"`
+	Currency        *SupportedCurrency `json:"currency,omitempty"`
+	ExpenseCategory *ExpenseCategory   `json:"expenseCategory,omitempty"`
 
 	// IncludeInSettlement When provided, updates whether the expense is included in final settlement calculations. Omit to keep the existing value.
 	IncludeInSettlement *bool `json:"includeInSettlement,omitempty"`

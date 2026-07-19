@@ -1,6 +1,6 @@
 import type { Href } from 'expo-router';
 
-import type { DayExpenseListItem, DayExpenseSplitListItem, TripPlaceType } from '@i-um/api-contract';
+import type { DayExpenseListItem, DayExpenseSplitListItem } from '@i-um/api-contract';
 
 import { type ExpenseCategory, getExpenseCategoryMarkerMeta } from '../trip-ui/expense-category-markers';
 
@@ -84,7 +84,7 @@ export function buildDayExpensesViewModel({
       const detailLine = [payerLabel, splitLabel, settlementLabel]
         .filter((part): part is string => part !== null)
         .join(' · ');
-      const category = expenseCategory(expense.place?.placeType);
+      const category = expense.expenseCategory;
       const categoryLabel = getExpenseCategoryMarkerMeta(category).label;
 
       return {
@@ -141,26 +141,6 @@ function displayTitle(expense: DayExpenseListItem): string {
     return title;
   }
   return expense.place?.name.trim() || '지출';
-}
-
-function expenseCategory(placeType?: TripPlaceType | null): ExpenseCategory {
-  switch (placeType) {
-    case 'cafe':
-    case 'food':
-    case 'lodging':
-    case 'shopping':
-    case 'sights':
-    case 'transport':
-      return placeType;
-    case 'etc':
-    case null:
-    case undefined:
-      return 'etc';
-    default: {
-      const exhaustive: never = placeType;
-      throw new Error(`Unsupported trip place type: ${exhaustive}`);
-    }
-  }
 }
 
 function normalizeDisplayName(value: string): string {

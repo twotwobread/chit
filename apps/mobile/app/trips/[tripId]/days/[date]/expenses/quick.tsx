@@ -35,6 +35,7 @@ export default function QuickExpenseScreen() {
     clearTripDay,
     completeSavedExpense,
     errors,
+    expenseCategory,
     expenseDateInput,
     formMessage,
     goToLogin,
@@ -48,6 +49,8 @@ export default function QuickExpenseScreen() {
     receiptMessage,
     savedSummary,
     saving,
+    selectCurrency,
+    selectExpenseCategory,
     selectItem,
     selectPayer,
     selectSplitPolicy,
@@ -136,6 +139,7 @@ export default function QuickExpenseScreen() {
   const submitState = viewModel
     ? buildQuickExpenseFormSubmitState({
         amountInput,
+        expenseCategory,
         expenseDateInput,
         includeInSettlement,
         manualSplitInputs,
@@ -184,6 +188,7 @@ export default function QuickExpenseScreen() {
           <QuickExpenseForm
             amountInput={amountInput}
             errors={errors}
+            expenseCategory={expenseCategory}
             expenseDateInput={expenseDateInput}
             formMessage={formMessage}
             includeInSettlement={includeInSettlement}
@@ -192,6 +197,8 @@ export default function QuickExpenseScreen() {
             onClearReceiptDraft={() => void clearReceiptDraft()}
             onClearTripDay={clearTripDay}
             onReceiptDraftCreated={acceptReceiptDraft}
+            onSelectCurrency={selectCurrency}
+            onSelectExpenseCategory={selectExpenseCategory}
             onSelectItem={selectItem}
             onSelectPayer={selectPayer}
             onSelectSplitPolicy={selectSplitPolicy}

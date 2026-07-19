@@ -1,5 +1,6 @@
 import type {
   Expense,
+  ExpenseCategory,
   GetDayScheduleItemsResponse,
   ScheduleItem,
   SupportedCurrency,
@@ -56,6 +57,7 @@ export type ExpenseEditViewModel = {
   formattedDate: string;
   amountLabel: string;
   currency: SupportedCurrency;
+  expenseCategory: ExpenseCategory;
   showTitleField: boolean;
   showPlaceField: boolean;
   titlePlaceholder: string;
@@ -77,6 +79,8 @@ export type ExpenseEditViewModel = {
 export function buildExpenseEditViewModel({
   amountInput,
   expense,
+  currency = expense.currency,
+  expenseCategory = expense.expenseCategory,
   itinerary,
   itineraries,
   participants,
@@ -86,7 +90,9 @@ export function buildExpenseEditViewModel({
   selectedTripDayId,
 }: {
   amountInput: string;
+  currency?: SupportedCurrency;
   expense: Expense;
+  expenseCategory?: ExpenseCategory;
   itinerary: GetDayScheduleItemsResponse | null;
   itineraries?: GetDayScheduleItemsResponse[];
   memoInput: string;
@@ -126,11 +132,11 @@ export function buildExpenseEditViewModel({
   const selectedParticipants = participants.filter((participant) =>
     selectedParticipantSet.has(participant.participantId),
   );
-  const parsedAmount = amountInput.trim() === '' ? null : parseAmountMinor(amountInput, expense.currency);
+  const parsedAmount = amountInput.trim() === '' ? null : parseAmountMinor(amountInput, currency);
   const splitPreviewRows = parsedAmount?.ok
     ? buildDefaultEqualSplitPreview({
         amountMinor: parsedAmount.amountMinor,
-        currency: expense.currency,
+        currency,
         participants: selectedParticipants,
       })
     : [];
@@ -142,11 +148,12 @@ export function buildExpenseEditViewModel({
     dayLabel: isAllDayMode ? '전체 일정' : isTripLevel ? '여행 전체' : formatTripDayLabel(itinerary.day.dayOrder),
     formattedDate: formatTripDayDate(expense.expenseDate),
     amountLabel: formatMoney(expense.amountMinor, expense.currency),
-    currency: expense.currency,
+    currency,
+    expenseCategory,
     showTitleField: isTripLevel || selectedItemId === null || expense.title !== null,
     showPlaceField: allItemOptions.length > 0,
     titlePlaceholder: selectedItemId === null ? '예: 항공권, 숙소 예약금' : '선택 입력',
-    currencyLabel: currencyLabel(expense.currency),
+    currencyLabel: currencyLabel(currency),
     selectedItem,
     selectedTripDayId: activeTripDayId,
     dayOptions,
@@ -183,6 +190,7 @@ export function buildExpenseEditInitialAmountInput(expense: Expense): string {
 export function buildUpdateExpenseRequest({
   amountInput,
   currency,
+  expenseCategory,
   splitPolicy,
   participantIds,
   manualSplitInputs,
@@ -194,6 +202,7 @@ export function buildUpdateExpenseRequest({
 }: {
   amountInput: string;
   currency: SupportedCurrency;
+  expenseCategory?: ExpenseCategory;
   splitPolicy: QuickExpenseSplitPolicy;
   participantIds: string[];
   manualSplitInputs: QuickExpenseManualSplitInput[];
@@ -239,6 +248,8 @@ export function buildUpdateExpenseRequest({
       ok: true,
       request: {
         amountMinor: parsedAmount.amountMinor,
+        currency,
+        ...(expenseCategory ? { expenseCategory } : {}),
         payerParticipantId,
         splitPolicy,
         participantIds,
@@ -261,6 +272,8 @@ export function buildUpdateExpenseRequest({
     ok: true,
     request: {
       amountMinor: parsedAmount.amountMinor,
+      currency,
+      ...(expenseCategory ? { expenseCategory } : {}),
       payerParticipantId,
       splitPolicy,
       splits: manualSummary.requestSplits,

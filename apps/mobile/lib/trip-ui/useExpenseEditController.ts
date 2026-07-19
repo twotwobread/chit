@@ -2,7 +2,13 @@ import { useCallback, useState } from 'react';
 import { Alert } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 
-import { type Expense, type GetDayScheduleItemsResponse, type TripParticipantListItem } from '@i-um/api-contract';
+import {
+  type Expense,
+  type ExpenseCategory,
+  type GetDayScheduleItemsResponse,
+  type SupportedCurrency,
+  type TripParticipantListItem,
+} from '@i-um/api-contract';
 
 import { clearStoredSessionOnAuthError, isApiStatus } from '../auth/errors';
 import {
@@ -77,6 +83,8 @@ export function useExpenseEditController() {
   const [splitPolicy, setSplitPolicy] = useState<QuickExpenseSplitPolicy>('equal');
   const [manualSplitInputs, setManualSplitInputs] = useState<QuickExpenseManualSplitInput[]>([]);
   const [includeInSettlement, setIncludeInSettlement] = useState(true);
+  const [currency, setCurrency] = useState<SupportedCurrency>('KRW');
+  const [expenseCategory, setExpenseCategory] = useState<ExpenseCategory>('etc');
   const [errors, setErrors] = useState<ExpenseEditFormErrors>({});
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -127,6 +135,8 @@ export function useExpenseEditController() {
         expense.scheduleItemId && itemIDs.has(expense.scheduleItemId) ? expense.scheduleItemId : null;
       setTitleInput(expense.title ?? (expense.anchorType === 'trip' ? expense.displayTitle : ''));
       setAmountInput(buildExpenseEditInitialAmountInput(expense));
+      setCurrency(expense.currency);
+      setExpenseCategory(expense.expenseCategory);
       setMemoInput(expense.memo ?? '');
       setPayerParticipantId(
         expense.payer.participantId && participantIDs.has(expense.payer.participantId)
@@ -177,7 +187,8 @@ export function useExpenseEditController() {
     );
     const validation = buildUpdateExpenseRequest({
       amountInput,
-      currency: state.expense.currency,
+      currency,
+      expenseCategory,
       splitPolicy,
       payerParticipantId,
       memoInput,
@@ -216,8 +227,10 @@ export function useExpenseEditController() {
     }
   }, [
     amountInput,
+    currency,
     date,
     deleting,
+    expenseCategory,
     expenseId,
     handleAuthError,
     includeInSettlement,
@@ -263,6 +276,17 @@ export function useExpenseEditController() {
       setDeleting(false);
     }
   }, [date, deleting, expenseId, handleAuthError, saving, state, tripId]);
+
+  const selectCurrency = useCallback((value: SupportedCurrency) => {
+    setCurrency(value);
+    setErrors((current) => ({ ...current, amount: undefined }));
+    setFormMessage(null);
+  }, []);
+
+  const selectExpenseCategory = useCallback((value: ExpenseCategory) => {
+    setExpenseCategory(value);
+    setFormMessage(null);
+  }, []);
 
   const selectTripDay = useCallback((tripDayId: string) => {
     setSelectedTripDayId(tripDayId);
@@ -325,7 +349,9 @@ export function useExpenseEditController() {
   if (state.status === 'success') {
     viewModel = buildExpenseEditViewModel({
       amountInput,
+      currency,
       expense: state.expense,
+      expenseCategory,
       itinerary: state.itinerary,
       itineraries: state.itineraries,
       memoInput,
@@ -342,6 +368,7 @@ export function useExpenseEditController() {
     confirmDelete,
     deleting,
     errors,
+    expenseCategory,
     formMessage,
     goBack,
     includeInSettlement,
@@ -350,6 +377,8 @@ export function useExpenseEditController() {
     memoInput,
     saving,
     clearTripDay,
+    selectCurrency,
+    selectExpenseCategory,
     selectItem,
     selectTripDay,
     selectedSplitParticipantIds,

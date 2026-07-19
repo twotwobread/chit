@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { type SupportedCurrency } from '@i-um/api-contract';
 
 import { PrimaryButton, theme } from '../design';
+import { expenseCategoryValues, getExpenseCategoryMarkerMeta, type ExpenseCategory } from './expense-category-markers';
 import {
   buildQuickExpenseManualSplitSummary,
   formatMoney,
@@ -38,6 +39,81 @@ export type ExpenseFormParticipantOption = {
   displayName: string;
   selected: boolean;
 };
+
+const supportedCurrencyValues: SupportedCurrency[] = ['KRW', 'JPY', 'USD', 'EUR'];
+
+export function ExpenseCurrencySelector({
+  currency,
+  disabled,
+  onSelectCurrency,
+}: {
+  currency: SupportedCurrency;
+  disabled: boolean;
+  onSelectCurrency: (currency: SupportedCurrency) => void;
+}) {
+  return (
+    <View style={styles.fieldGroup}>
+      <Text style={styles.label}>통화</Text>
+      <View style={styles.optionList}>
+        {supportedCurrencyValues.map((option) => {
+          const selected = option === currency;
+          return (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+              disabled={disabled}
+              key={option}
+              onPress={() => onSelectCurrency(option)}
+              style={[styles.chip, selected ? styles.chipSelected : null]}
+            >
+              <Text style={[styles.chipText, selected ? styles.chipTextSelected : null]}>
+                {currencyOptionLabel(option)}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+export function ExpenseCategorySelector({
+  disabled,
+  expenseCategory,
+  onSelectExpenseCategory,
+}: {
+  disabled: boolean;
+  expenseCategory: ExpenseCategory;
+  onSelectExpenseCategory: (expenseCategory: ExpenseCategory) => void;
+}) {
+  return (
+    <View style={styles.fieldGroup}>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.label}>카테고리</Text>
+        <Text style={styles.helper}>장소 종류와 별개로 지출 카테고리를 정할 수 있어요.</Text>
+      </View>
+      <View style={styles.optionList}>
+        {expenseCategoryValues.map((option) => {
+          const selected = option === expenseCategory;
+          return (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+              disabled={disabled}
+              key={option}
+              onPress={() => onSelectExpenseCategory(option)}
+              style={[styles.chip, selected ? styles.chipSelected : null]}
+            >
+              <Text style={[styles.chipText, selected ? styles.chipTextSelected : null]}>
+                {getExpenseCategoryMarkerMeta(option).label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
 
 export function ExpenseFormSummaryActionRow({
   disabled,
@@ -536,6 +612,23 @@ function ExpenseSettlementChoice({
       <Text style={styles.helper}>{description}</Text>
     </Pressable>
   );
+}
+
+function currencyOptionLabel(currency: SupportedCurrency): string {
+  switch (currency) {
+    case 'KRW':
+      return 'KRW 원';
+    case 'JPY':
+      return 'JPY 엔';
+    case 'USD':
+      return 'USD 달러';
+    case 'EUR':
+      return 'EUR 유로';
+    default: {
+      const exhaustive: never = currency;
+      return exhaustive;
+    }
+  }
 }
 
 function manualSplitDifferenceLabel(differenceMinor: number | null, currency: SupportedCurrency): string | null {

@@ -2,8 +2,10 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
+import type { ExpenseCategory } from './ExpenseCategory';
 import type { ExpenseSplitPolicy } from './ExpenseSplitPolicy';
 import type { ManualExpenseSplitInput } from './ManualExpenseSplitInput';
+import type { SupportedCurrency } from './SupportedCurrency';
 export type CreateTripExpenseRequest = {
     /**
      * Optional display title. Required when no schedule item is selected.
@@ -22,6 +24,14 @@ export type CreateTripExpenseRequest = {
      */
     scheduleItemId: string | null;
     amountMinor: number;
+    /**
+     * Expense currency. Defaults to the trip default currency when omitted.
+     */
+    currency?: SupportedCurrency;
+    /**
+     * Expense category used for settlement analytics. Defaults to linked place type when available, otherwise etc.
+     */
+    expenseCategory?: ExpenseCategory;
     payerParticipantId: string;
     splitPolicy: ExpenseSplitPolicy;
     /**

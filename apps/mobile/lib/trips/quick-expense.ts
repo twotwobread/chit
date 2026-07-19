@@ -7,6 +7,7 @@ import type {
   ScheduleItem,
   ExpenseSplit,
   GetDayScheduleItemsResponse,
+  ExpenseCategory,
   SupportedCurrency,
   TripParticipantListItem,
 } from '@i-um/api-contract';
@@ -669,6 +670,8 @@ export function buildQuickExpenseMemoUpdateRequest({
     amountMinor: createRequest.amountMinor,
     payerParticipantId: createRequest.payerParticipantId,
     splitPolicy: createRequest.splitPolicy,
+    ...(createRequest.currency ? { currency: createRequest.currency } : {}),
+    ...(createRequest.expenseCategory ? { expenseCategory: createRequest.expenseCategory } : {}),
     ...(createRequest.participantIds ? { participantIds: createRequest.participantIds } : {}),
     ...(createRequest.splits ? { splits: createRequest.splits } : {}),
     memo,
@@ -683,6 +686,7 @@ export function buildCreateQuickExpenseRequest({
   amountInput,
   currency,
   scheduleItemId,
+  expenseCategory,
   splitPolicy,
   participantIds,
   manualSplitInputs,
@@ -693,6 +697,7 @@ export function buildCreateQuickExpenseRequest({
   amountInput: string;
   currency: SupportedCurrency;
   scheduleItemId: string | null;
+  expenseCategory?: ExpenseCategory;
   splitPolicy: QuickExpenseSplitPolicy;
   participantIds: string[];
   manualSplitInputs: QuickExpenseManualSplitInput[];
@@ -727,6 +732,8 @@ export function buildCreateQuickExpenseRequest({
       request: {
         scheduleItemId,
         amountMinor: validation.parsedAmount.amountMinor,
+        currency,
+        ...(expenseCategory ? { expenseCategory } : {}),
         payerParticipantId,
         splitPolicy,
         participantIds,
@@ -741,6 +748,8 @@ export function buildCreateQuickExpenseRequest({
     request: {
       scheduleItemId,
       amountMinor: validation.parsedAmount.amountMinor,
+      currency,
+      ...(expenseCategory ? { expenseCategory } : {}),
       payerParticipantId,
       splitPolicy,
       splits: validation.manualSummary.requestSplits,
@@ -757,6 +766,7 @@ export function buildCreateTripExpenseRequest({
   currency,
   selectedTripDayId,
   scheduleItemId,
+  expenseCategory,
   splitPolicy,
   participantIds,
   manualSplitInputs,
@@ -771,6 +781,7 @@ export function buildCreateTripExpenseRequest({
   currency: SupportedCurrency;
   selectedTripDayId: string | null;
   scheduleItemId: string | null;
+  expenseCategory?: ExpenseCategory;
   splitPolicy: QuickExpenseSplitPolicy;
   participantIds: string[];
   manualSplitInputs: QuickExpenseManualSplitInput[];
@@ -806,6 +817,8 @@ export function buildCreateTripExpenseRequest({
     tripDayId: selectedTripDayId,
     scheduleItemId,
     amountMinor: validation.parsedAmount.amountMinor,
+    currency,
+    ...(expenseCategory ? { expenseCategory } : {}),
     payerParticipantId,
     splitPolicy,
     memo: memo === '' ? null : memo,

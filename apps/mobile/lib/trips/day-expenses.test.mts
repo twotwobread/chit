@@ -25,6 +25,7 @@ function expense(overrides: Partial<DayExpenseListItem> = {}): DayExpenseListIte
     place: { tripPlaceId: 'place-a', name: '도톤보리', address: 'Dotonbori', placeType: 'food', source: 'live' },
     amountMinor: 1200,
     currency: 'JPY',
+    expenseCategory: 'food',
     payer: participant('민수', 'payer-a'),
     splitPolicy: 'equal',
     includeInSettlement: true,
@@ -67,18 +68,19 @@ test('builds compact read-only day expense rows from canonical API display data'
   ]);
 });
 
-test('maps lodging place expenses to a lodging category and category-aware accessibility label', () => {
+test('maps expenseCategory independent of place type for category-aware accessibility label', () => {
   const viewModel = buildDayExpensesViewModel({
     tripId: 'trip-a',
     date: '2026-07-10',
     expenses: [
       expense({
         displayTitle: '호텔 체크인',
+        expenseCategory: 'lodging',
         place: {
           tripPlaceId: 'place-hotel',
           name: '오사카 호텔',
           address: 'Namba',
-          placeType: 'lodging',
+          placeType: 'food',
           source: 'live',
         },
       }),

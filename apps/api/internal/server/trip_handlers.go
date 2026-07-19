@@ -402,6 +402,8 @@ func (s apiServer) CreateTripExpense(w http.ResponseWriter, r *http.Request, tri
 		TripDayID:           body.TripDayId,
 		ScheduleItemID:      body.ScheduleItemId,
 		AmountMinor:         body.AmountMinor,
+		Currency:            optionalCurrencyFromOpenAPI(body.Currency),
+		ExpenseCategory:     optionalExpenseCategoryFromOpenAPI(body.ExpenseCategory),
 		PayerParticipantID:  body.PayerParticipantId,
 		SplitPolicy:         string(body.SplitPolicy),
 		ParticipantIDs:      optionalStringSlice(body.ParticipantIds),
@@ -450,6 +452,8 @@ func (s apiServer) UpdateTripExpense(w http.ResponseWriter, r *http.Request, tri
 	}
 	result, err := s.trips.UpdateTripExpense(r.Context(), authContext.UserID, tripId, expenseId, trip.UpdateExpenseInput{
 		AmountMinor:         body.AmountMinor,
+		Currency:            optionalCurrencyFromOpenAPI(body.Currency),
+		ExpenseCategory:     optionalExpenseCategoryFromOpenAPI(body.ExpenseCategory),
 		PayerParticipantID:  body.PayerParticipantId,
 		SplitPolicy:         string(body.SplitPolicy),
 		ParticipantIDs:      optionalStringSlice(body.ParticipantIds),
@@ -514,6 +518,8 @@ func (s apiServer) UpdateExpense(w http.ResponseWriter, r *http.Request, tripId 
 	}
 	result, err := s.trips.UpdateExpense(r.Context(), authContext.UserID, tripId, tripDayId, expenseId, trip.UpdateExpenseInput{
 		AmountMinor:         body.AmountMinor,
+		Currency:            optionalCurrencyFromOpenAPI(body.Currency),
+		ExpenseCategory:     optionalExpenseCategoryFromOpenAPI(body.ExpenseCategory),
 		PayerParticipantID:  body.PayerParticipantId,
 		SplitPolicy:         string(body.SplitPolicy),
 		ParticipantIDs:      optionalStringSlice(body.ParticipantIds),
@@ -565,6 +571,8 @@ func (s apiServer) CreateQuickExpense(w http.ResponseWriter, r *http.Request, tr
 	result, err := s.trips.CreateQuickExpense(r.Context(), authContext.UserID, tripId, tripDayId, trip.CreateQuickExpenseInput{
 		ScheduleItemID:      body.ScheduleItemId,
 		AmountMinor:         body.AmountMinor,
+		Currency:            optionalCurrencyFromOpenAPI(body.Currency),
+		ExpenseCategory:     optionalExpenseCategoryFromOpenAPI(body.ExpenseCategory),
 		PayerParticipantID:  body.PayerParticipantId,
 		SplitPolicy:         string(body.SplitPolicy),
 		ParticipantIDs:      optionalStringSlice(body.ParticipantIds),

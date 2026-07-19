@@ -49,6 +49,7 @@ export type { DeviceInfo } from './models/DeviceInfo';
 export type { ErrorResponse } from './models/ErrorResponse';
 export type { Expense } from './models/Expense';
 export type { ExpenseAnchorType } from './models/ExpenseAnchorType';
+export type { ExpenseCategory } from './models/ExpenseCategory';
 export type { ExpenseDisplaySource } from './models/ExpenseDisplaySource';
 export type { ExpenseParticipantDisplay } from './models/ExpenseParticipantDisplay';
 export type { ExpensePlaceDisplay } from './models/ExpensePlaceDisplay';

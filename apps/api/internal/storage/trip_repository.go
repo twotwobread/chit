@@ -899,6 +899,7 @@ func (s *Store) ListDayExpensesByTripDay(ctx context.Context, tripID string, tri
 			Place:               expensePlaceDisplay(expenseRow.TripPlaceID, expenseRow.PlaceName, expenseRow.PlaceAddress, expenseRow.PlaceType, expenseRow.PlaceSource),
 			AmountMinor:         expenseRow.AmountMinor,
 			Currency:            expenseRow.Currency,
+			ExpenseCategory:     expenseRow.ExpenseCategory,
 			Payer:               expenseParticipantDisplay(expenseRow.PayerParticipantID, expenseRow.PayerDisplayName, expenseRow.PayerSource),
 			SplitPolicy:         expenseRow.SplitPolicy,
 			Splits:              []trip.DayExpenseSplitListItem{},
@@ -946,6 +947,7 @@ func (s *Store) ListTripExpenses(ctx context.Context, tripID string) (trip.ListT
 			Place:               expensePlaceDisplay(expenseRow.TripPlaceID, expenseRow.PlaceName, expenseRow.PlaceAddress, expenseRow.PlaceType, expenseRow.PlaceSource),
 			AmountMinor:         expenseRow.AmountMinor,
 			Currency:            expenseRow.Currency,
+			ExpenseCategory:     expenseRow.ExpenseCategory,
 			Payer:               expenseParticipantDisplay(expenseRow.PayerParticipantID, expenseRow.PayerDisplayName, expenseRow.PayerSource),
 			SplitPolicy:         expenseRow.SplitPolicy,
 			Splits:              []trip.DayExpenseSplitListItem{},
@@ -1257,6 +1259,8 @@ func (s *Store) UpdateExpense(ctx context.Context, record trip.UpdateExpenseReco
 		PlaceType:           placeType,
 		Title:               nullableText(record.Title),
 		AmountMinor:         record.AmountMinor,
+		Currency:            nullableText(record.Currency),
+		ExpenseCategory:     nullableText(record.ExpenseCategory),
 		SplitPolicy:         record.SplitPolicy,
 		PayerParticipantID:  mustUUID(payerRow.ID),
 		PayerDisplayName:    trip.NormalizeParticipantDisplayName(payerRow.DisplayName),
@@ -1358,6 +1362,8 @@ func (s *Store) UpdateTripExpense(ctx context.Context, record trip.UpdateExpense
 	updatedRow, err := qtx.UpdateTripExpense(ctx, db.UpdateTripExpenseParams{
 		Title:               nullableText(record.Title),
 		AmountMinor:         record.AmountMinor,
+		Currency:            nullableText(record.Currency),
+		ExpenseCategory:     nullableText(record.ExpenseCategory),
 		SplitPolicy:         record.SplitPolicy,
 		PayerParticipantID:  mustUUID(payerRow.ID),
 		PayerDisplayName:    trip.NormalizeParticipantDisplayName(payerRow.DisplayName),
@@ -1531,7 +1537,8 @@ func (s *Store) CreateQuickExpense(ctx context.Context, record trip.CreateQuickE
 		PlaceType:           textValue(itemRow.PlaceType),
 		Title:               pgtype.Text{},
 		AmountMinor:         record.AmountMinor,
-		Currency:            tripRow.DefaultCurrency,
+		Currency:            expenseCurrency(record.Currency, tripRow.DefaultCurrency),
+		ExpenseCategory:     expenseCategory(record.ExpenseCategory, itemRow.PlaceType),
 		SplitPolicy:         record.SplitPolicy,
 		PayerParticipantID:  mustUUID(payerRow.ID),
 		PayerDisplayName:    trip.NormalizeParticipantDisplayName(payerRow.DisplayName),
@@ -1592,6 +1599,7 @@ func (s *Store) CreateQuickExpense(ctx context.Context, record trip.CreateQuickE
 		Place:               expensePlaceDisplay(expenseRow.TripPlaceID, expenseRow.PlaceName, expenseRow.PlaceAddress, expenseRow.PlaceType, trip.ExpenseDisplaySourceLive),
 		AmountMinor:         expenseRow.AmountMinor,
 		Currency:            expenseRow.Currency,
+		ExpenseCategory:     expenseRow.ExpenseCategory,
 		Payer:               expenseParticipantDisplay(expenseRow.PayerParticipantID, expenseRow.PayerDisplayName, trip.ExpenseDisplaySourceLive),
 		Memo:                textPtr(expenseRow.Memo),
 		SplitPolicy:         expenseRow.SplitPolicy,
@@ -1693,7 +1701,8 @@ func (s *Store) CreateTripExpense(ctx context.Context, record trip.CreateTripExp
 		PlaceAddress:        placeAddress,
 		PlaceType:           placeType,
 		AmountMinor:         record.AmountMinor,
-		Currency:            tripRow.DefaultCurrency,
+		Currency:            expenseCurrency(record.Currency, tripRow.DefaultCurrency),
+		ExpenseCategory:     expenseCategory(record.ExpenseCategory, textString(placeType)),
 		SplitPolicy:         record.SplitPolicy,
 		PayerParticipantID:  mustUUID(payerRow.ID),
 		PayerDisplayName:    trip.NormalizeParticipantDisplayName(payerRow.DisplayName),
@@ -3594,6 +3603,7 @@ func expenseFromGetRow(row db.GetExpenseByTripDayAndIDRow) trip.Expense {
 		Place:               expensePlaceDisplay(row.TripPlaceID, row.PlaceName, row.PlaceAddress, row.PlaceType, row.PlaceSource),
 		AmountMinor:         row.AmountMinor,
 		Currency:            row.Currency,
+		ExpenseCategory:     row.ExpenseCategory,
 		Payer:               expenseParticipantDisplay(row.PayerParticipantID, row.PayerDisplayName, row.PayerSource),
 		Memo:                textPtr(row.Memo),
 		SplitPolicy:         row.SplitPolicy,
@@ -3617,6 +3627,7 @@ func expenseFromTripGetRow(row db.GetTripExpenseByIDRow) trip.Expense {
 		Place:               expensePlaceDisplay(row.TripPlaceID, row.PlaceName, row.PlaceAddress, row.PlaceType, row.PlaceSource),
 		AmountMinor:         row.AmountMinor,
 		Currency:            row.Currency,
+		ExpenseCategory:     row.ExpenseCategory,
 		Payer:               expenseParticipantDisplay(row.PayerParticipantID, row.PayerDisplayName, row.PayerSource),
 		Memo:                textPtr(row.Memo),
 		SplitPolicy:         row.SplitPolicy,
@@ -3644,6 +3655,7 @@ func expenseFromUpdateRow(row db.UpdateExpenseRow) trip.Expense {
 		Place:               expensePlaceDisplay(row.TripPlaceID, row.PlaceName, row.PlaceAddress, row.PlaceType, placeSource),
 		AmountMinor:         row.AmountMinor,
 		Currency:            row.Currency,
+		ExpenseCategory:     row.ExpenseCategory,
 		Payer:               expenseParticipantDisplay(row.PayerParticipantID, row.PayerDisplayName, trip.ExpenseDisplaySourceLive),
 		Memo:                textPtr(row.Memo),
 		SplitPolicy:         row.SplitPolicy,
@@ -3671,6 +3683,7 @@ func expenseFromUpdateTripRow(row db.UpdateTripExpenseRow) trip.Expense {
 		Place:               expensePlaceDisplay(row.TripPlaceID, row.PlaceName, row.PlaceAddress, row.PlaceType, placeSource),
 		AmountMinor:         row.AmountMinor,
 		Currency:            row.Currency,
+		ExpenseCategory:     row.ExpenseCategory,
 		Payer:               expenseParticipantDisplay(row.PayerParticipantID, row.PayerDisplayName, trip.ExpenseDisplaySourceLive),
 		Memo:                textPtr(row.Memo),
 		SplitPolicy:         row.SplitPolicy,
@@ -3694,6 +3707,7 @@ func expenseFromInsertRow(row db.InsertExpenseRow, splits []trip.ExpenseSplit, p
 		Place:               expensePlaceDisplay(row.TripPlaceID, row.PlaceName, row.PlaceAddress, row.PlaceType, placeSource),
 		AmountMinor:         row.AmountMinor,
 		Currency:            row.Currency,
+		ExpenseCategory:     row.ExpenseCategory,
 		Payer:               expenseParticipantDisplay(row.PayerParticipantID, row.PayerDisplayName, trip.ExpenseDisplaySourceLive),
 		Memo:                textPtr(row.Memo),
 		SplitPolicy:         row.SplitPolicy,
@@ -3702,6 +3716,30 @@ func expenseFromInsertRow(row db.InsertExpenseRow, splits []trip.ExpenseSplit, p
 		Receipt:             receiptSummary(row.ReceiptExists, row.ReceiptContentType, row.ReceiptByteSize, row.ReceiptUploadedAt),
 		CreatedAt:           row.CreatedAt.Time,
 	}
+}
+
+func expenseCurrency(value *string, defaultCurrency string) string {
+	if value == nil || strings.TrimSpace(*value) == "" {
+		return defaultCurrency
+	}
+	return strings.TrimSpace(*value)
+}
+
+func expenseCategory(value *string, placeType string) string {
+	if value != nil && strings.TrimSpace(*value) != "" {
+		return strings.TrimSpace(*value)
+	}
+	if strings.TrimSpace(placeType) != "" {
+		return strings.TrimSpace(placeType)
+	}
+	return trip.ExpenseCategoryEtc
+}
+
+func textString(value pgtype.Text) string {
+	if !value.Valid {
+		return ""
+	}
+	return value.String
 }
 
 func receiptSummary(exists bool, contentTypeValue string, byteSizeValue int32, uploadedAtValue pgtype.Timestamptz) trip.ExpenseReceiptSummary {

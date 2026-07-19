@@ -4,6 +4,7 @@
 /* eslint-disable */
 import type { DayExpenseSplitListItem } from './DayExpenseSplitListItem';
 import type { ExpenseAnchorType } from './ExpenseAnchorType';
+import type { ExpenseCategory } from './ExpenseCategory';
 import type { ExpenseParticipantDisplay } from './ExpenseParticipantDisplay';
 import type { ExpensePlaceDisplay } from './ExpensePlaceDisplay';
 import type { ExpenseReceiptSummary } from './ExpenseReceiptSummary';
@@ -22,6 +23,7 @@ export type DayExpenseListItem = {
     place: ExpensePlaceDisplay | null;
     amountMinor: number;
     currency: SupportedCurrency;
+    expenseCategory: ExpenseCategory;
     payer: ExpenseParticipantDisplay;
     splitPolicy: ExpenseSplitPolicy;
     splits: Array<DayExpenseSplitListItem>;

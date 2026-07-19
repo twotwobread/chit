@@ -676,6 +676,7 @@ test('builds create quick expense request and validation errors', () => {
     buildCreateQuickExpenseRequest({
       amountInput: '18,500',
       currency: 'KRW',
+      expenseCategory: 'shopping',
       scheduleItemId: 'item-a',
       splitPolicy: 'equal',
       participantIds: ['participant-b'],
@@ -687,6 +688,8 @@ test('builds create quick expense request and validation errors', () => {
       request: {
         scheduleItemId: 'item-a',
         amountMinor: 18500,
+        currency: 'KRW',
+        expenseCategory: 'shopping',
         payerParticipantId: 'participant-a',
         splitPolicy: 'equal',
         participantIds: ['participant-b'],
@@ -733,6 +736,7 @@ test('builds create quick expense request with an explicit settlement exclusion 
       request: {
         scheduleItemId: 'item-a',
         amountMinor: 18500,
+        currency: 'KRW',
         payerParticipantId: 'participant-a',
         splitPolicy: 'equal',
         participantIds: ['participant-b'],
@@ -759,6 +763,7 @@ test('builds create quick expense request with a reviewed receipt draft id', () 
       request: {
         scheduleItemId: 'item-a',
         amountMinor: 18500,
+        currency: 'KRW',
         payerParticipantId: 'participant-a',
         splitPolicy: 'equal',
         participantIds: ['participant-b'],
@@ -772,6 +777,7 @@ test('builds memo update request after quick expense creation and skips blank me
   const createValidation = buildCreateQuickExpenseRequest({
     amountInput: '18,500',
     currency: 'KRW',
+    expenseCategory: 'shopping',
     scheduleItemId: 'item-a',
     splitPolicy: 'equal',
     participantIds: ['participant-b'],
@@ -789,6 +795,8 @@ test('builds memo update request after quick expense creation and skips blank me
     buildQuickExpenseMemoUpdateRequest({ createRequest: createValidation.request, memoInput: '  저녁 회식  ' }),
     {
       amountMinor: 18500,
+      currency: 'KRW',
+      expenseCategory: 'shopping',
       payerParticipantId: 'participant-a',
       splitPolicy: 'equal',
       participantIds: ['participant-b'],
@@ -823,6 +831,7 @@ test('builds trip-level general expense request when no related context is selec
         tripDayId: null,
         scheduleItemId: null,
         amountMinor: 650000,
+        currency: 'KRW',
         payerParticipantId: 'payer-a',
         splitPolicy: 'equal',
         participantIds: ['participant-a', 'participant-b'],
@@ -856,6 +865,7 @@ test('builds trip-level general expense request with an explicit settlement excl
         tripDayId: null,
         scheduleItemId: null,
         amountMinor: 10000,
+        currency: 'KRW',
         payerParticipantId: 'payer-a',
         splitPolicy: 'equal',
         participantIds: ['participant-a', 'participant-b'],
@@ -890,6 +900,7 @@ test('builds trip expense request with a reviewed receipt draft id', () => {
         tripDayId: null,
         scheduleItemId: null,
         amountMinor: 10000,
+        currency: 'KRW',
         payerParticipantId: 'payer-a',
         splitPolicy: 'equal',
         participantIds: ['participant-a', 'participant-b'],
@@ -923,6 +934,7 @@ test('builds day-level general expense request when only related day is selected
         tripDayId: 'day-2',
         scheduleItemId: null,
         amountMinor: 120000,
+        currency: 'KRW',
         payerParticipantId: 'payer-a',
         splitPolicy: 'equal',
         participantIds: ['participant-a'],
@@ -955,6 +967,7 @@ test('builds schedule-item general expense request without requiring a title', (
         tripDayId: 'day-1',
         scheduleItemId: 'item-a',
         amountMinor: 1000,
+        currency: 'JPY',
         payerParticipantId: 'payer-a',
         splitPolicy: 'equal',
         participantIds: ['participant-a'],
@@ -1012,6 +1025,7 @@ test('builds manual quick expense request only when split sum matches total', ()
       request: {
         scheduleItemId: 'item-a',
         amountMinor: 1000,
+        currency: 'JPY',
         payerParticipantId: 'participant-payer',
         splitPolicy: 'manual',
         splits: [
