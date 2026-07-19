@@ -14,6 +14,7 @@ import {
   tripParticipantsPath,
   tripRootPath,
   tripSettlePath,
+  tripSettlementDetailDeepLink,
   tripSettlementDetailPath,
   tripTabPath,
   tripTodayPath,
@@ -28,6 +29,7 @@ test('builds canonical trip tab and hidden detail paths', () => {
   assert.equal(tripExpensesPath('trip-a'), '/trips/trip-a/expenses');
   assert.equal(tripSettlePath('trip-a'), '/trips/trip-a/settle');
   assert.equal(tripSettlementDetailPath('trip-a'), '/trips/trip-a/settlement-detail');
+  assert.equal(tripSettlementDetailDeepLink('trip a'), 'ium:///trips/trip%20a/settlement-detail');
   assert.equal(tripDetailPath('trip-a'), '/trips/trip-a/detail');
   assert.equal(tripParticipantsPath('trip-a'), '/trips/trip-a/participants');
 });

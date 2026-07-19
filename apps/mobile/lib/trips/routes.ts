@@ -61,6 +61,10 @@ export function tripSettlementDetailPath(tripId: string): `/trips/${string}/sett
   return `/trips/${tripId}/settlement-detail`;
 }
 
+export function tripSettlementDetailDeepLink(tripId: string): `ium:///trips/${string}/settlement-detail` {
+  return `ium:///trips/${encodeURIComponent(tripId)}/settlement-detail`;
+}
+
 export function tripDetailPath(tripId: string): `/trips/${string}/detail` {
   return `/trips/${tripId}/detail`;
 }

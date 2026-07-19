@@ -16,7 +16,7 @@ import {
   type SettlementTransferFailureViewModel,
   type SettlementTransferViewModel,
 } from '../../../../lib/trips/settlement';
-import { tripSettlementDetailPath } from '../../../../lib/trips/routes';
+import { tripSettlementDetailDeepLink } from '../../../../lib/trips/routes';
 import { resolveTripShellDetail } from '../../../../lib/trips/trip-shell-detail';
 import { useTripShellState } from '../../../../lib/trips/trip-shell-context';
 
@@ -169,7 +169,7 @@ function SettlementContent({
         </TripListCard>
       ))}
 
-      <SettlementRequestButton detailLink={tripSettlementDetailPath(tripId)} tripName={tripName} viewModel={viewModel} />
+      <SettlementRequestButton detailLink={tripSettlementDetailDeepLink(tripId)} tripName={tripName} viewModel={viewModel} />
     </>
   );
 }
