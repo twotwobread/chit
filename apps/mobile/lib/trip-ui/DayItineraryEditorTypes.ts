@@ -23,6 +23,7 @@ export type EditPlacePanelState = {
   original: DayItineraryEditFormValues;
   values: DayItineraryEditFormValues;
   errors: DayItineraryEditFormErrors;
+  defaultStartTime?: string | null;
   error?: { title: string; helper: string };
 };
 

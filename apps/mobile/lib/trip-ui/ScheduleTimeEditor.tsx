@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { theme } from '../design';
 import {
   addScheduleEndTime,
+  addScheduleEndTimeDuration,
   addScheduleStartTime,
   buildScheduleTimeEditorSummary,
   clearScheduleTimes,
@@ -13,14 +14,21 @@ import { buildScheduleTimeEditorLayout } from '../trips/schedule-time-editor-lay
 import { ScheduleTimeWheel } from './ScheduleTimeWheel';
 
 const timeEditorLayout = buildScheduleTimeEditorLayout();
+const endTimeDurationOptions = [
+  { label: '+30분', minutes: 30 },
+  { label: '+1시간', minutes: 60 },
+  { label: '+2시간', minutes: 120 },
+] as const;
 
 export function ScheduleTimeEditor({
+  defaultStartTime,
   disabled,
   endTimeError,
   onChange,
   startTimeError,
   values,
 }: {
+  defaultStartTime?: string;
   disabled: boolean;
   endTimeError?: string;
   onChange: (patch: Partial<ScheduleTimeEditorValues>) => void;
@@ -38,7 +46,7 @@ export function ScheduleTimeEditor({
       return;
     }
     if (!values.startTime) {
-      updateValues(addScheduleStartTime(values));
+      updateValues(addScheduleStartTime(values, defaultStartTime));
     }
     setActiveWheel('start');
   };
@@ -48,11 +56,18 @@ export function ScheduleTimeEditor({
       return;
     }
     if (!values.startTime) {
-      updateValues(addScheduleEndTime(addScheduleStartTime(values)));
+      updateValues(addScheduleEndTime(addScheduleStartTime(values, defaultStartTime)));
     } else if (!values.endTime) {
       updateValues(addScheduleEndTime(values));
     }
     setActiveWheel('end');
+  };
+
+  const setQuickEndTime = (durationMinutes: number) => {
+    if (disabled) {
+      return;
+    }
+    updateValues(addScheduleEndTimeDuration(values, durationMinutes));
   };
 
   const clearTimes = () => {
@@ -119,6 +134,25 @@ export function ScheduleTimeEditor({
         ) : null}
         {startTimeError ? <Text style={styles.fieldError}>{startTimeError}</Text> : null}
 
+        {activeWheel === 'end' && values.startTime ? (
+          <View style={styles.quickDurationRow}>
+            {endTimeDurationOptions.map((option) => (
+              <Pressable
+                accessibilityLabel={`종료 시간 ${option.label}로 설정`}
+                accessibilityRole="button"
+                disabled={disabled}
+                key={option.minutes}
+                onPress={() => setQuickEndTime(option.minutes)}
+                style={[styles.quickDurationButton, disabled ? styles.quickDurationButtonDisabled : null]}
+              >
+                <Text style={[styles.quickDurationButtonText, disabled ? styles.disabledText : null]}>
+                  {option.label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
+
         {activeWheel === 'end' && values.endTime ? (
           <ScheduleTimeWheel
             disabled={disabled}
@@ -162,6 +196,28 @@ const styles = StyleSheet.create({
     fontFamily: theme.font.family.semibold,
     fontSize: theme.font.size.label,
     fontWeight: theme.font.weight.semibold,
+  },
+  quickDurationButton: {
+    backgroundColor: theme.color.primarySoft,
+    borderColor: theme.color.borderDefault,
+    borderRadius: theme.radius.pill,
+    borderWidth: 1,
+    paddingHorizontal: theme.space[3],
+    paddingVertical: theme.space[2],
+  },
+  quickDurationButtonDisabled: {
+    opacity: 0.5,
+  },
+  quickDurationButtonText: {
+    color: theme.color.primary,
+    fontFamily: theme.font.family.semibold,
+    fontSize: theme.font.size.caption,
+    fontWeight: theme.font.weight.semibold,
+  },
+  quickDurationRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.space[2],
   },
   timeArrow: {
     color: theme.color.textMuted,

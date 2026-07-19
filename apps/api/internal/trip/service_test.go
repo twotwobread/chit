@@ -2689,7 +2689,7 @@ func TestServiceReorderScheduleItemsValidation(t *testing.T) {
 				dayScheduleItems: []ScheduleItem{{ID: testUUID(7001)}, {ID: anchorBefore}, {ID: anchorAfter}},
 			}
 			service := newTestService(repo)
-			_, err := service.ReorderScheduleItems(context.Background(), tt.user, tt.trip, tt.date, tt.moves)
+			_, err := service.ReorderScheduleItems(context.Background(), tt.user, tt.trip, tt.date, tt.moves, nil)
 			want := ErrValidation
 			if tt.name == "missing auth" {
 				want = ErrUnauthorized
@@ -2699,6 +2699,44 @@ func TestServiceReorderScheduleItemsValidation(t *testing.T) {
 			}
 			if repo.reorderedCalled {
 				t.Fatal("expected invalid reorder not to reach repository")
+			}
+		})
+	}
+}
+
+func TestServiceReorderScheduleItemsTimeUpdateValidation(t *testing.T) {
+	validTrip := Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"}
+	move := ReorderDayScheduleMoveInput{ItemID: testUUID(7001), BeforeItemID: stringPtr(testUUID(7002)), ClientVersion: 1}
+	tests := []struct {
+		name        string
+		timeUpdates []ReorderScheduleItemTimeUpdateInput
+	}{
+		{name: "invalid item id", timeUpdates: []ReorderScheduleItemTimeUpdateInput{{ItemID: "bad", ExpectedStartTime: stringPtr("09:00"), ExpectedEndTime: stringPtr("10:00"), StartTime: stringPtr("10:00"), EndTime: stringPtr("11:00")}}},
+		{name: "missing referenced item", timeUpdates: []ReorderScheduleItemTimeUpdateInput{{ItemID: testUUID(7999), ExpectedStartTime: stringPtr("09:00"), ExpectedEndTime: stringPtr("10:00"), StartTime: stringPtr("10:00"), EndTime: stringPtr("11:00")}}},
+		{name: "invalid expected start", timeUpdates: []ReorderScheduleItemTimeUpdateInput{{ItemID: testUUID(7001), ExpectedStartTime: stringPtr("9:00"), ExpectedEndTime: stringPtr("10:00"), StartTime: stringPtr("10:00"), EndTime: stringPtr("11:00")}}},
+		{name: "end without start", timeUpdates: []ReorderScheduleItemTimeUpdateInput{{ItemID: testUUID(7001), ExpectedStartTime: stringPtr("09:00"), ExpectedEndTime: stringPtr("10:00"), StartTime: nil, EndTime: stringPtr("11:00")}}},
+		{name: "end before start", timeUpdates: []ReorderScheduleItemTimeUpdateInput{{ItemID: testUUID(7001), ExpectedStartTime: stringPtr("09:00"), ExpectedEndTime: stringPtr("10:00"), StartTime: stringPtr("11:00"), EndTime: stringPtr("10:00")}}},
+		{name: "duplicate item", timeUpdates: []ReorderScheduleItemTimeUpdateInput{
+			{ItemID: testUUID(7001), ExpectedStartTime: stringPtr("09:00"), ExpectedEndTime: stringPtr("10:00"), StartTime: stringPtr("10:00"), EndTime: stringPtr("11:00")},
+			{ItemID: testUUID(7001), ExpectedStartTime: stringPtr("09:00"), ExpectedEndTime: stringPtr("10:00"), StartTime: stringPtr("11:00"), EndTime: stringPtr("12:00")},
+		}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := &fakeRepository{
+				trip:             validTrip,
+				tripFound:        true,
+				isParticipant:    true,
+				dayScheduleItems: []ScheduleItem{{ID: testUUID(7001)}, {ID: testUUID(7002)}},
+			}
+			service := newTestService(repo)
+			_, err := service.ReorderScheduleItems(context.Background(), "user-1", testTripID, "2026-07-10", []ReorderDayScheduleMoveInput{move}, tt.timeUpdates)
+			if !errors.Is(err, ErrValidation) {
+				t.Fatalf("expected ErrValidation, got %v", err)
+			}
+			if repo.reorderedCalled {
+				t.Fatal("expected invalid time update not to reach repository")
 			}
 		})
 	}
@@ -2722,7 +2760,7 @@ func TestServiceReorderScheduleItemsAuthConflictAndRange(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			service := newTestService(tt.repo)
-			_, err := service.ReorderScheduleItems(context.Background(), tt.user, testTripID, tt.date, []ReorderDayScheduleMoveInput{move})
+			_, err := service.ReorderScheduleItems(context.Background(), tt.user, testTripID, tt.date, []ReorderDayScheduleMoveInput{move}, nil)
 			if !errors.Is(err, tt.want) {
 				t.Fatalf("expected %v, got %v", tt.want, err)
 			}
@@ -2754,6 +2792,9 @@ func TestServiceReorderScheduleItemsSuccess(t *testing.T) {
 	result, err := service.ReorderScheduleItems(context.Background(), "user-1", testTripID, "2026-07-11", []ReorderDayScheduleMoveInput{
 		{ItemID: testUUID(7004), BeforeItemID: stringPtr(testUUID(7001)), AfterItemID: stringPtr(testUUID(7002)), ClientVersion: 1},
 		{ItemID: testUUID(7002), BeforeItemID: stringPtr(testUUID(7003)), ClientVersion: 1},
+	}, []ReorderScheduleItemTimeUpdateInput{
+		{ItemID: testUUID(7004), ExpectedStartTime: stringPtr("13:00"), ExpectedEndTime: stringPtr("15:00"), StartTime: stringPtr("09:00"), EndTime: stringPtr("11:00")},
+		{ItemID: testUUID(7001), ExpectedStartTime: stringPtr("09:00"), ExpectedEndTime: stringPtr("10:00"), StartTime: stringPtr("14:00"), EndTime: stringPtr("15:00")},
 	})
 	if err != nil {
 		t.Fatalf("ReorderScheduleItems returned error: %v", err)
@@ -2766,6 +2807,12 @@ func TestServiceReorderScheduleItemsSuccess(t *testing.T) {
 	}
 	if len(repo.reorderedRecord.Moves) != 2 {
 		t.Fatalf("expected two recorded moves, got %#v", repo.reorderedRecord.Moves)
+	}
+	if len(repo.reorderedRecord.TimeUpdates) != 2 {
+		t.Fatalf("expected two recorded time updates, got %#v", repo.reorderedRecord.TimeUpdates)
+	}
+	if repo.reorderedRecord.TimeUpdates[0].ItemID != testUUID(7004) || *repo.reorderedRecord.TimeUpdates[0].StartTime != "09:00" || *repo.reorderedRecord.TimeUpdates[0].EndTime != "11:00" {
+		t.Fatalf("unexpected first time update: %#v", repo.reorderedRecord.TimeUpdates[0])
 	}
 	if result.Day.Date != "2026-07-11" || result.Day.DayOrder != 2 {
 		t.Fatalf("unexpected day mapping: %#v", result.Day)

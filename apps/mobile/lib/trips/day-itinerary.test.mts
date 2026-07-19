@@ -82,6 +82,86 @@ describe('day itinerary helpers', () => {
     });
   });
 
+  it('orders timed rows by time while preserving untimed row positions and visible sequence labels', () => {
+    const response: GetDayScheduleItemsResponse = {
+      day: { date: '2026-07-10', dayOrder: 1, lodgingPlace: null },
+      items: [
+        {
+          id: 'timed-late',
+          itemOrder: 1,
+          version: 1,
+          isLodging: false,
+          startTime: '18:00',
+          endTime: '19:00',
+          arrivedAt: null,
+          skippedAt: null,
+          place: { id: 'place-late', name: '저녁', placeType: 'food', address: 'B' },
+        },
+        {
+          id: 'untimed-middle',
+          itemOrder: 2,
+          version: 1,
+          isLodging: false,
+          startTime: null,
+          endTime: null,
+          arrivedAt: null,
+          skippedAt: null,
+          place: { id: 'place-untimed-middle', name: '시간 미정 A', placeType: 'etc', address: 'A' },
+        },
+        {
+          id: 'timed-early-tie-second',
+          itemOrder: 4,
+          version: 1,
+          isLodging: false,
+          startTime: '09:30',
+          endTime: '10:30',
+          arrivedAt: null,
+          skippedAt: null,
+          place: { id: 'place-early-2', name: '아침 산책 2', placeType: 'sights', address: 'C' },
+        },
+        {
+          id: 'timed-early-tie-first',
+          itemOrder: 3,
+          version: 1,
+          isLodging: false,
+          startTime: '09:30',
+          endTime: '10:00',
+          arrivedAt: null,
+          skippedAt: null,
+          place: { id: 'place-early-1', name: '아침 산책 1', placeType: 'sights', address: 'D' },
+        },
+        {
+          id: 'untimed-last',
+          itemOrder: 5,
+          version: 1,
+          isLodging: false,
+          startTime: null,
+          endTime: null,
+          arrivedAt: null,
+          skippedAt: null,
+          place: { id: 'place-untimed-last', name: '시간 미정 B', placeType: 'etc', address: 'E' },
+        },
+      ],
+    };
+
+    const viewModel = buildDayItineraryViewModel(response);
+    assert.equal(viewModel.status, 'success');
+    if (viewModel.status !== 'success') {
+      return;
+    }
+
+    assert.deepEqual(
+      viewModel.items.map((item) => [item.id, item.orderLabel]),
+      [
+        ['timed-early-tie-first', '1'],
+        ['untimed-middle', '2'],
+        ['timed-early-tie-second', '3'],
+        ['timed-late', '4'],
+        ['untimed-last', '5'],
+      ],
+    );
+  });
+
   it('uses place schedule title as the primary label while keeping place context', () => {
     const response: GetDayScheduleItemsResponse = {
       day: { date: '2026-07-10', dayOrder: 1, lodgingPlace: null },

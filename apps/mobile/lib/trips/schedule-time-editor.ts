@@ -1,8 +1,5 @@
-import {
-  defaultEndScheduleTimeFromStart,
-  defaultScheduleTimeFromDate,
-  parseScheduleTimePickerValue,
-} from '../places/place-schedule-detail';
+import { defaultScheduleTimeFromDate, parseScheduleTimePickerValue } from '../places/place-schedule-detail';
+import { formatScheduleMinutes, parseScheduleTimeToMinutes } from './schedule-item-ordering';
 
 export type ScheduleTimeEditorValues = {
   startTime: string;
@@ -17,13 +14,35 @@ export type ScheduleTimeEditorSummary = {
   hasEndTime: boolean;
 };
 
-export function addScheduleStartTime<T extends ScheduleTimeEditorValues>(values: T, date = new Date()): T {
-  return { ...values, startTime: defaultScheduleTimeFromDate(date) };
+export function addScheduleStartTime<T extends ScheduleTimeEditorValues>(
+  values: T,
+  defaultSource: Date | string = new Date(),
+): T {
+  const defaultStartTime =
+    typeof defaultSource === 'string' && parseScheduleTimeToMinutes(defaultSource) !== null
+      ? defaultSource
+      : defaultScheduleTimeFromDate(defaultSource instanceof Date ? defaultSource : new Date());
+  return { ...values, startTime: defaultStartTime };
 }
 
 export function addScheduleEndTime<T extends ScheduleTimeEditorValues>(values: T): T {
-  const endTime = defaultEndScheduleTimeFromStart(values.startTime);
-  return endTime ? { ...values, endTime } : values;
+  return parseScheduleTimeToMinutes(values.startTime) === null ? values : { ...values, endTime: values.startTime };
+}
+
+export function addScheduleEndTimeDuration<T extends ScheduleTimeEditorValues>(values: T, durationMinutes: number): T {
+  const startMinutes = parseScheduleTimeToMinutes(values.startTime);
+  const endMinutes = parseScheduleTimeToMinutes(values.endTime);
+  const baseMinutes =
+    startMinutes === null || endMinutes === null || endMinutes <= startMinutes ? startMinutes : endMinutes;
+  if (startMinutes === null || baseMinutes === null || !Number.isInteger(durationMinutes) || durationMinutes <= 0) {
+    return values;
+  }
+
+  const nextEndTime = formatScheduleMinutes(baseMinutes + durationMinutes);
+  const nextEndMinutes = parseScheduleTimeToMinutes(nextEndTime);
+  return nextEndTime && nextEndMinutes !== null && nextEndMinutes > startMinutes
+    ? { ...values, endTime: nextEndTime }
+    : values;
 }
 
 export function clearScheduleTimes<T extends ScheduleTimeEditorValues>(values: T): T {

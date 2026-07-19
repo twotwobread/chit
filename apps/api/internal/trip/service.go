@@ -1279,7 +1279,7 @@ func (s *Service) DeleteScheduleItem(ctx context.Context, userID string, tripID 
 	return nil
 }
 
-func (s *Service) ReorderScheduleItems(ctx context.Context, userID string, tripID string, tripDayID string, moves []ReorderDayScheduleMoveInput) (ReorderScheduleItemsResult, error) {
+func (s *Service) ReorderScheduleItems(ctx context.Context, userID string, tripID string, tripDayID string, moves []ReorderDayScheduleMoveInput, timeUpdates []ReorderScheduleItemTimeUpdateInput) (ReorderScheduleItemsResult, error) {
 	day, err := s.activeTripDay(ctx, userID, tripID, tripDayID)
 	if err != nil {
 		return ReorderScheduleItemsResult{}, err
@@ -1287,15 +1287,22 @@ func (s *Service) ReorderScheduleItems(ctx context.Context, userID string, tripI
 	if len(moves) == 0 {
 		return ReorderScheduleItemsResult{}, ErrValidation
 	}
+
+	tripID = strings.TrimSpace(tripID)
+	tripDayID = strings.TrimSpace(tripDayID)
 	recordMoves := make([]ReorderDayScheduleMoveRecord, 0, len(moves))
 	for _, move := range moves {
-		recordMove, err := s.validateReorderDayScheduleMove(ctx, strings.TrimSpace(tripID), strings.TrimSpace(tripDayID), move)
+		recordMove, err := s.validateReorderDayScheduleMove(ctx, tripID, tripDayID, move)
 		if err != nil {
 			return ReorderScheduleItemsResult{}, err
 		}
 		recordMoves = append(recordMoves, recordMove)
 	}
-	items, err := s.repo.ReorderScheduleItems(ctx, ReorderScheduleItemsRecord{TripID: strings.TrimSpace(tripID), TripDayID: strings.TrimSpace(tripDayID), Moves: recordMoves})
+	recordTimeUpdates, err := s.validateReorderScheduleItemTimeUpdates(ctx, tripID, tripDayID, timeUpdates)
+	if err != nil {
+		return ReorderScheduleItemsResult{}, err
+	}
+	items, err := s.repo.ReorderScheduleItems(ctx, ReorderScheduleItemsRecord{TripID: tripID, TripDayID: tripDayID, Moves: recordMoves, TimeUpdates: recordTimeUpdates})
 	if err != nil {
 		return ReorderScheduleItemsResult{}, err
 	}
@@ -1427,6 +1434,50 @@ func (s *Service) activeTripDay(ctx context.Context, userID string, tripID strin
 		return TripDay{}, ErrNotFound
 	}
 	return day, nil
+}
+
+func (s *Service) validateReorderScheduleItemTimeUpdates(ctx context.Context, tripID string, tripDayID string, updates []ReorderScheduleItemTimeUpdateInput) ([]ReorderScheduleItemTimeUpdateRecord, error) {
+	if len(updates) == 0 {
+		return nil, nil
+	}
+	seen := make(map[string]struct{}, len(updates))
+	records := make([]ReorderScheduleItemTimeUpdateRecord, 0, len(updates))
+	for _, update := range updates {
+		itemID := strings.TrimSpace(update.ItemID)
+		if !isUUID(itemID) {
+			return nil, ErrValidation
+		}
+		if _, exists := seen[itemID]; exists {
+			return nil, ErrValidation
+		}
+		seen[itemID] = struct{}{}
+
+		expectedStart, expectedEnd, err := normalizeScheduleItemTimePair(nil, nil, update.ExpectedStartTime, update.ExpectedEndTime)
+		if err != nil {
+			return nil, err
+		}
+		startTime, endTime, err := normalizeScheduleItemTimePair(nil, nil, update.StartTime, update.EndTime)
+		if err != nil {
+			return nil, err
+		}
+
+		_, ok, err := s.repo.GetScheduleItemByTripDayAndID(ctx, tripID, tripDayID, itemID)
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			return nil, ErrValidation
+		}
+
+		records = append(records, ReorderScheduleItemTimeUpdateRecord{
+			ItemID:            itemID,
+			ExpectedStartTime: expectedStart,
+			ExpectedEndTime:   expectedEnd,
+			StartTime:         startTime,
+			EndTime:           endTime,
+		})
+	}
+	return records, nil
 }
 
 func (s *Service) validateReorderDayScheduleMove(ctx context.Context, tripID string, tripDayID string, move ReorderDayScheduleMoveInput) (ReorderDayScheduleMoveRecord, error) {

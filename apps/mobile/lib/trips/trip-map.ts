@@ -16,6 +16,7 @@ import type { DayChip } from '../trip-ui/DayChips';
 import type { RouteMapPlace, RouteMapPolyline } from '../trip-ui/RouteMap';
 import { getScheduleItems, type DayItineraryViewModel } from './day-itinerary';
 import { formatTripDayDate, formatTripDayLabel } from './days';
+import { orderScheduleItemsByDisplayTime } from './schedule-item-ordering';
 
 export type TripMapSearchLayout = {
   screenMode: 'fullScreen';
@@ -297,19 +298,17 @@ export function resolveMapRouteSheetState(current: MapRouteSheetState, gestureDy
 }
 
 export function buildRouteMapPlaces(items: ScheduleItem[]): RouteMapPlace[] {
-  return items
-    .slice()
-    .sort((left, right) => left.itemOrder - right.itemOrder)
+  return orderScheduleItemsByDisplayTime(items)
     .filter((item) => {
       const coordinates = item.place.routablePlace;
       return coordinates && Number.isFinite(coordinates.latitude) && Number.isFinite(coordinates.longitude);
     })
-    .map((item) => ({
+    .map((item, index) => ({
       id: item.id,
       latitude: item.place.routablePlace?.latitude,
       longitude: item.place.routablePlace?.longitude,
       name: item.place.name,
-      order: item.itemOrder,
+      order: index + 1,
       status: mapScheduleItemStatus(item),
       type: item.place.placeType,
     }));

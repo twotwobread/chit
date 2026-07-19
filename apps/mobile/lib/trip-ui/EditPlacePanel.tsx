@@ -71,6 +71,7 @@ export function EditPlacePanel({
       </View>
 
       <ScheduleTimeEditor
+        defaultStartTime={editState.defaultStartTime ?? undefined}
         disabled={isSaving}
         endTimeError={editState.errors.endTime}
         onChange={update}
