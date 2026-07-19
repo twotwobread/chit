@@ -5,7 +5,7 @@ import {
   ensurePushRegistration,
   loadOptionalExpoNotifications,
   type PushRegistrationDeps,
-} from './push-registration.ts';
+} from './push-registration-core.ts';
 
 test('registers an Expo push token after permission is granted', async () => {
   const calls: string[] = [];
