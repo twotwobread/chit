@@ -28,6 +28,7 @@ import {
   buildSavedEqualSplitSummary,
   formatAmountInput,
   quickExpenseFailureMessage,
+  resolveQuickExpenseFormMode,
   resolveQuickExpenseItemDayId,
   resolveTodayQuickExpenseInitialItemId,
   resolveQuickExpenseReturnPath,
@@ -135,23 +136,23 @@ export function useQuickExpenseController() {
     try {
       const participantsResponse = await listTripParticipants(tripId);
       const tripDetail = shellDetail.detail;
-      const itineraries =
-        returnTo === 'settle'
-          ? buildTripItinerariesFromTripScheduleItems(tripDetail.days, await listTripScheduleItems(tripId))
-          : [await getTripDayItinerary(tripId, date)];
+      const formMode = resolveQuickExpenseFormMode(returnTo);
+      const usesTripExpenseMode = formMode === 'settlement';
+      const itineraries = usesTripExpenseMode
+        ? buildTripItinerariesFromTripScheduleItems(tripDetail.days, await listTripScheduleItems(tripId))
+        : [await getTripDayItinerary(tripId, date)];
       const itinerary = itineraries.find((candidate) => candidate.day.id === date) ?? itineraries[0];
       if (!itinerary) {
         setState({ status: 'invalid' });
         return;
       }
-      const isSettlementMode = returnTo === 'settle';
       const scheduleItems = itineraries.flatMap((candidate) => getScheduleItems(candidate));
-      const selectedItemId = isSettlementMode
+      const selectedItemId = usesTripExpenseMode
         ? routeItemId && scheduleItems.some((item) => item.id === routeItemId)
           ? routeItemId
           : null
         : resolveTodayQuickExpenseInitialItemId(scheduleItems, routeItemId);
-      const initialTripDayId = isSettlementMode
+      const initialTripDayId = usesTripExpenseMode
         ? resolveQuickExpenseItemDayId(itineraries, selectedItemId)
         : (resolveQuickExpenseItemDayId(itineraries, selectedItemId) ?? itinerary.day.id);
       const participants = participantsResponse.participants;
@@ -175,9 +176,9 @@ export function useQuickExpenseController() {
         currency: tripDetail.trip.defaultCurrency,
         itinerary,
         itineraries,
-        mode: isSettlementMode ? 'settlement' : 'today',
+        mode: formMode,
         participants,
-        shouldChooseItem: !isSettlementMode && selectedItemId === null,
+        shouldChooseItem: !usesTripExpenseMode && selectedItemId === null,
       });
     } catch (error) {
       if (await handleAuthError(error)) {

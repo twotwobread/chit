@@ -29,6 +29,7 @@ import {
   parseAmountMinor,
   resolveInitialQuickExpenseItemId,
   resolveInitialQuickExpenseItemIdFromItineraries,
+  resolveQuickExpenseFormMode,
   resolveQuickExpenseItemDayId,
   resolveTodayQuickExpenseInitialItemId,
   parseQuickExpenseRoute,
@@ -193,6 +194,14 @@ test('resolves the trip day for a selected quick expense item across multiple da
 
   assert.equal(resolveQuickExpenseItemDayId(itineraries, 'item-b'), 'day-2');
   assert.equal(resolveQuickExpenseItemDayId(itineraries, 'missing'), null);
+});
+
+test('resolves trip-level expense form mode for Expense and Settlement tab return targets', () => {
+  assert.equal(resolveQuickExpenseFormMode('expenses'), 'settlement');
+  assert.equal(resolveQuickExpenseFormMode('settle'), 'settlement');
+  assert.equal(resolveQuickExpenseFormMode(['expenses']), 'settlement');
+  assert.equal(resolveQuickExpenseFormMode(undefined), 'today');
+  assert.equal(resolveQuickExpenseFormMode('today'), 'today');
 });
 
 test('builds OCR-primary quick expense entry choice copy', () => {

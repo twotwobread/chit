@@ -147,6 +147,8 @@ const zeroDecimalCurrencies = new Set<SupportedCurrency>(['KRW', 'JPY']);
 
 export type QuickExpenseReturnTo = 'settle' | 'expenses';
 
+export type QuickExpenseFormMode = 'today' | 'settlement';
+
 export type QuickExpenseReturnParam = string | string[] | undefined;
 
 export type QuickExpenseReturnDayParam = string | string[] | undefined;
@@ -172,6 +174,11 @@ export function buildQuickExpenseRoute(
   ].filter((param): param is string => param !== null);
 
   return (params.length > 0 ? `${base}?${params.join('&')}` : base) as Href;
+}
+
+export function resolveQuickExpenseFormMode(returnTo?: QuickExpenseReturnParam): QuickExpenseFormMode {
+  const returnValue = Array.isArray(returnTo) ? returnTo[0] : returnTo;
+  return returnValue === 'settle' || returnValue === 'expenses' ? 'settlement' : 'today';
 }
 
 export function resolveQuickExpenseReturnPath({
