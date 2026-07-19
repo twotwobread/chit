@@ -225,7 +225,7 @@ Important columns:
 
 Cloud Run Jobs exist and fit this slice better than an API-process goroutine. Implement the push sender as a finite `cmd/notification-worker` command that reuses the same notification worker package and can run in the same container image with a different command/args.
 
-For staging/prod, use Cloud Scheduler to invoke the Cloud Run Job on a short interval such as every 1 minute. This avoids depending on Cloud Run service background CPU, request traffic, or instance lifetime. The outbox table remains the reliability boundary: if no job is running, rows stay `pending`; if a job is killed mid-send, stuck `running` rows are recovered by timeout/retry policy.
+For staging/prod, use Cloud Scheduler to invoke the Cloud Run Job on a short interval such as every 1 minute. The staging deploy path provisions/updates the job and scheduler through `pnpm run deploy stage` so the worker is deployed with the same API image and `/app/notification-worker` command override. This avoids depending on Cloud Run service background CPU, request traffic, or instance lifetime. The outbox table remains the reliability boundary: if no job is running, rows stay `pending`; if a job is killed mid-send, stuck `running` rows are recovered by timeout/retry policy.
 
 If product requirements later demand seconds-level delivery latency instead of minute-level eventual delivery, move the same worker package to an always-on Cloud Run service with min instances/CPU always allocated, or revisit Cloud Tasks/PubSub/Kafka depending on the number of consumers and fan-out requirements.
 

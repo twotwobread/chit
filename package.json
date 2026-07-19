@@ -13,6 +13,7 @@
     "db:status": "pnpm --filter @i-um/api db:status",
     "deploy": "node scripts/deploy.mjs",
     "deploy:stage": "node scripts/deploy.mjs stage",
+    "deploy:notifications": "node scripts/deploy.mjs stage --only notifications --platform none",
     "test:deploy": "node --test scripts/*.test.mjs",
     "verify:generated": "tmp=$(mktemp) && find apps/api/internal/openapi apps/api/internal/db packages/api-contract/gen/ts -type f | sort | xargs shasum > \"$tmp\" && pnpm generate && find apps/api/internal/openapi apps/api/internal/db packages/api-contract/gen/ts -type f | sort | xargs shasum | diff -u \"$tmp\" -",
     "harness:sync": "node .harness/scripts/sync-adapters.mjs",

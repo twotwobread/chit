@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 
 import {
+  artifactImageUri,
   buildStageConfig,
   cloudRunEnvMapping,
   cloudRunSecretMapping,
@@ -10,6 +11,9 @@ import {
   deriveDirectDatabaseUrl,
   easEnvSpecs,
   legacyCloudRunEnvNames,
+  notificationWorkerEnvMapping,
+  notificationWorkerRunUri,
+  notificationWorkerSecretMapping,
   parseDeployArgs,
   readDotenvFile,
   resolvePublicEndpoints,
@@ -40,6 +44,9 @@ async function main() {
 
   if (shouldRun(options.only, 'secrets')) {
     syncSecretManager(runner, config);
+  }
+
+  if (shouldRun(options.only, 'api-env')) {
     updateCloudRunEnvironment(runner, config);
   }
 
@@ -49,6 +56,10 @@ async function main() {
 
   if (shouldRun(options.only, 'api-deploy')) {
     deployApi(runner, config);
+  }
+
+  if (shouldRun(options.only, 'notification-worker')) {
+    deployNotificationWorker(runner, config);
   }
 
   if (shouldRun(options.only, 'smoke')) {
@@ -140,6 +151,110 @@ function deployApi(runner, config) {
   ]);
 }
 
+function deployNotificationWorker(runner, config) {
+  ensureNotificationWorkerSchedulerIdentity(runner, config);
+  upsertNotificationWorkerJob(runner, config);
+  upsertNotificationWorkerScheduler(runner, config);
+}
+
+function ensureNotificationWorkerSchedulerIdentity(runner, config) {
+  const schedulerServiceAccount = config.notificationWorker.schedulerServiceAccount;
+  const accountId = serviceAccountIdForProject(schedulerServiceAccount, config.gcp.projectId);
+  if (accountId) {
+    const describe = runner.run(
+      'gcloud',
+      ['iam', 'service-accounts', 'describe', schedulerServiceAccount, '--project', config.gcp.projectId],
+      { allowFailure: true, quiet: true },
+    );
+    if (describe.status !== 0) {
+      runner.run('gcloud', [
+        'iam',
+        'service-accounts',
+        'create',
+        accountId,
+        '--project',
+        config.gcp.projectId,
+        '--display-name',
+        'i-um notification worker scheduler',
+      ]);
+    }
+  }
+
+  runner.run('gcloud', ['services', 'enable', 'cloudscheduler.googleapis.com', 'run.googleapis.com', '--project', config.gcp.projectId]);
+  runner.run('gcloud', [
+    'projects',
+    'add-iam-policy-binding',
+    config.gcp.projectId,
+    `--member=serviceAccount:${schedulerServiceAccount}`,
+    '--role=roles/run.developer',
+  ]);
+}
+
+function upsertNotificationWorkerJob(runner, config) {
+  const jobName = config.notificationWorker.jobName;
+  const image = artifactImageUri(config);
+  const commonArgs = [
+    `--image=${image}`,
+    `--region=${config.gcp.region}`,
+    `--service-account=${config.gcp.runtimeServiceAccount}`,
+    '--command=/app/notification-worker',
+    `--set-secrets=${notificationWorkerSecretMapping(config)}`,
+    `--set-env-vars=${notificationWorkerEnvMapping(config)}`,
+    '--tasks=1',
+    '--max-retries=0',
+    '--task-timeout=600s',
+    '--quiet',
+  ];
+
+  const describe = runner.run(
+    'gcloud',
+    ['run', 'jobs', 'describe', jobName, '--project', config.gcp.projectId, '--region', config.gcp.region],
+    { allowFailure: true, quiet: true },
+  );
+  if (describe.status === 0) {
+    console.log(`Update notification worker Cloud Run Job: ${jobName}`);
+    runner.run('gcloud', ['run', 'jobs', 'update', jobName, '--project', config.gcp.projectId, ...commonArgs]);
+    return;
+  }
+
+  console.log(`Create notification worker Cloud Run Job: ${jobName}`);
+  runner.run('gcloud', ['run', 'jobs', 'create', jobName, '--project', config.gcp.projectId, ...commonArgs]);
+}
+
+function upsertNotificationWorkerScheduler(runner, config) {
+  const schedulerJobName = config.notificationWorker.schedulerJobName;
+  const commonArgs = [
+    `--location=${config.gcp.region}`,
+    `--schedule=${config.notificationWorker.schedule}`,
+    `--time-zone=${config.notificationWorker.timeZone}`,
+    `--uri=${notificationWorkerRunUri(config)}`,
+    '--http-method=POST',
+    '--message-body={}',
+    '--headers=Content-Type=application/json',
+    `--oauth-service-account-email=${config.notificationWorker.schedulerServiceAccount}`,
+    '--oauth-token-scope=https://www.googleapis.com/auth/cloud-platform',
+  ];
+
+  const describe = runner.run(
+    'gcloud',
+    ['scheduler', 'jobs', 'describe', schedulerJobName, '--project', config.gcp.projectId, '--location', config.gcp.region],
+    { allowFailure: true, quiet: true },
+  );
+  if (describe.status === 0) {
+    console.log(`Update notification worker Cloud Scheduler job: ${schedulerJobName}`);
+    runner.run('gcloud', ['scheduler', 'jobs', 'update', 'http', schedulerJobName, '--project', config.gcp.projectId, ...commonArgs]);
+    return;
+  }
+
+  console.log(`Create notification worker Cloud Scheduler job: ${schedulerJobName}`);
+  runner.run('gcloud', ['scheduler', 'jobs', 'create', 'http', schedulerJobName, '--project', config.gcp.projectId, ...commonArgs]);
+}
+
+function serviceAccountIdForProject(email, projectId) {
+  const suffix = `@${projectId}.iam.gserviceaccount.com`;
+  return email.endsWith(suffix) ? email.slice(0, -suffix.length) : null;
+}
+
 function getCloudRunUrl(runner, config) {
   const result = runner.run('gcloud', [
     'run',
@@ -211,7 +326,7 @@ function buildMobile(runner, config, options) {
 }
 
 function shouldResolvePublicEndpoints(only) {
-  return only !== 'db';
+  return only !== 'db' && only !== 'notifications';
 }
 
 function shouldRun(only, step) {
@@ -219,12 +334,13 @@ function shouldRun(only, step) {
     return true;
   }
   const groups = {
-    api: new Set(['secrets', 'db', 'api-deploy', 'smoke']),
+    api: new Set(['secrets', 'api-env', 'db', 'api-deploy', 'notification-worker', 'smoke']),
     mobile: new Set(['eas-env', 'mobile-build']),
-    secrets: new Set(['secrets']),
+    secrets: new Set(['secrets', 'api-env']),
     db: new Set(['db']),
     smoke: new Set(['smoke']),
     'eas-env': new Set(['eas-env']),
+    notifications: new Set(['secrets', 'notification-worker']),
   };
   return groups[only]?.has(step) ?? false;
 }
