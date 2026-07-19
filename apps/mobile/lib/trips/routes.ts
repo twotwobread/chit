@@ -1,8 +1,8 @@
 import type { Href } from 'expo-router';
 
-export type TripRootTab = 'today' | 'map' | 'itinerary' | 'settle';
+export type TripRootTab = 'today' | 'map' | 'itinerary' | 'expenses' | 'settle';
 
-const TRIP_ROOT_TABS: readonly TripRootTab[] = ['today', 'map', 'itinerary', 'settle'];
+const TRIP_ROOT_TABS: readonly TripRootTab[] = ['today', 'map', 'itinerary', 'expenses', 'settle'];
 
 export type TripHiddenRouteKind =
   | 'detail'
@@ -12,6 +12,7 @@ export type TripHiddenRouteKind =
   | 'flightNew'
   | 'flightDetail'
   | 'tripExpenseEdit'
+  | 'settlementDetail'
   | 'day'
   | 'dayPlaceSearch'
   | 'dayPlaceNew'
@@ -24,6 +25,7 @@ export type TripRouteFallbackInput =
   | { kind: 'participants'; tripId: string }
   | { kind: 'flights' | 'flightNew' | 'flightDetail'; tripId: string }
   | { kind: 'tripExpenseEdit'; tripId: string }
+  | { kind: 'settlementDetail'; tripId: string }
   | { kind: 'day'; tripId: string }
   | { kind: 'dayPlaceSearch' | 'dayPlaceNew' | 'dayQuickExpense'; tripId: string; tripDayId: string };
 
@@ -47,8 +49,16 @@ export function tripItineraryDayPath(tripId: string, tripDayId: string): `/trips
   return `/trips/${tripId}/itinerary?dayId=${tripDayId}`;
 }
 
+export function tripExpensesPath(tripId: string): `/trips/${string}/expenses` {
+  return `/trips/${tripId}/expenses`;
+}
+
 export function tripSettlePath(tripId: string): `/trips/${string}/settle` {
   return `/trips/${tripId}/settle`;
+}
+
+export function tripSettlementDetailPath(tripId: string): `/trips/${string}/settlement-detail` {
+  return `/trips/${tripId}/settlement-detail`;
 }
 
 export function tripDetailPath(tripId: string): `/trips/${string}/detail` {
@@ -87,6 +97,8 @@ export function tripTabPath(tripId: string, tab: TripRootTab): Href {
       return tripMapPath(tripId);
     case 'itinerary':
       return tripItineraryPath(tripId);
+    case 'expenses':
+      return tripExpensesPath(tripId);
     case 'settle':
       return tripSettlePath(tripId);
     default: {
@@ -111,6 +123,8 @@ export function tripFallbackPath(input: TripRouteFallbackInput): Href {
     case 'flightDetail':
       return tripFlightsPath(input.tripId);
     case 'tripExpenseEdit':
+      return tripExpensesPath(input.tripId);
+    case 'settlementDetail':
       return tripSettlePath(input.tripId);
     case 'day':
       return tripItineraryPath(input.tripId);
@@ -145,6 +159,10 @@ export function tripFallbackPathForPathname(pathname: string, tripId: string): H
   }
   if (normalizedPathname.startsWith(`/trips/${tripId}/flights/`)) {
     return tripFallbackPath({ kind: 'flightDetail', tripId });
+  }
+
+  if (normalizedPathname === tripSettlementDetailPath(tripId)) {
+    return tripFallbackPath({ kind: 'settlementDetail', tripId });
   }
 
   const tripExpenseRoutePrefix = `/trips/${tripId}/expenses/`;
@@ -184,6 +202,7 @@ export function isTripRootTabPath(pathname: string, tripId: string): boolean {
     pathname === tripTodayPath(tripId) ||
     pathname === tripMapPath(tripId) ||
     pathname === tripItineraryPath(tripId) ||
+    pathname === tripExpensesPath(tripId) ||
     pathname === tripSettlePath(tripId)
   );
 }
