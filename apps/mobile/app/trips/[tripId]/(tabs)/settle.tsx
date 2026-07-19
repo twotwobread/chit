@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { Share, StyleSheet, Text, View } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { ArrowDownLeft, ArrowUpRight, CircleCheck, type LucideIcon } from 'lucide-react-native';
 import KakaoShareLink from 'react-native-kakao-share-link';
 
 import { SecondaryButton, theme } from '../../../../lib/design';
@@ -109,10 +110,11 @@ function SettlementContent({
   return (
     <>
       <TripListCard>
-        <View style={styles.noticeCardContent}>
-          <Text style={styles.noticeTitle}>현재 지출 기준 최신 정산이에요.</Text>
-          <Text style={styles.noticeHelper}>지출이 수정되면 사람별 금액과 송금 제안도 함께 바뀝니다.</Text>
-          <Text style={styles.formulaText}>결제 금액 - 부담 금액 = 받을/보낼 금액</Text>
+        <View style={styles.heroCard}>
+          <Text style={styles.heroEyebrow}>LIVE SETTLEMENT</Text>
+          <Text style={styles.heroTitle}>칫, 정산 별거없네.</Text>
+          <Text style={styles.heroHelper}>현재 지출 기준 최신 정산이에요. 수정하면 사람별 금액도 바로 바뀝니다.</Text>
+          <Text style={styles.heroFormula}>결제 금액 - 부담 금액 = 받을/보낼 금액</Text>
         </View>
       </TripListCard>
 
@@ -228,8 +230,20 @@ function BalanceMetric({
 }) {
   return (
     <View style={styles.balanceMetric}>
-      <Text style={styles.balanceMetricLabel}>{label}</Text>
-      <Text style={[styles.balanceMetricValue, direction ? netAmountStyle(direction) : null]}>{value}</Text>
+      {direction ? <BalanceMetricIcon direction={direction} /> : null}
+      <View style={styles.balanceMetricTextColumn}>
+        <Text style={styles.balanceMetricLabel}>{label}</Text>
+        <Text style={[styles.balanceMetricValue, direction ? netAmountStyle(direction) : null]}>{value}</Text>
+      </View>
+    </View>
+  );
+}
+
+function BalanceMetricIcon({ direction }: { direction: SettlementBalanceDirection }) {
+  const Icon: LucideIcon = direction === 'receive' ? ArrowDownLeft : direction === 'send' ? ArrowUpRight : CircleCheck;
+  return (
+    <View style={[styles.balanceMetricIcon, balanceMetricIconStyle(direction)]}>
+      <Icon color={balanceMetricIconColor(direction)} size={16} strokeWidth={2.5} />
     </View>
   );
 }
@@ -242,6 +256,26 @@ function netAmountStyle(direction: SettlementBalanceDirection) {
     return styles.balanceMetricValueSend;
   }
   return styles.balanceMetricValueSettled;
+}
+
+function balanceMetricIconStyle(direction: SettlementBalanceDirection) {
+  if (direction === 'receive') {
+    return styles.balanceMetricIconReceive;
+  }
+  if (direction === 'send') {
+    return styles.balanceMetricIconSend;
+  }
+  return styles.balanceMetricIconSettled;
+}
+
+function balanceMetricIconColor(direction: SettlementBalanceDirection): string {
+  if (direction === 'receive') {
+    return theme.color.credit;
+  }
+  if (direction === 'send') {
+    return theme.color.debit;
+  }
+  return theme.color.textMuted;
 }
 
 function settleShellFailureState(status: 'auth' | 'notFound' | 'error'): TripSettleState {
@@ -277,13 +311,31 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.space[5],
   },
   balanceMetric: {
+    alignItems: 'center',
     backgroundColor: theme.color.surfaceSunken,
     borderRadius: theme.radius.md,
     flex: 1,
-    gap: theme.space[1],
-    minWidth: 88,
-    paddingHorizontal: theme.space[4],
+    flexDirection: 'row',
+    gap: theme.space[2],
+    minWidth: 104,
+    paddingHorizontal: theme.space[3],
     paddingVertical: theme.space[3],
+  },
+  balanceMetricIcon: {
+    alignItems: 'center',
+    borderRadius: theme.radius.pill,
+    height: 28,
+    justifyContent: 'center',
+    width: 28,
+  },
+  balanceMetricIconReceive: {
+    backgroundColor: theme.color.chit.fintechBlueSoft,
+  },
+  balanceMetricIconSend: {
+    backgroundColor: theme.color.chit.punchRedSoft,
+  },
+  balanceMetricIconSettled: {
+    backgroundColor: theme.color.surface,
   },
   balanceMetricLabel: {
     color: theme.color.textMuted,
@@ -294,6 +346,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: theme.space[3],
+  },
+  balanceMetricTextColumn: {
+    flex: 1,
+    gap: theme.space[1],
   },
   balanceMetricValue: {
     color: theme.color.textStrong,
@@ -329,27 +385,36 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: theme.space[3],
   },
-  formulaText: {
+  heroCard: {
+    backgroundColor: theme.color.chit.charcoal,
+    borderRadius: theme.radius.xl,
+    gap: theme.space[3],
+    paddingHorizontal: theme.space[5],
+    paddingVertical: theme.space[5],
+  },
+  heroEyebrow: {
+    color: theme.color.primary,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.micro,
+    fontWeight: theme.font.weight.bold,
+    letterSpacing: 0.8,
+  },
+  heroFormula: {
     color: theme.color.primary,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.label,
     fontWeight: theme.font.weight.bold,
   },
-  noticeCardContent: {
-    gap: theme.space[2],
-    paddingHorizontal: theme.space[5],
-    paddingVertical: theme.space[5],
-  },
-  noticeHelper: {
-    color: theme.color.textMuted,
+  heroHelper: {
+    color: theme.color.ink[100],
     fontFamily: theme.font.family.regular,
     fontSize: theme.font.size.body,
     lineHeight: theme.font.size.body * theme.font.leading.normal,
   },
-  noticeTitle: {
-    color: theme.color.textStrong,
+  heroTitle: {
+    color: theme.color.textOnDark,
     fontFamily: theme.font.family.bold,
-    fontSize: theme.font.size.subhead,
+    fontSize: theme.font.size.title,
     fontWeight: theme.font.weight.bold,
   },
   sectionHeader: {

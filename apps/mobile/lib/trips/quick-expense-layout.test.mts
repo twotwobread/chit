@@ -20,3 +20,12 @@ test('renders Today quick expense amount input before the currency unit', () => 
   assert.notEqual(currencyLabelIndex, -1, 'expected amount field to render currency label');
   assert.ok(inputIndex < currencyLabelIndex, 'expected amount input JSX to precede currency label JSX');
 });
+
+test('Today quick expense legacy form uses shared Chit actions and accessible amount controls', () => {
+  assert.match(quickExpenseFormSource, /PrimaryButton, SecondaryButton/, 'expected shared Chit buttons');
+  assert.match(quickExpenseFormSource, /accessibilityLabel="금액"/, 'expected amount input to be labelled');
+  assert.match(quickExpenseFormSource, /loading=\{submitting\}/, 'expected save button loading state');
+  assert.match(quickExpenseFormSource, /loadingLabel="저장 중\.\.\."/, 'expected Chit loading copy');
+  assert.match(quickExpenseFormSource, /accessibilityLabel="영수증 다시 촬영"/, 'expected receipt retry action label');
+  assert.match(quickExpenseFormSource, /accessibilityLabel="영수증 초안 해제"/, 'expected receipt clear action label');
+});

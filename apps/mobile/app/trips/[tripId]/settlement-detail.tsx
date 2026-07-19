@@ -1,8 +1,10 @@
 import { useCallback, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { ArrowDownLeft, ArrowUpRight, CircleCheck, type LucideIcon } from 'lucide-react-native';
 
 import { theme } from '../../../lib/design';
+import { ExpenseRow } from '../../../lib/trip-ui/ExpenseRow';
 import { TransferRow } from '../../../lib/trip-ui/TransferRow';
 import { TripListCard, TripScreen, TripScreenHeader, TripStateCard } from '../../../lib/trip-ui/TripScreenScaffold';
 import { listTripExpenses } from '../../../lib/trips/expense-api';
@@ -196,17 +198,18 @@ function SettlementDetailExpenseSection({
       ) : (
         <View style={styles.expenseList}>
           {rows.map((row, index) => (
-            <View key={row.id} style={[styles.expenseRow, index === 0 ? null : styles.rowDivider]}>
-              <View style={styles.expenseHeader}>
-                <View style={styles.expenseTitleColumn}>
-                  <Text style={styles.expenseTitle}>{row.title}</Text>
-                  <Text style={styles.sectionHelper}>
-                    {row.contextLabel} · {row.categoryLabel} · {row.payerLabel}
-                  </Text>
-                </View>
-                <Text style={styles.expenseAmount}>{row.amountLabel}</Text>
-              </View>
-              <Text style={styles.settlementLabel}>{row.settlementLabel}</Text>
+            <View key={row.id} style={[styles.expenseEvidenceCard, index === 0 ? null : styles.rowDivider]}>
+              <ExpenseRow
+                accessibilityLabel={`${row.title} ${row.amountLabel}. ${row.contextLabel} · ${row.categoryLabel} · ${row.payerLabel}`}
+                amount={row.amountMinor}
+                category={row.category}
+                currency={row.currency}
+                first
+                payerLabel={row.payerLabel}
+                settlementLabel={row.settlementLabel}
+                splitLabel={row.contextLabel}
+                title={row.title}
+              />
               <View style={styles.splitList}>
                 {row.splitRows.map((split, splitIndex) => (
                   <View key={`${row.id}-${split.displayName}-${splitIndex}`} style={styles.splitRow}>
@@ -234,8 +237,20 @@ function SummaryMetric({
 }) {
   return (
     <View style={styles.summaryMetric}>
-      <Text style={styles.metricLabel}>{label}</Text>
-      <Text style={[styles.metricValue, direction ? netAmountStyle(direction) : null]}>{value}</Text>
+      {direction ? <SummaryMetricIcon direction={direction} /> : null}
+      <View style={styles.metricTextColumn}>
+        <Text style={styles.metricLabel}>{label}</Text>
+        <Text style={[styles.metricValue, direction ? netAmountStyle(direction) : null]}>{value}</Text>
+      </View>
+    </View>
+  );
+}
+
+function SummaryMetricIcon({ direction }: { direction: SettlementBalanceDirection }) {
+  const Icon: LucideIcon = direction === 'receive' ? ArrowDownLeft : direction === 'send' ? ArrowUpRight : CircleCheck;
+  return (
+    <View style={[styles.metricIcon, metricIconStyle(direction)]}>
+      <Icon color={metricIconColor(direction)} size={16} strokeWidth={2.5} />
     </View>
   );
 }
@@ -248,6 +263,26 @@ function netAmountStyle(direction: SettlementBalanceDirection) {
     return styles.metricValueSend;
   }
   return styles.metricValueSettled;
+}
+
+function metricIconStyle(direction: SettlementBalanceDirection) {
+  if (direction === 'receive') {
+    return styles.metricIconReceive;
+  }
+  if (direction === 'send') {
+    return styles.metricIconSend;
+  }
+  return styles.metricIconSettled;
+}
+
+function metricIconColor(direction: SettlementBalanceDirection): string {
+  if (direction === 'receive') {
+    return theme.color.credit;
+  }
+  if (direction === 'send') {
+    return theme.color.debit;
+  }
+  return theme.color.textMuted;
 }
 
 function settlementDetailShellFailureState(status: 'auth' | 'notFound' | 'error'): SettlementDetailState {
@@ -307,46 +342,45 @@ const styles = StyleSheet.create({
     paddingVertical: theme.space[5],
     textAlign: 'center',
   },
-  expenseAmount: {
-    color: theme.color.textStrong,
-    fontFamily: theme.font.family.bold,
-    fontSize: theme.font.size.label,
-    fontWeight: theme.font.weight.bold,
-  },
-  expenseHeader: {
-    alignItems: 'flex-start',
-    flexDirection: 'row',
+  expenseEvidenceCard: {
+    backgroundColor: theme.color.surface,
     gap: theme.space[3],
-    justifyContent: 'space-between',
+    paddingBottom: theme.space[4],
   },
   expenseList: {
     paddingBottom: theme.space[3],
   },
-  expenseRow: {
-    gap: theme.space[3],
-    paddingHorizontal: theme.space[5],
-    paddingVertical: theme.space[4],
-  },
-  expenseTitle: {
-    color: theme.color.textStrong,
-    fontFamily: theme.font.family.semibold,
-    fontSize: theme.font.size.body,
-    fontWeight: theme.font.weight.semibold,
-  },
-  expenseTitleColumn: {
-    flex: 1,
-    gap: theme.space[1],
-  },
+
   formulaText: {
     color: theme.color.primary,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.label,
     fontWeight: theme.font.weight.bold,
   },
+  metricIcon: {
+    alignItems: 'center',
+    borderRadius: theme.radius.pill,
+    height: 28,
+    justifyContent: 'center',
+    width: 28,
+  },
+  metricIconReceive: {
+    backgroundColor: theme.color.chit.fintechBlueSoft,
+  },
+  metricIconSend: {
+    backgroundColor: theme.color.chit.punchRedSoft,
+  },
+  metricIconSettled: {
+    backgroundColor: theme.color.surface,
+  },
   metricLabel: {
     color: theme.color.textMuted,
     fontFamily: theme.font.family.regular,
     fontSize: theme.font.size.micro,
+  },
+  metricTextColumn: {
+    flex: 1,
+    gap: theme.space[1],
   },
   metricValue: {
     color: theme.color.textStrong,
@@ -401,17 +435,7 @@ const styles = StyleSheet.create({
     fontSize: theme.font.size.subhead,
     fontWeight: theme.font.weight.bold,
   },
-  settlementLabel: {
-    alignSelf: 'flex-start',
-    backgroundColor: theme.color.surfaceSunken,
-    borderRadius: theme.radius.pill,
-    color: theme.color.textMuted,
-    fontFamily: theme.font.family.bold,
-    fontSize: theme.font.size.micro,
-    fontWeight: theme.font.weight.bold,
-    paddingHorizontal: theme.space[3],
-    paddingVertical: theme.space[1],
-  },
+
   splitAmount: {
     color: theme.color.textStrong,
     fontFamily: theme.font.family.semibold,
@@ -448,12 +472,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.space[5],
   },
   summaryMetric: {
+    alignItems: 'center',
     backgroundColor: theme.color.surfaceSunken,
     borderRadius: theme.radius.md,
     flex: 1,
-    gap: theme.space[1],
-    minWidth: 112,
-    paddingHorizontal: theme.space[4],
+    flexDirection: 'row',
+    gap: theme.space[2],
+    minWidth: 128,
+    paddingHorizontal: theme.space[3],
     paddingVertical: theme.space[3],
   },
   transferList: {

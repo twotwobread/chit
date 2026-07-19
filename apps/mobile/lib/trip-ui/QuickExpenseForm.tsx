@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { type ExpenseReceiptDraft } from '@i-um/api-contract';
 
-import { SegmentedControl, theme } from '../design';
+import { PrimaryButton, SecondaryButton, SegmentedControl, theme } from '../design';
 import { cancelExpenseReceiptDraft } from '../trips/expense-api';
 import {
   buildExpensePaymentSplitSummaryLabel,
@@ -297,6 +297,7 @@ export function QuickExpenseForm({
         <Text style={styles.label}>금액</Text>
         <View style={styles.amountField}>
           <TextInput
+            accessibilityLabel="금액"
             keyboardType="decimal-pad"
             onChangeText={(amountInput) => updateDraft({ amountInput })}
             placeholder="0"
@@ -318,33 +319,21 @@ export function QuickExpenseForm({
           ) : null}
           {receiptMessage ? <Text style={styles.helperText}>{receiptMessage}</Text> : null}
           <View style={styles.actionRow}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ disabled: submitting || receiptBusy || !tripId }}
+            <SecondaryButton
+              accessibilityLabel="영수증 다시 촬영"
               disabled={submitting || receiptBusy || !tripId}
+              label={receiptDraft ? '다른 영수증 촬영' : '영수증 촬영'}
               onPress={() => setScannerVisible(true)}
-              style={({ pressed }) => [
-                styles.receiptAction,
-                submitting || receiptBusy || !tripId ? styles.disabled : null,
-                pressed ? styles.pressed : null,
-              ]}
-            >
-              <Text style={styles.receiptActionText}>{receiptDraft ? '다른 영수증 촬영' : '영수증 촬영'}</Text>
-            </Pressable>
+              style={styles.receiptActionButton}
+            />
             {receiptDraft ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityState={{ disabled: submitting || receiptBusy }}
+              <SecondaryButton
+                accessibilityLabel="영수증 초안 해제"
                 disabled={submitting || receiptBusy}
+                label={receiptBusy ? '해제 중...' : '초안 해제'}
                 onPress={() => void clearReceiptDraft()}
-                style={({ pressed }) => [
-                  styles.receiptAction,
-                  submitting || receiptBusy ? styles.disabled : null,
-                  pressed ? styles.pressed : null,
-                ]}
-              >
-                <Text style={styles.receiptActionText}>{receiptBusy ? '해제 중...' : '초안 해제'}</Text>
-              </Pressable>
+                style={styles.receiptActionButton}
+              />
             ) : null}
           </View>
         </View>
@@ -437,15 +426,14 @@ export function QuickExpenseForm({
               <Text style={styles.cancelText}>취소</Text>
             </Pressable>
           ) : null}
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ disabled: submitting }}
+          <PrimaryButton
             disabled={submitting}
+            label="저장"
+            loading={submitting}
+            loadingLabel="저장 중..."
             onPress={save}
-            style={({ pressed }) => [styles.save, submitting ? styles.disabled : null, pressed ? styles.pressed : null]}
-          >
-            <Text style={styles.saveText}>{submitting ? '저장 중' : '저장'}</Text>
-          </Pressable>
+            style={styles.saveAction}
+          />
         </View>
       </View>
 
@@ -745,6 +733,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.space[4],
     paddingVertical: theme.space[3],
   },
+  receiptActionButton: {
+    flex: 1,
+  },
   receiptActionText: {
     color: theme.color.primary,
     fontFamily: theme.font.family.bold,
@@ -974,6 +965,9 @@ const styles = StyleSheet.create({
     flex: 2,
     height: theme.layout.controlHLg,
     justifyContent: 'center',
+  },
+  saveAction: {
+    flex: 2,
   },
   saveText: {
     color: theme.color.onPrimary,
