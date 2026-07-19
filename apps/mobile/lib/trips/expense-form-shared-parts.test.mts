@@ -16,6 +16,8 @@ const sharedComponents = [
   'ExpenseSettlementOptionSheet',
 ];
 
+const separatedCurrencyCategoryComponents = ['ExpenseCurrencySelector', 'ExpenseCategorySelector'];
+
 test('settlement expense create and edit forms use the shared expense form components', () => {
   for (const componentName of sharedComponents) {
     assert.match(createSource, new RegExp(`\\b${componentName}\\b`), `create form should use ${componentName}`);
@@ -27,5 +29,15 @@ test('settlement expense create and edit forms do not define duplicated local su
   for (const source of [createSource, editSource]) {
     assert.doesNotMatch(source, /function SummaryActionRow\b/);
     assert.doesNotMatch(source, /function SettlementChoice\b/);
+  }
+});
+
+test('expense forms use separate currency and category selectors instead of a combined section', () => {
+  for (const componentName of separatedCurrencyCategoryComponents) {
+    assert.match(createSource, new RegExp(`\\b${componentName}\\b`), `create form should use ${componentName}`);
+    assert.match(editSource, new RegExp(`\\b${componentName}\\b`), `edit form should use ${componentName}`);
+  }
+  for (const source of [createSource, editSource]) {
+    assert.doesNotMatch(source, /ExpenseCategoryCurrencySelector/);
   }
 });

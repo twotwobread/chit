@@ -2661,6 +2661,8 @@ func TestCreateTripExpenseHandlerCreatesTripLevelExpense(t *testing.T) {
 		"tripDayId":null,
 		"scheduleItemId":null,
 		"amountMinor":650000,
+		"currency":"USD",
+		"expenseCategory":"transport",
 		"payerParticipantId":%q,
 		"splitPolicy":"equal",
 		"participantIds":[%q],
@@ -2685,6 +2687,8 @@ func TestCreateTripExpenseHandlerCreatesTripLevelExpense(t *testing.T) {
 			DisplayTitle        string  `json:"displayTitle"`
 			ExpenseDate         string  `json:"expenseDate"`
 			AmountMinor         int64   `json:"amountMinor"`
+			Currency            string  `json:"currency"`
+			ExpenseCategory     string  `json:"expenseCategory"`
 			Memo                *string `json:"memo"`
 			IncludeInSettlement *bool   `json:"includeInSettlement"`
 		} `json:"expense"`
@@ -2695,7 +2699,7 @@ func TestCreateTripExpenseHandlerCreatesTripLevelExpense(t *testing.T) {
 	if createBody.Expense.TripID != tripID || createBody.Expense.AnchorType != "trip" || createBody.Expense.TripDayID != nil {
 		t.Fatalf("unexpected trip-level create response: %#v", createBody.Expense)
 	}
-	if createBody.Expense.Title == nil || *createBody.Expense.Title != "항공권" || createBody.Expense.DisplayTitle != "항공권" || createBody.Expense.ExpenseDate != "2026-06-12" || createBody.Expense.AmountMinor != 650000 || createBody.Expense.Memo == nil || *createBody.Expense.Memo != "사전 결제" || createBody.Expense.IncludeInSettlement == nil || !*createBody.Expense.IncludeInSettlement {
+	if createBody.Expense.Title == nil || *createBody.Expense.Title != "항공권" || createBody.Expense.DisplayTitle != "항공권" || createBody.Expense.ExpenseDate != "2026-06-12" || createBody.Expense.AmountMinor != 650000 || createBody.Expense.Currency != "USD" || createBody.Expense.ExpenseCategory != "transport" || createBody.Expense.Memo == nil || *createBody.Expense.Memo != "사전 결제" || createBody.Expense.IncludeInSettlement == nil || !*createBody.Expense.IncludeInSettlement {
 		t.Fatalf("unexpected create response fields: %#v", createBody.Expense)
 	}
 
@@ -2711,6 +2715,8 @@ func TestCreateTripExpenseHandlerCreatesTripLevelExpense(t *testing.T) {
 			AnchorType          string  `json:"anchorType"`
 			Title               *string `json:"title"`
 			DisplayTitle        string  `json:"displayTitle"`
+			Currency            string  `json:"currency"`
+			ExpenseCategory     string  `json:"expenseCategory"`
 			IncludeInSettlement *bool   `json:"includeInSettlement"`
 		} `json:"tripExpenses"`
 		Days []interface{} `json:"days"`
@@ -2718,7 +2724,7 @@ func TestCreateTripExpenseHandlerCreatesTripLevelExpense(t *testing.T) {
 	if err := json.NewDecoder(listRecorder.Body).Decode(&listBody); err != nil {
 		t.Fatalf("decode list response: %v", err)
 	}
-	if len(listBody.TripExpenses) != 1 || listBody.TripExpenses[0].AnchorType != "trip" || listBody.TripExpenses[0].Title != nil || listBody.TripExpenses[0].DisplayTitle != "항공권" || listBody.TripExpenses[0].IncludeInSettlement == nil || !*listBody.TripExpenses[0].IncludeInSettlement || len(listBody.Days) != 0 {
+	if len(listBody.TripExpenses) != 1 || listBody.TripExpenses[0].AnchorType != "trip" || listBody.TripExpenses[0].Title != nil || listBody.TripExpenses[0].DisplayTitle != "항공권" || listBody.TripExpenses[0].Currency != "USD" || listBody.TripExpenses[0].ExpenseCategory != "transport" || listBody.TripExpenses[0].IncludeInSettlement == nil || !*listBody.TripExpenses[0].IncludeInSettlement || len(listBody.Days) != 0 {
 		t.Fatalf("unexpected list response: %#v", listBody)
 	}
 }
@@ -2744,6 +2750,8 @@ func TestGetUpdateDeleteTripExpenseHandlers(t *testing.T) {
 		"tripDayId":null,
 		"scheduleItemId":null,
 		"amountMinor":650000,
+		"currency":"USD",
+		"expenseCategory":"transport",
 		"payerParticipantId":%q,
 		"splitPolicy":"equal",
 		"participantIds":[%q,%q],
@@ -2784,6 +2792,8 @@ func TestGetUpdateDeleteTripExpenseHandlers(t *testing.T) {
 			AnchorType          string  `json:"anchorType"`
 			TripDayID           *string `json:"tripDayId"`
 			DisplayTitle        string  `json:"displayTitle"`
+			Currency            string  `json:"currency"`
+			ExpenseCategory     string  `json:"expenseCategory"`
 			Memo                *string `json:"memo"`
 			IncludeInSettlement *bool   `json:"includeInSettlement"`
 		} `json:"expense"`
@@ -2791,13 +2801,15 @@ func TestGetUpdateDeleteTripExpenseHandlers(t *testing.T) {
 	if err := json.NewDecoder(getRecorder.Body).Decode(&got); err != nil {
 		t.Fatalf("decode get response: %v", err)
 	}
-	if got.Expense.ID != created.Expense.ID || got.Expense.AnchorType != "trip" || got.Expense.TripDayID != nil || got.Expense.DisplayTitle != "항공권" || got.Expense.Memo == nil || *got.Expense.Memo != "사전 결제" || got.Expense.IncludeInSettlement == nil || *got.Expense.IncludeInSettlement {
+	if got.Expense.ID != created.Expense.ID || got.Expense.AnchorType != "trip" || got.Expense.TripDayID != nil || got.Expense.DisplayTitle != "항공권" || got.Expense.Currency != "USD" || got.Expense.ExpenseCategory != "transport" || got.Expense.Memo == nil || *got.Expense.Memo != "사전 결제" || got.Expense.IncludeInSettlement == nil || *got.Expense.IncludeInSettlement {
 		t.Fatalf("unexpected get trip expense response: %#v", got.Expense)
 	}
 
 	patchBody := []byte(fmt.Sprintf(`{
 		"title":"숙소 예약금",
 		"amountMinor":700000,
+		"currency":"KRW",
+		"expenseCategory":"lodging",
 		"payerParticipantId":%q,
 		"splitPolicy":"manual",
 		"splits":[{"participantId":%q,"amountMinor":350000},{"participantId":%q,"amountMinor":350000}],
@@ -2815,14 +2827,16 @@ func TestGetUpdateDeleteTripExpenseHandlers(t *testing.T) {
 	}
 	var patched struct {
 		Expense struct {
-			AnchorType     string  `json:"anchorType"`
-			TripDayID      *string `json:"tripDayId"`
-			ScheduleItemID *string `json:"scheduleItemId"`
-			Title          *string `json:"title"`
-			DisplayTitle   string  `json:"displayTitle"`
-			AmountMinor    int64   `json:"amountMinor"`
-			Memo           *string `json:"memo"`
-			Place          *struct {
+			AnchorType      string  `json:"anchorType"`
+			TripDayID       *string `json:"tripDayId"`
+			ScheduleItemID  *string `json:"scheduleItemId"`
+			Title           *string `json:"title"`
+			DisplayTitle    string  `json:"displayTitle"`
+			AmountMinor     int64   `json:"amountMinor"`
+			Currency        string  `json:"currency"`
+			ExpenseCategory string  `json:"expenseCategory"`
+			Memo            *string `json:"memo"`
+			Place           *struct {
 				Name string `json:"name"`
 			} `json:"place"`
 			IncludeInSettlement *bool `json:"includeInSettlement"`
@@ -2837,7 +2851,7 @@ func TestGetUpdateDeleteTripExpenseHandlers(t *testing.T) {
 	if err := json.NewDecoder(patchRecorder.Body).Decode(&patched); err != nil {
 		t.Fatalf("decode patch response: %v", err)
 	}
-	if patched.Expense.AnchorType != "trip" || patched.Expense.TripDayID != nil || patched.Expense.ScheduleItemID != nil || patched.Expense.Title == nil || *patched.Expense.Title != "숙소 예약금" || patched.Expense.DisplayTitle != "숙소 예약금" || patched.Expense.AmountMinor != 700000 || patched.Expense.Memo == nil || *patched.Expense.Memo != "변경" || patched.Expense.Place != nil || patched.Expense.IncludeInSettlement == nil || !*patched.Expense.IncludeInSettlement || patched.Expense.Payer.ParticipantID != member.ID || len(patched.Expense.Splits) != 2 || patched.Expense.Splits[0].AmountMinor != 350000 || patched.Expense.Splits[1].AmountMinor != 350000 {
+	if patched.Expense.AnchorType != "trip" || patched.Expense.TripDayID != nil || patched.Expense.ScheduleItemID != nil || patched.Expense.Title == nil || *patched.Expense.Title != "숙소 예약금" || patched.Expense.DisplayTitle != "숙소 예약금" || patched.Expense.AmountMinor != 700000 || patched.Expense.Currency != "KRW" || patched.Expense.ExpenseCategory != "lodging" || patched.Expense.Memo == nil || *patched.Expense.Memo != "변경" || patched.Expense.Place != nil || patched.Expense.IncludeInSettlement == nil || !*patched.Expense.IncludeInSettlement || patched.Expense.Payer.ParticipantID != member.ID || len(patched.Expense.Splits) != 2 || patched.Expense.Splits[0].AmountMinor != 350000 || patched.Expense.Splits[1].AmountMinor != 350000 {
 		t.Fatalf("unexpected patch trip expense response: %#v", patched.Expense)
 	}
 
@@ -2875,7 +2889,7 @@ func TestCreateQuickExpenseHandler(t *testing.T) {
 	backend.participants[tripID] = append(backend.participants[tripID], member)
 	payerID := backend.participants[tripID][0].ID
 
-	requestBody := []byte(fmt.Sprintf(`{"scheduleItemId":%q,"amountMinor":1001,"payerParticipantId":%q,"splitPolicy":"equal","participantIds":[%q],"includeInSettlement":false}`, item.ID, payerID, member.ID))
+	requestBody := []byte(fmt.Sprintf(`{"scheduleItemId":%q,"amountMinor":1001,"currency":"USD","expenseCategory":"shopping","payerParticipantId":%q,"splitPolicy":"equal","participantIds":[%q],"includeInSettlement":false}`, item.ID, payerID, member.ID))
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/days/2026-07-11/expenses/quick", bytes.NewReader(requestBody))
 	request.Header.Set("Content-Type", "application/json")
@@ -2895,6 +2909,7 @@ func TestCreateQuickExpenseHandler(t *testing.T) {
 			DisplayTitle        string `json:"displayTitle"`
 			AmountMinor         int64  `json:"amountMinor"`
 			Currency            string `json:"currency"`
+			ExpenseCategory     string `json:"expenseCategory"`
 			SplitPolicy         string `json:"splitPolicy"`
 			IncludeInSettlement *bool  `json:"includeInSettlement"`
 			Payer               struct {
@@ -2925,7 +2940,7 @@ func TestCreateQuickExpenseHandler(t *testing.T) {
 	if body.Expense.TripID != tripID || body.Expense.TripDayID != "2026-07-11" || body.Expense.ScheduleItemID != item.ID || body.Expense.Place.TripPlaceID != item.PlaceID {
 		t.Fatalf("unexpected linked expense ids: %#v", body.Expense)
 	}
-	if body.Expense.AmountMinor != 1001 || body.Expense.Currency != "JPY" || body.Expense.SplitPolicy != "equal" || body.Expense.IncludeInSettlement == nil || *body.Expense.IncludeInSettlement || body.Expense.Payer.ParticipantID != payerID || body.Expense.Payer.DisplayName != "민수" || body.Expense.Payer.Source != "live" {
+	if body.Expense.AmountMinor != 1001 || body.Expense.Currency != "USD" || body.Expense.ExpenseCategory != "shopping" || body.Expense.SplitPolicy != "equal" || body.Expense.IncludeInSettlement == nil || *body.Expense.IncludeInSettlement || body.Expense.Payer.ParticipantID != payerID || body.Expense.Payer.DisplayName != "민수" || body.Expense.Payer.Source != "live" {
 		t.Fatalf("unexpected money/payer display: %#v", body.Expense)
 	}
 	if body.Expense.DisplayTitle != "도톤보리" || body.Expense.Place.Name != "도톤보리" || body.Expense.Place.Address != "Dotonbori" || body.Expense.Place.PlaceType != "food" || body.Expense.Place.Source != "live" {
@@ -3115,19 +3130,21 @@ func TestGetUpdateDeleteExpenseHandlers(t *testing.T) {
 	}
 	var got struct {
 		Expense struct {
-			ID           string  `json:"id"`
-			Memo         *string `json:"memo"`
-			DisplayTitle string  `json:"displayTitle"`
+			ID              string  `json:"id"`
+			Memo            *string `json:"memo"`
+			DisplayTitle    string  `json:"displayTitle"`
+			Currency        string  `json:"currency"`
+			ExpenseCategory string  `json:"expenseCategory"`
 		} `json:"expense"`
 	}
 	if err := json.NewDecoder(getRecorder.Body).Decode(&got); err != nil {
 		t.Fatalf("decode get response: %v", err)
 	}
-	if got.Expense.ID != created.Expense.ID || got.Expense.Memo != nil || got.Expense.DisplayTitle != "도톤보리" {
+	if got.Expense.ID != created.Expense.ID || got.Expense.Memo != nil || got.Expense.DisplayTitle != "도톤보리" || got.Expense.Currency != "JPY" || got.Expense.ExpenseCategory != "food" {
 		t.Fatalf("unexpected get expense response: %#v", got.Expense)
 	}
 
-	patchBody := []byte(fmt.Sprintf(`{"amountMinor":1501,"payerParticipantId":%q,"splitPolicy":"equal","participantIds":[%q,%q],"memo":"  저녁  ","scheduleItemId":null}`, member.ID, ownerParticipantID, member.ID))
+	patchBody := []byte(fmt.Sprintf(`{"amountMinor":1501,"currency":"USD","expenseCategory":"shopping","payerParticipantId":%q,"splitPolicy":"equal","participantIds":[%q,%q],"memo":"  저녁  ","scheduleItemId":null}`, member.ID, ownerParticipantID, member.ID))
 	patchRecorder := httptest.NewRecorder()
 	patchRequest := httptest.NewRequest(http.MethodPatch, "/trips/"+tripID+"/days/2026-07-11/expenses/"+created.Expense.ID, bytes.NewReader(patchBody))
 	patchRequest.Header.Set("Content-Type", "application/json")
@@ -3138,11 +3155,13 @@ func TestGetUpdateDeleteExpenseHandlers(t *testing.T) {
 	}
 	var patched struct {
 		Expense struct {
-			AnchorType     string  `json:"anchorType"`
-			AmountMinor    int64   `json:"amountMinor"`
-			Memo           *string `json:"memo"`
-			ScheduleItemID *string `json:"scheduleItemId"`
-			Place          struct {
+			AnchorType      string  `json:"anchorType"`
+			AmountMinor     int64   `json:"amountMinor"`
+			Currency        string  `json:"currency"`
+			ExpenseCategory string  `json:"expenseCategory"`
+			Memo            *string `json:"memo"`
+			ScheduleItemID  *string `json:"scheduleItemId"`
+			Place           struct {
 				Name string `json:"name"`
 			} `json:"place"`
 			Payer struct {
@@ -3156,7 +3175,7 @@ func TestGetUpdateDeleteExpenseHandlers(t *testing.T) {
 	if err := json.NewDecoder(patchRecorder.Body).Decode(&patched); err != nil {
 		t.Fatalf("decode patch response: %v", err)
 	}
-	if patched.Expense.AnchorType != "trip_day" || patched.Expense.AmountMinor != 1501 || patched.Expense.Memo == nil || *patched.Expense.Memo != "저녁" || patched.Expense.ScheduleItemID != nil || patched.Expense.Place.Name != "장소 없음" || patched.Expense.Payer.ParticipantID != member.ID || len(patched.Expense.Splits) != 2 || patched.Expense.Splits[0].AmountMinor != 751 || patched.Expense.Splits[1].AmountMinor != 750 {
+	if patched.Expense.AnchorType != "trip_day" || patched.Expense.AmountMinor != 1501 || patched.Expense.Currency != "USD" || patched.Expense.ExpenseCategory != "shopping" || patched.Expense.Memo == nil || *patched.Expense.Memo != "저녁" || patched.Expense.ScheduleItemID != nil || patched.Expense.Place.Name != "장소 없음" || patched.Expense.Payer.ParticipantID != member.ID || len(patched.Expense.Splits) != 2 || patched.Expense.Splits[0].AmountMinor != 751 || patched.Expense.Splits[1].AmountMinor != 750 {
 		t.Fatalf("unexpected patch expense response: %#v", patched.Expense)
 	}
 
@@ -5988,6 +6007,23 @@ func copyStringPtr(value *string) *string {
 	return &copyValue
 }
 
+func fakeExpenseCurrency(value *string, fallback string) string {
+	if value == nil || strings.TrimSpace(*value) == "" {
+		return fallback
+	}
+	return strings.TrimSpace(*value)
+}
+
+func fakeExpenseCategory(value *string, fallback string) string {
+	if value != nil && strings.TrimSpace(*value) != "" {
+		return strings.TrimSpace(*value)
+	}
+	if strings.TrimSpace(fallback) != "" {
+		return strings.TrimSpace(fallback)
+	}
+	return tripdomain.ExpenseCategoryEtc
+}
+
 func (b *fakeAuthBackend) GetExpenseByTripDayAndID(_ context.Context, tripID string, tripDayID string, expenseID string) (tripdomain.Expense, bool, error) {
 	for _, dayExpense := range b.dayExpenses[tripID+":"+tripDayID] {
 		if dayExpense.ID == expenseID {
@@ -6006,8 +6042,7 @@ func (b *fakeAuthBackend) GetTripExpenseByID(_ context.Context, tripID string, e
 }
 
 func (b *fakeAuthBackend) UpdateTripExpense(_ context.Context, record tripdomain.UpdateExpenseRecord) (tripdomain.Expense, error) {
-	foundTrip, ok := b.trips[record.TripID]
-	if !ok {
+	if _, ok := b.trips[record.TripID]; !ok {
 		return tripdomain.Expense{}, tripdomain.ErrNotFound
 	}
 
@@ -6066,6 +6101,8 @@ func (b *fakeAuthBackend) UpdateTripExpense(_ context.Context, record tripdomain
 	if record.IncludeInSettlement != nil {
 		includeInSettlement = *record.IncludeInSettlement
 	}
+	currency := fakeExpenseCurrency(record.Currency, existingDetail.Currency)
+	expenseCategory := fakeExpenseCategory(record.ExpenseCategory, existingDetail.ExpenseCategory)
 	updatedTripExpense := tripdomain.DayExpenseListItem{
 		ID:                  record.ExpenseID,
 		AnchorType:          "trip",
@@ -6075,7 +6112,8 @@ func (b *fakeAuthBackend) UpdateTripExpense(_ context.Context, record tripdomain
 		DisplayTitle:        displayTitle,
 		Place:               nil,
 		AmountMinor:         record.AmountMinor,
-		Currency:            foundTrip.DefaultCurrency,
+		Currency:            currency,
+		ExpenseCategory:     expenseCategory,
 		Payer:               payerDisplay,
 		SplitPolicy:         record.SplitPolicy,
 		Splits:              daySplits,
@@ -6095,7 +6133,8 @@ func (b *fakeAuthBackend) UpdateTripExpense(_ context.Context, record tripdomain
 		DisplayTitle:        displayTitle,
 		Place:               nil,
 		AmountMinor:         record.AmountMinor,
-		Currency:            foundTrip.DefaultCurrency,
+		Currency:            currency,
+		ExpenseCategory:     expenseCategory,
 		Payer:               payerDisplay,
 		Memo:                record.Memo,
 		SplitPolicy:         record.SplitPolicy,
@@ -6124,8 +6163,7 @@ func (b *fakeAuthBackend) DeleteTripExpenseByID(_ context.Context, tripID string
 }
 
 func (b *fakeAuthBackend) UpdateExpense(_ context.Context, record tripdomain.UpdateExpenseRecord) (tripdomain.Expense, error) {
-	foundTrip, ok := b.trips[record.TripID]
-	if !ok {
+	if _, ok := b.trips[record.TripID]; !ok {
 		return tripdomain.Expense{}, tripdomain.ErrNotFound
 	}
 
@@ -6211,6 +6249,8 @@ func (b *fakeAuthBackend) UpdateExpense(_ context.Context, record tripdomain.Upd
 	if record.IncludeInSettlement != nil {
 		includeInSettlement = *record.IncludeInSettlement
 	}
+	currency := fakeExpenseCurrency(record.Currency, existing.Currency)
+	expenseCategory := fakeExpenseCategory(record.ExpenseCategory, existing.ExpenseCategory)
 	updatedDayExpense := tripdomain.DayExpenseListItem{
 		ID:                  existing.ID,
 		AnchorType:          anchorType,
@@ -6220,7 +6260,8 @@ func (b *fakeAuthBackend) UpdateExpense(_ context.Context, record tripdomain.Upd
 		DisplayTitle:        displayTitle,
 		Place:               placeDisplay,
 		AmountMinor:         record.AmountMinor,
-		Currency:            foundTrip.DefaultCurrency,
+		Currency:            currency,
+		ExpenseCategory:     expenseCategory,
 		Payer:               payerDisplay,
 		SplitPolicy:         record.SplitPolicy,
 		Splits:              daySplits,
@@ -6240,6 +6281,7 @@ func (b *fakeAuthBackend) UpdateExpense(_ context.Context, record tripdomain.Upd
 		Place:               updatedDayExpense.Place,
 		AmountMinor:         updatedDayExpense.AmountMinor,
 		Currency:            updatedDayExpense.Currency,
+		ExpenseCategory:     updatedDayExpense.ExpenseCategory,
 		Payer:               updatedDayExpense.Payer,
 		Memo:                record.Memo,
 		SplitPolicy:         updatedDayExpense.SplitPolicy,
@@ -6272,6 +6314,7 @@ func expenseFromDayExpenseListItem(tripID string, expense tripdomain.DayExpenseL
 		Place:               expense.Place,
 		AmountMinor:         expense.AmountMinor,
 		Currency:            expense.Currency,
+		ExpenseCategory:     expense.ExpenseCategory,
 		Payer:               expense.Payer,
 		SplitPolicy:         expense.SplitPolicy,
 		Splits:              expenseSplitsFromDaySplits(expense.Splits),
@@ -6348,6 +6391,8 @@ func (b *fakeAuthBackend) CreateQuickExpense(_ context.Context, record tripdomai
 	placeType := foundItem.Place.PlaceType
 	placeDisplay := &tripdomain.ExpensePlaceDisplay{TripPlaceID: &tripPlaceID, Name: foundItem.Place.Name, Address: &placeAddress, PlaceType: &placeType, Source: tripdomain.ExpenseDisplaySourceLive}
 	payerDisplay := tripdomain.ExpenseParticipantDisplay{ParticipantID: &payerParticipantID, DisplayName: tripdomain.NormalizeParticipantDisplayName(payer.DisplayName), Source: tripdomain.ExpenseDisplaySourceLive}
+	currency := fakeExpenseCurrency(record.Currency, foundTrip.DefaultCurrency)
+	expenseCategory := fakeExpenseCategory(record.ExpenseCategory, foundItem.Place.PlaceType)
 
 	daySplits := make([]tripdomain.DayExpenseSplitListItem, 0, len(splitRecords))
 	for _, splitRecord := range splitRecords {
@@ -6368,7 +6413,8 @@ func (b *fakeAuthBackend) CreateQuickExpense(_ context.Context, record tripdomai
 		DisplayTitle:        foundItem.Place.Name,
 		Place:               placeDisplay,
 		AmountMinor:         record.AmountMinor,
-		Currency:            foundTrip.DefaultCurrency,
+		Currency:            currency,
+		ExpenseCategory:     expenseCategory,
 		Payer:               payerDisplay,
 		SplitPolicy:         record.SplitPolicy,
 		Splits:              daySplits,
@@ -6386,7 +6432,8 @@ func (b *fakeAuthBackend) CreateQuickExpense(_ context.Context, record tripdomai
 		DisplayTitle:        foundItem.Place.Name,
 		Place:               placeDisplay,
 		AmountMinor:         record.AmountMinor,
-		Currency:            foundTrip.DefaultCurrency,
+		Currency:            currency,
+		ExpenseCategory:     expenseCategory,
 		Payer:               payerDisplay,
 		SplitPolicy:         record.SplitPolicy,
 		Splits:              splits,
@@ -6481,6 +6528,12 @@ func (b *fakeAuthBackend) CreateTripExpense(_ context.Context, record tripdomain
 	createdAt := time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC).Add(time.Duration(b.nextExpense) * time.Minute)
 	payerParticipantID := payer.ID
 	payerDisplay := tripdomain.ExpenseParticipantDisplay{ParticipantID: &payerParticipantID, DisplayName: tripdomain.NormalizeParticipantDisplayName(payer.DisplayName), Source: tripdomain.ExpenseDisplaySourceLive}
+	placeTypeFallback := ""
+	if placeDisplay != nil && placeDisplay.PlaceType != nil {
+		placeTypeFallback = *placeDisplay.PlaceType
+	}
+	currency := fakeExpenseCurrency(record.Currency, foundTrip.DefaultCurrency)
+	expenseCategory := fakeExpenseCategory(record.ExpenseCategory, placeTypeFallback)
 	dayExpense := tripdomain.DayExpenseListItem{
 		ID:                  expenseID,
 		AnchorType:          anchorType,
@@ -6490,7 +6543,8 @@ func (b *fakeAuthBackend) CreateTripExpense(_ context.Context, record tripdomain
 		DisplayTitle:        displayTitle,
 		Place:               placeDisplay,
 		AmountMinor:         record.AmountMinor,
-		Currency:            foundTrip.DefaultCurrency,
+		Currency:            currency,
+		ExpenseCategory:     expenseCategory,
 		Payer:               payerDisplay,
 		SplitPolicy:         record.SplitPolicy,
 		Splits:              daySplits,
@@ -6508,7 +6562,8 @@ func (b *fakeAuthBackend) CreateTripExpense(_ context.Context, record tripdomain
 		DisplayTitle:        displayTitle,
 		Place:               placeDisplay,
 		AmountMinor:         record.AmountMinor,
-		Currency:            foundTrip.DefaultCurrency,
+		Currency:            currency,
+		ExpenseCategory:     expenseCategory,
 		Payer:               payerDisplay,
 		Memo:                record.Memo,
 		SplitPolicy:         record.SplitPolicy,

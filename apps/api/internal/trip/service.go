@@ -702,6 +702,14 @@ func (s *Service) UpdateTripExpense(ctx context.Context, userID string, tripID s
 	if err != nil {
 		return UpdateExpenseResult{}, err
 	}
+	currency, err := normalizeOptionalExpenseCurrency(input.Currency)
+	if err != nil {
+		return UpdateExpenseResult{}, err
+	}
+	expenseCategory, err := normalizeOptionalExpenseCategory(input.ExpenseCategory)
+	if err != nil {
+		return UpdateExpenseResult{}, err
+	}
 	if !isUUID(expenseID) || !isUUID(payerParticipantID) || input.AmountMinor < 1 {
 		return UpdateExpenseResult{}, ErrValidation
 	}
@@ -725,6 +733,8 @@ func (s *Service) UpdateTripExpense(ctx context.Context, userID string, tripID s
 		TripID:              tripID,
 		ExpenseID:           expenseID,
 		AmountMinor:         input.AmountMinor,
+		Currency:            currency,
+		ExpenseCategory:     expenseCategory,
 		PayerParticipantID:  payerParticipantID,
 		SplitPolicy:         splitPolicy,
 		ParticipantIDs:      participantIDs,
@@ -766,6 +776,14 @@ func (s *Service) UpdateExpense(ctx context.Context, userID string, tripID strin
 	if err != nil {
 		return UpdateExpenseResult{}, err
 	}
+	currency, err := normalizeOptionalExpenseCurrency(input.Currency)
+	if err != nil {
+		return UpdateExpenseResult{}, err
+	}
+	expenseCategory, err := normalizeOptionalExpenseCategory(input.ExpenseCategory)
+	if err != nil {
+		return UpdateExpenseResult{}, err
+	}
 	if !isUUID(expenseID) || !isUUID(payerParticipantID) || input.AmountMinor < 1 {
 		return UpdateExpenseResult{}, ErrValidation
 	}
@@ -794,6 +812,8 @@ func (s *Service) UpdateExpense(ctx context.Context, userID string, tripID strin
 		TripDayID:           strings.TrimSpace(tripDayID),
 		ExpenseID:           expenseID,
 		AmountMinor:         input.AmountMinor,
+		Currency:            currency,
+		ExpenseCategory:     expenseCategory,
 		PayerParticipantID:  payerParticipantID,
 		SplitPolicy:         splitPolicy,
 		ParticipantIDs:      participantIDs,
@@ -838,6 +858,14 @@ func (s *Service) CreateQuickExpense(ctx context.Context, userID string, tripID 
 	if err != nil {
 		return CreateQuickExpenseResult{}, err
 	}
+	currency, err := normalizeOptionalExpenseCurrency(input.Currency)
+	if err != nil {
+		return CreateQuickExpenseResult{}, err
+	}
+	expenseCategory, err := normalizeOptionalExpenseCategory(input.ExpenseCategory)
+	if err != nil {
+		return CreateQuickExpenseResult{}, err
+	}
 	if !isUUID(scheduleItemID) || !isUUID(payerParticipantID) || input.AmountMinor < 1 {
 		return CreateQuickExpenseResult{}, ErrValidation
 	}
@@ -850,6 +878,8 @@ func (s *Service) CreateQuickExpense(ctx context.Context, userID string, tripID 
 		TripDayID:           strings.TrimSpace(tripDayID),
 		ScheduleItemID:      scheduleItemID,
 		AmountMinor:         input.AmountMinor,
+		Currency:            currency,
+		ExpenseCategory:     expenseCategory,
 		PayerParticipantID:  payerParticipantID,
 		SplitPolicy:         splitPolicy,
 		ParticipantIDs:      participantIDs,
@@ -911,6 +941,14 @@ func (s *Service) CreateTripExpense(ctx context.Context, userID string, tripID s
 	if err != nil {
 		return CreateTripExpenseResult{}, err
 	}
+	currency, err := normalizeOptionalExpenseCurrency(input.Currency)
+	if err != nil {
+		return CreateTripExpenseResult{}, err
+	}
+	expenseCategory, err := normalizeOptionalExpenseCategory(input.ExpenseCategory)
+	if err != nil {
+		return CreateTripExpenseResult{}, err
+	}
 
 	_, ok, err := s.repo.GetTripByID(ctx, tripID)
 	if err != nil {
@@ -941,6 +979,8 @@ func (s *Service) CreateTripExpense(ctx context.Context, userID string, tripID s
 		TripDayID:           tripDayID,
 		ScheduleItemID:      scheduleItemID,
 		AmountMinor:         input.AmountMinor,
+		Currency:            currency,
+		ExpenseCategory:     expenseCategory,
 		PayerParticipantID:  payerParticipantID,
 		SplitPolicy:         splitPolicy,
 		ParticipantIDs:      participantIDs,
@@ -1870,6 +1910,37 @@ func isSupportedCurrency(value string) bool {
 	default:
 		return false
 	}
+}
+
+func normalizeOptionalExpenseCurrency(value *string) (*string, error) {
+	if value == nil {
+		return nil, nil
+	}
+	trimmed := strings.TrimSpace(*value)
+	if !isSupportedCurrency(trimmed) {
+		return nil, ErrValidation
+	}
+	return &trimmed, nil
+}
+
+func isSupportedExpenseCategory(value string) bool {
+	switch value {
+	case ExpenseCategoryCafe, ExpenseCategoryEtc, ExpenseCategoryFood, ExpenseCategoryLodging, ExpenseCategoryShopping, ExpenseCategorySights, ExpenseCategoryTransport:
+		return true
+	default:
+		return false
+	}
+}
+
+func normalizeOptionalExpenseCategory(value *string) (*string, error) {
+	if value == nil {
+		return nil, nil
+	}
+	trimmed := strings.TrimSpace(*value)
+	if !isSupportedExpenseCategory(trimmed) {
+		return nil, ErrValidation
+	}
+	return &trimmed, nil
 }
 
 func isSupportedPlaceType(value string) bool {

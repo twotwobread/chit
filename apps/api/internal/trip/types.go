@@ -86,6 +86,8 @@ type CreateManualDayLodgingPlaceInput struct {
 type CreateQuickExpenseInput struct {
 	ScheduleItemID      string
 	AmountMinor         int64
+	Currency            *string
+	ExpenseCategory     *string
 	PayerParticipantID  string
 	SplitPolicy         string
 	ParticipantIDs      []string
@@ -100,6 +102,8 @@ type CreateTripExpenseInput struct {
 	TripDayID           *string
 	ScheduleItemID      *string
 	AmountMinor         int64
+	Currency            *string
+	ExpenseCategory     *string
 	PayerParticipantID  string
 	SplitPolicy         string
 	ParticipantIDs      []string
@@ -111,6 +115,8 @@ type CreateTripExpenseInput struct {
 
 type UpdateExpenseInput struct {
 	AmountMinor         int64
+	Currency            *string
+	ExpenseCategory     *string
 	PayerParticipantID  string
 	SplitPolicy         string
 	ParticipantIDs      []string
@@ -272,6 +278,8 @@ type CreateQuickExpenseRecord struct {
 	TripDayID           string
 	ScheduleItemID      string
 	AmountMinor         int64
+	Currency            *string
+	ExpenseCategory     *string
 	PayerParticipantID  string
 	SplitPolicy         string
 	ParticipantIDs      []string
@@ -288,6 +296,8 @@ type CreateTripExpenseRecord struct {
 	TripDayID           *string
 	ScheduleItemID      *string
 	AmountMinor         int64
+	Currency            *string
+	ExpenseCategory     *string
 	PayerParticipantID  string
 	SplitPolicy         string
 	ParticipantIDs      []string
@@ -303,6 +313,8 @@ type UpdateExpenseRecord struct {
 	TripDayID           string
 	ExpenseID           string
 	AmountMinor         int64
+	Currency            *string
+	ExpenseCategory     *string
 	PayerParticipantID  string
 	SplitPolicy         string
 	ParticipantIDs      []string
@@ -562,6 +574,14 @@ const (
 	ExpenseSplitPolicyEqual      = "equal"
 	ExpenseSplitPolicyManual     = "manual"
 
+	ExpenseCategoryCafe      = "cafe"
+	ExpenseCategoryEtc       = "etc"
+	ExpenseCategoryFood      = "food"
+	ExpenseCategoryLodging   = "lodging"
+	ExpenseCategoryShopping  = "shopping"
+	ExpenseCategorySights    = "sights"
+	ExpenseCategoryTransport = "transport"
+
 	ExpenseReceiptConfidenceHigh   = "high"
 	ExpenseReceiptConfidenceMedium = "medium"
 	ExpenseReceiptConfidenceLow    = "low"
@@ -733,6 +753,7 @@ type Expense struct {
 	Place               *ExpensePlaceDisplay
 	AmountMinor         int64
 	Currency            string
+	ExpenseCategory     string
 	Payer               ExpenseParticipantDisplay
 	Memo                *string
 	SplitPolicy         string
@@ -774,6 +795,7 @@ type DayExpenseListItem struct {
 	Place               *ExpensePlaceDisplay
 	AmountMinor         int64
 	Currency            string
+	ExpenseCategory     string
 	Payer               ExpenseParticipantDisplay
 	SplitPolicy         string
 	Splits              []DayExpenseSplitListItem

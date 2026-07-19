@@ -2,8 +2,10 @@ import { useCallback, useState } from 'react';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 
 import {
+  type ExpenseCategory,
   type ExpenseReceiptDraft,
   type GetDayScheduleItemsResponse,
+  type ScheduleItem,
   type SupportedCurrency,
   type TripParticipantListItem,
 } from '@i-um/api-contract';
@@ -88,6 +90,7 @@ export function useQuickExpenseController() {
   const [splitPolicy, setSplitPolicy] = useState<QuickExpenseSplitPolicy>('equal');
   const [manualSplitInputs, setManualSplitInputs] = useState<QuickExpenseManualSplitInput[]>([]);
   const [includeInSettlement, setIncludeInSettlement] = useState(true);
+  const [expenseCategory, setExpenseCategory] = useState<ExpenseCategory>('etc');
   const [errors, setErrors] = useState<QuickExpenseFormErrors>({});
   const [saving, setSaving] = useState(false);
   const [formMessage, setFormMessage] = useState<string | null>(null);
@@ -154,6 +157,7 @@ export function useQuickExpenseController() {
       const participants = participantsResponse.participants;
       setSelectedItemId(selectedItemId);
       setSelectedTripDayId(initialTripDayId);
+      setExpenseCategory(expenseCategoryFromScheduleItems(scheduleItems, selectedItemId));
       setPayerParticipantId(participants.length === 1 ? participants[0].participantId : null);
       setSelectedSplitParticipantIds(buildDefaultSplitParticipantIds(participants));
       setSplitPolicy('equal');
@@ -214,10 +218,27 @@ export function useQuickExpenseController() {
     setFormMessage(null);
   };
 
+  const selectCurrency = (currency: SupportedCurrency) => {
+    setState((current) => (current.status === 'success' ? { ...current, currency } : current));
+    setErrors((current) => ({ ...current, amount: undefined }));
+    setFormMessage(null);
+  };
+
+  const selectExpenseCategory = (nextExpenseCategory: ExpenseCategory) => {
+    setExpenseCategory(nextExpenseCategory);
+    setFormMessage(null);
+  };
+
   const selectItem = (itemId: string) => {
     setSelectedItemId(itemId);
     if (state.status === 'success') {
       setSelectedTripDayId(resolveQuickExpenseItemDayId(state.itineraries, itemId) ?? selectedTripDayId);
+      setExpenseCategory(
+        expenseCategoryFromScheduleItems(
+          state.itineraries.flatMap((candidate) => getScheduleItems(candidate)),
+          itemId,
+        ),
+      );
     }
     setErrors((current) => ({ ...current, item: undefined }));
     setFormMessage(null);
@@ -322,15 +343,12 @@ export function useQuickExpenseController() {
     const extraction = draft.extraction;
     const candidateCurrency = extraction.currency ?? currentState.currency;
     const warnings: string[] = [];
+    if (extraction.currency && extraction.currency !== currentState.currency) {
+      selectCurrency(extraction.currency);
+    }
     if (extraction.totalAmountMinor != null) {
-      if (candidateCurrency === currentState.currency) {
-        setAmountInput(formatAmountInput(extraction.totalAmountMinor, currentState.currency));
-        setErrors((current) => ({ ...current, amount: undefined }));
-      } else {
-        warnings.push(
-          `영수증 통화(${candidateCurrency})가 여행 통화(${currentState.currency})와 달라 금액은 직접 확인해주세요.`,
-        );
-      }
+      setAmountInput(formatAmountInput(extraction.totalAmountMinor, candidateCurrency));
+      setErrors((current) => ({ ...current, amount: undefined }));
     }
     if (currentState.mode === 'settlement') {
       const titleCandidate = extraction.expenseTitle?.trim() || extraction.merchantName?.trim() || '';
@@ -415,6 +433,7 @@ export function useQuickExpenseController() {
       expenseDate: expenseDateInput,
       amountInput,
       currency: state.currency,
+      expenseCategory,
       selectedTripDayId,
       scheduleItemId: selectedItemId,
       splitPolicy,
@@ -442,6 +461,7 @@ export function useQuickExpenseController() {
     const validation = buildCreateQuickExpenseRequest({
       amountInput,
       currency: state.currency,
+      expenseCategory,
       scheduleItemId: selectedItemId,
       splitPolicy,
       participantIds: selectedSplitParticipantIds,
@@ -509,6 +529,7 @@ export function useQuickExpenseController() {
     clearTripDay,
     completeSavedExpense,
     errors,
+    expenseCategory,
     expenseDateInput,
     formMessage,
     goToLogin,
@@ -522,6 +543,8 @@ export function useQuickExpenseController() {
     receiptMessage,
     savedSummary,
     saving,
+    selectCurrency,
+    selectExpenseCategory,
     selectItem,
     selectPayer,
     selectTripDay,
@@ -543,6 +566,27 @@ export function useQuickExpenseController() {
     updateTitleInput,
     viewModel,
   };
+}
+
+function expenseCategoryFromScheduleItems(items: ScheduleItem[], selectedItemId: string | null): ExpenseCategory {
+  const placeType = selectedItemId ? items.find((item) => item.id === selectedItemId)?.place.placeType : null;
+  switch (placeType) {
+    case 'cafe':
+    case 'food':
+    case 'lodging':
+    case 'shopping':
+    case 'sights':
+    case 'transport':
+      return placeType;
+    case 'etc':
+    case null:
+    case undefined:
+      return 'etc';
+    default: {
+      const exhaustive: never = placeType;
+      return exhaustive;
+    }
+  }
 }
 
 class QuickExpenseValidationAbort extends Error {}

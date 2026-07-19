@@ -31,6 +31,7 @@ export default function ExpenseEditScreen() {
     confirmDelete,
     deleting,
     errors,
+    expenseCategory,
     formMessage,
     goBack,
     includeInSettlement,
@@ -39,6 +40,8 @@ export default function ExpenseEditScreen() {
     memoInput,
     saving,
     clearTripDay,
+    selectCurrency,
+    selectExpenseCategory,
     selectItem,
     selectTripDay,
     setAmountInput,
@@ -124,6 +127,7 @@ export default function ExpenseEditScreen() {
     ? buildExpenseEditFormSubmitState({
         amountInput,
         deleting,
+        expenseCategory,
         includeInSettlement,
         manualSplitInputs,
         memoInput,
@@ -184,6 +188,7 @@ export default function ExpenseEditScreen() {
             amountInput={amountInput}
             deleting={deleting}
             errors={errors}
+            expenseCategory={expenseCategory}
             formMessage={formMessage}
             includeInSettlement={includeInSettlement}
             memoInput={memoInput}
@@ -193,6 +198,8 @@ export default function ExpenseEditScreen() {
             onMemoFocus={scrollMemoInputIntoView}
             onMemoLayout={handleMemoLayout}
             onPayerChange={setPayerParticipantId}
+            onCurrencyChange={selectCurrency}
+            onExpenseCategoryChange={selectExpenseCategory}
             onSettlementIncludeChange={setIncludeInSettlement}
             onClearTripDay={clearTripDay}
             onPlaceChange={selectItem}

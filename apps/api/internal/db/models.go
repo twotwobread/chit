@@ -58,6 +58,7 @@ type Expense struct {
 	PlaceType           pgtype.Text
 	AmountMinor         int64
 	Currency            string
+	ExpenseCategory     string
 	SplitPolicy         string
 	PayerParticipantID  pgtype.UUID
 	PayerDisplayName    string

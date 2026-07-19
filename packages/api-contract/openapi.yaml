@@ -4273,6 +4273,16 @@ components:
           enum:
             - initialized
           example: initialized
+    ExpenseCategory:
+      type: string
+      enum:
+        - cafe
+        - etc
+        - food
+        - lodging
+        - shopping
+        - sights
+        - transport
     SupportedCurrency:
       type: string
       enum:
@@ -5198,6 +5208,7 @@ components:
         - place
         - amountMinor
         - currency
+        - expenseCategory
         - payer
         - splitPolicy
         - splits
@@ -5232,6 +5243,8 @@ components:
           minimum: 1
         currency:
           $ref: '#/components/schemas/SupportedCurrency'
+        expenseCategory:
+          $ref: '#/components/schemas/ExpenseCategory'
         payer:
           $ref: '#/components/schemas/ExpenseParticipantDisplay'
         splitPolicy:
@@ -5520,6 +5533,12 @@ components:
           type: string
           nullable: true
           description: Same-day schedule item to link, or null to clear the linked place.
+        currency:
+          $ref: '#/components/schemas/SupportedCurrency'
+          description: When provided, replaces the expense currency. Amount and split minor units are interpreted in this currency without FX conversion. Omit to keep the existing value.
+        expenseCategory:
+          $ref: '#/components/schemas/ExpenseCategory'
+          description: When provided, replaces the expense category used for settlement analytics and row markers. Omit to keep the existing value.
         includeInSettlement:
           type: boolean
           description: When provided, updates whether the expense is included in final settlement calculations. Omit to keep the existing value.
@@ -5565,6 +5584,12 @@ components:
           type: integer
           format: int64
           minimum: 1
+        currency:
+          $ref: '#/components/schemas/SupportedCurrency'
+          description: Expense currency. Defaults to the trip default currency when omitted.
+        expenseCategory:
+          $ref: '#/components/schemas/ExpenseCategory'
+          description: Expense category used for settlement analytics. Defaults to linked place type when available, otherwise etc.
         payerParticipantId:
           type: string
         splitPolicy:
@@ -5618,6 +5643,12 @@ components:
           format: int64
           minimum: 1
           description: Positive amount in currency minor units.
+        currency:
+          $ref: '#/components/schemas/SupportedCurrency'
+          description: Expense currency. Defaults to the trip default currency when omitted.
+        expenseCategory:
+          $ref: '#/components/schemas/ExpenseCategory'
+          description: Expense category used for settlement analytics. Defaults to linked place type when available, otherwise etc.
         payerParticipantId:
           type: string
           description: Active trip participant who paid the expense.
@@ -5666,6 +5697,7 @@ components:
         - place
         - amountMinor
         - currency
+        - expenseCategory
         - payer
         - memo
         - splitPolicy
@@ -5709,6 +5741,8 @@ components:
           minimum: 1
         currency:
           $ref: '#/components/schemas/SupportedCurrency'
+        expenseCategory:
+          $ref: '#/components/schemas/ExpenseCategory'
         payer:
           $ref: '#/components/schemas/ExpenseParticipantDisplay'
         memo:

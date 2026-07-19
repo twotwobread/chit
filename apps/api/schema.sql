@@ -421,6 +421,7 @@ CREATE TABLE expenses (
   place_type text,
   amount_minor bigint NOT NULL,
   currency text NOT NULL,
+  expense_category text NOT NULL DEFAULT 'etc',
   split_policy text NOT NULL DEFAULT 'equal',
   payer_participant_id uuid REFERENCES trip_participants(id) ON DELETE SET NULL,
   payer_display_name text NOT NULL,
@@ -444,6 +445,7 @@ CREATE TABLE expenses (
   CONSTRAINT expenses_place_type_check CHECK (place_type IS NULL OR place_type IN ('sights', 'food', 'lodging', 'cafe', 'shopping', 'transport', 'etc')),
   CONSTRAINT expenses_amount_minor_check CHECK (amount_minor > 0),
   CONSTRAINT expenses_currency_check CHECK (currency IN ('KRW', 'JPY', 'USD', 'EUR')),
+  CONSTRAINT expenses_expense_category_check CHECK (expense_category IN ('cafe', 'etc', 'food', 'lodging', 'shopping', 'sights', 'transport')),
   CONSTRAINT expenses_split_policy_check CHECK (split_policy IN ('equal', 'manual')),
   CONSTRAINT expenses_payer_display_name_length_check CHECK (char_length(payer_display_name) BETWEEN 1 AND 80),
   CONSTRAINT expenses_memo_length_check CHECK (memo IS NULL OR char_length(memo) <= 240)

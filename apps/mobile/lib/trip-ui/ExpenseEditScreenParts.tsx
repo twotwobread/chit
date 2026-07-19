@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { Text, TextInput, View } from 'react-native';
 
+import { type SupportedCurrency } from '@i-um/api-contract';
+
 import { Card, PrimaryButton, SecondaryButton, theme } from '../design';
+import { type ExpenseCategory } from './expense-category-markers';
 import {
   buildUpdateExpenseRequest,
   type ExpenseEditFormErrors,
@@ -15,6 +18,8 @@ import {
   type QuickExpenseSplitPolicy,
 } from '../trips/quick-expense';
 import {
+  ExpenseCategorySelector,
+  ExpenseCurrencySelector,
   ExpenseFormScheduleSelector,
   ExpenseFormSummaryActionRow,
   ExpensePaymentSplitSheet,
@@ -25,6 +30,7 @@ import { styles } from './ExpenseEditScreenStyles';
 export type ExpenseEditFormSubmitStateInput = {
   amountInput: string;
   deleting: boolean;
+  expenseCategory: ExpenseCategory;
   includeInSettlement: boolean;
   manualSplitInputs: QuickExpenseManualSplitInput[];
   memoInput: string;
@@ -37,6 +43,7 @@ export type ExpenseEditFormSubmitStateInput = {
 export function buildExpenseEditFormSubmitState({
   amountInput,
   deleting,
+  expenseCategory,
   includeInSettlement,
   manualSplitInputs,
   memoInput,
@@ -56,6 +63,7 @@ export function buildExpenseEditFormSubmitState({
   const saveValidation = buildUpdateExpenseRequest({
     amountInput,
     currency: viewModel.currency,
+    expenseCategory,
     splitPolicy,
     participantIds: selectedSplitParticipantIds,
     manualSplitInputs: activeManualSplitInputs,
@@ -73,6 +81,7 @@ export function ExpenseEditForm({
   amountInput,
   deleting,
   errors,
+  expenseCategory,
   formMessage,
   includeInSettlement,
   memoInput,
@@ -82,6 +91,8 @@ export function ExpenseEditForm({
   onMemoFocus,
   onMemoLayout,
   onPayerChange,
+  onCurrencyChange,
+  onExpenseCategoryChange,
   onSettlementIncludeChange,
   onClearTripDay,
   onPlaceChange,
@@ -101,6 +112,7 @@ export function ExpenseEditForm({
   amountInput: string;
   deleting: boolean;
   errors: ExpenseEditFormErrors;
+  expenseCategory: ExpenseCategory;
   formMessage: string | null;
   includeInSettlement: boolean;
   memoInput: string;
@@ -110,6 +122,8 @@ export function ExpenseEditForm({
   onMemoFocus?: () => void;
   onMemoLayout?: (layout: { height: number; y: number }) => void;
   onPayerChange: (value: string) => void;
+  onCurrencyChange: (value: SupportedCurrency) => void;
+  onExpenseCategoryChange: (value: ExpenseCategory) => void;
   onSettlementIncludeChange: (value: boolean) => void;
   onClearTripDay: () => void;
   onPlaceChange: (value: string | null) => void;
@@ -134,6 +148,7 @@ export function ExpenseEditForm({
   const submitState = buildExpenseEditFormSubmitState({
     amountInput,
     deleting,
+    expenseCategory,
     includeInSettlement,
     manualSplitInputs,
     memoInput,
@@ -185,7 +200,7 @@ export function ExpenseEditForm({
         <View style={styles.fieldGroup}>
           <Text style={styles.label}>금액</Text>
           <TextInput
-            keyboardType="decimal-pad"
+            keyboardType={viewModel.currency === 'KRW' || viewModel.currency === 'JPY' ? 'number-pad' : 'decimal-pad'}
             onChangeText={onAmountChange}
             placeholder={viewModel.amountLabel}
             placeholderTextColor={theme.color.textFaint}
@@ -193,10 +208,19 @@ export function ExpenseEditForm({
             value={amountInput}
           />
           {errors.amount ? <Text style={styles.validationText}>{errors.amount}</Text> : null}
-          <Text style={styles.readOnlyText}>
-            통화: {viewModel.currency} · {viewModel.currencyLabel}
-          </Text>
         </View>
+
+        <ExpenseCurrencySelector
+          currency={viewModel.currency}
+          disabled={saving || deleting}
+          onSelectCurrency={onCurrencyChange}
+        />
+
+        <ExpenseCategorySelector
+          disabled={saving || deleting}
+          expenseCategory={expenseCategory}
+          onSelectExpenseCategory={onExpenseCategoryChange}
+        />
 
         <ExpenseFormSummaryActionRow
           disabled={saving || deleting}

@@ -2,8 +2,10 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
+import type { ExpenseCategory } from './ExpenseCategory';
 import type { ExpenseSplitPolicy } from './ExpenseSplitPolicy';
 import type { ManualExpenseSplitInput } from './ManualExpenseSplitInput';
+import type { SupportedCurrency } from './SupportedCurrency';
 export type CreateQuickExpenseRequest = {
     /**
      * Required schedule item for the selected Day. Must belong to tripId/tripDayId.
@@ -13,6 +15,14 @@ export type CreateQuickExpenseRequest = {
      * Positive amount in currency minor units.
      */
     amountMinor: number;
+    /**
+     * Expense currency. Defaults to the trip default currency when omitted.
+     */
+    currency?: SupportedCurrency;
+    /**
+     * Expense category used for settlement analytics. Defaults to linked place type when available, otherwise etc.
+     */
+    expenseCategory?: ExpenseCategory;
     /**
      * Active trip participant who paid the expense.
      */

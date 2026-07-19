@@ -345,6 +345,7 @@ func dayExpenseListItemToOpenAPI(expense trip.DayExpenseListItem) openapi.DayExp
 		Place:               expensePlaceDisplayToOpenAPI(expense.Place),
 		AmountMinor:         expense.AmountMinor,
 		Currency:            openapi.SupportedCurrency(expense.Currency),
+		ExpenseCategory:     openapi.ExpenseCategory(expense.ExpenseCategory),
 		Payer:               expenseParticipantDisplayToOpenAPI(expense.Payer),
 		SplitPolicy:         openapi.ExpenseSplitPolicy(expense.SplitPolicy),
 		Splits:              splits,
@@ -374,6 +375,7 @@ func expenseToOpenAPI(expense trip.Expense) openapi.Expense {
 		Place:               expensePlaceDisplayToOpenAPI(expense.Place),
 		AmountMinor:         expense.AmountMinor,
 		Currency:            openapi.SupportedCurrency(expense.Currency),
+		ExpenseCategory:     openapi.ExpenseCategory(expense.ExpenseCategory),
 		Payer:               expenseParticipantDisplayToOpenAPI(expense.Payer),
 		Memo:                expense.Memo,
 		SplitPolicy:         openapi.ExpenseSplitPolicy(expense.SplitPolicy),
@@ -861,6 +863,14 @@ func optionalCurrencyFromOpenAPI(value *openapi.SupportedCurrency) *string {
 	}
 	currency := string(*value)
 	return &currency
+}
+
+func optionalExpenseCategoryFromOpenAPI(value *openapi.ExpenseCategory) *string {
+	if value == nil {
+		return nil
+	}
+	category := string(*value)
+	return &category
 }
 
 func optionalPlaceTypeFromOpenAPI(value *openapi.TripPlaceType) *string {

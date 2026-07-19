@@ -215,6 +215,7 @@ test('builds update expense request with trimmed memo and nullable place', () =>
   const result = buildUpdateExpenseRequest({
     amountInput: '2,500',
     currency: 'JPY',
+    expenseCategory: 'cafe',
     splitPolicy: 'equal',
     participantIds: buildExpenseEditParticipantIds(participants),
     manualSplitInputs: [],
@@ -229,6 +230,8 @@ test('builds update expense request with trimmed memo and nullable place', () =>
   }
   assert.deepEqual(result.request, {
     amountMinor: 2500,
+    currency: 'JPY',
+    expenseCategory: 'cafe',
     payerParticipantId: 'participant-a',
     splitPolicy: 'equal',
     participantIds: ['participant-a', 'participant-b'],
@@ -281,6 +284,7 @@ test('builds update expense request with nullable general expense title', () => 
   }
   assert.deepEqual(result.request, {
     amountMinor: 2500,
+    currency: 'JPY',
     payerParticipantId: 'participant-a',
     splitPolicy: 'equal',
     participantIds: ['participant-a', 'participant-b'],
@@ -354,6 +358,7 @@ test('builds update expense request with manual split rows', () => {
   }
   assert.deepEqual(result.request, {
     amountMinor: 1000,
+    currency: 'JPY',
     payerParticipantId: 'participant-payer',
     splitPolicy: 'manual',
     splits: [

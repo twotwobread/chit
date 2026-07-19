@@ -258,6 +258,7 @@ SELECT
   END::text AS place_source,
   e.amount_minor,
   e.currency,
+  e.expense_category,
   COALESCE(payer.id::text, e.payer_participant_id::text, '')::text AS payer_participant_id,
   COALESCE(payer.display_name, e.payer_display_name, '여행자')::text AS payer_display_name,
   CASE
@@ -316,6 +317,7 @@ type GetExpenseByTripDayAndIDRow struct {
 	PlaceSource         string
 	AmountMinor         int64
 	Currency            string
+	ExpenseCategory     string
 	PayerParticipantID  string
 	PayerDisplayName    string
 	PayerSource         string
@@ -348,6 +350,7 @@ func (q *Queries) GetExpenseByTripDayAndID(ctx context.Context, arg GetExpenseBy
 		&i.PlaceSource,
 		&i.AmountMinor,
 		&i.Currency,
+		&i.ExpenseCategory,
 		&i.PayerParticipantID,
 		&i.PayerDisplayName,
 		&i.PayerSource,
@@ -600,6 +603,7 @@ SELECT
   END::text AS place_source,
   e.amount_minor,
   e.currency,
+  e.expense_category,
   COALESCE(payer.id::text, e.payer_participant_id::text, '')::text AS payer_participant_id,
   COALESCE(payer.display_name, e.payer_display_name, '여행자')::text AS payer_display_name,
   CASE
@@ -649,6 +653,7 @@ type GetTripExpenseByIDRow struct {
 	PlaceSource         string
 	AmountMinor         int64
 	Currency            string
+	ExpenseCategory     string
 	PayerParticipantID  string
 	PayerDisplayName    string
 	PayerSource         string
@@ -681,6 +686,7 @@ func (q *Queries) GetTripExpenseByID(ctx context.Context, arg GetTripExpenseByID
 		&i.PlaceSource,
 		&i.AmountMinor,
 		&i.Currency,
+		&i.ExpenseCategory,
 		&i.PayerParticipantID,
 		&i.PayerDisplayName,
 		&i.PayerSource,
@@ -762,6 +768,7 @@ INSERT INTO expenses (
   place_type,
   amount_minor,
   currency,
+  expense_category,
   split_policy,
   payer_participant_id,
   payer_display_name,
@@ -782,11 +789,12 @@ INSERT INTO expenses (
   $11,
   $12,
   $13,
-  $14::uuid,
-  $15,
+  $14,
+  $15::uuid,
   $16,
   $17,
-  $18::uuid
+  $18,
+  $19::uuid
 )
 RETURNING
   id::text,
@@ -802,6 +810,7 @@ RETURNING
   COALESCE(place_type, '')::text AS place_type,
   amount_minor,
   currency,
+  expense_category,
   split_policy,
   COALESCE(payer_participant_id::text, '')::text AS payer_participant_id,
   payer_display_name,
@@ -827,6 +836,7 @@ type InsertExpenseParams struct {
 	PlaceType           pgtype.Text
 	AmountMinor         int64
 	Currency            string
+	ExpenseCategory     string
 	SplitPolicy         string
 	PayerParticipantID  pgtype.UUID
 	PayerDisplayName    string
@@ -849,6 +859,7 @@ type InsertExpenseRow struct {
 	PlaceType           string
 	AmountMinor         int64
 	Currency            string
+	ExpenseCategory     string
 	SplitPolicy         string
 	PayerParticipantID  string
 	PayerDisplayName    string
@@ -875,6 +886,7 @@ func (q *Queries) InsertExpense(ctx context.Context, arg InsertExpenseParams) (I
 		arg.PlaceType,
 		arg.AmountMinor,
 		arg.Currency,
+		arg.ExpenseCategory,
 		arg.SplitPolicy,
 		arg.PayerParticipantID,
 		arg.PayerDisplayName,
@@ -897,6 +909,7 @@ func (q *Queries) InsertExpense(ctx context.Context, arg InsertExpenseParams) (I
 		&i.PlaceType,
 		&i.AmountMinor,
 		&i.Currency,
+		&i.ExpenseCategory,
 		&i.SplitPolicy,
 		&i.PayerParticipantID,
 		&i.PayerDisplayName,
@@ -1168,6 +1181,7 @@ SELECT
   END::text AS place_source,
   e.amount_minor,
   e.currency,
+  e.expense_category,
   COALESCE(payer.id::text, e.payer_participant_id::text, '')::text AS payer_participant_id,
   COALESCE(payer.display_name, e.payer_display_name, '여행자')::text AS payer_display_name,
   CASE
@@ -1222,6 +1236,7 @@ type ListDayExpensesByTripDayRow struct {
 	PlaceSource         string
 	AmountMinor         int64
 	Currency            string
+	ExpenseCategory     string
 	PayerParticipantID  string
 	PayerDisplayName    string
 	PayerSource         string
@@ -1257,6 +1272,7 @@ func (q *Queries) ListDayExpensesByTripDay(ctx context.Context, arg ListDayExpen
 			&i.PlaceSource,
 			&i.AmountMinor,
 			&i.Currency,
+			&i.ExpenseCategory,
 			&i.PayerParticipantID,
 			&i.PayerDisplayName,
 			&i.PayerSource,
@@ -1617,6 +1633,7 @@ SELECT
   END::text AS place_source,
   e.amount_minor,
   e.currency,
+  e.expense_category,
   COALESCE(payer.id::text, e.payer_participant_id::text, '')::text AS payer_participant_id,
   COALESCE(payer.display_name, e.payer_display_name, '여행자')::text AS payer_display_name,
   CASE
@@ -1669,6 +1686,7 @@ type ListTripExpensesByTripRow struct {
 	PlaceSource         string
 	AmountMinor         int64
 	Currency            string
+	ExpenseCategory     string
 	PayerParticipantID  string
 	PayerDisplayName    string
 	PayerSource         string
@@ -1704,6 +1722,7 @@ func (q *Queries) ListTripExpensesByTrip(ctx context.Context, tripID pgtype.UUID
 			&i.PlaceSource,
 			&i.AmountMinor,
 			&i.Currency,
+			&i.ExpenseCategory,
 			&i.PayerParticipantID,
 			&i.PayerDisplayName,
 			&i.PayerSource,
@@ -1804,15 +1823,17 @@ SET
   place_type = $6,
   title = COALESCE($7, title),
   amount_minor = $8,
-  split_policy = $9,
-  payer_participant_id = $10::uuid,
-  payer_display_name = $11,
-  memo = $12,
-  include_in_settlement = COALESCE($13, include_in_settlement),
+  currency = COALESCE($9, currency),
+  expense_category = COALESCE($10, expense_category),
+  split_policy = $11,
+  payer_participant_id = $12::uuid,
+  payer_display_name = $13,
+  memo = $14,
+  include_in_settlement = COALESCE($15, include_in_settlement),
   updated_at = now()
-WHERE trip_id = $14::uuid
-  AND trip_day_id = $15::uuid
-  AND id = $16::uuid
+WHERE trip_id = $16::uuid
+  AND trip_day_id = $17::uuid
+  AND id = $18::uuid
   AND anchor_type IN ('trip_day', 'schedule_item')
 RETURNING
   id::text,
@@ -1828,6 +1849,7 @@ RETURNING
   COALESCE(place_type, '')::text AS place_type,
   amount_minor,
   currency,
+  expense_category,
   split_policy,
   COALESCE(payer_participant_id::text, '')::text AS payer_participant_id,
   payer_display_name,
@@ -1849,6 +1871,8 @@ type UpdateExpenseParams struct {
 	PlaceType           pgtype.Text
 	Title               pgtype.Text
 	AmountMinor         int64
+	Currency            pgtype.Text
+	ExpenseCategory     pgtype.Text
 	SplitPolicy         string
 	PayerParticipantID  pgtype.UUID
 	PayerDisplayName    string
@@ -1873,6 +1897,7 @@ type UpdateExpenseRow struct {
 	PlaceType           string
 	AmountMinor         int64
 	Currency            string
+	ExpenseCategory     string
 	SplitPolicy         string
 	PayerParticipantID  string
 	PayerDisplayName    string
@@ -1895,6 +1920,8 @@ func (q *Queries) UpdateExpense(ctx context.Context, arg UpdateExpenseParams) (U
 		arg.PlaceType,
 		arg.Title,
 		arg.AmountMinor,
+		arg.Currency,
+		arg.ExpenseCategory,
 		arg.SplitPolicy,
 		arg.PayerParticipantID,
 		arg.PayerDisplayName,
@@ -1919,6 +1946,7 @@ func (q *Queries) UpdateExpense(ctx context.Context, arg UpdateExpenseParams) (U
 		&i.PlaceType,
 		&i.AmountMinor,
 		&i.Currency,
+		&i.ExpenseCategory,
 		&i.SplitPolicy,
 		&i.PayerParticipantID,
 		&i.PayerDisplayName,
@@ -1938,14 +1966,16 @@ UPDATE expenses
 SET
   title = $1,
   amount_minor = $2,
-  split_policy = $3,
-  payer_participant_id = $4::uuid,
-  payer_display_name = $5,
-  memo = $6,
-  include_in_settlement = COALESCE($7, include_in_settlement),
+  currency = COALESCE($3, currency),
+  expense_category = COALESCE($4, expense_category),
+  split_policy = $5,
+  payer_participant_id = $6::uuid,
+  payer_display_name = $7,
+  memo = $8,
+  include_in_settlement = COALESCE($9, include_in_settlement),
   updated_at = now()
-WHERE trip_id = $8::uuid
-  AND id = $9::uuid
+WHERE trip_id = $10::uuid
+  AND id = $11::uuid
   AND anchor_type = 'trip'
   AND trip_day_id IS NULL
   AND schedule_item_id IS NULL
@@ -1963,6 +1993,7 @@ RETURNING
   COALESCE(place_type, '')::text AS place_type,
   amount_minor,
   currency,
+  expense_category,
   split_policy,
   COALESCE(payer_participant_id::text, '')::text AS payer_participant_id,
   payer_display_name,
@@ -1978,6 +2009,8 @@ RETURNING
 type UpdateTripExpenseParams struct {
 	Title               pgtype.Text
 	AmountMinor         int64
+	Currency            pgtype.Text
+	ExpenseCategory     pgtype.Text
 	SplitPolicy         string
 	PayerParticipantID  pgtype.UUID
 	PayerDisplayName    string
@@ -2001,6 +2034,7 @@ type UpdateTripExpenseRow struct {
 	PlaceType           string
 	AmountMinor         int64
 	Currency            string
+	ExpenseCategory     string
 	SplitPolicy         string
 	PayerParticipantID  string
 	PayerDisplayName    string
@@ -2017,6 +2051,8 @@ func (q *Queries) UpdateTripExpense(ctx context.Context, arg UpdateTripExpensePa
 	row := q.db.QueryRow(ctx, updateTripExpense,
 		arg.Title,
 		arg.AmountMinor,
+		arg.Currency,
+		arg.ExpenseCategory,
 		arg.SplitPolicy,
 		arg.PayerParticipantID,
 		arg.PayerDisplayName,
@@ -2040,6 +2076,7 @@ func (q *Queries) UpdateTripExpense(ctx context.Context, arg UpdateTripExpensePa
 		&i.PlaceType,
 		&i.AmountMinor,
 		&i.Currency,
+		&i.ExpenseCategory,
 		&i.SplitPolicy,
 		&i.PayerParticipantID,
 		&i.PayerDisplayName,

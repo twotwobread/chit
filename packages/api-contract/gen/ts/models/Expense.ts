@@ -3,6 +3,7 @@
 /* tslint:disable */
 /* eslint-disable */
 import type { ExpenseAnchorType } from './ExpenseAnchorType';
+import type { ExpenseCategory } from './ExpenseCategory';
 import type { ExpenseParticipantDisplay } from './ExpenseParticipantDisplay';
 import type { ExpensePlaceDisplay } from './ExpensePlaceDisplay';
 import type { ExpenseReceiptSummary } from './ExpenseReceiptSummary';
@@ -30,6 +31,7 @@ export type Expense = {
     place: ExpensePlaceDisplay | null;
     amountMinor: number;
     currency: SupportedCurrency;
+    expenseCategory: ExpenseCategory;
     payer: ExpenseParticipantDisplay;
     memo: string | null;
     splitPolicy: ExpenseSplitPolicy;

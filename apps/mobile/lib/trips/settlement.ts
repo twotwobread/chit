@@ -8,7 +8,6 @@ import type {
   SettlementCurrencySummary as ApiSettlementCurrencySummary,
   SupportedCurrency,
   TripDay,
-  TripPlaceType,
 } from '@i-um/api-contract';
 
 import type { DayChip } from '../trip-ui/DayChips';
@@ -338,7 +337,7 @@ export function buildSettlementTotalSpendViewModel({
     for (const expense of dayInput.expenses) {
       totalExpenseCount += 1;
       const currencySummary = getOrCreateTotalSpendCurrencySummary(currencySummaries, expense.currency);
-      const categoryKey = settlementTotalSpendCategoryKey(expense.place?.placeType);
+      const categoryKey = expense.expenseCategory;
       const categorySummary = getOrCreateTotalSpendCategorySummary(currencySummary.categories, categoryKey);
 
       currencySummary.expenseCount += 1;
@@ -447,26 +446,6 @@ function compareTotalSpendCategorySummary(
     return amountDiff;
   }
   return settlementTotalSpendCategoryOrder.indexOf(left.key) - settlementTotalSpendCategoryOrder.indexOf(right.key);
-}
-
-function settlementTotalSpendCategoryKey(placeType?: TripPlaceType | null): SettlementTotalSpendCategoryKey {
-  switch (placeType) {
-    case 'cafe':
-    case 'food':
-    case 'lodging':
-    case 'shopping':
-    case 'sights':
-    case 'transport':
-      return placeType;
-    case 'etc':
-    case null:
-    case undefined:
-      return 'etc';
-    default: {
-      const exhaustive: never = placeType;
-      throw new Error(`Unsupported trip place type: ${exhaustive}`);
-    }
-  }
 }
 
 export type SettlementTransferRowViewModel = {
