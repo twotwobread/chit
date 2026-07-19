@@ -92,7 +92,9 @@ describe('buildStageConfig', () => {
     assert.equal(config.notificationWorker.schedulerServiceAccount, 'i-um-notify-scheduler@i-um-488511.iam.gserviceaccount.com');
     assert.equal(config.apiEnv.AUTH_ALLOW_DEV_OAUTH, 'false');
     assert.equal(config.apiEnv.APPLE_CLIENT_ID, 'com.twotwobread.ium.staging');
-    assert.equal(config.apiEnv.GCS_BUCKET, 'shared-gcs-bucket');
+    assert.equal(config.apiEnv.OBJECT_STORAGE_PROVIDER, 'gcs');
+    assert.equal(config.apiEnv.OBJECT_STORAGE_BUCKET, 'shared-gcs-bucket');
+    assert.equal(config.apiEnv.GCS_BUCKET, undefined);
     assert.equal(config.apiEnv.GCS_SIGNING_ACCESS_ID, 'signer@i-um-488511.iam.gserviceaccount.com');
     assert.equal(config.apiEnv.RECEIPT_OPENAI_MODEL, 'gpt-4o-mini');
     assert.equal(config.eas.env.EXPO_PUBLIC_AUTH_DEV_MODE, 'false');
@@ -103,7 +105,7 @@ describe('buildStageConfig', () => {
   it('requires server, shared GCS storage, and mobile credentials for real Apple/Kakao staging login', () => {
     assert.throws(
       () => buildStageConfig({ env: { DATABASE_URL: 'postgresql://u:p@example.test/db' } }),
-      /AUTH_TOKEN_SECRET, GOOGLE_MAPS_API_KEY, GCS_BUCKET, GCS_SIGNING_ACCESS_ID, GCS_SIGNING_PRIVATE_KEY, OPENAI_API_KEY, EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY/,
+      /AUTH_TOKEN_SECRET, GOOGLE_MAPS_API_KEY, OBJECT_STORAGE_BUCKET, GCS_SIGNING_ACCESS_ID, GCS_SIGNING_PRIVATE_KEY, OPENAI_API_KEY, EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY/,
     );
   });
 
@@ -130,6 +132,16 @@ describe('buildStageConfig', () => {
         }),
       /INVITE_APP_STORE_URL/,
     );
+  });
+
+  it('uses canonical object storage bucket while accepting legacy GCS bucket fallback', () => {
+    const config = buildStageConfig({
+      env: requiredStageEnv({ OBJECT_STORAGE_BUCKET: '', GCS_BUCKET: 'legacy-gcs-bucket' }),
+    });
+
+    assert.equal(config.apiEnv.OBJECT_STORAGE_PROVIDER, 'gcs');
+    assert.equal(config.apiEnv.OBJECT_STORAGE_BUCKET, 'legacy-gcs-bucket');
+    assert.equal(config.apiEnv.GCS_BUCKET, undefined);
   });
 
   it('carries the Android Google Maps SDK key into EAS environment config', () => {
@@ -183,7 +195,14 @@ describe('env examples', () => {
       'AUTH_ALLOW_DEV_OAUTH',
       'APPLE_CLIENT_ID',
       'GOOGLE_MAPS_API_KEY',
-      'GCS_BUCKET',
+      'OBJECT_STORAGE_PROVIDER',
+      'OBJECT_STORAGE_BUCKET',
+      'OBJECT_STORAGE_ENDPOINT',
+      'OBJECT_STORAGE_PUBLIC_ENDPOINT',
+      'OBJECT_STORAGE_ACCESS_KEY',
+      'OBJECT_STORAGE_SECRET_KEY',
+      'OBJECT_STORAGE_REGION',
+      'OBJECT_STORAGE_FORCE_PATH_STYLE',
       'GCS_SIGNING_ACCESS_ID',
       'GCS_SIGNING_PRIVATE_KEY',
       'OPENAI_API_KEY',
@@ -242,6 +261,7 @@ describe('legacyCloudRunEnvNames', () => {
       'APPLE_BUNDLE_ID',
       'GOOGLE_PLACES_API_KEY',
       'GOOGLE_ROUTES_API_KEY',
+      'GCS_BUCKET',
       'BOARDING_PASS_GCS_BUCKET',
       'BOARDING_PASS_GCS_SIGNING_ACCESS_ID',
       'BOARDING_PASS_GCS_SIGNING_PRIVATE_KEY',
@@ -304,7 +324,7 @@ function requiredStageEnv(overrides = {}) {
     DATABASE_URL: 'postgresql://user:pass@ep-test-pooler.ap-northeast-1.aws.neon.tech/ium?sslmode=require',
     AUTH_TOKEN_SECRET: 'long-secret',
     GOOGLE_MAPS_API_KEY: 'maps-key',
-    GCS_BUCKET: 'shared-gcs-bucket',
+    OBJECT_STORAGE_BUCKET: 'shared-gcs-bucket',
     GCS_SIGNING_ACCESS_ID: 'signer@i-um-488511.iam.gserviceaccount.com',
     GCS_SIGNING_PRIVATE_KEY: 'private-key-pem',
     OPENAI_API_KEY: 'openai-key',
