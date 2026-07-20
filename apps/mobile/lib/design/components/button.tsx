@@ -24,6 +24,7 @@ export function PrimaryButton({
   loading,
   loadingLabel,
   onPress,
+  selected,
   style,
   tone = 'graphite',
 }: {
@@ -33,6 +34,7 @@ export function PrimaryButton({
   loading?: boolean;
   loadingLabel?: string;
   onPress: PressableProps['onPress'];
+  selected?: boolean;
   style?: StyleProp<ViewStyle>;
   tone?: PrimaryButtonTone;
 }) {
@@ -56,6 +58,7 @@ export function PrimaryButton({
       disabled={isDisabled}
       minHeight={textLayout.minHeight}
       onPress={onPress}
+      selected={selected}
       style={({ pressed }) => [
         styles.primaryButton,
         isLime ? styles.primaryButtonLime : styles.primaryButtonGraphite,

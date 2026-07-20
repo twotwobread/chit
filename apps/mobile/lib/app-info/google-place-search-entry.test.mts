@@ -121,10 +121,9 @@ describe('google place search native module entry setup', () => {
     assert.match(mapSearchSource, /styles\.resultPrimaryActionButton/);
     assert.match(mapSearchSource, /const isPrimaryActionSelected = actionView\.primaryAction\?\.label === '선택됨';/);
     assert.match(mapSearchSource, /styles\.resultPrimaryActionButtonSelected/);
-    assert.match(mapSearchSource, /styles\.resultPrimaryActionTextSelected/);
     assert.match(
       mapSearchSource,
-      /accessibilityState=\{\{ disabled: isPrimaryActionDisabled, selected: isPrimaryActionSelected \}\}/,
+      /<PrimaryButton[\s\S]*disabled=\{isPrimaryActionDisabled\}[\s\S]*selected=\{isPrimaryActionSelected\}/,
     );
     assert.match(mapSearchSource, /styles\.topSearchClearButton/);
     assert.doesNotMatch(mapSearchSource, /styles\.searchResultsCloseButton/);
@@ -203,6 +202,46 @@ describe('google place search native module entry setup', () => {
     assert.match(placeSearchSource, /선택된 장소 일정 등록/);
     assert.doesNotMatch(placeSearchSource, /선택 \{selectedBatchResults\.length\}/);
     assert.doesNotMatch(placeSearchSource, /batchFooterHeader/);
+  });
+
+  it('Issue 402 map and day place search controls use shared primitives with selected and touch-target semantics', () => {
+    assert.match(
+      placeSearchSource,
+      /import \{[^}]*FilterChip[^}]*PrimaryButton[^}]*ScreenBackground[^}]*theme[^}]*\} from '\.\.\/\.\.\/\.\.\/\.\.\/\.\.\/lib\/design';/s,
+    );
+    assert.match(
+      placeSearchSource,
+      /<FilterChip[\s\S]*accessibilityLabel=\{`\$\{result\.placeName\} 제거`\}[\s\S]*selected[\s\S]*tone="accent"/,
+    );
+    assert.match(
+      placeSearchSource,
+      /<PrimaryButton[\s\S]*label=\{isSubmittingBatch \? '등록 중\.\.\.' : '선택된 장소 일정 등록'\}[\s\S]*loading=\{isSubmittingBatch\}[\s\S]*tone="lime"/,
+    );
+
+    assert.match(
+      mapSearchSource,
+      /import \{[^}]*FilterChip[^}]*IconButton[^}]*InlineAction[^}]*PrimaryButton[^}]*SecondaryButton[^}]*theme[^}]*\} from '\.\.\/design';/s,
+    );
+    assert.match(mapSearchSource, /<IconButton[\s\S]*accessibilityLabel="검색어 지우기"/);
+    assert.match(
+      mapSearchSource,
+      /<FilterChip[\s\S]*accessibilityLabel=\{chip\.accessibilityLabel\}[\s\S]*selected=\{chip\.selected\}/,
+    );
+    assert.match(mapSearchSource, /<FilterChip[\s\S]*accessibilityRole="tab"[\s\S]*selected=\{tab\.selected\}/);
+    assert.match(
+      mapSearchSource,
+      /<IconButton[\s\S]*accessibilityLabel=\{favoriteSelected \? '찜 해제' : '찜하기'\}[\s\S]*selected=\{favoriteSelected\}/,
+    );
+    assert.match(
+      mapSearchSource,
+      /<PrimaryButton[\s\S]*label=\{actionButtonLabel \?\? ''\}[\s\S]*selected=\{isPrimaryActionSelected\}/,
+    );
+    assert.match(mapSearchSource, /<InlineAction[\s\S]*label=\{detail\.mapSearchLabel\}/);
+    assert.match(mapSearchSource, /<SecondaryButton[\s\S]*label=\{confirmation\.cancelLabel\}/);
+    assert.doesNotMatch(
+      mapSearchSource,
+      /accessibilityState=\{\{ disabled: isPrimaryActionDisabled, selected: isPrimaryActionSelected \}\}/,
+    );
   });
 });
 
