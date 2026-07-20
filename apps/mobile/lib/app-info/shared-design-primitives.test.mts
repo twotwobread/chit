@@ -5,7 +5,33 @@ import test from 'node:test';
 import { theme } from '../design/theme';
 
 const componentsSource = readMobileSource('../design/components.tsx');
+const primitivesSource = readMobileSource('../design/primitives.tsx');
 const indexSource = readMobileSource('../design/index.ts');
+const foundationInteractiveSource = readMobileSource('../design/foundation/interactive-surface.tsx');
+const foundationAccessibilitySource = readMobileSource('../design/foundation/accessibility.ts');
+const cardSource = readMobileSource('../design/components/card.tsx');
+const buttonSource = readMobileSource('../design/components/button.tsx');
+const iconButtonSource = readMobileSource('../design/components/icon-button.tsx');
+const linkSource = readMobileSource('../design/components/link.tsx');
+const rowSource = readMobileSource('../design/components/row.tsx');
+const chipSource = readMobileSource('../design/components/chip.tsx');
+const formFieldSource = readMobileSource('../design/patterns/form-field.tsx');
+const stateCardSource = readMobileSource('../design/patterns/state-card.tsx');
+const heroSource = readMobileSource('../design/patterns/hero.tsx');
+
+const sharedImplementationSource = [
+  componentsSource,
+  primitivesSource,
+  cardSource,
+  buttonSource,
+  iconButtonSource,
+  linkSource,
+  rowSource,
+  chipSource,
+  formFieldSource,
+  stateCardSource,
+  heroSource,
+].join('\n');
 
 const primitiveExports = [
   'IconButton',
@@ -31,10 +57,13 @@ const primitiveTypeExports = [
   'ChoiceChipTone',
 ];
 
+const heroExports = ['HeroCard', 'HeroHeader', 'HeroMetricPanel', 'HeroActions'];
+const heroTypeExports = ['HeroCardVariant', 'HeroAction', 'HeroMetricPanelTone'];
+
 test('Issue 389 shared design primitives are exported from the foundation surface', () => {
   for (const exportName of primitiveExports) {
     assert.match(
-      componentsSource,
+      sharedImplementationSource,
       new RegExp(`export function ${exportName}\\b`),
       `${exportName} should be implemented`,
     );
@@ -46,7 +75,11 @@ test('Issue 389 shared design primitives are exported from the foundation surfac
   }
 
   for (const exportName of primitiveTypeExports) {
-    assert.match(componentsSource, new RegExp(`export type ${exportName}\\b`), `${exportName} type should be public`);
+    assert.match(
+      sharedImplementationSource,
+      new RegExp(`export type ${exportName}\\b`),
+      `${exportName} type should be public`,
+    );
     assert.match(
       indexSource,
       new RegExp(`\\b${exportName}\\b`),
@@ -55,14 +88,54 @@ test('Issue 389 shared design primitives are exported from the foundation surfac
   }
 });
 
+test('Issue 395 shared design layer exposes foundation-backed Hero primitives', () => {
+  for (const exportName of heroExports) {
+    assert.match(heroSource, new RegExp(`export function ${exportName}\\b`), `${exportName} should be implemented`);
+    assert.match(
+      indexSource,
+      new RegExp(`\\b${exportName}\\b`),
+      `${exportName} should be re-exported from design index`,
+    );
+  }
+
+  for (const exportName of heroTypeExports) {
+    assert.match(heroSource, new RegExp(`export type ${exportName}\\b`), `${exportName} type should be public`);
+    assert.match(
+      indexSource,
+      new RegExp(`\\b${exportName}\\b`),
+      `${exportName} type should be re-exported from design index`,
+    );
+  }
+
+  assert.match(foundationAccessibilitySource, /export function buildAccessibilityState/);
+  assert.match(foundationInteractiveSource, /export function InteractiveSurface/);
+  assert.match(foundationInteractiveSource, /accessibilityState=\{buildAccessibilityState/);
+  assert.match(foundationInteractiveSource, /minHeight: minHeight \?\? theme\.layout\.tapMin/);
+  assert.match(foundationInteractiveSource, /Pressable/);
+  assert.match(foundationInteractiveSource, /children\(\{ busy, disabled: isDisabled, pressed, selected \}\)/);
+  assert.doesNotMatch(foundationInteractiveSource, /pressed: false/);
+
+  assert.match(buttonSource, /export type PrimaryButtonTone = 'graphite' \| 'lime'/);
+  assert.match(buttonSource, /tone = 'graphite'/);
+  assert.match(buttonSource, /primaryButtonLime/);
+  assert.match(buttonSource, /backgroundColor: theme\.color\.uiAccent/);
+  assert.match(buttonSource, /color: theme\.color\.onUiAccent/);
+
+  assert.match(heroSource, /variant = 'panel'/);
+  assert.match(heroSource, /HeroActions/);
+  assert.match(heroSource, /tone: 'lime'/);
+  assert.match(heroSource, /theme\.color\.actionPrimary/);
+  assert.doesNotMatch(heroSource, /#[0-9a-fA-F]{3,8}\b/);
+});
+
 test('Issue 389 shared component code stays token-only and avoids emoji-style decorative glyphs', () => {
   assert.doesNotMatch(
-    componentsSource,
+    sharedImplementationSource,
     /#[0-9a-fA-F]{3,8}\b/,
     'components should use Chit theme tokens, not raw hex colors',
   );
   assert.doesNotMatch(
-    componentsSource,
+    sharedImplementationSource,
     /[✅⚠️❌🎉✨🔥👉]/u,
     'shared status/action primitives should not use emoji or decorative unicode as UI icons',
   );
@@ -71,10 +144,10 @@ test('Issue 389 shared component code stays token-only and avoids emoji-style de
 test('Issue 389 interactive primitives encode accessibility roles, states, touch targets, and pressed feedback', () => {
   assert.ok(theme.layout.tapMin >= 44, `tap target floor must remain at least 44pt, got ${theme.layout.tapMin}`);
 
-  assert.match(componentsSource, /const ICON_BUTTON_HIT_SLOP = theme\.space\[3\]/);
-  assert.match(componentsSource, /accessibilityLabel: string;/, 'IconButton should require an accessibility label');
-  assert.match(componentsSource, /accessibilityHint\?: string;/, 'IconButton should allow an accessibility hint');
-  assert.match(componentsSource, /hitSlop=\{ICON_BUTTON_HIT_SLOP\}/, 'IconButton should expand icon-only hit area');
+  assert.match(iconButtonSource, /const ICON_BUTTON_HIT_SLOP = theme\.space\[3\]/);
+  assert.match(iconButtonSource, /accessibilityLabel: string;/, 'IconButton should require an accessibility label');
+  assert.match(iconButtonSource, /accessibilityHint\?: string;/, 'IconButton should allow an accessibility hint');
+  assert.match(iconButtonSource, /hitSlop=\{ICON_BUTTON_HIT_SLOP\}/, 'IconButton should expand icon-only hit area');
 
   for (const functionName of [
     'PrimaryButton',
@@ -88,7 +161,7 @@ test('Issue 389 interactive primitives encode accessibility roles, states, touch
   ]) {
     const body = functionBody(functionName);
     assert.match(body, /accessibilityRole=/, `${functionName} should set an accessibility role`);
-    assert.match(body, /accessibilityState=/, `${functionName} should expose accessibility state`);
+    assert.match(body, /InteractiveSurface/, `${functionName} should use the shared interactive primitive`);
     assert.match(body, /pressed/, `${functionName} should react to Pressable pressed state`);
   }
 
@@ -106,18 +179,18 @@ test('Issue 389 primitives keep Acid Lime vivid but sparse in shared UI', () => 
   assert.equal(theme.color.onUiAccent, theme.color.chit.charcoal);
   assert.notEqual(theme.color.actionPrimary, theme.color.brandAccent);
 
-  assert.match(componentsSource, /brandStampOffset:[\s\S]*backgroundColor: theme\.color\.brandAccent/);
-  assert.match(componentsSource, /brandStampText:[\s\S]*color: theme\.color\.brandAccent/);
-  assert.match(functionBody('PrimaryButton'), /ActivityIndicator color=\{theme\.color\.onActionPrimary\}/);
-  assert.match(componentsSource, /primaryButton:[\s\S]*backgroundColor: theme\.color\.actionPrimary/);
-  assert.match(componentsSource, /primaryButtonPressed:[\s\S]*backgroundColor: theme\.color\.actionPrimaryPressed/);
-  assert.match(componentsSource, /primaryButtonText:[\s\S]*color: theme\.color\.onActionPrimary/);
-  assert.match(componentsSource, /inlineActionPrimary:[\s\S]*backgroundColor: theme\.color\.actionPrimary/);
-  assert.match(componentsSource, /inlineActionTextPrimary:[\s\S]*color: theme\.color\.onActionPrimary/);
-  assert.match(componentsSource, /filterChipSelectedAccent:[\s\S]*backgroundColor: theme\.color\.uiAccent/);
-  assert.match(componentsSource, /choiceChipSelectedAccent:[\s\S]*backgroundColor: theme\.color\.uiAccent/);
-  assert.match(componentsSource, /filterChipTextSelected:[\s\S]*color: theme\.color\.onUiAccent/);
-  assert.match(componentsSource, /choiceChipTextSelected:[\s\S]*color: theme\.color\.onUiAccent/);
+  assert.match(cardSource, /brandStampOffset:[\s\S]*backgroundColor: theme\.color\.brandAccent/);
+  assert.match(cardSource, /brandStampText:[\s\S]*color: theme\.color\.brandAccent/);
+  assert.match(buttonSource, /ActivityIndicator color=\{spinnerColor\}/);
+  assert.match(buttonSource, /primaryButtonGraphite:[\s\S]*backgroundColor: theme\.color\.actionPrimary/);
+  assert.match(buttonSource, /primaryButtonPressed:[\s\S]*backgroundColor: theme\.color\.actionPrimaryPressed/);
+  assert.match(buttonSource, /primaryButtonText:[\s\S]*color: theme\.color\.onActionPrimary/);
+  assert.match(linkSource, /inlineActionPrimary:[\s\S]*backgroundColor: theme\.color\.actionPrimary/);
+  assert.match(linkSource, /inlineActionTextPrimary:[\s\S]*color: theme\.color\.onActionPrimary/);
+  assert.match(chipSource, /filterChipSelectedAccent:[\s\S]*backgroundColor: theme\.color\.uiAccent/);
+  assert.match(chipSource, /choiceChipSelectedAccent:[\s\S]*backgroundColor: theme\.color\.uiAccent/);
+  assert.match(chipSource, /filterChipTextSelected:[\s\S]*color: theme\.color\.onUiAccent/);
+  assert.match(chipSource, /choiceChipTextSelected:[\s\S]*color: theme\.color\.onUiAccent/);
 
   const loadingState = functionBody('LoadingState');
   assert.doesNotMatch(
@@ -143,11 +216,7 @@ test('Issue 389 form and status primitives provide visible recovery structure wi
     assert.match(body, /action\?:\s*StateAction/, `${functionName} should support one recovery action slot`);
   }
 
-  assert.match(
-    componentsSource,
-    /function StatusStateCard\b/,
-    'status primitives should share one visual card pattern',
-  );
+  assert.match(stateCardSource, /function StatusStateCard\b/, 'status primitives should share one visual card pattern');
   assertStyleContains('statusCard', /backgroundColor: theme\.color\.surface/);
   assertStyleContains('statusCard', /borderColor: theme\.color\.borderDefault/);
 });
@@ -158,22 +227,20 @@ function readMobileSource(relativePath: string): string {
 
 function functionBody(functionName: string): string {
   const startMarker = `export function ${functionName}(`;
-  const start = componentsSource.indexOf(startMarker);
+  const start = sharedImplementationSource.indexOf(startMarker);
 
   assert.notEqual(start, -1, `${functionName} function should exist`);
 
-  const rest = componentsSource.slice(start + startMarker.length);
-  const nextFunction = rest.search(
-    /\nexport function |\nfunction StatusStateCard\b|\nfunction buildAccessibilityState\b|\nconst styles =/,
-  );
-  const end = nextFunction === -1 ? componentsSource.length : start + startMarker.length + nextFunction;
+  const rest = sharedImplementationSource.slice(start + startMarker.length);
+  const nextFunction = rest.search(/\nexport function |\nfunction StatusStateCard\b|\nconst styles =/);
+  const end = nextFunction === -1 ? sharedImplementationSource.length : start + startMarker.length + nextFunction;
 
-  return componentsSource.slice(start, end);
+  return sharedImplementationSource.slice(start, end);
 }
 
 function assertStyleContains(styleName: string, expected: RegExp): void {
   const stylePattern = new RegExp(`${styleName}: \\{[\\s\\S]*?\\n  \\},`);
-  const match = componentsSource.match(stylePattern);
+  const match = sharedImplementationSource.match(stylePattern);
 
   assert.ok(match, `${styleName} style should exist`);
   assert.match(match[0], expected);

@@ -1,11 +1,11 @@
 import { useCallback, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { ListTripExpensesResponse } from '@i-um/api-contract';
 
-import { SecondaryButton, theme } from '../../../../lib/design';
+import { FilterChip, InlineAction, SecondaryButton, TextLink, theme } from '../../../../lib/design';
 import { ExpenseRow } from '../../../../lib/trip-ui/ExpenseRow';
 import { TripRootFab } from '../../../../lib/trip-ui/TripRootFab';
 import { TripListCard, TripScreen, TripScreenHeader, TripStateCard } from '../../../../lib/trip-ui/TripScreenScaffold';
@@ -259,9 +259,7 @@ function ExpenseCategorySummaryCard({
           <Text style={styles.sectionTitle}>카테고리별 사용</Text>
           <Text style={styles.sectionHelper}>어디에 많이 썼는지 확인해요.</Text>
         </View>
-        <Pressable accessibilityRole="button" onPress={onOpenCategories} style={styles.linkButton}>
-          <Text style={styles.linkText}>전체 보기</Text>
-        </Pressable>
+        <TextLink label="전체 보기" onPress={onOpenCategories} tone="strong" />
       </View>
       {categorySections.map((section) => (
         <View key={section.currency} style={styles.categorySection}>
@@ -413,11 +411,7 @@ function ExpenseRowsCard({
           <Text style={styles.sectionTitle}>{title}</Text>
           {subtitle ? <Text style={styles.sectionHelper}>{subtitle}</Text> : null}
         </View>
-        {actionLabel && onAction ? (
-          <Pressable accessibilityRole="button" onPress={onAction} style={styles.linkButton}>
-            <Text style={styles.linkText}>{actionLabel}</Text>
-          </Pressable>
-        ) : null}
+        {actionLabel && onAction ? <InlineAction label={actionLabel} onPress={onAction} /> : null}
       </View>
       {rows.length === 0 ? (
         <View style={styles.emptyRows}>
@@ -452,34 +446,6 @@ function SubscreenHeader({ helper, onBack, title }: { title: string; helper: str
       <SecondaryButton label="지출로 돌아가기" onPress={onBack} />
       <TripScreenHeader helper={helper} title={title} />
     </View>
-  );
-}
-
-function FilterChip({
-  label,
-  onPress,
-  selected,
-  statusLabel,
-}: {
-  label: string;
-  selected: boolean;
-  statusLabel?: string;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected }}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.filterChip,
-        selected ? styles.filterChipSelected : null,
-        pressed ? styles.pressed : null,
-      ]}
-    >
-      <Text style={[styles.filterChipText, selected ? styles.filterChipTextSelected : null]}>{label}</Text>
-      {statusLabel ? <Text style={styles.filterChipStatus}>{statusLabel}</Text> : null}
-    </Pressable>
   );
 }
 
@@ -601,50 +567,6 @@ const styles = StyleSheet.create({
   expenseList: {
     paddingBottom: theme.space[2],
   },
-  filterChip: {
-    alignItems: 'center',
-    backgroundColor: theme.color.surface,
-    borderColor: theme.color.borderDefault,
-    borderRadius: theme.radius.pill,
-    borderWidth: 1,
-    minHeight: theme.layout.tapMin,
-    paddingHorizontal: theme.space[4],
-    paddingVertical: theme.space[3],
-  },
-  filterChipSelected: {
-    backgroundColor: theme.color.primarySoft,
-    borderColor: theme.color.primary,
-  },
-  filterChipStatus: {
-    color: theme.color.textMuted,
-    fontFamily: theme.font.family.regular,
-    fontSize: theme.font.size.micro,
-    marginTop: theme.space[1],
-  },
-  filterChipText: {
-    color: theme.color.textBody,
-    fontFamily: theme.font.family.semibold,
-    fontSize: theme.font.size.label,
-    fontWeight: theme.font.weight.semibold,
-  },
-  filterChipTextSelected: {
-    color: theme.color.primary,
-    fontFamily: theme.font.family.bold,
-    fontWeight: theme.font.weight.bold,
-  },
-  linkButton: {
-    alignItems: 'center',
-    borderRadius: theme.radius.pill,
-    minHeight: theme.layout.tapMin,
-    justifyContent: 'center',
-    paddingHorizontal: theme.space[3],
-  },
-  linkText: {
-    color: theme.color.primary,
-    fontFamily: theme.font.family.bold,
-    fontSize: theme.font.size.caption,
-    fontWeight: theme.font.weight.bold,
-  },
   metricBox: {
     backgroundColor: theme.color.surfaceSunken,
     borderRadius: theme.radius.md,
@@ -669,9 +591,6 @@ const styles = StyleSheet.create({
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.label,
     fontWeight: theme.font.weight.bold,
-  },
-  pressed: {
-    opacity: 0.72,
   },
   sectionHelper: {
     color: theme.color.textMuted,
