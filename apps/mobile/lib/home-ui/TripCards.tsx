@@ -76,7 +76,7 @@ export function ActiveTripCard({
         {members.length > 0 ? <AvatarGroup members={members} size={28} /> : null}
       </View>
 
-      <Text numberOfLines={1} style={styles.heroName}>
+      <Text accessibilityLabel={name} numberOfLines={2} style={styles.heroName}>
         {name}
       </Text>
       {dateLabel ? <Text style={styles.heroDate}>{dateLabel}</Text> : null}
@@ -93,7 +93,11 @@ export function ActiveTripCard({
       {nextPlaceLabel ? (
         <View style={styles.heroNextRow}>
           <MapPin color={theme.color.primary} size={16} strokeWidth={2} />
-          <Text numberOfLines={1} style={styles.heroNext}>
+          <Text
+            accessibilityLabel={`다음 ${nextPlaceLabel}${nextTimeLabel ? ` · ${nextTimeLabel}` : ''}`}
+            numberOfLines={2}
+            style={styles.heroNext}
+          >
             다음 <Text style={styles.heroNextStrong}>{nextPlaceLabel}</Text>
             {nextTimeLabel ? ` · ${nextTimeLabel}` : ''}
           </Text>
@@ -132,6 +136,7 @@ export function UpcomingTripRow({
   surfaceTone = 'default',
 }: UpcomingTripRowProps) {
   const isHomeHeroSurface = surfaceTone === 'homeHero';
+  const upcomingMetaLabel = [dateLabel, currencyLabel, companionsLabel].filter(Boolean).join(' · ');
 
   return (
     <Pressable
@@ -150,11 +155,19 @@ export function UpcomingTripRow({
         </View>
       ) : null}
       <View style={styles.upcomingBody}>
-        <Text numberOfLines={1} style={[styles.upcomingName, isHomeHeroSurface ? styles.upcomingNameOnHero : null]}>
+        <Text
+          accessibilityLabel={name}
+          numberOfLines={2}
+          style={[styles.upcomingName, isHomeHeroSurface ? styles.upcomingNameOnHero : null]}
+        >
           {name}
         </Text>
-        <Text numberOfLines={1} style={[styles.upcomingMeta, isHomeHeroSurface ? styles.upcomingMetaOnHero : null]}>
-          {[dateLabel, currencyLabel, companionsLabel].filter(Boolean).join(' · ')}
+        <Text
+          accessibilityLabel={upcomingMetaLabel}
+          numberOfLines={2}
+          style={[styles.upcomingMeta, isHomeHeroSurface ? styles.upcomingMetaOnHero : null]}
+        >
+          {upcomingMetaLabel}
         </Text>
         {metaLabels.length > 0 ? (
           <View style={styles.rowMetaWrap}>
@@ -191,7 +204,7 @@ export function PastTripRow({
         <MapPin color={theme.color.textMuted} size={19} strokeWidth={2} />
       </View>
       <View style={styles.pastBody}>
-        <Text numberOfLines={1} style={styles.pastName}>
+        <Text accessibilityLabel={name} numberOfLines={2} style={styles.pastName}>
           {name}
         </Text>
         <Text style={styles.pastMeta}>{[dateLabel, currencyLabel].filter(Boolean).join(' · ')}</Text>

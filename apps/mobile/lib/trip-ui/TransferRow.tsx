@@ -17,11 +17,11 @@ export function TransferRow({ amount, currency = 'JPY', fromColor, fromName, toC
     <View style={styles.row}>
       <Avatar color={fromColor} name={fromName} size={32} />
       <View style={styles.names}>
-        <Text numberOfLines={1} style={styles.name}>
+        <Text accessibilityLabel={fromName} numberOfLines={2} style={styles.name}>
           {fromName}
         </Text>
         <ArrowRight color={theme.color.primary} size={18} strokeWidth={2.4} />
-        <Text numberOfLines={1} style={styles.name}>
+        <Text accessibilityLabel={toName} numberOfLines={2} style={styles.name}>
           {toName}
         </Text>
       </View>
@@ -43,7 +43,8 @@ const styles = StyleSheet.create({
     fontFamily: theme.font.family.semibold,
     fontSize: theme.font.size.body,
     fontWeight: theme.font.weight.semibold,
-    maxWidth: 72,
+    lineHeight: theme.font.size.body * theme.font.leading.snug,
+    maxWidth: 88,
   },
   names: {
     alignItems: 'center',

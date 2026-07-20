@@ -159,7 +159,7 @@ export const font = {
     title: 22,
     headline: 19,
     subhead: 17,
-    body: 15,
+    body: 16,
     label: 14,
     caption: 13,
     micro: 11,
