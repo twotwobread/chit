@@ -49,12 +49,14 @@ Chit은 여행 지출과 정산을 위한 `hip fintech settlement app`이다.
 
 Chit 디자인은 `Dark Shell + Off-white Content`를 기본 앱 구조로 사용한다.
 
-1. `Dark Shell` — Matte Charcoal 앱 배경/네비게이션/상단 쉘, 미세한 Acid Lime ambient glow.
+1. `Dark Shell` — Matte Charcoal 앱 배경/네비게이션/상단 쉘. 핵심 앱 화면에서는 decorative glow/gradient 없이 깔끔한 matte shell을 기본으로 한다.
 2. `Off-white Content` — 카드, 리스트, 폼, 시트는 깨끗한 오프화이트 표면 위에 배치.
-3. `Dark Acid Hero` — 앱 아이콘, 로그인/홈 브랜드 헤더, 정산 히어로, 완료/빈 상태 등 고임팩트 순간.
-4. `Stamp Pop` — BrandStamp, 온보딩, 빈 상태, 완료 상태, 캠페인 장식.
+3. `Graphite UI Primary` — 일반 UI의 주요 액션은 Acid Lime 대신 차분한 Graphite 계열을 기본으로 한다.
+4. `Sparse Acid UI Accent` — 선택/성공/상태 강조는 Acid Lime을 어둡게 죽이지 말고 그대로 쓰되 빈도를 낮춘다.
+5. `Brand Acid Moment` — 앱 아이콘, BrandStamp, 스플래시/온보딩 등 브랜드 기억점에 Acid Lime을 선명하게 남긴다.
+6. `Stamp Pop` — BrandStamp, 온보딩, 빈 상태, 완료 상태, 캠페인 장식.
 
-Warm Paper는 더 이상 핵심 앱 배경/카드 표면으로 쓰지 않는다. 다크 쉘 위 오프화이트 콘텐츠가 기본이며, Acid Lime은 어두운 쉘/CTA/선택 상태에서 선명하게 보이도록 제한적으로 사용한다.
+Warm Paper는 더 이상 핵심 앱 배경/카드 표면으로 쓰지 않는다. 다크 쉘 위 오프화이트 콘텐츠가 기본이며, Acid Lime은 일반 UI primary가 아니라 브랜드/선택 순간의 짧은 포인트로 제한한다. 일반 UI에서는 Graphite primary가 구조를 잡고 Acid Lime은 적게, 선명하게 사용한다.
 
 ### Color tokens
 
@@ -64,8 +66,10 @@ Warm Paper는 더 이상 핵심 앱 배경/카드 표면으로 쓰지 않는다.
 | App shell | Matte Charcoal | `#191B1F` | 기본 앱 배경, root shell, 스플래시 배경 |
 | Dark elevated | Charcoal Elevated | `#24272C` | AppBar, tab bar, 다크 카드, shell elevated surface |
 | Dark raised | Charcoal Raised | `#30343A` | 다크 쉘 경계/분리선 |
-| Primary accent | Acid Lime | `#C8FF00` | 주요 CTA fill, 선택 상태, 큰/핵심 금액, BrandStamp offset |
-| Shell glow | Acid Lime Ambient | `rgba(200,255,0,0.10-0.18)` | 다크 쉘 상단/우측 브랜드 glow, 콘텐츠 진입 전 fade |
+| Graphite | Graphite | `#3B4248` | 일반 UI primary action, dark shell의 높은 elevation |
+| Brand accent | Acid Lime | `#C8FF00` | BrandStamp, 앱 아이콘, 스플래시/온보딩 등 브랜드 기억점 |
+| UI accent | Acid Lime | `#C8FF00` | 선택 chip/button fill, 브랜드/선택 순간의 짧은 강조 |
+| UI accent soft | Acid Lime Softer | `#F8FFE0` | 오프화이트 위 selected/soft 상태 배경 |
 | Content base | Off-white | `#F7F7F2` | 기본 라이트 콘텐츠 베이스 |
 | Content elevated | Off-white Elevated | `#FCFCF8` | 카드, 리스트, 폼, sheet 표면 |
 | Content sunken | Off-white Subtle | `#F0F0EA` | 입력/내부 패널/눌린 표면 |
@@ -80,20 +84,21 @@ Warm Paper는 더 이상 핵심 앱 배경/카드 표면으로 쓰지 않는다.
 - App root/shell은 Matte Charcoal을 기본으로 한다.
 - 핵심 카드/리스트/입력/시트는 Off-white Elevated/Subtle 계열만 사용한다.
 - Warm Paper `#F5F1E8`는 핵심 UI 배경/카드에서 retired 상태다.
-- Acid Lime은 브랜드의 기억점이지만 과다 사용하지 않는다.
+- Acid Lime은 브랜드의 기억점이지만 일반 UI primary로 반복 사용하지 않는다.
 - Acid Lime 허용 위치:
-  - primary CTA 배경.
-  - 큰/핵심 금액 숫자 또는 다크 히어로의 큰 강조.
-  - 선택된 탭/칩 상태.
-  - BrandStamp offset/shadow.
-  - 정산 완료/성공 상태.
-  - 다크 쉘 ambient glow.
+  - BrandStamp text/offset.
+  - 앱 아이콘, 스플래시, 온보딩, 마케팅 hero 같은 브랜드 순간.
+  - 다크 히어로 위 매우 제한적인 큰 강조.
+- 일반 UI primary action은 Graphite fill + Off-white text를 기본으로 한다.
+- 선택/성공/상태 강조는 Acid Lime을 fill 또는 soft surface로 사용하되 한 화면에서 반복 빈도를 낮춘다.
 - Acid Lime 금지 위치:
   - 긴 본문.
-  - 라이트/오프화이트 표면 위 작은 보조 텍스트.
+  - 라이트/오프화이트 표면 위 텍스트, 스피너, 얇은 marker 같은 전경색.
+  - 일반 CTA/chip/tab fill의 반복 사용.
   - 오류/위험 의미.
   - 색상만으로 상태를 전달하는 경우.
-- 다크 쉘 glow는 중앙화된 토큰/컴포넌트로만 구현한다. 화면별 ad-hoc radial/rgba 값을 만들지 않는다.
+- 오프화이트 위 작은 텍스트/스피너/얇은 marker는 Acid Lime 대신 Graphite/Charcoal 계열을 사용한다. 선택 상태가 필요하면 Acid Lime fill 또는 soft surface + Charcoal foreground로 표현한다.
+- 핵심 앱 shell은 decorative glow/gradient 없이 matte charcoal을 기본으로 한다. 화면별 ad-hoc radial/rgba 장식은 만들지 않는다.
 - Charcoal은 순수 블랙 대신 사용한다.
 - Fintech Blue는 신뢰/정보 보조색으로 제한한다. 브랜드 primary로 쓰지 않는다.
 
@@ -149,15 +154,16 @@ Use `Pretendard Punch`.
 
 - Default cards use Off-white Elevated on Matte Charcoal shell.
 - Internal panels/input wells use Off-white Subtle.
-- Critical settlement summary cards may use Charcoal background with Acid Lime amount/accent.
+- Critical settlement summary cards may use Charcoal background with Acid Lime only for large, rare emphasis.
 - Rounded cards stay modern and soft, but not bubbly.
 - Borders are preferred over heavy shadows for everyday dense surfaces.
 - Stamp-style offset/shadow is reserved for BrandStamp, onboarding/empty/completion states, not dense lists.
 
 ### Buttons
 
-- Primary CTA: Acid Lime background + Charcoal text.
+- Primary CTA: Graphite background + Off-white text.
 - Secondary CTA: Off-white background + off-white border family + Charcoal text.
+- Selected/soft chips: Acid Lime fill or Acid Lime Soft/Softer surface + Charcoal text.
 - Destructive CTA: Danger token, never Acid Lime.
 - Pressed states should be fast and tactile, without layout shift.
 
@@ -171,7 +177,7 @@ Use `Pretendard Punch`.
 ### Navigation
 
 - Bottom tab remains text + vector icon on dark elevated shell surface.
-- Current tab uses Acid Lime active capsule with Charcoal icon/text.
+- New or migrated tab selection should prefer Graphite for dense UI or sparse Acid Lime active fill for high-signal selection, with accessible icon/text contrast.
 - AppBar and trip tabs use Charcoal Elevated/Charcoal Raised shell surfaces, not off-white bars.
 - Do not exceed five top-level trip tabs.
 
@@ -216,7 +222,7 @@ Avoid:
 ## Accessibility and Usability
 
 - Normal text contrast must meet WCAG AA where applicable.
-- Acid Lime on Off-white can be low legibility for text; use it mostly as fill behind Charcoal text or as large/dark-surface accent.
+- Acid Lime on Off-white has poor legibility as a fine-detail foreground; do not use it for light-surface text/spinner/thin markers. Use Graphite/Charcoal for neutral UI, or Acid Lime fill/soft surface with Charcoal foreground for selected or success semantics.
 - Minimum touch target: 44pt.
 - Do not communicate settlement status by color alone.
 - Support Dynamic Type as much as current app patterns allow.
@@ -259,10 +265,10 @@ Avoid:
 - [ ] `apps/mobile/lib/design/theme.ts` exposes Chit color tokens without raw per-screen colors.
 - [ ] Existing green/amber i-um primary visual language no longer appears in core app surfaces except where semantically required by category/status tokens.
 - [ ] New brand assets replace `apps/mobile/assets/brand/*` and app icons.
-- [ ] Primary CTA uses Acid Lime with accessible Charcoal text.
+- [ ] Primary CTA uses Graphite with accessible Off-white text; Acid Lime is reserved for BrandStamp/app-icon/rare brand moments.
 - [ ] Core screens use Matte Charcoal shell with clean Off-white content surfaces.
 - [ ] Warm Paper `#F5F1E8` is not visible in core app backgrounds/cards.
-- [ ] Shell Acid Lime glow is centralized in tokens/components, not duplicated per screen.
+- [ ] Core shell remains clean Matte Charcoal without decorative Acid Lime glow/gradient.
 - [ ] BrandStamp appears only in approved brand/header/empty/loading/settlement moments.
 - [ ] Settlement summary screens use Off-white content by default and Dark Acid for high-emphasis summary/complete states.
 - [ ] Copy follows short Chit voice while preserving clear recovery text for errors.
