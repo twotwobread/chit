@@ -42,13 +42,19 @@ test('Chit foundation components do not introduce raw hex colors outside theme t
   }
 });
 
-test('Issue 385 theme exposes dark shell, lime glow, and clean off-white content tokens', () => {
+test('Issue 385 theme exposes clean matte dark shell and off-white content tokens', () => {
   assert.equal(theme.color.bg, theme.color.chit.matteCharcoal);
   assert.equal(theme.color.surface, theme.color.chit.offWhiteElevated);
   assert.equal(theme.color.surfaceSunken, theme.color.chit.offWhiteSubtle);
   assert.equal(theme.color.borderDefault, theme.color.chit.offWhiteBorder);
-  assert.equal(theme.color.shellGlow, 'rgba(200,255,0,0.16)');
+  assert.equal(theme.color.shell, theme.color.chit.matteCharcoal);
   assert.equal(theme.color.primaryTextOnLight, theme.color.chit.charcoal);
+  assert.equal(theme.color.brandAccent, theme.color.chit.acidLime);
+  assert.equal(theme.color.actionPrimary, theme.color.chit.graphite);
+  assert.equal(theme.color.shellHighest, theme.color.chit.graphite);
+  assert.equal(theme.color.uiAccent, theme.color.chit.acidLime);
+  assert.equal(theme.color.uiAccentSoft, theme.color.chit.acidLimeSofter);
+  assert.notEqual(theme.color.actionPrimary, theme.color.brandAccent);
   assert.notEqual(theme.color.surface, theme.color.chit.warmPaper);
 });
 
@@ -65,8 +71,9 @@ test('Issue 385 shared components provide BrandStamp, ScreenBackground, and card
   assert.match(source, /styles\.brandStamp/);
   assert.match(source, /transform: \[\{ rotate: '-3deg' \}\]/);
   assert.match(source, /export function ScreenBackground/);
-  assert.match(source, /styles\.shellGlow/);
-  assert.match(source, /backgroundColor: theme\.color\.shellGlow/);
+  assert.match(source, /screenBackground:[\s\S]*backgroundColor: theme\.color\.bg/);
+  assert.doesNotMatch(source, /LinearGradient|screenBackgroundLimeWash/);
+  assert.doesNotMatch(source, /shellGradient|shellGlow/);
   assert.match(indexSource, /BrandStamp/);
   assert.match(indexSource, /ScreenBackground/);
 });
@@ -92,8 +99,8 @@ test('Issue 385 core screens adopt dark shell and brand stamp primitives', () =>
 test('shared primary and secondary buttons use enterprise Chit action hierarchy', () => {
   const source = readMobileSource('../design/components.tsx');
 
-  assert.match(source, /primaryButton:[\s\S]*backgroundColor: theme\.color\.primary/);
-  assert.match(source, /primaryButtonText:[\s\S]*color: theme\.color\.onPrimary/);
+  assert.match(source, /primaryButton:[\s\S]*backgroundColor: theme\.color\.actionPrimary/);
+  assert.match(source, /primaryButtonText:[\s\S]*color: theme\.color\.onActionPrimary/);
   assert.match(source, /secondaryButton:[\s\S]*backgroundColor: theme\.color\.surface/);
   assert.match(source, /secondaryButton:[\s\S]*borderColor: theme\.color\.borderDefault/);
   assert.match(source, /secondaryButtonText:[\s\S]*color: theme\.color\.textStrong/);
@@ -109,7 +116,7 @@ test('compact interactive controls keep the 44pt Chit touch target floor', () =>
   assertStyleContains(primitivesSource, 'segmentItem', /minHeight: theme\.layout\.tapMin/);
 });
 
-test('selected bottom and trip tab surfaces use Acid fill with on-primary icon and label contrast', () => {
+test('selected bottom and trip tab surfaces preserve existing primary fill until follow-up migration', () => {
   const tabSelectionSource = readMobileSource('../navigation/tab-selection.ts');
   const bottomMenuSource = readMobileSource('../navigation/BottomMenu.tsx');
   const tripTabBarSource = readMobileSource('../navigation/TripTabBar.tsx');
