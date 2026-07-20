@@ -54,7 +54,7 @@ export function ProfileCard({
     <View style={styles.profile}>
       <Avatar color={avatarColor} name={name} size={60} />
       <View style={styles.profileBody}>
-        <Text numberOfLines={1} style={styles.name}>
+        <Text accessibilityLabel={name} numberOfLines={2} style={styles.name}>
           {name}
         </Text>
         {helperLabel ? <Text style={styles.profileHelper}>{helperLabel}</Text> : null}
