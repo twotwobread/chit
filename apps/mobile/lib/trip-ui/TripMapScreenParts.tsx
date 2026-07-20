@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { router } from 'expo-router';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 
-import { PrimaryButton, theme } from '../design';
+import { FilterChip, PrimaryButton, theme } from '../design';
 import {
   type GooglePlaceAddViewState,
   type GooglePlaceSearchRowViewModel,
@@ -206,19 +206,14 @@ function MapScheduleAddTray({
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scheduleAddChipScroller}>
         <View style={styles.scheduleAddChipRow}>
           {results.map((result) => (
-            <Pressable
+            <FilterChip
               accessibilityLabel={`${result.placeName} 제거`}
-              accessibilityRole="button"
               disabled={isSubmitting}
               key={`map-selected-${result.id}`}
+              label={result.placeName}
               onPress={() => onRemoveResult(result.id)}
-              style={[styles.scheduleAddChip, isSubmitting ? styles.scheduleAddChipDisabled : null]}
-            >
-              <Text numberOfLines={1} style={styles.scheduleAddChipText}>
-                {result.placeName}
-              </Text>
-              <Text style={styles.scheduleAddChipRemove}>×</Text>
-            </Pressable>
+              statusLabel="제거"
+            />
           ))}
         </View>
       </ScrollView>
@@ -242,6 +237,7 @@ function MapScheduleAddTray({
             onSubmit(targetDay.id);
           }
         }}
+        tone="lime"
       />
     </View>
   );

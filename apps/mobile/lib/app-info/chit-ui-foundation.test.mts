@@ -7,6 +7,25 @@ import { theme } from '../design/theme';
 const componentSources = [
   '../design/components.tsx',
   '../design/primitives.tsx',
+  '../design/foundation/accessibility.ts',
+  '../design/foundation/action-group.tsx',
+  '../design/foundation/interactive-surface.tsx',
+  '../design/foundation/responsive-label.tsx',
+  '../design/foundation/surface-frame.tsx',
+  '../design/components/card.tsx',
+  '../design/components/button.tsx',
+  '../design/components/icon-button.tsx',
+  '../design/components/link.tsx',
+  '../design/components/chip.tsx',
+  '../design/components/row.tsx',
+  '../design/components/badge.tsx',
+  '../design/components/amount-text.tsx',
+  '../design/components/avatar.tsx',
+  '../design/components/place.tsx',
+  '../design/components/segmented-control.tsx',
+  '../design/patterns/form-field.tsx',
+  '../design/patterns/hero.tsx',
+  '../design/patterns/state-card.tsx',
   '../navigation/BottomMenu.tsx',
   '../navigation/TripTabBar.tsx',
   '../navigation/tab-selection.ts',
@@ -32,6 +51,28 @@ const coreJourneySources = [
   '../trip-ui/TripMapScreenParts.tsx',
   '../trip-ui/TripMapScreenStyles.ts',
 ];
+
+const cardSource = readMobileSource('../design/components/card.tsx');
+const buttonSource = readMobileSource('../design/components/button.tsx');
+const chipSource = readMobileSource('../design/components/chip.tsx');
+const segmentedControlSource = readMobileSource('../design/components/segmented-control.tsx');
+const heroSource = readMobileSource('../design/patterns/hero.tsx');
+const indexSource = readMobileSource('../design/index.ts');
+const expensesSource = readMobileSource('../../app/trips/[tripId]/(tabs)/expenses.tsx');
+const todaySpendSource = readMobileSource('../trip-ui/TodaySpendCard.tsx');
+const representativeNextPlaceHeroSource = readMobileSource('../trip-ui/NextPlaceHeroCard.tsx');
+const representativeMapPartsSource = readMobileSource('../trip-ui/TripMapScreenParts.tsx');
+
+test('Issue 395 representative surfaces adopt Hero and shared action primitives', () => {
+  assert.match(representativeNextPlaceHeroSource, /import \{[\s\S]*HeroActions[\s\S]*HeroCard[\s\S]*HeroHeader/);
+  assert.doesNotMatch(representativeNextPlaceHeroSource, /<Pressable/);
+  assert.match(todaySpendSource, /import \{[\s\S]*HeroActions[\s\S]*HeroCard[\s\S]*HeroMetricPanel/);
+  assert.match(todaySpendSource, /tone: 'lime'|tone="lime"/);
+  assert.match(expensesSource, /import \{[\s\S]*FilterChip[\s\S]*InlineAction[\s\S]*TextLink/);
+  assert.doesNotMatch(expensesSource, /function FilterChip\(/);
+  assert.match(representativeMapPartsSource, /import \{[\s\S]*FilterChip[\s\S]*PrimaryButton/);
+  assert.match(representativeMapPartsSource, /tone="lime"/);
+});
 
 test('Chit foundation components do not introduce raw hex colors outside theme tokens', () => {
   const rawHexPattern = /#[0-9a-fA-F]{3,8}\b/;
@@ -59,21 +100,18 @@ test('Issue 385 theme exposes clean matte dark shell and off-white content token
 });
 
 test('Issue 385 shared components provide BrandStamp, ScreenBackground, and card variants', () => {
-  const source = readMobileSource('../design/components.tsx');
-  const indexSource = readMobileSource('../design/index.ts');
-
-  assert.match(source, /export type CardVariant = 'content' \| 'hero' \| 'dark' \| 'shelf'/);
-  assert.match(source, /variant = 'content'/);
-  assert.match(source, /cardHero:/);
-  assert.match(source, /cardDark:/);
-  assert.match(source, /cardShelf:/);
-  assert.match(source, /export function BrandStamp/);
-  assert.match(source, /styles\.brandStamp/);
-  assert.match(source, /transform: \[\{ rotate: '-3deg' \}\]/);
-  assert.match(source, /export function ScreenBackground/);
-  assert.match(source, /screenBackground:[\s\S]*backgroundColor: theme\.color\.bg/);
-  assert.doesNotMatch(source, /LinearGradient|screenBackgroundLimeWash/);
-  assert.doesNotMatch(source, /shellGradient|shellGlow/);
+  assert.match(
+    cardSource,
+    /export type CardVariant = Extract<SurfaceFrameVariant, 'content' \| 'hero' \| 'dark' \| 'shelf'>/,
+  );
+  assert.match(cardSource, /variant = 'content'/);
+  assert.match(cardSource, /export function BrandStamp/);
+  assert.match(cardSource, /styles\.brandStamp/);
+  assert.match(cardSource, /transform: \[\{ rotate: '-3deg' \}\]/);
+  assert.match(cardSource, /export function ScreenBackground/);
+  assert.match(cardSource, /screenBackground:[\s\S]*backgroundColor: theme\.color\.bg/);
+  assert.doesNotMatch(cardSource, /LinearGradient|screenBackgroundLimeWash/);
+  assert.doesNotMatch(cardSource, /shellGradient|shellGlow/);
   assert.match(indexSource, /BrandStamp/);
   assert.match(indexSource, /ScreenBackground/);
 });
@@ -97,23 +135,21 @@ test('Issue 385 core screens adopt dark shell and brand stamp primitives', () =>
 });
 
 test('shared primary and secondary buttons use enterprise Chit action hierarchy', () => {
-  const source = readMobileSource('../design/components.tsx');
-
-  assert.match(source, /primaryButton:[\s\S]*backgroundColor: theme\.color\.actionPrimary/);
-  assert.match(source, /primaryButtonText:[\s\S]*color: theme\.color\.onActionPrimary/);
-  assert.match(source, /secondaryButton:[\s\S]*backgroundColor: theme\.color\.surface/);
-  assert.match(source, /secondaryButton:[\s\S]*borderColor: theme\.color\.borderDefault/);
-  assert.match(source, /secondaryButtonText:[\s\S]*color: theme\.color\.textStrong/);
+  assert.match(buttonSource, /primaryButtonGraphite:[\s\S]*backgroundColor: theme\.color\.actionPrimary/);
+  assert.match(buttonSource, /primaryButtonText:[\s\S]*color: theme\.color\.onActionPrimary/);
+  assert.match(buttonSource, /primaryButtonLime:[\s\S]*backgroundColor: theme\.color\.uiAccent/);
+  assert.match(buttonSource, /primaryButtonTextLime:[\s\S]*color: theme\.color\.onUiAccent/);
+  assert.match(buttonSource, /secondaryButton:[\s\S]*backgroundColor: theme\.color\.surface/);
+  assert.match(buttonSource, /secondaryButton:[\s\S]*borderColor: theme\.color\.borderDefault/);
+  assert.match(buttonSource, /secondaryButtonText:[\s\S]*color: theme\.color\.textStrong/);
 });
 
 test('compact interactive controls keep the 44pt Chit touch target floor', () => {
-  const primitivesSource = readMobileSource('../design/primitives.tsx');
-
   assert.ok(
     theme.layout.controlHSm >= theme.layout.tapMin,
     `compact controls must be at least ${theme.layout.tapMin}pt, got ${theme.layout.controlHSm}pt`,
   );
-  assertStyleContains(primitivesSource, 'segmentItem', /minHeight: theme\.layout\.tapMin/);
+  assertStyleContains(segmentedControlSource, 'segmentItem', /minHeight: theme\.layout\.tapMin/);
 });
 
 test('selected bottom and trip tab surfaces preserve existing primary fill until follow-up migration', () => {
@@ -132,15 +168,14 @@ test('selected bottom and trip tab surfaces preserve existing primary fill until
 test('key tab and chip primitives expose explicit accessibility labels with selected state', () => {
   const bottomMenuSource = readMobileSource('../navigation/BottomMenu.tsx');
   const tripTabBarSource = readMobileSource('../navigation/TripTabBar.tsx');
-  const primitivesSource = readMobileSource('../design/primitives.tsx');
   const dayChipsSource = readMobileSource('../trip-ui/DayChips.tsx');
 
   assert.match(bottomMenuSource, /accessibilityLabel=\{tab\.label\}/);
   assert.match(bottomMenuSource, /accessibilityState=\{\{ selected: focused \}\}/);
   assert.match(tripTabBarSource, /accessibilityLabel=\{label\}/);
   assert.match(tripTabBarSource, /accessibilityState=\{\{ selected: focused \}\}/);
-  assert.match(primitivesSource, /accessibilityLabel=\{label\}/);
-  assert.match(primitivesSource, /accessibilityLabel=\{option\}/);
+  assert.match(chipSource, /accessibilityLabel=\{label\}/);
+  assert.match(segmentedControlSource, /accessibilityLabel=\{option\}/);
   assert.match(dayChipsSource, /accessibilityLabel=\{buildDayChipAccessibilityLabel\(day\)\}/);
   assert.match(dayChipsSource, /accessibilityState=\{\{ selected \}\}/);
 });
@@ -154,29 +189,24 @@ test('Issue 372 core journey surfaces do not introduce raw hex colors outside th
   }
 });
 
-test('Issue 372 high-emphasis journey heroes use Charcoal surfaces with Acid primary actions', () => {
+test('Issue 395 high-emphasis journey heroes use Graphite Hero and Lime CTA primitives', () => {
   const tripCardsSource = readMobileSource('../home-ui/TripCards.tsx');
-  const nextPlaceHeroSource = readMobileSource('../trip-ui/NextPlaceHeroCard.tsx');
 
   assertStyleContains(tripCardsSource, 'hero', /backgroundColor: theme\.color\.chit\.charcoal/);
   assertStyleContains(tripCardsSource, 'heroCta', /backgroundColor: theme\.color\.primary/);
   assertStyleContains(tripCardsSource, 'heroCtaText', /color: theme\.color\.onPrimary/);
   assertStyleContains(tripCardsSource, 'upcomingHomeHero', /backgroundColor: theme\.color\.chit\.charcoal/);
 
-  assertStyleContains(nextPlaceHeroSource, 'card', /backgroundColor: theme\.color\.chit\.charcoal/);
-  assertStyleContains(nextPlaceHeroSource, 'actionGreen', /backgroundColor: theme\.color\.primary/);
-  assertStyleContains(nextPlaceHeroSource, 'actionTextLight', /color: theme\.color\.onPrimary/);
+  assert.match(representativeNextPlaceHeroSource, /<HeroCard[\s\S]*variant="graphite"/);
+  assert.match(representativeNextPlaceHeroSource, /<HeroActions[\s\S]*tone: 'lime'/);
+  assert.doesNotMatch(representativeNextPlaceHeroSource, /actionGreen|actionTextLight/);
 });
 
-test('Issue 372 Today spend summary uses Paper Fintech surface and foundation action', () => {
-  const source = readMobileSource('../trip-ui/TodaySpendCard.tsx');
-
-  assert.match(source, /import \{ AmountText, Badge, PrimaryButton, theme \} from '\.\.\/design';/);
-  assertStyleContains(source, 'card', /backgroundColor: theme\.color\.surface/);
-  assertStyleContains(source, 'card', /borderColor: theme\.color\.borderSubtle/);
-  assert.doesNotMatch(source, /card:\s*\{[\s\S]*?backgroundColor: theme\.color\.accentSoft/);
-  assert.doesNotMatch(source, /theme\.color\.amber\[700\]/);
-  assert.match(source, /<PrimaryButton[\s\S]*label=\{addLabel\}[\s\S]*onPress=\{onPressAdd\}/);
+test('Issue 395 Today spend summary uses Hero panel and Lime add action', () => {
+  assert.match(todaySpendSource, /HeroMetricPanel/);
+  assert.match(todaySpendSource, /<HeroCard[\s\S]*variant="panel"/);
+  assert.match(todaySpendSource, /<HeroActions[\s\S]*tone: 'lime'/);
+  assert.doesNotMatch(todaySpendSource, /card:\s*\{[\s\S]*?backgroundColor: theme\.color\.accentSoft/);
 });
 
 test('Today tab compact row actions preserve the 44pt touch target floor', () => {
@@ -201,19 +231,18 @@ test('Issue 372 My Page uses foundation buttons for simple state and section act
   assert.match(partsSource, /<PrimaryButton[\s\S]*label="새 여행 만들기"/);
 });
 
-test('Issue 372 itinerary and map selected actions use Chit action hierarchy', () => {
+test('Issue 395 itinerary and map selected actions use Chit action hierarchy', () => {
   const itineraryStylesSource = readMobileSource('../trip-ui/DayItineraryEditorStyles.ts');
-  const mapPartsSource = readMobileSource('../trip-ui/TripMapScreenParts.tsx');
 
   assertStyleContains(itineraryStylesSource, 'defaultTravelModeChipSelected', /backgroundColor: theme\.color\.primary/);
   assertStyleContains(itineraryStylesSource, 'defaultTravelModeChipTextSelected', /color: theme\.color\.onPrimary/);
   assertStyleContains(itineraryStylesSource, 'chipSelected', /backgroundColor: theme\.color\.primary/);
   assertStyleContains(itineraryStylesSource, 'chipTextSelected', /color: theme\.color\.onPrimary/);
 
-  assert.match(mapPartsSource, /import \{ PrimaryButton, theme \} from '\.\.\/design';/);
+  assert.match(representativeMapPartsSource, /import \{ FilterChip, PrimaryButton, theme \} from '\.\.\/design';/);
   assert.match(
-    mapPartsSource,
-    /<PrimaryButton[\s\S]*disabled=\{isSubmitting \|\| \(choosingDay && !targetDay\)\}[\s\S]*label=\{submitLabel\}[\s\S]*loading=\{isSubmitting\}/,
+    representativeMapPartsSource,
+    /<PrimaryButton[\s\S]*disabled=\{isSubmitting \|\| \(choosingDay && !targetDay\)\}[\s\S]*label=\{submitLabel\}[\s\S]*loading=\{isSubmitting\}[\s\S]*tone="lime"/,
   );
 });
 
