@@ -47,7 +47,7 @@ import MapView, { Marker, type Region } from 'react-native-maps';
 import { ApiError, OpenAPI } from '@i-um/api-contract';
 
 import { MobileAuthError } from '../auth/client';
-import { theme } from '../design';
+import { FilterChip, IconButton, InlineAction, PrimaryButton, SecondaryButton, theme } from '../design';
 import { getGooglePlaceDetails, searchGooglePlaces } from '../places/client';
 import {
   buildDefaultGooglePlaceDestinationSelection,
@@ -1029,9 +1029,12 @@ export function GooglePlaceMapSearch({
           <Text style={styles.errorTitle}>{state.title}</Text>
           <Text style={styles.message}>{state.helper}</Text>
           {notFoundAction ? (
-            <Pressable accessibilityRole="button" onPress={notFoundAction.onPress} style={styles.primaryButton}>
-              <Text style={styles.primaryButtonText}>{notFoundAction.label}</Text>
-            </Pressable>
+            <PrimaryButton
+              label={notFoundAction.label}
+              onPress={notFoundAction.onPress}
+              style={styles.notFoundAction}
+              tone="lime"
+            />
           ) : null}
         </View>
       </ScrollView>
@@ -1192,26 +1195,26 @@ export function GooglePlaceMapSearch({
             value={query}
           />
           {showTopSearchClear ? (
-            <Pressable
+            <IconButton
               accessibilityLabel="검색어 지우기"
-              accessibilityRole="button"
               disabled={isBusy}
               onPress={closeSearchResults}
-              style={[styles.topSearchClearButton, isBusy ? styles.topSearchClearButtonDisabled : null]}
+              style={styles.topSearchClearButton}
+              variant="plain"
             >
               <X color={theme.color.textMuted} size={17} strokeWidth={2.5} />
-            </Pressable>
+            </IconButton>
           ) : null}
-          <Pressable
+          <PrimaryButton
             accessibilityLabel="장소 검색"
-            accessibilityRole="button"
             disabled={isBusy}
+            label={isLoading ? '검색 중' : '검색'}
+            loading={isLoading}
+            loadingLabel="검색 중"
             onPress={runActiveSearch}
-            style={[styles.topSearchButton, isBusy ? styles.searchButtonDisabled : null]}
-          >
-            {isLoading ? <ActivityIndicator color={theme.color.onPrimary} /> : null}
-            <Text style={styles.topSearchButtonText}>{isLoading ? '검색 중' : '검색'}</Text>
-          </Pressable>
+            style={styles.topSearchButton}
+            tone="lime"
+          />
         </View>
         {routeChips.length > 0 ? (
           <View style={styles.topRouteChipRow}>
@@ -1226,29 +1229,24 @@ export function GooglePlaceMapSearch({
       </View>
 
       {showCurrentLocation ? (
-        <Pressable
+        <IconButton
           accessibilityLabel="현재 위치로 이동"
-          accessibilityRole="button"
           disabled={isBusy}
           onPress={() => void moveToCurrentLocation()}
-          style={[
-            styles.locationButton,
-            { bottom: Math.max(visibleSheetHeight + theme.space[4], theme.space[6]) },
-            isBusy ? styles.floatingButtonDisabled : null,
-          ]}
+          style={[styles.locationButton, { bottom: Math.max(visibleSheetHeight + theme.space[4], theme.space[6]) }]}
+          variant="soft"
         >
           <LocateFixed color={theme.color.textBody} size={22} strokeWidth={2.4} />
-        </Pressable>
+        </IconButton>
       ) : null}
 
       {showRegionSearch ? (
-        <Pressable
-          accessibilityRole="button"
+        <PrimaryButton
+          label="이 지역에서 다시 검색"
           onPress={runRegionSearch}
           style={[styles.regionSearchButton, { bottom: Math.max(visibleSheetHeight + theme.space[4], theme.space[6]) }]}
-        >
-          <Text style={styles.regionSearchButtonText}>이 지역에서 다시 검색</Text>
-        </Pressable>
+          tone="lime"
+        />
       ) : null}
 
       <GooglePlaceBottomSheet
@@ -1292,28 +1290,16 @@ export function GooglePlaceMapSearch({
                   >
                     <View style={styles.destinationChipRow}>
                       {destinationChips.map((chip) => (
-                        <Pressable
+                        <FilterChip
                           accessibilityLabel={chip.accessibilityLabel}
-                          accessibilityRole="button"
-                          accessibilityState={{ selected: chip.selected }}
                           disabled={isBusy}
                           key={chip.id}
+                          label={chip.label}
                           onPress={() => selectDestinationChip(chip.id)}
-                          style={[
-                            styles.destinationChip,
-                            chip.selected ? styles.destinationChipSelected : null,
-                            isBusy ? styles.destinationChipDisabled : null,
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.destinationChipText,
-                              chip.selected ? styles.destinationChipTextSelected : null,
-                            ]}
-                          >
-                            {chip.label}
-                          </Text>
-                        </Pressable>
+                          selected={chip.selected}
+                          style={styles.destinationChip}
+                          tone="accent"
+                        />
                       ))}
                     </View>
                   </ScrollView>
@@ -1398,23 +1384,20 @@ export function GooglePlaceMapSearch({
               <>
                 <View style={styles.sheetTabRow}>
                   {sheetTabs.map((tab) => (
-                    <Pressable
+                    <FilterChip
                       accessibilityLabel={tab.accessibilityLabel}
                       accessibilityRole="tab"
-                      accessibilityState={{ selected: tab.selected }}
                       key={tab.id}
+                      label={tab.label}
                       onPress={() => {
                         setSelectedSheetTab(tab.id);
                         if (isCandidateSheetTab(tab.id)) {
                           setActiveCandidateMarkerTab(tab.id);
                         }
                       }}
-                      style={[styles.sheetTab, tab.selected ? styles.sheetTabSelected : null]}
-                    >
-                      <Text style={[styles.sheetTabText, tab.selected ? styles.sheetTabTextSelected : null]}>
-                        {tab.label}
-                      </Text>
-                    </Pressable>
+                      selected={tab.selected}
+                      style={styles.sheetTab}
+                    />
                   ))}
                 </View>
                 <View style={styles.resultListContent}>
@@ -1476,13 +1459,12 @@ export function GooglePlaceMapSearch({
                     <View style={styles.emptyCandidateCard}>
                       <Text style={styles.emptyCandidateTitle}>등록된 숙소가 없어요.</Text>
                       {lodgingEmptyAction ? (
-                        <Pressable
-                          accessibilityRole="button"
+                        <PrimaryButton
+                          label={lodgingEmptyAction.label}
                           onPress={lodgingEmptyAction.onPress}
                           style={styles.emptyCandidateAction}
-                        >
-                          <Text style={styles.emptyCandidateActionText}>{lodgingEmptyAction.label}</Text>
-                        </Pressable>
+                          tone="lime"
+                        />
                       ) : null}
                     </View>
                   ) : null}
@@ -1587,18 +1569,24 @@ function PlaceResultCard({
         </Pressable>
         <View style={styles.resultTextBlock}>
           <View style={styles.resultTitleRow}>
-            <Pressable accessibilityRole="button" onPress={onPress} style={styles.resultTitlePressable}>
+            <Pressable
+              accessibilityRole="button"
+              hitSlop={theme.space[3]}
+              onPress={onPress}
+              style={styles.resultTitlePressable}
+            >
               <Text numberOfLines={isExpanded ? 3 : 2} style={styles.resultName}>
                 {result.placeName}
               </Text>
             </Pressable>
             {onToggleFavorite ? (
-              <Pressable
+              <IconButton
                 accessibilityLabel={favoriteSelected ? '찜 해제' : '찜하기'}
-                accessibilityRole="button"
                 disabled={favoriteLoading}
                 onPress={onToggleFavorite}
-                style={[styles.favoriteButton, favoriteLoading ? styles.favoriteButtonDisabled : null]}
+                selected={favoriteSelected}
+                style={styles.favoriteButton}
+                variant="soft"
               >
                 {favoriteLoading ? (
                   <ActivityIndicator color={theme.color.accent} size="small" />
@@ -1610,39 +1598,25 @@ function PlaceResultCard({
                     strokeWidth={2.5}
                   />
                 )}
-              </Pressable>
+              </IconButton>
             ) : null}
           </View>
           {extraLabels.length > 0 ? <Text style={styles.metadataText}>{extraLabels.join(' · ')}</Text> : null}
         </View>
         {actionView.primaryAction ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ disabled: isPrimaryActionDisabled, selected: isPrimaryActionSelected }}
+          <PrimaryButton
             disabled={isPrimaryActionDisabled}
+            label={actionButtonLabel ?? ''}
+            loading={actionView.primaryAction.isLoading}
+            loadingLabel={actionView.primaryAction.loadingLabel}
             onPress={onPrimaryAction}
+            selected={isPrimaryActionSelected}
             style={[
               styles.resultPrimaryActionButton,
               isPrimaryActionSelected ? styles.resultPrimaryActionButtonSelected : null,
-              isPrimaryActionDisabled ? styles.resultPrimaryActionButtonDisabled : null,
             ]}
-          >
-            {actionView.primaryAction.isLoading ? (
-              <ActivityIndicator
-                color={isPrimaryActionSelected ? theme.color.primary : theme.color.onPrimary}
-                size="small"
-              />
-            ) : null}
-            <Text
-              numberOfLines={1}
-              style={[
-                styles.resultPrimaryActionText,
-                isPrimaryActionSelected ? styles.resultPrimaryActionTextSelected : null,
-              ]}
-            >
-              {actionButtonLabel}
-            </Text>
-          </Pressable>
+            tone="lime"
+          />
         ) : null}
       </View>
       {isExpanded ? (
@@ -1662,26 +1636,18 @@ function PlaceResultCard({
             </View>
           ) : null}
           <View style={styles.inlineActionRow}>
-            <Pressable
-              accessibilityRole="button"
+            <InlineAction
+              label={detail.mapSearchLabel}
               onPress={() => onOpenMaps(detail.mapUrl)}
-              style={[styles.secondaryButton, styles.inlineActionButton]}
-            >
-              <Text style={styles.secondaryButtonText}>{detail.mapSearchLabel}</Text>
-            </Pressable>
+              style={styles.inlineActionButton}
+            />
             {onDeleteBookmark ? (
-              <Pressable
-                accessibilityRole="button"
+              <SecondaryButton
                 disabled={isBusy}
+                label="찜 해제"
                 onPress={onDeleteBookmark}
-                style={[
-                  styles.secondaryButton,
-                  styles.inlineActionButton,
-                  isBusy ? styles.secondaryButtonDisabled : null,
-                ]}
-              >
-                <Text style={styles.secondaryButtonText}>찜 해제</Text>
-              </Pressable>
+                style={styles.inlineActionButton}
+              />
             ) : null}
           </View>
           {actionView.duplicateConfirmation ? (
@@ -1758,25 +1724,15 @@ function DuplicateConfirmationCard({
       <Text style={styles.errorTitle}>이미 추가된 장소예요.</Text>
       <Text style={styles.message}>{confirmation.message}</Text>
       <View style={styles.detailActions}>
-        <Pressable
-          accessibilityRole="button"
+        <PrimaryButton
           disabled={isBusy}
+          label={confirmation.isLoading ? '추가 중...' : confirmation.confirmLabel}
+          loading={confirmation.isLoading}
+          loadingLabel="추가 중..."
           onPress={onConfirm}
-          style={[styles.primaryButton, isBusy ? styles.primaryButtonDisabled : null]}
-        >
-          {confirmation.isLoading ? <ActivityIndicator color={theme.color.onPrimary} /> : null}
-          <Text style={styles.primaryButtonText}>
-            {confirmation.isLoading ? '추가 중...' : confirmation.confirmLabel}
-          </Text>
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          disabled={isBusy}
-          onPress={onCancel}
-          style={[styles.secondaryButton, isBusy ? styles.secondaryButtonDisabled : null]}
-        >
-          <Text style={styles.secondaryButtonText}>{confirmation.cancelLabel}</Text>
-        </Pressable>
+          tone="lime"
+        />
+        <SecondaryButton disabled={isBusy} label={confirmation.cancelLabel} onPress={onCancel} />
       </View>
     </View>
   );
@@ -2024,12 +1980,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.space[1],
   },
   destinationChip: {
-    backgroundColor: theme.color.surfaceSunken,
-    borderColor: theme.color.borderDefault,
-    borderRadius: theme.radius.pill,
-    borderWidth: 1,
-    paddingHorizontal: theme.space[4],
-    paddingVertical: theme.space[2],
+    flexShrink: 0,
   },
   destinationChipSelected: {
     backgroundColor: theme.color.primarySoft,
@@ -2254,12 +2205,6 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.bold,
   },
   favoriteButton: {
-    alignItems: 'center',
-    backgroundColor: theme.color.surface,
-    borderColor: theme.color.borderSubtle,
-    borderRadius: theme.radius.pill,
-    borderWidth: 1,
-    justifyContent: 'center',
     minHeight: theme.layout.tapMin,
     minWidth: theme.layout.tapMin,
   },
@@ -2446,5 +2391,8 @@ const styles = StyleSheet.create({
     gap: theme.layout.gapCard,
     padding: theme.space[7],
     ...theme.shadow.sm,
+  },
+  notFoundAction: {
+    alignSelf: 'stretch',
   },
 });

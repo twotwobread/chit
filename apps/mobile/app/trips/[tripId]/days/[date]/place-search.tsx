@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 
 import { ApiError } from '@i-um/api-contract';
 
 import { MobileAuthError } from '../../../../../lib/auth/client';
-import { ScreenBackground, theme } from '../../../../../lib/design';
+import { FilterChip, PrimaryButton, ScreenBackground, theme } from '../../../../../lib/design';
 import { GooglePlaceMapSearch } from '../../../../../lib/trip-ui/GooglePlaceMapSearch';
 import {
   createGoogleDayLodgingPlace,
@@ -296,38 +296,29 @@ export default function GooglePlaceSearchScreen() {
           style={styles.batchChipScroll}
         >
           {selectedBatchResults.map((result) => (
-            <Pressable
+            <FilterChip
               accessibilityLabel={`${result.placeName} 제거`}
-              accessibilityRole="button"
               disabled={isSubmittingBatch}
               key={`selected-batch-${result.id}`}
+              label={`${result.placeName} ×`}
               onPress={() => removeBatchResult(result.id)}
-              style={({ pressed }) => [
-                styles.batchChip,
-                pressed && !isSubmittingBatch ? styles.batchChipPressed : null,
-                isSubmittingBatch ? styles.batchChipDisabled : null,
-              ]}
-            >
-              <Text numberOfLines={1} style={styles.batchChipText}>
-                {result.placeName}
-              </Text>
-              <Text style={styles.batchChipRemove}>×</Text>
-            </Pressable>
+              selected
+              style={styles.batchChip}
+              tone="accent"
+            />
           ))}
         </ScrollView>
         {batchFeedbackMessage ? <Text style={styles.batchFeedback}>{batchFeedbackMessage}</Text> : null}
-        <Pressable
-          accessibilityRole="button"
+        <PrimaryButton
+          accessibilityLabel="선택된 장소 일정 등록"
           disabled={isSubmittingBatch}
+          label={isSubmittingBatch ? '등록 중...' : '선택된 장소 일정 등록'}
+          loading={isSubmittingBatch}
+          loadingLabel="등록 중..."
           onPress={() => void submitBatch()}
-          style={({ pressed }) => [
-            styles.batchSubmitButton,
-            isSubmittingBatch ? styles.batchSubmitButtonDisabled : null,
-            pressed && !isSubmittingBatch ? styles.batchSubmitButtonPressed : null,
-          ]}
-        >
-          <Text style={styles.batchSubmitButtonText}>{isSubmittingBatch ? '등록 중...' : '선택된 장소 일정 등록'}</Text>
-        </Pressable>
+          style={styles.batchSubmitButton}
+          tone="lime"
+        />
       </View>
     ) : null;
 
@@ -338,9 +329,7 @@ export default function GooglePlaceSearchScreen() {
           <View style={styles.notFoundCard}>
             <Text style={styles.errorTitle}>일정을 찾을 수 없어요.</Text>
             <Text style={styles.message}>삭제되었거나 접근할 수 없는 여행 일정이에요.</Text>
-            <Pressable accessibilityRole="button" onPress={returnToDay} style={styles.primaryButton}>
-              <Text style={styles.primaryButtonText}>일정으로</Text>
-            </Pressable>
+            <PrimaryButton label="일정으로" onPress={returnToDay} style={styles.notFoundAction} tone="lime" />
           </View>
         </ScrollView>
       </ScreenBackground>
@@ -412,22 +401,8 @@ const styles = StyleSheet.create({
     lineHeight: theme.font.size.label * theme.font.leading.normal,
     textAlign: 'center',
   },
-  primaryButton: {
-    alignItems: 'center',
-    backgroundColor: theme.color.primary,
-    borderRadius: theme.radius.md,
-    flexDirection: 'row',
-    gap: theme.space[2],
-    justifyContent: 'center',
-    minHeight: theme.layout.controlH,
-    paddingHorizontal: theme.space[5],
-    paddingVertical: theme.space[4],
-  },
-  primaryButtonText: {
-    color: theme.color.onPrimary,
-    fontFamily: theme.font.family.bold,
-    fontWeight: theme.font.weight.bold,
-    textAlign: 'center',
+  notFoundAction: {
+    alignSelf: 'stretch',
   },
   batchFooter: {
     gap: theme.space[3],
@@ -441,40 +416,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.space[1],
   },
   batchChip: {
-    alignItems: 'center',
-    backgroundColor: theme.color.primary,
-    borderColor: theme.color.primary,
-    borderRadius: theme.radius.pill,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: theme.space[2],
     maxWidth: 220,
     minHeight: theme.layout.tapMin,
-    paddingHorizontal: theme.space[3],
-  },
-  batchChipPressed: {
-    opacity: 0.72,
-  },
-  batchChipDisabled: {
-    opacity: 0.48,
-  },
-  batchChipText: {
-    color: theme.color.onPrimary,
-    flexShrink: 1,
-    fontFamily: theme.font.family.semibold,
-    fontSize: theme.font.size.label,
-  },
-  batchChipRemove: {
-    color: theme.color.onPrimary,
-    fontFamily: theme.font.family.bold,
-    fontSize: theme.font.size.label,
-    fontWeight: theme.font.weight.bold,
-  },
-  batchHint: {
-    color: theme.color.textMuted,
-    fontFamily: theme.font.family.regular,
-    fontSize: theme.font.size.label,
-    lineHeight: theme.font.size.label * theme.font.leading.normal,
   },
   batchFeedback: {
     color: theme.color.danger,
@@ -483,25 +426,6 @@ const styles = StyleSheet.create({
     lineHeight: theme.font.size.label * theme.font.leading.normal,
   },
   batchSubmitButton: {
-    alignItems: 'center',
-    backgroundColor: theme.color.primary,
-    borderRadius: theme.radius.md,
-    justifyContent: 'center',
-    minHeight: theme.layout.controlH,
-    paddingHorizontal: theme.space[5],
-    paddingVertical: theme.space[4],
     width: '100%',
-  },
-  batchSubmitButtonPressed: {
-    backgroundColor: theme.color.primaryPressed,
-  },
-  batchSubmitButtonDisabled: {
-    backgroundColor: theme.color.borderStrong,
-  },
-  batchSubmitButtonText: {
-    color: theme.color.onPrimary,
-    fontFamily: theme.font.family.bold,
-    fontWeight: theme.font.weight.bold,
-    textAlign: 'center',
   },
 });
