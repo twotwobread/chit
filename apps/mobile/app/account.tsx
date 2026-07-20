@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 
 import type { AuthMeResponse, AuthProvider } from '@i-um/api-contract';
@@ -22,7 +22,7 @@ import { normalizeDisplayNameInput } from '../lib/auth/display-name';
 import { createLogoutFlow, type LogoutFlow } from '../lib/auth/logout-flow';
 import { getOAuthCredential, getVisibleOAuthProviderConfigs } from '../lib/auth/oauth';
 import { ProfileCard, SettingRow, SettingsList, type AccountProvider } from '../lib/account-ui/AccountRows';
-import { Card, PrimaryButton, ScreenBackground, SecondaryButton, theme } from '../lib/design';
+import { Card, PrimaryButton, ScreenBackground, SecondaryButton, TextInputField, theme } from '../lib/design';
 import { KeyboardAwareFormScrollView } from '../lib/trip-ui/KeyboardAwareFormScrollView';
 
 type AccountState =
@@ -242,19 +242,15 @@ export default function AccountScreen() {
                   <Text style={styles.sectionTitle}>내 이름 수정</Text>
                   <Text style={styles.helperText}>여행 참여자와 정산 화면에 표시되는 이름이에요.</Text>
                 </View>
-                <View style={styles.fieldGroup}>
-                  <Text style={styles.inputLabel}>이름</Text>
-                  <TextInput
-                    accessibilityLabel="이름"
-                    editable={!isSavingName}
-                    onChangeText={setDraftDisplayName}
-                    placeholder="이름"
-                    placeholderTextColor={theme.color.textMuted}
-                    style={styles.input}
-                    value={draftDisplayName}
-                  />
-                  {nameError ? <Text style={styles.errorMessage}>{nameError}</Text> : null}
-                </View>
+                <TextInputField
+                  disabled={isSavingName}
+                  errorText={nameError ?? undefined}
+                  label="이름"
+                  onChangeText={setDraftDisplayName}
+                  placeholder="이름"
+                  required
+                  value={draftDisplayName}
+                />
                 <View style={styles.actionRow}>
                   <PrimaryButton
                     disabled={isSavingName}

@@ -3,7 +3,7 @@ import { Text, TextInput, View } from 'react-native';
 
 import { type SupportedCurrency } from '@i-um/api-contract';
 
-import { Card, PrimaryButton, SecondaryButton, theme } from '../design';
+import { Card, FormField, PrimaryButton, SecondaryButton, TextInputField, theme } from '../design';
 import { type ExpenseCategory } from './expense-category-markers';
 import {
   buildUpdateExpenseRequest,
@@ -183,23 +183,20 @@ export function ExpenseEditForm({
         </View>
 
         {viewModel.showTitleField ? (
-          <View style={styles.fieldGroup}>
-            <Text style={styles.label}>지출명</Text>
-            <TextInput
-              accessibilityLabel="지출명"
-              onChangeText={onTitleChange}
-              placeholder={viewModel.titlePlaceholder}
-              placeholderTextColor={theme.color.textFaint}
-              style={[styles.input, errors.title ? styles.inputError : null]}
-              value={titleInput}
-            />
-            {errors.title ? <Text style={styles.validationText}>{errors.title}</Text> : null}
-          </View>
+          <TextInputField
+            disabled={saving || deleting}
+            errorText={errors.title}
+            label="지출명"
+            onChangeText={onTitleChange}
+            placeholder={viewModel.titlePlaceholder}
+            value={titleInput}
+          />
         ) : null}
 
-        <View style={styles.fieldGroup}>
-          <Text style={styles.label}>금액</Text>
+        <FormField disabled={saving || deleting} errorText={errors.amount} label="금액" required>
           <TextInput
+            accessibilityLabel="금액"
+            editable={!saving && !deleting}
             keyboardType={viewModel.currency === 'KRW' || viewModel.currency === 'JPY' ? 'number-pad' : 'decimal-pad'}
             onChangeText={onAmountChange}
             placeholder={viewModel.amountLabel}
@@ -207,8 +204,7 @@ export function ExpenseEditForm({
             style={[styles.input, errors.amount ? styles.inputError : null]}
             value={amountInput}
           />
-          {errors.amount ? <Text style={styles.validationText}>{errors.amount}</Text> : null}
-        </View>
+        </FormField>
 
         <ExpenseCurrencySelector
           currency={viewModel.currency}
@@ -249,18 +245,18 @@ export function ExpenseEditForm({
           showItemSelector={viewModel.showPlaceField}
         />
 
-        <View onLayout={(event) => onMemoLayout?.(event.nativeEvent.layout)} style={styles.fieldGroup}>
-          <Text style={styles.label}>메모</Text>
-          <TextInput
+        <View onLayout={(event) => onMemoLayout?.(event.nativeEvent.layout)}>
+          <TextInputField
+            disabled={saving || deleting}
+            errorText={errors.memo}
+            inputStyle={styles.memoInput}
+            label="메모"
             multiline
             onChangeText={onMemoChange}
             onFocus={onMemoFocus}
             placeholder="메모를 입력해주세요."
-            placeholderTextColor={theme.color.textFaint}
-            style={[styles.input, styles.memoInput, errors.memo ? styles.inputError : null]}
             value={memoInput}
           />
-          {errors.memo ? <Text style={styles.validationText}>{errors.memo}</Text> : null}
         </View>
 
         <ExpenseFormSummaryActionRow

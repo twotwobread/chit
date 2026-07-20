@@ -299,84 +299,90 @@ export function QuickExpenseForm({
           </View>
         </FormField>
 
-        <Text style={styles.label}>영수증</Text>
-        <View style={styles.receiptBox}>
-          <Text style={styles.helperText}>영수증을 촬영하면 금액 초안을 채워줘요. 저장 전 직접 확인해야 해요.</Text>
-          {receiptDraft ? (
-            <Text style={styles.helperText}>
-              첨부된 초안 · 신뢰도 {receiptConfidenceLabel(receiptDraft.extraction.confidence)}
-            </Text>
-          ) : null}
-          {receiptMessage ? <Text style={styles.helperText}>{receiptMessage}</Text> : null}
-          <View style={styles.actionRow}>
-            <SecondaryButton
-              accessibilityLabel="영수증 다시 촬영"
-              disabled={submitting || receiptBusy || !tripId}
-              label={receiptDraft ? '다른 영수증 촬영' : '영수증 촬영'}
-              onPress={() => setScannerVisible(true)}
-              style={styles.receiptActionButton}
-            />
+        <FormField
+          disabled={submitting}
+          helperText="영수증을 촬영하면 금액 초안을 채워줘요. 저장 전 직접 확인해야 해요."
+          label="영수증"
+        >
+          <View style={styles.receiptBox}>
             {receiptDraft ? (
+              <Text style={styles.helperText}>
+                첨부된 초안 · 신뢰도 {receiptConfidenceLabel(receiptDraft.extraction.confidence)}
+              </Text>
+            ) : null}
+            {receiptMessage ? <Text style={styles.helperText}>{receiptMessage}</Text> : null}
+            <View style={styles.actionRow}>
               <SecondaryButton
-                accessibilityLabel="영수증 초안 해제"
-                disabled={submitting || receiptBusy}
-                label={receiptBusy ? '해제 중...' : '초안 해제'}
-                onPress={() => void clearReceiptDraft()}
+                accessibilityLabel="영수증 다시 촬영"
+                disabled={submitting || receiptBusy || !tripId}
+                label={receiptDraft ? '다른 영수증 촬영' : '영수증 촬영'}
+                onPress={() => setScannerVisible(true)}
                 style={styles.receiptActionButton}
               />
-            ) : null}
+              {receiptDraft ? (
+                <SecondaryButton
+                  accessibilityLabel="영수증 초안 해제"
+                  disabled={submitting || receiptBusy}
+                  label={receiptBusy ? '해제 중...' : '초안 해제'}
+                  onPress={() => void clearReceiptDraft()}
+                  style={styles.receiptActionButton}
+                />
+              ) : null}
+            </View>
           </View>
-        </View>
+        </FormField>
 
-        <Text style={styles.label}>연결할 일정</Text>
-        {itemOptions.length === 0 ? (
-          <Text style={styles.helperText}>연결할 일정이 없어요.</Text>
-        ) : (
-          <View style={styles.selectorWrap}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ expanded: itemSelectorExpanded }}
-              onPress={() => setItemSelectorExpanded((expanded) => !expanded)}
-              style={({ pressed }) => [styles.selectorButton, pressed ? styles.pressed : null]}
-            >
-              <View style={styles.selectorTextColumn}>
-                <Text style={styles.selectorTitle}>{selectedItem?.label ?? '일정을 선택해주세요.'}</Text>
-                {selectedItem?.helper ? (
-                  <Text numberOfLines={1} style={styles.selectorHelper}>
-                    {selectedItem.helper}
-                  </Text>
-                ) : null}
-              </View>
-              <Text style={styles.selectorAction}>{itemSelectorExpanded ? '닫기' : '변경'}</Text>
-            </Pressable>
-            {itemSelectorExpanded ? (
-              <View style={styles.selectorMenu}>
-                {itemOptions.map((item) => {
-                  const selected = item.id === draft.itemId;
-                  return (
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityState={{ selected }}
-                      key={item.id}
-                      onPress={() => selectItem(item.id)}
-                      style={({ pressed }) => [
-                        styles.selectorOption,
-                        selected ? styles.selectorOptionSelected : null,
-                        pressed ? styles.pressed : null,
-                      ]}
-                    >
-                      <Text style={[styles.selectorOptionTitle, selected ? styles.selectorOptionTitleSelected : null]}>
-                        {item.label}
-                      </Text>
-                      {item.helper ? <Text style={styles.selectorHelper}>{item.helper}</Text> : null}
-                    </Pressable>
-                  );
-                })}
-              </View>
-            ) : null}
-          </View>
-        )}
-        {errors.item ? <Text style={styles.errorText}>{errors.item}</Text> : null}
+        <FormField disabled={submitting} errorText={errors.item} label="연결할 일정" required>
+          {itemOptions.length === 0 ? (
+            <Text style={styles.helperText}>연결할 일정이 없어요.</Text>
+          ) : (
+            <View style={styles.selectorWrap}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ expanded: itemSelectorExpanded }}
+                onPress={() => setItemSelectorExpanded((expanded) => !expanded)}
+                style={({ pressed }) => [styles.selectorButton, pressed ? styles.pressed : null]}
+              >
+                <View style={styles.selectorTextColumn}>
+                  <Text style={styles.selectorTitle}>{selectedItem?.label ?? '일정을 선택해주세요.'}</Text>
+                  {selectedItem?.helper ? (
+                    <Text numberOfLines={1} style={styles.selectorHelper}>
+                      {selectedItem.helper}
+                    </Text>
+                  ) : null}
+                </View>
+                <Text style={styles.selectorAction}>{itemSelectorExpanded ? '닫기' : '변경'}</Text>
+              </Pressable>
+              {itemSelectorExpanded ? (
+                <View style={styles.selectorMenu}>
+                  {itemOptions.map((item) => {
+                    const selected = item.id === draft.itemId;
+                    return (
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityState={{ selected }}
+                        key={item.id}
+                        onPress={() => selectItem(item.id)}
+                        style={({ pressed }) => [
+                          styles.selectorOption,
+                          selected ? styles.selectorOptionSelected : null,
+                          pressed ? styles.pressed : null,
+                        ]}
+                      >
+                        <Text
+                          style={[styles.selectorOptionTitle, selected ? styles.selectorOptionTitleSelected : null]}
+                        >
+                          {item.label}
+                        </Text>
+                        {item.helper ? <Text style={styles.selectorHelper}>{item.helper}</Text> : null}
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              ) : null}
+            </View>
+          )}
+        </FormField>
 
         <SummaryActionRow
           disabled={submitting}
@@ -394,16 +400,18 @@ export function QuickExpenseForm({
           value={settlementSummary}
         />
 
-        <Text style={styles.label}>메모</Text>
-        <TextInput
-          multiline
-          onChangeText={(memoInput) => updateDraft({ memoInput })}
-          placeholder="선택 입력"
-          placeholderTextColor={theme.color.textFaint}
-          style={[styles.memoInput, styles.textArea]}
-          textAlignVertical="top"
-          value={draft.memoInput}
-        />
+        <FormField disabled={submitting} label="메모">
+          <TextInput
+            editable={!submitting}
+            multiline
+            onChangeText={(memoInput) => updateDraft({ memoInput })}
+            placeholder="선택 입력"
+            placeholderTextColor={theme.color.textFaint}
+            style={[styles.memoInput, styles.textArea]}
+            textAlignVertical="top"
+            value={draft.memoInput}
+          />
+        </FormField>
         {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
 
         <View style={styles.actionRow}>
