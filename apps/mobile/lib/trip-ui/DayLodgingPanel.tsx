@@ -1,6 +1,6 @@
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 
-import { Badge } from '../design';
+import { ActionRow, Badge, InlineAction, SecondaryButton } from '../design';
 import {
   buildDayLodgingManagementActionRows,
   buildDayLodgingManagementActions,
@@ -60,20 +60,16 @@ export function DayLodgingPanel({
 
   return (
     <>
-      <Pressable
-        ref={onSummaryRef}
-        accessibilityRole="button"
-        onPress={viewModel.sheet.placeName ? onOpenSheet : onOpenSearchRegister}
-        style={[styles.lodgingSummary, highlighted ? styles.lodgingSummaryHighlighted : null]}
-      >
-        <View style={styles.lodgingSummaryTextGroup}>
-          <Text style={styles.lodgingSummaryLabel}>{viewModel.summary.label}</Text>
-          <Text numberOfLines={1} style={styles.lodgingSummaryName}>
-            {viewModel.summary.placeName}
-          </Text>
-        </View>
-        <Text style={styles.lodgingSummaryAction}>{viewModel.summary.actionLabel}</Text>
-      </Pressable>
+      <View ref={onSummaryRef}>
+        <ActionRow
+          accessibilityLabel={`${viewModel.summary.label} ${viewModel.summary.placeName} ${viewModel.summary.actionLabel}`}
+          meta={viewModel.summary.actionLabel}
+          onPress={viewModel.sheet.placeName ? onOpenSheet : onOpenSearchRegister}
+          selected={highlighted}
+          subtitle={viewModel.summary.label}
+          title={viewModel.summary.placeName}
+        />
+      </View>
 
       <BottomSheet onClose={closeSheet} visible={isSheetVisible}>
         <ScrollView contentContainerStyle={styles.lodgingSheetBody} showsVerticalScrollIndicator={false}>
@@ -93,35 +89,22 @@ export function DayLodgingPanel({
                 <View style={styles.lodgingCurrentActionRow}>
                   {currentPlaceActionRow.actions.map((action) =>
                     action.kind === 'copyAddress' ? (
-                      <Pressable
-                        accessibilityRole="button"
+                      <InlineAction
                         disabled={isBusy}
                         key={action.kind}
+                        label={action.label}
                         onPress={onCopyAddress}
-                        style={[
-                          styles.rowActionButton,
-                          styles.lodgingCurrentActionButton,
-                          isBusy ? styles.rowActionButtonDisabled : null,
-                        ]}
-                      >
-                        <Text style={styles.rowActionText}>{action.label}</Text>
-                      </Pressable>
+                        style={styles.lodgingCurrentActionButton}
+                      />
                     ) : (
-                      <Pressable
-                        accessibilityRole="button"
+                      <InlineAction
                         disabled={isBusy}
                         key={action.kind}
+                        label={lodgingState.status === 'clearing' ? dayLodgingCopy.clearing : action.label}
                         onPress={onClear}
-                        style={[
-                          styles.rowDangerActionButton,
-                          styles.lodgingCurrentActionButton,
-                          isBusy ? styles.rowActionButtonDisabled : null,
-                        ]}
-                      >
-                        <Text style={styles.rowDangerActionText}>
-                          {lodgingState.status === 'clearing' ? dayLodgingCopy.clearing : action.label}
-                        </Text>
-                      </Pressable>
+                        style={styles.lodgingCurrentActionButton}
+                        tone="danger"
+                      />
                     ),
                   )}
                 </View>
@@ -132,19 +115,13 @@ export function DayLodgingPanel({
           {managementActionRow ? (
             <View style={styles.lodgingSheetActions}>
               {managementActionRow.actions.map((action) => (
-                <Pressable
-                  accessibilityRole="button"
+                <InlineAction
                   disabled={isBusy}
                   key={action.kind}
+                  label={action.label}
                   onPress={onOpenSearchRegister}
-                  style={[
-                    styles.secondaryButton,
-                    styles.lodgingSheetActionButton,
-                    isBusy ? styles.secondaryButtonDisabled : null,
-                  ]}
-                >
-                  <Text style={styles.secondaryButtonText}>{action.label}</Text>
-                </Pressable>
+                  style={styles.lodgingSheetActionButton}
+                />
               ))}
             </View>
           ) : null}
@@ -191,25 +168,19 @@ function ExistingPlaceOptions({
       >
         <View style={styles.lodgingOptionListContent}>
           {options.map((option) => (
-            <Pressable
-              accessibilityRole="button"
+            <ActionRow
               disabled={isMutating || option.selected}
               key={option.id}
               onPress={() => onSelectPlace(option)}
-              style={[styles.lodgingOption, option.selected ? styles.lodgingOptionSelected : null]}
-            >
-              <View style={styles.placeTitleRow}>
-                <Text style={styles.placeName}>{option.name}</Text>
-                {option.selected ? <Badge label="선택됨" tone="primary" /> : null}
-              </View>
-              <Text style={styles.address}>{option.address}</Text>
-            </Pressable>
+              selected={option.selected}
+              subtitle={option.address}
+              title={option.name}
+              trailing={option.selected ? <Badge label="선택됨" tone="primary" /> : null}
+            />
           ))}
         </View>
       </ScrollView>
-      <Pressable accessibilityRole="button" disabled={isBusy} onPress={onCancelPicker} style={styles.secondaryButton}>
-        <Text style={styles.secondaryButtonText}>닫기</Text>
-      </Pressable>
+      <SecondaryButton disabled={isBusy} label="닫기" onPress={onCancelPicker} />
     </View>
   );
 }

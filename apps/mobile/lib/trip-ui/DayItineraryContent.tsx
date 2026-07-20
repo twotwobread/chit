@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, findNodeHandle, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, findNodeHandle, Text, View } from 'react-native';
 import { ArrowRight, Trash2 } from 'lucide-react-native';
 
-import { Badge, PrimaryButton, SecondaryButton, theme } from '../design';
+import { Badge, FilterChip, IconButton, InlineAction, PrimaryButton, SecondaryButton, theme } from '../design';
 import {
   buildDayItineraryPlaceAccessibilityLabel,
   type DayItineraryRowViewModel,
@@ -280,38 +280,35 @@ export function DayItineraryContent({
     return (
       <View style={styles.swipeActionGroup}>
         {canMovePlaces ? (
-          <Pressable
+          <IconButton
             accessibilityLabel={`${item.placeName} 다른 Day로 이동`}
-            accessibilityRole="button"
             disabled={isMoveActive || isReorderMode || editState.status !== 'idle'}
             onPress={() => {
               closeDetailSheet();
               onMovePlace(item);
             }}
-            style={({ pressed }) => [styles.swipeDeleteButton, pressed ? styles.swipeDeleteButtonPressed : null]}
+            style={styles.swipeMoveIconButton}
           >
-            <View style={styles.swipeMoveIconButton}>
-              <ArrowRight color={theme.color.onPrimary} size={20} strokeWidth={2.4} />
-            </View>
-          </Pressable>
+            <ArrowRight color={theme.color.onPrimary} size={20} strokeWidth={2.4} />
+          </IconButton>
         ) : null}
-        <Pressable
+        <View
           ref={(node) => {
             deleteTriggerRefs.current[item.id] = node;
           }}
-          accessibilityLabel={`${item.placeName} 삭제`}
-          accessibilityRole="button"
-          disabled={isMoveActive || isReorderMode || editState.status !== 'idle'}
-          onPress={() => {
-            closeDetailSheet();
-            onDeletePlace(item, findNodeHandle(deleteTriggerRefs.current[item.id]));
-          }}
-          style={({ pressed }) => [styles.swipeDeleteButton, pressed ? styles.swipeDeleteButtonPressed : null]}
         >
-          <View style={styles.swipeDeleteIconButton}>
+          <IconButton
+            accessibilityLabel={`${item.placeName} 삭제`}
+            disabled={isMoveActive || isReorderMode || editState.status !== 'idle'}
+            onPress={() => {
+              closeDetailSheet();
+              onDeletePlace(item, findNodeHandle(deleteTriggerRefs.current[item.id]));
+            }}
+            style={styles.swipeDeleteIconButton}
+          >
             <Trash2 color={theme.color.onPrimary} size={20} strokeWidth={2.4} />
-          </View>
-        </Pressable>
+          </IconButton>
+        </View>
       </View>
     );
   };
@@ -373,34 +370,31 @@ export function DayItineraryContent({
             <Text style={styles.sectionTitle}>일정 목록</Text>
             {isReorderMode ? (
               <View style={styles.placeListHeaderActions}>
-                <Pressable
-                  accessibilityRole="button"
+                <InlineAction
                   disabled={reorderState.status === 'saving'}
+                  label="취소"
                   onPress={onExitReorderMode}
-                  style={[
-                    styles.headerSecondaryButton,
-                    reorderState.status === 'saving' ? styles.secondaryButtonDisabled : null,
-                  ]}
-                >
-                  <Text style={styles.headerSecondaryButtonText}>취소</Text>
-                </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityState={{ disabled: reorderSubmitState?.disabled ?? true }}
+                  style={styles.headerActionButton}
+                />
+                <InlineAction
                   disabled={reorderSubmitState?.disabled ?? true}
+                  label={reorderSubmitState?.label ?? '저장'}
+                  leading={
+                    reorderState.status === 'saving' ? (
+                      <ActivityIndicator color={theme.color.onActionPrimary} size="small" />
+                    ) : undefined
+                  }
                   onPress={onSaveReorder}
-                  style={[styles.headerPrimaryButton, reorderSubmitState?.disabled ? styles.buttonDisabled : null]}
-                >
-                  {reorderState.status === 'saving' ? (
-                    <ActivityIndicator color={theme.color.onPrimary} size="small" />
-                  ) : null}
-                  <Text style={styles.headerPrimaryButtonText}>{reorderSubmitState?.label ?? '저장'}</Text>
-                </Pressable>
+                  style={styles.headerActionButton}
+                  tone="primary"
+                />
               </View>
             ) : reorderAction.status === 'enabled' ? (
-              <Pressable accessibilityRole="button" onPress={onEnterReorderMode} style={styles.headerSecondaryButton}>
-                <Text style={styles.headerSecondaryButtonText}>{reorderAction.label}</Text>
-              </Pressable>
+              <InlineAction
+                label={reorderAction.label}
+                onPress={onEnterReorderMode}
+                style={styles.headerActionButton}
+              />
             ) : null}
           </View>
 
@@ -436,15 +430,11 @@ export function DayItineraryContent({
         {sharedUpdateBanner ? (
           <View style={styles.sharedUpdateNotice}>
             <Text style={styles.message}>{sharedUpdateBanner.message}</Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ disabled: sharedUpdateReloadDisabled }}
+            <InlineAction
               disabled={sharedUpdateReloadDisabled}
+              label={sharedUpdateBanner.actionLabel}
               onPress={onReloadSharedUpdate}
-              style={[styles.secondaryButton, sharedUpdateReloadDisabled ? styles.secondaryButtonDisabled : null]}
-            >
-              <Text style={styles.secondaryButtonText}>{sharedUpdateBanner.actionLabel}</Text>
-            </Pressable>
+            />
           </View>
         ) : null}
 
@@ -532,17 +522,15 @@ function DayItineraryMoveTargetSheet({
         </View>
         <View style={styles.chipList}>
           {moveState.targetOptions.map((option) => (
-            <Pressable
+            <FilterChip
               accessibilityLabel={`${option.dayLabel} ${option.formattedDate}로 이동`}
-              accessibilityRole="button"
               disabled={isSaving}
               key={option.tripDayId}
+              label={option.dayLabel}
               onPress={() => onSelectTarget(option.tripDayId)}
-              style={[styles.chip, isSaving ? styles.secondaryButtonDisabled : null]}
-            >
-              <Text style={styles.chipText}>{option.dayLabel}</Text>
-              <Text style={styles.fieldHelper}>{option.formattedDate}</Text>
-            </Pressable>
+              statusLabel={option.formattedDate}
+              style={styles.moveTargetChip}
+            />
           ))}
         </View>
         {moveState.status === 'pickingTarget' && moveState.error ? (
@@ -552,19 +540,9 @@ function DayItineraryMoveTargetSheet({
           </View>
         ) : null}
         <View style={styles.sheetActionRow}>
-          <Pressable
-            accessibilityRole="button"
-            disabled={isSaving}
-            onPress={onCancel}
-            style={[styles.secondaryButton, styles.sheetActionButton, isSaving ? styles.secondaryButtonDisabled : null]}
-          >
-            <Text style={styles.secondaryButtonText}>취소</Text>
-          </Pressable>
+          <SecondaryButton disabled={isSaving} label="취소" onPress={onCancel} style={styles.sheetActionButton} />
           {isSaving ? (
-            <View style={[styles.button, styles.sheetActionButton]}>
-              <ActivityIndicator color={theme.color.onPrimary} size="small" />
-              <Text style={styles.buttonText}>이동 중...</Text>
-            </View>
+            <PrimaryButton disabled label="이동 중..." loading onPress={() => {}} style={styles.sheetActionButton} />
           ) : null}
         </View>
       </View>
@@ -677,24 +655,18 @@ function DayItineraryItemSheet({
 
         <View style={styles.detailActionGroup}>
           {panel.actions.copyAddress ? (
-            <Pressable
+            <InlineAction
               accessibilityLabel={panel.actions.copyAddress.accessibilityLabel}
-              accessibilityRole="button"
+              label={panel.actions.copyAddress.label}
               onPress={() => onCopyAddress(item)}
-              style={({ pressed }) => [styles.rowActionButton, pressed ? styles.rowActionButtonPressed : null]}
-            >
-              <Text style={styles.rowActionText}>{panel.actions.copyAddress.label}</Text>
-            </Pressable>
+            />
           ) : null}
           {panel.actions.openMap ? (
-            <Pressable
+            <InlineAction
               accessibilityLabel={panel.actions.openMap.accessibilityLabel}
-              accessibilityRole="button"
+              label={panel.actions.openMap.label}
               onPress={() => onOpenMap(item)}
-              style={({ pressed }) => [styles.rowActionButton, pressed ? styles.rowActionButtonPressed : null]}
-            >
-              <Text style={styles.rowActionText}>{panel.actions.openMap.label}</Text>
-            </Pressable>
+            />
           ) : null}
         </View>
 

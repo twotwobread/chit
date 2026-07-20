@@ -1,8 +1,9 @@
 import { type ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { Clock } from 'lucide-react-native';
 
-import { Badge, PlaceTag, theme } from '../design';
+import { Badge, InlineAction, PlaceTag, theme } from '../design';
+import { CompactActionRow } from './CompactActionRow';
 import { SwipeActionRow } from './SwipeActionRow';
 import {
   buildItinerarySegments,
@@ -204,15 +205,13 @@ function TimelineCard({
         {item.status === 'skipped' ? <Badge label="건너뜀" tone="neutral" /> : null}
         {item.lodgingBadgeLabel ? (
           onPressLodgingBadge ? (
-            <Pressable
+            <InlineAction
               accessibilityLabel={`${item.name} 대표 숙소 관리`}
-              accessibilityRole="button"
-              hitSlop={6}
+              label={item.lodgingBadgeLabel}
               onPress={() => onPressLodgingBadge(item)}
-              style={({ pressed }) => (pressed ? styles.pressed : null)}
-            >
-              <Badge label={item.lodgingBadgeLabel} tone="primary" />
-            </Pressable>
+              style={styles.lodgingBadgeAction}
+              tone="primary"
+            />
           ) : (
             <Badge label={item.lodgingBadgeLabel} tone="primary" />
           )
@@ -228,16 +227,15 @@ function TimelineCard({
     </View>
   );
 
-  const card = onPressItem ? (
-    <Pressable
-      accessibilityRole="button"
-      onPress={() => onPressItem(item)}
-      style={({ pressed }) => [styles.card, swipeAction ? styles.cardSwipeable : null, pressed ? styles.pressed : null]}
+  const card = (
+    <CompactActionRow
+      accessibilityLabel={accessibilityLabel}
+      onPress={onPressItem ? () => onPressItem(item) : undefined}
+      pressedStyle={styles.pressed}
+      style={[styles.card, swipeAction ? styles.cardSwipeable : null]}
     >
       {content}
-    </Pressable>
-  ) : (
-    <View style={[styles.card, swipeAction ? styles.cardSwipeable : null]}>{content}</View>
+    </CompactActionRow>
   );
 
   if (!swipeAction) {
@@ -334,6 +332,11 @@ const styles = StyleSheet.create({
     color: theme.color.textMuted,
     fontFamily: theme.font.family.regular,
     fontSize: theme.font.size.caption,
+  },
+  lodgingBadgeAction: {
+    minHeight: theme.layout.tapMin,
+    paddingHorizontal: theme.space[3],
+    paddingVertical: theme.space[2],
   },
   meta: {
     color: theme.color.textMuted,

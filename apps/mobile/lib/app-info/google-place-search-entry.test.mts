@@ -160,7 +160,7 @@ describe('google place search native module entry setup', () => {
     assert.match(itineraryTabSource, /initialAction: initialActionParam/);
     assert.match(itineraryTabSource, /initialAction=\{initialAction\}/);
     assert.match(dayItineraryContentSource, /focusRequest\.target\.kind === 'lodgingPanel'/);
-    assert.match(dayLodgingPanelSource, /styles\.lodgingSummaryHighlighted/);
+    assert.match(dayLodgingPanelSource, /selected=\{highlighted\}/);
     assert.match(
       dayLodgingPanelSource,
       /onPress=\{viewModel\.sheet\.placeName \? onOpenSheet : onOpenSearchRegister\}/,

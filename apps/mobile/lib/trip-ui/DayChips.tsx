@@ -1,6 +1,6 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { theme } from '../design';
+import { FilterChip, theme } from '../design';
 
 export type DayChip = {
   id: string;
@@ -44,20 +44,13 @@ export function DayChips({
       {days.map((day) => {
         const selected = selectedDayIds ? selectedDayIds.includes(day.id) : day.id === selectedDayId;
         return (
-          <Pressable
+          <FilterChip
             accessibilityLabel={buildDayChipAccessibilityLabel(day)}
             accessibilityRole="tab"
-            accessibilityState={{ selected }}
             key={day.id}
-            onPress={() => onSelectDay(day.id)}
-            style={({ pressed }) => [
-              styles.chip,
-              selected ? styles.chipSelected : styles.chipIdle,
-              pressed ? styles.pressed : null,
-            ]}
-          >
-            <View style={styles.labelRow}>
-              {day.legendColor ? (
+            label={day.label}
+            leading={
+              day.legendColor ? (
                 <View
                   style={[
                     styles.legendDot,
@@ -65,16 +58,14 @@ export function DayChips({
                     selected ? styles.legendDotSelected : null,
                   ]}
                 />
-              ) : null}
-              <Text style={[styles.label, selected ? styles.labelSelected : null]}>{day.label}</Text>
-            </View>
-            {day.dateLabel ? (
-              <Text style={[styles.date, selected ? styles.dateSelected : null]}>{day.dateLabel}</Text>
-            ) : null}
-            {day.statusLabel ? (
-              <Text style={[styles.status, selected ? styles.statusSelected : null]}>{day.statusLabel}</Text>
-            ) : null}
-          </Pressable>
+              ) : undefined
+            }
+            onPress={() => onSelectDay(day.id)}
+            selected={selected}
+            statusLabel={buildDayChipStatusLabel(day)}
+            style={styles.chip}
+            tone="accent"
+          />
         );
       })}
     </ScrollView>
@@ -85,31 +76,13 @@ function buildDayChipAccessibilityLabel(day: DayChip): string {
   return [day.label, day.dateLabel, day.statusLabel].filter(Boolean).join(' ');
 }
 
+function buildDayChipStatusLabel(day: DayChip): string | undefined {
+  return [day.dateLabel, day.statusLabel].filter(Boolean).join(' · ') || undefined;
+}
+
 const styles = StyleSheet.create({
   chip: {
-    borderRadius: theme.radius.pill,
-    borderWidth: 1.5,
-    gap: theme.space[1],
-    justifyContent: 'center',
     minHeight: theme.layout.controlHSm + theme.space[2],
-    paddingHorizontal: theme.space[4],
-    paddingVertical: theme.space[2],
-  },
-  chipIdle: {
-    backgroundColor: theme.color.surface,
-    borderColor: theme.color.borderDefault,
-  },
-  chipSelected: {
-    backgroundColor: theme.color.primary,
-    borderColor: theme.color.primary,
-  },
-  date: {
-    color: theme.color.textMuted,
-    fontFamily: theme.font.family.regular,
-    fontSize: theme.font.size.micro,
-  },
-  dateSelected: {
-    color: theme.color.green[50],
   },
   emptyText: {
     color: theme.color.textMuted,
@@ -124,17 +97,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.space[4],
     paddingVertical: theme.space[3],
   },
-  label: {
-    color: theme.color.textBody,
-    fontFamily: theme.font.family.bold,
-    fontSize: theme.font.size.label,
-    fontWeight: theme.font.weight.bold,
-  },
-  labelRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: theme.space[2],
-  },
   legendDot: {
     borderColor: theme.color.surface,
     borderRadius: 5,
@@ -146,23 +108,8 @@ const styles = StyleSheet.create({
     borderColor: theme.color.onPrimary,
     borderWidth: 2,
   },
-  labelSelected: {
-    color: theme.color.onPrimary,
-  },
-  pressed: {
-    opacity: 0.72,
-  },
   row: {
     gap: theme.space[3],
     paddingVertical: theme.space[2],
-  },
-  status: {
-    color: theme.color.textFaint,
-    fontFamily: theme.font.family.semibold,
-    fontSize: theme.font.size.micro,
-    fontWeight: theme.font.weight.semibold,
-  },
-  statusSelected: {
-    color: theme.color.green[100],
   },
 });

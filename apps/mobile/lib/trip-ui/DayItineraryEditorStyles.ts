@@ -191,6 +191,10 @@ export const styles = StyleSheet.create({
     gap: theme.space[2],
     justifyContent: 'flex-end',
   },
+  headerActionButton: {
+    paddingHorizontal: theme.space[4],
+    paddingVertical: theme.space[2],
+  },
   headerPrimaryButton: {
     alignItems: 'center',
     backgroundColor: theme.color.primary,
@@ -456,20 +460,16 @@ export const styles = StyleSheet.create({
     opacity: 0.82,
   },
   swipeMoveIconButton: {
-    alignItems: 'center',
     backgroundColor: theme.color.primary,
-    borderRadius: theme.radius.pill,
-    height: 40,
-    justifyContent: 'center',
-    width: 40,
+    minHeight: theme.layout.tapMin,
+    minWidth: theme.layout.tapMin,
+    width: 52,
   },
   swipeDeleteIconButton: {
-    alignItems: 'center',
     backgroundColor: theme.color.red[500],
-    borderRadius: theme.radius.pill,
-    height: 40,
-    justifyContent: 'center',
-    width: 40,
+    minHeight: theme.layout.tapMin,
+    minWidth: theme.layout.tapMin,
+    width: 52,
   },
   expenseStatusBox: {
     alignItems: 'center',
@@ -685,6 +685,9 @@ export const styles = StyleSheet.create({
     minHeight: theme.layout.controlHSm,
     paddingHorizontal: theme.space[3],
     paddingVertical: theme.space[2],
+  },
+  moveTargetChip: {
+    minWidth: theme.layout.controlHLg,
   },
   chipSelected: {
     backgroundColor: theme.color.primary,
