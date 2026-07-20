@@ -1,11 +1,10 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Compass, ListOrdered, Map as MapIcon, ReceiptText, Wallet } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { theme } from '../design';
+import { TabButton, theme } from '../design';
 import { isTripRootTab, tripTabPath } from '../trips/routes';
-import { SELECTED_NAV_TAB_SURFACE_STYLE } from './tab-selection';
 
 type TripTabRoute = {
   key: string;
@@ -58,11 +57,12 @@ export function TripTabBar({ navigation, state }: TripTabBarProps) {
         const label = LABELS[route.name] ?? route.name;
 
         return (
-          <Pressable
+          <TabButton
             accessibilityLabel={label}
             accessibilityRole="tab"
-            accessibilityState={{ selected: focused }}
+            icon={({ color, size, strokeWidth }) => <Icon color={color} size={size} strokeWidth={strokeWidth} />}
             key={route.key}
+            label={label}
             onPress={() => {
               const event = navigation.emit({ canPreventDefault: true, target: route.key, type: 'tabPress' });
               if (!focused && !event.defaultPrevented) {
@@ -73,15 +73,8 @@ export function TripTabBar({ navigation, state }: TripTabBarProps) {
                 navigation.navigate(route.name);
               }
             }}
-            style={({ pressed }) => [styles.item, focused ? styles.itemActive : null, pressed ? styles.pressed : null]}
-          >
-            <Icon
-              color={focused ? theme.color.onPrimary : theme.color.textFaint}
-              size={24}
-              strokeWidth={focused ? 2.2 : 2}
-            />
-            <Text style={[styles.label, focused ? styles.labelActive : null]}>{label}</Text>
-          </Pressable>
+            selected={focused}
+          />
         );
       })}
     </View>
@@ -96,29 +89,5 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     flexDirection: 'row',
     paddingTop: theme.space[3],
-  },
-  item: {
-    alignItems: 'center',
-    borderRadius: theme.radius.pill,
-    flex: 1,
-    gap: theme.space[1] + 2,
-    marginHorizontal: theme.space[2],
-    minHeight: theme.layout.tapMin,
-    justifyContent: 'center',
-  },
-  label: {
-    color: theme.color.textFaint,
-    fontFamily: theme.font.family.semibold,
-    fontSize: theme.font.size.micro,
-    fontWeight: theme.font.weight.semibold,
-  },
-  itemActive: SELECTED_NAV_TAB_SURFACE_STYLE,
-  labelActive: {
-    color: theme.color.onPrimary,
-    fontFamily: theme.font.family.bold,
-    fontWeight: theme.font.weight.bold,
-  },
-  pressed: {
-    opacity: 0.72,
   },
 });

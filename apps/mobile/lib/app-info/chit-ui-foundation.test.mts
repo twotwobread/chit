@@ -57,6 +57,8 @@ const buttonSource = readMobileSource('../design/components/button.tsx');
 const chipSource = readMobileSource('../design/components/chip.tsx');
 const segmentedControlSource = readMobileSource('../design/components/segmented-control.tsx');
 const heroSource = readMobileSource('../design/patterns/hero.tsx');
+const tabButtonSource = readOptionalMobileSource('../design/components/tab-button.tsx');
+const floatingActionButtonSource = readOptionalMobileSource('../design/components/floating-action-button.tsx');
 const indexSource = readMobileSource('../design/index.ts');
 const expensesSource = readMobileSource('../../app/trips/[tripId]/(tabs)/expenses.tsx');
 const todaySpendSource = readMobileSource('../trip-ui/TodaySpendCard.tsx');
@@ -152,17 +154,67 @@ test('compact interactive controls keep the 44pt Chit touch target floor', () =>
   assertStyleContains(segmentedControlSource, 'segmentItem', /minHeight: theme\.layout\.tapMin/);
 });
 
-test('selected bottom and trip tab surfaces preserve existing primary fill until follow-up migration', () => {
+test('selected bottom and trip tab surfaces preserve existing primary fill through shared TabButton', () => {
   const tabSelectionSource = readMobileSource('../navigation/tab-selection.ts');
   const bottomMenuSource = readMobileSource('../navigation/BottomMenu.tsx');
   const tripTabBarSource = readMobileSource('../navigation/TripTabBar.tsx');
 
   assert.match(tabSelectionSource, /backgroundColor: theme\.color\.primary/);
   assert.match(tabSelectionSource, /theme\.shadow\.xs/);
-  assert.match(bottomMenuSource, /focused \? theme\.color\.onPrimary : theme\.color\.textFaint/);
-  assert.match(bottomMenuSource, /selectedLabel:[\s\S]*color: theme\.color\.onPrimary/);
-  assert.match(tripTabBarSource, /focused \? theme\.color\.onPrimary : theme\.color\.textFaint/);
-  assert.match(tripTabBarSource, /labelActive:[\s\S]*color: theme\.color\.onPrimary/);
+  assert.match(tabButtonSource, /tabButtonSelected:[\s\S]*backgroundColor: theme\.color\.primary/);
+  assert.match(tabButtonSource, /theme\.shadow\.xs/);
+  assert.match(tabButtonSource, /iconColor = selected \? theme\.color\.onPrimary : theme\.color\.textFaint/);
+  assert.match(tabButtonSource, /labelSelected:[\s\S]*color: theme\.color\.onPrimary/);
+  assert.match(bottomMenuSource, /<TabButton/);
+  assert.match(tripTabBarSource, /<TabButton/);
+});
+
+test('Issue 399 navigation chrome adopts shared interactive primitives without route drift', () => {
+  const bottomMenuSource = readMobileSource('../navigation/BottomMenu.tsx');
+  const tripTabBarSource = readMobileSource('../navigation/TripTabBar.tsx');
+  const appBarSource = readMobileSource('../trip-ui/AppBar.tsx');
+  const tripRootFabSource = readMobileSource('../trip-ui/TripRootFab.tsx');
+
+  assert.match(indexSource, /TabButton/);
+  assert.match(indexSource, /FloatingActionButton/);
+  assert.match(bottomMenuSource, /import \{ TabButton, theme \} from '\.\.\/design';/);
+  assert.doesNotMatch(bottomMenuSource, /<Pressable/);
+  assert.match(bottomMenuSource, /<TabButton[\s\S]*accessibilityRole="button"[\s\S]*selected=\{focused\}/);
+  assert.match(bottomMenuSource, /markExplicitHomeIntent\(\)/);
+  assert.match(bottomMenuSource, /router\.replace\('\/'\)/);
+  assert.match(bottomMenuSource, /router\.replace\('\/mypage'\)/);
+
+  assert.match(tripTabBarSource, /import \{ TabButton, theme \} from '\.\.\/design';/);
+  assert.doesNotMatch(tripTabBarSource, /<Pressable/);
+  assert.match(tripTabBarSource, /<TabButton[\s\S]*accessibilityRole="tab"[\s\S]*selected=\{focused\}/);
+  assert.match(
+    tripTabBarSource,
+    /navigation\.emit\(\{ canPreventDefault: true, target: route\.key, type: 'tabPress' \}\)/,
+  );
+  assert.match(tripTabBarSource, /router\.replace\(tripTabPath\(tripId, route\.name\)\)/);
+  assert.match(tripTabBarSource, /navigation\.navigate\(route\.name\)/);
+
+  assert.match(appBarSource, /import \{ AvatarGroup, IconButton, theme \} from '\.\.\/design';/);
+  assert.match(appBarSource, /InteractiveSurface/);
+  assert.doesNotMatch(appBarSource, /<Pressable/);
+  assert.match(appBarSource, /accessibilityHint=\{leadingHint\}/);
+  assert.match(appBarSource, /accessibilityHint="다른 여행으로 전환합니다\."/);
+  assert.match(appBarSource, /accessibilityHint="항공권 목록을 엽니다\."/);
+  assert.match(appBarSource, /accessibilityHint="동행자 목록을 엽니다\."/);
+  assert.match(appBarSource, /router\.replace\('\/'\)/);
+
+  assert.match(tripRootFabSource, /import \{ FloatingActionButton, theme \} from '\.\.\/design';/);
+  assert.doesNotMatch(tripRootFabSource, /<Pressable/);
+  assert.match(
+    tripRootFabSource,
+    /<FloatingActionButton[\s\S]*accessibilityHint=\{accessibilityHint\}[\s\S]*accessibilityLabel=\{accessibilityLabel\}/,
+  );
+  assert.match(tripRootFabSource, /<Plus color=\{theme\.color\.onUiAccent\}/);
+  assert.match(floatingActionButtonSource, /floatingActionButtonLime:[\s\S]*backgroundColor: theme\.color\.uiAccent/);
+  assert.match(
+    floatingActionButtonSource,
+    /floatingActionButtonGraphite:[\s\S]*backgroundColor: theme\.color\.actionPrimary/,
+  );
 });
 
 test('key tab and chip primitives expose explicit accessibility labels with selected state', () => {
@@ -171,9 +223,9 @@ test('key tab and chip primitives expose explicit accessibility labels with sele
   const dayChipsSource = readMobileSource('../trip-ui/DayChips.tsx');
 
   assert.match(bottomMenuSource, /accessibilityLabel=\{tab\.label\}/);
-  assert.match(bottomMenuSource, /accessibilityState=\{\{ selected: focused \}\}/);
+  assert.match(bottomMenuSource, /selected=\{focused\}/);
   assert.match(tripTabBarSource, /accessibilityLabel=\{label\}/);
-  assert.match(tripTabBarSource, /accessibilityState=\{\{ selected: focused \}\}/);
+  assert.match(tripTabBarSource, /selected=\{focused\}/);
   assert.match(chipSource, /accessibilityLabel=\{label\}/);
   assert.match(segmentedControlSource, /accessibilityLabel=\{option\}/);
   assert.match(dayChipsSource, /accessibilityLabel=\{buildDayChipAccessibilityLabel\(day\)\}/);
@@ -266,6 +318,17 @@ test('keyboard-aware forms are backed by the production keyboard controller with
 
 function readMobileSource(relativePath: string): string {
   return readFileSync(new URL(relativePath, import.meta.url), 'utf8');
+}
+
+function readOptionalMobileSource(relativePath: string): string {
+  try {
+    return readMobileSource(relativePath);
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+      return '';
+    }
+    throw error;
+  }
 }
 
 function assertStyleContains(source: string, styleName: string, expected: RegExp): void {

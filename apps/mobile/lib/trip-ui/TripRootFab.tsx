@@ -1,8 +1,7 @@
-import { Pressable, StyleSheet } from 'react-native';
 import type { PressableProps } from 'react-native';
 import { Plus } from 'lucide-react-native';
 
-import { theme } from '../design';
+import { FloatingActionButton, theme } from '../design';
 import type { TripRootFabLayout } from '../trips/trip-root-fab-layout';
 
 export function TripRootFab({
@@ -17,32 +16,14 @@ export function TripRootFab({
   onPress: PressableProps['onPress'];
 }) {
   return (
-    <Pressable
+    <FloatingActionButton
       accessibilityHint={accessibilityHint}
       accessibilityLabel={accessibilityLabel}
-      accessibilityRole="button"
-      hitSlop={theme.space[3]}
       onPress={onPress}
-      style={({ pressed }) => [styles.fab, layout, pressed ? styles.fabPressed : null]}
+      style={layout}
+      tone="lime"
     >
-      <Plus color={theme.color.onPrimary} size={30} strokeWidth={2.8} />
-    </Pressable>
+      <Plus color={theme.color.onUiAccent} size={30} strokeWidth={2.8} />
+    </FloatingActionButton>
   );
 }
-
-const styles = StyleSheet.create({
-  fab: {
-    alignItems: 'center',
-    backgroundColor: theme.color.primary,
-    borderRadius: theme.radius.pill,
-    height: theme.layout.controlHLg,
-    justifyContent: 'center',
-    position: 'absolute',
-    width: theme.layout.controlHLg,
-    zIndex: 10,
-    ...theme.shadow.lg,
-  },
-  fabPressed: {
-    backgroundColor: theme.color.primaryPressed,
-  },
-});
