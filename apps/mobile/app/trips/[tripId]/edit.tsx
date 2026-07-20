@@ -1,12 +1,20 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 
 import { ApiError } from '@i-um/api-contract';
 
 import { MobileAuthError } from '../../../lib/auth/client';
 import { getStoredSession } from '../../../lib/auth/session';
-import { Card, PrimaryButton, ScreenBackground, SecondaryButton, theme } from '../../../lib/design';
+import {
+  Card,
+  ChoiceChip,
+  FormField,
+  PrimaryButton,
+  ScreenBackground,
+  SecondaryButton,
+  theme,
+} from '../../../lib/design';
 import { KeyboardAwareFormScrollView } from '../../../lib/trip-ui/KeyboardAwareFormScrollView';
 import { StickyActionFooter, useStickyActionFooterLayout } from '../../../lib/trip-ui/StickyActionFooter';
 import { updateTrip } from '../../../lib/trips/trip-api';
@@ -268,63 +276,47 @@ export default function EditTripScreen() {
               />
             ) : null}
 
-            <View style={styles.field}>
-              <Text style={styles.label}>기본 통화</Text>
+            <FormField label="기본 통화" disabled={submitting}>
               <View style={styles.currencyRow}>
                 {supportedCurrencies.map((currency) => {
                   const selected = form.defaultCurrency === currency;
                   return (
-                    <Pressable
-                      accessibilityRole="button"
+                    <ChoiceChip
                       disabled={submitting}
                       key={currency}
+                      label={currency}
                       onPress={() => {
                         setForm((current) => (current ? { ...current, defaultCurrency: currency } : current));
                         setSaveError(null);
                       }}
-                      style={[
-                        styles.currencyChip,
-                        selected ? styles.currencyChipSelected : null,
-                        submitting ? styles.disabledButton : null,
-                      ]}
-                    >
-                      <Text style={[styles.currencyText, selected ? styles.currencyTextSelected : null]}>
-                        {currency}
-                      </Text>
-                    </Pressable>
+                      selected={selected}
+                    />
                   );
                 })}
               </View>
-            </View>
+            </FormField>
 
-            <View style={styles.field}>
-              <Text style={styles.label}>이동 방식</Text>
-              <Text style={styles.fieldHelperText}>일정 이동 시간 계산에 기본으로 사용할 방식을 선택해요.</Text>
+            <FormField
+              disabled={submitting}
+              helperText="일정 이동 시간 계산에 기본으로 사용할 방식을 선택해요."
+              label="이동 방식"
+            >
               <View style={styles.currencyRow}>
                 {buildTripDefaultTravelModeSelectorViewModel(form.defaultTravelMode).options.map((option) => (
-                  <Pressable
+                  <ChoiceChip
                     accessibilityLabel={option.accessibilityLabel}
-                    accessibilityRole="button"
-                    accessibilityState={option.accessibilityState}
                     disabled={submitting}
                     key={option.mode}
+                    label={option.label}
                     onPress={() => {
                       setForm((current) => (current ? { ...current, defaultTravelMode: option.mode } : current));
                       setSaveError(null);
                     }}
-                    style={[
-                      styles.currencyChip,
-                      option.selected ? styles.currencyChipSelected : null,
-                      submitting ? styles.disabledButton : null,
-                    ]}
-                  >
-                    <Text style={[styles.currencyText, option.selected ? styles.currencyTextSelected : null]}>
-                      {option.label}
-                    </Text>
-                  </Pressable>
+                    selected={option.selected}
+                  />
                 ))}
               </View>
-            </View>
+            </FormField>
 
             {validationError ? <Text style={styles.errorText}>{validationError}</Text> : null}
             {!validationError && original && !canSave ? (

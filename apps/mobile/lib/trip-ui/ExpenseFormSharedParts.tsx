@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { type SupportedCurrency } from '@i-um/api-contract';
 
-import { PrimaryButton, theme } from '../design';
+import { ChoiceChip, FormField, InlineAction, PrimaryButton, SegmentedControl, theme } from '../design';
 import { expenseCategoryValues, getExpenseCategoryMarkerMeta, type ExpenseCategory } from './expense-category-markers';
 import {
   buildQuickExpenseManualSplitSummary,
@@ -41,6 +41,11 @@ export type ExpenseFormParticipantOption = {
 };
 
 const supportedCurrencyValues: SupportedCurrency[] = ['KRW', 'JPY', 'USD', 'EUR'];
+const SPLIT_POLICY_LABELS: Record<QuickExpenseSplitPolicy, string> = {
+  equal: '1/N 분할',
+  manual: '직접 분할',
+};
+const splitPolicyOptions = [SPLIT_POLICY_LABELS.equal, SPLIT_POLICY_LABELS.manual];
 
 export function ExpenseCurrencySelector({
   currency,
@@ -52,28 +57,22 @@ export function ExpenseCurrencySelector({
   onSelectCurrency: (currency: SupportedCurrency) => void;
 }) {
   return (
-    <View style={styles.fieldGroup}>
-      <Text style={styles.label}>통화</Text>
+    <FormField disabled={disabled} label="통화">
       <View style={styles.optionList}>
         {supportedCurrencyValues.map((option) => {
           const selected = option === currency;
           return (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ selected }}
+            <ChoiceChip
               disabled={disabled}
               key={option}
+              label={currencyOptionLabel(option)}
               onPress={() => onSelectCurrency(option)}
-              style={[styles.chip, selected ? styles.chipSelected : null]}
-            >
-              <Text style={[styles.chipText, selected ? styles.chipTextSelected : null]}>
-                {currencyOptionLabel(option)}
-              </Text>
-            </Pressable>
+              selected={selected}
+            />
           );
         })}
       </View>
-    </View>
+    </FormField>
   );
 }
 
@@ -87,31 +86,22 @@ export function ExpenseCategorySelector({
   onSelectExpenseCategory: (expenseCategory: ExpenseCategory) => void;
 }) {
   return (
-    <View style={styles.fieldGroup}>
-      <View style={styles.sectionHeader}>
-        <Text style={styles.label}>카테고리</Text>
-        <Text style={styles.helper}>장소 종류와 별개로 지출 카테고리를 정할 수 있어요.</Text>
-      </View>
+    <FormField disabled={disabled} helperText="장소 종류와 별개로 지출 카테고리를 정할 수 있어요." label="카테고리">
       <View style={styles.optionList}>
         {expenseCategoryValues.map((option) => {
           const selected = option === expenseCategory;
           return (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ selected }}
+            <ChoiceChip
               disabled={disabled}
               key={option}
+              label={getExpenseCategoryMarkerMeta(option).label}
               onPress={() => onSelectExpenseCategory(option)}
-              style={[styles.chip, selected ? styles.chipSelected : null]}
-            >
-              <Text style={[styles.chipText, selected ? styles.chipTextSelected : null]}>
-                {getExpenseCategoryMarkerMeta(option).label}
-              </Text>
-            </Pressable>
+              selected={selected}
+            />
           );
         })}
       </View>
-    </View>
+    </FormField>
   );
 }
 
@@ -129,21 +119,16 @@ export function ExpenseFormSummaryActionRow({
   value: string;
 }) {
   return (
-    <View style={styles.fieldGroup}>
-      <Text style={styles.label}>{title}</Text>
-      <Pressable
-        accessibilityRole="button"
+    <FormField disabled={disabled} helperText={helper} label={title}>
+      <InlineAction
+        accessibilityLabel={`${title} 변경`}
         disabled={disabled}
+        label={value}
         onPress={onPress}
-        style={({ pressed }) => [styles.summaryRow, disabled ? styles.disabled : null, pressed ? styles.pressed : null]}
-      >
-        <View style={styles.summaryTextColumn}>
-          <Text style={styles.summaryValue}>{value}</Text>
-          {helper ? <Text style={styles.helper}>{helper}</Text> : null}
-        </View>
-        <Text style={styles.summaryAction}>변경</Text>
-      </Pressable>
-    </View>
+        style={styles.summaryRow}
+        trailing={<Text style={styles.summaryAction}>변경</Text>}
+      />
+    </FormField>
   );
 }
 
@@ -209,20 +194,14 @@ export function ExpenseFormScheduleSelector({
   return (
     <>
       {showDayTabs ? (
-        <View style={styles.fieldGroup}>
-          <Text style={styles.label}>{dayLabel}</Text>
+        <FormField disabled={disabled} label={dayLabel}>
           {showClearDayOption ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ selected: selectedTripDayId === null }}
+            <ChoiceChip
               disabled={disabled}
+              label="선택 안 함"
               onPress={clearTripDay}
-              style={[styles.chip, selectedTripDayId === null ? styles.chipSelected : null]}
-            >
-              <Text style={[styles.chipText, selectedTripDayId === null ? styles.chipTextSelected : null]}>
-                선택 안 함
-              </Text>
-            </Pressable>
+              selected={selectedTripDayId === null}
+            />
           ) : null}
           <DayChips
             days={dayOptions.map((option) => ({
@@ -234,7 +213,7 @@ export function ExpenseFormScheduleSelector({
             onSelectDay={selectTripDay}
             selectedDayId={selectedTripDayId}
           />
-        </View>
+        </FormField>
       ) : null}
 
       {showItemSelector && itemOptions.length > 0 ? (
@@ -348,46 +327,28 @@ export function ExpensePaymentSplitSheet({
           <Text style={styles.helper}>누가 냈고 누구와 나눌지 설정해요.</Text>
         </View>
 
-        <View style={styles.fieldGroup}>
-          <Text style={styles.label}>결제자</Text>
+        <FormField disabled={disabled} errorText={payerError ?? undefined} label="결제자">
           <View style={styles.optionList}>
             {payerOptions.map((option) => (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityState={{ selected: option.selected }}
+              <ChoiceChip
                 disabled={disabled}
                 key={option.participantId}
+                label={option.displayName}
                 onPress={() => onSelectPayer(option.participantId)}
-                style={[styles.chip, option.selected ? styles.chipSelected : null]}
-              >
-                <Text style={[styles.chipText, option.selected ? styles.chipTextSelected : null]}>
-                  {option.displayName}
-                </Text>
-              </Pressable>
+                selected={option.selected}
+              />
             ))}
           </View>
-          {payerError ? <Text style={styles.errorMessage}>{payerError}</Text> : null}
-        </View>
+        </FormField>
 
-        <View style={styles.fieldGroup}>
-          <Text style={styles.label}>분할 방식</Text>
-          <View style={styles.modeRow}>
-            {(['equal', 'manual'] as const).map((policy) => (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityState={{ selected: splitPolicy === policy }}
-                disabled={disabled}
-                key={policy}
-                onPress={() => onSelectSplitPolicy(policy)}
-                style={[styles.modeChip, splitPolicy === policy ? styles.chipSelected : null]}
-              >
-                <Text style={[styles.chipText, splitPolicy === policy ? styles.chipTextSelected : null]}>
-                  {policy === 'equal' ? '1/N 분할' : '직접 분할'}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
+        <FormField disabled={disabled} label="분할 방식">
+          <SegmentedControl
+            disabledOptions={disabled ? splitPolicyOptions : []}
+            onChange={(value) => onSelectSplitPolicy(value === SPLIT_POLICY_LABELS.equal ? 'equal' : 'manual')}
+            options={splitPolicyOptions}
+            value={SPLIT_POLICY_LABELS[splitPolicy]}
+          />
+        </FormField>
 
         {splitPolicy === 'equal' ? (
           <>
