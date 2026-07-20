@@ -162,8 +162,8 @@ test('place edit sheet includes read-only place name and address context above e
     /buildDayItineraryEditPlaceSummary/,
     'expected edit sheet to build read-only place context from the selected item',
   );
-  assert.match(editPanelSource, />장소명</, 'expected edit sheet to label the place name as read-only context');
-  assert.match(editPanelSource, />주소</, 'expected edit sheet to label the address as read-only context');
+  assert.match(editPanelSource, /label="장소명"/, 'expected edit sheet to label the place name as read-only context');
+  assert.match(editPanelSource, /label="주소"/, 'expected edit sheet to label the address as read-only context');
   assert.match(editPanelSource, /placeSummary\.placeName/, 'expected edit sheet to render the selected place name');
   assert.match(editPanelSource, /placeSummary\.address/, 'expected edit sheet to render the selected place address');
 });

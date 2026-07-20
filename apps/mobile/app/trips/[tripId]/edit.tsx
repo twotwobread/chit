@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 
 import { ApiError } from '@i-um/api-contract';
@@ -13,6 +13,7 @@ import {
   PrimaryButton,
   ScreenBackground,
   SecondaryButton,
+  TextInputField,
   theme,
 } from '../../../lib/design';
 import { KeyboardAwareFormScrollView } from '../../../lib/trip-ui/KeyboardAwareFormScrollView';
@@ -22,7 +23,7 @@ import { dateFromString, monthStringFromDate, todayString } from '../../../lib/t
 import { tripDetailPath } from '../../../lib/trips/routes';
 import { resolveTripShellDetail } from '../../../lib/trips/trip-shell-detail';
 import { useTripShellState } from '../../../lib/trips/trip-shell-context';
-import { TripDateFieldButton, TripDatePicker, TripFormField } from '../../../lib/trips/date-picker';
+import { TripDateFieldButton, TripDatePicker } from '../../../lib/trips/date-picker';
 import {
   buildUpdateTripRequest,
   canSubmitTripBasicInfoUpdate,
@@ -233,35 +234,33 @@ export default function EditTripScreen() {
 
         {loadState === 'ready' && form ? (
           <Card>
-            <TripFormField label="여행 이름">
-              <TextInput
-                editable={!submitting}
-                onChangeText={(name) => {
-                  setForm((current) => (current ? { ...current, name } : current));
-                  setSaveError(null);
-                }}
-                placeholder="예: 오사카 3박 4일"
-                placeholderTextColor={theme.color.textFaint}
-                style={styles.input}
-                value={form.name}
-              />
-            </TripFormField>
+            <TextInputField
+              disabled={submitting}
+              label="여행 이름"
+              onChangeText={(name) => {
+                setForm((current) => (current ? { ...current, name } : current));
+                setSaveError(null);
+              }}
+              placeholder="예: 오사카 3박 4일"
+              required
+              value={form.name}
+            />
 
-            <TripFormField label="시작일">
+            <FormField disabled={submitting} label="시작일" required>
               <TripDateFieldButton
                 disabled={submitting}
                 onPress={() => openDatePicker('startDate')}
                 value={form.startDate}
               />
-            </TripFormField>
+            </FormField>
 
-            <TripFormField label="종료일">
+            <FormField disabled={submitting} label="종료일" required>
               <TripDateFieldButton
                 disabled={submitting}
                 onPress={() => openDatePicker('endDate')}
                 value={form.endDate}
               />
-            </TripFormField>
+            </FormField>
 
             {activeDateField ? (
               <TripDatePicker

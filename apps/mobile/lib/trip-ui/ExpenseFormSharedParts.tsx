@@ -217,8 +217,7 @@ export function ExpenseFormScheduleSelector({
       ) : null}
 
       {showItemSelector && itemOptions.length > 0 ? (
-        <View style={styles.fieldGroup}>
-          <Text style={styles.label}>{itemLabel}</Text>
+        <FormField disabled={disabled} errorText={errorMessage} label={itemLabel}>
           <Pressable
             accessibilityRole="button"
             accessibilityState={{ expanded: itemSelectorExpanded }}
@@ -275,8 +274,7 @@ export function ExpenseFormScheduleSelector({
               })}
             </View>
           ) : null}
-          {errorMessage ? <Text style={styles.errorMessage}>{errorMessage}</Text> : null}
-        </View>
+        </FormField>
       ) : null}
     </>
   );

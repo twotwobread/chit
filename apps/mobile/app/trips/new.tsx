@@ -18,6 +18,7 @@ import {
   PrimaryButton,
   ScreenBackground,
   SecondaryButton,
+  TextInputField,
   theme,
 } from '../../lib/design';
 import {
@@ -36,7 +37,6 @@ import { KeyboardAwareFormScrollView } from '../../lib/trip-ui/KeyboardAwareForm
 import { StickyActionFooter, useStickyActionFooterLayout } from '../../lib/trip-ui/StickyActionFooter';
 import { TripDateRangeEditor } from '../../lib/trip-ui/TripDateRangeEditor';
 import { dateFromString, isValidDate, monthStringFromDate, todayString } from '../../lib/trips/date';
-import { TripFormField } from '../../lib/trips/date-picker';
 import {
   applySuggestedTripName,
   createTripWizardSteps,
@@ -383,20 +383,19 @@ export default function NewTripScreen() {
           {wizardStep === 'review' ? (
             <View style={styles.stepStack}>
               <View style={styles.optionCard}>
-                <TripFormField label="여행 이름">
-                  <TextInput
-                    editable={!submitting}
-                    onChangeText={(name) => {
-                      setForm((current) => ({ ...current, name }));
-                      setNameEdited(true);
-                      setError(null);
-                    }}
-                    placeholder="예: 오사카 3박 4일"
-                    placeholderTextColor={theme.color.textFaint}
-                    style={styles.input}
-                    value={effectiveTripName}
-                  />
-                </TripFormField>
+                <TextInputField
+                  disabled={submitting}
+                  helperText="추천 이름을 그대로 쓰거나 원하는 이름으로 바꿀 수 있어요."
+                  label="여행 이름"
+                  onChangeText={(name) => {
+                    setForm((current) => ({ ...current, name }));
+                    setNameEdited(true);
+                    setError(null);
+                  }}
+                  placeholder="예: 오사카 3박 4일"
+                  required
+                  value={effectiveTripName}
+                />
                 {nameEdited ? (
                   <SecondaryButton
                     disabled={submitting}
@@ -599,7 +598,7 @@ function InlineDestinationSearchPanel({
 
   return (
     <View style={styles.searchPanel}>
-      <FormField label="도시 검색" helperText="도시명이나 지역명을 입력하고 검색해요.">
+      <FormField label="도시 검색" helperText="도시명이나 지역명을 입력하고 검색해요." errorText={error ?? undefined}>
         <View style={styles.searchPanelHeader}>
           <View style={styles.searchCountBadge}>
             <Text style={styles.searchCountText}>{destinations.length}/5</Text>
@@ -633,7 +632,6 @@ function InlineDestinationSearchPanel({
         <Text style={styles.resultPanelTitle}>검색 결과</Text>
         {searchSubmitState.helperText ? <Text style={styles.helperText}>{searchSubmitState.helperText}</Text> : null}
         {loading ? <Text style={styles.helperText}>도시를 검색하는 중...</Text> : null}
-        {error ? <Text style={styles.errorText}>{error}</Text> : null}
         {pendingCountryMismatchConfirmation ? (
           <View style={styles.destinationWarningBox}>
             <Text style={styles.destinationWarningTitle}>{pendingCountryMismatchConfirmation.title}</Text>

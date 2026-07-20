@@ -5,7 +5,7 @@ import { type ExpenseReceiptDraft, type SupportedCurrency } from '@i-um/api-cont
 
 import { type ExpenseCategory } from './expense-category-markers';
 
-import { Card, PrimaryButton, SecondaryButton, theme } from '../design';
+import { Card, FormField, PrimaryButton, SecondaryButton, TextInputField, theme } from '../design';
 import { dateFromString, isValidDate, monthStringFromDate } from '../trips/date';
 import { TripDateFieldButton, TripDatePicker } from '../trips/date-picker';
 import {
@@ -309,22 +309,16 @@ export function QuickExpenseForm({
 
         {mode === 'settlement' ? (
           <>
-            <View style={styles.fieldGroup}>
-              <Text style={styles.label}>지출명</Text>
-              <TextInput
-                accessibilityLabel="지출명"
-                editable={!saving}
-                onChangeText={onUpdateTitle}
-                placeholder={selectedItemId ? '선택 입력' : '예: 항공권, 숙소 예약금'}
-                placeholderTextColor={theme.color.textFaint}
-                style={styles.input}
-                value={titleInput}
-              />
-              {errors.title ? <Text style={styles.errorMessage}>{errors.title}</Text> : null}
-            </View>
+            <TextInputField
+              disabled={saving}
+              errorText={errors.title}
+              label="지출명"
+              onChangeText={onUpdateTitle}
+              placeholder={selectedItemId ? '선택 입력' : '예: 항공권, 숙소 예약금'}
+              value={titleInput}
+            />
 
-            <View style={styles.fieldGroup}>
-              <Text style={styles.label}>결제일자</Text>
+            <FormField disabled={saving} errorText={errors.expenseDate} label="결제일자" required>
               <TripDateFieldButton
                 disabled={saving}
                 onPress={openPaymentDatePicker}
@@ -342,8 +336,7 @@ export function QuickExpenseForm({
                   selectedDate={expenseDateInput}
                 />
               ) : null}
-              {errors.expenseDate ? <Text style={styles.errorMessage}>{errors.expenseDate}</Text> : null}
-            </View>
+            </FormField>
           </>
         ) : null}
 
@@ -367,8 +360,7 @@ export function QuickExpenseForm({
           showItemSelector={viewModel.showItemSelector}
         />
 
-        <View style={styles.fieldGroup}>
-          <Text style={styles.label}>금액</Text>
+        <FormField disabled={saving || Boolean(viewModel.emptyMessage)} errorText={errors.amount} label="금액" required>
           <View style={styles.amountInputBox}>
             <TextInput
               accessibilityLabel="금액"
@@ -382,8 +374,7 @@ export function QuickExpenseForm({
             />
             <Text style={styles.currencyLabel}>{viewModel.currencyLabel}</Text>
           </View>
-          {errors.amount ? <Text style={styles.errorMessage}>{errors.amount}</Text> : null}
-        </View>
+        </FormField>
 
         <ExpenseCurrencySelector
           currency={viewModel.currency}
@@ -397,12 +388,12 @@ export function QuickExpenseForm({
           onSelectExpenseCategory={onSelectExpenseCategory}
         />
 
-        <View style={styles.fieldGroup}>
-          <Text style={styles.label}>영수증</Text>
+        <FormField
+          disabled={saving || Boolean(viewModel.emptyMessage)}
+          helperText="금액/날짜/지출명 초안은 저장 전 직접 확인해야 해요."
+          label="영수증"
+        >
           <View style={styles.noticeBox}>
-            <Text style={styles.helper}>
-              영수증을 촬영하면 금액/날짜/지출명 초안을 채워줘요. 저장 전 직접 확인해야 해요.
-            </Text>
             {receiptDraft ? (
               <Text style={styles.helper}>
                 첨부된 초안 · 신뢰도 {receiptConfidenceLabel(receiptDraft.extraction.confidence)}
@@ -424,7 +415,7 @@ export function QuickExpenseForm({
               ) : null}
             </View>
           </View>
-        </View>
+        </FormField>
 
         <ExpenseFormSummaryActionRow
           disabled={saving || Boolean(viewModel.emptyMessage)}
@@ -442,17 +433,15 @@ export function QuickExpenseForm({
           value={settlementSummary}
         />
 
-        <View onLayout={(event) => onMemoLayout?.(event.nativeEvent.layout)} style={styles.fieldGroup}>
-          <Text style={styles.label}>메모</Text>
-          <TextInput
-            editable={!saving && !viewModel.emptyMessage}
+        <View onLayout={(event) => onMemoLayout?.(event.nativeEvent.layout)}>
+          <TextInputField
+            disabled={saving || Boolean(viewModel.emptyMessage)}
+            inputStyle={styles.memoInput}
+            label="메모"
             multiline
             onChangeText={onUpdateMemo}
             onFocus={onMemoFocus}
             placeholder="선택 입력"
-            placeholderTextColor={theme.color.textFaint}
-            style={[styles.input, styles.memoInput]}
-            textAlignVertical="top"
             value={memoInput}
           />
         </View>

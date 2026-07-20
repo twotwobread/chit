@@ -1,6 +1,6 @@
-import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 
-import { Card, PrimaryButton, SecondaryButton, theme } from '../design';
+import { Card, FormField, PrimaryButton, SecondaryButton, TextInputField } from '../design';
 import {
   buildDayItineraryEditPlaceSummary,
   buildDayItineraryEditSubmitState,
@@ -37,26 +37,24 @@ export function EditPlacePanel({
     <>
       <Text style={styles.panelTitle}>일정 상세 · 수정</Text>
       <View style={styles.detailAddressBox}>
-        <View style={styles.fieldGroup}>
-          <Text style={styles.label}>장소명</Text>
+        <FormField label="장소명">
           <Text style={styles.detailAddressText}>{placeSummary.placeName}</Text>
-        </View>
+        </FormField>
         {placeSummary.address ? (
-          <View style={styles.fieldGroup}>
-            <Text style={styles.label}>주소</Text>
+          <FormField label="주소">
             <Text style={styles.detailAddressText}>{placeSummary.address}</Text>
-          </View>
+          </FormField>
         ) : null}
       </View>
 
-      <View style={styles.fieldGroup}>
-        <Text style={styles.label}>장소 타입</Text>
+      <FormField disabled={isSaving} errorText={editState.errors.placeType ?? undefined} label="장소 타입" required>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.compactChipList}>
           {manualPlaceTypeOptions.map((option) => {
             const selected = editState.values.placeType === option.value;
             return (
               <Pressable
                 accessibilityRole="button"
+                accessibilityState={{ selected }}
                 disabled={isSaving}
                 key={option.value}
                 onPress={() => update({ placeType: option.value })}
@@ -67,8 +65,7 @@ export function EditPlacePanel({
             );
           })}
         </ScrollView>
-        {editState.errors.placeType ? <Text style={styles.fieldError}>{editState.errors.placeType}</Text> : null}
-      </View>
+      </FormField>
 
       <ScheduleTimeEditor
         defaultStartTime={editState.defaultStartTime ?? undefined}
@@ -79,20 +76,16 @@ export function EditPlacePanel({
         values={editState.values}
       />
 
-      <View style={styles.fieldGroup}>
-        <Text style={styles.label}>메모</Text>
-        <TextInput
-          editable={!isSaving}
-          multiline
-          onChangeText={(memo) => update({ memo })}
-          placeholder="선택 입력"
-          placeholderTextColor={theme.color.textFaint}
-          style={[styles.input, styles.addressInput]}
-          textAlignVertical="top"
-          value={editState.values.memo}
-        />
-        {editState.errors.memo ? <Text style={styles.fieldError}>{editState.errors.memo}</Text> : null}
-      </View>
+      <TextInputField
+        disabled={isSaving}
+        errorText={editState.errors.memo ?? undefined}
+        inputStyle={styles.addressInput}
+        label="메모"
+        multiline
+        onChangeText={(memo) => update({ memo })}
+        placeholder="선택 입력"
+        value={editState.values.memo}
+      />
 
       {editState.errors.form ? <Text style={styles.fieldError}>{editState.errors.form}</Text> : null}
 
