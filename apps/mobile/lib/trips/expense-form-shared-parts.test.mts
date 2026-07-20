@@ -8,6 +8,7 @@ const currentDir = dirname(fileURLToPath(import.meta.url));
 const tripUiDir = resolve(currentDir, '../trip-ui');
 const createSource = readFileSync(resolve(tripUiDir, 'QuickExpenseEntryParts.tsx'), 'utf8');
 const editSource = readFileSync(resolve(tripUiDir, 'ExpenseEditScreenParts.tsx'), 'utf8');
+const sharedPartsSource = readFileSync(resolve(tripUiDir, 'ExpenseFormSharedParts.tsx'), 'utf8');
 
 const sharedComponents = [
   'ExpenseFormScheduleSelector',
@@ -32,6 +33,18 @@ test('settlement expense create and edit forms do not define duplicated local su
   }
 });
 
+test('shared settlement option choices use SelectableCard radio semantics', () => {
+  const body = functionBody(sharedPartsSource, 'ExpenseSettlementChoice');
+
+  assert.match(sharedPartsSource, /import \{[^}]*SelectableCard[^}]*\} from '\.\.\/design'/s);
+  assert.match(body, /<SelectableCard\b/);
+  assert.match(body, /mode="radio"/);
+  assert.match(body, /checked=\{selected\}/);
+  assert.match(body, /title=\{label\}/);
+  assert.match(body, /description=\{description\}/);
+  assert.doesNotMatch(body, /<Pressable\b/);
+});
+
 test('expense forms use separate currency and category selectors instead of a combined section', () => {
   for (const componentName of separatedCurrencyCategoryComponents) {
     assert.match(createSource, new RegExp(`\\b${componentName}\\b`), `create form should use ${componentName}`);
@@ -41,3 +54,16 @@ test('expense forms use separate currency and category selectors instead of a co
     assert.doesNotMatch(source, /ExpenseCategoryCurrencySelector/);
   }
 });
+
+function functionBody(source: string, functionName: string): string {
+  const startMarker = `function ${functionName}(`;
+  const start = source.indexOf(startMarker);
+
+  assert.notEqual(start, -1, `${functionName} function should exist`);
+
+  const rest = source.slice(start + startMarker.length);
+  const nextFunction = rest.search(/\nfunction \w+\b|\nconst styles =/);
+  const end = nextFunction === -1 ? source.length : start + startMarker.length + nextFunction;
+
+  return source.slice(start, end);
+}

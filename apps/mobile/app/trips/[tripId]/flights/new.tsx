@@ -1,9 +1,17 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
+import { StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ApiError, type TripParticipantListItem } from '@i-um/api-contract';
 
-import { Card, ChoiceChip, FormField, InlineAction, PrimaryButton, theme } from '../../../../lib/design';
+import {
+  Card,
+  ChoiceChip,
+  FormField,
+  InlineAction,
+  PrimaryButton,
+  SelectableCard,
+  theme,
+} from '../../../../lib/design';
 import {
   buildFlightCreateRequest,
   defaultFlightCreateFormValues,
@@ -183,12 +191,12 @@ export default function NewFlightScreen() {
         {participantsState.participants.map((participant) => {
           const selected = selectedPassengerIds.includes(participant.participantId);
           return (
-            <Pressable
+            <SelectableCard
               accessibilityLabel={`${participant.displayName} 탑승자 ${selected ? '해제' : '선택'}`}
-              accessibilityRole="button"
-              accessibilityState={{ disabled: saving, selected }}
+              checked={selected}
               disabled={saving}
               key={participant.participantId}
+              mode="checkbox"
               onPress={() =>
                 setSelectedPassengerIds((current) =>
                   current.includes(participant.participantId)
@@ -196,18 +204,14 @@ export default function NewFlightScreen() {
                     : [...current, participant.participantId],
                 )
               }
-              style={({ pressed }) => [
-                styles.passengerRow,
-                selected ? styles.passengerRowSelected : null,
-                pressed ? styles.pressed : null,
-                saving ? styles.disabled : null,
-              ]}
-            >
-              <Text style={styles.passengerName}>{participant.displayName}</Text>
-              <Text style={[styles.passengerState, selected ? styles.passengerStateSelected : null]}>
-                {selected ? '선택됨' : '선택'}
-              </Text>
-            </Pressable>
+              style={styles.passengerRow}
+              title={<Text style={styles.passengerName}>{participant.displayName}</Text>}
+              trailing={
+                <Text style={[styles.passengerState, selected ? styles.passengerStateSelected : null]}>
+                  {selected ? '선택됨' : '선택'}
+                </Text>
+              }
+            />
           );
         })}
       </Card>
@@ -479,9 +483,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: theme.space[3],
   },
-  disabled: {
-    opacity: 0.5,
-  },
   feedback: {
     color: theme.color.danger,
     fontFamily: theme.font.family.bold,
@@ -526,10 +527,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.space[4],
     paddingVertical: theme.space[3],
   },
-  passengerRowSelected: {
-    backgroundColor: theme.color.primarySoft,
-    borderColor: theme.color.primary,
-  },
   passengerState: {
     color: theme.color.textMuted,
     fontFamily: theme.font.family.bold,
@@ -543,9 +540,6 @@ const styles = StyleSheet.create({
     color: theme.color.textMuted,
     fontFamily: theme.font.family.regular,
     fontWeight: theme.font.weight.regular,
-  },
-  pressed: {
-    opacity: 0.7,
   },
   sectionTitle: {
     color: theme.color.textStrong,

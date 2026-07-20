@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { type SupportedCurrency } from '@i-um/api-contract';
 
-import { ChoiceChip, FormField, InlineAction, PrimaryButton, SegmentedControl, theme } from '../design';
+import { ChoiceChip, FormField, InlineAction, PrimaryButton, SegmentedControl, SelectableCard, theme } from '../design';
 import { expenseCategoryValues, getExpenseCategoryMarkerMeta, type ExpenseCategory } from './expense-category-markers';
 import {
   buildQuickExpenseManualSplitSummary,
@@ -562,17 +562,7 @@ function ExpenseSettlementChoice({
   onPress: () => void;
   selected: boolean;
 }) {
-  return (
-    <Pressable
-      accessibilityRole="radio"
-      accessibilityState={{ checked: selected }}
-      onPress={onPress}
-      style={[styles.optionCard, selected ? styles.optionCardSelected : null]}
-    >
-      <Text style={styles.optionTitle}>{label}</Text>
-      <Text style={styles.helper}>{description}</Text>
-    </Pressable>
-  );
+  return <SelectableCard checked={selected} description={description} mode="radio" onPress={onPress} title={label} />;
 }
 
 function currencyOptionLabel(currency: SupportedCurrency): string {

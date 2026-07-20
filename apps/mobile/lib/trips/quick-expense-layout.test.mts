@@ -22,7 +22,11 @@ test('renders Today quick expense amount input before the currency unit', () => 
 });
 
 test('Today quick expense legacy form uses shared Chit actions and accessible amount controls', () => {
-  assert.match(quickExpenseFormSource, /PrimaryButton, SecondaryButton/, 'expected shared Chit buttons');
+  assert.match(
+    quickExpenseFormSource,
+    /import \{[^}]*PrimaryButton[^}]*SecondaryButton[^}]*\} from '\.\.\/design'/s,
+    'expected shared Chit buttons',
+  );
   assert.match(quickExpenseFormSource, /accessibilityLabel="금액"/, 'expected amount input to be labelled');
   assert.match(quickExpenseFormSource, /loading=\{submitting\}/, 'expected save button loading state');
   assert.match(quickExpenseFormSource, /loadingLabel="저장 중\.\.\."/, 'expected Chit loading copy');
@@ -30,9 +34,34 @@ test('Today quick expense legacy form uses shared Chit actions and accessible am
   assert.match(quickExpenseFormSource, /accessibilityLabel="영수증 초안 해제"/, 'expected receipt clear action label');
 });
 
+test('quick expense settlement choices use SelectableCard radio semantics', () => {
+  const body = functionBody(quickExpenseFormSource, 'SettlementChoice');
+
+  assert.match(quickExpenseFormSource, /import \{[^}]*SelectableCard[^}]*\} from '\.\.\/design'/s);
+  assert.match(body, /<SelectableCard\b/);
+  assert.match(body, /mode="radio"/);
+  assert.match(body, /checked=\{selected\}/);
+  assert.match(body, /title=\{label\}/);
+  assert.match(body, /description=\{description\}/);
+  assert.doesNotMatch(body, /<Pressable\b/);
+});
+
 test('quick expense participant chips preserve the 44pt touch target floor', () => {
   assertStyleContains(quickExpenseFormSource, 'participantChip', /minHeight: theme\.layout\.tapMin/);
 });
+
+function functionBody(source: string, functionName: string): string {
+  const startMarker = `function ${functionName}(`;
+  const start = source.indexOf(startMarker);
+
+  assert.notEqual(start, -1, `${functionName} function should exist`);
+
+  const rest = source.slice(start + startMarker.length);
+  const nextFunction = rest.search(/\nfunction \w+\b|\nconst styles =/);
+  const end = nextFunction === -1 ? source.length : start + startMarker.length + nextFunction;
+
+  return source.slice(start, end);
+}
 
 function assertStyleContains(source: string, styleName: string, expected: RegExp): void {
   const stylePattern = new RegExp(`${styleName}: \\{[\\s\\S]*?\\n  \\},`);

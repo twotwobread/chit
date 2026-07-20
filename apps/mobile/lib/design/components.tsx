@@ -14,6 +14,8 @@ export { ActionRow } from './components/row';
 export type { ActionRowTone } from './components/row';
 export { ChoiceChip, FilterChip } from './components/chip';
 export type { ChoiceChipTone, FilterChipTone } from './components/chip';
+export { SelectableCard } from './components/selectable-card';
+export type { SelectableCardMode, SelectableCardProps } from './components/selectable-card';
 export { FormField } from './patterns/form-field';
 export type { FormFieldTone } from './patterns/form-field';
 export { EmptyState, ErrorState, LoadingState } from './patterns/state-card';

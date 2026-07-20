@@ -3,7 +3,15 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { type ExpenseReceiptDraft } from '@i-um/api-contract';
 
-import { FormField, InlineAction, PrimaryButton, SecondaryButton, SegmentedControl, theme } from '../design';
+import {
+  FormField,
+  InlineAction,
+  PrimaryButton,
+  SecondaryButton,
+  SegmentedControl,
+  SelectableCard,
+  theme,
+} from '../design';
 import { cancelExpenseReceiptDraft } from '../trips/expense-api';
 import {
   buildExpensePaymentSplitSummaryLabel,
@@ -542,17 +550,7 @@ function SettlementChoice({
   onPress: () => void;
   selected: boolean;
 }) {
-  return (
-    <Pressable
-      accessibilityRole="radio"
-      accessibilityState={{ checked: selected }}
-      onPress={onPress}
-      style={[styles.settlementChoice, selected ? styles.toggleCardSelected : null]}
-    >
-      <Text style={styles.selectorTitle}>{label}</Text>
-      <Text style={styles.helperText}>{description}</Text>
-    </Pressable>
-  );
+  return <SelectableCard checked={selected} description={description} mode="radio" onPress={onPress} title={label} />;
 }
 
 function ParticipantChip({
@@ -835,47 +833,6 @@ const styles = StyleSheet.create({
   },
   summaryAction: {
     color: theme.color.primaryTextOnLight,
-    fontFamily: theme.font.family.bold,
-    fontSize: theme.font.size.label,
-    fontWeight: theme.font.weight.bold,
-  },
-  settlementChoice: {
-    backgroundColor: theme.color.surface,
-    borderColor: theme.color.borderDefault,
-    borderRadius: theme.radius.lg,
-    borderWidth: 1.5,
-    gap: theme.space[1],
-    paddingHorizontal: theme.space[4],
-    paddingVertical: theme.space[3],
-  },
-  toggleCard: {
-    alignItems: 'center',
-    backgroundColor: theme.color.surface,
-    borderColor: theme.color.borderDefault,
-    borderRadius: theme.radius.lg,
-    borderWidth: 1.5,
-    flexDirection: 'row',
-    gap: theme.space[3],
-    justifyContent: 'space-between',
-    paddingHorizontal: theme.space[4],
-    paddingVertical: theme.space[3],
-  },
-  toggleCardSelected: {
-    backgroundColor: theme.color.primary,
-    borderColor: theme.color.primary,
-  },
-  toggleTextColumn: {
-    flex: 1,
-    gap: theme.space[1],
-  },
-  toggleState: {
-    color: theme.color.textMuted,
-    fontFamily: theme.font.family.bold,
-    fontSize: theme.font.size.label,
-    fontWeight: theme.font.weight.bold,
-  },
-  toggleStateSelected: {
-    color: theme.color.onPrimary,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.label,
     fontWeight: theme.font.weight.bold,
