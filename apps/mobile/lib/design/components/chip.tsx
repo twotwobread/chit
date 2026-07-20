@@ -45,8 +45,10 @@ export function Chip({
 
 export function FilterChip({
   accessibilityLabel,
+  accessibilityRole = 'button',
   disabled,
   label,
+  leading,
   onPress,
   selected,
   statusLabel,
@@ -54,8 +56,10 @@ export function FilterChip({
   tone = 'neutral',
 }: {
   accessibilityLabel?: string;
+  accessibilityRole?: NonNullable<PressableProps['accessibilityRole']>;
   disabled?: boolean;
   label: string;
+  leading?: ReactNode;
   onPress: PressableProps['onPress'];
   selected?: boolean;
   statusLabel?: string;
@@ -65,7 +69,7 @@ export function FilterChip({
   return (
     <InteractiveSurface
       accessibilityLabel={accessibilityLabel ?? [label, statusLabel].filter(Boolean).join(', ')}
-      accessibilityRole="button"
+      accessibilityRole={accessibilityRole}
       disabled={disabled}
       minHeight={theme.layout.controlHSm}
       onPress={onPress}
@@ -78,6 +82,7 @@ export function FilterChip({
         style,
       ]}
     >
+      {leading}
       <ResponsiveLabel
         fontSize={theme.font.size.label}
         style={[styles.filterChipText, selected ? styles.filterChipTextSelected : null]}
@@ -85,7 +90,10 @@ export function FilterChip({
         {label}
       </ResponsiveLabel>
       {statusLabel ? (
-        <ResponsiveLabel fontSize={theme.font.size.micro} style={styles.filterChipStatus}>
+        <ResponsiveLabel
+          fontSize={theme.font.size.micro}
+          style={[styles.filterChipStatus, selected ? styles.filterChipStatusSelected : null]}
+        >
           {statusLabel}
         </ResponsiveLabel>
       ) : null}
@@ -254,6 +262,9 @@ const styles = StyleSheet.create({
     fontFamily: theme.font.family.regular,
     fontSize: theme.font.size.micro,
     textAlign: 'center',
+  },
+  filterChipStatusSelected: {
+    color: theme.color.onUiAccent,
   },
   filterChipText: {
     color: theme.color.textStrong,

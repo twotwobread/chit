@@ -229,7 +229,7 @@ test('key tab and chip primitives expose explicit accessibility labels with sele
   assert.match(chipSource, /accessibilityLabel=\{label\}/);
   assert.match(segmentedControlSource, /accessibilityLabel=\{option\}/);
   assert.match(dayChipsSource, /accessibilityLabel=\{buildDayChipAccessibilityLabel\(day\)\}/);
-  assert.match(dayChipsSource, /accessibilityState=\{\{ selected \}\}/);
+  assert.match(dayChipsSource, /selected=\{selected\}/);
 });
 
 test('Issue 372 core journey surfaces do not introduce raw hex colors outside theme tokens', () => {
@@ -259,6 +259,58 @@ test('Issue 395 Today spend summary uses Hero panel and Lime add action', () => 
   assert.match(todaySpendSource, /<HeroCard[\s\S]*variant="panel"/);
   assert.match(todaySpendSource, /<HeroActions[\s\S]*tone: 'lime'/);
   assert.doesNotMatch(todaySpendSource, /card:\s*\{[\s\S]*?backgroundColor: theme\.color\.accentSoft/);
+});
+
+test('Issue 401 itinerary/list rows use shared action primitives without losing accessibility semantics', () => {
+  const dayChipsSource = readMobileSource('../trip-ui/DayChips.tsx');
+  const itineraryContentSource = readMobileSource('../trip-ui/DayItineraryContent.tsx');
+  const timelineSource = readMobileSource('../trip-ui/ItineraryTimeline.tsx');
+  const lodgingPanelSource = readMobileSource('../trip-ui/DayLodgingPanel.tsx');
+  const expenseRowSource = readMobileSource('../trip-ui/ExpenseRow.tsx');
+  const compactActionRowSource = readMobileSource('../trip-ui/CompactActionRow.tsx');
+
+  assert.match(dayChipsSource, /import \{ FilterChip, theme \} from '\.\.\/design';/);
+  assert.match(dayChipsSource, /<FilterChip[\s\S]*accessibilityRole="tab"[\s\S]*selected=\{selected\}/);
+
+  assert.match(
+    itineraryContentSource,
+    /import \{[^}]*FilterChip[^}]*IconButton[^}]*InlineAction[^}]*PrimaryButton[^}]*SecondaryButton[^}]*theme[^}]*\} from '\.\.\/design';/,
+  );
+  assert.match(
+    itineraryContentSource,
+    /<IconButton[\s\S]*accessibilityLabel=\{`\$\{item\.placeName\} 다른 Day로 이동`\}/,
+  );
+  assert.match(itineraryContentSource, /<IconButton[\s\S]*accessibilityLabel=\{`\$\{item\.placeName\} 삭제`\}/);
+  assert.match(
+    itineraryContentSource,
+    /<FilterChip[\s\S]*accessibilityLabel=\{`\$\{option\.dayLabel\} \$\{option\.formattedDate\}로 이동`\}/,
+  );
+  assert.match(
+    itineraryContentSource,
+    /<InlineAction[\s\S]*accessibilityLabel=\{panel\.actions\.copyAddress\.accessibilityLabel\}/,
+  );
+  assert.match(
+    itineraryContentSource,
+    /<InlineAction[\s\S]*accessibilityLabel=\{panel\.actions\.openMap\.accessibilityLabel\}/,
+  );
+
+  assert.match(timelineSource, /import \{ Badge, InlineAction, PlaceTag, theme \} from '\.\.\/design';/);
+  assert.match(timelineSource, /import \{ CompactActionRow \} from '\.\/CompactActionRow';/);
+  assert.doesNotMatch(timelineSource, /<Pressable/);
+  assert.match(timelineSource, /<InlineAction[\s\S]*accessibilityLabel=\{`\$\{item\.name\} 대표 숙소 관리`\}/);
+
+  assert.match(lodgingPanelSource, /import \{ ActionRow, Badge, InlineAction, SecondaryButton \} from '\.\.\/design';/);
+  assert.doesNotMatch(lodgingPanelSource, /<Pressable/);
+  assert.match(lodgingPanelSource, /<ActionRow[\s\S]*selected=\{highlighted\}/);
+  assert.match(lodgingPanelSource, /<InlineAction[\s\S]*tone="danger"/);
+
+  assert.match(expenseRowSource, /import \{ CompactActionRow \} from '\.\/CompactActionRow';/);
+  assert.match(expenseRowSource, /<CompactActionRow[\s\S]*accessibilityLabel=\{resolvedAccessibilityLabel\}/);
+  assert.match(expenseRowSource, /accessibilityLabel=\{`\$\{categoryMeta\.label\} 카테고리`\}/);
+
+  assert.match(compactActionRowSource, /InteractiveSurface/);
+  assert.match(compactActionRowSource, /theme\.layout\.tapMin/);
+  assert.match(compactActionRowSource, /selected=\{selected\}/);
 });
 
 test('Today tab compact row actions preserve the 44pt touch target floor', () => {

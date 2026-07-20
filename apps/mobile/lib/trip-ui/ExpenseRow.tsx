@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import {
   BedDouble,
   Coffee,
@@ -16,6 +16,7 @@ import {
   type ExpenseCategoryMarkerIconName,
   getExpenseCategoryMarkerMeta,
 } from './expense-category-markers';
+import { CompactActionRow } from './CompactActionRow';
 import { buildExpenseRowLayout, type ExpenseRowLayout } from './expense-row-layout';
 
 export type { ExpenseCategory } from './expense-category-markers';
@@ -89,23 +90,15 @@ export function ExpenseRow({
     first ? null : styles.divider,
   ];
 
-  if (onPress) {
-    return (
-      <Pressable
-        accessibilityLabel={resolvedAccessibilityLabel}
-        accessibilityRole="button"
-        onPress={onPress}
-        style={({ pressed }) => [...rowStyle, pressed ? styles.pressed : null]}
-      >
-        {content}
-      </Pressable>
-    );
-  }
-
   return (
-    <View accessibilityLabel={resolvedAccessibilityLabel} style={rowStyle}>
+    <CompactActionRow
+      accessibilityLabel={resolvedAccessibilityLabel}
+      onPress={onPress}
+      pressedStyle={styles.pressed}
+      style={rowStyle}
+    >
       {content}
-    </View>
+    </CompactActionRow>
   );
 }
 
