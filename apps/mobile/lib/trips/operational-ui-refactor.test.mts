@@ -115,11 +115,15 @@ test('dense operational rows expose 44pt touch target evidence', () => {
   assert.match(source('app/trips/[tripId]/flights/new.tsx'), /passengerRow:[\s\S]*minHeight: theme\.layout\.tapMin/);
 });
 
-test('flight passenger selection rows announce selected and disabled states', () => {
+test('flight passenger selection rows use SelectableCard checkbox semantics with disabled state', () => {
   const newFlightSource = source('app/trips/[tripId]/flights/new.tsx');
   const flightDetailSource = source('app/trips/[tripId]/flights/[flightId].tsx');
 
-  assert.match(newFlightSource, /accessibilityState=\{\{ disabled: saving, selected \}\}/);
+  assert.match(newFlightSource, /import \{[^}]*SelectableCard[^}]*\} from '\.\.\/\.\.\/\.\.\/\.\.\/lib\/design'/s);
+  assert.match(newFlightSource, /<SelectableCard\b[\s\S]*mode="checkbox"/);
+  assert.match(newFlightSource, /checked=\{selected\}/);
+  assert.match(newFlightSource, /disabled=\{saving\}/);
+  assert.match(newFlightSource, /trailing=\{[\s\S]*selected \? '선택됨' : '선택'/);
   assert.match(
     flightDetailSource,
     /accessibilityState=\{\{ disabled: addingPassengers, selected: option\.selected \}\}/,

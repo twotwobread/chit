@@ -17,6 +17,7 @@ const floatingActionButtonSource = readOptionalMobileSource('../design/component
 const linkSource = readMobileSource('../design/components/link.tsx');
 const rowSource = readMobileSource('../design/components/row.tsx');
 const chipSource = readMobileSource('../design/components/chip.tsx');
+const selectableCardSource = readOptionalMobileSource('../design/components/selectable-card.tsx');
 const formFieldSource = readMobileSource('../design/patterns/form-field.tsx');
 const stateCardSource = readMobileSource('../design/patterns/state-card.tsx');
 const heroSource = readMobileSource('../design/patterns/hero.tsx');
@@ -32,6 +33,7 @@ const sharedImplementationSource = [
   linkSource,
   rowSource,
   chipSource,
+  selectableCardSource,
   formFieldSource,
   stateCardSource,
   heroSource,
@@ -50,6 +52,7 @@ const primitiveExports = [
   'LoadingState',
   'FilterChip',
   'ChoiceChip',
+  'SelectableCard',
 ];
 
 const primitiveTypeExports = [
@@ -63,6 +66,7 @@ const primitiveTypeExports = [
   'StateAction',
   'FilterChipTone',
   'ChoiceChipTone',
+  'SelectableCardMode',
 ];
 
 const heroExports = ['HeroCard', 'HeroHeader', 'HeroMetricPanel', 'HeroActions'];
@@ -120,7 +124,10 @@ test('Issue 395 shared design layer exposes foundation-backed Hero primitives', 
   assert.match(foundationInteractiveSource, /accessibilityState=\{buildAccessibilityState/);
   assert.match(foundationInteractiveSource, /minHeight: minHeight \?\? theme\.layout\.tapMin/);
   assert.match(foundationInteractiveSource, /Pressable/);
-  assert.match(foundationInteractiveSource, /children\(\{ busy, disabled: isDisabled, pressed, selected \}\)/);
+  assert.match(
+    foundationInteractiveSource,
+    /children\(\{ busy, disabled: isDisabled, pressed, selected: isSelected \}\)/,
+  );
   assert.doesNotMatch(foundationInteractiveSource, /pressed: false/);
 
   assert.match(buttonSource, /export type PrimaryButtonTone = 'graphite' \| 'lime'/);
@@ -190,6 +197,7 @@ test('Issue 389 interactive primitives encode accessibility roles, states, touch
     'ActionRow',
     'FilterChip',
     'ChoiceChip',
+    'SelectableCard',
   ]) {
     const body = functionBody(functionName);
     assert.match(body, /accessibilityRole=/, `${functionName} should set an accessibility role`);
@@ -206,9 +214,29 @@ test('Issue 389 interactive primitives encode accessibility roles, states, touch
     'actionRow',
     'choiceChip',
     'filterChip',
+    'selectableCard',
   ]) {
     assertStyleContains(styleName, /minHeight: theme\.layout\.(tapMin|controlHSm|controlH|controlHLg)/);
   }
+});
+
+test('Issue 406 SelectableCard supports rich checked, expanded, and trailing selection semantics', () => {
+  const body = functionBody('SelectableCard');
+
+  assert.match(foundationAccessibilitySource, /checked/, 'shared accessibility state should support checked');
+  assert.match(foundationInteractiveSource, /checked\?:/, 'InteractiveSurface should accept checked state');
+  assert.match(body, /InteractiveSurface/, 'SelectableCard should use the shared interactive surface');
+  assert.match(body, /accessibilityRole=\{selectableCardRole\(mode\)\}/);
+  assert.match(body, /checked=\{isCheckedMode\(mode\) \? active : undefined\}/);
+  assert.match(body, /expanded=\{expanded\}/);
+  assert.match(body, /selected=\{!isCheckedMode\(mode\) \? selected : undefined\}/);
+  assert.match(selectableCardSource, /title: ReactNode;/);
+  assert.match(selectableCardSource, /description\?: ReactNode;/);
+  assert.match(selectableCardSource, /meta\?: ReactNode;/);
+  assert.match(selectableCardSource, /trailing\?: ReactNode;/);
+  assert.match(selectableCardSource, /children\?: ReactNode;/);
+  assert.match(selectableCardSource, /selectableCardSelected/);
+  assert.doesNotMatch(selectableCardSource, /#[0-9a-fA-F]{3,8}\b/);
 });
 
 test('Issue 389 primitives keep Acid Lime vivid but sparse in shared UI', () => {

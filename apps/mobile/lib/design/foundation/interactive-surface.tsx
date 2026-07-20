@@ -4,6 +4,8 @@ import { Pressable, type Insets, type PressableProps, type StyleProp, type ViewS
 import { buildAccessibilityState } from './accessibility';
 import { theme } from '../theme';
 
+export type InteractiveSurfaceCheckedState = NonNullable<PressableProps['accessibilityState']>['checked'];
+
 export type InteractiveSurfaceState = {
   pressed: boolean;
   disabled: boolean;
@@ -18,6 +20,7 @@ export type InteractiveSurfaceProps = {
   accessibilityLabel?: string;
   accessibilityRole?: InteractiveSurfaceRole;
   busy?: boolean;
+  checked?: InteractiveSurfaceCheckedState;
   children: ReactNode | ((state: InteractiveSurfaceState) => ReactNode);
   disabled?: boolean;
   expanded?: boolean;
@@ -34,6 +37,7 @@ export function InteractiveSurface({
   accessibilityLabel,
   accessibilityRole = 'button',
   busy = false,
+  checked,
   children,
   disabled = false,
   expanded,
@@ -41,22 +45,23 @@ export function InteractiveSurface({
   minHeight,
   minWidth,
   onPress,
-  selected = false,
+  selected,
   style,
 }: InteractiveSurfaceProps) {
   const isDisabled = disabled || busy;
+  const isSelected = selected ?? false;
 
   return (
     <Pressable
       accessibilityHint={accessibilityHint}
       accessibilityLabel={accessibilityLabel}
       accessibilityRole={accessibilityRole}
-      accessibilityState={buildAccessibilityState({ busy, disabled: isDisabled, expanded, selected })}
+      accessibilityState={buildAccessibilityState({ busy, checked, disabled: isDisabled, expanded, selected })}
       disabled={isDisabled}
       hitSlop={hitSlop}
       onPress={onPress}
       style={({ pressed }) => {
-        const state = { busy, disabled: isDisabled, pressed, selected };
+        const state = { busy, disabled: isDisabled, pressed, selected: isSelected };
         return [
           { minHeight: minHeight ?? theme.layout.tapMin, minWidth: minWidth ?? undefined },
           typeof style === 'function' ? style(state) : style,
@@ -64,7 +69,9 @@ export function InteractiveSurface({
       }}
     >
       {({ pressed }) =>
-        typeof children === 'function' ? children({ busy, disabled: isDisabled, pressed, selected }) : children
+        typeof children === 'function'
+          ? children({ busy, disabled: isDisabled, pressed, selected: isSelected })
+          : children
       }
     </Pressable>
   );

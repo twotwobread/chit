@@ -1,12 +1,16 @@
 import type { PressableProps } from 'react-native';
 
+type AccessibilityCheckedState = NonNullable<PressableProps['accessibilityState']>['checked'];
+
 export function buildAccessibilityState({
   busy,
+  checked,
   disabled,
   expanded,
   selected,
 }: {
   busy?: boolean;
+  checked?: AccessibilityCheckedState;
   disabled?: boolean;
   expanded?: boolean;
   selected?: boolean;
@@ -15,6 +19,9 @@ export function buildAccessibilityState({
 
   if (busy !== undefined) {
     state.busy = busy;
+  }
+  if (checked !== undefined) {
+    state.checked = checked;
   }
   if (disabled !== undefined) {
     state.disabled = disabled;

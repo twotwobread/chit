@@ -18,6 +18,7 @@ export {
   PrimaryButton,
   ScreenBackground,
   SecondaryButton,
+  SelectableCard,
   TabButton,
   TextLink,
 } from './components';
@@ -35,6 +36,8 @@ export type {
   IconButtonVariant,
   InlineActionTone,
   PrimaryButtonTone,
+  SelectableCardMode,
+  SelectableCardProps,
   StateAction,
   TabButtonIconRenderer,
   TextLinkTone,
