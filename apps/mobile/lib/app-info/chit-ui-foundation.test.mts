@@ -132,7 +132,10 @@ test('Issue 385 core screens adopt dark shell and brand stamp primitives', () =>
   assert.match(homeSource, /<BrandStamp/);
   assert.match(mypageSource, /import \{ PrimaryButton, ScreenBackground, SecondaryButton, theme \}/);
   assert.match(mypageSource, /<ScreenBackground/);
-  assert.match(tripScreenSource, /import \{ Card, PrimaryButton, ScreenBackground, SecondaryButton, theme \}/);
+  assert.match(
+    tripScreenSource,
+    /import \{ Card, PrimaryButton, ScreenBackground, SecondaryButton, SkeletonCard, theme \}/,
+  );
   assert.match(tripScreenSource, /<ScreenBackground/);
 });
 

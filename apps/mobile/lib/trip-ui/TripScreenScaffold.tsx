@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
-import { Card, PrimaryButton, ScreenBackground, SecondaryButton, theme } from '../design';
+import { Card, PrimaryButton, ScreenBackground, SecondaryButton, SkeletonCard, theme } from '../design';
 import { KeyboardAwareFormScrollView } from './KeyboardAwareFormScrollView';
 import { StickyActionFooter, useStickyActionFooterLayout } from './StickyActionFooter';
 
@@ -54,6 +54,15 @@ export function TripScreenHeader({ helper, title }: { title: string; helper?: st
   );
 }
 
+type TripStateAction = {
+  accessibilityLabel?: string;
+  disabled?: boolean;
+  label: string;
+  loading?: boolean;
+  loadingLabel?: string;
+  onPress: () => void;
+};
+
 export function TripStateCard({
   helper,
   loading = false,
@@ -64,16 +73,37 @@ export function TripStateCard({
   title: string;
   helper?: string;
   loading?: boolean;
-  primaryAction?: { label: string; onPress: () => void };
-  secondaryAction?: { label: string; onPress: () => void };
+  primaryAction?: TripStateAction;
+  secondaryAction?: TripStateAction;
 }) {
+  if (loading) {
+    return <SkeletonCard title={title} body={helper ?? '화면 구조를 준비하고 있어요.'} />;
+  }
+
   return (
     <Card>
-      {loading ? <ActivityIndicator color={theme.color.primary} /> : null}
       <Text style={styles.cardTitle}>{title}</Text>
       {helper ? <Text style={styles.cardHelper}>{helper}</Text> : null}
-      {primaryAction ? <PrimaryButton label={primaryAction.label} onPress={primaryAction.onPress} /> : null}
-      {secondaryAction ? <SecondaryButton label={secondaryAction.label} onPress={secondaryAction.onPress} /> : null}
+      {primaryAction ? (
+        <PrimaryButton
+          accessibilityLabel={primaryAction.accessibilityLabel}
+          disabled={primaryAction.disabled}
+          label={primaryAction.label}
+          loading={primaryAction.loading}
+          loadingLabel={primaryAction.loadingLabel}
+          onPress={primaryAction.onPress}
+        />
+      ) : null}
+      {secondaryAction ? (
+        <SecondaryButton
+          accessibilityLabel={secondaryAction.accessibilityLabel}
+          disabled={secondaryAction.disabled || secondaryAction.loading}
+          label={
+            secondaryAction.loading ? (secondaryAction.loadingLabel ?? secondaryAction.label) : secondaryAction.label
+          }
+          onPress={secondaryAction.onPress}
+        />
+      ) : null}
     </Card>
   );
 }

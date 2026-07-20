@@ -45,6 +45,7 @@
       "ScreenBackground",
       "SecondaryButton",
       "SelectableCard",
+      "SkeletonCard",
       "TabButton",
       "TextInputField",
       "TextLink",
