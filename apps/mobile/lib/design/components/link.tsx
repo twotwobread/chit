@@ -57,9 +57,11 @@ export function InlineAction({
   accessibilityHint,
   accessibilityLabel,
   disabled,
+  expanded,
   label,
   leading,
   onPress,
+  selected,
   style,
   tone = 'neutral',
   trailing,
@@ -67,9 +69,11 @@ export function InlineAction({
   accessibilityHint?: string;
   accessibilityLabel?: string;
   disabled?: boolean;
+  expanded?: boolean;
   label: string;
   leading?: ReactNode;
   onPress: PressableProps['onPress'];
+  selected?: boolean;
   style?: StyleProp<ViewStyle>;
   tone?: InlineActionTone;
   trailing?: ReactNode;
@@ -80,8 +84,10 @@ export function InlineAction({
       accessibilityLabel={accessibilityLabel ?? label}
       accessibilityRole="button"
       disabled={disabled}
+      expanded={expanded}
       minHeight={theme.layout.controlHSm}
       onPress={onPress}
+      selected={selected}
       style={({ pressed }) => [
         styles.inlineAction,
         inlineActionToneStyle(tone),

@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, TextInput, View, type TextInputProps } fro
 import { router, useLocalSearchParams } from 'expo-router';
 import { ApiError, type TripParticipantListItem } from '@i-um/api-contract';
 
-import { Card, PrimaryButton, theme } from '../../../../lib/design';
+import { Card, ChoiceChip, FormField, InlineAction, PrimaryButton, theme } from '../../../../lib/design';
 import {
   buildFlightCreateRequest,
   defaultFlightCreateFormValues,
@@ -322,24 +322,23 @@ function DateTimeField({
   title: string;
 }) {
   return (
-    <View style={styles.field}>
-      <Text style={styles.label}>현지 날짜·시간</Text>
+    <FormField disabled={disabled} label="현지 날짜·시간">
       <View style={styles.dateTimeRow}>
-        <DateTimeButton
-          active={dateActive}
+        <ChoiceChip
+          accessibilityLabel={`날짜 ${dateValue || '날짜 선택'}`}
           disabled={disabled}
-          label="날짜"
+          label={`날짜 · ${dateValue || '날짜 선택'}`}
           onPress={onOpenDate}
-          placeholder="날짜 선택"
-          value={dateValue}
+          selected={dateActive}
+          style={styles.dateTimeChoice}
         />
-        <DateTimeButton
-          active={timeActive}
+        <ChoiceChip
+          accessibilityLabel={`시간 ${timeValue || '시간 선택'}`}
           disabled={disabled}
-          label="시간"
+          label={`시간 · ${timeValue || '시간 선택'}`}
           onPress={onOpenTime}
-          placeholder="시간 선택"
-          value={timeValue}
+          selected={timeActive}
+          style={styles.dateTimeChoice}
         />
       </View>
       {dateActive ? (
@@ -362,42 +361,7 @@ function DateTimeField({
           value={timeValue}
         />
       ) : null}
-    </View>
-  );
-}
-
-function DateTimeButton({
-  active,
-  disabled,
-  label,
-  onPress,
-  placeholder,
-  value,
-}: {
-  active: boolean;
-  disabled: boolean;
-  label: string;
-  onPress: () => void;
-  placeholder: string;
-  value: string;
-}) {
-  return (
-    <Pressable
-      accessibilityLabel={`${label} ${value || placeholder}`}
-      accessibilityRole="button"
-      accessibilityState={{ selected: active }}
-      disabled={disabled}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.dateTimeButton,
-        active ? styles.dateTimeButtonActive : null,
-        pressed ? styles.pressed : null,
-        disabled ? styles.disabled : null,
-      ]}
-    >
-      <Text style={[styles.dateTimeButtonLabel, active ? styles.dateTimeButtonLabelActive : null]}>{label}</Text>
-      <Text style={[styles.dateTimeButtonValue, value ? null : styles.placeholderText]}>{value || placeholder}</Text>
-    </Pressable>
+    </FormField>
   );
 }
 
@@ -414,60 +378,43 @@ function TimeZoneSelect({
 }) {
   const [open, setOpen] = useState(false);
   return (
-    <View style={styles.field}>
-      <Text style={styles.label}>{label}</Text>
-      <Pressable
+    <FormField disabled={disabled} label={label}>
+      <InlineAction
         accessibilityLabel={`${label} 선택`}
-        accessibilityRole="button"
-        accessibilityState={{ expanded: open }}
         disabled={disabled}
+        expanded={open}
+        label={flightTimeZoneLabel(value)}
         onPress={() => setOpen((current) => !current)}
-        style={({ pressed }) => [
-          styles.selectButton,
-          pressed ? styles.pressed : null,
-          disabled ? styles.disabled : null,
-        ]}
-      >
-        <Text style={styles.selectButtonText}>{flightTimeZoneLabel(value)}</Text>
-        <Text style={styles.selectChevron}>{open ? '접기' : '변경'}</Text>
-      </Pressable>
+        style={styles.selectButton}
+        trailing={<Text style={styles.selectChevron}>{open ? '접기' : '변경'}</Text>}
+      />
       {open ? (
         <View style={styles.selectOptions}>
           {flightTimeZoneOptions.map((option) => {
             const selected = option.value === value;
             return (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityState={{ selected }}
+              <ChoiceChip
                 key={option.value}
+                label={option.label}
                 onPress={() => {
                   onChange(option.value);
                   setOpen(false);
                 }}
-                style={({ pressed }) => [
-                  styles.selectOption,
-                  selected ? styles.selectOptionSelected : null,
-                  pressed ? styles.pressed : null,
-                ]}
-              >
-                <Text style={[styles.selectOptionText, selected ? styles.selectOptionTextSelected : null]}>
-                  {option.label}
-                </Text>
-              </Pressable>
+                selected={selected}
+              />
             );
           })}
         </View>
       ) : null}
-    </View>
+    </FormField>
   );
 }
 
 function Field({ label, ...props }: { label: string } & TextInputProps) {
   return (
-    <View style={styles.field}>
-      <Text style={styles.label}>{label}</Text>
+    <FormField disabled={props.editable === false} label={label}>
       <TextInput placeholderTextColor={theme.color.textMuted} style={styles.input} {...props} />
-    </View>
+    </FormField>
   );
 }
 
@@ -524,6 +471,9 @@ const styles = StyleSheet.create({
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.body,
     fontWeight: theme.font.weight.bold,
+  },
+  dateTimeChoice: {
+    flex: 1,
   },
   dateTimeRow: {
     flexDirection: 'row',

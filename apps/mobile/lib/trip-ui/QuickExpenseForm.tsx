@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { type ExpenseReceiptDraft } from '@i-um/api-contract';
 
-import { PrimaryButton, SecondaryButton, SegmentedControl, theme } from '../design';
+import { FormField, InlineAction, PrimaryButton, SecondaryButton, SegmentedControl, theme } from '../design';
 import { cancelExpenseReceiptDraft } from '../trips/expense-api';
 import {
   buildExpensePaymentSplitSummaryLabel,
@@ -258,27 +258,9 @@ export function QuickExpenseForm({
         <View style={styles.wrap}>
           <Text style={styles.sheetTitle}>지출을 어떻게 입력할까요?</Text>
           <Text style={styles.helperText}>직접 입력하거나 영수증을 촬영해 금액 초안을 채울 수 있어요.</Text>
-          <Pressable accessibilityRole="button" onPress={handleDirectInput} style={styles.save}>
-            <Text style={styles.saveText}>직접 입력</Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ disabled: !tripId }}
-            disabled={!tripId}
-            onPress={() => setScannerVisible(true)}
-            style={({ pressed }) => [
-              styles.receiptAction,
-              !tripId ? styles.disabled : null,
-              pressed ? styles.pressed : null,
-            ]}
-          >
-            <Text style={styles.receiptActionText}>영수증 촬영</Text>
-          </Pressable>
-          {onCancel ? (
-            <Pressable accessibilityRole="button" onPress={onCancel} style={styles.cancel}>
-              <Text style={styles.cancelText}>취소</Text>
-            </Pressable>
-          ) : null}
+          <PrimaryButton label="직접 입력" onPress={handleDirectInput} />
+          <SecondaryButton disabled={!tripId} label="영수증 촬영" onPress={() => setScannerVisible(true)} />
+          {onCancel ? <SecondaryButton label="취소" onPress={onCancel} /> : null}
         </View>
         <ReceiptCaptureScanner
           onClose={() => setScannerVisible(false)}
@@ -294,20 +276,20 @@ export function QuickExpenseForm({
   return (
     <>
       <View style={styles.wrap}>
-        <Text style={styles.label}>금액</Text>
-        <View style={styles.amountField}>
-          <TextInput
-            accessibilityLabel="금액"
-            keyboardType="decimal-pad"
-            onChangeText={(amountInput) => updateDraft({ amountInput })}
-            placeholder="0"
-            placeholderTextColor={theme.color.textFaint}
-            style={styles.amountInput}
-            value={draft.amountInput}
-          />
-          <Text style={styles.currencyLabel}>{currencyLabel(currency)}</Text>
-        </View>
-        {errors.amount ? <Text style={styles.errorText}>{errors.amount}</Text> : null}
+        <FormField errorText={errors.amount} label="금액">
+          <View style={styles.amountField}>
+            <TextInput
+              accessibilityLabel="금액"
+              keyboardType="decimal-pad"
+              onChangeText={(amountInput) => updateDraft({ amountInput })}
+              placeholder="0"
+              placeholderTextColor={theme.color.textFaint}
+              style={styles.amountInput}
+              value={draft.amountInput}
+            />
+            <Text style={styles.currencyLabel}>{currencyLabel(currency)}</Text>
+          </View>
+        </FormField>
 
         <Text style={styles.label}>영수증</Text>
         <View style={styles.receiptBox}>
@@ -417,15 +399,7 @@ export function QuickExpenseForm({
         {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
 
         <View style={styles.actionRow}>
-          {onCancel ? (
-            <Pressable
-              accessibilityRole="button"
-              onPress={onCancel}
-              style={({ pressed }) => [styles.cancel, pressed ? styles.pressed : null]}
-            >
-              <Text style={styles.cancelText}>취소</Text>
-            </Pressable>
-          ) : null}
+          {onCancel ? <SecondaryButton label="취소" onPress={onCancel} style={styles.cancel} /> : null}
           <PrimaryButton
             disabled={submitting}
             label="저장"
@@ -494,9 +468,7 @@ export function QuickExpenseForm({
             ))}
           </View>
           {errors.participants ? <Text style={styles.errorText}>{errors.participants}</Text> : null}
-          <Pressable accessibilityRole="button" onPress={() => setActiveSheet(null)} style={styles.save}>
-            <Text style={styles.saveText}>적용</Text>
-          </Pressable>
+          <PrimaryButton label="적용" onPress={() => setActiveSheet(null)} />
         </View>
       </BottomSheet>
 
@@ -518,9 +490,7 @@ export function QuickExpenseForm({
             onPress={() => updateDraft({ includeInSettlement: false })}
             selected={!draft.includeInSettlement}
           />
-          <Pressable accessibilityRole="button" onPress={() => setActiveSheet(null)} style={styles.save}>
-            <Text style={styles.saveText}>적용</Text>
-          </Pressable>
+          <PrimaryButton label="적용" onPress={() => setActiveSheet(null)} />
         </View>
       </BottomSheet>
       <ReceiptCaptureScanner
@@ -548,21 +518,16 @@ function SummaryActionRow({
   value: string;
 }) {
   return (
-    <>
-      <Text style={styles.label}>{title}</Text>
-      <Pressable
-        accessibilityRole="button"
+    <FormField disabled={disabled} helperText={helper} label={title}>
+      <InlineAction
+        accessibilityLabel={`${title} 변경`}
         disabled={disabled}
+        label={value}
         onPress={onPress}
-        style={({ pressed }) => [styles.summaryRow, disabled ? styles.disabled : null, pressed ? styles.pressed : null]}
-      >
-        <View style={styles.summaryTextColumn}>
-          <Text style={styles.summaryValue}>{value}</Text>
-          {helper ? <Text style={styles.helperText}>{helper}</Text> : null}
-        </View>
-        <Text style={styles.summaryAction}>변경</Text>
-      </Pressable>
-    </>
+        style={styles.summaryRow}
+        trailing={<Text style={styles.summaryAction}>변경</Text>}
+      />
+    </FormField>
   );
 }
 

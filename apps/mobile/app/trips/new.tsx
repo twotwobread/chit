@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 
 import type {
@@ -10,7 +10,16 @@ import type {
 } from '@i-um/api-contract';
 
 import { MobileAuthError } from '../../lib/auth/client';
-import { Card, PrimaryButton, ScreenBackground, SecondaryButton, theme } from '../../lib/design';
+import {
+  Card,
+  ChoiceChip,
+  FormField,
+  InlineAction,
+  PrimaryButton,
+  ScreenBackground,
+  SecondaryButton,
+  theme,
+} from '../../lib/design';
 import {
   addTripDestination,
   buildCreateTripDestinations,
@@ -331,19 +340,16 @@ export default function NewTripScreen() {
                   {currencies.map((currency) => {
                     const selected = form.defaultCurrency === currency;
                     return (
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityState={{ selected }}
+                      <ChoiceChip
                         disabled={submitting}
                         key={currency}
+                        label={currency}
                         onPress={() => {
                           setForm((current) => ({ ...current, defaultCurrency: currency }));
                           setError(null);
                         }}
-                        style={[styles.optionChip, selected ? styles.optionChipSelected : null]}
-                      >
-                        <Text style={[styles.optionText, selected ? styles.optionTextSelected : null]}>{currency}</Text>
-                      </Pressable>
+                        selected={selected}
+                      />
                     );
                   })}
                 </View>
@@ -356,22 +362,17 @@ export default function NewTripScreen() {
                 </View>
                 <View style={styles.optionRow}>
                   {travelModeSelector.options.map((option) => (
-                    <Pressable
+                    <ChoiceChip
                       accessibilityLabel={option.accessibilityLabel}
-                      accessibilityRole="button"
-                      accessibilityState={option.accessibilityState}
                       disabled={submitting}
                       key={option.mode}
+                      label={option.label}
                       onPress={() => {
                         setForm((current) => ({ ...current, defaultTravelMode: option.mode }));
                         setError(null);
                       }}
-                      style={[styles.optionChip, option.selected ? styles.optionChipSelected : null]}
-                    >
-                      <Text style={[styles.optionText, option.selected ? styles.optionTextSelected : null]}>
-                        {option.label}
-                      </Text>
-                    </Pressable>
+                      selected={option.selected}
+                    />
                   ))}
                 </View>
                 <Text style={styles.inlineHint}>도보는 trip 기본값이 아니라 구간별 확인 옵션으로 유지돼요.</Text>
@@ -510,19 +511,14 @@ function DestinationStep({
       {destinations.length > 0 ? (
         <View style={styles.destinationChipRow}>
           {destinations.map((destination, index) => (
-            <Pressable
+            <InlineAction
               accessibilityLabel={`${destination.displayName} 도시 삭제`}
-              accessibilityRole="button"
               disabled={submitting}
               key={destinationKey(destination)}
+              label={`${destination.displayName}${index === 0 ? '  대표' : ''}`}
               onPress={() => onRemove(destinationKey(destination))}
-              style={styles.destinationChip}
-            >
-              <Text style={styles.destinationChipText}>
-                {destination.displayName}
-                {index === 0 ? '  대표' : ''}
-              </Text>
-            </Pressable>
+              tone="primary"
+            />
           ))}
         </View>
       ) : null}
@@ -603,44 +599,35 @@ function InlineDestinationSearchPanel({
 
   return (
     <View style={styles.searchPanel}>
-      <View style={styles.searchPanelHeader}>
-        <View style={styles.searchPanelTitleGroup}>
-          <Text style={styles.label}>도시 검색</Text>
-          <Text style={styles.helperText}>도시명이나 지역명을 입력하고 검색해요.</Text>
+      <FormField label="도시 검색" helperText="도시명이나 지역명을 입력하고 검색해요.">
+        <View style={styles.searchPanelHeader}>
+          <View style={styles.searchCountBadge}>
+            <Text style={styles.searchCountText}>{destinations.length}/5</Text>
+          </View>
         </View>
-        <View style={styles.searchCountBadge}>
-          <Text style={styles.searchCountText}>{destinations.length}/5</Text>
+        <View style={styles.destinationSearchRow}>
+          <TextInput
+            editable={!loading}
+            onChangeText={onQueryChange}
+            onSubmitEditing={() => {
+              if (searchSubmitState.canSearch) {
+                onSearch();
+              }
+            }}
+            placeholder="예: 오사카"
+            placeholderTextColor={theme.color.textFaint}
+            returnKeyType="search"
+            style={[styles.input, styles.destinationSearchInput]}
+            value={query}
+          />
+          <PrimaryButton
+            disabled={!searchSubmitState.canSearch}
+            label={searchSubmitState.buttonLabel}
+            loading={loading}
+            onPress={onSearch}
+          />
         </View>
-      </View>
-
-      <View style={styles.destinationSearchRow}>
-        <TextInput
-          editable={!loading}
-          onChangeText={onQueryChange}
-          onSubmitEditing={() => {
-            if (searchSubmitState.canSearch) {
-              onSearch();
-            }
-          }}
-          placeholder="예: 오사카"
-          placeholderTextColor={theme.color.textFaint}
-          returnKeyType="search"
-          style={[styles.input, styles.destinationSearchInput]}
-          value={query}
-        />
-        <Pressable
-          accessibilityRole="button"
-          disabled={!searchSubmitState.canSearch}
-          onPress={onSearch}
-          style={[
-            styles.destinationSearchButton,
-            !searchSubmitState.canSearch ? styles.destinationSearchButtonDisabled : null,
-          ]}
-        >
-          {loading ? <ActivityIndicator color={theme.color.onPrimary} /> : null}
-          <Text style={styles.destinationSearchButtonText}>{searchSubmitState.buttonLabel}</Text>
-        </Pressable>
-      </View>
+      </FormField>
 
       <View style={styles.resultPanel}>
         <Text style={styles.resultPanelTitle}>검색 결과</Text>
@@ -652,24 +639,14 @@ function InlineDestinationSearchPanel({
             <Text style={styles.destinationWarningTitle}>{pendingCountryMismatchConfirmation.title}</Text>
             <Text style={styles.destinationWarningText}>{pendingCountryMismatchConfirmation.message}</Text>
             <View style={styles.destinationWarningActions}>
-              <Pressable
-                accessibilityRole="button"
+              <SecondaryButton
+                label={pendingCountryMismatchConfirmation.cancelLabel}
                 onPress={() => setPendingCountryMismatchResult(null)}
-                style={styles.destinationWarningSecondaryButton}
-              >
-                <Text style={styles.destinationWarningSecondaryText}>
-                  {pendingCountryMismatchConfirmation.cancelLabel}
-                </Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
+              />
+              <PrimaryButton
+                label={pendingCountryMismatchConfirmation.confirmLabel}
                 onPress={confirmCountryMismatchAdd}
-                style={styles.destinationWarningPrimaryButton}
-              >
-                <Text style={styles.destinationWarningPrimaryText}>
-                  {pendingCountryMismatchConfirmation.confirmLabel}
-                </Text>
-              </Pressable>
+              />
             </View>
           </View>
         ) : null}
@@ -693,16 +670,11 @@ function InlineDestinationSearchPanel({
                   {result.cityName}, {result.countryName}
                 </Text>
               </View>
-              <Pressable
-                accessibilityRole="button"
+              <InlineAction
                 disabled={disabled}
+                label={selected ? '추가됨' : '추가'}
                 onPress={() => requestAddResult(result)}
-                style={[styles.addResultButton, disabled ? styles.addResultButtonDisabled : null]}
-              >
-                <Text style={[styles.addResultButtonText, disabled ? styles.addResultButtonTextDisabled : null]}>
-                  {selected ? '추가됨' : '추가'}
-                </Text>
-              </Pressable>
+              />
             </View>
           );
         })}
