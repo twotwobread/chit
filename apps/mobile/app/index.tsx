@@ -1,13 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
-} from 'react-native';
+import { ScrollView, StyleSheet, Text, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -15,7 +7,15 @@ import { ApiError } from '@i-um/api-contract';
 
 import { MobileAuthError } from '../lib/auth/client';
 import { clearStoredSession, readStoredSession } from '../lib/auth/session';
-import { BrandStamp, Card, PrimaryButton, ScreenBackground, SecondaryButton, theme } from '../lib/design';
+import {
+  BrandStamp,
+  EmptyState,
+  ErrorState,
+  ScreenBackground,
+  SecondaryButton,
+  SkeletonCard,
+  theme,
+} from '../lib/design';
 import { ActiveTripCard, PastTripRow, UpcomingTripRow } from '../lib/home-ui/TripCards';
 import { BottomMenu } from '../lib/navigation/BottomMenu';
 import { getRootScreenContentTopPadding } from '../lib/navigation/root-screen-layout';
@@ -112,22 +112,18 @@ function HomeScreenContent({ onRetry, state }: { onRetry: () => void; state: Hom
     return (
       <>
         {state.surface === 'home' ? <HomeHeader /> : null}
-        <Card>
-          <ActivityIndicator color={theme.color.primary} />
-          <Text style={styles.stateTitle}>{state.title}</Text>
-          <Text style={styles.message}>{state.helper}</Text>
-        </Card>
+        <SkeletonCard title={state.title} body={state.helper} />
       </>
     );
   }
 
   if (state.status === 'needsLogin') {
     return (
-      <Card>
-        <Text style={styles.stateTitle}>{state.title}</Text>
-        <Text style={styles.message}>{state.helper}</Text>
-        <PrimaryButton label="로그인하기" onPress={() => router.replace(state.loginPath)} />
-      </Card>
+      <EmptyState
+        action={{ label: '로그인하기', onPress: () => router.replace(state.loginPath), variant: 'primary' }}
+        body={state.helper}
+        title={state.title}
+      />
     );
   }
 
@@ -135,11 +131,7 @@ function HomeScreenContent({ onRetry, state }: { onRetry: () => void; state: Hom
     return (
       <>
         {state.status === 'homeError' ? <HomeHeader /> : null}
-        <Card>
-          <Text style={styles.errorTitle}>{state.title}</Text>
-          <Text style={styles.message}>{state.helper}</Text>
-          <SecondaryButton label={state.retryLabel} onPress={onRetry} />
-        </Card>
+        <ErrorState action={{ label: state.retryLabel, onPress: onRetry }} body={state.helper} title={state.title} />
       </>
     );
   }
@@ -173,11 +165,11 @@ function HomeHeader() {
 function HomeContent({ viewModel }: { viewModel: HomeViewModel }) {
   if (viewModel.isEmpty) {
     return (
-      <Card>
-        <Text style={styles.stateTitle}>아직 여행이 없어요.</Text>
-        <Text style={styles.message}>새 여행을 만들고 여정을 이어가요.</Text>
-        <PrimaryButton label="새 여행 만들기" onPress={() => router.push('/trips/new')} />
-      </Card>
+      <EmptyState
+        action={{ label: '새 여행 만들기', onPress: () => router.push('/trips/new'), variant: 'primary' }}
+        body="새 여행을 만들고 여정을 이어가요."
+        title="아직 여행이 없어요."
+      />
     );
   }
 
@@ -192,12 +184,7 @@ function HomeContent({ viewModel }: { viewModel: HomeViewModel }) {
 }
 
 function HomeHistoryOnlyCard() {
-  return (
-    <Card>
-      <Text style={styles.stateTitle}>진행 중이거나 예정된 여행이 없어요.</Text>
-      <Text style={styles.message}>지난 여행은 마이페이지에서 볼 수 있어요.</Text>
-    </Card>
-  );
+  return <EmptyState body="지난 여행은 마이페이지에서 볼 수 있어요." title="진행 중이거나 예정된 여행이 없어요." />;
 }
 
 function OngoingTripCarousel({ trips }: { trips: HomeCurrentTripViewModel[] }) {

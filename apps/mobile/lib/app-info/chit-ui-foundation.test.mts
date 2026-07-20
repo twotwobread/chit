@@ -127,10 +127,21 @@ test('Issue 385 core screens adopt dark shell and brand stamp primitives', () =>
   assert.match(loginSource, /import \{ BrandStamp, Card, PrimaryButton, SecondaryButton, ScreenBackground, theme \}/);
   assert.match(loginSource, /<ScreenBackground/);
   assert.match(loginSource, /<BrandStamp/);
-  assert.match(homeSource, /import \{ BrandStamp, Card, PrimaryButton, ScreenBackground, SecondaryButton, theme \}/);
+  for (const expected of [
+    'BrandStamp',
+    'EmptyState',
+    'ErrorState',
+    'ScreenBackground',
+    'SecondaryButton',
+    'SkeletonCard',
+  ]) {
+    assert.match(homeSource, new RegExp(expected));
+  }
   assert.match(homeSource, /<ScreenBackground/);
   assert.match(homeSource, /<BrandStamp/);
-  assert.match(mypageSource, /import \{ PrimaryButton, ScreenBackground, SecondaryButton, theme \}/);
+  for (const expected of ['EmptyState', 'ErrorState', 'ScreenBackground', 'SkeletonCard']) {
+    assert.match(mypageSource, new RegExp(expected));
+  }
   assert.match(mypageSource, /<ScreenBackground/);
   assert.match(
     tripScreenSource,
@@ -322,20 +333,21 @@ test('Today tab compact row actions preserve the 44pt touch target floor', () =>
   assertStyleContains(source, 'rowButton', /minHeight: theme\.layout\.tapMin/);
 });
 
-test('Issue 372 My Page uses foundation buttons for simple state and section actions', () => {
+test('Issue 372 My Page uses foundation primitives for simple state and section actions', () => {
   const screenSource = readMobileSource('../../app/mypage.tsx');
   const partsSource = readMobileSource('../trip-ui/MyPageParts.tsx');
 
-  assert.match(
-    screenSource,
-    /import \{ PrimaryButton, ScreenBackground, SecondaryButton, theme \} from '\.\.\/lib\/design';/,
-  );
-  assert.match(screenSource, /<PrimaryButton[\s\S]*label="로그인하기"[\s\S]*router\.replace\('\/login'\)/);
-  assert.match(screenSource, /<SecondaryButton[\s\S]*label="다시 시도"[\s\S]*onPress=\{load\}/);
+  assert.match(screenSource, /EmptyState/);
+  assert.match(screenSource, /ErrorState/);
+  assert.match(screenSource, /SkeletonCard/);
+  assert.match(screenSource, /label: '로그인하기'[\s\S]*router\.replace\('\/login'\)/);
+  assert.match(screenSource, /label: '다시 시도'[\s\S]*onPress: load/);
 
-  assert.match(partsSource, /import \{ PrimaryButton, SecondaryButton, theme \} from '\.\.\/design';/);
-  assert.match(partsSource, /<SecondaryButton[\s\S]*label="다시 시도"[\s\S]*onPress=\{onRetry\}/);
-  assert.match(partsSource, /<PrimaryButton[\s\S]*label="새 여행 만들기"/);
+  assert.match(partsSource, /EmptyState/);
+  assert.match(partsSource, /ErrorState/);
+  assert.match(partsSource, /SkeletonCard/);
+  assert.match(partsSource, /label: '다시 시도'[\s\S]*onPress: onRetry/);
+  assert.match(partsSource, /label: '새 여행 만들기'/);
 });
 
 test('Issue 395 itinerary and map selected actions use Chit action hierarchy', () => {

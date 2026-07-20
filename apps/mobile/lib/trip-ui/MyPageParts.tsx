@@ -1,4 +1,4 @@
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { router, type Href } from 'expo-router';
 
 import type { AuthProvider } from '@i-um/api-contract';
@@ -11,7 +11,7 @@ import {
 } from '../app-info/legal';
 import { SettingRow, StatRow, type AccountProvider } from '../account-ui/AccountRows';
 import { PastTripRow, UpcomingTripRow } from '../home-ui/TripCards';
-import { PrimaryButton, SecondaryButton, theme } from '../design';
+import { EmptyState, ErrorState, SecondaryButton, SkeletonCard } from '../design';
 import { type SettlementSummaryState, type TripListState } from './useMyPageController';
 import {
   buildMySettlementSummaryViewModel,
@@ -72,27 +72,17 @@ export function MySettlementSummarySection({ state, onRetry }: { state: Settleme
     <View style={styles.sectionStack}>
       <Text style={styles.sectionTitle}>정산 요약</Text>
 
-      {state.status === 'loading' ? (
-        <View style={styles.card}>
-          <ActivityIndicator color={theme.color.primary} />
-          <Text style={styles.message}>정산 요약을 불러오는 중...</Text>
-        </View>
-      ) : null}
+      {state.status === 'loading' ? <SkeletonCard title="정산 요약을 불러오는 중..." /> : null}
 
       {state.status === 'error' ? (
-        <View style={styles.card}>
-          <Text style={styles.errorMessage}>정산 요약을 불러올 수 없어요.</Text>
-          <Text style={styles.message}>잠시 후 다시 시도해주세요.</Text>
-          <SecondaryButton label="다시 시도" onPress={onRetry} />
-        </View>
+        <ErrorState
+          action={{ label: '다시 시도', onPress: onRetry }}
+          body="잠시 후 다시 시도해주세요."
+          title="정산 요약을 불러올 수 없어요."
+        />
       ) : null}
 
-      {viewModel?.status === 'empty' ? (
-        <View style={styles.card}>
-          <Text style={styles.emptyTitle}>{viewModel.title}</Text>
-          <Text style={styles.message}>{viewModel.helper}</Text>
-        </View>
-      ) : null}
+      {viewModel?.status === 'empty' ? <EmptyState body={viewModel.helper} title={viewModel.title} /> : null}
 
       {viewModel?.status === 'ready' ? <MySettlementSummaryList viewModel={viewModel} /> : null}
     </View>
@@ -160,26 +150,18 @@ export function MyTripsSection({ state, onRetry }: { state: TripListState; onRet
     <View style={styles.sectionStack}>
       <Text style={styles.sectionTitle}>내 여행</Text>
 
-      {state.status === 'loading' ? (
-        <View style={styles.card}>
-          <ActivityIndicator color={theme.color.primary} />
-          <Text style={styles.message}>내 여행을 불러오는 중...</Text>
-        </View>
-      ) : null}
+      {state.status === 'loading' ? <SkeletonCard title="내 여행을 불러오는 중..." /> : null}
 
       {state.status === 'error' ? (
-        <View style={styles.card}>
-          <Text style={styles.errorMessage}>내 여행을 불러올 수 없어요.</Text>
-          <SecondaryButton label="다시 시도" onPress={onRetry} />
-        </View>
+        <ErrorState action={{ label: '다시 시도', onPress: onRetry }} title="내 여행을 불러올 수 없어요." />
       ) : null}
 
       {state.status === 'ready' && state.trips.length === 0 ? (
-        <View style={styles.card}>
-          <Text style={styles.emptyTitle}>아직 여행이 없어요.</Text>
-          <Text style={styles.message}>새 여행을 만들고 여정을 이어가요.</Text>
-          <PrimaryButton label="새 여행 만들기" onPress={() => router.push('/trips/new')} />
-        </View>
+        <EmptyState
+          action={{ label: '새 여행 만들기', onPress: () => router.push('/trips/new'), variant: 'primary' }}
+          body="새 여행을 만들고 여정을 이어가요."
+          title="아직 여행이 없어요."
+        />
       ) : null}
 
       {state.status === 'ready' && state.trips.length > 0 && viewModel ? (
