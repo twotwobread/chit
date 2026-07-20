@@ -17,8 +17,9 @@ Use when changing Expo screens, mobile UI state, styling, copy, or navigation.
 ## Sources
 
 - Brand/design: `docs/features/0341-chit-brand-design-system.md`
+- Shared design-system guard/guidance: `docs/features/0403-shared-design-system-guard-guidance.md`
 - Tokens: `apps/mobile/lib/design/theme.ts`
-- Shared primitives: `apps/mobile/lib/design/components.tsx`
+- Shared primitives: `apps/mobile/lib/design/components.tsx` and `apps/mobile/lib/design/index.ts`
 - Assets/fonts: `apps/mobile/assets/`
 
 ## Voice
@@ -40,9 +41,11 @@ Use when changing Expo screens, mobile UI state, styling, copy, or navigation.
 - Use theme tokens for color, spacing, radius, typography, and shadow.
 - Do not add raw hex colors in screen code.
 - External brand colors also need tokens before use.
-- Acid Lime is for primary CTA fill, large/key amounts, selected state, BrandStamp accent/glow, and success/complete emphasis; do not use it for long body text, small text on light/off-white surfaces, or danger/error states.
+- Graphite is the default primary CTA / 기본 주요 액션 fill for normal product UI; use Off-white text on Graphite for primary hierarchy.
+- Acid Lime is sparse and explicit: use it for one high-emphasis CTA in a Hero/action moment, large/key amounts, selected state, BrandStamp accent/glow, and success/complete emphasis; do not use it for long body text, small text on light/off-white surfaces, dense repeated routine actions, or danger/error states.
 - Credit/받을 돈 uses credit color and `+`; debit/보낼 돈 uses debit color and `−`.
 - Reuse shared Button/Card/ListRow/Badge/Chip/ScreenBackground/BrandStamp patterns before duplicating styles.
+- New shared interactive primitives should use `InteractiveSurface` with accessibility role/state, disabled/busy/selected semantics, pressed feedback, `theme.layout.tapMin` touch target, and `hitSlop` for small icon-only controls.
 
 ## Common patterns
 

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import { theme } from '../design/theme';
@@ -165,6 +165,59 @@ test('Issue 399 navigation chrome primitives are exported and foundation-backed'
   assert.match(floatingActionButtonSource, /pressed/);
 });
 
+test('Issue 403 design public export surface matches the tracked snapshot', () => {
+  assert.deepEqual(extractDesignPublicSurface(), readDesignPublicSurfaceSnapshot());
+});
+
+test('Issue 403 shared design layer files stay token-only and avoid decorative glyph drift', () => {
+  const rawColorPattern = /#[0-9a-fA-F]{3,8}\b|rgba\(/;
+  const decorativeGlyphPattern = /[✅⚠️❌🎉✨🔥👉⭐★☆◆◇●○■□▲▼→←↑↓]/u;
+
+  for (const relativePath of listDesignSourceFiles()) {
+    const source = readMobileSource(relativePath);
+
+    if (relativePath !== '../design/theme.ts') {
+      assert.doesNotMatch(source, rawColorPattern, `${relativePath} should use theme tokens instead of raw colors`);
+    }
+
+    assert.doesNotMatch(
+      source,
+      decorativeGlyphPattern,
+      `${relativePath} should not introduce emoji or decorative unicode glyphs`,
+    );
+  }
+});
+
+test('Issue 403 contributor guidance documents shared primitive guardrails', () => {
+  const guidanceSource = readRepoSource('docs/features/0403-shared-design-system-guard-guidance.md');
+  const mobileUiRuleSource = readRepoSource('.harness/rules/code/mobile-ui.md');
+
+  for (const expected of [
+    'foundation',
+    'components',
+    'patterns',
+    'InteractiveSurface',
+    'accessibilityRole',
+    'accessibilityState',
+    'theme.layout.tapMin',
+    'hitSlop',
+    'Graphite',
+    'Acid Lime',
+  ]) {
+    assert.match(guidanceSource, new RegExp(escapeRegExp(expected)), `guidance should mention ${expected}`);
+  }
+
+  assert.match(guidanceSource, /Graphite[\s\S]*(default|기본)[\s\S]*(primary|CTA|주요 액션)/i);
+  assert.match(guidanceSource, /Acid Lime[\s\S]*(sparse|one|single|한 개|드물게|제한)/i);
+  assert.match(guidanceSource, /foundation[\s\S]*components[\s\S]*patterns/i);
+  assert.match(guidanceSource, /InteractiveSurface[\s\S]*theme\.layout\.tapMin[\s\S]*hitSlop/);
+
+  assert.match(mobileUiRuleSource, /docs\/features\/0403-shared-design-system-guard-guidance\.md/);
+  assert.match(mobileUiRuleSource, /Graphite[\s\S]*(default|기본)[\s\S]*(primary|CTA|주요 액션)/i);
+  assert.match(mobileUiRuleSource, /Acid Lime[\s\S]*(sparse|one|single|한 개|드물게|제한)/i);
+  assert.match(mobileUiRuleSource, /InteractiveSurface[\s\S]*(accessibility|touch|tap|hitSlop|터치)/i);
+});
+
 test('Issue 389 shared component code stays token-only and avoids emoji-style decorative glyphs', () => {
   assert.doesNotMatch(
     sharedImplementationSource,
@@ -293,6 +346,65 @@ test('Issue 389 form and status primitives provide visible recovery structure wi
 function readMobileSource(relativePath: string): string {
   return readFileSync(new URL(relativePath, import.meta.url), 'utf8');
 }
+
+function readRepoSource(relativePath: string): string {
+  return readFileSync(new URL(`../../../../${relativePath}`, import.meta.url), 'utf8');
+}
+
+function readDesignPublicSurfaceSnapshot(): DesignPublicSurfaceSnapshot {
+  return JSON.parse(readFileSync(new URL('./design-public-surface.snapshot.json', import.meta.url), 'utf8'));
+}
+
+function extractDesignPublicSurface(): DesignPublicSurfaceSnapshot {
+  const surface: DesignPublicSurfaceSnapshot = {
+    typeExports: {},
+    valueExports: {},
+  };
+  const exportBlockPattern = /export( type)? \{([\s\S]*?)\} from '(\.\/[\w/-]+)';/g;
+
+  for (const match of indexSource.matchAll(exportBlockPattern)) {
+    const [, typeMarker, namesBlock, sourcePath] = match;
+    const target = typeMarker ? surface.typeExports : surface.valueExports;
+    target[sourcePath] = namesBlock
+      .split(',')
+      .map((name) => name.trim())
+      .filter(Boolean)
+      .sort();
+  }
+
+  return surface;
+}
+
+function listDesignSourceFiles(): string[] {
+  return listSourceFiles(new URL('../design/', import.meta.url), '../design/').filter(
+    (relativePath) => !relativePath.endsWith('.test.mts'),
+  );
+}
+
+function listSourceFiles(directoryUrl: URL, relativeDirectory: string): string[] {
+  return readdirSync(directoryUrl, { withFileTypes: true }).flatMap((entry) => {
+    const childRelativePath = `${relativeDirectory}${entry.name}`;
+
+    if (entry.isDirectory()) {
+      return listSourceFiles(new URL(`${entry.name}/`, directoryUrl), `${childRelativePath}/`);
+    }
+
+    if (/\.(ts|tsx)$/.test(entry.name)) {
+      return [childRelativePath];
+    }
+
+    return [];
+  });
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+type DesignPublicSurfaceSnapshot = {
+  typeExports: Record<string, string[]>;
+  valueExports: Record<string, string[]>;
+};
 
 function readOptionalMobileSource(relativePath: string): string {
   try {
