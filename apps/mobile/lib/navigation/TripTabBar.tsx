@@ -4,11 +4,12 @@ import { Compass, ListOrdered, Map as MapIcon, ReceiptText, Wallet } from 'lucid
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { TabButton, theme } from '../design';
-import { isTripRootTab, tripTabPath } from '../trips/routes';
+import { isTripRootTab, tripTabPathWithState } from '../trips/routes';
 
 type TripTabRoute = {
   key: string;
   name: string;
+  params?: Readonly<object>;
 };
 
 type TabPressEvent = {
@@ -67,7 +68,9 @@ export function TripTabBar({ navigation, state }: TripTabBarProps) {
               const event = navigation.emit({ canPreventDefault: true, target: route.key, type: 'tabPress' });
               if (!focused && !event.defaultPrevented) {
                 if (tripId && isTripRootTab(route.name)) {
-                  router.replace(tripTabPath(tripId, route.name));
+                  router.replace(
+                    tripTabPathWithState(tripId, route.name, route.params as Record<string, unknown> | undefined),
+                  );
                   return;
                 }
                 navigation.navigate(route.name);

@@ -56,6 +56,7 @@ import {
   type TripMapRouteNotice,
   type TripMapScheduleMarkerDetail,
 } from '../trips/trip-map';
+import { parseTripMapRouteDayIdsParam, tripMapStatePath } from '../trips/routes';
 import { buildTripTabUnavailableViewModel, type TripTabUnavailableViewModel } from '../trips/trip-tabs';
 
 export type TripMapState =
@@ -85,10 +86,15 @@ export type TripMapState =
   | { status: 'error' };
 
 export function useTripMapController() {
-  const { tripId: tripIdParam } = useLocalSearchParams<{ tripId?: string | string[] }>();
+  const { tripId: tripIdParam, routeDays: routeDaysParam } = useLocalSearchParams<{
+    tripId?: string | string[];
+    routeDays?: string | string[];
+  }>();
   const tripId = Array.isArray(tripIdParam) ? tripIdParam[0] : tripIdParam;
   const shellState = useTripShellState();
-  const routeLayerRef = useRef<TripMapRouteLayerSelection>(emptyTripMapRouteLayerSelection);
+  const routeLayerRef = useRef<TripMapRouteLayerSelection>(
+    tripMapRouteLayerFromDayIds(parseTripMapRouteDayIdsParam(routeDaysParam)),
+  );
   const selectedDayIdRef = useRef<string | null>(null);
   const bookmarkLayerVisibleRef = useRef(true);
   const allBookmarkResultsRef = useRef<GooglePlaceSearchRowViewModel[]>([]);
@@ -172,7 +178,8 @@ export function useTripMapController() {
         }
         const itineraries = buildTripItinerariesFromTripScheduleItems(detail.days, scheduleResult.value);
         const dayRoutes = buildTripMapDayRoutes(itineraries);
-        const routeLayer = resolveAvailableRouteLayer(routeLayerRef.current, dayRoutes);
+        const routeLayerFromParams = tripMapRouteLayerFromDayIds(parseTripMapRouteDayIdsParam(routeDaysParam));
+        const routeLayer = resolveAvailableRouteLayer(routeLayerFromParams, dayRoutes);
         const routeViewModel = buildTripMapRouteLayerViewModel(dayRoutes, routeLayer);
         const selectedItinerary = resolveSelectedItinerary(itineraries, selectedDay.id);
         routeLayerRef.current = routeLayer;
@@ -208,7 +215,7 @@ export function useTripMapController() {
         );
       }
     },
-    [shellState, tripId],
+    [routeDaysParam, shellState, tripId],
   );
 
   useFocusEffect(
@@ -217,30 +224,36 @@ export function useTripMapController() {
     }, [load]),
   );
 
-  const toggleRouteLayer = useCallback((chipId: TripMapRouteLayerChipId) => {
-    setFeedback(null);
-    selectedRoutePlaceIdRef.current = null;
-    setState((current) => {
-      if (current.status !== 'success') {
-        return current;
-      }
-
-      const routeLayer = toggleTripMapRouteLayer(current.routeLayer, chipId);
-      const routeViewModel = buildTripMapRouteLayerViewModel(current.dayRoutes, routeLayer);
+  const toggleRouteLayer = useCallback(
+    (chipId: TripMapRouteLayerChipId) => {
+      setFeedback(null);
+      selectedRoutePlaceIdRef.current = null;
+      const routeLayer = toggleTripMapRouteLayer(routeLayerRef.current, chipId);
       routeLayerRef.current = routeLayer;
+      if (tripId) {
+        router.replace(tripMapStatePath(tripId, { routeDayIds: tripMapRouteLayerDayIds(routeLayer) }));
+      }
+      setState((current) => {
+        if (current.status !== 'success') {
+          return current;
+        }
 
-      return {
-        ...current,
-        mapPlaces: routeViewModel.places,
-        routeLayer,
-        routeNotice: routeViewModel.notice,
-        routePolylines: routeViewModel.polylines,
-        selectedRouteLayerChipIds: tripMapRouteLayerChipIds(routeLayer),
-        selectedRoutePlaceId: null,
-        scheduleMarkerDetail: null,
-      };
-    });
-  }, []);
+        const routeViewModel = buildTripMapRouteLayerViewModel(current.dayRoutes, routeLayer);
+
+        return {
+          ...current,
+          mapPlaces: routeViewModel.places,
+          routeLayer,
+          routeNotice: routeViewModel.notice,
+          routePolylines: routeViewModel.polylines,
+          selectedRouteLayerChipIds: tripMapRouteLayerChipIds(routeLayer),
+          selectedRoutePlaceId: null,
+          scheduleMarkerDetail: null,
+        };
+      });
+    },
+    [tripId],
+  );
 
   const toggleBookmarkLayer = useCallback(() => {
     setState((current) => {
@@ -432,6 +445,14 @@ export function useTripMapController() {
     toggleRouteLayer,
     tripId,
   };
+}
+
+function tripMapRouteLayerFromDayIds(dayIds: string[]): TripMapRouteLayerSelection {
+  return dayIds.length > 0 ? { dayIds, kind: 'days' } : emptyTripMapRouteLayerSelection;
+}
+
+function tripMapRouteLayerDayIds(routeLayer: TripMapRouteLayerSelection): string[] {
+  return routeLayer.kind === 'days' ? routeLayer.dayIds : [];
 }
 
 function resolveAvailableRouteLayer(

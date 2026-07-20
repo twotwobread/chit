@@ -8,15 +8,20 @@ import {
   tripFallbackPath,
   tripFallbackPathForPathname,
   tripItineraryDayPath,
+  parseTripMapRouteDayIdsParam,
+  resolveTripExpensesRouteState,
   tripExpensesPath,
+  tripExpensesStatePath,
   tripItineraryPath,
   tripMapPath,
+  tripMapStatePath,
   tripParticipantsPath,
   tripRootPath,
   tripSettlePath,
   tripSettlementDetailDeepLink,
   tripSettlementDetailPath,
   tripTabPath,
+  tripTabPathWithState,
   tripTodayPath,
 } from './routes.ts';
 
@@ -105,4 +110,60 @@ test('recognizes only trip tab roots as root tab paths', () => {
   assert.equal(isTripRootTabPath('/trips/trip-a/settle', 'trip-a'), true);
   assert.equal(isTripRootTabPath('/trips/trip-a/detail', 'trip-a'), false);
   assert.equal(isTripRootTabPath('/trips/trip-b/today', 'trip-a'), false);
+});
+
+test('encodes and restores Expenses tab route state for deep links', () => {
+  assert.deepEqual(resolveTripExpensesRouteState({ mode: 'days', dayId: 'day-2', category: 'food' }), {
+    mode: 'days',
+    selectedCategory: null,
+    selectedDayId: 'day-2',
+  });
+  assert.deepEqual(resolveTripExpensesRouteState({ mode: 'categories', dayId: 'day-2', category: 'food' }), {
+    mode: 'categories',
+    selectedCategory: 'food',
+    selectedDayId: null,
+  });
+  assert.deepEqual(resolveTripExpensesRouteState({ mode: 'unknown', dayId: 'day-2', category: 'food' }), {
+    mode: 'main',
+    selectedCategory: null,
+    selectedDayId: null,
+  });
+
+  assert.equal(tripExpensesStatePath('trip-a', { mode: 'main' }), '/trips/trip-a/expenses');
+  assert.equal(
+    tripExpensesStatePath('trip-a', { mode: 'days', selectedDayId: 'day-2' }),
+    '/trips/trip-a/expenses?mode=days&dayId=day-2',
+  );
+  assert.equal(
+    tripExpensesStatePath('trip-a', { mode: 'categories', selectedCategory: 'food' }),
+    '/trips/trip-a/expenses?mode=categories&category=food',
+  );
+});
+
+test('encodes and restores Map route-layer tab state for deep links', () => {
+  assert.deepEqual(parseTripMapRouteDayIdsParam('day-1,day-2,,day-1'), ['day-1', 'day-2']);
+  assert.deepEqual(parseTripMapRouteDayIdsParam(['day-3,day-4']), ['day-3', 'day-4']);
+  assert.deepEqual(parseTripMapRouteDayIdsParam(''), []);
+
+  assert.equal(tripMapStatePath('trip-a', { routeDayIds: [] }), '/trips/trip-a/map');
+  assert.equal(
+    tripMapStatePath('trip-a', { routeDayIds: ['day-1', 'day-2'] }),
+    '/trips/trip-a/map?routeDays=day-1%2Cday-2',
+  );
+});
+
+test('preserves known Trip tab route state when switching tabs', () => {
+  assert.equal(
+    tripTabPathWithState('trip-a', 'expenses', { category: 'food', dayId: 'day-3', mode: 'days' }),
+    '/trips/trip-a/expenses?mode=days&dayId=day-3',
+  );
+  assert.equal(
+    tripTabPathWithState('trip-a', 'map', { routeDays: 'day-1,day-2' }),
+    '/trips/trip-a/map?routeDays=day-1%2Cday-2',
+  );
+  assert.equal(
+    tripTabPathWithState('trip-a', 'itinerary', { dayId: 'day-2', initialAction: 'add-place' }),
+    '/trips/trip-a/itinerary?dayId=day-2',
+  );
+  assert.equal(tripTabPathWithState('trip-a', 'settle', { dayId: 'day-2' }), '/trips/trip-a/settle');
 });
