@@ -12,6 +12,8 @@ const foundationAccessibilitySource = readMobileSource('../design/foundation/acc
 const cardSource = readMobileSource('../design/components/card.tsx');
 const buttonSource = readMobileSource('../design/components/button.tsx');
 const iconButtonSource = readMobileSource('../design/components/icon-button.tsx');
+const tabButtonSource = readOptionalMobileSource('../design/components/tab-button.tsx');
+const floatingActionButtonSource = readOptionalMobileSource('../design/components/floating-action-button.tsx');
 const linkSource = readMobileSource('../design/components/link.tsx');
 const rowSource = readMobileSource('../design/components/row.tsx');
 const chipSource = readMobileSource('../design/components/chip.tsx');
@@ -25,6 +27,8 @@ const sharedImplementationSource = [
   cardSource,
   buttonSource,
   iconButtonSource,
+  tabButtonSource,
+  floatingActionButtonSource,
   linkSource,
   rowSource,
   chipSource,
@@ -35,6 +39,8 @@ const sharedImplementationSource = [
 
 const primitiveExports = [
   'IconButton',
+  'TabButton',
+  'FloatingActionButton',
   'TextLink',
   'InlineAction',
   'ActionRow',
@@ -48,6 +54,8 @@ const primitiveExports = [
 
 const primitiveTypeExports = [
   'IconButtonVariant',
+  'TabButtonIconRenderer',
+  'FloatingActionButtonTone',
   'TextLinkTone',
   'InlineActionTone',
   'ActionRowTone',
@@ -128,6 +136,28 @@ test('Issue 395 shared design layer exposes foundation-backed Hero primitives', 
   assert.doesNotMatch(heroSource, /#[0-9a-fA-F]{3,8}\b/);
 });
 
+test('Issue 399 navigation chrome primitives are exported and foundation-backed', () => {
+  assert.match(tabButtonSource, /export type TabButtonIconRenderer\b/);
+  assert.match(tabButtonSource, /export function TabButton\b/);
+  assert.match(tabButtonSource, /InteractiveSurface/);
+  assert.match(tabButtonSource, /accessibilityRole=\{accessibilityRole\}/);
+  assert.match(tabButtonSource, /selected=\{selected\}/);
+  assert.match(tabButtonSource, /hitSlop=\{TAB_BUTTON_HIT_SLOP\}/);
+  assert.match(tabButtonSource, /minHeight=\{theme\.layout\.tapMin\}/);
+  assert.match(tabButtonSource, /backgroundColor: theme\.color\.primary/);
+  assert.match(tabButtonSource, /color: theme\.color\.onPrimary/);
+
+  assert.match(floatingActionButtonSource, /export type FloatingActionButtonTone = 'lime' \| 'graphite'/);
+  assert.match(floatingActionButtonSource, /export function FloatingActionButton\b/);
+  assert.match(floatingActionButtonSource, /InteractiveSurface/);
+  assert.match(floatingActionButtonSource, /hitSlop=\{FAB_HIT_SLOP\}/);
+  assert.match(floatingActionButtonSource, /minHeight=\{theme\.layout\.controlHLg\}/);
+  assert.match(floatingActionButtonSource, /minWidth=\{theme\.layout\.controlHLg\}/);
+  assert.match(floatingActionButtonSource, /backgroundColor: theme\.color\.uiAccent/);
+  assert.match(floatingActionButtonSource, /backgroundColor: theme\.color\.actionPrimary/);
+  assert.match(floatingActionButtonSource, /pressed/);
+});
+
 test('Issue 389 shared component code stays token-only and avoids emoji-style decorative glyphs', () => {
   assert.doesNotMatch(
     sharedImplementationSource,
@@ -153,6 +183,8 @@ test('Issue 389 interactive primitives encode accessibility roles, states, touch
     'PrimaryButton',
     'SecondaryButton',
     'IconButton',
+    'TabButton',
+    'FloatingActionButton',
     'TextLink',
     'InlineAction',
     'ActionRow',
@@ -165,7 +197,16 @@ test('Issue 389 interactive primitives encode accessibility roles, states, touch
     assert.match(body, /pressed/, `${functionName} should react to Pressable pressed state`);
   }
 
-  for (const styleName of ['iconButton', 'textLinkHitArea', 'inlineAction', 'actionRow', 'choiceChip', 'filterChip']) {
+  for (const styleName of [
+    'iconButton',
+    'tabButton',
+    'floatingActionButton',
+    'textLinkHitArea',
+    'inlineAction',
+    'actionRow',
+    'choiceChip',
+    'filterChip',
+  ]) {
     assertStyleContains(styleName, /minHeight: theme\.layout\.(tapMin|controlHSm|controlH|controlHLg)/);
   }
 });
@@ -223,6 +264,17 @@ test('Issue 389 form and status primitives provide visible recovery structure wi
 
 function readMobileSource(relativePath: string): string {
   return readFileSync(new URL(relativePath, import.meta.url), 'utf8');
+}
+
+function readOptionalMobileSource(relativePath: string): string {
+  try {
+    return readMobileSource(relativePath);
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+      return '';
+    }
+    throw error;
+  }
 }
 
 function functionBody(functionName: string): string {

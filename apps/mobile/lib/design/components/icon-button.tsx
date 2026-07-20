@@ -4,7 +4,7 @@ import { StyleSheet, type PressableProps, type StyleProp, type ViewStyle } from 
 import { InteractiveSurface } from '../foundation/interactive-surface';
 import { theme } from '../theme';
 
-export type IconButtonVariant = 'plain' | 'soft' | 'onDark';
+export type IconButtonVariant = 'plain' | 'soft' | 'onDark' | 'ghostOnDark';
 
 const ICON_BUTTON_HIT_SLOP = theme.space[3];
 
@@ -32,8 +32,11 @@ export function IconButton({
       ? styles.iconButtonSoft
       : variant === 'onDark'
         ? styles.iconButtonOnDark
-        : styles.iconButtonPlain;
-  const pressedStyle = variant === 'onDark' ? styles.iconButtonOnDarkPressed : styles.iconButtonPressed;
+        : variant === 'ghostOnDark'
+          ? styles.iconButtonGhostOnDark
+          : styles.iconButtonPlain;
+  const pressedStyle =
+    variant === 'onDark' || variant === 'ghostOnDark' ? styles.iconButtonOnDarkPressed : styles.iconButtonPressed;
 
   return (
     <InteractiveSurface
@@ -70,6 +73,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     minHeight: theme.layout.tapMin,
     minWidth: theme.layout.tapMin,
+  },
+  iconButtonGhostOnDark: {
+    backgroundColor: 'transparent',
   },
   iconButtonOnDark: {
     backgroundColor: theme.color.shellElevated,

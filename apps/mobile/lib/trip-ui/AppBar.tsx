@@ -1,8 +1,9 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { ChevronDown, ChevronLeft, House, Ticket } from 'lucide-react-native';
 import { router } from 'expo-router';
 
-import { AvatarGroup, theme } from '../design';
+import { AvatarGroup, IconButton, theme } from '../design';
+import { InteractiveSurface } from '../design/foundation/interactive-surface';
 
 export type AppBarMember = { name: string; color?: string };
 
@@ -41,55 +42,58 @@ export function AppBar({
 
   const LeadingIcon = leadingAction === 'home' ? House : ChevronLeft;
   const leadingLabel = leadingAction === 'home' ? '홈으로' : '뒤로가기';
+  const leadingHint = leadingAction === 'home' ? '홈 화면으로 이동합니다.' : '이전 화면으로 이동합니다.';
 
   return (
     <View style={styles.bar}>
-      <Pressable
+      <IconButton
+        accessibilityHint={leadingHint}
         accessibilityLabel={leadingLabel}
-        accessibilityRole="button"
-        hitSlop={8}
         onPress={onBack ?? (() => router.replace('/'))}
-        style={({ pressed }) => [styles.side, pressed ? styles.pressed : null]}
+        style={styles.side}
+        variant="ghostOnDark"
       >
         <LeadingIcon color={theme.color.textOnShell} size={leadingAction === 'home' ? 23 : 26} strokeWidth={2.2} />
-      </Pressable>
+      </IconButton>
 
       {onPressTitle ? (
-        <Pressable
+        <InteractiveSurface
+          accessibilityHint="다른 여행으로 전환합니다."
           accessibilityLabel={`${tripName} 여행 전환`}
           accessibilityRole="button"
+          minHeight={theme.layout.tapMin}
           onPress={onPressTitle}
           style={({ pressed }) => [styles.titleWrap, pressed ? styles.pressed : null]}
         >
           {titleContent}
-        </Pressable>
+        </InteractiveSurface>
       ) : (
         <View style={styles.titleWrap}>{titleContent}</View>
       )}
 
       <View style={[styles.side, styles.sideEnd]}>
         {onPressTickets ? (
-          <Pressable
+          <IconButton
+            accessibilityHint="항공권 목록을 엽니다."
             accessibilityLabel="항공권 보관함 열기"
-            accessibilityRole="button"
-            hitSlop={8}
             onPress={onPressTickets}
-            style={({ pressed }) => [styles.ticketButton, pressed ? styles.pressed : null]}
+            style={styles.ticketButton}
+            variant="onDark"
           >
             <Ticket color={theme.color.textOnShell} size={23} strokeWidth={2.2} />
             <Text style={styles.ticketLabel}>항공권</Text>
-          </Pressable>
+          </IconButton>
         ) : null}
         {members.length > 0 && onPressMembers ? (
-          <Pressable
+          <IconButton
+            accessibilityHint="동행자 목록을 엽니다."
             accessibilityLabel="동행자 보기"
-            accessibilityRole="button"
-            hitSlop={8}
             onPress={onPressMembers}
-            style={({ pressed }) => (pressed ? styles.pressed : null)}
+            style={styles.memberButton}
+            variant="ghostOnDark"
           >
             <AvatarGroup members={members} size={27} />
-          </Pressable>
+          </IconButton>
         ) : members.length > 0 ? (
           <AvatarGroup members={members} size={27} />
         ) : null}
@@ -115,6 +119,9 @@ const styles = StyleSheet.create({
     fontFamily: theme.font.family.regular,
     fontSize: theme.font.size.caption,
   },
+  memberButton: {
+    paddingHorizontal: 0,
+  },
   pressed: {
     opacity: 0.7,
   },
@@ -132,13 +139,8 @@ const styles = StyleSheet.create({
   },
   ticketButton: {
     alignItems: 'center',
-    backgroundColor: theme.color.shellElevated,
-    borderColor: theme.color.shellRaised,
     borderRadius: theme.radius.md,
-    borderWidth: 1,
     gap: 1,
-    minHeight: theme.layout.tapMin,
-    minWidth: theme.layout.tapMin,
     paddingHorizontal: theme.space[2],
   },
   ticketLabel: {
@@ -164,6 +166,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
     gap: 1,
+    justifyContent: 'center',
     paddingVertical: theme.space[1],
   },
 });

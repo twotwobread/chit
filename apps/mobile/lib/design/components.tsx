@@ -4,6 +4,10 @@ export { ButtonGroup, PrimaryButton, SecondaryButton } from './components/button
 export type { PrimaryButtonTone } from './components/button';
 export { IconButton } from './components/icon-button';
 export type { IconButtonVariant } from './components/icon-button';
+export { TabButton } from './components/tab-button';
+export type { TabButtonIconRenderer } from './components/tab-button';
+export { FloatingActionButton } from './components/floating-action-button';
+export type { FloatingActionButtonTone } from './components/floating-action-button';
 export { InlineAction, TextLink } from './components/link';
 export type { InlineActionTone, TextLinkTone } from './components/link';
 export { ActionRow } from './components/row';

@@ -6,6 +6,7 @@ export {
   EmptyState,
   ErrorState,
   FilterChip,
+  FloatingActionButton,
   FormField,
   HeroActions,
   HeroCard,
@@ -17,6 +18,7 @@ export {
   PrimaryButton,
   ScreenBackground,
   SecondaryButton,
+  TabButton,
   TextLink,
 } from './components';
 export type {
@@ -25,6 +27,7 @@ export type {
   CardVariant,
   ChoiceChipTone,
   FilterChipTone,
+  FloatingActionButtonTone,
   FormFieldTone,
   HeroAction,
   HeroCardVariant,
@@ -33,6 +36,7 @@ export type {
   InlineActionTone,
   PrimaryButtonTone,
   StateAction,
+  TabButtonIconRenderer,
   TextLinkTone,
 } from './components';
 export {
