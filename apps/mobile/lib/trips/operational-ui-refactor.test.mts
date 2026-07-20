@@ -83,15 +83,16 @@ test('trip edit form uses sticky footer keyboard clearance instead of inline sav
   assert.match(editSource, /<StickyActionFooter[\s\S]*<PrimaryButton[\s\S]*<SecondaryButton/s);
 });
 
-test('trip detail recovery and management actions use Foundation buttons', () => {
+test('trip detail recovery and management actions use Foundation primitives', () => {
   const detailScreenSource = source('app/trips/[tripId]/detail.tsx');
   const detailPartsSource = source('lib/trip-ui/TripDetailScreenParts.tsx');
 
   assert.match(
     detailScreenSource,
-    /import \{[^}]*Card[^}]*PrimaryButton[^}]*theme[^}]*\} from '..\/..\/..\/lib\/design'/s,
+    /import \{[^}]*EmptyState[^}]*ErrorState[^}]*ScreenBackground[^}]*SkeletonCard[^}]*\} from '..\/..\/..\/lib\/design'/s,
   );
-  assert.match(detailScreenSource, /<Card\b[\s\S]*<PrimaryButton/s);
+  assert.match(detailScreenSource, /<SkeletonCard[\s\S]*<ErrorState[\s\S]*<EmptyState/s);
+  assert.match(detailScreenSource, /action=\{\{ label: '다시 시도'[\s\S]*variant: 'primary' \}\}/);
   assert.match(
     detailPartsSource,
     /import \{[^}]*Badge[^}]*PrimaryButton[^}]*SecondaryButton[^}]*theme[^}]*\} from '\.\.\/design'/s,

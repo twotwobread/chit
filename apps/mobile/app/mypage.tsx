@@ -1,9 +1,9 @@
-import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ProfileCard, SettingRow, SettingsList } from '../lib/account-ui/AccountRows';
-import { PrimaryButton, ScreenBackground, SecondaryButton, theme } from '../lib/design';
+import { EmptyState, ErrorState, ScreenBackground, SkeletonCard } from '../lib/design';
 import { BottomMenu } from '../lib/navigation/BottomMenu';
 import { getRootScreenContentTopPadding } from '../lib/navigation/root-screen-layout';
 import {
@@ -43,26 +43,22 @@ export default function MyPageScreen() {
           <Text style={styles.subtitle}>내 정보와 여행을 한곳에서 확인해요.</Text>
         </View>
 
-        {state.status === 'loading' ? (
-          <View style={styles.card}>
-            <ActivityIndicator color={theme.color.primary} />
-            <Text style={styles.message}>마이페이지를 불러오는 중...</Text>
-          </View>
-        ) : null}
+        {state.status === 'loading' ? <SkeletonCard title="마이페이지를 불러오는 중..." /> : null}
 
         {state.status === 'needsLogin' ? (
-          <View style={styles.card}>
-            <Text style={styles.message}>{state.message ?? '로그인이 필요합니다.'}</Text>
-            <PrimaryButton label="로그인하기" onPress={() => router.replace('/login')} />
-          </View>
+          <EmptyState
+            action={{ label: '로그인하기', onPress: () => router.replace('/login'), variant: 'primary' }}
+            body={state.message ?? '로그인이 필요합니다.'}
+            title="마이페이지를 보려면 로그인해주세요."
+          />
         ) : null}
 
         {state.status === 'error' ? (
-          <View style={styles.card}>
-            <Text style={styles.errorTitle}>마이페이지를 불러올 수 없어요.</Text>
-            <Text style={styles.message}>다시 시도해주세요.</Text>
-            <SecondaryButton label="다시 시도" onPress={load} />
-          </View>
+          <ErrorState
+            action={{ label: '다시 시도', onPress: load }}
+            body="다시 시도해주세요."
+            title="마이페이지를 불러올 수 없어요."
+          />
         ) : null}
 
         {state.status === 'ready' ? (

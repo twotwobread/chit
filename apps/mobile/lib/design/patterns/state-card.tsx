@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { ActivityIndicator, StyleSheet, View, type PressableProps } from 'react-native';
 
 import { BrandStamp } from '../components/card';
-import { SecondaryButton } from '../components/button';
+import { PrimaryButton, SecondaryButton } from '../components/button';
 import { ResponsiveLabel } from '../foundation/responsive-label';
 import { theme } from '../theme';
 
@@ -10,7 +10,10 @@ export type StateAction = {
   accessibilityLabel?: string;
   disabled?: boolean;
   label: string;
+  loading?: boolean;
+  loadingLabel?: string;
   onPress: PressableProps['onPress'];
+  variant?: 'primary' | 'secondary';
 };
 
 export function EmptyState({ action, body, title }: { action?: StateAction; body?: string; title: string }) {
@@ -107,12 +110,25 @@ function StatusStateCard({
       ) : null}
       {action ? (
         <View style={styles.statusAction}>
-          <SecondaryButton
-            accessibilityLabel={action.accessibilityLabel}
-            disabled={action.disabled}
-            label={action.label}
-            onPress={action.onPress}
-          />
+          {action.variant === 'primary' ? (
+            <PrimaryButton
+              accessibilityLabel={action.accessibilityLabel}
+              disabled={action.disabled}
+              label={action.label}
+              loading={action.loading}
+              loadingLabel={action.loadingLabel}
+              onPress={action.onPress}
+            />
+          ) : (
+            <SecondaryButton
+              accessibilityLabel={
+                action.accessibilityLabel ?? (action.loading ? (action.loadingLabel ?? action.label) : action.label)
+              }
+              disabled={action.disabled || action.loading}
+              label={action.loading ? (action.loadingLabel ?? action.label) : action.label}
+              onPress={action.onPress}
+            />
+          )}
         </View>
       ) : null}
     </View>

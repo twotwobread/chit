@@ -1,12 +1,12 @@
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ApiError, type UserNotificationListItem } from '@i-um/api-contract';
 
 import { MobileAuthError } from '../lib/auth/client';
-import { Card, ScreenBackground, SecondaryButton, theme } from '../lib/design';
+import { EmptyState, ErrorState, ScreenBackground, SecondaryButton, SkeletonCard, theme } from '../lib/design';
 import { BottomMenu } from '../lib/navigation/BottomMenu';
 import { getRootScreenContentTopPadding } from '../lib/navigation/root-screen-layout';
 import { listNotifications, markNotificationRead } from '../lib/notifications/api';
@@ -128,27 +128,22 @@ export default function NotificationsScreen() {
           <Text style={styles.subtitle}>여행 지출과 정산 소식을 모아볼 수 있어요.</Text>
         </View>
 
-        {state.status === 'loading' ? (
-          <Card>
-            <ActivityIndicator color={theme.color.primary} />
-            <Text style={styles.message}>알림을 불러오는 중...</Text>
-          </Card>
-        ) : null}
+        {state.status === 'loading' ? <SkeletonCard title="알림을 불러오는 중..." /> : null}
 
         {state.status === 'auth' ? (
-          <Card>
-            <Text style={styles.stateTitle}>다시 로그인해주세요.</Text>
-            <Text style={styles.message}>알림을 보려면 로그인이 필요해요.</Text>
-            <SecondaryButton label="로그인하기" onPress={() => router.replace('/login')} />
-          </Card>
+          <ErrorState
+            action={{ label: '로그인하기', onPress: () => router.replace('/login'), variant: 'primary' }}
+            body="알림을 보려면 로그인이 필요해요."
+            title="다시 로그인해주세요."
+          />
         ) : null}
 
         {state.status === 'error' ? (
-          <Card>
-            <Text style={styles.errorTitle}>알림을 불러오지 못했어요.</Text>
-            <Text style={styles.message}>잠시 후 다시 시도해주세요.</Text>
-            <SecondaryButton label="다시 시도" onPress={() => void load(false)} />
-          </Card>
+          <ErrorState
+            action={{ label: '다시 시도', onPress: () => void load(false) }}
+            body="잠시 후 다시 시도해주세요."
+            title="알림을 불러오지 못했어요."
+          />
         ) : null}
 
         {state.status === 'ready' ? (
@@ -185,12 +180,7 @@ function NotificationsContent({
   const viewModel = buildNotificationsViewModel(notifications);
 
   if (viewModel.status === 'empty') {
-    return (
-      <Card>
-        <Text style={styles.stateTitle}>{viewModel.emptyTitle}</Text>
-        <Text style={styles.message}>{viewModel.helper}</Text>
-      </Card>
-    );
+    return <EmptyState body={viewModel.helper} title={viewModel.emptyTitle} />;
   }
 
   return (
