@@ -22,7 +22,7 @@ export { TextInputField } from './patterns/input-field';
 export type { TextInputFieldProps } from './patterns/input-field';
 export { buildFieldAccessibilityHint, firstInvalidFieldKey } from './form-accessibility';
 export type { FieldErrorMap } from './form-accessibility';
-export { EmptyState, ErrorState, LoadingState } from './patterns/state-card';
+export { EmptyState, ErrorState, LoadingState, SkeletonCard } from './patterns/state-card';
 export type { StateAction } from './patterns/state-card';
 export { HeroActions, HeroCard, HeroHeader, HeroMetricPanel } from './patterns/hero';
 export type { HeroAction, HeroCardVariant, HeroMetricPanelTone } from './patterns/hero';

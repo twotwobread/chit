@@ -50,6 +50,7 @@ const primitiveExports = [
   'EmptyState',
   'ErrorState',
   'LoadingState',
+  'SkeletonCard',
   'FilterChip',
   'ChoiceChip',
   'SelectableCard',
@@ -339,6 +340,8 @@ test('Issue 389 form and status primitives provide visible recovery structure wi
   }
 
   assert.match(stateCardSource, /function StatusStateCard\b/, 'status primitives should share one visual card pattern');
+  assert.match(functionBody('SkeletonCard'), /accessibilityState=\{\{ busy: true \}\}/);
+  assert.match(functionBody('SkeletonCard'), /skeletonRow/);
   assertStyleContains('statusCard', /backgroundColor: theme\.color\.surface/);
   assertStyleContains('statusCard', /borderColor: theme\.color\.borderDefault/);
 });
