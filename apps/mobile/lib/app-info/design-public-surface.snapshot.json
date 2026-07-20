@@ -5,6 +5,7 @@
       "BrandStampSize",
       "CardVariant",
       "ChoiceChipTone",
+      "FieldErrorMap",
       "FilterChipTone",
       "FloatingActionButtonTone",
       "FormFieldTone",
@@ -18,6 +19,7 @@
       "SelectableCardProps",
       "StateAction",
       "TabButtonIconRenderer",
+      "TextInputFieldProps",
       "TextLinkTone"
     ]
   },
@@ -44,7 +46,10 @@
       "SecondaryButton",
       "SelectableCard",
       "TabButton",
-      "TextLink"
+      "TextInputField",
+      "TextLink",
+      "buildFieldAccessibilityHint",
+      "firstInvalidFieldKey"
     ],
     "./fonts": [
       "useDesignFonts"
