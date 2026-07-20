@@ -21,13 +21,17 @@ import {
   type ExpenseDayBrowserViewModel,
   tripExpenseBucketId,
 } from '../../../../lib/trips/expense-dashboard';
+import {
+  resolveTripExpensesRouteState,
+  tripExpensesStatePath,
+  type TripExpensesRouteMode,
+  type TripExpensesRouteState,
+} from '../../../../lib/trips/routes';
 import { buildQuickExpenseRoute } from '../../../../lib/trips/quick-expense';
 import { localDateString } from '../../../../lib/trips/status';
 import { buildTripRootFabLayout, shouldShowTripRootFab } from '../../../../lib/trips/trip-root-fab-layout';
 import { resolveTripShellDetail } from '../../../../lib/trips/trip-shell-detail';
 import { useTripShellState } from '../../../../lib/trips/trip-shell-context';
-
-type ExpenseTabMode = 'main' | 'days' | 'categories';
 
 type TripExpensesState =
   | { status: 'loading' }
@@ -37,13 +41,25 @@ type TripExpensesState =
   | { status: 'error' };
 
 export default function TripExpensesTabScreen() {
-  const { tripId: tripIdParam } = useLocalSearchParams<{ tripId?: string | string[] }>();
+  const {
+    tripId: tripIdParam,
+    mode: modeParam,
+    dayId: dayIdParam,
+    category: categoryParam,
+  } = useLocalSearchParams<{
+    tripId?: string | string[];
+    mode?: string | string[];
+    dayId?: string | string[];
+    category?: string | string[];
+  }>();
   const tripId = Array.isArray(tripIdParam) ? tripIdParam[0] : tripIdParam;
+  const expenseRouteState = resolveTripExpensesRouteState({
+    category: categoryParam,
+    dayId: dayIdParam,
+    mode: modeParam,
+  });
   const shellState = useTripShellState();
   const [state, setState] = useState<TripExpensesState>({ status: 'loading' });
-  const [mode, setMode] = useState<ExpenseTabMode>('main');
-  const [selectedDayId, setSelectedDayId] = useState<string | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const insets = useSafeAreaInsets();
 
   const load = useCallback(async () => {
@@ -73,6 +89,16 @@ export default function TripExpensesTabScreen() {
     useCallback(() => {
       void load();
     }, [load]),
+  );
+
+  const updateExpenseRouteState = useCallback(
+    (next: Partial<TripExpensesRouteState>) => {
+      if (!tripId) {
+        return;
+      }
+      router.replace(tripExpensesStatePath(tripId, { ...expenseRouteState, ...next }));
+    },
+    [expenseRouteState, tripId],
   );
 
   const shellDetail = tripId ? resolveTripShellDetail(shellState, tripId) : { status: 'notFound' as const };
@@ -111,15 +137,19 @@ export default function TripExpensesTabScreen() {
         ) : null}
         {state.status === 'ready' && detail ? (
           <ExpenseContent
-            mode={mode}
-            onBack={() => setMode('main')}
-            onCategorySelect={setSelectedCategory}
-            onDaySelect={setSelectedDayId}
-            onOpenCategories={() => setMode('categories')}
-            onOpenDays={() => setMode('days')}
+            mode={expenseRouteState.mode}
+            onBack={() => updateExpenseRouteState({ mode: 'main', selectedCategory: null, selectedDayId: null })}
+            onCategorySelect={(category) =>
+              updateExpenseRouteState({ mode: 'categories', selectedCategory: category, selectedDayId: null })
+            }
+            onDaySelect={(dayId) =>
+              updateExpenseRouteState({ mode: 'days', selectedCategory: null, selectedDayId: dayId })
+            }
+            onOpenCategories={() => updateExpenseRouteState({ mode: 'categories', selectedDayId: null })}
+            onOpenDays={() => updateExpenseRouteState({ mode: 'days', selectedCategory: null })}
             response={state.response}
-            selectedCategory={selectedCategory}
-            selectedDayId={selectedDayId}
+            selectedCategory={expenseRouteState.selectedCategory}
+            selectedDayId={expenseRouteState.selectedDayId}
             tripDays={detail.days}
             tripId={tripId ?? ''}
           />
@@ -153,7 +183,7 @@ function ExpenseContent({
   tripId: string;
   tripDays: Parameters<typeof buildExpenseDashboardViewModel>[0]['days'];
   response: ListTripExpensesResponse;
-  mode: ExpenseTabMode;
+  mode: TripExpensesRouteMode;
   selectedDayId: string | null;
   selectedCategory: string | null;
   onOpenDays: () => void;

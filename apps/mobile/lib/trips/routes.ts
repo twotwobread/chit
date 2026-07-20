@@ -53,6 +53,43 @@ export function tripExpensesPath(tripId: string): `/trips/${string}/expenses` {
   return `/trips/${tripId}/expenses`;
 }
 
+export type TripExpensesRouteMode = 'main' | 'days' | 'categories';
+
+export type TripExpensesRouteState = {
+  mode: TripExpensesRouteMode;
+  selectedCategory?: string | null;
+  selectedDayId?: string | null;
+};
+
+export function resolveTripExpensesRouteState(input: {
+  category?: unknown;
+  dayId?: unknown;
+  mode?: unknown;
+}): Required<TripExpensesRouteState> {
+  const mode = resolveTripExpensesRouteMode(input.mode);
+  return {
+    mode,
+    selectedCategory: mode === 'categories' ? routeParamString(input.category) : null,
+    selectedDayId: mode === 'days' ? routeParamString(input.dayId) : null,
+  };
+}
+
+export function tripExpensesStatePath(tripId: string, state: TripExpensesRouteState): Href {
+  const params = new URLSearchParams();
+  const mode = state.mode;
+  if (mode !== 'main') {
+    params.set('mode', mode);
+  }
+  if (mode === 'days' && state.selectedDayId) {
+    params.set('dayId', state.selectedDayId);
+  }
+  if (mode === 'categories' && state.selectedCategory) {
+    params.set('category', state.selectedCategory);
+  }
+  const query = params.toString();
+  return `${tripExpensesPath(tripId)}${query ? `?${query}` : ''}` as Href;
+}
+
 export function tripSettlePath(tripId: string): `/trips/${string}/settle` {
   return `/trips/${tripId}/settle`;
 }
@@ -105,6 +142,43 @@ export function tripTabPath(tripId: string, tab: TripRootTab): Href {
       return tripExpensesPath(tripId);
     case 'settle':
       return tripSettlePath(tripId);
+    default: {
+      const exhaustive: never = tab;
+      throw new Error(`Unsupported trip tab: ${exhaustive}`);
+    }
+  }
+}
+
+export function tripMapStatePath(tripId: string, state: { routeDayIds?: readonly string[] }): Href {
+  const routeDayIds = uniqueNonEmptyStrings(state.routeDayIds ?? []);
+  if (routeDayIds.length === 0) {
+    return tripMapPath(tripId);
+  }
+  const params = new URLSearchParams({ routeDays: routeDayIds.join(',') });
+  return `${tripMapPath(tripId)}?${params.toString()}` as Href;
+}
+
+export function parseTripMapRouteDayIdsParam(value: unknown): string[] {
+  const encoded = routeParamString(value);
+  if (!encoded) {
+    return [];
+  }
+  return uniqueNonEmptyStrings(encoded.split(','));
+}
+
+export function tripTabPathWithState(tripId: string, tab: TripRootTab, params: Record<string, unknown> = {}): Href {
+  switch (tab) {
+    case 'expenses':
+      return tripExpensesStatePath(tripId, resolveTripExpensesRouteState(params));
+    case 'itinerary': {
+      const dayId = routeParamString(params.dayId);
+      return dayId ? tripItineraryDayPath(tripId, dayId) : tripItineraryPath(tripId);
+    }
+    case 'map':
+      return tripMapStatePath(tripId, { routeDayIds: parseTripMapRouteDayIdsParam(params.routeDays) });
+    case 'settle':
+    case 'today':
+      return tripTabPath(tripId, tab);
     default: {
       const exhaustive: never = tab;
       throw new Error(`Unsupported trip tab: ${exhaustive}`);
@@ -209,4 +283,37 @@ export function isTripRootTabPath(pathname: string, tripId: string): boolean {
     pathname === tripExpensesPath(tripId) ||
     pathname === tripSettlePath(tripId)
   );
+}
+
+function resolveTripExpensesRouteMode(value: unknown): TripExpensesRouteMode {
+  const mode = routeParamString(value);
+  if (mode === 'days' || mode === 'categories') {
+    return mode;
+  }
+  return 'main';
+}
+
+function routeParamString(value: unknown): string | null {
+  if (Array.isArray(value)) {
+    return routeParamString(value[0]);
+  }
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function uniqueNonEmptyStrings(values: readonly string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const value of values) {
+    const trimmed = value.trim();
+    if (!trimmed || seen.has(trimmed)) {
+      continue;
+    }
+    seen.add(trimmed);
+    result.push(trimmed);
+  }
+  return result;
 }

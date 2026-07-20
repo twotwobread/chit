@@ -205,7 +205,7 @@ test('Issue 399 navigation chrome adopts shared interactive primitives without r
     tripTabBarSource,
     /navigation\.emit\(\{ canPreventDefault: true, target: route\.key, type: 'tabPress' \}\)/,
   );
-  assert.match(tripTabBarSource, /router\.replace\(tripTabPath\(tripId, route\.name\)\)/);
+  assert.match(tripTabBarSource, /router\.replace\([\s\S]*tripTabPathWithState\(tripId, route\.name, route\.params/);
   assert.match(tripTabBarSource, /navigation\.navigate\(route\.name\)/);
 
   assert.match(appBarSource, /import \{ AvatarGroup, IconButton, theme \} from '\.\.\/design';/);
