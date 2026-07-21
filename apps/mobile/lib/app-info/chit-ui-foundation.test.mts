@@ -264,8 +264,8 @@ test('Issue 395 high-emphasis journey heroes use Graphite Hero and explicit Lime
   const tripCardsSource = readMobileSource('../home-ui/TripCards.tsx');
 
   assertStyleContains(tripCardsSource, 'hero', /backgroundColor: theme\.color\.chit\.charcoal/);
-  assertStyleContains(tripCardsSource, 'heroCta', /backgroundColor: theme\.color\.primary/);
-  assertStyleContains(tripCardsSource, 'heroCtaText', /color: theme\.color\.onPrimary/);
+  assertStyleContains(tripCardsSource, 'heroCta', /backgroundColor: theme\.color\.actionPrimary/);
+  assertStyleContains(tripCardsSource, 'heroCtaText', /color: theme\.color\.onActionPrimary/);
   assertStyleContains(tripCardsSource, 'upcomingHomeHero', /backgroundColor: theme\.color\.chit\.charcoal/);
 
   assert.match(representativeNextPlaceHeroSource, /<HeroCard[\s\S]*variant="graphite"/);

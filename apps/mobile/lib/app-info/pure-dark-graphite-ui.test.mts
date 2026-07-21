@@ -82,3 +82,21 @@ test('navigation shell uses dark selected surfaces and avoids Lime capsules', ()
   assert.doesNotMatch(tripRootFab, /tone="lime"/);
   assert.match(tripRootFab, /<Plus color=\{theme\.color\.uiAccent\}/);
 });
+
+test('root screens use Pure Dark Graphite shared surfaces without local off-white blocks', () => {
+  for (const relativePath of [
+    '../../app/login.tsx',
+    '../../app/index.tsx',
+    '../../app/mypage.tsx',
+    '../../app/notifications.tsx',
+    '../../app/account.tsx',
+    '../home-ui/TripCards.tsx',
+    '../account-ui/AccountRows.tsx',
+    '../trip-ui/MyPageParts.tsx',
+    '../trip-ui/MyPageStyles.ts',
+  ]) {
+    const source = read(relativePath);
+    assert.doesNotMatch(source, /offWhiteElevated|offWhiteSubtle|warmPaper/);
+    assert.doesNotMatch(source, /backgroundColor: theme\.color\.primary/);
+  }
+});

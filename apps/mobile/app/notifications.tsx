@@ -298,7 +298,7 @@ const styles = StyleSheet.create({
     paddingVertical: theme.space[4],
   },
   unreadDot: {
-    backgroundColor: theme.color.primary,
+    backgroundColor: theme.color.uiAccent,
     borderRadius: 5,
     height: 10,
     marginTop: 5,

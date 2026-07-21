@@ -598,7 +598,7 @@ git commit -m "feat: apply pure dark navigation shell"
 - Consumes: dark shared Card, Button, StateCard, BottomMenu.
 - Produces: login/home/mypage/notifications/account consistent with Pure Dark Graphite.
 
-- [ ] **Step 1: Write root-screen source assertions**
+- [x] **Step 1: Write root-screen source assertions**
 
 Add to `pure-dark-graphite-ui.test.mts`:
 
@@ -620,7 +620,7 @@ test('root screens use Pure Dark Graphite shared surfaces without local off-whit
 });
 ```
 
-- [ ] **Step 2: Run test to verify failure**
+- [x] **Step 2: Run test to verify failure**
 
 Run:
 
@@ -630,23 +630,23 @@ pnpm --filter @i-um/mobile test -- --test-name-pattern="root screens use Pure Da
 
 Expected: FAIL where old hero cards or CTA styles still use `theme.color.primary` or old off-white tokens.
 
-- [ ] **Step 3: Update login**
+- [x] **Step 3: Update login**
 
 Keep provider button brand colors. Update the surrounding card/hero styles to dark tokens. Keep BrandStamp as the main Lime brand moment.
 
-- [ ] **Step 4: Update home trip cards**
+- [x] **Step 4: Update home trip cards**
 
 In `TripCards.tsx`, make current-trip hero a dark graphite card with Graphite CTA. If an explicit Lime signal is needed, use badge/dot/BrandStamp, not a giant Lime button.
 
-- [ ] **Step 5: Update mypage/account rows**
+- [x] **Step 5: Update mypage/account rows**
 
 Use dark cards/rows. Keep settings rows compact with `theme.layout.tapMin` minHeight and muted metadata.
 
-- [ ] **Step 6: Update notifications rows**
+- [x] **Step 6: Update notifications rows**
 
 Unread state: small Lime dot plus explicit/readable text context. Do not use Lime as the whole row background.
 
-- [ ] **Step 7: Run root-screen focused tests**
+- [x] **Step 7: Run root-screen focused tests**
 
 Run:
 
@@ -656,7 +656,7 @@ pnpm --filter @i-um/mobile test -- --test-name-pattern="root screens|My Page|Not
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add apps/mobile/app/login.tsx apps/mobile/app/index.tsx apps/mobile/app/mypage.tsx apps/mobile/app/notifications.tsx apps/mobile/app/account.tsx apps/mobile/lib/home-ui apps/mobile/lib/account-ui apps/mobile/lib/trip-ui/MyPageParts.tsx apps/mobile/lib/trip-ui/MyPageStyles.ts apps/mobile/lib/app-info/pure-dark-graphite-ui.test.mts apps/mobile/lib/app-info/chit-ui-foundation.test.mts

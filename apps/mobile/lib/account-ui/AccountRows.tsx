@@ -240,7 +240,7 @@ const styles = StyleSheet.create({
   },
   rowIcon: {
     alignItems: 'center',
-    backgroundColor: theme.color.primarySoft,
+    backgroundColor: theme.color.uiAccentSoft,
     borderRadius: theme.radius.md,
     height: 34,
     justifyContent: 'center',
