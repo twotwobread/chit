@@ -33,16 +33,20 @@ Use when changing Expo screens, mobile UI state, styling, copy, or navigation.
 
 ## Visual rules
 
-- Use Chit `Dark Shell + Off-white Content` as the default app UI language: Matte Charcoal shell, clean Off-white content surfaces, Charcoal text on light surfaces, Acid Lime primary accents.
+- Use Chit `Pure Dark Graphite` as the default app UI language: near-black shell, dark graphite app bars/tabs/cards/lists/forms/sheets, off-white text tiers, and sparse Acid Lime signals.
 - Do not use retired Warm Paper `#F5F1E8` for core app backgrounds/cards.
-- Keep shell glow centralized through design tokens/shared components (`theme.color.shellGlow`, `ScreenBackground`); do not add ad-hoc rgba/radial values per screen.
-- Reserve `Dark Acid` hero treatment for app icon, splash, login/home brand moments, settlement summary/complete hero moments, and other high-emphasis surfaces.
+- Do not use Off-white as the default content card/sheet/form surface. Off-white is an explicit escape for long-readability, legal, export/share, or accessibility-driven contexts only.
+- Keep shell treatment centralized through design tokens/shared components (`ScreenBackground`, shell/card/input tokens); do not add ad-hoc rgba/radial/glow values per screen.
+- Reserve `Dark Acid`/BrandStamp treatment for app icon, splash, login/home brand moments, empty/loading/completion states, settlement summary/complete hero moments, and other approved high-emphasis surfaces.
 - Use `Stamp Pop`/`BrandStamp` only for approved brand/header, onboarding, empty/loading/completion, mypage accent, or settlement moments; avoid repeated dense rows, bottom tabs, and routine forms.
 - Use theme tokens for color, spacing, radius, typography, and shadow.
 - Do not add raw hex colors in screen code.
 - External brand colors also need tokens before use.
 - Graphite is the default primary CTA / 기본 주요 액션 fill for normal product UI; use Off-white text on Graphite for primary hierarchy.
-- Acid Lime is sparse and explicit: use it for one high-emphasis CTA in a Hero/action moment, large/key amounts, selected state, BrandStamp accent/glow, and success/complete emphasis; do not use it for long body text, small text on light/off-white surfaces, dense repeated routine actions, or danger/error states.
+- Acid Lime is sparse and explicit: use it for BrandStamp/app icon/splash/onboarding, selected dot/underline/edge, rare success/complete emphasis, and at most one explicitly approved hero CTA; do not use it for long body text, small text, repeated routine tabs/chips/FAB/buttons, dense repeated actions, or danger/error states.
+- Use `Compact Premium Dark` density: hero titles, total spend, settlement results, and next actions are large; repeated rows/chips/settings/forms are compact, aligned, and still 44pt+ touch-safe.
+- Avoid previous visual issues: large floating off-white blocks, repeated Acid Lime fills, over-rounded pill/card repetition, weak all-bold hierarchy, clipped day chips/carousels, appbar misalignment, unsafe sheet/safe-area spacing, and placeholder-quality place cards.
+- Place/map result cards should use real imagery when available, or polished dark thumbnails/category icons when not; avoid text-only placeholder blocks.
 - Credit/받을 돈 uses credit color and `+`; debit/보낼 돈 uses debit color and `−`.
 - Reuse shared Button/Card/ListRow/Badge/Chip/ScreenBackground/BrandStamp patterns before duplicating styles.
 - New shared interactive primitives should use `InteractiveSurface` with accessibility role/state, disabled/busy/selected semantics, pressed feedback, `theme.layout.tapMin` touch target, and `hitSlop` for small icon-only controls.
