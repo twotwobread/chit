@@ -203,8 +203,8 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.md,
   },
   timeWheelSelectionFrame: {
-    backgroundColor: theme.color.primarySoft,
-    borderColor: theme.color.primary,
+    backgroundColor: theme.color.surfaceSoft,
+    borderColor: theme.color.uiAccent,
     borderRadius: theme.radius.sm,
     borderWidth: 1,
     left: theme.space[1],
@@ -221,7 +221,7 @@ const styles = StyleSheet.create({
     fontSize: theme.font.size.body,
   },
   timeWheelOptionTextSelected: {
-    color: theme.color.primary,
+    color: theme.color.uiAccent,
     fontFamily: theme.font.family.bold,
     fontWeight: theme.font.weight.bold,
   },

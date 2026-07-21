@@ -223,7 +223,7 @@ const styles = StyleSheet.create({
     padding: theme.space[3] + 1,
   },
   rowCurrent: {
-    backgroundColor: theme.color.primarySoft,
+    backgroundColor: theme.color.surfaceSoft,
   },
   scrim: {
     ...StyleSheet.absoluteFillObject,

@@ -778,8 +778,8 @@ const styles = StyleSheet.create({
     paddingVertical: theme.space[3],
   },
   selectorOptionSelected: {
-    backgroundColor: theme.color.primary,
-    borderColor: theme.color.primary,
+    backgroundColor: theme.color.surfaceSoft,
+    borderColor: theme.color.uiAccent,
   },
   selectorOptionTitle: {
     color: theme.color.textBody,
@@ -788,7 +788,7 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.semibold,
   },
   selectorOptionTitleSelected: {
-    color: theme.color.onPrimary,
+    color: theme.color.textStrong,
     fontFamily: theme.font.family.bold,
     fontWeight: theme.font.weight.bold,
   },
@@ -859,8 +859,8 @@ const styles = StyleSheet.create({
     paddingVertical: theme.space[2],
   },
   participantChipSelected: {
-    backgroundColor: theme.color.primary,
-    borderColor: theme.color.primary,
+    backgroundColor: theme.color.surfaceSoft,
+    borderColor: theme.color.uiAccent,
   },
   participantDot: {
     alignItems: 'center',
@@ -882,7 +882,7 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.semibold,
   },
   participantNameSelected: {
-    color: theme.color.onPrimary,
+    color: theme.color.textStrong,
     fontFamily: theme.font.family.bold,
     fontWeight: theme.font.weight.bold,
   },
@@ -891,7 +891,7 @@ const styles = StyleSheet.create({
   },
   save: {
     alignItems: 'center',
-    backgroundColor: theme.color.primary,
+    backgroundColor: theme.color.actionPrimary,
     borderRadius: theme.radius.lg,
     flex: 2,
     height: theme.layout.controlHLg,
@@ -901,7 +901,7 @@ const styles = StyleSheet.create({
     flex: 2,
   },
   saveText: {
-    color: theme.color.onPrimary,
+    color: theme.color.onActionPrimary,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.subhead,
     fontWeight: theme.font.weight.bold,

@@ -317,7 +317,6 @@ export default function GooglePlaceSearchScreen() {
           loadingLabel="등록 중..."
           onPress={() => void submitBatch()}
           style={styles.batchSubmitButton}
-          tone="lime"
         />
       </View>
     ) : null;
@@ -329,7 +328,7 @@ export default function GooglePlaceSearchScreen() {
           <View style={styles.notFoundCard}>
             <Text style={styles.errorTitle}>일정을 찾을 수 없어요.</Text>
             <Text style={styles.message}>삭제되었거나 접근할 수 없는 여행 일정이에요.</Text>
-            <PrimaryButton label="일정으로" onPress={returnToDay} style={styles.notFoundAction} tone="lime" />
+            <PrimaryButton label="일정으로" onPress={returnToDay} style={styles.notFoundAction} />
           </View>
         </ScrollView>
       </ScreenBackground>

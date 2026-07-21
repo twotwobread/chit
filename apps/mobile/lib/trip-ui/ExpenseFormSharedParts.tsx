@@ -605,8 +605,8 @@ const styles = StyleSheet.create({
     paddingVertical: theme.space[3],
   },
   chipSelected: {
-    backgroundColor: theme.color.primarySoft,
-    borderColor: theme.color.primary,
+    backgroundColor: theme.color.surfaceSoft,
+    borderColor: theme.color.uiAccent,
   },
   chipText: {
     color: theme.color.textBody,
@@ -614,7 +614,7 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.semibold,
   },
   chipTextSelected: {
-    color: theme.color.primary,
+    color: theme.color.uiAccent,
     fontFamily: theme.font.family.bold,
     fontWeight: theme.font.weight.bold,
   },
@@ -698,8 +698,8 @@ const styles = StyleSheet.create({
     padding: theme.space[4],
   },
   optionCardSelected: {
-    backgroundColor: theme.color.primary,
-    borderColor: theme.color.primary,
+    backgroundColor: theme.color.surfaceSoft,
+    borderColor: theme.color.uiAccent,
   },
   optionList: {
     gap: theme.space[3],
@@ -711,9 +711,9 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.bold,
   },
   orderBadge: {
-    backgroundColor: theme.color.primary,
+    backgroundColor: theme.color.surfaceSoft,
     borderRadius: theme.radius.pill,
-    color: theme.color.onPrimary,
+    color: theme.color.uiAccent,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.caption,
     fontWeight: theme.font.weight.bold,

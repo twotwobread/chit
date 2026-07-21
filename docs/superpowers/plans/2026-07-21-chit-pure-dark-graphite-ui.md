@@ -918,7 +918,7 @@ git commit -m "feat: migrate forms and detail flows to dark graphite"
 - Consumes: all implementation commits.
 - Produces: evidence needed for completion/PR.
 
-- [ ] **Step 1: Run full automated verification**
+- [x] **Step 1: Run full automated verification**
 
 Run:
 
@@ -933,7 +933,9 @@ pnpm harness:validate
 
 Expected: all commands exit 0. If `pnpm --filter @i-um/mobile lint` is not available, run repository `pnpm lint` and record that substitution.
 
-- [ ] **Step 2: Run source searches for forbidden patterns**
+Evidence recorded on 2026-07-21: `pnpm --filter @i-um/mobile test` passed with 751 tests / 0 failures; typecheck, format check, lint, context-bound UI check, harness validation, and `git diff --check` all passed.
+
+- [x] **Step 2: Run source searches for forbidden patterns**
 
 Run:
 
@@ -943,11 +945,13 @@ rg -n "warmPaper|offWhiteElevated|offWhiteSubtle|backgroundColor: theme\.color\.
 
 Expected: no routine UI matches. Any remaining match must be an explicitly justified BrandStamp/provider/semantic exception and recorded in `evaluation-report.md`.
 
-- [ ] **Step 3: Record verification artifact**
+Evidence recorded on 2026-07-21: remaining matches are limited to `theme.ts` legacy token definitions/aliases and explicit Lime pressed-state support in `button.tsx` / `floating-action-button.tsx`; no routine screen `tone="lime"`, `tone: 'lime'`, off-white surface token, or `backgroundColor: theme.color.primary` match remains.
+
+- [x] **Step 3: Record verification artifact**
 
 Write `.harness/runs/20260721-pure-dark-graphite-ui/artifacts/verification.md` with the exact commands, results, and any manual smoke gap.
 
-- [ ] **Step 4: Manual smoke if devices are available**
+- [x] **Step 4: Manual smoke if devices are available**
 
 Smoke at least:
 
@@ -956,7 +960,9 @@ Smoke at least:
 
 If device/simulator is unavailable, record explicit gap and do not claim manual smoke passed.
 
-- [ ] **Step 5: Update evaluation report**
+Evidence recorded on 2026-07-21: device/simulator smoke was not run in this harness session; iOS and Android are explicitly marked blocked in artifacts.
+
+- [x] **Step 5: Update evaluation report**
 
 Create `.harness/runs/20260721-pure-dark-graphite-ui/artifacts/evaluation-report.md` with acceptance criteria mapping:
 
@@ -979,7 +985,7 @@ Create `.harness/runs/20260721-pure-dark-graphite-ui/artifacts/evaluation-report
 - Android: pass/fail/blocked.
 ```
 
-- [ ] **Step 6: Commit artifacts if needed**
+- [x] **Step 6: Commit artifacts if needed**
 
 Run artifacts are gitignored; do not force-add them unless project policy explicitly requires it. Commit tracked docs/code only:
 

@@ -74,7 +74,7 @@ const styles = StyleSheet.create({
     padding: theme.space[1] + 2,
   },
   segmentDark: {
-    backgroundColor: theme.color.green[800],
+    backgroundColor: theme.color.surfaceSunken,
   },
   segmentItem: {
     alignItems: 'center',
@@ -86,7 +86,7 @@ const styles = StyleSheet.create({
     paddingVertical: theme.space[3],
   },
   segmentItemActive: {
-    backgroundColor: theme.color.primary,
+    backgroundColor: theme.color.surfaceSoft,
     ...theme.shadow.xs,
   },
   segmentItemActiveDark: {
@@ -104,13 +104,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   segmentTextActive: {
-    color: theme.color.onPrimary,
+    color: theme.color.textStrong,
   },
   segmentTextActiveDark: {
-    color: theme.color.green[800],
+    color: theme.color.textStrong,
   },
   segmentTextDark: {
-    color: theme.color.green[100],
+    color: theme.color.textBody,
   },
   segmentTextDisabled: {
     color: theme.color.textFaint,

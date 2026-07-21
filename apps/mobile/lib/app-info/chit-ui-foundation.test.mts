@@ -358,7 +358,11 @@ test('Issue 372 My Page uses foundation primitives for simple state and section 
 test('Issue 395 itinerary and map selected actions use Chit action hierarchy', () => {
   const itineraryStylesSource = readMobileSource('../trip-ui/DayItineraryEditorStyles.ts');
 
-  assertStyleContains(itineraryStylesSource, 'defaultTravelModeChipSelected', /backgroundColor: theme\.color\.surfaceSoft/);
+  assertStyleContains(
+    itineraryStylesSource,
+    'defaultTravelModeChipSelected',
+    /backgroundColor: theme\.color\.surfaceSoft/,
+  );
   assertStyleContains(itineraryStylesSource, 'defaultTravelModeChipSelected', /borderColor: theme\.color\.uiAccent/);
   assertStyleContains(itineraryStylesSource, 'defaultTravelModeChipTextSelected', /color: theme\.color\.textStrong/);
   assertStyleContains(itineraryStylesSource, 'chipSelected', /backgroundColor: theme\.color\.surfaceSoft/);

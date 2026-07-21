@@ -215,8 +215,9 @@ describe('google place search native module entry setup', () => {
     );
     assert.match(
       placeSearchSource,
-      /<PrimaryButton[\s\S]*label=\{isSubmittingBatch \? '등록 중\.\.\.' : '선택된 장소 일정 등록'\}[\s\S]*loading=\{isSubmittingBatch\}[\s\S]*tone="lime"/,
+      /<PrimaryButton[\s\S]*label=\{isSubmittingBatch \? '등록 중\.\.\.' : '선택된 장소 일정 등록'\}[\s\S]*loading=\{isSubmittingBatch\}/,
     );
+    assert.doesNotMatch(placeSearchSource, /tone="lime"|tone: 'lime'/);
 
     assert.match(
       mapSearchSource,
