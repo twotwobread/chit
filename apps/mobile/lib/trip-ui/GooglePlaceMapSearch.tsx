@@ -1033,7 +1033,6 @@ export function GooglePlaceMapSearch({
               label={notFoundAction.label}
               onPress={notFoundAction.onPress}
               style={styles.notFoundAction}
-              tone="lime"
             />
           ) : null}
         </View>
@@ -1213,7 +1212,6 @@ export function GooglePlaceMapSearch({
             loadingLabel="검색 중"
             onPress={runActiveSearch}
             style={styles.topSearchButton}
-            tone="lime"
           />
         </View>
         {routeChips.length > 0 ? (
@@ -1245,7 +1243,6 @@ export function GooglePlaceMapSearch({
           label="이 지역에서 다시 검색"
           onPress={runRegionSearch}
           style={[styles.regionSearchButton, { bottom: Math.max(visibleSheetHeight + theme.space[4], theme.space[6]) }]}
-          tone="lime"
         />
       ) : null}
 
@@ -1463,7 +1460,6 @@ export function GooglePlaceMapSearch({
                           label={lodgingEmptyAction.label}
                           onPress={lodgingEmptyAction.onPress}
                           style={styles.emptyCandidateAction}
-                          tone="lime"
                         />
                       ) : null}
                     </View>
@@ -1615,7 +1611,6 @@ function PlaceResultCard({
               styles.resultPrimaryActionButton,
               isPrimaryActionSelected ? styles.resultPrimaryActionButtonSelected : null,
             ]}
-            tone="lime"
           />
         ) : null}
       </View>
@@ -1730,7 +1725,6 @@ function DuplicateConfirmationCard({
           loading={confirmation.isLoading}
           loadingLabel="추가 중..."
           onPress={onConfirm}
-          tone="lime"
         />
         <SecondaryButton disabled={isBusy} label={confirmation.cancelLabel} onPress={onCancel} />
       </View>
@@ -1807,7 +1801,7 @@ const styles = StyleSheet.create({
   },
   topSearchButton: {
     alignItems: 'center',
-    backgroundColor: theme.color.primary,
+    backgroundColor: theme.color.actionPrimary,
     borderRadius: theme.radius.pill,
     flexDirection: 'row',
     gap: theme.space[2],
@@ -1817,7 +1811,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.space[4],
   },
   topSearchButtonText: {
-    color: theme.color.onPrimary,
+    color: theme.color.onActionPrimary,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.label,
     fontWeight: theme.font.weight.bold,
@@ -1855,7 +1849,7 @@ const styles = StyleSheet.create({
   },
   regionSearchButton: {
     alignSelf: 'center',
-    backgroundColor: theme.color.primary,
+    backgroundColor: theme.color.actionPrimary,
     borderRadius: theme.radius.pill,
     minHeight: theme.layout.tapMin,
     paddingHorizontal: theme.space[5],
@@ -1865,7 +1859,7 @@ const styles = StyleSheet.create({
     ...theme.shadow.md,
   },
   regionSearchButtonText: {
-    color: theme.color.onPrimary,
+    color: theme.color.onActionPrimary,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.label,
     fontWeight: theme.font.weight.bold,
@@ -1983,8 +1977,8 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   destinationChipSelected: {
-    backgroundColor: theme.color.primarySoft,
-    borderColor: theme.color.primary,
+    backgroundColor: theme.color.surfaceSoft,
+    borderColor: theme.color.uiAccent,
   },
   destinationChipDisabled: {
     opacity: 0.6,
@@ -1996,7 +1990,7 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.semibold,
   },
   destinationChipTextSelected: {
-    color: theme.color.primaryTextOnLight,
+    color: theme.color.textStrong,
   },
   searchRow: {
     flexDirection: 'row',
@@ -2016,7 +2010,7 @@ const styles = StyleSheet.create({
   },
   searchButton: {
     alignItems: 'center',
-    backgroundColor: theme.color.primary,
+    backgroundColor: theme.color.actionPrimary,
     borderRadius: theme.radius.md,
     flexDirection: 'row',
     gap: theme.space[2],
@@ -2029,7 +2023,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.color.textFaint,
   },
   searchButtonText: {
-    color: theme.color.onPrimary,
+    color: theme.color.onActionPrimary,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.label,
     fontWeight: theme.font.weight.bold,
@@ -2109,14 +2103,14 @@ const styles = StyleSheet.create({
   },
   emptyCandidateAction: {
     alignItems: 'center',
-    backgroundColor: theme.color.primary,
+    backgroundColor: theme.color.actionPrimary,
     borderRadius: theme.radius.pill,
     justifyContent: 'center',
     minHeight: theme.layout.controlHSm,
     paddingHorizontal: theme.space[4],
   },
   emptyCandidateActionText: {
-    color: theme.color.onPrimary,
+    color: theme.color.onActionPrimary,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.label,
     fontWeight: theme.font.weight.bold,
@@ -2132,7 +2126,7 @@ const styles = StyleSheet.create({
     ...theme.shadow.xs,
   },
   resultCardSelected: {
-    borderColor: theme.color.primary,
+    borderColor: theme.color.uiAccent,
     borderWidth: 2,
   },
   resultCardPressArea: {
@@ -2163,12 +2157,12 @@ const styles = StyleSheet.create({
   },
   photoPlaceholder: {
     alignItems: 'center',
-    backgroundColor: theme.color.primarySoft,
+    backgroundColor: theme.color.surfaceSoft,
     flex: 1,
     justifyContent: 'center',
   },
   photoPlaceholderText: {
-    color: theme.color.primaryTextOnLight,
+    color: theme.color.textStrong,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.label,
     fontWeight: theme.font.weight.bold,
@@ -2213,8 +2207,8 @@ const styles = StyleSheet.create({
   },
   resultPrimaryActionButton: {
     alignItems: 'center',
-    backgroundColor: theme.color.primary,
-    borderColor: theme.color.primary,
+    backgroundColor: theme.color.actionPrimary,
+    borderColor: theme.color.shellRaised,
     borderRadius: theme.radius.pill,
     borderWidth: 1,
     flexDirection: 'row',
@@ -2225,8 +2219,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.space[3],
   },
   resultPrimaryActionButtonSelected: {
-    backgroundColor: theme.color.primarySoft,
-    borderColor: theme.color.primary,
+    backgroundColor: theme.color.surfaceSoft,
+    borderColor: theme.color.uiAccent,
     borderWidth: 2,
   },
   resultPrimaryActionButtonDisabled: {
@@ -2234,18 +2228,18 @@ const styles = StyleSheet.create({
     borderColor: theme.color.textFaint,
   },
   resultPrimaryActionText: {
-    color: theme.color.onPrimary,
+    color: theme.color.onActionPrimary,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.label,
     fontWeight: theme.font.weight.bold,
   },
   resultPrimaryActionTextSelected: {
-    color: theme.color.primaryTextOnLight,
+    color: theme.color.textStrong,
   },
   categoryPill: {
-    backgroundColor: theme.color.primarySoft,
+    backgroundColor: theme.color.surfaceSoft,
     borderRadius: theme.radius.pill,
-    color: theme.color.primaryTextOnLight,
+    color: theme.color.textStrong,
     fontFamily: theme.font.family.semibold,
     fontSize: theme.font.size.micro,
     fontWeight: theme.font.weight.semibold,
@@ -2288,7 +2282,7 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     alignItems: 'center',
-    backgroundColor: theme.color.primary,
+    backgroundColor: theme.color.actionPrimary,
     borderRadius: theme.radius.md,
     flexDirection: 'row',
     gap: theme.space[2],
@@ -2301,7 +2295,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.color.textFaint,
   },
   primaryButtonText: {
-    color: theme.color.onPrimary,
+    color: theme.color.onActionPrimary,
     fontFamily: theme.font.family.bold,
     fontWeight: theme.font.weight.bold,
     textAlign: 'center',

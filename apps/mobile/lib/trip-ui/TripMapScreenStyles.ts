@@ -79,8 +79,8 @@ export const styles = StyleSheet.create({
     ...theme.shadow.xs,
   },
   bookmarkLayerChipSelected: {
-    backgroundColor: theme.color.primary,
-    borderColor: theme.color.primary,
+    backgroundColor: theme.color.surfaceSoft,
+    borderColor: theme.color.uiAccent,
   },
   bookmarkLayerChipText: {
     color: theme.color.textBody,
@@ -89,7 +89,7 @@ export const styles = StyleSheet.create({
     fontWeight: theme.font.weight.bold,
   },
   bookmarkLayerChipTextSelected: {
-    color: theme.color.onPrimary,
+    color: theme.color.textStrong,
   },
   mapFeedbackOverlay: {
     bottom: theme.space[5],
@@ -222,7 +222,7 @@ export const styles = StyleSheet.create({
   },
   searchButton: {
     alignItems: 'center',
-    backgroundColor: theme.color.primary,
+    backgroundColor: theme.color.actionPrimary,
     borderRadius: theme.radius.md,
     flexDirection: 'row',
     gap: theme.space[2],
@@ -234,7 +234,7 @@ export const styles = StyleSheet.create({
     opacity: 0.55,
   },
   searchButtonText: {
-    color: theme.color.onPrimary,
+    color: theme.color.onActionPrimary,
     fontFamily: theme.font.family.bold,
     fontWeight: theme.font.weight.bold,
   },
@@ -271,8 +271,8 @@ export const styles = StyleSheet.create({
     padding: theme.space[4],
   },
   searchResultCardSelected: {
-    backgroundColor: theme.color.primarySoft,
-    borderColor: theme.color.primary,
+    backgroundColor: theme.color.surfaceSoft,
+    borderColor: theme.color.uiAccent,
   },
   searchResultList: {
     gap: theme.space[3],

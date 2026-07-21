@@ -771,7 +771,7 @@ git commit -m "feat: migrate trip tabs to compact dark graphite"
 - Consumes: dark bottom sheet, dark chips, dark place rows.
 - Produces: map/search with polished result cards and no placeholder-quality text blocks.
 
-- [ ] **Step 1: Write map/search assertions**
+- [x] **Step 1: Write map/search assertions**
 
 Add to `pure-dark-graphite-ui.test.mts`:
 
@@ -787,7 +787,7 @@ test('map search overlays use dark surfaces and polished place thumbnails', () =
 });
 ```
 
-- [ ] **Step 2: Run test to verify failure**
+- [x] **Step 2: Run test to verify failure**
 
 Run:
 
@@ -797,15 +797,15 @@ pnpm --filter @i-um/mobile test -- --test-name-pattern="map search overlays"
 
 Expected: FAIL until map parts/styles stop Lime-heavy and expose polished thumbnail/category treatment.
 
-- [ ] **Step 3: Update bottom sheet/search overlay styles**
+- [x] **Step 3: Update bottom sheet/search overlay styles**
 
 Use dark `theme.color.shellElevated`, `surface`, `surfaceSunken`, `borderDefault`. Keep provider/context-bound boundaries intact; do not move gesture/map components outside their provider tree.
 
-- [ ] **Step 4: Update place cards**
+- [x] **Step 4: Update place cards**
 
 If place photo data exists, show it. If not, use a tokenized dark category thumbnail with vector/category text/icon. Avoid large light green placeholder boxes.
 
-- [ ] **Step 5: Run map/context checks**
+- [x] **Step 5: Run map/context checks**
 
 Run:
 
@@ -816,7 +816,7 @@ node .harness/scripts/check-mobile-context-bound-ui.mjs --repo-root .
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add apps/mobile/app/trips/[tripId]/\(tabs\)/map.tsx apps/mobile/lib/trip-ui/TripMapScreenParts.tsx apps/mobile/lib/trip-ui/TripMapScreenStyles.ts apps/mobile/lib/trip-ui/GooglePlaceMapSearch.tsx apps/mobile/lib/places apps/mobile/lib/app-info/pure-dark-graphite-ui.test.mts

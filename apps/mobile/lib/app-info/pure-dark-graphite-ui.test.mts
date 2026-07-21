@@ -121,3 +121,16 @@ test('trip tabs use compact premium dark density and avoid routine Lime CTA fill
     assert.doesNotMatch(source, /offWhiteElevated|offWhiteSubtle|warmPaper/);
   }
 });
+
+test('map search overlays use dark surfaces and polished place thumbnails', () => {
+  const mapParts = read('../trip-ui/TripMapScreenParts.tsx');
+  const mapStyles = read('../trip-ui/TripMapScreenStyles.ts');
+  const googlePlaceMapSearch = read('../trip-ui/GooglePlaceMapSearch.tsx');
+
+  assert.doesNotMatch(mapParts, /tone="lime"|tone: 'lime'/);
+  assert.doesNotMatch(googlePlaceMapSearch, /tone="lime"|tone: 'lime'/);
+  assert.doesNotMatch(mapStyles, /backgroundColor: theme\.color\.primary/);
+  assert.doesNotMatch(googlePlaceMapSearch, /backgroundColor: theme\.color\.primary/);
+  assert.match(mapStyles, /backgroundColor: theme\.color\.surface|backgroundColor: theme\.color\.shellElevated/);
+  assert.match(googlePlaceMapSearch, /photo|thumbnail|category|Place/);
+});

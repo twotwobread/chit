@@ -73,7 +73,7 @@ test('Issue 395 representative surfaces adopt Hero and shared action primitives'
   assert.match(expensesSource, /import \{[\s\S]*FilterChip[\s\S]*InlineAction[\s\S]*TextLink/);
   assert.doesNotMatch(expensesSource, /function FilterChip\(/);
   assert.match(representativeMapPartsSource, /import \{[\s\S]*FilterChip[\s\S]*PrimaryButton/);
-  assert.match(representativeMapPartsSource, /tone="lime"/);
+  assert.doesNotMatch(representativeMapPartsSource, /tone="lime"|tone: 'lime'/);
 });
 
 test('Chit foundation components do not introduce raw hex colors outside theme tokens', () => {
@@ -368,8 +368,9 @@ test('Issue 395 itinerary and map selected actions use Chit action hierarchy', (
   assert.match(representativeMapPartsSource, /import \{ FilterChip, PrimaryButton, theme \} from '\.\.\/design';/);
   assert.match(
     representativeMapPartsSource,
-    /<PrimaryButton[\s\S]*disabled=\{isSubmitting \|\| \(choosingDay && !targetDay\)\}[\s\S]*label=\{submitLabel\}[\s\S]*loading=\{isSubmitting\}[\s\S]*tone="lime"/,
+    /<PrimaryButton[\s\S]*disabled=\{isSubmitting \|\| \(choosingDay && !targetDay\)\}[\s\S]*label=\{submitLabel\}[\s\S]*loading=\{isSubmitting\}/,
   );
+  assert.doesNotMatch(representativeMapPartsSource, /tone="lime"|tone: 'lime'/);
 });
 
 test('expense rows keep explicit category icon markers and accessible category labels', () => {
