@@ -726,8 +726,8 @@ const styles = StyleSheet.create({
     paddingVertical: theme.space[3],
   },
   addPassengerRowSelected: {
-    backgroundColor: theme.color.primarySoft,
-    borderColor: theme.color.primary,
+    backgroundColor: theme.color.surfaceSoft,
+    borderColor: theme.color.uiAccent,
   },
   addPassengerState: {
     color: theme.color.textMuted,
@@ -736,13 +736,13 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.bold,
   },
   addPassengerStateSelected: {
-    color: theme.color.primary,
+    color: theme.color.uiAccent,
   },
   disabled: {
     opacity: 0.5,
   },
   pressed: {
-    backgroundColor: theme.color.primarySoft,
+    backgroundColor: theme.color.surfaceSoft,
   },
   divider: {
     backgroundColor: theme.color.borderSubtle,
@@ -750,7 +750,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   feedback: {
-    color: theme.color.primary,
+    color: theme.color.uiAccent,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.body,
     fontWeight: theme.font.weight.bold,
@@ -762,7 +762,8 @@ const styles = StyleSheet.create({
     lineHeight: theme.font.size.body * theme.font.leading.normal,
   },
   input: {
-    borderColor: theme.color.borderSubtle,
+    backgroundColor: theme.color.surfaceSunken,
+    borderColor: theme.color.borderDefault,
     borderRadius: theme.radius.md,
     borderWidth: 1,
     color: theme.color.textStrong,

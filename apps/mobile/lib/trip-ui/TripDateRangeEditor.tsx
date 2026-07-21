@@ -125,7 +125,7 @@ const styles = StyleSheet.create({
     paddingVertical: dateEditorLayout.segmentVerticalPadding,
   },
   dateSegmentActive: {
-    backgroundColor: theme.color.primarySoft,
+    backgroundColor: theme.color.surfaceSoft,
   },
   dateSegmentedControl: {
     alignItems: 'center',
@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.semibold,
   },
   dateSegmentLabelActive: {
-    color: theme.color.primary,
+    color: theme.color.uiAccent,
   },
   dateSegmentPlaceholder: {
     color: theme.color.textFaint,
@@ -160,7 +160,7 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.bold,
   },
   dateSegmentTextActive: {
-    color: theme.color.primary,
+    color: theme.color.uiAccent,
   },
   fieldGroup: {
     gap: theme.space[3],

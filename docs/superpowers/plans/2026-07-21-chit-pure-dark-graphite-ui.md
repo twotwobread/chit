@@ -843,7 +843,7 @@ git commit -m "feat: refine map search with dark place cards"
 - Consumes: dark form fields, buttons, cards, chips.
 - Produces: remaining detail/form flows consistent with core surfaces.
 
-- [ ] **Step 1: Write form/detail assertions**
+- [x] **Step 1: Write form/detail assertions**
 
 Add to `pure-dark-graphite-ui.test.mts`:
 
@@ -865,7 +865,7 @@ test('form and detail flows use dark graphite form surfaces', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify failure**
+- [x] **Step 2: Run test to verify failure**
 
 Run:
 
@@ -875,19 +875,19 @@ pnpm --filter @i-um/mobile test -- --test-name-pattern="form and detail flows"
 
 Expected: FAIL until remaining form/detail styles stop relying on old off-white/default Lime patterns.
 
-- [ ] **Step 3: Update trip creation/edit forms**
+- [x] **Step 3: Update trip creation/edit forms**
 
 Make form fields and date picker dark. Focus state uses border/small Lime signal. Sticky footer buttons remain Graphite/secondary.
 
-- [ ] **Step 4: Update participants invite card**
+- [x] **Step 4: Update participants invite card**
 
 Use dark Acid Lime Surface for invite hero if needed. Keep share buttons compact; Kakao button may keep provider yellow token.
 
-- [ ] **Step 5: Update flights**
+- [x] **Step 5: Update flights**
 
 Use dark vault-like cards, large route codes, compact passenger/time metadata. Do not introduce new route behavior.
 
-- [ ] **Step 6: Run focused tests**
+- [x] **Step 6: Run focused tests**
 
 Run:
 
@@ -897,7 +897,7 @@ pnpm --filter @i-um/mobile test -- --test-name-pattern="trip date|flight|partici
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add apps/mobile/app/trips/new.tsx apps/mobile/app/trips/[tripId]/detail.tsx apps/mobile/app/trips/[tripId]/edit.tsx apps/mobile/app/trips/[tripId]/participants.tsx apps/mobile/app/trips/[tripId]/flights apps/mobile/lib/trip-ui/ParticipantsScreenParts.tsx apps/mobile/lib/trip-ui/ParticipantsScreenStyles.ts apps/mobile/lib/app-info/pure-dark-graphite-ui.test.mts

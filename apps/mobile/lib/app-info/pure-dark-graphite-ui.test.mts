@@ -134,3 +134,28 @@ test('map search overlays use dark surfaces and polished place thumbnails', () =
   assert.match(mapStyles, /backgroundColor: theme\.color\.surface|backgroundColor: theme\.color\.shellElevated/);
   assert.match(googlePlaceMapSearch, /photo|thumbnail|category|Place/);
 });
+
+test('form and detail flows use dark graphite form surfaces', () => {
+  for (const relativePath of [
+    '../../app/trips/new.tsx',
+    '../../app/trips/[tripId]/detail.tsx',
+    '../../app/trips/[tripId]/edit.tsx',
+    '../../app/trips/[tripId]/participants.tsx',
+    '../../app/trips/[tripId]/flights/index.tsx',
+    '../../app/trips/[tripId]/flights/new.tsx',
+    '../../app/trips/[tripId]/flights/[flightId].tsx',
+    '../trip-ui/ParticipantsScreenParts.tsx',
+    '../trip-ui/ParticipantsScreenStyles.ts',
+    '../trip-ui/TripDetailScreenParts.tsx',
+    '../trip-ui/TripDetailScreenStyles.ts',
+    '../trip-ui/TripDateRangeEditor.tsx',
+    '../trips/date-picker.tsx',
+  ]) {
+    const source = read(relativePath);
+    assert.doesNotMatch(source, /offWhiteElevated|offWhiteSubtle|warmPaper/);
+    assert.doesNotMatch(source, /backgroundColor: theme\.color\.primary/);
+    assert.doesNotMatch(source, /backgroundColor: theme\.color\.primarySoft/);
+    assert.doesNotMatch(source, /borderColor: theme\.color\.primary/);
+    assert.doesNotMatch(source, /tone="lime"|tone: 'lime'/);
+  }
+});

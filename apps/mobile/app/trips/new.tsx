@@ -765,7 +765,7 @@ const styles = StyleSheet.create({
   },
   stepHero: {
     backgroundColor: theme.color.surfaceSoft,
-    borderColor: theme.color.green[100],
+    borderColor: theme.color.borderDefault,
     borderRadius: theme.radius.xl,
     borderWidth: 1,
     gap: theme.space[3],
@@ -778,7 +778,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   stepEyebrow: {
-    color: theme.color.primaryTextOnLight,
+    color: theme.color.textMuted,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.micro,
     fontWeight: theme.font.weight.bold,
@@ -786,14 +786,14 @@ const styles = StyleSheet.create({
   },
   stepBadge: {
     backgroundColor: theme.color.surface,
-    borderColor: theme.color.green[100],
+    borderColor: theme.color.borderDefault,
     borderRadius: theme.radius.pill,
     borderWidth: 1,
     paddingHorizontal: theme.space[3],
     paddingVertical: theme.space[2],
   },
   stepBadgeText: {
-    color: theme.color.primaryTextOnLight,
+    color: theme.color.textStrong,
     fontFamily: theme.font.family.semibold,
     fontSize: theme.font.size.micro,
     fontWeight: theme.font.weight.semibold,
@@ -823,7 +823,7 @@ const styles = StyleSheet.create({
     height: 6,
   },
   progressSegmentActive: {
-    backgroundColor: theme.color.primary,
+    backgroundColor: theme.color.uiAccent,
   },
   stepSummaryStrip: {
     flexDirection: 'row',
@@ -841,8 +841,8 @@ const styles = StyleSheet.create({
     paddingVertical: theme.space[3],
   },
   stepSummaryBadgeActive: {
-    backgroundColor: theme.color.primarySoft,
-    borderColor: theme.color.green[200],
+    backgroundColor: theme.color.surfaceSoft,
+    borderColor: theme.color.uiAccent,
   },
   stepSummaryLabel: {
     color: theme.color.textMuted,
@@ -851,7 +851,7 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.semibold,
   },
   stepSummaryLabelActive: {
-    color: theme.color.primaryTextOnLight,
+    color: theme.color.textStrong,
   },
   stepSummaryValue: {
     color: theme.color.textBody,
@@ -914,15 +914,15 @@ const styles = StyleSheet.create({
     gap: theme.space[2],
   },
   searchCountBadge: {
-    backgroundColor: theme.color.primarySoft,
-    borderColor: theme.color.green[100],
+    backgroundColor: theme.color.surfaceSoft,
+    borderColor: theme.color.borderDefault,
     borderRadius: theme.radius.pill,
     borderWidth: 1,
     paddingHorizontal: theme.space[3],
     paddingVertical: theme.space[2],
   },
   searchCountText: {
-    color: theme.color.primaryTextOnLight,
+    color: theme.color.textStrong,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.caption,
     fontWeight: theme.font.weight.bold,
@@ -985,8 +985,8 @@ const styles = StyleSheet.create({
     gap: theme.space[3],
   },
   destinationChip: {
-    backgroundColor: theme.color.primary,
-    borderColor: theme.color.primary,
+    backgroundColor: theme.color.surfaceSoft,
+    borderColor: theme.color.uiAccent,
     borderRadius: theme.radius.pill,
     borderWidth: 1,
     justifyContent: 'center',
@@ -994,7 +994,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.space[4],
   },
   destinationChipText: {
-    color: theme.color.onPrimary,
+    color: theme.color.textStrong,
     fontFamily: theme.font.family.semibold,
     fontWeight: theme.font.weight.semibold,
   },
@@ -1029,8 +1029,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.space[5],
   },
   optionChipSelected: {
-    backgroundColor: theme.color.primary,
-    borderColor: theme.color.primary,
+    backgroundColor: theme.color.surfaceSoft,
+    borderColor: theme.color.uiAccent,
   },
   optionText: {
     color: theme.color.textBody,
@@ -1038,7 +1038,7 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.bold,
   },
   optionTextSelected: {
-    color: theme.color.onPrimary,
+    color: theme.color.textStrong,
   },
   summaryBox: {
     backgroundColor: theme.color.surfaceSunken,
@@ -1076,7 +1076,7 @@ const styles = StyleSheet.create({
   },
   destinationSearchButton: {
     alignItems: 'center',
-    backgroundColor: theme.color.primary,
+    backgroundColor: theme.color.actionPrimary,
     borderRadius: theme.radius.md,
     flexDirection: 'row',
     gap: theme.space[2],
@@ -1088,7 +1088,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   destinationSearchButtonText: {
-    color: theme.color.onPrimary,
+    color: theme.color.onActionPrimary,
     fontFamily: theme.font.family.bold,
     fontWeight: theme.font.weight.bold,
   },
@@ -1136,14 +1136,14 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.semibold,
   },
   destinationWarningPrimaryButton: {
-    backgroundColor: theme.color.primary,
+    backgroundColor: theme.color.actionPrimary,
     borderRadius: theme.radius.md,
     justifyContent: 'center',
     minHeight: theme.layout.tapMin,
     paddingHorizontal: theme.space[4],
   },
   destinationWarningPrimaryText: {
-    color: theme.color.onPrimary,
+    color: theme.color.onActionPrimary,
     fontFamily: theme.font.family.semibold,
     fontWeight: theme.font.weight.semibold,
   },
@@ -1173,7 +1173,7 @@ const styles = StyleSheet.create({
   },
   addResultButton: {
     backgroundColor: theme.color.surface,
-    borderColor: theme.color.primary,
+    borderColor: theme.color.uiAccent,
     borderRadius: theme.radius.pill,
     borderWidth: 1,
     justifyContent: 'center',
@@ -1184,7 +1184,7 @@ const styles = StyleSheet.create({
     borderColor: theme.color.borderDefault,
   },
   addResultButtonText: {
-    color: theme.color.primaryTextOnLight,
+    color: theme.color.uiAccent,
     fontFamily: theme.font.family.semibold,
     fontWeight: theme.font.weight.semibold,
   },

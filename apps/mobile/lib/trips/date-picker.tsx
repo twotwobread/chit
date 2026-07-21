@@ -198,14 +198,14 @@ export function TripDatePicker({
           backgroundColor: theme.color.surfaceSunken,
           calendarBackground: theme.color.surfaceSunken,
           dayTextColor: theme.color.textBody,
-          selectedDayBackgroundColor: theme.color.primary,
-          selectedDayTextColor: theme.color.onPrimary,
+          selectedDayBackgroundColor: theme.color.actionPrimary,
+          selectedDayTextColor: theme.color.onActionPrimary,
           textDayFontFamily: theme.font.family.regular,
           textDayHeaderFontFamily: theme.font.family.semibold,
           textDayHeaderFontWeight: theme.font.weight.semibold,
           textDisabledColor: theme.color.textFaint,
           textSectionTitleColor: theme.color.textMuted,
-          todayTextColor: theme.color.primaryTextOnLight,
+          todayTextColor: theme.color.uiAccent,
         }}
       />
 
@@ -223,16 +223,16 @@ function buildMarkedDates({ anchorDate, selectedDate }: { anchorDate?: string; s
   if (anchorDate) {
     dates[anchorDate] = {
       selected: true,
-      selectedColor: theme.color.primarySoft,
-      selectedTextColor: theme.color.primaryTextOnLight,
+      selectedColor: theme.color.surfaceSoft,
+      selectedTextColor: theme.color.textStrong,
     };
   }
 
   if (selectedDate) {
     dates[selectedDate] = {
       selected: true,
-      selectedColor: theme.color.primary,
-      selectedTextColor: theme.color.onPrimary,
+      selectedColor: theme.color.actionPrimary,
+      selectedTextColor: theme.color.onActionPrimary,
     };
   }
 
@@ -324,8 +324,8 @@ const styles = StyleSheet.create({
     paddingVertical: theme.space[2],
   },
   optionChipSelected: {
-    backgroundColor: theme.color.primary,
-    borderColor: theme.color.primary,
+    backgroundColor: theme.color.surfaceSoft,
+    borderColor: theme.color.uiAccent,
   },
   optionChipText: {
     color: theme.color.textBody,
@@ -334,7 +334,7 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.semibold,
   },
   optionChipTextSelected: {
-    color: theme.color.onPrimary,
+    color: theme.color.textStrong,
   },
   optionChipTextDisabled: {
     color: theme.color.textFaint,
@@ -350,7 +350,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.space[4],
   },
   calendarNavText: {
-    color: theme.color.primaryTextOnLight,
+    color: theme.color.uiAccent,
     fontFamily: theme.font.family.semibold,
     fontSize: theme.font.size.label,
     fontWeight: theme.font.weight.semibold,
@@ -374,7 +374,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.space[5],
   },
   secondaryButtonText: {
-    color: theme.color.primaryTextOnLight,
+    color: theme.color.textStrong,
     fontFamily: theme.font.family.semibold,
     fontWeight: theme.font.weight.semibold,
   },

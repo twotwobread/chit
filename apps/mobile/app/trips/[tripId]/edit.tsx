@@ -409,8 +409,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.space[5],
   },
   currencyChipSelected: {
-    backgroundColor: theme.color.primary,
-    borderColor: theme.color.primary,
+    backgroundColor: theme.color.surfaceSoft,
+    borderColor: theme.color.uiAccent,
   },
   currencyText: {
     color: theme.color.textBody,
@@ -418,7 +418,7 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.bold,
   },
   currencyTextSelected: {
-    color: theme.color.onPrimary,
+    color: theme.color.textStrong,
   },
   helperText: {
     color: theme.color.textMuted,
