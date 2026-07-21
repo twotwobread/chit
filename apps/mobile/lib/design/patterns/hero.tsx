@@ -138,7 +138,7 @@ export function HeroMetricPanel({
 }
 
 export function HeroActions({ primary, secondary }: { primary: HeroAction; secondary?: HeroAction }) {
-  const primaryAction = { tone: 'lime' as PrimaryButtonTone, ...primary };
+  const primaryAction = { tone: 'graphite' as PrimaryButtonTone, ...primary };
 
   return (
     <ActionGroup direction={secondary ? 'row' : 'column'} style={styles.heroActions}>

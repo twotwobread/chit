@@ -14,7 +14,7 @@ export function FloatingActionButton({
   children,
   onPress,
   style,
-  tone = 'lime',
+  tone = 'graphite',
 }: {
   accessibilityLabel: string;
   accessibilityHint: string;

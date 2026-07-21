@@ -139,7 +139,7 @@ test('Issue 395 shared design layer exposes foundation-backed Hero primitives', 
 
   assert.match(heroSource, /variant = 'panel'/);
   assert.match(heroSource, /HeroActions/);
-  assert.match(heroSource, /tone: 'lime'/);
+  assert.match(heroSource, /tone: 'graphite'/);
   assert.match(heroSource, /theme\.color\.actionPrimary/);
   assert.doesNotMatch(heroSource, /#[0-9a-fA-F]{3,8}\b/);
 });
@@ -152,8 +152,9 @@ test('Issue 399 navigation chrome primitives are exported and foundation-backed'
   assert.match(tabButtonSource, /selected=\{selected\}/);
   assert.match(tabButtonSource, /hitSlop=\{TAB_BUTTON_HIT_SLOP\}/);
   assert.match(tabButtonSource, /minHeight=\{theme\.layout\.tapMin\}/);
-  assert.match(tabButtonSource, /backgroundColor: theme\.color\.primary/);
-  assert.match(tabButtonSource, /color: theme\.color\.onPrimary/);
+  assert.match(tabButtonSource, /backgroundColor: theme\.color\.surfaceSoft/);
+  assert.match(tabButtonSource, /borderBottomColor: theme\.color\.uiAccent/);
+  assert.match(tabButtonSource, /color: theme\.color\.textStrong/);
 
   assert.match(floatingActionButtonSource, /export type FloatingActionButtonTone = 'lime' \| 'graphite'/);
   assert.match(floatingActionButtonSource, /export function FloatingActionButton\b/);
@@ -310,10 +311,10 @@ test('Issue 389 primitives keep Acid Lime vivid but sparse in shared UI', () => 
   assert.match(buttonSource, /primaryButtonText:[\s\S]*color: theme\.color\.onActionPrimary/);
   assert.match(linkSource, /inlineActionPrimary:[\s\S]*backgroundColor: theme\.color\.actionPrimary/);
   assert.match(linkSource, /inlineActionTextPrimary:[\s\S]*color: theme\.color\.onActionPrimary/);
-  assert.match(chipSource, /filterChipSelectedAccent:[\s\S]*backgroundColor: theme\.color\.uiAccent/);
-  assert.match(chipSource, /choiceChipSelectedAccent:[\s\S]*backgroundColor: theme\.color\.uiAccent/);
-  assert.match(chipSource, /filterChipTextSelected:[\s\S]*color: theme\.color\.onUiAccent/);
-  assert.match(chipSource, /choiceChipTextSelected:[\s\S]*color: theme\.color\.onUiAccent/);
+  assert.match(chipSource, /filterChipSelectedAccent:[\s\S]*backgroundColor: theme\.color\.uiAccentSoft/);
+  assert.match(chipSource, /choiceChipSelectedAccent:[\s\S]*backgroundColor: theme\.color\.uiAccentSoft/);
+  assert.match(chipSource, /filterChipTextSelected:[\s\S]*color: theme\.color\.textStrong/);
+  assert.match(chipSource, /choiceChipTextSelected:[\s\S]*color: theme\.color\.textStrong/);
 
   const loadingState = functionBody('LoadingState');
   assert.doesNotMatch(

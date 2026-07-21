@@ -169,17 +169,19 @@ test('compact interactive controls keep the 44pt Chit touch target floor', () =>
   assertStyleContains(segmentedControlSource, 'segmentItem', /minHeight: theme\.layout\.tapMin/);
 });
 
-test('selected bottom and trip tab surfaces preserve existing primary fill through shared TabButton', () => {
+test('selected bottom and trip tab surfaces use dark graphite with sparse Acid Lime edge', () => {
   const tabSelectionSource = readMobileSource('../navigation/tab-selection.ts');
   const bottomMenuSource = readMobileSource('../navigation/BottomMenu.tsx');
   const tripTabBarSource = readMobileSource('../navigation/TripTabBar.tsx');
 
-  assert.match(tabSelectionSource, /backgroundColor: theme\.color\.primary/);
-  assert.match(tabSelectionSource, /theme\.shadow\.xs/);
-  assert.match(tabButtonSource, /tabButtonSelected:[\s\S]*backgroundColor: theme\.color\.primary/);
-  assert.match(tabButtonSource, /theme\.shadow\.xs/);
-  assert.match(tabButtonSource, /iconColor = selected \? theme\.color\.onPrimary : theme\.color\.textFaint/);
-  assert.match(tabButtonSource, /labelSelected:[\s\S]*color: theme\.color\.onPrimary/);
+  assert.match(tabSelectionSource, /backgroundColor: theme\.color\.surfaceSoft/);
+  assert.match(tabSelectionSource, /borderBottomColor: theme\.color\.uiAccent/);
+  assert.doesNotMatch(tabSelectionSource, /backgroundColor: theme\.color\.primary/);
+  assert.match(tabButtonSource, /tabButtonSelected:[\s\S]*backgroundColor: theme\.color\.surfaceSoft/);
+  assert.match(tabButtonSource, /tabButtonSelected:[\s\S]*borderBottomColor: theme\.color\.uiAccent/);
+  assert.doesNotMatch(tabButtonSource, /tabButtonSelected:[\s\S]*backgroundColor: theme\.color\.primary/);
+  assert.match(tabButtonSource, /iconColor = selected \? theme\.color\.uiAccent : theme\.color\.textFaint/);
+  assert.match(tabButtonSource, /labelSelected:[\s\S]*color: theme\.color\.textStrong/);
   assert.match(bottomMenuSource, /<TabButton/);
   assert.match(tripTabBarSource, /<TabButton/);
 });
@@ -225,6 +227,7 @@ test('Issue 399 navigation chrome adopts shared interactive primitives without r
     /<FloatingActionButton[\s\S]*accessibilityHint=\{accessibilityHint\}[\s\S]*accessibilityLabel=\{accessibilityLabel\}/,
   );
   assert.match(tripRootFabSource, /<Plus color=\{theme\.color\.onUiAccent\}/);
+  assert.match(floatingActionButtonSource, /tone = 'graphite'/);
   assert.match(floatingActionButtonSource, /floatingActionButtonLime:[\s\S]*backgroundColor: theme\.color\.uiAccent/);
   assert.match(
     floatingActionButtonSource,
@@ -256,7 +259,7 @@ test('Issue 372 core journey surfaces do not introduce raw hex colors outside th
   }
 });
 
-test('Issue 395 high-emphasis journey heroes use Graphite Hero and Lime CTA primitives', () => {
+test('Issue 395 high-emphasis journey heroes use Graphite Hero and explicit Lime-only moments', () => {
   const tripCardsSource = readMobileSource('../home-ui/TripCards.tsx');
 
   assertStyleContains(tripCardsSource, 'hero', /backgroundColor: theme\.color\.chit\.charcoal/);
@@ -265,14 +268,14 @@ test('Issue 395 high-emphasis journey heroes use Graphite Hero and Lime CTA prim
   assertStyleContains(tripCardsSource, 'upcomingHomeHero', /backgroundColor: theme\.color\.chit\.charcoal/);
 
   assert.match(representativeNextPlaceHeroSource, /<HeroCard[\s\S]*variant="graphite"/);
-  assert.match(representativeNextPlaceHeroSource, /<HeroActions[\s\S]*tone: 'lime'/);
+  assert.match(representativeNextPlaceHeroSource, /HeroActions/);
   assert.doesNotMatch(representativeNextPlaceHeroSource, /actionGreen|actionTextLight/);
 });
 
-test('Issue 395 Today spend summary uses Hero panel and Lime add action', () => {
+test('Issue 395 Today spend summary uses Hero panel and shared action hierarchy', () => {
   assert.match(todaySpendSource, /HeroMetricPanel/);
   assert.match(todaySpendSource, /<HeroCard[\s\S]*variant="panel"/);
-  assert.match(todaySpendSource, /<HeroActions[\s\S]*tone: 'lime'/);
+  assert.match(todaySpendSource, /HeroActions/);
   assert.doesNotMatch(todaySpendSource, /card:\s*\{[\s\S]*?backgroundColor: theme\.color\.accentSoft/);
 });
 

@@ -25,10 +25,35 @@ test('Pure Dark Graphite keeps off-white as text or escape only', () => {
   assert.equal(theme.color.lightEscape, theme.color.chit.offWhiteElevated);
 });
 
+const read = (relativePath: string) => readFileSync(new URL(relativePath, import.meta.url), 'utf8');
+
 test('mobile UI rule documents Pure Dark Graphite and Compact Premium Dark', () => {
-  const rule = readFileSync(new URL('../../../../.harness/rules/code/mobile-ui.md', import.meta.url), 'utf8');
+  const rule = read('../../../../.harness/rules/code/mobile-ui.md');
   assert.match(rule, /Pure Dark Graphite/);
   assert.match(rule, /Compact Premium Dark/);
   assert.match(rule, /large floating off-white blocks/);
   assert.match(rule, /placeholder-quality place cards/);
+});
+
+test('shared surfaces default to dark graphite instead of off-white', () => {
+  const surfaceFrame = read('../design/foundation/surface-frame.tsx');
+  const card = read('../design/components/card.tsx');
+  const hero = read('../design/patterns/hero.tsx');
+
+  assert.match(surfaceFrame, /frame:[\s\S]*backgroundColor: theme\.color\.surface/);
+  assert.match(surfaceFrame, /graphite:[\s\S]*backgroundColor: theme\.color\.surfaceSoft/);
+  assert.match(card, /screenBackground:[\s\S]*backgroundColor: theme\.color\.bg/);
+  assert.match(hero, /heroCardPanel:[\s\S]*backgroundColor: theme\.color\.surface/);
+  assert.doesNotMatch(hero, /tone: 'lime' as PrimaryButtonTone, \.\.\.primary/);
+});
+
+test('routine nav and floating actions avoid full Acid Lime fill', () => {
+  const tabButton = read('../design/components/tab-button.tsx');
+  const fab = read('../design/components/floating-action-button.tsx');
+
+  assert.doesNotMatch(tabButton, /tabButtonSelected:[\s\S]*backgroundColor: theme\.color\.primary/);
+  assert.match(tabButton, /tabButtonSelected:[\s\S]*backgroundColor: theme\.color\.surfaceSoft/);
+  assert.match(tabButton, /tabButtonSelected:[\s\S]*borderBottomColor: theme\.color\.uiAccent/);
+  assert.doesNotMatch(fab, /tone = 'lime'/);
+  assert.match(fab, /tone = 'graphite'/);
 });

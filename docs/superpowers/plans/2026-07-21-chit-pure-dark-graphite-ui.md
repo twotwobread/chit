@@ -302,7 +302,7 @@ git commit -m "feat: add pure dark graphite theme tokens"
 - Consumes: Pure Dark semantic tokens from Task 1.
 - Produces: shared components whose default visual language is dark graphite; later screens can migrate mostly by using existing components.
 
-- [ ] **Step 1: Write failing source assertions for shared primitives**
+- [x] **Step 1: Write failing source assertions for shared primitives**
 
 In `pure-dark-graphite-ui.test.mts`, add:
 
@@ -333,7 +333,7 @@ test('routine nav and floating actions avoid full Acid Lime fill', () => {
 });
 ```
 
-- [ ] **Step 2: Run assertions to verify failure**
+- [x] **Step 2: Run assertions to verify failure**
 
 Run:
 
@@ -343,7 +343,7 @@ pnpm --filter @i-um/mobile test -- --test-name-pattern="shared surfaces|routine 
 
 Expected: FAIL because Hero still defaults Lime and selected tabs/FAB are Lime-heavy.
 
-- [ ] **Step 3: Update SurfaceFrame/Card defaults**
+- [x] **Step 3: Update SurfaceFrame/Card defaults**
 
 In `surface-frame.tsx`, keep `variant='content'` but make all variants dark by relying on Task 1 semantic tokens:
 
@@ -386,7 +386,7 @@ const styles = StyleSheet.create({
 });
 ```
 
-- [ ] **Step 4: Update HeroActions default CTA**
+- [x] **Step 4: Update HeroActions default CTA**
 
 In `patterns/hero.tsx`, change:
 
@@ -402,7 +402,7 @@ const primaryAction = { tone: 'graphite' as PrimaryButtonTone, ...primary };
 
 Also make `heroCardPanel`, `heroCardSplit`, `heroSplitBody`, `metricPanelNeutral`, and `heroEyebrow` use dark semantic tokens.
 
-- [ ] **Step 5: Update TabButton selected style**
+- [x] **Step 5: Update TabButton selected style**
 
 In `components/tab-button.tsx`, keep icon/text selected contrast but change the selected container:
 
@@ -416,7 +416,7 @@ tabButtonSelected: {
 
 Remove `...theme.shadow.xs` if it makes the tab look like a floating Lime pill.
 
-- [ ] **Step 6: Update FloatingActionButton default**
+- [x] **Step 6: Update FloatingActionButton default**
 
 In `components/floating-action-button.tsx`, set default tone to graphite:
 
@@ -428,7 +428,7 @@ export function FloatingActionButton({ tone = 'graphite', ...props }: FloatingAc
 
 Ensure the icon passed by callers can still use `theme.color.uiAccent` for the small Lime signal.
 
-- [ ] **Step 7: Update chip selected styles**
+- [x] **Step 7: Update chip selected styles**
 
 In `components/chip.tsx`, make selected dense UI use dark surfaces:
 
@@ -449,11 +449,11 @@ choiceChipSelectedAccent: {
 
 Keep text readable on dark surfaces with `theme.color.textStrong`, not `onPrimary` when the fill is not full Lime.
 
-- [ ] **Step 8: Update old source tests to new expectations**
+- [x] **Step 8: Update old source tests to new expectations**
 
 Replace assertions that require `tone: 'lime'`, selected tab primary fill, or FAB Lime default with new Pure Dark expectations. Keep one explicit Lime test that verifies Lime is possible when a caller opts in.
 
-- [ ] **Step 9: Run shared primitive tests**
+- [x] **Step 9: Run shared primitive tests**
 
 Run:
 
@@ -463,7 +463,7 @@ pnpm --filter @i-um/mobile test -- --test-name-pattern="Pure Dark Graphite|share
 
 Expected: PASS.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add apps/mobile/lib/design apps/mobile/lib/app-info/chit-ui-foundation.test.mts apps/mobile/lib/app-info/shared-design-primitives.test.mts apps/mobile/lib/app-info/pure-dark-graphite-ui.test.mts
