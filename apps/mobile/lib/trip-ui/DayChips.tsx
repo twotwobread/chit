@@ -105,7 +105,7 @@ const styles = StyleSheet.create({
     width: 10,
   },
   legendDotSelected: {
-    borderColor: theme.color.onPrimary,
+    borderColor: theme.color.textStrong,
     borderWidth: 2,
   },
   row: {

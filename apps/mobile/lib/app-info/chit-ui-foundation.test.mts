@@ -226,7 +226,8 @@ test('Issue 399 navigation chrome adopts shared interactive primitives without r
     tripRootFabSource,
     /<FloatingActionButton[\s\S]*accessibilityHint=\{accessibilityHint\}[\s\S]*accessibilityLabel=\{accessibilityLabel\}/,
   );
-  assert.match(tripRootFabSource, /<Plus color=\{theme\.color\.onUiAccent\}/);
+  assert.doesNotMatch(tripRootFabSource, /tone="lime"/);
+  assert.match(tripRootFabSource, /<Plus color=\{theme\.color\.uiAccent\}/);
   assert.match(floatingActionButtonSource, /tone = 'graphite'/);
   assert.match(floatingActionButtonSource, /floatingActionButtonLime:[\s\S]*backgroundColor: theme\.color\.uiAccent/);
   assert.match(

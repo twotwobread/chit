@@ -57,3 +57,28 @@ test('routine nav and floating actions avoid full Acid Lime fill', () => {
   assert.doesNotMatch(fab, /tone = 'lime'/);
   assert.match(fab, /tone = 'graphite'/);
 });
+
+test('navigation shell uses dark selected surfaces and avoids Lime capsules', () => {
+  const bottomMenu = read('../navigation/BottomMenu.tsx');
+  const tripTabBar = read('../navigation/TripTabBar.tsx');
+  const selection = read('../navigation/tab-selection.ts');
+  const appBar = read('../trip-ui/AppBar.tsx');
+  const bottomSheet = read('../trip-ui/BottomSheet.tsx');
+  const dayChips = read('../trip-ui/DayChips.tsx');
+  const tripRootFab = read('../trip-ui/TripRootFab.tsx');
+
+  assert.doesNotMatch(selection, /backgroundColor: theme\.color\.primary/);
+  assert.match(selection, /backgroundColor: theme\.color\.surfaceSoft/);
+  assert.match(bottomMenu, /backgroundColor: theme\.color\.shellElevated/);
+  assert.match(bottomMenu, /borderTopColor: theme\.color\.borderDefault/);
+  assert.match(tripTabBar, /backgroundColor: theme\.color\.shellElevated/);
+  assert.match(tripTabBar, /borderTopColor: theme\.color\.borderDefault/);
+  assert.match(appBar, /backgroundColor: theme\.color\.shell/);
+  assert.match(appBar, /borderBottomColor: theme\.color\.borderDefault/);
+  assert.match(bottomSheet, /sheet:[\s\S]*backgroundColor: theme\.color\.shellElevated/);
+  assert.match(bottomSheet, /sheet:[\s\S]*borderColor: theme\.color\.borderDefault/);
+  assert.match(dayChips, /FilterChip/);
+  assert.match(dayChips, /legendDotSelected:[\s\S]*borderColor: theme\.color\.textStrong/);
+  assert.doesNotMatch(tripRootFab, /tone="lime"/);
+  assert.match(tripRootFab, /<Plus color=\{theme\.color\.uiAccent\}/);
+});

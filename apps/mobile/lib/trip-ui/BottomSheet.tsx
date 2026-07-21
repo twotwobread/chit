@@ -85,8 +85,8 @@ export function BottomSheet({
 const styles = StyleSheet.create({
   closeButton: {
     alignItems: 'center',
-    backgroundColor: theme.color.surface,
-    borderColor: theme.color.borderSubtle,
+    backgroundColor: theme.color.surfaceSoft,
+    borderColor: theme.color.borderDefault,
     borderRadius: theme.radius.pill,
     borderWidth: 1,
     height: 36,
@@ -100,7 +100,7 @@ const styles = StyleSheet.create({
   },
   grabber: {
     alignSelf: 'center',
-    backgroundColor: theme.color.borderDefault,
+    backgroundColor: theme.color.borderStrong,
     borderRadius: theme.radius.pill,
     height: 5,
     marginBottom: theme.space[5],
@@ -125,8 +125,8 @@ const styles = StyleSheet.create({
     opacity: 0.42,
   },
   sheet: {
-    backgroundColor: theme.color.surface,
-    borderColor: theme.color.borderSubtle,
+    backgroundColor: theme.color.shellElevated,
+    borderColor: theme.color.borderDefault,
     borderTopLeftRadius: theme.radius['2xl'],
     borderTopRightRadius: theme.radius['2xl'],
     borderWidth: 1,

@@ -489,7 +489,7 @@ git commit -m "feat: convert shared primitives to pure dark graphite"
 - Consumes: updated shared `TabButton`, `FloatingActionButton`, dark Card/ScreenBackground.
 - Produces: dark shell navigation used by all root and trip screens.
 
-- [ ] **Step 1: Write failing nav source assertions**
+- [x] **Step 1: Write failing nav source assertions**
 
 Add to `pure-dark-graphite-ui.test.mts`:
 
@@ -510,7 +510,7 @@ test('navigation shell uses dark selected surfaces and avoids Lime capsules', ()
 });
 ```
 
-- [ ] **Step 2: Run test to verify failure**
+- [x] **Step 2: Run test to verify failure**
 
 Run:
 
@@ -520,7 +520,7 @@ pnpm --filter @i-um/mobile test -- --test-name-pattern="navigation shell"
 
 Expected: FAIL while `tab-selection.ts` still encodes primary/Lime selected fill.
 
-- [ ] **Step 3: Update `tab-selection.ts`**
+- [x] **Step 3: Update `tab-selection.ts`**
 
 Replace selected fill with dark selected surface plus explicit signal fields if the helper supports style objects:
 
@@ -534,7 +534,7 @@ export const selectedTabContainerStyle = {
 
 If the helper currently returns only background/shadow, update callers/tests together to preserve route behavior.
 
-- [ ] **Step 4: Update BottomMenu and TripTabBar containers**
+- [x] **Step 4: Update BottomMenu and TripTabBar containers**
 
 Ensure wrappers use:
 
@@ -545,11 +545,11 @@ borderTopColor: theme.color.borderDefault,
 
 Keep route calls unchanged: `router.replace('/')`, `router.replace('/mypage')`, `tripTabPathWithState(...)`.
 
-- [ ] **Step 5: Update AppBar grid alignment**
+- [x] **Step 5: Update AppBar grid alignment**
 
 In `AppBar.tsx`, keep the same data/route behavior but ensure leading icon, title, utility action, and avatar use fixed token sizes and `alignItems: 'center'`. Avoid raw positional tweaks.
 
-- [ ] **Step 6: Update BottomSheet surface**
+- [x] **Step 6: Update BottomSheet surface**
 
 In `BottomSheet.tsx`, make sheet frame dark:
 
@@ -560,7 +560,7 @@ borderColor: theme.color.borderDefault,
 
 Make the handle use a tokenized border/text tier, not raw rgba.
 
-- [ ] **Step 7: Run nav and context-bound checks**
+- [x] **Step 7: Run nav and context-bound checks**
 
 Run:
 
@@ -571,7 +571,7 @@ node .harness/scripts/check-mobile-context-bound-ui.mjs --repo-root .
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add apps/mobile/lib/navigation apps/mobile/lib/trip-ui/AppBar.tsx apps/mobile/lib/trip-ui/TripScreenScaffold.tsx apps/mobile/lib/trip-ui/BottomSheet.tsx apps/mobile/lib/trip-ui/TripRootFab.tsx apps/mobile/lib/trip-ui/DayChips.tsx apps/mobile/lib/app-info/pure-dark-graphite-ui.test.mts apps/mobile/lib/app-info/chit-ui-foundation.test.mts

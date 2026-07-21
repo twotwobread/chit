@@ -88,7 +88,7 @@ const styles = StyleSheet.create({
   bar: {
     alignItems: 'center',
     backgroundColor: theme.color.shellElevated,
-    borderTopColor: theme.color.shellRaised,
+    borderTopColor: theme.color.borderDefault,
     borderTopWidth: 1,
     flexDirection: 'row',
     paddingTop: theme.space[3],

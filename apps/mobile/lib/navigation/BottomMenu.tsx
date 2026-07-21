@@ -54,7 +54,7 @@ export function BottomMenu({ selected }: BottomMenuProps) {
 const styles = StyleSheet.create({
   container: {
     backgroundColor: theme.color.shellElevated,
-    borderColor: theme.color.shellRaised,
+    borderTopColor: theme.color.borderDefault,
     borderTopWidth: 1,
     flexDirection: 'row',
     minHeight: theme.layout.tabbarH,

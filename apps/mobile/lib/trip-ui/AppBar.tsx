@@ -106,7 +106,7 @@ const styles = StyleSheet.create({
   bar: {
     alignItems: 'center',
     backgroundColor: theme.color.shell,
-    borderBottomColor: theme.color.shellRaised,
+    borderBottomColor: theme.color.borderDefault,
     borderBottomWidth: 1,
     flexDirection: 'row',
     gap: theme.space[2],
@@ -126,6 +126,7 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   side: {
+    alignItems: 'center',
     height: theme.layout.tapMin,
     justifyContent: 'center',
     width: 54,
