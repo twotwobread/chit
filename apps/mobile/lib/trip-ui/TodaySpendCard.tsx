@@ -53,7 +53,7 @@ export function TodaySpendCard({
           <AmountText currency={currency} size="sm" value={paidByMeAmount} style={styles.paidByMeAmount} />
         </View>
       )}
-      <HeroActions primary={{ label: addLabel, onPress: onPressAdd, tone: 'lime' }} />
+      <HeroActions primary={{ label: addLabel, onPress: onPressAdd }} />
     </HeroCard>
   );
 }

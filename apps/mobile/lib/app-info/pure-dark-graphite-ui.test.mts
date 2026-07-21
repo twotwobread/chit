@@ -100,3 +100,24 @@ test('root screens use Pure Dark Graphite shared surfaces without local off-whit
     assert.doesNotMatch(source, /backgroundColor: theme\.color\.primary/);
   }
 });
+
+test('trip tabs use compact premium dark density and avoid routine Lime CTA fill', () => {
+  for (const relativePath of [
+    '../../app/trips/[tripId]/(tabs)/today.tsx',
+    '../../app/trips/[tripId]/(tabs)/itinerary.tsx',
+    '../../app/trips/[tripId]/(tabs)/expenses.tsx',
+    '../../app/trips/[tripId]/(tabs)/settle.tsx',
+    '../trip-ui/NextPlaceHeroCard.tsx',
+    '../trip-ui/TodaySpendCard.tsx',
+    '../trip-ui/DayItineraryEditorStyles.ts',
+    '../trip-ui/DayItineraryContent.tsx',
+    '../trip-ui/ItineraryTimeline.tsx',
+    '../trip-ui/ExpenseRow.tsx',
+    '../trip-ui/TransferRow.tsx',
+  ]) {
+    const source = read(relativePath);
+    assert.doesNotMatch(source, /backgroundColor: theme\.color\.primary/);
+    assert.doesNotMatch(source, /tone="lime"|tone: 'lime'/);
+    assert.doesNotMatch(source, /offWhiteElevated|offWhiteSubtle|warmPaper/);
+  }
+});

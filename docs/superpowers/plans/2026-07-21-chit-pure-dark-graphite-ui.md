@@ -684,7 +684,7 @@ git commit -m "feat: migrate root screens to pure dark graphite"
 - Consumes: dark shell primitives and Graphite Hero pattern.
 - Produces: primary trip tabs using large core moments + compact rows.
 
-- [ ] **Step 1: Write trip tab source assertions**
+- [x] **Step 1: Write trip tab source assertions**
 
 Add to `pure-dark-graphite-ui.test.mts`:
 
@@ -709,7 +709,7 @@ test('trip tabs use compact premium dark density and avoid routine Lime CTA fill
 
 If one screen truly needs an explicit Lime hero CTA, document that exception in the test with a named allowlist and spec comment.
 
-- [ ] **Step 2: Run test to verify failure**
+- [x] **Step 2: Run test to verify failure**
 
 Run:
 
@@ -719,27 +719,27 @@ pnpm --filter @i-um/mobile test -- --test-name-pattern="trip tabs use compact"
 
 Expected: FAIL where Today/Spend/Map still explicitly use Lime CTA.
 
-- [ ] **Step 3: Update Today hero**
+- [x] **Step 3: Update Today hero**
 
 Use `HeroCard variant="graphite"` or dark default. Default primary action should be Graphite. Use Lime as small route/selected/brand signal only.
 
-- [ ] **Step 4: Update TodaySpendCard**
+- [x] **Step 4: Update TodaySpendCard**
 
 Keep total amount large. Make add/view actions Graphite/secondary unless a spec explicitly calls for Lime.
 
-- [ ] **Step 5: Update expenses**
+- [x] **Step 5: Update expenses**
 
 Total spend hero: dark accent card, large amount. Expense rows: compact dark rows, right-aligned tabular amounts, category badge/icons with semantic colors.
 
-- [ ] **Step 6: Update settlement**
+- [x] **Step 6: Update settlement**
 
 Settlement hero may keep Chit brand copy. Credit/debit stays blue/red with `+`/`−`. Do not use Lime for receive/send amount semantics.
 
-- [ ] **Step 7: Update itinerary/day editor styles**
+- [x] **Step 7: Update itinerary/day editor styles**
 
 Day chips and selected travel mode use dark selected surfaces with Lime edge/dot. Avoid giant full Lime chips.
 
-- [ ] **Step 8: Run trip focused tests**
+- [x] **Step 8: Run trip focused tests**
 
 Run:
 
@@ -749,7 +749,7 @@ pnpm --filter @i-um/mobile test -- --test-name-pattern="Today|expense|settlement
 
 Expected: PASS.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add apps/mobile/app/trips/[tripId]/\(tabs\) apps/mobile/lib/trip-ui/NextPlaceHeroCard.tsx apps/mobile/lib/trip-ui/TodaySpendCard.tsx apps/mobile/lib/trip-ui/DayItineraryEditorStyles.ts apps/mobile/lib/trip-ui/DayItineraryContent.tsx apps/mobile/lib/trip-ui/ItineraryTimeline.tsx apps/mobile/lib/trip-ui/ExpenseRow.tsx apps/mobile/lib/trip-ui/TransferRow.tsx apps/mobile/lib/app-info/pure-dark-graphite-ui.test.mts

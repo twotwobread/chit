@@ -69,7 +69,7 @@ test('Issue 395 representative surfaces adopt Hero and shared action primitives'
   assert.match(representativeNextPlaceHeroSource, /import \{[\s\S]*HeroActions[\s\S]*HeroCard[\s\S]*HeroHeader/);
   assert.doesNotMatch(representativeNextPlaceHeroSource, /<Pressable/);
   assert.match(todaySpendSource, /import \{[\s\S]*HeroActions[\s\S]*HeroCard[\s\S]*HeroMetricPanel/);
-  assert.match(todaySpendSource, /tone: 'lime'|tone="lime"/);
+  assert.doesNotMatch(todaySpendSource, /tone: 'lime'|tone="lime"/);
   assert.match(expensesSource, /import \{[\s\S]*FilterChip[\s\S]*InlineAction[\s\S]*TextLink/);
   assert.doesNotMatch(expensesSource, /function FilterChip\(/);
   assert.match(representativeMapPartsSource, /import \{[\s\S]*FilterChip[\s\S]*PrimaryButton/);
@@ -358,10 +358,12 @@ test('Issue 372 My Page uses foundation primitives for simple state and section 
 test('Issue 395 itinerary and map selected actions use Chit action hierarchy', () => {
   const itineraryStylesSource = readMobileSource('../trip-ui/DayItineraryEditorStyles.ts');
 
-  assertStyleContains(itineraryStylesSource, 'defaultTravelModeChipSelected', /backgroundColor: theme\.color\.primary/);
-  assertStyleContains(itineraryStylesSource, 'defaultTravelModeChipTextSelected', /color: theme\.color\.onPrimary/);
-  assertStyleContains(itineraryStylesSource, 'chipSelected', /backgroundColor: theme\.color\.primary/);
-  assertStyleContains(itineraryStylesSource, 'chipTextSelected', /color: theme\.color\.onPrimary/);
+  assertStyleContains(itineraryStylesSource, 'defaultTravelModeChipSelected', /backgroundColor: theme\.color\.surfaceSoft/);
+  assertStyleContains(itineraryStylesSource, 'defaultTravelModeChipSelected', /borderColor: theme\.color\.uiAccent/);
+  assertStyleContains(itineraryStylesSource, 'defaultTravelModeChipTextSelected', /color: theme\.color\.textStrong/);
+  assertStyleContains(itineraryStylesSource, 'chipSelected', /backgroundColor: theme\.color\.surfaceSoft/);
+  assertStyleContains(itineraryStylesSource, 'chipSelected', /borderColor: theme\.color\.uiAccent/);
+  assertStyleContains(itineraryStylesSource, 'chipTextSelected', /color: theme\.color\.textStrong/);
 
   assert.match(representativeMapPartsSource, /import \{ FilterChip, PrimaryButton, theme \} from '\.\.\/design';/);
   assert.match(

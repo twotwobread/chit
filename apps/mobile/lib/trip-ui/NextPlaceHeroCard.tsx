@@ -100,7 +100,7 @@ export function NextPlaceHeroCard({
       ) : null}
 
       <HeroActions
-        primary={{ disabled: arriveDisabled, label: arriveLabel, onPress: onArrive, tone: 'lime' }}
+        primary={{ disabled: arriveDisabled, label: arriveLabel, onPress: onArrive }}
         secondary={navigationAvailable ? { label: '길찾기', onPress: onNavigate } : undefined}
       />
 

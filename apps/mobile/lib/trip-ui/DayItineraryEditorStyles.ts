@@ -94,8 +94,8 @@ export const styles = StyleSheet.create({
     paddingHorizontal: theme.space[4],
   },
   defaultTravelModeChipSelected: {
-    backgroundColor: theme.color.primary,
-    borderColor: theme.color.primaryPressed,
+    backgroundColor: theme.color.surfaceSoft,
+    borderColor: theme.color.uiAccent,
   },
   defaultTravelModeChipDisabled: {
     opacity: 0.55,
@@ -107,7 +107,7 @@ export const styles = StyleSheet.create({
     fontWeight: theme.font.weight.bold,
   },
   defaultTravelModeChipTextSelected: {
-    color: theme.color.onPrimary,
+    color: theme.color.textStrong,
   },
   defaultTravelModeFeedback: {
     color: theme.color.textMuted,
@@ -197,7 +197,7 @@ export const styles = StyleSheet.create({
   },
   headerPrimaryButton: {
     alignItems: 'center',
-    backgroundColor: theme.color.primary,
+    backgroundColor: theme.color.actionPrimary,
     borderRadius: theme.radius.pill,
     flexDirection: 'row',
     gap: theme.space[2],
@@ -207,7 +207,7 @@ export const styles = StyleSheet.create({
     paddingVertical: theme.space[2],
   },
   headerPrimaryButtonText: {
-    color: theme.color.onPrimary,
+    color: theme.color.onActionPrimary,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.caption,
     fontWeight: theme.font.weight.bold,
@@ -251,8 +251,8 @@ export const styles = StyleSheet.create({
     paddingVertical: theme.space[3],
   },
   lodgingSummaryHighlighted: {
-    backgroundColor: theme.color.primarySoft,
-    borderColor: theme.color.primary,
+    backgroundColor: theme.color.surfaceSoft,
+    borderColor: theme.color.uiAccent,
     borderWidth: 2,
   },
   lodgingSummaryTextGroup: {
@@ -357,8 +357,8 @@ export const styles = StyleSheet.create({
     padding: theme.space[3],
   },
   lodgingOptionSelected: {
-    borderColor: theme.color.primary,
-    backgroundColor: theme.color.primarySoft,
+    backgroundColor: theme.color.surfaceSoft,
+    borderColor: theme.color.uiAccent,
   },
   placeRow: {
     alignItems: 'flex-start',
@@ -371,8 +371,8 @@ export const styles = StyleSheet.create({
     padding: theme.space[4],
   },
   placeRowActive: {
-    borderColor: theme.color.primary,
-    backgroundColor: theme.color.primarySoft,
+    backgroundColor: theme.color.surfaceSoft,
+    borderColor: theme.color.uiAccent,
   },
   placeContent: {
     flex: 1,
@@ -460,7 +460,7 @@ export const styles = StyleSheet.create({
     opacity: 0.82,
   },
   swipeMoveIconButton: {
-    backgroundColor: theme.color.primary,
+    backgroundColor: theme.color.actionPrimary,
     minHeight: theme.layout.tapMin,
     minWidth: theme.layout.tapMin,
     width: 52,
@@ -690,8 +690,8 @@ export const styles = StyleSheet.create({
     minWidth: theme.layout.controlHLg,
   },
   chipSelected: {
-    backgroundColor: theme.color.primary,
-    borderColor: theme.color.primaryPressed,
+    backgroundColor: theme.color.surfaceSoft,
+    borderColor: theme.color.uiAccent,
   },
   chipText: {
     color: theme.color.textBody,
@@ -700,7 +700,7 @@ export const styles = StyleSheet.create({
     fontWeight: theme.font.weight.semibold,
   },
   chipTextSelected: {
-    color: theme.color.onPrimary,
+    color: theme.color.textStrong,
   },
   errorBox: {
     backgroundColor: theme.color.surfaceSunken,
@@ -718,15 +718,15 @@ export const styles = StyleSheet.create({
     padding: theme.space[4],
   },
   inlineSuccessNotice: {
-    backgroundColor: theme.color.green[50],
-    borderColor: theme.color.green[200],
+    backgroundColor: theme.color.surfaceSoft,
+    borderColor: theme.color.uiAccent,
     borderRadius: theme.radius.md,
     borderWidth: 1,
     padding: theme.space[4],
   },
   sharedUpdateNotice: {
-    backgroundColor: theme.color.primarySoft,
-    borderColor: theme.color.primary,
+    backgroundColor: theme.color.surfaceSoft,
+    borderColor: theme.color.uiAccent,
     borderRadius: theme.radius.md,
     borderWidth: 1,
     gap: theme.space[3],
@@ -744,7 +744,7 @@ export const styles = StyleSheet.create({
   },
   button: {
     alignItems: 'center',
-    backgroundColor: theme.color.primary,
+    backgroundColor: theme.color.actionPrimary,
     borderRadius: theme.radius.md,
     flexDirection: 'row',
     gap: theme.space[3],
@@ -782,7 +782,7 @@ export const styles = StyleSheet.create({
     opacity: 0.6,
   },
   buttonText: {
-    color: theme.color.onPrimary,
+    color: theme.color.onActionPrimary,
     fontFamily: theme.font.family.bold,
     fontWeight: theme.font.weight.bold,
     textAlign: 'center',

@@ -36,8 +36,8 @@ test('itinerary timeline uses axis markers and explicit time labels for timed an
   assert.equal(timelineSource.includes('cardCompact'), false);
   assert.equal(timelineSource.includes("borderStyle: 'solid'"), true);
   assert.equal(timelineSource.includes("borderStyle: 'dashed'"), true);
-  assert.equal(timelineSource.includes('backgroundColor: theme.color.green[600]'), true);
-  assert.equal(timelineSource.includes('color: theme.color.onPrimary'), true);
-  assert.equal(timelineSource.includes('borderColor: theme.color.green[600]'), true);
+  assert.equal(timelineSource.includes('backgroundColor: theme.color.surfaceSoft'), true);
+  assert.equal(timelineSource.includes('color: theme.color.textStrong'), true);
+  assert.equal(timelineSource.includes('borderColor: theme.color.uiAccent'), true);
   assert.equal(timelineSource.includes('borderColor: theme.color.borderStrong'), true);
 });

@@ -149,7 +149,7 @@ function ExpenseRowContent({
         accessible
         style={[styles.icon, { backgroundColor: categoryMeta.color }]}
       >
-        <CategoryIcon color={theme.color.surface} size={18} strokeWidth={2.4} />
+        <CategoryIcon color={theme.color.textStrong} size={18} strokeWidth={2.4} />
       </View>
       <View style={styles.body}>
         <Text

@@ -289,7 +289,7 @@ export function DayItineraryContent({
             }}
             style={styles.swipeMoveIconButton}
           >
-            <ArrowRight color={theme.color.onPrimary} size={20} strokeWidth={2.4} />
+            <ArrowRight color={theme.color.uiAccent} size={20} strokeWidth={2.4} />
           </IconButton>
         ) : null}
         <View
