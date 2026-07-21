@@ -295,10 +295,10 @@ test('Issue 406 SelectableCard supports rich checked, expanded, and trailing sel
 
 test('Issue 389 primitives keep Acid Lime vivid but sparse in shared UI', () => {
   assert.equal(theme.color.brandAccent, theme.color.chit.acidLime);
-  assert.equal(theme.color.actionPrimary, theme.color.chit.graphite);
-  assert.equal(theme.color.onActionPrimary, theme.color.chit.surface);
+  assert.equal(theme.color.actionPrimary, theme.color.chit.graphiteHighest);
+  assert.equal(theme.color.onActionPrimary, theme.color.chit.offWhiteText);
   assert.equal(theme.color.uiAccent, theme.color.chit.acidLime);
-  assert.equal(theme.color.uiAccentSoft, theme.color.chit.acidLimeSofter);
+  assert.equal(theme.color.uiAccentSoft, theme.color.chit.acidLimeSurface);
   assert.equal(theme.color.onUiAccent, theme.color.chit.charcoal);
   assert.notEqual(theme.color.actionPrimary, theme.color.brandAccent);
 

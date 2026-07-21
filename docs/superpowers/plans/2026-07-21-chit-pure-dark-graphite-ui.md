@@ -106,7 +106,7 @@ The first failing tests should assert:
 - Consumes: existing `theme.color.*`, `theme.layout.*`, `theme.radius.*` public shape.
 - Produces: stable Pure Dark token names through existing semantic keys: `bg`, `surface`, `surfaceSunken`, `surfaceSoft`, `shell`, `shellElevated`, `shellRaised`, `shellHighest`, `actionPrimary`, `onActionPrimary`, `primary`, `onPrimary`, `uiAccent`, `uiAccentSoft`, text tiers.
 
-- [ ] **Step 1: Write failing Pure Dark theme tests**
+- [x] **Step 1: Write failing Pure Dark theme tests**
 
 Add this test to `apps/mobile/lib/app-info/pure-dark-graphite-ui.test.mts`:
 
@@ -147,7 +147,7 @@ test('mobile UI rule documents Pure Dark Graphite and Compact Premium Dark', () 
 });
 ```
 
-- [ ] **Step 2: Run tests to verify failure**
+- [x] **Step 2: Run tests to verify failure**
 
 Run:
 
@@ -157,7 +157,7 @@ pnpm --filter @i-um/mobile test -- --test-name-pattern="Pure Dark Graphite"
 
 Expected: FAIL because `theme.color.chit.graphiteShell` and related Pure Dark tokens do not exist yet, or because `surface` still maps to off-white.
 
-- [ ] **Step 3: Update `theme.ts` tokens**
+- [x] **Step 3: Update `theme.ts` tokens**
 
 In `apps/mobile/lib/design/theme.ts`, extend `chit` and remap semantic tokens. Preserve existing old aliases only when needed for compatibility.
 
@@ -231,7 +231,7 @@ export const color = {
   textOnShellMuted: 'rgba(247,247,242,0.72)',
   textOnShellFaint: 'rgba(247,247,242,0.52)',
   textLink: chit.fintechBlue,
-  primaryTextOnLight: chit.charcoal,
+  primaryTextOnLight: chit.offWhiteText,
   borderSubtle: chit.graphiteLine,
   borderDefault: chit.graphiteLine,
   borderStrong: chit.graphiteLineStrong,
@@ -244,7 +244,7 @@ export const color = {
 } as const;
 ```
 
-- [ ] **Step 4: Update old source assertions**
+- [x] **Step 4: Update old source assertions**
 
 In `chit-ui-foundation.test.mts`, replace the old test named `Issue 385 theme exposes clean matte dark shell and off-white content tokens` with:
 
@@ -266,7 +266,7 @@ test('Issue 385 theme exposes Pure Dark Graphite surface tokens', () => {
 });
 ```
 
-- [ ] **Step 5: Run token tests**
+- [x] **Step 5: Run token tests**
 
 Run:
 
@@ -276,7 +276,7 @@ pnpm --filter @i-um/mobile test -- --test-name-pattern="Pure Dark Graphite|Issue
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add apps/mobile/lib/design/theme.ts apps/mobile/lib/app-info/chit-ui-foundation.test.mts apps/mobile/lib/app-info/shared-design-primitives.test.mts apps/mobile/lib/app-info/pure-dark-graphite-ui.test.mts

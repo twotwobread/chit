@@ -85,20 +85,21 @@ test('Chit foundation components do not introduce raw hex colors outside theme t
   }
 });
 
-test('Issue 385 theme exposes clean matte dark shell and off-white content tokens', () => {
-  assert.equal(theme.color.bg, theme.color.chit.matteCharcoal);
-  assert.equal(theme.color.surface, theme.color.chit.offWhiteElevated);
-  assert.equal(theme.color.surfaceSunken, theme.color.chit.offWhiteSubtle);
-  assert.equal(theme.color.borderDefault, theme.color.chit.offWhiteBorder);
-  assert.equal(theme.color.shell, theme.color.chit.matteCharcoal);
-  assert.equal(theme.color.primaryTextOnLight, theme.color.chit.charcoal);
+test('Issue 385 theme exposes Pure Dark Graphite surface tokens', () => {
+  assert.equal(theme.color.bg, theme.color.chit.graphiteShell);
+  assert.equal(theme.color.surface, theme.color.chit.graphiteCard);
+  assert.equal(theme.color.surfaceSunken, theme.color.chit.graphiteSunken);
+  assert.equal(theme.color.borderDefault, theme.color.chit.graphiteLine);
+  assert.equal(theme.color.shell, theme.color.chit.graphiteShell);
+  assert.equal(theme.color.primaryTextOnLight, theme.color.chit.offWhiteText);
   assert.equal(theme.color.brandAccent, theme.color.chit.acidLime);
-  assert.equal(theme.color.actionPrimary, theme.color.chit.graphite);
-  assert.equal(theme.color.shellHighest, theme.color.chit.graphite);
+  assert.equal(theme.color.actionPrimary, theme.color.chit.graphiteHighest);
+  assert.equal(theme.color.shellHighest, theme.color.chit.graphiteHighest);
   assert.equal(theme.color.uiAccent, theme.color.chit.acidLime);
-  assert.equal(theme.color.uiAccentSoft, theme.color.chit.acidLimeSofter);
+  assert.equal(theme.color.uiAccentSoft, theme.color.chit.acidLimeSurface);
   assert.notEqual(theme.color.actionPrimary, theme.color.brandAccent);
   assert.notEqual(theme.color.surface, theme.color.chit.warmPaper);
+  assert.notEqual(theme.color.surface, theme.color.chit.offWhiteElevated);
 });
 
 test('Issue 385 shared components provide BrandStamp, ScreenBackground, and card variants', () => {
