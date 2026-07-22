@@ -139,6 +139,9 @@ export default function QuickExpenseScreen() {
     requestAnimationFrame(scroll);
     setTimeout(scroll, 320);
   }, []);
+  const screenMode = state.status === 'success' ? state.mode : 'today';
+  const shouldShowScreenHeader = screenMode !== 'settlement';
+  const headerSubtitle = '금액과 결제자만 입력하면 함께 나눠요.';
   const submitState = viewModel
     ? buildQuickExpenseFormSubmitState({
         amountInput,
@@ -172,10 +175,12 @@ export default function QuickExpenseScreen() {
         scrollEventThrottle={16}
         style={styles.scroll}
       >
-        <View style={styles.header}>
-          <Text style={styles.screenTitle}>지출 등록</Text>
-          <Text style={styles.subtitle}>금액과 결제자만 입력하면 함께 나눠요.</Text>
-        </View>
+        {shouldShowScreenHeader ? (
+          <View style={styles.header}>
+            <Text style={styles.screenTitle}>지출 등록</Text>
+            <Text style={styles.subtitle}>{headerSubtitle}</Text>
+          </View>
+        ) : null}
 
         {state.status === 'loading' ? (
           <Card>

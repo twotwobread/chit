@@ -24,9 +24,10 @@
 - 현재 `정산` 탭에 섞여 있는 지출 관리 정보는 새 `지출` 탭으로 이동한다.
 - `오늘`의 빠른 지출은 현장에서 빠르게 기록하는 흐름으로 유지한다.
 - `지출` 페이지는 전체 지출 관리와 상세 등록 흐름을 담당한다.
-- `지출 추가` 첫 화면은 `영수증 촬영으로 입력`을 primary로, `직접 입력`을 secondary로 제공한다.
-- 영수증/OCR draft 기능은 유지하며, OCR 값은 저장 전 확인이 필요한 초안으로 표시한다.
-- 상세 지출 등록 폼은 핵심 필드 우선 + 상세 옵션 접기 구조로 단순화한다.
+- `지출 추가` 첫 화면은 `직접 입력`을 primary로, `영수증으로 채우기`를 secondary로 제공한다.
+- 영수증/OCR draft 기능은 선택형 자동 채우기로 유지하며, OCR 값은 저장 전 확인이 필요한 초안으로 표시한다.
+- 상세 지출 등록 폼은 긴 입력 폼이 아니라 초안 요약 + 확인 그룹 + 항목별 수정 구조로 단순화한다.
+- 상세 지출 등록 본문은 중복되는 상단 제목/설명을 줄이고, 하나의 큰 outer card 안에 작은 card를 넣지 않는다. 배경 위에 초안/확인 그룹 card를 직접 배치한다.
 - `지출` 페이지는 총 지출, 카테고리별 사용 금액, 일자별 보기, 카테고리별 필터 보기를 제공한다.
 - `정산` 탭은 사람별 결제/부담/net, 최종 송금 제안, 정산 요청 CTA에 집중한다.
 - 정산 요청 링크는 요청 당시 snapshot이 아니라 현재 여행 지출 기준 최신 정산을 보여준다.
@@ -53,10 +54,10 @@
   - 선택한 카테고리 합계/건수/비율.
   - 선택한 카테고리의 지출 목록.
 - Expense add flow:
-  - OCR-primary choice screen.
-  - Direct-input fallback.
+  - Direct-input-primary choice screen.
+  - Optional receipt/OCR auto-fill.
   - OCR draft applied state and verification copy.
-  - Core fields first, advanced fields progressively disclosed.
+  - Draft summary and grouped review/edit sections instead of one flat form stack.
 - Settlement tab cleanup:
   - 기본 지출 history/FAB/category summary 제거.
   - 최신 계산 안내, 사람별 결제/부담/net, 송금 제안, 정산 요청 CTA 유지.
@@ -133,10 +134,10 @@ Expense main은 상단부터 다음 순서로 보여준다.
 
 첫 화면은 두 선택지를 보여준다.
 
-1. `영수증 촬영으로 입력` — primary.
-2. `직접 입력` — secondary.
+1. `직접 입력` — primary.
+2. `영수증으로 채우기` — secondary.
 
-OCR draft 적용 후에는 작은 상태 카드로 표시한다.
+영수증은 필수가 아니다. OCR draft 적용 후에는 작은 상태 카드로 표시한다.
 
 예시 copy:
 
@@ -145,23 +146,16 @@ OCR draft 적용 후에는 작은 상태 카드로 표시한다.
 금액/날짜/지출명을 확인한 뒤 저장해주세요.
 ```
 
-상세 폼 기본 노출 필드:
+상세 등록 화면은 초안 리뷰 구조로 보여준다.
 
-- 지출명 또는 연결 일정 요약.
-- 금액.
-- 결제자.
+- 상단: 지출 초안 요약(지출명/연결 일정, 금액, 결제일자, 결제자, 영수증 초안 여부).
+- `먼저 확인`: 지출명, 결제일자, 금액.
+- `정산`: 결제/분할 방식과 대상, 정산 포함 여부.
+- `분류/연결`: 관련 일정 row, 카테고리/통화 2-column picker row.
+- `선택 정보`: 메모, 영수증 다시 촬영/초안 해제.
 - 저장 CTA.
 
-상세 옵션으로 접는 필드:
-
-- 결제일자.
-- 관련 Day/일정.
-- 통화.
-- 카테고리.
-- 결제/분할 방식과 대상.
-- 정산 포함 여부.
-- 메모.
-- 영수증 다시 촬영/초안 해제.
+복잡한 선택은 항목 row 또는 bottom sheet로 수정한다. 관련 일정 row를 누르면 Day 선택과 해당 Day의 일정 목록을 함께 보여주는 sheet가 열린다. 카테고리와 통화는 같은 row의 두 picker cell로 보여주고, 각각 누르면 선택 목록 sheet가 열린다.
 
 ### Settlement tab
 
@@ -228,9 +222,9 @@ No DB changes.
 - [ ] AC-03: Category summary shows category label, amount, count, and percentage without relying on color alone.
 - [ ] AC-04: `일자별 보기` shows Day N tabs and per-day expense lists, including `여행 전체` for unanchored expenses.
 - [ ] AC-05: `카테고리별 사용 > 전체 보기` filters expenses by selected category.
-- [ ] AC-06: `지출 추가` choice screen visually prioritizes `영수증 촬영으로 입력` over `직접 입력`.
-- [ ] AC-07: OCR draft can fill available fields and is clearly labeled as a draft requiring verification before save.
-- [ ] AC-08: Detailed expense form shows core fields first and advanced options behind progressive disclosure.
+- [ ] AC-06: `지출 추가` choice screen visually prioritizes `직접 입력` over optional `영수증으로 채우기`.
+- [ ] AC-07: OCR draft can fill available fields and is clearly labeled as an optional draft requiring verification before save.
+- [ ] AC-08: Detailed expense form shows a draft summary and grouped review/edit sections as direct screen cards instead of one nested outer-card form stack.
 - [ ] AC-09: Today quick expense remains lightweight and does not inherit heavier Expense tab controls.
 - [ ] AC-10: Settlement tab no longer default-renders expense management content or expense add FAB.
 - [ ] AC-11: Settlement tab shows latest/current calculation copy.
@@ -252,7 +246,7 @@ No DB changes.
 | Category summary groups by category/currency and computes amount/count/percentage | Mobile helper | `pnpm --filter @i-um/mobile test` |
 | Day N browsing groups expenses by Day and `여행 전체` | Mobile helper | `pnpm --filter @i-um/mobile test` |
 | Category browsing filters expense rows by selected category | Mobile helper | `pnpm --filter @i-um/mobile test` |
-| Expense add choice/draft view model keeps OCR primary and draft verification copy | Mobile helper/component seam | `pnpm --filter @i-um/mobile test` |
+| Expense add choice/draft view model keeps direct input primary and receipt/OCR optional with draft verification copy | Mobile helper/component seam | `pnpm --filter @i-um/mobile test` |
 | Settlement tab view model excludes expense management content by default | Mobile helper | `pnpm --filter @i-um/mobile test` |
 | Settlement detail view model renders totals, balances, transfers, formula, included/excluded expenses, multi-currency sections | Mobile helper | `pnpm --filter @i-um/mobile test` |
 | Settlement share message includes latest detail link and latest/current copy | Mobile helper | `pnpm --filter @i-um/mobile test` |
