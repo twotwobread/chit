@@ -23,6 +23,9 @@ export {
   ScreenBackground,
   SecondaryButton,
   SelectableCard,
+  SelectableListRow,
+  SectionCard,
+  StepWizardHeader,
   TabButton,
   TextLink,
 } from './components';
@@ -44,7 +47,12 @@ export type {
   PrimaryButtonTone,
   SelectableCardMode,
   SelectableCardProps,
+  SelectableListRowProps,
+  SectionCardProps,
+  SectionCardTone,
   StateAction,
+  StepWizardHeaderAction,
+  StepWizardHeaderProps,
   TabButtonIconRenderer,
   TextLinkTone,
 } from './components';

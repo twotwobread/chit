@@ -16,6 +16,8 @@ export { ChoiceChip, FilterChip } from './components/chip';
 export type { ChoiceChipTone, FilterChipTone } from './components/chip';
 export { SelectableCard } from './components/selectable-card';
 export type { SelectableCardMode, SelectableCardProps } from './components/selectable-card';
+export { SelectableListRow } from './components/selectable-list-row';
+export type { SelectableListRowProps } from './components/selectable-list-row';
 export { FormField } from './patterns/form-field';
 export type { FormFieldTone } from './patterns/form-field';
 export { TextInputField } from './patterns/input-field';
@@ -26,3 +28,7 @@ export { EmptyState, ErrorState, LoadingState, SkeletonCard } from './patterns/s
 export type { StateAction } from './patterns/state-card';
 export { HeroActions, HeroCard, HeroHeader, HeroMetricPanel } from './patterns/hero';
 export type { HeroAction, HeroCardVariant, HeroMetricPanelTone } from './patterns/hero';
+export { SectionCard } from './patterns/section-card';
+export type { SectionCardProps, SectionCardTone } from './patterns/section-card';
+export { StepWizardHeader } from './patterns/step-wizard-header';
+export type { StepWizardHeaderAction, StepWizardHeaderProps } from './patterns/step-wizard-header';
