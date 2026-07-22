@@ -86,6 +86,17 @@ test('detailed schedule link opens a day and schedule-item picker sheet', () => 
   assert.match(entryPartsSource, /일정 연결 안 함/);
 });
 
+test('detailed optional info keeps memo only without repeating receipt controls', () => {
+  const optionalInfoBlock = sourceBetween(
+    entryPartsSource,
+    '<DetailedExpenseReviewGroup helper="메모는 필요할 때만 더해요." title="선택 정보">',
+    '</DetailedExpenseReviewGroup>',
+  );
+
+  assert.match(optionalInfoBlock, /renderMemoInput\(formDisabled\)/);
+  assert.doesNotMatch(optionalInfoBlock, /renderReceiptSection/);
+});
+
 test('Today quick expense keeps its lightweight form separate from the detailed review layout', () => {
   assert.doesNotMatch(todayQuickSource, /renderDetailedExpenseReview/);
   assert.doesNotMatch(todayQuickSource, /먼저 확인/);

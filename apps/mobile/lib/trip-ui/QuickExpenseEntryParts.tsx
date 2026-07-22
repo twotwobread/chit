@@ -517,8 +517,7 @@ export function QuickExpenseForm({
         />
       </DetailedExpenseReviewGroup>
 
-      <DetailedExpenseReviewGroup helper="영수증과 메모는 필요할 때만 더해요." title="선택 정보">
-        {renderReceiptSection()}
+      <DetailedExpenseReviewGroup helper="메모는 필요할 때만 더해요." title="선택 정보">
         {renderMemoInput(formDisabled)}
       </DetailedExpenseReviewGroup>
     </>
