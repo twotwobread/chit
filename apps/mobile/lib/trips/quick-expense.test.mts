@@ -716,6 +716,7 @@ test('builds create quick expense request and validation errors', () => {
       ok: true,
       request: {
         scheduleItemId: 'item-a',
+        tripPlaceId: null,
         amountMinor: 18500,
         currency: 'KRW',
         expenseCategory: 'shopping',
@@ -740,9 +741,38 @@ test('builds create quick expense request and validation errors', () => {
       ok: false,
       errors: {
         amount: '금액을 1 이상 입력해주세요.',
-        item: '지출을 연결할 일정을 선택해주세요.',
+        item: '지출을 연결할 일정이나 영수증 장소를 선택해주세요.',
         payer: '결제자를 선택해주세요.',
         participants: '분할할 사람을 1명 이상 선택해주세요.',
+      },
+    },
+  );
+});
+
+test('builds create quick expense request linked to a trip place without schedule', () => {
+  assert.deepEqual(
+    buildCreateQuickExpenseRequest({
+      amountInput: '17,800',
+      currency: 'KRW',
+      scheduleItemId: null,
+      tripPlaceId: 'trip-place-a',
+      splitPolicy: 'equal',
+      participantIds: ['participant-b'],
+      manualSplitInputs: [],
+      payerParticipantId: 'participant-a',
+      receiptDraftId: 'receipt-draft-a',
+    }),
+    {
+      ok: true,
+      request: {
+        scheduleItemId: null,
+        tripPlaceId: 'trip-place-a',
+        amountMinor: 17800,
+        currency: 'KRW',
+        payerParticipantId: 'participant-a',
+        splitPolicy: 'equal',
+        participantIds: ['participant-b'],
+        receiptDraftId: 'receipt-draft-a',
       },
     },
   );
@@ -764,6 +794,7 @@ test('builds create quick expense request with an explicit settlement exclusion 
       ok: true,
       request: {
         scheduleItemId: 'item-a',
+        tripPlaceId: null,
         amountMinor: 18500,
         currency: 'KRW',
         payerParticipantId: 'participant-a',
@@ -791,6 +822,7 @@ test('builds create quick expense request with a reviewed receipt draft id', () 
       ok: true,
       request: {
         scheduleItemId: 'item-a',
+        tripPlaceId: null,
         amountMinor: 18500,
         currency: 'KRW',
         payerParticipantId: 'participant-a',
@@ -831,6 +863,7 @@ test('builds memo update request after quick expense creation and skips blank me
       participantIds: ['participant-b'],
       memo: '저녁 회식',
       scheduleItemId: 'item-a',
+      tripPlaceId: null,
       includeInSettlement: false,
     },
   );
@@ -859,6 +892,7 @@ test('builds trip-level general expense request when no related context is selec
         expenseDate: '2026-06-12',
         tripDayId: null,
         scheduleItemId: null,
+        tripPlaceId: null,
         amountMinor: 650000,
         currency: 'KRW',
         payerParticipantId: 'payer-a',
@@ -893,6 +927,7 @@ test('builds trip-level general expense request with an explicit settlement excl
         expenseDate: '2026-06-12',
         tripDayId: null,
         scheduleItemId: null,
+        tripPlaceId: null,
         amountMinor: 10000,
         currency: 'KRW',
         payerParticipantId: 'payer-a',
@@ -928,11 +963,49 @@ test('builds trip expense request with a reviewed receipt draft id', () => {
         expenseDate: '2026-06-12',
         tripDayId: null,
         scheduleItemId: null,
+        tripPlaceId: null,
         amountMinor: 10000,
         currency: 'KRW',
         payerParticipantId: 'payer-a',
         splitPolicy: 'equal',
         participantIds: ['participant-a', 'participant-b'],
+        memo: null,
+        receiptDraftId: 'receipt-draft-a',
+      },
+    },
+  );
+});
+
+test('builds trip expense request linked to a trip place without schedule or title', () => {
+  assert.deepEqual(
+    buildCreateTripExpenseRequest({
+      titleInput: '   ',
+      expenseDate: '2026-07-04',
+      amountInput: '17,800',
+      currency: 'KRW',
+      selectedTripDayId: 'day-1',
+      scheduleItemId: null,
+      tripPlaceId: 'trip-place-a',
+      splitPolicy: 'equal',
+      participantIds: ['participant-a'],
+      manualSplitInputs: [],
+      payerParticipantId: 'payer-a',
+      memoInput: '',
+      receiptDraftId: 'receipt-draft-a',
+    }),
+    {
+      ok: true,
+      request: {
+        title: null,
+        expenseDate: '2026-07-04',
+        tripDayId: 'day-1',
+        scheduleItemId: null,
+        tripPlaceId: 'trip-place-a',
+        amountMinor: 17800,
+        currency: 'KRW',
+        payerParticipantId: 'payer-a',
+        splitPolicy: 'equal',
+        participantIds: ['participant-a'],
         memo: null,
         receiptDraftId: 'receipt-draft-a',
       },
@@ -962,6 +1035,7 @@ test('builds day-level general expense request when only related day is selected
         expenseDate: '2026-06-30',
         tripDayId: 'day-2',
         scheduleItemId: null,
+        tripPlaceId: null,
         amountMinor: 120000,
         currency: 'KRW',
         payerParticipantId: 'payer-a',
@@ -995,6 +1069,7 @@ test('builds schedule-item general expense request without requiring a title', (
         expenseDate: '2026-06-12',
         tripDayId: 'day-1',
         scheduleItemId: 'item-a',
+        tripPlaceId: null,
         amountMinor: 1000,
         currency: 'JPY',
         payerParticipantId: 'payer-a',
@@ -1053,6 +1128,7 @@ test('builds manual quick expense request only when split sum matches total', ()
       ok: true,
       request: {
         scheduleItemId: 'item-a',
+        tripPlaceId: null,
         amountMinor: 1000,
         currency: 'JPY',
         payerParticipantId: 'participant-payer',

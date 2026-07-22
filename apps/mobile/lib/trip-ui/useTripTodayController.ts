@@ -374,6 +374,7 @@ export function useTripTodayController() {
         amountInput: String(amount),
         currency: quickExpenseState.currency,
         scheduleItemId: itemId,
+        tripPlaceId: null,
         splitPolicy: 'equal',
         participantIds: splitParticipantIds,
         manualSplitInputs: [],

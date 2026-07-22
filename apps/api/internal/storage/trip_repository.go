@@ -784,6 +784,22 @@ func (s *Store) CreateManualDayLodgingPlace(ctx context.Context, record trip.Cre
 	return tripPlaceSummary(row.ID, row.Name, row.PlaceType, row.Address, row.Provider, row.GooglePlaceID, row.Latitude, row.Longitude), nil
 }
 
+func (s *Store) CreateManualTripPlace(ctx context.Context, record trip.CreateManualTripPlaceRecord) (trip.TripPlaceSummary, error) {
+	row, err := s.queries.CreateTripPlace(ctx, db.CreateTripPlaceParams{
+		TripID:    mustUUID(record.TripID),
+		Name:      record.Name,
+		Address:   record.Address,
+		PlaceType: record.PlaceType,
+	})
+	if isForeignKeyViolation(err) {
+		return trip.TripPlaceSummary{}, trip.ErrNotFound
+	}
+	if err != nil {
+		return trip.TripPlaceSummary{}, err
+	}
+	return tripPlaceSummary(row.ID, row.Name, row.PlaceType, row.Address, row.Provider, row.GooglePlaceID, row.Latitude, row.Longitude), nil
+}
+
 func (s *Store) CreateGoogleDayLodgingPlace(ctx context.Context, record place.CreateGoogleDayLodgingPlaceRecord) (trip.TripPlaceSummary, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -1238,6 +1254,21 @@ func (s *Store) UpdateExpense(ctx context.Context, record trip.UpdateExpenseReco
 		placeName = textValue(itemRow.PlaceName)
 		placeAddress = textValue(itemRow.PlaceAddress)
 		placeType = textValue(itemRow.PlaceType)
+	} else if record.TripPlaceID != nil {
+		placeRow, err := qtx.GetTripPlaceSummaryByTripAndPlace(ctx, db.GetTripPlaceSummaryByTripAndPlaceParams{
+			TripID:      mustUUID(record.TripID),
+			TripPlaceID: mustUUID(*record.TripPlaceID),
+		})
+		if err == pgx.ErrNoRows {
+			return trip.Expense{}, trip.ErrNotFound
+		}
+		if err != nil {
+			return trip.Expense{}, err
+		}
+		tripPlaceID = mustUUID(placeRow.ID)
+		placeName = textValue(placeRow.Name)
+		placeAddress = textValue(placeRow.Address)
+		placeType = textValue(placeRow.PlaceType)
 	}
 
 	participantRows, err := qtx.ListQuickExpenseSplitParticipants(ctx, mustUUID(record.TripID))
@@ -1350,6 +1381,27 @@ func (s *Store) UpdateTripExpense(ctx context.Context, record trip.UpdateExpense
 		return trip.Expense{}, err
 	}
 
+	tripPlaceID := pgtype.UUID{}
+	placeName := pgtype.Text{}
+	placeAddress := pgtype.Text{}
+	placeType := pgtype.Text{}
+	if record.TripPlaceID != nil {
+		placeRow, err := qtx.GetTripPlaceSummaryByTripAndPlace(ctx, db.GetTripPlaceSummaryByTripAndPlaceParams{
+			TripID:      mustUUID(record.TripID),
+			TripPlaceID: mustUUID(*record.TripPlaceID),
+		})
+		if err == pgx.ErrNoRows {
+			return trip.Expense{}, trip.ErrNotFound
+		}
+		if err != nil {
+			return trip.Expense{}, err
+		}
+		tripPlaceID = mustUUID(placeRow.ID)
+		placeName = textValue(placeRow.Name)
+		placeAddress = textValue(placeRow.Address)
+		placeType = textValue(placeRow.PlaceType)
+	}
+
 	participantRows, err := qtx.ListQuickExpenseSplitParticipants(ctx, mustUUID(record.TripID))
 	if err != nil {
 		return trip.Expense{}, err
@@ -1370,6 +1422,10 @@ func (s *Store) UpdateTripExpense(ctx context.Context, record trip.UpdateExpense
 
 	updatedRow, err := qtx.UpdateTripExpense(ctx, db.UpdateTripExpenseParams{
 		Title:               nullableText(record.Title),
+		TripPlaceID:         tripPlaceID,
+		PlaceName:           placeName,
+		PlaceAddress:        placeAddress,
+		PlaceType:           placeType,
 		AmountMinor:         record.AmountMinor,
 		Currency:            nullableText(record.Currency),
 		ExpenseCategory:     nullableText(record.ExpenseCategory),
@@ -1494,16 +1550,65 @@ func (s *Store) CreateQuickExpense(ctx context.Context, record trip.CreateQuickE
 		return trip.CreateQuickExpenseResult{}, err
 	}
 
-	itemRow, err := qtx.GetQuickExpenseScheduleItem(ctx, db.GetQuickExpenseScheduleItemParams{
-		TripID:         mustUUID(record.TripID),
-		TripDayID:      mustUUID(record.TripDayID),
-		ScheduleItemID: mustUUID(record.ScheduleItemID),
+	dayRow, err := qtx.GetActiveTripDayByTripAndID(ctx, db.GetActiveTripDayByTripAndIDParams{
+		TripID:    mustUUID(record.TripID),
+		TripDayID: mustUUID(record.TripDayID),
 	})
 	if err == pgx.ErrNoRows {
 		return trip.CreateQuickExpenseResult{}, trip.ErrNotFound
 	}
 	if err != nil {
 		return trip.CreateQuickExpenseResult{}, err
+	}
+
+	anchorType := "trip_day"
+	tripDayID := mustUUID(dayRow.ID)
+	scheduleItemID := pgtype.UUID{}
+	tripPlaceID := pgtype.UUID{}
+	placeName := textValue("장소 없음")
+	placeAddress := textValue("연결된 장소 없음")
+	placeType := textValue("etc")
+	expenseDate := dayRow.Date
+	placeSource := trip.ExpenseDisplaySourceFallback
+	if record.ScheduleItemID != nil {
+		itemRow, err := qtx.GetQuickExpenseScheduleItem(ctx, db.GetQuickExpenseScheduleItemParams{
+			TripID:         mustUUID(record.TripID),
+			TripDayID:      mustUUID(record.TripDayID),
+			ScheduleItemID: mustUUID(*record.ScheduleItemID),
+		})
+		if err == pgx.ErrNoRows {
+			return trip.CreateQuickExpenseResult{}, trip.ErrNotFound
+		}
+		if err != nil {
+			return trip.CreateQuickExpenseResult{}, err
+		}
+		anchorType = "schedule_item"
+		tripDayID = mustUUID(itemRow.TripDayID)
+		scheduleItemID = mustUUID(itemRow.ScheduleItemID)
+		tripPlaceID = mustUUID(itemRow.TripPlaceID)
+		placeName = textValue(itemRow.PlaceName)
+		placeAddress = textValue(itemRow.PlaceAddress)
+		placeType = textValue(itemRow.PlaceType)
+		expenseDate = itemRow.TripDayDate
+		placeSource = trip.ExpenseDisplaySourceLive
+	} else if record.TripPlaceID != nil {
+		placeRow, err := qtx.GetTripPlaceSummaryByTripAndPlace(ctx, db.GetTripPlaceSummaryByTripAndPlaceParams{
+			TripID:      mustUUID(record.TripID),
+			TripPlaceID: mustUUID(*record.TripPlaceID),
+		})
+		if err == pgx.ErrNoRows {
+			return trip.CreateQuickExpenseResult{}, trip.ErrNotFound
+		}
+		if err != nil {
+			return trip.CreateQuickExpenseResult{}, err
+		}
+		tripPlaceID = mustUUID(placeRow.ID)
+		placeName = textValue(placeRow.Name)
+		placeAddress = textValue(placeRow.Address)
+		placeType = textValue(placeRow.PlaceType)
+		placeSource = trip.ExpenseDisplaySourceLive
+	} else {
+		return trip.CreateQuickExpenseResult{}, trip.ErrValidation
 	}
 
 	payerRow, err := qtx.GetQuickExpensePayerParticipant(ctx, db.GetQuickExpensePayerParticipantParams{
@@ -1537,18 +1642,18 @@ func (s *Store) CreateQuickExpense(ctx context.Context, record trip.CreateQuickE
 
 	expenseRow, err := qtx.InsertExpense(ctx, db.InsertExpenseParams{
 		TripID:              mustUUID(record.TripID),
-		AnchorType:          "schedule_item",
-		TripDayID:           mustUUID(itemRow.TripDayID),
-		ScheduleItemID:      mustUUID(itemRow.ScheduleItemID),
-		ExpenseDate:         itemRow.TripDayDate,
-		TripPlaceID:         mustUUID(itemRow.TripPlaceID),
-		PlaceName:           textValue(itemRow.PlaceName),
-		PlaceAddress:        textValue(itemRow.PlaceAddress),
-		PlaceType:           textValue(itemRow.PlaceType),
+		AnchorType:          anchorType,
+		TripDayID:           tripDayID,
+		ScheduleItemID:      scheduleItemID,
+		ExpenseDate:         expenseDate,
+		TripPlaceID:         tripPlaceID,
+		PlaceName:           placeName,
+		PlaceAddress:        placeAddress,
+		PlaceType:           placeType,
 		Title:               pgtype.Text{},
 		AmountMinor:         record.AmountMinor,
 		Currency:            expenseCurrency(record.Currency, tripRow.DefaultCurrency),
-		ExpenseCategory:     expenseCategory(record.ExpenseCategory, itemRow.PlaceType),
+		ExpenseCategory:     expenseCategory(record.ExpenseCategory, textString(placeType)),
 		SplitPolicy:         record.SplitPolicy,
 		PayerParticipantID:  mustUUID(payerRow.ID),
 		PayerDisplayName:    trip.NormalizeParticipantDisplayName(payerRow.DisplayName),
@@ -1625,7 +1730,7 @@ func (s *Store) CreateQuickExpense(ctx context.Context, record trip.CreateQuickE
 		ExpenseDate:         dateString(expenseRow.ExpenseDate),
 		Title:               textPtr(expenseRow.Title),
 		DisplayTitle:        expenseDisplayTitle(expenseRow.Title, expenseRow.PlaceName),
-		Place:               expensePlaceDisplay(expenseRow.TripPlaceID, expenseRow.PlaceName, expenseRow.PlaceAddress, expenseRow.PlaceType, trip.ExpenseDisplaySourceLive),
+		Place:               expensePlaceDisplay(expenseRow.TripPlaceID, expenseRow.PlaceName, expenseRow.PlaceAddress, expenseRow.PlaceType, placeSource),
 		AmountMinor:         expenseRow.AmountMinor,
 		Currency:            expenseRow.Currency,
 		ExpenseCategory:     expenseRow.ExpenseCategory,
@@ -1685,6 +1790,26 @@ func (s *Store) CreateTripExpense(ctx context.Context, record trip.CreateTripExp
 		placeAddress = textValue(itemRow.PlaceAddress)
 		placeType = textValue(itemRow.PlaceType)
 		placeSource = trip.ExpenseDisplaySourceLive
+	} else if record.TripPlaceID != nil {
+		placeRow, err := qtx.GetTripPlaceSummaryByTripAndPlace(ctx, db.GetTripPlaceSummaryByTripAndPlaceParams{
+			TripID:      mustUUID(record.TripID),
+			TripPlaceID: mustUUID(*record.TripPlaceID),
+		})
+		if err == pgx.ErrNoRows {
+			return trip.CreateTripExpenseResult{}, trip.ErrNotFound
+		}
+		if err != nil {
+			return trip.CreateTripExpenseResult{}, err
+		}
+		tripPlaceID = mustUUID(placeRow.ID)
+		placeName = textValue(placeRow.Name)
+		placeAddress = textValue(placeRow.Address)
+		placeType = textValue(placeRow.PlaceType)
+		placeSource = trip.ExpenseDisplaySourceLive
+		if record.TripDayID != nil {
+			anchorType = "trip_day"
+			tripDayID = mustUUID(*record.TripDayID)
+		}
 	} else if record.TripDayID != nil {
 		anchorType = "trip_day"
 		tripDayID = mustUUID(*record.TripDayID)

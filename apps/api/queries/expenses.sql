@@ -180,7 +180,10 @@ LEFT JOIN schedule_items si
  AND si.trip_id = e.trip_id
  AND si.deleted_at IS NULL
 LEFT JOIN trip_places live_place
-  ON live_place.id = si.trip_place_id
+  ON live_place.id = CASE
+    WHEN e.anchor_type = 'schedule_item' THEN si.trip_place_id
+    ELSE e.trip_place_id
+  END
  AND live_place.trip_id = e.trip_id
 LEFT JOIN trip_participants payer
   ON payer.id = e.payer_participant_id
@@ -234,7 +237,10 @@ LEFT JOIN schedule_items si
  AND si.trip_id = e.trip_id
  AND si.deleted_at IS NULL
 LEFT JOIN trip_places live_place
-  ON live_place.id = si.trip_place_id
+  ON live_place.id = CASE
+    WHEN e.anchor_type = 'schedule_item' THEN si.trip_place_id
+    ELSE e.trip_place_id
+  END
  AND live_place.trip_id = e.trip_id
 LEFT JOIN trip_participants payer
   ON payer.id = e.payer_participant_id
@@ -388,7 +394,10 @@ LEFT JOIN schedule_items si
  AND si.trip_id = e.trip_id
  AND si.deleted_at IS NULL
 LEFT JOIN trip_places live_place
-  ON live_place.id = si.trip_place_id
+  ON live_place.id = CASE
+    WHEN e.anchor_type = 'schedule_item' THEN si.trip_place_id
+    ELSE e.trip_place_id
+  END
  AND live_place.trip_id = e.trip_id
 LEFT JOIN trip_participants payer
   ON payer.id = e.payer_participant_id
@@ -407,12 +416,13 @@ SELECT
   COALESCE(e.schedule_item_id::text, '')::text AS schedule_item_id,
   e.expense_date,
   e.title,
-  COALESCE(e.title, e.place_name, '지출')::text AS display_title,
-  COALESCE(e.trip_place_id::text, '')::text AS trip_place_id,
-  COALESCE(e.place_name, '')::text AS place_name,
-  COALESCE(e.place_address, '')::text AS place_address,
-  COALESCE(e.place_type, '')::text AS place_type,
+  COALESCE(e.title, live_place.name, e.place_name, '지출')::text AS display_title,
+  COALESCE(live_place.id::text, e.trip_place_id::text, '')::text AS trip_place_id,
+  COALESCE(live_place.name, e.place_name, '')::text AS place_name,
+  COALESCE(live_place.address, e.place_address, '')::text AS place_address,
+  COALESCE(live_place.place_type, e.place_type, '')::text AS place_type,
   CASE
+    WHEN live_place.id IS NOT NULL THEN 'live'
     WHEN e.place_name IS NOT NULL THEN 'fallback'
     ELSE ''
   END::text AS place_source,
@@ -437,6 +447,9 @@ FROM expenses e
 LEFT JOIN expense_receipts er
   ON er.expense_id = e.id
  AND er.trip_id = e.trip_id
+LEFT JOIN trip_places live_place
+  ON live_place.id = e.trip_place_id
+ AND live_place.trip_id = e.trip_id
 LEFT JOIN trip_participants payer
   ON payer.id = e.payer_participant_id
  AND payer.trip_id = e.trip_id
@@ -518,6 +531,10 @@ RETURNING
 UPDATE expenses
 SET
   title = sqlc.narg(title),
+  trip_place_id = COALESCE(sqlc.narg(trip_place_id)::uuid, trip_place_id),
+  place_name = COALESCE(sqlc.narg(place_name), place_name),
+  place_address = COALESCE(sqlc.narg(place_address), place_address),
+  place_type = COALESCE(sqlc.narg(place_type), place_type),
   amount_minor = sqlc.arg(amount_minor),
   currency = COALESCE(sqlc.narg(currency), currency),
   expense_category = COALESCE(sqlc.narg(expense_category), expense_category),

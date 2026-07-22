@@ -2,6 +2,8 @@ import {
   OpenAPI,
   TripsService,
   type CreateExpenseReceiptDraftResponse,
+  type CreateManualTripPlaceRequest,
+  type CreateManualTripPlaceResponse,
   type CreateQuickExpenseRequest,
   type CreateQuickExpenseResponse,
   type CreateTripExpenseRequest,
@@ -74,6 +76,13 @@ export async function createTripExpense(
   request: CreateTripExpenseRequest,
 ): Promise<CreateTripExpenseResponse> {
   return runAuthenticatedRequest(() => TripsService.createTripExpense(tripId, request));
+}
+
+export async function createManualTripPlace(
+  tripId: string,
+  request: CreateManualTripPlaceRequest,
+): Promise<CreateManualTripPlaceResponse> {
+  return runAuthenticatedRequest(() => TripsService.createManualTripPlace(tripId, request));
 }
 
 export class ExpenseReceiptUploadError extends Error {

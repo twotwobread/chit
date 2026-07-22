@@ -44,6 +44,7 @@ export type QuickExpenseFormSubmitStateInput = {
   payerParticipantId: string | null;
   saving: boolean;
   selectedItemId: string | null;
+  selectedTripPlaceId: string | null;
   selectedSplitParticipantIds: string[];
   splitPolicy: QuickExpenseSplitPolicy;
   titleInput: string;
@@ -61,6 +62,7 @@ export function buildQuickExpenseFormSubmitState({
   payerParticipantId,
   saving,
   selectedItemId,
+  selectedTripPlaceId,
   selectedSplitParticipantIds,
   splitPolicy,
   titleInput,
@@ -79,6 +81,7 @@ export function buildQuickExpenseFormSubmitState({
           expenseCategory,
           selectedTripDayId: viewModel.selectedTripDayId,
           scheduleItemId: selectedItemId,
+          tripPlaceId: selectedTripPlaceId,
           splitPolicy,
           participantIds: selectedSplitParticipantIds,
           manualSplitInputs: activeManualSplitInputs,
@@ -91,6 +94,7 @@ export function buildQuickExpenseFormSubmitState({
           currency: viewModel.currency,
           expenseCategory,
           scheduleItemId: selectedItemId,
+          tripPlaceId: selectedTripPlaceId,
           splitPolicy,
           participantIds: selectedSplitParticipantIds,
           manualSplitInputs: activeManualSplitInputs,
@@ -112,6 +116,7 @@ export function QuickExpenseForm({
   onBack,
   onClearReceiptDraft,
   onClearTripDay,
+  onCreateReceiptPlaceCandidate,
   onSelectCurrency,
   onSelectExpenseCategory,
   onSelectItem,
@@ -133,8 +138,10 @@ export function QuickExpenseForm({
   receiptBusy,
   receiptDraft,
   receiptMessage,
+  receiptPlaceBusy,
   saving,
   selectedItemId,
+  selectedTripPlaceId,
   selectedSplitParticipantIds,
   showActions = true,
   splitPolicy,
@@ -154,6 +161,7 @@ export function QuickExpenseForm({
   mode: 'today' | 'settlement';
   onBack: () => void;
   onClearTripDay: () => void;
+  onCreateReceiptPlaceCandidate: () => void;
   onSelectCurrency: (currency: SupportedCurrency) => void;
   onSelectExpenseCategory: (expenseCategory: ExpenseCategory) => void;
   onSelectItem: (itemId: string) => void;
@@ -177,10 +185,12 @@ export function QuickExpenseForm({
   receiptBusy: boolean;
   receiptDraft: ExpenseReceiptDraft | null;
   receiptMessage: string | null;
+  receiptPlaceBusy: boolean;
   onClearReceiptDraft: () => void;
   onReceiptDraftCreated: (draft: ExpenseReceiptDraft) => void;
   saving: boolean;
   selectedItemId: string | null;
+  selectedTripPlaceId: string | null;
   selectedSplitParticipantIds: string[];
   showActions?: boolean;
   splitPolicy: QuickExpenseSplitPolicy;
@@ -202,6 +212,7 @@ export function QuickExpenseForm({
     payerParticipantId,
     saving,
     selectedItemId,
+    selectedTripPlaceId,
     selectedSplitParticipantIds,
     splitPolicy,
     titleInput,
@@ -252,6 +263,10 @@ export function QuickExpenseForm({
     setEntryMode('manual');
   };
   const entryChoice = buildQuickExpenseEntryChoiceViewModel({ hasTripId: Boolean(tripId) });
+  const receiptPlaceCandidateName = receiptDraft?.extraction.placeCandidateName?.trim() || null;
+  const receiptPlaceCandidateAddress = receiptDraft?.extraction.placeCandidateAddress?.trim() || null;
+  const receiptPlaceCandidateWarnings = receiptDraft?.extraction.placeCandidateWarnings ?? [];
+  const showReceiptPlaceCandidate = Boolean(receiptPlaceCandidateName && receiptPlaceCandidateAddress);
 
   if (entryMode === 'choice' && !receiptDraft) {
     return (
@@ -400,6 +415,24 @@ export function QuickExpenseForm({
               </Text>
             ) : null}
             {receiptMessage ? <Text style={styles.helper}>{receiptMessage}</Text> : null}
+            {showReceiptPlaceCandidate ? (
+              <View style={styles.noticeBox}>
+                <Text style={styles.label}>영수증 장소 후보</Text>
+                <Text style={styles.helper}>{receiptPlaceCandidateName}</Text>
+                <Text style={styles.helper}>{receiptPlaceCandidateAddress}</Text>
+                <Text style={styles.helper}>확인하면 여행 장소로만 등록하고 일정에는 추가하지 않아요.</Text>
+                {receiptPlaceCandidateWarnings[0] ? (
+                  <Text style={styles.helper}>{receiptPlaceCandidateWarnings[0]}</Text>
+                ) : null}
+                <SecondaryButton
+                  disabled={saving || receiptPlaceBusy || Boolean(selectedTripPlaceId)}
+                  label={
+                    selectedTripPlaceId ? '장소로 등록됨' : receiptPlaceBusy ? '장소 등록 중...' : '여행 장소로 등록'
+                  }
+                  onPress={onCreateReceiptPlaceCandidate}
+                />
+              </View>
+            ) : null}
             <View style={styles.amountRow}>
               <SecondaryButton
                 disabled={saving || receiptBusy || Boolean(viewModel.emptyMessage) || !tripId}

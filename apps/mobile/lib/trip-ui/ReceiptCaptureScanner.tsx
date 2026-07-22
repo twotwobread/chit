@@ -15,6 +15,7 @@ import {
   validateKoreanReceiptTextParts,
   type ReceiptOCRTextPart,
 } from '../trips/receipt-ocr';
+import { isReceiptOCRFixtureModeEnabled } from '../trips/receipt-ocr-fixture';
 import { recognizeKoreanReceiptText } from '../trips/receipt-ocr-native';
 
 type CapturedReceiptImage = ExpenseReceiptDraftImageInput & {
@@ -22,6 +23,9 @@ type CapturedReceiptImage = ExpenseReceiptDraftImageInput & {
 };
 
 type ScannerStep = 'mode' | 'capture' | 'review' | 'recognizing' | 'failure';
+
+const receiptOCRFixtureModeCopy =
+  '개발 OCR fixture 사용 중이에요. 촬영 이미지는 업로드하고, 글자만 IMG_8925 결과로 보내 실제 OpenAI 정제를 확인해요.';
 
 export function ReceiptCaptureScanner({
   onClose,
@@ -46,6 +50,7 @@ export function ReceiptCaptureScanner({
     '이미지를 인식하지 못했어요. 다시 촬영하거나 직접 입력해주세요.',
   );
   const [takingPicture, setTakingPicture] = useState(false);
+  const fixtureOCRModeEnabled = isReceiptOCRFixtureModeEnabled();
 
   useEffect(() => {
     if (!visible) {
@@ -109,7 +114,7 @@ export function ReceiptCaptureScanner({
     try {
       const parts: ReceiptOCRTextPart[] = [];
       for (const image of capturedImages) {
-        parts.push({ role: image.role, text: await recognizeKoreanReceiptText(image.uri) });
+        parts.push({ role: image.role, text: await recognizeKoreanReceiptText(image.uri, { role: image.role }) });
       }
       const textParts = buildReceiptOCRTextParts({ mode, parts });
       const validation = validateKoreanReceiptTextParts(textParts);
@@ -207,6 +212,7 @@ export function ReceiptCaptureScanner({
           <View style={scannerStyles.card}>
             <Text style={scannerStyles.cardTitle}>초안 만들기 전 확인</Text>
             <Text style={scannerStyles.helper}>글자가 흐리면 다시 촬영해주세요. 선명하면 바로 초안을 만들게요.</Text>
+            {fixtureOCRModeEnabled ? <Text style={scannerStyles.helper}>{receiptOCRFixtureModeCopy}</Text> : null}
             <View style={scannerStyles.previewRow}>
               {capturedImages.map((image) => (
                 <Image key={image.role} source={{ uri: image.uri }} style={scannerStyles.previewImage} />
@@ -225,7 +231,9 @@ export function ReceiptCaptureScanner({
           <View style={scannerStyles.card}>
             <ActivityIndicator color={theme.color.primary} />
             <Text style={scannerStyles.cardTitle}>칫, 글자를 읽는 중</Text>
-            <Text style={scannerStyles.helper}>금액과 날짜 초안을 만들고 있어요.</Text>
+            <Text style={scannerStyles.helper}>
+              {fixtureOCRModeEnabled ? receiptOCRFixtureModeCopy : '금액과 날짜 초안을 만들고 있어요.'}
+            </Text>
           </View>
         ) : null}
 

@@ -31,6 +31,8 @@ export type { CreateGoogleTripPlaceBookmarkResponse } from './models/CreateGoogl
 export type { CreateManualDayLodgingPlaceRequest } from './models/CreateManualDayLodgingPlaceRequest';
 export type { CreateManualScheduleItemRequest } from './models/CreateManualScheduleItemRequest';
 export type { CreateManualScheduleItemResponse } from './models/CreateManualScheduleItemResponse';
+export type { CreateManualTripPlaceRequest } from './models/CreateManualTripPlaceRequest';
+export type { CreateManualTripPlaceResponse } from './models/CreateManualTripPlaceResponse';
 export type { CreateQuickExpenseRequest } from './models/CreateQuickExpenseRequest';
 export type { CreateQuickExpenseResponse } from './models/CreateQuickExpenseResponse';
 export type { CreateRoutePreviewRequest } from './models/CreateRoutePreviewRequest';

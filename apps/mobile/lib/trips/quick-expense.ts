@@ -421,6 +421,7 @@ export function buildQuickExpenseViewModel({
   selectedItemId,
   selectedSplitParticipantIds,
   selectedTripDayId,
+  selectedTripPlaceId,
   shouldChooseItem,
 }: {
   amountInput?: string;
@@ -431,6 +432,7 @@ export function buildQuickExpenseViewModel({
   selectedItemId: string | null;
   selectedSplitParticipantIds?: string[];
   selectedTripDayId?: string | null;
+  selectedTripPlaceId?: string | null;
   shouldChooseItem: boolean;
 }): QuickExpenseViewModel {
   const itineraryList = itineraries && itineraries.length > 0 ? orderedItineraries(itineraries) : [itinerary];
@@ -505,7 +507,7 @@ export function buildQuickExpenseViewModel({
           : '현재 일정을 확정할 수 없어 오늘 일정에서 연결할 일정을 선택해주세요.'
         : null,
     emptyMessage:
-      itemOptions.length === 0
+      itemOptions.length === 0 && !selectedTripPlaceId
         ? isAllDayMode
           ? null
           : '오늘 일정에 등록된 일정이 없어 지출을 저장할 수 없어요.'
@@ -722,6 +724,7 @@ export function buildQuickExpenseMemoUpdateRequest({
     ...(createRequest.splits ? { splits: createRequest.splits } : {}),
     memo,
     scheduleItemId: createRequest.scheduleItemId,
+    tripPlaceId: createRequest.tripPlaceId,
     ...(createRequest.includeInSettlement !== undefined
       ? { includeInSettlement: createRequest.includeInSettlement }
       : {}),
@@ -732,6 +735,7 @@ export function buildCreateQuickExpenseRequest({
   amountInput,
   currency,
   scheduleItemId,
+  tripPlaceId,
   expenseCategory,
   splitPolicy,
   participantIds,
@@ -743,6 +747,7 @@ export function buildCreateQuickExpenseRequest({
   amountInput: string;
   currency: SupportedCurrency;
   scheduleItemId: string | null;
+  tripPlaceId?: string | null;
   expenseCategory?: ExpenseCategory;
   splitPolicy: QuickExpenseSplitPolicy;
   participantIds: string[];
@@ -759,15 +764,16 @@ export function buildCreateQuickExpenseRequest({
     manualSplitInputs,
     payerParticipantId,
   });
-  if (!scheduleItemId) {
-    validation.errors.item = '지출을 연결할 일정을 선택해주세요.';
+  const normalizedTripPlaceId = tripPlaceId?.trim() || null;
+  if (!scheduleItemId && !normalizedTripPlaceId) {
+    validation.errors.item = '지출을 연결할 일정이나 영수증 장소를 선택해주세요.';
   }
 
   if (
     Object.keys(validation.errors).length > 0 ||
     !validation.parsedAmount.ok ||
     !payerParticipantId ||
-    !scheduleItemId
+    (!scheduleItemId && !normalizedTripPlaceId)
   ) {
     return { ok: false, errors: validation.errors };
   }
@@ -777,6 +783,7 @@ export function buildCreateQuickExpenseRequest({
       ok: true,
       request: {
         scheduleItemId,
+        tripPlaceId: normalizedTripPlaceId,
         amountMinor: validation.parsedAmount.amountMinor,
         currency,
         ...(expenseCategory ? { expenseCategory } : {}),
@@ -793,6 +800,7 @@ export function buildCreateQuickExpenseRequest({
     ok: true,
     request: {
       scheduleItemId,
+      tripPlaceId: normalizedTripPlaceId,
       amountMinor: validation.parsedAmount.amountMinor,
       currency,
       ...(expenseCategory ? { expenseCategory } : {}),
@@ -812,6 +820,7 @@ export function buildCreateTripExpenseRequest({
   currency,
   selectedTripDayId,
   scheduleItemId,
+  tripPlaceId,
   expenseCategory,
   splitPolicy,
   participantIds,
@@ -827,6 +836,7 @@ export function buildCreateTripExpenseRequest({
   currency: SupportedCurrency;
   selectedTripDayId: string | null;
   scheduleItemId: string | null;
+  tripPlaceId?: string | null;
   expenseCategory?: ExpenseCategory;
   splitPolicy: QuickExpenseSplitPolicy;
   participantIds: string[];
@@ -845,7 +855,8 @@ export function buildCreateTripExpenseRequest({
     payerParticipantId,
   });
   const title = titleInput.trim();
-  if (title === '' && !scheduleItemId) {
+  const normalizedTripPlaceId = tripPlaceId?.trim() || null;
+  if (title === '' && !scheduleItemId && !normalizedTripPlaceId) {
     validation.errors.title = '지출명을 입력해주세요.';
   }
   if (!isDateOnlyString(expenseDate)) {
@@ -862,6 +873,7 @@ export function buildCreateTripExpenseRequest({
     expenseDate,
     tripDayId: selectedTripDayId,
     scheduleItemId,
+    tripPlaceId: normalizedTripPlaceId,
     amountMinor: validation.parsedAmount.amountMinor,
     currency,
     ...(expenseCategory ? { expenseCategory } : {}),

@@ -227,6 +227,35 @@ func (s apiServer) ListTripPlaces(w http.ResponseWriter, r *http.Request, tripId
 	writeJSON(w, http.StatusOK, listTripPlacesResponseToOpenAPI(result))
 }
 
+func (s apiServer) CreateManualTripPlace(w http.ResponseWriter, r *http.Request, tripId string) {
+	if s.auth == nil || s.trips == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "manual trip place creation is not configured", nil)
+		return
+	}
+
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	var body openapi.CreateManualTripPlaceJSONRequestBody
+	if !decodeJSON(w, r, &body) {
+		return
+	}
+
+	result, err := s.trips.CreateManualTripPlace(r.Context(), authContext.UserID, tripId, trip.CreateManualTripPlaceInput{
+		Name:      body.Name,
+		Address:   body.Address,
+		PlaceType: string(body.PlaceType),
+	})
+	if err != nil {
+		writeTripDetailError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, createManualTripPlaceResponseToOpenAPI(result))
+}
+
 func (s apiServer) SetDayLodgingPlace(w http.ResponseWriter, r *http.Request, tripId string, tripDayId string) {
 	if s.auth == nil || s.trips == nil {
 		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "day lodging place is not configured", nil)
@@ -402,6 +431,7 @@ func (s apiServer) CreateTripExpense(w http.ResponseWriter, r *http.Request, tri
 		ExpenseDate:         body.ExpenseDate.Time.Format("2006-01-02"),
 		TripDayID:           body.TripDayId,
 		ScheduleItemID:      body.ScheduleItemId,
+		TripPlaceID:         body.TripPlaceId,
 		AmountMinor:         body.AmountMinor,
 		Currency:            optionalCurrencyFromOpenAPI(body.Currency),
 		ExpenseCategory:     optionalExpenseCategoryFromOpenAPI(body.ExpenseCategory),
@@ -462,6 +492,7 @@ func (s apiServer) UpdateTripExpense(w http.ResponseWriter, r *http.Request, tri
 		Memo:                body.Memo,
 		Title:               body.Title,
 		ScheduleItemID:      body.ScheduleItemId,
+		TripPlaceID:         body.TripPlaceId,
 		IncludeInSettlement: body.IncludeInSettlement,
 	})
 	if err != nil {
@@ -528,6 +559,7 @@ func (s apiServer) UpdateExpense(w http.ResponseWriter, r *http.Request, tripId 
 		Memo:                body.Memo,
 		Title:               body.Title,
 		ScheduleItemID:      body.ScheduleItemId,
+		TripPlaceID:         body.TripPlaceId,
 		IncludeInSettlement: body.IncludeInSettlement,
 	})
 	if err != nil {
@@ -571,6 +603,7 @@ func (s apiServer) CreateQuickExpense(w http.ResponseWriter, r *http.Request, tr
 
 	result, err := s.trips.CreateQuickExpense(r.Context(), authContext.UserID, tripId, tripDayId, trip.CreateQuickExpenseInput{
 		ScheduleItemID:      body.ScheduleItemId,
+		TripPlaceID:         body.TripPlaceId,
 		AmountMinor:         body.AmountMinor,
 		Currency:            optionalCurrencyFromOpenAPI(body.Currency),
 		ExpenseCategory:     optionalExpenseCategoryFromOpenAPI(body.ExpenseCategory),

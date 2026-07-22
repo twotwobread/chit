@@ -7,6 +7,8 @@ import type { CreateExpenseReceiptDraftResponse } from '../models/CreateExpenseR
 import type { CreateManualDayLodgingPlaceRequest } from '../models/CreateManualDayLodgingPlaceRequest';
 import type { CreateManualScheduleItemRequest } from '../models/CreateManualScheduleItemRequest';
 import type { CreateManualScheduleItemResponse } from '../models/CreateManualScheduleItemResponse';
+import type { CreateManualTripPlaceRequest } from '../models/CreateManualTripPlaceRequest';
+import type { CreateManualTripPlaceResponse } from '../models/CreateManualTripPlaceResponse';
 import type { CreateQuickExpenseRequest } from '../models/CreateQuickExpenseRequest';
 import type { CreateQuickExpenseResponse } from '../models/CreateQuickExpenseResponse';
 import type { CreateRoutePreviewRequest } from '../models/CreateRoutePreviewRequest';
@@ -629,6 +631,35 @@ export class TripsService {
             path: {
                 'tripId': tripId,
             },
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                403: `Forbidden.`,
+                404: `Trip not found.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
+     * Create a manual trip place
+     * Creates a manual trip-level place for an authenticated trip participant. Does not create a Day lodging target or schedule item.
+     * @param tripId
+     * @param requestBody
+     * @returns CreateManualTripPlaceResponse Manual trip place created.
+     * @throws ApiError
+     */
+    public static createManualTripPlace(
+        tripId: string,
+        requestBody: CreateManualTripPlaceRequest,
+    ): CancelablePromise<CreateManualTripPlaceResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/trips/{tripId}/places',
+            path: {
+                'tripId': tripId,
+            },
+            body: requestBody,
+            mediaType: 'application/json',
             errors: {
                 400: `Validation error.`,
                 401: `Unauthorized.`,

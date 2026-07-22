@@ -111,6 +111,8 @@ const receiptExtractionSystemPrompt = `You extract an expense draft from OCR tex
 Return only fields allowed by the JSON schema. Use null when the receipt does not support a value.
 Never invent payer, participants, split policy, schedule item, place binding, or settlement inclusion.
 Prefer the final paid total over subtotals. Convert monetary values to minor units for the detected currency.
+Minor-unit rules are currency-specific: KRW, JPY, and VND are zero-decimal currencies with multiplier 1, so 17,800원 must be totalAmountMinor 17800, not 1780000. USD, EUR, GBP, AUD, CAD, SGD, HKD, TWD, THB, PHP, and CNY usually use multiplier 100 when amounts include major units.
+Extract merchantAddress when the receipt has a business/store address. For explicit user confirmation only, set placeCandidateName/placeCandidateAddress when the merchant looks like a visitable trip place; otherwise use null. Do not imply that the candidate is already saved.
 Use ISO date YYYY-MM-DD and 24-hour HH:MM when present. If confidence is not high, include concise warnings.`
 
 type openAIChatRequest struct {
@@ -149,10 +151,11 @@ func receiptExtractionJSONSchema() map[string]any {
 		"type":                 "object",
 		"additionalProperties": false,
 		"required": []string{
-			"merchantName", "expenseTitle", "expenseDate", "expenseTime", "currency", "totalAmountMinor", "taxAmountMinor", "serviceChargeMinor", "lineItems", "confidence", "warnings",
+			"merchantName", "merchantAddress", "expenseTitle", "expenseDate", "expenseTime", "currency", "totalAmountMinor", "taxAmountMinor", "serviceChargeMinor", "lineItems", "confidence", "warnings", "placeCandidateName", "placeCandidateAddress", "placeCandidateConfidence", "placeCandidateWarnings",
 		},
 		"properties": map[string]any{
 			"merchantName":       map[string]any{"type": []string{"string", "null"}},
+			"merchantAddress":    map[string]any{"type": []string{"string", "null"}},
 			"expenseTitle":       map[string]any{"type": []string{"string", "null"}},
 			"expenseDate":        map[string]any{"type": []string{"string", "null"}, "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
 			"expenseTime":        map[string]any{"type": []string{"string", "null"}, "pattern": "^\\d{2}:\\d{2}$"},
@@ -174,8 +177,12 @@ func receiptExtractionJSONSchema() map[string]any {
 					},
 				},
 			},
-			"confidence": map[string]any{"type": "string", "enum": []string{ExpenseReceiptConfidenceHigh, ExpenseReceiptConfidenceMedium, ExpenseReceiptConfidenceLow}},
-			"warnings":   map[string]any{"type": "array", "maxItems": 10, "items": map[string]any{"type": "string"}},
+			"confidence":               map[string]any{"type": "string", "enum": []string{ExpenseReceiptConfidenceHigh, ExpenseReceiptConfidenceMedium, ExpenseReceiptConfidenceLow}},
+			"warnings":                 map[string]any{"type": "array", "maxItems": 10, "items": map[string]any{"type": "string"}},
+			"placeCandidateName":       map[string]any{"type": []string{"string", "null"}},
+			"placeCandidateAddress":    map[string]any{"type": []string{"string", "null"}},
+			"placeCandidateConfidence": map[string]any{"type": []string{"string", "null"}, "enum": []any{ExpenseReceiptConfidenceHigh, ExpenseReceiptConfidenceMedium, ExpenseReceiptConfidenceLow, nil}},
+			"placeCandidateWarnings":   map[string]any{"type": "array", "maxItems": 5, "items": map[string]any{"type": "string"}},
 		},
 	}
 }

@@ -11,7 +11,13 @@ import {
 } from '@i-um/api-contract';
 
 import { apiErrorStatus, clearStoredSessionOnAuthError, isApiStatus } from '../auth/errors';
-import { cancelExpenseReceiptDraft, createQuickExpense, createTripExpense, updateExpense } from '../trips/expense-api';
+import {
+  cancelExpenseReceiptDraft,
+  createManualTripPlace,
+  createQuickExpense,
+  createTripExpense,
+  updateExpense,
+} from '../trips/expense-api';
 import { getTripDayItinerary, listTripScheduleItems } from '../trips/itinerary-api';
 import { listTripParticipants } from '../trips/trip-api';
 import { getScheduleItems } from '../trips/day-itinerary';
@@ -97,7 +103,9 @@ export function useQuickExpenseController() {
   const [formMessage, setFormMessage] = useState<string | null>(null);
   const [savedSummary, setSavedSummary] = useState<QuickExpenseSavedSplitSummary | null>(null);
   const [receiptDraft, setReceiptDraft] = useState<ExpenseReceiptDraft | null>(null);
+  const [selectedTripPlaceId, setSelectedTripPlaceId] = useState<string | null>(null);
   const [receiptBusy, setReceiptBusy] = useState(false);
+  const [receiptPlaceBusy, setReceiptPlaceBusy] = useState(false);
   const [receiptMessage, setReceiptMessage] = useState<string | null>(null);
 
   const handleAuthError = useCallback(async (error: unknown) => {
@@ -121,7 +129,9 @@ export function useQuickExpenseController() {
     setFormMessage(null);
     setSavedSummary(null);
     setReceiptDraft(null);
+    setSelectedTripPlaceId(null);
     setReceiptBusy(false);
+    setReceiptPlaceBusy(false);
     setReceiptMessage(null);
 
     const shellDetail = resolveTripShellDetail(shellState, tripId);
@@ -169,6 +179,7 @@ export function useQuickExpenseController() {
       setAmountInput('');
       setMemoInput('');
       setReceiptDraft(null);
+      setSelectedTripPlaceId(null);
       setReceiptMessage(null);
       setState({
         status: 'success',
@@ -232,6 +243,7 @@ export function useQuickExpenseController() {
 
   const selectItem = (itemId: string) => {
     setSelectedItemId(itemId);
+    setSelectedTripPlaceId(null);
     if (state.status === 'success') {
       setSelectedTripDayId(resolveQuickExpenseItemDayId(state.itineraries, itemId) ?? selectedTripDayId);
       setExpenseCategory(
@@ -312,6 +324,7 @@ export function useQuickExpenseController() {
       void cancelExpenseReceiptDraft(tripId, previousDraft.id).catch(() => undefined);
     }
     setReceiptDraft(draft);
+    setSelectedTripPlaceId(null);
     setReceiptMessage(null);
     setFormMessage(null);
     applyReceiptDraft(draft, state);
@@ -323,6 +336,7 @@ export function useQuickExpenseController() {
     }
     const draft = receiptDraft;
     setReceiptDraft(null);
+    setSelectedTripPlaceId(null);
     setReceiptMessage(null);
     setReceiptBusy(true);
     try {
@@ -374,6 +388,39 @@ export function useQuickExpenseController() {
     );
   };
 
+  const createReceiptPlaceCandidate = async () => {
+    if (!tripId || !receiptDraft || receiptPlaceBusy) {
+      return;
+    }
+    const name =
+      receiptDraft.extraction.placeCandidateName?.trim() || receiptDraft.extraction.merchantName?.trim() || '';
+    const address =
+      receiptDraft.extraction.placeCandidateAddress?.trim() || receiptDraft.extraction.merchantAddress?.trim() || '';
+    if (!name || !address) {
+      setReceiptMessage('등록할 장소 후보의 이름과 주소를 확인해주세요.');
+      return;
+    }
+    setReceiptPlaceBusy(true);
+    setReceiptMessage(null);
+    try {
+      const response = await createManualTripPlace(tripId, { name, address, placeType: 'food' });
+      setSelectedTripPlaceId(response.place.id);
+      setSelectedItemId(null);
+      setExpenseCategory('food');
+      setErrors((current) => ({ ...current, item: undefined }));
+      setReceiptMessage(
+        `${response.place.name}을 여행 장소로 등록했어요. 일정에는 추가하지 않고 이 지출에만 연결해요.`,
+      );
+    } catch (error) {
+      if (await handleAuthError(error)) {
+        return;
+      }
+      setReceiptMessage('장소를 등록할 수 없어요. 이름과 주소를 확인한 뒤 다시 시도해주세요.');
+    } finally {
+      setReceiptPlaceBusy(false);
+    }
+  };
+
   const submit = async () => {
     if (state.status !== 'success' || !tripId || !date || saving) {
       return;
@@ -399,6 +446,7 @@ export function useQuickExpenseController() {
         }),
       );
       setReceiptDraft(null);
+      setSelectedTripPlaceId(null);
       setReceiptMessage(null);
     } catch (error) {
       if (error instanceof QuickExpenseValidationAbort) {
@@ -437,6 +485,7 @@ export function useQuickExpenseController() {
       expenseCategory,
       selectedTripDayId,
       scheduleItemId: selectedItemId,
+      tripPlaceId: selectedTripPlaceId,
       splitPolicy,
       participantIds: selectedSplitParticipantIds,
       manualSplitInputs: activeManualSplitInputs,
@@ -464,6 +513,7 @@ export function useQuickExpenseController() {
       currency: state.currency,
       expenseCategory,
       scheduleItemId: selectedItemId,
+      tripPlaceId: selectedTripPlaceId,
       splitPolicy,
       participantIds: selectedSplitParticipantIds,
       manualSplitInputs: activeManualSplitInputs,
@@ -476,7 +526,8 @@ export function useQuickExpenseController() {
       throw new QuickExpenseValidationAbort();
     }
 
-    const expenseTripDayId = resolveQuickExpenseItemDayId(state.itineraries, selectedItemId) ?? date!;
+    const expenseTripDayId =
+      resolveQuickExpenseItemDayId(state.itineraries, selectedItemId) ?? selectedTripDayId ?? date!;
     const response = await createQuickExpense(tripId!, expenseTripDayId, validation.request);
     const memoUpdateRequest = buildQuickExpenseMemoUpdateRequest({ createRequest: validation.request, memoInput });
     if (memoUpdateRequest) {
@@ -518,7 +569,8 @@ export function useQuickExpenseController() {
           selectedItemId,
           selectedSplitParticipantIds,
           selectedTripDayId,
-          shouldChooseItem: state.shouldChooseItem || selectedItemId === null,
+          selectedTripPlaceId,
+          shouldChooseItem: state.shouldChooseItem || (selectedItemId === null && selectedTripPlaceId === null),
         })
       : null;
 
@@ -529,6 +581,7 @@ export function useQuickExpenseController() {
     clearReceiptDraft,
     clearTripDay,
     completeSavedExpense,
+    createReceiptPlaceCandidate,
     errors,
     expenseCategory,
     expenseDateInput,
@@ -542,6 +595,7 @@ export function useQuickExpenseController() {
     receiptBusy,
     receiptDraft,
     receiptMessage,
+    receiptPlaceBusy,
     savedSummary,
     saving,
     selectCurrency,
@@ -553,6 +607,7 @@ export function useQuickExpenseController() {
     selectedItemId,
     selectedSplitParticipantIds,
     selectedTripDayId,
+    selectedTripPlaceId,
     setMemoInput,
     splitPolicy,
     state,

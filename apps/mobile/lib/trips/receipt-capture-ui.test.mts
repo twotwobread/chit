@@ -44,3 +44,22 @@ test('receipt capture flow uses branded verification recovery copy and accessibl
   assert.match(scannerSource, /accessibilityLabel="영수증 다시 촬영하기"/);
   assert.match(scannerSource, /accessibilityLabel="영수증 직접 입력으로 전환"/);
 });
+
+test('receipt capture fixture OCR mode passes image roles and explains that OpenAI cleanup stays real', () => {
+  const scannerSource = source('lib/trip-ui/ReceiptCaptureScanner.tsx');
+
+  assert.match(scannerSource, /recognizeKoreanReceiptText\(image\.uri, \{ role: image\.role \}\)/);
+  assert.match(scannerSource, /개발 OCR fixture 사용 중이에요\./);
+  assert.match(scannerSource, /실제 OpenAI 정제를 확인해요\./);
+});
+
+test('receipt draft place candidate requires explicit trip-place-only confirmation', () => {
+  const formSource = source('lib/trip-ui/QuickExpenseEntryParts.tsx');
+  const controllerSource = source('lib/trip-ui/useQuickExpenseController.ts');
+
+  assert.match(formSource, /영수증 장소 후보/);
+  assert.match(formSource, /여행 장소로 등록/);
+  assert.match(formSource, /일정에는 추가하지 않아요/);
+  assert.match(controllerSource, /createManualTripPlace\(tripId, \{ name, address, placeType: 'food' \}\)/);
+  assert.doesNotMatch(controllerSource, /CreateManualScheduleItem|createManualScheduleItem/);
+});
