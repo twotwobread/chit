@@ -314,7 +314,7 @@ func TestExpenseDisplayUsesLiveRowsThenFallback(t *testing.T) {
 	created, err := store.CreateQuickExpense(ctx, trip.CreateQuickExpenseRecord{
 		TripID:             tripID,
 		TripDayID:          tripDayID,
-		ScheduleItemID:     scheduleItemID,
+		ScheduleItemID:     stringPtr(scheduleItemID),
 		AmountMinor:        1001,
 		PayerParticipantID: ownerParticipantID,
 		SplitPolicy:        trip.ExpenseSplitPolicyEqual,

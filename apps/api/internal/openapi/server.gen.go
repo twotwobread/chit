@@ -379,6 +379,18 @@ type CreateManualScheduleItemResponse struct {
 	ScheduleItem ScheduleItem `json:"scheduleItem"`
 }
 
+// CreateManualTripPlaceRequest defines model for CreateManualTripPlaceRequest.
+type CreateManualTripPlaceRequest struct {
+	Address   string        `json:"address"`
+	Name      string        `json:"name"`
+	PlaceType TripPlaceType `json:"placeType"`
+}
+
+// CreateManualTripPlaceResponse defines model for CreateManualTripPlaceResponse.
+type CreateManualTripPlaceResponse struct {
+	Place TripPlaceSummary `json:"place"`
+}
+
 // CreateQuickExpenseRequest defines model for CreateQuickExpenseRequest.
 type CreateQuickExpenseRequest struct {
 	// AmountMinor Positive amount in currency minor units.
@@ -398,14 +410,17 @@ type CreateQuickExpenseRequest struct {
 	// ReceiptDraftId Optional reviewed receipt draft to promote as the saved expense receipt. Must belong to the same trip and authenticated user.
 	ReceiptDraftId *string `json:"receiptDraftId"`
 
-	// ScheduleItemId Required schedule item for the selected Day. Must belong to tripId/tripDayId.
-	ScheduleItemId string `json:"scheduleItemId"`
+	// ScheduleItemId Optional schedule item for the selected Day. Must belong to tripId/tripDayId. When present, its place is authoritative.
+	ScheduleItemId *string `json:"scheduleItemId"`
 
 	// SplitPolicy Persisted split policy for current quick expenses.
 	SplitPolicy ExpenseSplitPolicy `json:"splitPolicy"`
 
 	// Splits Required only when splitPolicy is manual. Must be omitted for equal.
 	Splits *[]ManualExpenseSplitInput `json:"splits,omitempty"`
+
+	// TripPlaceId Optional trip-level place to link for a Day expense when no schedule item is selected. Does not create a schedule item.
+	TripPlaceId *string `json:"tripPlaceId"`
 }
 
 // CreateQuickExpenseResponse defines model for CreateQuickExpenseResponse.
@@ -439,7 +454,7 @@ type CreateTripExpenseRequest struct {
 	// ReceiptDraftId Optional reviewed receipt draft to promote as the saved expense receipt. Must belong to the same trip and authenticated user.
 	ReceiptDraftId *string `json:"receiptDraftId"`
 
-	// ScheduleItemId Optional related schedule item.
+	// ScheduleItemId Optional related schedule item. When present, the schedule item place is authoritative and takes precedence over tripPlaceId.
 	ScheduleItemId *string `json:"scheduleItemId"`
 
 	// SplitPolicy Persisted split policy for current quick expenses.
@@ -453,6 +468,9 @@ type CreateTripExpenseRequest struct {
 
 	// TripDayId Optional related Day. If scheduleItemId is present, the server derives and validates the Day from the schedule item.
 	TripDayId *string `json:"tripDayId"`
+
+	// TripPlaceId Optional trip-level place to link when no schedule item is selected. Does not create or require a schedule item.
+	TripPlaceId *string `json:"tripPlaceId"`
 }
 
 // CreateTripExpenseResponse defines model for CreateTripExpenseResponse.
@@ -639,17 +657,32 @@ type ExpenseReceiptDraft struct {
 
 // ExpenseReceiptExtraction defines model for ExpenseReceiptExtraction.
 type ExpenseReceiptExtraction struct {
-	Confidence         ExpenseReceiptConfidence      `json:"confidence"`
-	Currency           *SupportedCurrency            `json:"currency"`
-	ExpenseDate        *openapi_types.Date           `json:"expenseDate"`
-	ExpenseTime        *string                       `json:"expenseTime"`
-	ExpenseTitle       *string                       `json:"expenseTitle"`
-	LineItems          []ExpenseReceiptLineItemDraft `json:"lineItems"`
-	MerchantName       *string                       `json:"merchantName"`
-	ServiceChargeMinor *int64                        `json:"serviceChargeMinor"`
-	TaxAmountMinor     *int64                        `json:"taxAmountMinor"`
-	TotalAmountMinor   *int64                        `json:"totalAmountMinor"`
-	Warnings           []string                      `json:"warnings"`
+	Confidence   ExpenseReceiptConfidence      `json:"confidence"`
+	Currency     *SupportedCurrency            `json:"currency"`
+	ExpenseDate  *openapi_types.Date           `json:"expenseDate"`
+	ExpenseTime  *string                       `json:"expenseTime"`
+	ExpenseTitle *string                       `json:"expenseTitle"`
+	LineItems    []ExpenseReceiptLineItemDraft `json:"lineItems"`
+
+	// MerchantAddress Merchant/business address from the receipt when present. Does not imply a saved TripPlace.
+	MerchantAddress *string `json:"merchantAddress"`
+	MerchantName    *string `json:"merchantName"`
+
+	// PlaceCandidateAddress Suggested trip place address for explicit user confirmation. Never auto-register.
+	PlaceCandidateAddress *string `json:"placeCandidateAddress"`
+
+	// PlaceCandidateConfidence Confidence for the place candidate only.
+	PlaceCandidateConfidence *ExpenseReceiptConfidence `json:"placeCandidateConfidence"`
+
+	// PlaceCandidateName Suggested trip place name for explicit user confirmation. Never auto-register.
+	PlaceCandidateName *string `json:"placeCandidateName"`
+
+	// PlaceCandidateWarnings Candidate-specific warnings, for example when address appears to be a registered business address.
+	PlaceCandidateWarnings []string `json:"placeCandidateWarnings"`
+	ServiceChargeMinor     *int64   `json:"serviceChargeMinor"`
+	TaxAmountMinor         *int64   `json:"taxAmountMinor"`
+	TotalAmountMinor       *int64   `json:"totalAmountMinor"`
+	Warnings               []string `json:"warnings"`
 }
 
 // ExpenseReceiptLineItemDraft defines model for ExpenseReceiptLineItemDraft.
@@ -1490,7 +1523,7 @@ type UpdateExpenseRequest struct {
 	// PayerParticipantId Required current trip participant who paid the expense.
 	PayerParticipantId string `json:"payerParticipantId"`
 
-	// ScheduleItemId Same-day schedule item to link, or null to clear the linked place.
+	// ScheduleItemId Same-day schedule item to link, or null to use tripPlaceId or clear the schedule link. When present, its place is authoritative.
 	ScheduleItemId *string `json:"scheduleItemId"`
 
 	// SplitPolicy Persisted split policy for current quick expenses.
@@ -1501,6 +1534,9 @@ type UpdateExpenseRequest struct {
 
 	// Title Optional display title for general expenses. Empty strings are normalized to null by the server.
 	Title *string `json:"title"`
+
+	// TripPlaceId Trip-level place to link when scheduleItemId is null. For Day expense updates, null clears the linked place. For trip-level updates, omit or null to keep the existing linked place in this version.
+	TripPlaceId *string `json:"tripPlaceId"`
 }
 
 // UpdateExpenseResponse defines model for UpdateExpenseResponse.
@@ -1743,6 +1779,9 @@ type AddTripFlightPassengersJSONRequestBody = AddTripFlightPassengersRequest
 // CreateGoogleTripPlaceBookmarkJSONRequestBody defines body for CreateGoogleTripPlaceBookmark for application/json ContentType.
 type CreateGoogleTripPlaceBookmarkJSONRequestBody = CreateGoogleTripPlaceBookmarkRequest
 
+// CreateManualTripPlaceJSONRequestBody defines body for CreateManualTripPlace for application/json ContentType.
+type CreateManualTripPlaceJSONRequestBody = CreateManualTripPlaceRequest
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// Revoke the current session
@@ -1961,6 +2000,9 @@ type ServerInterface interface {
 	// List trip places
 	// (GET /trips/{tripId}/places)
 	ListTripPlaces(w http.ResponseWriter, r *http.Request, tripId string)
+	// Create a manual trip place
+	// (POST /trips/{tripId}/places)
+	CreateManualTripPlace(w http.ResponseWriter, r *http.Request, tripId string)
 	// List schedule items for a trip
 	// (GET /trips/{tripId}/schedule-items)
 	ListTripScheduleItems(w http.ResponseWriter, r *http.Request, tripId string)
@@ -2402,6 +2444,12 @@ func (_ Unimplemented) DeleteTripPlaceBookmark(w http.ResponseWriter, r *http.Re
 // List trip places
 // (GET /trips/{tripId}/places)
 func (_ Unimplemented) ListTripPlaces(w http.ResponseWriter, r *http.Request, tripId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Create a manual trip place
+// (POST /trips/{tripId}/places)
+func (_ Unimplemented) CreateManualTripPlace(w http.ResponseWriter, r *http.Request, tripId string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -5036,6 +5084,37 @@ func (siw *ServerInterfaceWrapper) ListTripPlaces(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
+// CreateManualTripPlace operation middleware
+func (siw *ServerInterfaceWrapper) CreateManualTripPlace(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateManualTripPlace(w, r, tripId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListTripScheduleItems operation middleware
 func (siw *ServerInterfaceWrapper) ListTripScheduleItems(w http.ResponseWriter, r *http.Request) {
 
@@ -5426,6 +5505,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/trips/{tripId}/places", wrapper.ListTripPlaces)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/trips/{tripId}/places", wrapper.CreateManualTripPlace)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/trips/{tripId}/schedule-items", wrapper.ListTripScheduleItems)

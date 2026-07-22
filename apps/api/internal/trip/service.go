@@ -724,11 +724,15 @@ func (s *Service) UpdateTripExpense(ctx context.Context, userID string, tripID s
 	if input.ScheduleItemID != nil {
 		return UpdateExpenseResult{}, ErrValidation
 	}
+	tripPlaceID, err := normalizeOptionalExpenseTripPlaceID(input.TripPlaceID)
+	if err != nil {
+		return UpdateExpenseResult{}, err
+	}
 	memo, err := normalizeExpenseMemo(input.Memo)
 	if err != nil {
 		return UpdateExpenseResult{}, err
 	}
-	title, err := normalizeExpenseTitle(input.Title, true)
+	title, err := normalizeExpenseTitle(input.Title, tripPlaceID == nil)
 	if err != nil {
 		return UpdateExpenseResult{}, err
 	}
@@ -750,6 +754,7 @@ func (s *Service) UpdateTripExpense(ctx context.Context, userID string, tripID s
 		Memo:                memo,
 		Title:               title,
 		ScheduleItemID:      nil,
+		TripPlaceID:         tripPlaceID,
 		IncludeInSettlement: input.IncludeInSettlement,
 	})
 	if err != nil {
@@ -798,10 +803,16 @@ func (s *Service) UpdateExpense(ctx context.Context, userID string, tripID strin
 	var scheduleItemID *string
 	if input.ScheduleItemID != nil {
 		trimmedScheduleItemID := strings.TrimSpace(*input.ScheduleItemID)
-		if !isUUID(trimmedScheduleItemID) {
-			return UpdateExpenseResult{}, ErrValidation
+		if trimmedScheduleItemID != "" {
+			if !isUUID(trimmedScheduleItemID) {
+				return UpdateExpenseResult{}, ErrValidation
+			}
+			scheduleItemID = &trimmedScheduleItemID
 		}
-		scheduleItemID = &trimmedScheduleItemID
+	}
+	tripPlaceID, err := normalizeOptionalExpenseTripPlaceID(input.TripPlaceID)
+	if err != nil {
+		return UpdateExpenseResult{}, err
 	}
 	memo, err := normalizeExpenseMemo(input.Memo)
 	if err != nil {
@@ -829,6 +840,7 @@ func (s *Service) UpdateExpense(ctx context.Context, userID string, tripID strin
 		Memo:                memo,
 		Title:               title,
 		ScheduleItemID:      scheduleItemID,
+		TripPlaceID:         tripPlaceID,
 		IncludeInSettlement: input.IncludeInSettlement,
 	})
 	if err != nil {
@@ -856,7 +868,14 @@ func (s *Service) DeleteExpense(ctx context.Context, userID string, tripID strin
 }
 
 func (s *Service) CreateQuickExpense(ctx context.Context, userID string, tripID string, tripDayID string, input CreateQuickExpenseInput) (CreateQuickExpenseResult, error) {
-	scheduleItemID := strings.TrimSpace(input.ScheduleItemID)
+	scheduleItemID, err := normalizeOptionalExpenseTripPlaceID(input.ScheduleItemID)
+	if err != nil {
+		return CreateQuickExpenseResult{}, err
+	}
+	tripPlaceID, err := normalizeOptionalExpenseTripPlaceID(input.TripPlaceID)
+	if err != nil {
+		return CreateQuickExpenseResult{}, err
+	}
 	payerParticipantID := strings.TrimSpace(input.PayerParticipantID)
 	splitPolicy, participantIDs, manualSplits, err := normalizeExpenseSplitInput(input.SplitPolicy, input.ParticipantIDs, input.ManualSplits, input.AmountMinor)
 	if err != nil {
@@ -874,7 +893,7 @@ func (s *Service) CreateQuickExpense(ctx context.Context, userID string, tripID 
 	if err != nil {
 		return CreateQuickExpenseResult{}, err
 	}
-	if !isUUID(scheduleItemID) || !isUUID(payerParticipantID) || input.AmountMinor < 1 {
+	if (scheduleItemID == nil && tripPlaceID == nil) || !isUUID(payerParticipantID) || input.AmountMinor < 1 {
 		return CreateQuickExpenseResult{}, ErrValidation
 	}
 	if _, err := s.activeTripDay(ctx, userID, tripID, tripDayID); err != nil {
@@ -885,6 +904,7 @@ func (s *Service) CreateQuickExpense(ctx context.Context, userID string, tripID 
 		TripID:              strings.TrimSpace(tripID),
 		TripDayID:           strings.TrimSpace(tripDayID),
 		ScheduleItemID:      scheduleItemID,
+		TripPlaceID:         tripPlaceID,
 		AmountMinor:         input.AmountMinor,
 		Currency:            currency,
 		ExpenseCategory:     expenseCategory,
@@ -927,13 +947,19 @@ func (s *Service) CreateTripExpense(ctx context.Context, userID string, tripID s
 	var scheduleItemID *string
 	if input.ScheduleItemID != nil {
 		trimmedScheduleItemID := strings.TrimSpace(*input.ScheduleItemID)
-		if !isUUID(trimmedScheduleItemID) {
-			return CreateTripExpenseResult{}, ErrValidation
+		if trimmedScheduleItemID != "" {
+			if !isUUID(trimmedScheduleItemID) {
+				return CreateTripExpenseResult{}, ErrValidation
+			}
+			scheduleItemID = &trimmedScheduleItemID
 		}
-		scheduleItemID = &trimmedScheduleItemID
+	}
+	tripPlaceID, err := normalizeOptionalExpenseTripPlaceID(input.TripPlaceID)
+	if err != nil {
+		return CreateTripExpenseResult{}, err
 	}
 
-	title, err := normalizeExpenseTitle(input.Title, scheduleItemID == nil)
+	title, err := normalizeExpenseTitle(input.Title, scheduleItemID == nil && tripPlaceID == nil)
 	if err != nil {
 		return CreateTripExpenseResult{}, err
 	}
@@ -986,6 +1012,7 @@ func (s *Service) CreateTripExpense(ctx context.Context, userID string, tripID s
 		ExpenseDate:         expenseDate,
 		TripDayID:           tripDayID,
 		ScheduleItemID:      scheduleItemID,
+		TripPlaceID:         tripPlaceID,
 		AmountMinor:         input.AmountMinor,
 		Currency:            currency,
 		ExpenseCategory:     expenseCategory,
@@ -1195,6 +1222,30 @@ func (s *Service) CreateManualDayLodgingPlace(ctx context.Context, userID string
 	}
 	day.LodgingPlace = &lodgingPlace
 	return CreateManualDayLodgingPlaceResult{Day: day, LodgingPlace: lodgingPlace}, nil
+}
+
+func (s *Service) CreateManualTripPlace(ctx context.Context, userID string, tripID string, input CreateManualTripPlaceInput) (CreateManualTripPlaceResult, error) {
+	tripID, err := s.authorizedTrip(ctx, userID, tripID)
+	if err != nil {
+		return CreateManualTripPlaceResult{}, err
+	}
+	name := strings.TrimSpace(input.Name)
+	if len([]rune(name)) < 1 || len([]rune(name)) > 120 {
+		return CreateManualTripPlaceResult{}, ErrValidation
+	}
+	address := strings.TrimSpace(input.Address)
+	if len([]rune(address)) < 1 || len([]rune(address)) > 300 {
+		return CreateManualTripPlaceResult{}, ErrValidation
+	}
+	placeType := strings.TrimSpace(input.PlaceType)
+	if !isSupportedPlaceType(placeType) {
+		return CreateManualTripPlaceResult{}, ErrValidation
+	}
+	created, err := s.repo.CreateManualTripPlace(ctx, CreateManualTripPlaceRecord{TripID: tripID, Name: name, Address: address, PlaceType: placeType})
+	if err != nil {
+		return CreateManualTripPlaceResult{}, err
+	}
+	return CreateManualTripPlaceResult{Place: created}, nil
 }
 
 func (s *Service) ClearDayLodgingPlace(ctx context.Context, userID string, tripID string, tripDayID string) error {

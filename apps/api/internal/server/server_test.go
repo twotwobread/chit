@@ -2450,6 +2450,42 @@ func TestListTripPlacesAndCreateManualDayLodgingPlaceHandlers(t *testing.T) {
 	}
 }
 
+func TestCreateManualTripPlaceHandlerDoesNotMutateDay(t *testing.T) {
+	backend := newFakeAuthBackend()
+	accessToken := loginTestUser(t, backend)
+	tripID := createTestTrip(t, backend, accessToken)
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/places", bytes.NewReader([]byte(`{"name":" 주식회사비플랜트 ","address":" 서울특별시 마포구 월드컵로 14길 108, 지층 ","placeType":"food"}`)))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", "Bearer "+accessToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("expected create status %d, got %d with body %s", http.StatusCreated, recorder.Code, recorder.Body.String())
+	}
+	var body struct {
+		Place struct {
+			ID        string `json:"id"`
+			Name      string `json:"name"`
+			Address   string `json:"address"`
+			PlaceType string `json:"placeType"`
+		} `json:"place"`
+	}
+	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Place.ID == "" || body.Place.Name != "주식회사비플랜트" || body.Place.PlaceType != "food" {
+		t.Fatalf("unexpected manual trip place response: %#v", body.Place)
+	}
+	if len(backend.dayLodgingPlaces) != 0 {
+		t.Fatalf("manual trip place must not set day lodging: %#v", backend.dayLodgingPlaces)
+	}
+	if len(backend.dayScheduleItems) != 0 {
+		t.Fatalf("manual trip place must not create schedule items: %#v", backend.dayScheduleItems)
+	}
+}
+
 func TestCreateGoogleDayLodgingPlaceHandler(t *testing.T) {
 	backend := newFakeAuthBackend()
 	accessToken := loginTestUser(t, backend)
@@ -5960,6 +5996,18 @@ func (b *fakeAuthBackend) CreateManualDayLodgingPlace(_ context.Context, record 
 	return place, nil
 }
 
+func (b *fakeAuthBackend) CreateManualTripPlace(_ context.Context, record tripdomain.CreateManualTripPlaceRecord) (tripdomain.TripPlaceSummary, error) {
+	b.nextPlace++
+	place := tripdomain.TripPlaceSummary{
+		ID:        testUUID(6000 + b.nextPlace),
+		Name:      record.Name,
+		Address:   record.Address,
+		PlaceType: record.PlaceType,
+	}
+	b.tripPlaces[record.TripID+":"+place.ID] = place
+	return place, nil
+}
+
 func (b *fakeAuthBackend) CreateGoogleDayLodgingPlace(_ context.Context, record placedomain.CreateGoogleDayLodgingPlaceRecord) (tripdomain.TripPlaceSummary, error) {
 	if placeID, ok := b.googleTripPlaces[record.TripID+":"+record.GooglePlaceID]; ok {
 		place, ok := b.tripPlaces[record.TripID+":"+placeID]
@@ -6468,10 +6516,12 @@ func (b *fakeAuthBackend) CreateQuickExpense(_ context.Context, record tripdomai
 	}
 
 	var foundItem tripdomain.ScheduleItem
-	for _, item := range b.dayScheduleItems[record.TripID+":"+record.TripDayID] {
-		if item.ID == record.ScheduleItemID {
-			foundItem = item
-			break
+	if record.ScheduleItemID != nil {
+		for _, item := range b.dayScheduleItems[record.TripID+":"+record.TripDayID] {
+			if item.ID == *record.ScheduleItemID {
+				foundItem = item
+				break
+			}
 		}
 	}
 	if foundItem.ID == "" {

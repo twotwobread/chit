@@ -85,8 +85,15 @@ type CreateManualDayLodgingPlaceInput struct {
 	Address string
 }
 
+type CreateManualTripPlaceInput struct {
+	Name      string
+	Address   string
+	PlaceType string
+}
+
 type CreateQuickExpenseInput struct {
-	ScheduleItemID      string
+	ScheduleItemID      *string
+	TripPlaceID         *string
 	AmountMinor         int64
 	Currency            *string
 	ExpenseCategory     *string
@@ -103,6 +110,7 @@ type CreateTripExpenseInput struct {
 	ExpenseDate         string
 	TripDayID           *string
 	ScheduleItemID      *string
+	TripPlaceID         *string
 	AmountMinor         int64
 	Currency            *string
 	ExpenseCategory     *string
@@ -126,6 +134,7 @@ type UpdateExpenseInput struct {
 	Memo                *string
 	Title               *string
 	ScheduleItemID      *string
+	TripPlaceID         *string
 	IncludeInSettlement *bool
 }
 
@@ -277,10 +286,18 @@ type CreateManualDayLodgingPlaceRecord struct {
 	Address   string
 }
 
+type CreateManualTripPlaceRecord struct {
+	TripID    string
+	Name      string
+	Address   string
+	PlaceType string
+}
+
 type CreateQuickExpenseRecord struct {
 	TripID              string
 	TripDayID           string
-	ScheduleItemID      string
+	ScheduleItemID      *string
+	TripPlaceID         *string
 	AmountMinor         int64
 	Currency            *string
 	ExpenseCategory     *string
@@ -299,6 +316,7 @@ type CreateTripExpenseRecord struct {
 	ExpenseDate         time.Time
 	TripDayID           *string
 	ScheduleItemID      *string
+	TripPlaceID         *string
 	AmountMinor         int64
 	Currency            *string
 	ExpenseCategory     *string
@@ -326,6 +344,7 @@ type UpdateExpenseRecord struct {
 	Memo                *string
 	Title               *string
 	ScheduleItemID      *string
+	TripPlaceID         *string
 	IncludeInSettlement *bool
 }
 
@@ -514,6 +533,10 @@ type CreateManualDayLodgingPlaceResult struct {
 	LodgingPlace TripPlaceSummary
 }
 
+type CreateManualTripPlaceResult struct {
+	Place TripPlaceSummary
+}
+
 type CreateManualScheduleItemResult struct {
 	Day  TripDay
 	Item ScheduleItem
@@ -610,17 +633,22 @@ type ExpenseReceiptLineItemDraft struct {
 }
 
 type ExpenseReceiptExtraction struct {
-	MerchantName       *string                       `json:"merchantName"`
-	ExpenseTitle       *string                       `json:"expenseTitle"`
-	ExpenseDate        *string                       `json:"expenseDate"`
-	ExpenseTime        *string                       `json:"expenseTime"`
-	Currency           *string                       `json:"currency"`
-	TotalAmountMinor   *int64                        `json:"totalAmountMinor"`
-	TaxAmountMinor     *int64                        `json:"taxAmountMinor"`
-	ServiceChargeMinor *int64                        `json:"serviceChargeMinor"`
-	LineItems          []ExpenseReceiptLineItemDraft `json:"lineItems"`
-	Confidence         string                        `json:"confidence"`
-	Warnings           []string                      `json:"warnings"`
+	MerchantName             *string                       `json:"merchantName"`
+	MerchantAddress          *string                       `json:"merchantAddress"`
+	ExpenseTitle             *string                       `json:"expenseTitle"`
+	ExpenseDate              *string                       `json:"expenseDate"`
+	ExpenseTime              *string                       `json:"expenseTime"`
+	Currency                 *string                       `json:"currency"`
+	TotalAmountMinor         *int64                        `json:"totalAmountMinor"`
+	TaxAmountMinor           *int64                        `json:"taxAmountMinor"`
+	ServiceChargeMinor       *int64                        `json:"serviceChargeMinor"`
+	LineItems                []ExpenseReceiptLineItemDraft `json:"lineItems"`
+	Confidence               string                        `json:"confidence"`
+	Warnings                 []string                      `json:"warnings"`
+	PlaceCandidateName       *string                       `json:"placeCandidateName"`
+	PlaceCandidateAddress    *string                       `json:"placeCandidateAddress"`
+	PlaceCandidateConfidence *string                       `json:"placeCandidateConfidence"`
+	PlaceCandidateWarnings   []string                      `json:"placeCandidateWarnings"`
 }
 
 type ReceiptCaptureMode string
@@ -959,6 +987,7 @@ type Repository interface {
 	ListTripPlaces(ctx context.Context, tripID string) ([]TripPlaceSummary, error)
 	SetDayLodgingPlace(ctx context.Context, record SetDayLodgingPlaceRecord) (TripPlaceSummary, error)
 	CreateManualDayLodgingPlace(ctx context.Context, record CreateManualDayLodgingPlaceRecord) (TripPlaceSummary, error)
+	CreateManualTripPlace(ctx context.Context, record CreateManualTripPlaceRecord) (TripPlaceSummary, error)
 	DeleteDayLodgingPlace(ctx context.Context, tripID string, tripDayID string) error
 	ListScheduleItemsByTripDay(ctx context.Context, tripID string, tripDayID string) ([]ScheduleItem, error)
 	ListTripScheduleItems(ctx context.Context, tripID string) ([]TripScheduleItemsDayListItem, error)

@@ -284,7 +284,10 @@ LEFT JOIN schedule_items si
  AND si.trip_id = e.trip_id
  AND si.deleted_at IS NULL
 LEFT JOIN trip_places live_place
-  ON live_place.id = si.trip_place_id
+  ON live_place.id = CASE
+    WHEN e.anchor_type = 'schedule_item' THEN si.trip_place_id
+    ELSE e.trip_place_id
+  END
  AND live_place.trip_id = e.trip_id
 LEFT JOIN trip_participants payer
   ON payer.id = e.payer_participant_id
@@ -599,12 +602,13 @@ SELECT
   COALESCE(e.schedule_item_id::text, '')::text AS schedule_item_id,
   e.expense_date,
   e.title,
-  COALESCE(e.title, e.place_name, '지출')::text AS display_title,
-  COALESCE(e.trip_place_id::text, '')::text AS trip_place_id,
-  COALESCE(e.place_name, '')::text AS place_name,
-  COALESCE(e.place_address, '')::text AS place_address,
-  COALESCE(e.place_type, '')::text AS place_type,
+  COALESCE(e.title, live_place.name, e.place_name, '지출')::text AS display_title,
+  COALESCE(live_place.id::text, e.trip_place_id::text, '')::text AS trip_place_id,
+  COALESCE(live_place.name, e.place_name, '')::text AS place_name,
+  COALESCE(live_place.address, e.place_address, '')::text AS place_address,
+  COALESCE(live_place.place_type, e.place_type, '')::text AS place_type,
   CASE
+    WHEN live_place.id IS NOT NULL THEN 'live'
     WHEN e.place_name IS NOT NULL THEN 'fallback'
     ELSE ''
   END::text AS place_source,
@@ -629,6 +633,9 @@ FROM expenses e
 LEFT JOIN expense_receipts er
   ON er.expense_id = e.id
  AND er.trip_id = e.trip_id
+LEFT JOIN trip_places live_place
+  ON live_place.id = e.trip_place_id
+ AND live_place.trip_id = e.trip_id
 LEFT JOIN trip_participants payer
   ON payer.id = e.payer_participant_id
  AND payer.trip_id = e.trip_id
@@ -1213,7 +1220,10 @@ LEFT JOIN schedule_items si
  AND si.trip_id = e.trip_id
  AND si.deleted_at IS NULL
 LEFT JOIN trip_places live_place
-  ON live_place.id = si.trip_place_id
+  ON live_place.id = CASE
+    WHEN e.anchor_type = 'schedule_item' THEN si.trip_place_id
+    ELSE e.trip_place_id
+  END
  AND live_place.trip_id = e.trip_id
 LEFT JOIN trip_participants payer
   ON payer.id = e.payer_participant_id
@@ -1672,7 +1682,10 @@ LEFT JOIN schedule_items si
  AND si.trip_id = e.trip_id
  AND si.deleted_at IS NULL
 LEFT JOIN trip_places live_place
-  ON live_place.id = si.trip_place_id
+  ON live_place.id = CASE
+    WHEN e.anchor_type = 'schedule_item' THEN si.trip_place_id
+    ELSE e.trip_place_id
+  END
  AND live_place.trip_id = e.trip_id
 LEFT JOIN trip_participants payer
   ON payer.id = e.payer_participant_id
@@ -1979,17 +1992,21 @@ const updateTripExpense = `-- name: UpdateTripExpense :one
 UPDATE expenses
 SET
   title = $1,
-  amount_minor = $2,
-  currency = COALESCE($3, currency),
-  expense_category = COALESCE($4, expense_category),
-  split_policy = $5,
-  payer_participant_id = $6::uuid,
-  payer_display_name = $7,
-  memo = $8,
-  include_in_settlement = COALESCE($9, include_in_settlement),
+  trip_place_id = COALESCE($2::uuid, trip_place_id),
+  place_name = COALESCE($3, place_name),
+  place_address = COALESCE($4, place_address),
+  place_type = COALESCE($5, place_type),
+  amount_minor = $6,
+  currency = COALESCE($7, currency),
+  expense_category = COALESCE($8, expense_category),
+  split_policy = $9,
+  payer_participant_id = $10::uuid,
+  payer_display_name = $11,
+  memo = $12,
+  include_in_settlement = COALESCE($13, include_in_settlement),
   updated_at = now()
-WHERE trip_id = $10::uuid
-  AND id = $11::uuid
+WHERE trip_id = $14::uuid
+  AND id = $15::uuid
   AND anchor_type = 'trip'
   AND trip_day_id IS NULL
   AND schedule_item_id IS NULL
@@ -2022,6 +2039,10 @@ RETURNING
 
 type UpdateTripExpenseParams struct {
 	Title               pgtype.Text
+	TripPlaceID         pgtype.UUID
+	PlaceName           pgtype.Text
+	PlaceAddress        pgtype.Text
+	PlaceType           pgtype.Text
 	AmountMinor         int64
 	Currency            pgtype.Text
 	ExpenseCategory     pgtype.Text
@@ -2064,6 +2085,10 @@ type UpdateTripExpenseRow struct {
 func (q *Queries) UpdateTripExpense(ctx context.Context, arg UpdateTripExpenseParams) (UpdateTripExpenseRow, error) {
 	row := q.db.QueryRow(ctx, updateTripExpense,
 		arg.Title,
+		arg.TripPlaceID,
+		arg.PlaceName,
+		arg.PlaceAddress,
+		arg.PlaceType,
 		arg.AmountMinor,
 		arg.Currency,
 		arg.ExpenseCategory,

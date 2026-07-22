@@ -1944,6 +1944,63 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+    post:
+      operationId: createManualTripPlace
+      summary: Create a manual trip place
+      description: Creates a manual trip-level place for an authenticated trip participant. Does not create a Day lodging target or schedule item.
+      tags:
+        - Trips
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateManualTripPlaceRequest'
+      responses:
+        '201':
+          description: Manual trip place created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateManualTripPlaceResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /trips/{tripId}/schedule-items:
     get:
       operationId: listTripScheduleItems
@@ -5515,6 +5572,7 @@ components:
       additionalProperties: false
       required:
         - merchantName
+        - merchantAddress
         - expenseTitle
         - expenseDate
         - expenseTime
@@ -5525,11 +5583,20 @@ components:
         - lineItems
         - confidence
         - warnings
+        - placeCandidateName
+        - placeCandidateAddress
+        - placeCandidateConfidence
+        - placeCandidateWarnings
       properties:
         merchantName:
           type: string
           nullable: true
           maxLength: 120
+        merchantAddress:
+          type: string
+          nullable: true
+          maxLength: 300
+          description: Merchant/business address from the receipt when present. Does not imply a saved TripPlace.
         expenseTitle:
           type: string
           nullable: true
@@ -5574,6 +5641,28 @@ components:
           items:
             type: string
             maxLength: 160
+        placeCandidateName:
+          type: string
+          nullable: true
+          maxLength: 120
+          description: Suggested trip place name for explicit user confirmation. Never auto-register.
+        placeCandidateAddress:
+          type: string
+          nullable: true
+          maxLength: 300
+          description: Suggested trip place address for explicit user confirmation. Never auto-register.
+        placeCandidateConfidence:
+          allOf:
+            - $ref: '#/components/schemas/ExpenseReceiptConfidence'
+          nullable: true
+          description: Confidence for the place candidate only.
+        placeCandidateWarnings:
+          type: array
+          maxItems: 5
+          items:
+            type: string
+            maxLength: 160
+          description: Candidate-specific warnings, for example when address appears to be a registered business address.
     ExpenseReceiptDraft:
       type: object
       additionalProperties: false
@@ -5682,6 +5771,7 @@ components:
         - payerParticipantId
         - memo
         - scheduleItemId
+        - tripPlaceId
         - splitPolicy
       properties:
         amountMinor:
@@ -5719,7 +5809,11 @@ components:
         scheduleItemId:
           type: string
           nullable: true
-          description: Same-day schedule item to link, or null to clear the linked place.
+          description: Same-day schedule item to link, or null to use tripPlaceId or clear the schedule link. When present, its place is authoritative.
+        tripPlaceId:
+          type: string
+          nullable: true
+          description: Trip-level place to link when scheduleItemId is null. For Day expense updates, null clears the linked place. For trip-level updates, omit or null to keep the existing linked place in this version.
         currency:
           $ref: '#/components/schemas/SupportedCurrency'
           description: When provided, replaces the expense currency. Amount and split minor units are interpreted in this currency without FX conversion. Omit to keep the existing value.
@@ -5745,6 +5839,7 @@ components:
         - expenseDate
         - tripDayId
         - scheduleItemId
+        - tripPlaceId
         - amountMinor
         - payerParticipantId
         - splitPolicy
@@ -5766,7 +5861,11 @@ components:
         scheduleItemId:
           type: string
           nullable: true
-          description: Optional related schedule item.
+          description: Optional related schedule item. When present, the schedule item place is authoritative and takes precedence over tripPlaceId.
+        tripPlaceId:
+          type: string
+          nullable: true
+          description: Optional trip-level place to link when no schedule item is selected. Does not create or require a schedule item.
         amountMinor:
           type: integer
           format: int64
@@ -5818,13 +5917,19 @@ components:
       additionalProperties: false
       required:
         - scheduleItemId
+        - tripPlaceId
         - amountMinor
         - payerParticipantId
         - splitPolicy
       properties:
         scheduleItemId:
           type: string
-          description: Required schedule item for the selected Day. Must belong to tripId/tripDayId.
+          nullable: true
+          description: Optional schedule item for the selected Day. Must belong to tripId/tripDayId. When present, its place is authoritative.
+        tripPlaceId:
+          type: string
+          nullable: true
+          description: Optional trip-level place to link for a Day expense when no schedule item is selected. Does not create a schedule item.
         amountMinor:
           type: integer
           format: int64
@@ -6032,6 +6137,34 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/TripPlaceSummary'
+    CreateManualTripPlaceRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - address
+        - placeType
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+          example: 주식회사비플랜트
+        address:
+          type: string
+          minLength: 1
+          maxLength: 300
+          example: 서울특별시 마포구 월드컵로 14길 108, 지층
+        placeType:
+          $ref: '#/components/schemas/TripPlaceType'
+    CreateManualTripPlaceResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - place
+      properties:
+        place:
+          $ref: '#/components/schemas/TripPlaceSummary'
     CreateManualDayLodgingPlaceRequest:
       type: object
       additionalProperties: false

@@ -30,9 +30,13 @@ export type UpdateExpenseRequest = {
      */
     title?: string | null;
     /**
-     * Same-day schedule item to link, or null to clear the linked place.
+     * Same-day schedule item to link, or null to use tripPlaceId or clear the schedule link. When present, its place is authoritative.
      */
     scheduleItemId: string | null;
+    /**
+     * Trip-level place to link when scheduleItemId is null. For Day expense updates, null clears the linked place. For trip-level updates, omit or null to keep the existing linked place in this version.
+     */
+    tripPlaceId: string | null;
     /**
      * When provided, replaces the expense currency. Amount and split minor units are interpreted in this currency without FX conversion. Omit to keep the existing value.
      */

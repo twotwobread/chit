@@ -191,7 +191,7 @@ func TestServiceCreateQuickExpensePassesReviewedReceiptDraftID(t *testing.T) {
 	itemID := testUUID(7001)
 	repo := &fakeRepository{trip: receiptValidTrip(), tripFound: true, isParticipant: true, dayItem: ScheduleItem{ID: itemID}, dayItemFound: true}
 	_, err := newTestService(repo).CreateQuickExpense(context.Background(), "user-1", testTripID, "2026-07-10", CreateQuickExpenseInput{
-		ScheduleItemID:     itemID,
+		ScheduleItemID:     stringPtr(itemID),
 		AmountMinor:        18500,
 		PayerParticipantID: payerID,
 		SplitPolicy:        ExpenseSplitPolicyEqual,

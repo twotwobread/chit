@@ -144,6 +144,20 @@ func normalizeOptionalReceiptDraftID(value *string) (*string, error) {
 	return &trimmed, nil
 }
 
+func normalizeOptionalExpenseTripPlaceID(value *string) (*string, error) {
+	if value == nil {
+		return nil, nil
+	}
+	trimmed := strings.TrimSpace(*value)
+	if trimmed == "" {
+		return nil, nil
+	}
+	if !isUUID(trimmed) {
+		return nil, ErrValidation
+	}
+	return &trimmed, nil
+}
+
 func validateAndNormalizeExpenseReceiptOCRInput(captureMode ReceiptCaptureMode, language ReceiptOCRLanguage, parts []ExpenseReceiptOCRTextPart) ([]ExpenseReceiptOCRTextPart, error) {
 	if language != ReceiptOCRLanguageKorean {
 		return nil, ErrUnsupportedReceiptLanguage
@@ -366,7 +380,20 @@ func validateExpenseReceiptExtraction(extraction ExpenseReceiptExtraction) error
 			return ErrReceiptExtractionInvalid
 		}
 	}
-	if len(extraction.LineItems) > 50 || len(extraction.Warnings) > 10 {
+	if len(extraction.LineItems) > 50 || len(extraction.Warnings) > 10 || len(extraction.PlaceCandidateWarnings) > 5 {
+		return ErrReceiptExtractionInvalid
+	}
+	for _, value := range []*string{extraction.MerchantName, extraction.ExpenseTitle, extraction.PlaceCandidateName} {
+		if value != nil && len([]rune(strings.TrimSpace(*value))) > 120 {
+			return ErrReceiptExtractionInvalid
+		}
+	}
+	for _, value := range []*string{extraction.MerchantAddress, extraction.PlaceCandidateAddress} {
+		if value != nil && len([]rune(strings.TrimSpace(*value))) > 300 {
+			return ErrReceiptExtractionInvalid
+		}
+	}
+	if extraction.PlaceCandidateConfidence != nil && !isSupportedReceiptConfidence(strings.TrimSpace(*extraction.PlaceCandidateConfidence)) {
 		return ErrReceiptExtractionInvalid
 	}
 	for _, item := range extraction.LineItems {
@@ -381,7 +408,7 @@ func validateExpenseReceiptExtraction(extraction ExpenseReceiptExtraction) error
 			return ErrReceiptExtractionInvalid
 		}
 	}
-	for _, warning := range extraction.Warnings {
+	for _, warning := range append(extraction.Warnings, extraction.PlaceCandidateWarnings...) {
 		if len([]rune(strings.TrimSpace(warning))) > 160 {
 			return ErrReceiptExtractionInvalid
 		}
@@ -391,10 +418,14 @@ func validateExpenseReceiptExtraction(extraction ExpenseReceiptExtraction) error
 
 func normalizeExpenseReceiptExtraction(extraction ExpenseReceiptExtraction) ExpenseReceiptExtraction {
 	extraction.MerchantName = trimNullableString(extraction.MerchantName)
+	extraction.MerchantAddress = trimNullableString(extraction.MerchantAddress)
 	extraction.ExpenseTitle = trimNullableString(extraction.ExpenseTitle)
 	extraction.ExpenseDate = trimNullableString(extraction.ExpenseDate)
 	extraction.ExpenseTime = trimNullableString(extraction.ExpenseTime)
 	extraction.Currency = trimNullableString(extraction.Currency)
+	extraction.PlaceCandidateName = trimNullableString(extraction.PlaceCandidateName)
+	extraction.PlaceCandidateAddress = trimNullableString(extraction.PlaceCandidateAddress)
+	extraction.PlaceCandidateConfidence = trimNullableString(extraction.PlaceCandidateConfidence)
 	if extraction.LineItems == nil {
 		extraction.LineItems = []ExpenseReceiptLineItemDraft{}
 	}
@@ -406,6 +437,12 @@ func normalizeExpenseReceiptExtraction(extraction ExpenseReceiptExtraction) Expe
 	}
 	for index := range extraction.Warnings {
 		extraction.Warnings[index] = strings.TrimSpace(extraction.Warnings[index])
+	}
+	if extraction.PlaceCandidateWarnings == nil {
+		extraction.PlaceCandidateWarnings = []string{}
+	}
+	for index := range extraction.PlaceCandidateWarnings {
+		extraction.PlaceCandidateWarnings[index] = strings.TrimSpace(extraction.PlaceCandidateWarnings[index])
 	}
 	return extraction
 }

@@ -20,9 +20,13 @@ export type CreateTripExpenseRequest = {
      */
     tripDayId: string | null;
     /**
-     * Optional related schedule item.
+     * Optional related schedule item. When present, the schedule item place is authoritative and takes precedence over tripPlaceId.
      */
     scheduleItemId: string | null;
+    /**
+     * Optional trip-level place to link when no schedule item is selected. Does not create or require a schedule item.
+     */
+    tripPlaceId: string | null;
     amountMinor: number;
     /**
      * Expense currency. Defaults to the trip default currency when omitted.

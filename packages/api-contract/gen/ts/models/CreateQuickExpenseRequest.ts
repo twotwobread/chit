@@ -8,9 +8,13 @@ import type { ManualExpenseSplitInput } from './ManualExpenseSplitInput';
 import type { SupportedCurrency } from './SupportedCurrency';
 export type CreateQuickExpenseRequest = {
     /**
-     * Required schedule item for the selected Day. Must belong to tripId/tripDayId.
+     * Optional schedule item for the selected Day. Must belong to tripId/tripDayId. When present, its place is authoritative.
      */
-    scheduleItemId: string;
+    scheduleItemId: string | null;
+    /**
+     * Optional trip-level place to link for a Day expense when no schedule item is selected. Does not create a schedule item.
+     */
+    tripPlaceId: string | null;
     /**
      * Positive amount in currency minor units.
      */

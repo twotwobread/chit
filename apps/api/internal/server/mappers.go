@@ -271,6 +271,10 @@ func createManualDayLodgingPlaceResponseToOpenAPI(result trip.CreateManualDayLod
 	}
 }
 
+func createManualTripPlaceResponseToOpenAPI(result trip.CreateManualTripPlaceResult) openapi.CreateManualTripPlaceResponse {
+	return openapi.CreateManualTripPlaceResponse{Place: tripPlaceSummaryToOpenAPI(result.Place)}
+}
+
 func createGoogleDayLodgingPlaceResponseToOpenAPI(result place.CreateGoogleDayLodgingPlaceResult) openapi.SetDayLodgingPlaceResponse {
 	return openapi.SetDayLodgingPlaceResponse{
 		Day:          tripDayToOpenAPI(result.Day),
@@ -440,18 +444,28 @@ func expenseReceiptExtractionToOpenAPI(extraction trip.ExpenseReceiptExtraction)
 		value := dateToOpenAPI(*extraction.ExpenseDate)
 		expenseDate = &value
 	}
+	var placeCandidateConfidence *openapi.ExpenseReceiptConfidence
+	if extraction.PlaceCandidateConfidence != nil {
+		value := openapi.ExpenseReceiptConfidence(*extraction.PlaceCandidateConfidence)
+		placeCandidateConfidence = &value
+	}
 	return openapi.ExpenseReceiptExtraction{
-		MerchantName:       extraction.MerchantName,
-		ExpenseTitle:       extraction.ExpenseTitle,
-		ExpenseDate:        expenseDate,
-		ExpenseTime:        extraction.ExpenseTime,
-		Currency:           currency,
-		TotalAmountMinor:   extraction.TotalAmountMinor,
-		TaxAmountMinor:     extraction.TaxAmountMinor,
-		ServiceChargeMinor: extraction.ServiceChargeMinor,
-		LineItems:          lineItems,
-		Confidence:         openapi.ExpenseReceiptConfidence(extraction.Confidence),
-		Warnings:           extraction.Warnings,
+		MerchantName:             extraction.MerchantName,
+		MerchantAddress:          extraction.MerchantAddress,
+		ExpenseTitle:             extraction.ExpenseTitle,
+		ExpenseDate:              expenseDate,
+		ExpenseTime:              extraction.ExpenseTime,
+		Currency:                 currency,
+		TotalAmountMinor:         extraction.TotalAmountMinor,
+		TaxAmountMinor:           extraction.TaxAmountMinor,
+		ServiceChargeMinor:       extraction.ServiceChargeMinor,
+		LineItems:                lineItems,
+		Confidence:               openapi.ExpenseReceiptConfidence(extraction.Confidence),
+		Warnings:                 extraction.Warnings,
+		PlaceCandidateName:       extraction.PlaceCandidateName,
+		PlaceCandidateAddress:    extraction.PlaceCandidateAddress,
+		PlaceCandidateConfidence: placeCandidateConfidence,
+		PlaceCandidateWarnings:   extraction.PlaceCandidateWarnings,
 	}
 }
 
