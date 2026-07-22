@@ -73,6 +73,25 @@ test('scrollable bottom sheets support an action footer outside their scroll con
   );
 });
 
+test('today quick expense action uses BottomSheet scroll ownership so the sheet remains visible', () => {
+  const todaySource = source('app/trips/[tripId]/(tabs)/today.tsx');
+  const overlaySource = todaySource.slice(
+    todaySource.indexOf('function QuickExpenseOverlaySheet'),
+    todaySource.indexOf('function SkippedPlacesSection'),
+  );
+
+  assert.match(
+    overlaySource,
+    /<BottomSheet\s+scrollable\s+onClose=\{onClose\}\s+visible=\{state\.status !== 'idle'\}>/,
+    'expected Today quick expense overlay to opt into the bounded scrollable BottomSheet height',
+  );
+  assert.doesNotMatch(
+    overlaySource,
+    /<KeyboardAwareFormScrollView/,
+    'expected Today quick expense overlay to avoid nesting a keyboard-aware scroll view inside BottomSheet',
+  );
+});
+
 test('expense create and edit screens actively scroll only the hidden memo delta into view on focus', () => {
   const quickExpenseScreenSource = source('app/trips/[tripId]/days/[date]/expenses/quick.tsx');
   const expenseEditScreenSource = source('app/trips/[tripId]/days/[date]/expenses/[expenseId]/edit.tsx');
