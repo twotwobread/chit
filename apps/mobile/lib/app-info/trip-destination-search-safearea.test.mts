@@ -5,9 +5,10 @@ import { describe, it } from 'node:test';
 const newTripSource = readFileSync(new URL('../../app/trips/new.tsx', import.meta.url), 'utf8');
 
 describe('trip destination search inline layout', () => {
-  it('keeps destination search in the wizard card instead of adding a separate safe-area screen', () => {
+  it('keeps destination search inline while padding the wizard below the top safe area', () => {
     assert.match(newTripSource, /InlineDestinationSearchPanel/);
-    assert.doesNotMatch(newTripSource, /useSafeAreaInsets/);
+    assert.match(newTripSource, /useSafeAreaInsets/);
+    assert.match(newTripSource, /insets\.top \+ theme\.space\[4\]/);
     assert.doesNotMatch(newTripSource, /buildDestinationSearchContentTopPadding\(insets\.top\)/);
   });
 });

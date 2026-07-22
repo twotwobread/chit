@@ -18,9 +18,12 @@ const linkSource = readMobileSource('../design/components/link.tsx');
 const rowSource = readMobileSource('../design/components/row.tsx');
 const chipSource = readMobileSource('../design/components/chip.tsx');
 const selectableCardSource = readOptionalMobileSource('../design/components/selectable-card.tsx');
+const selectableListRowSource = readOptionalMobileSource('../design/components/selectable-list-row.tsx');
 const formFieldSource = readMobileSource('../design/patterns/form-field.tsx');
 const stateCardSource = readMobileSource('../design/patterns/state-card.tsx');
 const heroSource = readMobileSource('../design/patterns/hero.tsx');
+const sectionCardSource = readOptionalMobileSource('../design/patterns/section-card.tsx');
+const stepWizardHeaderSource = readOptionalMobileSource('../design/patterns/step-wizard-header.tsx');
 
 const sharedImplementationSource = [
   componentsSource,
@@ -34,9 +37,12 @@ const sharedImplementationSource = [
   rowSource,
   chipSource,
   selectableCardSource,
+  selectableListRowSource,
   formFieldSource,
   stateCardSource,
   heroSource,
+  sectionCardSource,
+  stepWizardHeaderSource,
 ].join('\n');
 
 const primitiveExports = [
@@ -54,6 +60,7 @@ const primitiveExports = [
   'FilterChip',
   'ChoiceChip',
   'SelectableCard',
+  'SelectableListRow',
 ];
 
 const primitiveTypeExports = [
@@ -68,10 +75,13 @@ const primitiveTypeExports = [
   'FilterChipTone',
   'ChoiceChipTone',
   'SelectableCardMode',
+  'SelectableListRowProps',
 ];
 
 const heroExports = ['HeroCard', 'HeroHeader', 'HeroMetricPanel', 'HeroActions'];
 const heroTypeExports = ['HeroCardVariant', 'HeroAction', 'HeroMetricPanelTone'];
+const compactFlowPatternExports = ['SectionCard', 'StepWizardHeader'];
+const compactFlowPatternTypeExports = ['SectionCardProps', 'StepWizardHeaderProps'];
 
 test('Issue 389 shared design primitives are exported from the foundation surface', () => {
   for (const exportName of primitiveExports) {
@@ -142,6 +152,31 @@ test('Issue 395 shared design layer exposes foundation-backed Hero primitives', 
   assert.match(heroSource, /tone: 'graphite'/);
   assert.match(heroSource, /theme\.color\.actionPrimary/);
   assert.doesNotMatch(heroSource, /#[0-9a-fA-F]{3,8}\b/);
+});
+
+test('Trip wizard density patterns are reusable shared design exports', () => {
+  assert.match(selectableListRowSource, /export type SelectableListRowProps\b/);
+  assert.match(selectableListRowSource, /export function SelectableListRow\b/);
+  assert.match(selectableListRowSource, /InteractiveSurface/);
+  assert.match(selectableListRowSource, /Image/);
+  assert.match(selectableListRowSource, /imageSource\?: ImageSourcePropType;/);
+  assert.match(selectableListRowSource, /trailing\?: ReactNode;/);
+  assert.match(selectableListRowSource, /selected\?: boolean;/);
+
+  assert.match(sectionCardSource, /export type SectionCardProps\b/);
+  assert.match(sectionCardSource, /export function SectionCard\b/);
+  assert.match(sectionCardSource, /title\?: string;/);
+  assert.match(sectionCardSource, /meta\?: string;/);
+  assert.match(sectionCardSource, /Card/);
+
+  assert.match(stepWizardHeaderSource, /export type StepWizardHeaderProps\b/);
+  assert.match(stepWizardHeaderSource, /export function StepWizardHeader\b/);
+  assert.match(stepWizardHeaderSource, /STEP \{currentStep\} OF \{totalSteps\}/);
+  assert.match(stepWizardHeaderSource, /StepProgressSegments/);
+
+  for (const exportName of [...compactFlowPatternExports, ...compactFlowPatternTypeExports]) {
+    assert.match(indexSource, new RegExp(`\\b${exportName}\\b`), `${exportName} should be re-exported`);
+  }
 });
 
 test('Issue 399 navigation chrome primitives are exported and foundation-backed', () => {
@@ -253,6 +288,7 @@ test('Issue 389 interactive primitives encode accessibility roles, states, touch
     'FilterChip',
     'ChoiceChip',
     'SelectableCard',
+    'SelectableListRow',
   ]) {
     const body = functionBody(functionName);
     assert.match(body, /accessibilityRole=/, `${functionName} should set an accessibility role`);
@@ -270,6 +306,7 @@ test('Issue 389 interactive primitives encode accessibility roles, states, touch
     'choiceChip',
     'filterChip',
     'selectableCard',
+    'selectableListRow',
   ]) {
     assertStyleContains(styleName, /minHeight: theme\.layout\.(tapMin|controlHSm|controlH|controlHLg)/);
   }
