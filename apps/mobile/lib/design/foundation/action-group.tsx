@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
-import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { StyleSheet, View, useWindowDimensions, type StyleProp, type ViewStyle } from 'react-native';
 
+import { buildResponsiveTextProfile } from '../responsive-text';
 import { theme } from '../theme';
 
 export type ActionGroupDirection = 'row' | 'column';
@@ -14,7 +15,12 @@ export function ActionGroup({
   direction?: ActionGroupDirection;
   style?: StyleProp<ViewStyle>;
 }) {
-  return <View style={[styles.base, direction === 'row' ? styles.row : styles.column, style]}>{children}</View>;
+  const { fontScale, width } = useWindowDimensions();
+  const profile = buildResponsiveTextProfile({ fontScale, width });
+  const shouldStackRow = direction === 'row' && profile.prefersStackedContent;
+  const resolvedDirection = direction === 'row' && !shouldStackRow ? styles.row : styles.column;
+
+  return <View style={[styles.base, resolvedDirection, style]}>{children}</View>;
 }
 
 const styles = StyleSheet.create({
@@ -27,6 +33,5 @@ const styles = StyleSheet.create({
   row: {
     alignItems: 'center',
     flexDirection: 'row',
-    flexWrap: 'wrap',
   },
 });

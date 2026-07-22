@@ -301,9 +301,10 @@ export default function GooglePlaceSearchScreen() {
               disabled={isSubmittingBatch}
               key={`selected-batch-${result.id}`}
               label={`${result.placeName} ×`}
+              labelNumberOfLines={1}
               onPress={() => removeBatchResult(result.id)}
               selected
-              style={styles.batchChip}
+              style={styles.batchSelectedChip}
               tone="accent"
             />
           ))}
@@ -415,6 +416,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.space[1],
   },
   batchChip: {
+    maxWidth: 220,
+    minHeight: theme.layout.tapMin,
+  },
+  batchSelectedChip: {
     maxWidth: 220,
     minHeight: theme.layout.tapMin,
   },

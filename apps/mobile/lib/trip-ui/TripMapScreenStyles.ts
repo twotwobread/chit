@@ -117,6 +117,10 @@ export const styles = StyleSheet.create({
     gap: theme.space[2],
     paddingHorizontal: theme.space[1],
   },
+  scheduleAddSelectedChip: {
+    maxWidth: 220,
+    minHeight: theme.layout.tapMin,
+  },
   scheduleAddChip: {
     alignItems: 'center',
     backgroundColor: theme.color.surfaceSunken,

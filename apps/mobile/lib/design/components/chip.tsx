@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { StyleSheet, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
+import { StyleSheet, View, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
 
 import { InteractiveSurface } from '../foundation/interactive-surface';
 import { ResponsiveLabel } from '../foundation/responsive-label';
@@ -48,10 +48,12 @@ export function FilterChip({
   accessibilityRole = 'button',
   disabled,
   label,
+  labelNumberOfLines,
   leading,
   onPress,
   selected,
   statusLabel,
+  statusPlacement = 'below',
   style,
   tone = 'neutral',
 }: {
@@ -59,13 +61,17 @@ export function FilterChip({
   accessibilityRole?: NonNullable<PressableProps['accessibilityRole']>;
   disabled?: boolean;
   label: string;
+  labelNumberOfLines?: number;
   leading?: ReactNode;
   onPress: PressableProps['onPress'];
   selected?: boolean;
   statusLabel?: string;
+  statusPlacement?: 'auto' | 'below';
   style?: StyleProp<ViewStyle>;
   tone?: FilterChipTone;
 }) {
+  const isStatusBelow = statusPlacement === 'below';
+
   return (
     <InteractiveSurface
       accessibilityLabel={accessibilityLabel ?? [label, statusLabel].filter(Boolean).join(', ')}
@@ -76,27 +82,58 @@ export function FilterChip({
       selected={selected}
       style={({ pressed }) => [
         styles.filterChip,
+        isStatusBelow ? styles.filterChipStatusBelowSurface : null,
         selected ? filterChipSelectedStyle(tone) : styles.filterChipIdle,
         pressed && !disabled ? styles.filterChipPressed : null,
         disabled ? styles.disabled : null,
         style,
       ]}
     >
-      {leading}
-      <ResponsiveLabel
-        fontSize={theme.font.size.label}
-        style={[styles.filterChipText, selected ? styles.filterChipTextSelected : null]}
-      >
-        {label}
-      </ResponsiveLabel>
-      {statusLabel ? (
-        <ResponsiveLabel
-          fontSize={theme.font.size.micro}
-          style={[styles.filterChipStatus, selected ? styles.filterChipStatusSelected : null]}
-        >
-          {statusLabel}
-        </ResponsiveLabel>
-      ) : null}
+      {isStatusBelow ? (
+        <>
+          <View style={styles.filterChipPrimaryRow}>
+            {leading}
+            <ResponsiveLabel
+              fontSize={theme.font.size.label}
+              numberOfLines={labelNumberOfLines}
+              style={[styles.filterChipText, selected ? styles.filterChipTextSelected : null]}
+            >
+              {label}
+            </ResponsiveLabel>
+          </View>
+          {statusLabel ? (
+            <ResponsiveLabel
+              fontSize={theme.font.size.micro}
+              style={[
+                styles.filterChipStatus,
+                styles.filterChipStatusBelow,
+                selected ? styles.filterChipStatusSelected : null,
+              ]}
+            >
+              {statusLabel}
+            </ResponsiveLabel>
+          ) : null}
+        </>
+      ) : (
+        <>
+          {leading}
+          <ResponsiveLabel
+            fontSize={theme.font.size.label}
+            numberOfLines={labelNumberOfLines}
+            style={[styles.filterChipText, selected ? styles.filterChipTextSelected : null]}
+          >
+            {label}
+          </ResponsiveLabel>
+          {statusLabel ? (
+            <ResponsiveLabel
+              fontSize={theme.font.size.micro}
+              style={[styles.filterChipStatus, selected ? styles.filterChipStatusSelected : null]}
+            >
+              {statusLabel}
+            </ResponsiveLabel>
+          ) : null}
+        </>
+      )}
     </InteractiveSurface>
   );
 }
@@ -243,6 +280,13 @@ const styles = StyleSheet.create({
     backgroundColor: theme.color.surface,
     borderColor: theme.color.borderDefault,
   },
+  filterChipPrimaryRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexShrink: 1,
+    gap: theme.space[1],
+    justifyContent: 'center',
+  },
   filterChipPressed: {
     backgroundColor: theme.color.surfaceSunken,
     borderColor: theme.color.uiAccent,
@@ -261,6 +305,14 @@ const styles = StyleSheet.create({
     fontFamily: theme.font.family.regular,
     fontSize: theme.font.size.micro,
     textAlign: 'center',
+  },
+  filterChipStatusBelow: {
+    alignSelf: 'stretch',
+    flexBasis: 'auto',
+  },
+  filterChipStatusBelowSurface: {
+    flexDirection: 'column',
+    flexWrap: 'nowrap',
   },
   filterChipStatusSelected: {
     color: theme.color.uiAccent,
