@@ -53,8 +53,12 @@ const coreJourneySources = [
 ];
 
 const cardSource = readMobileSource('../design/components/card.tsx');
+const actionGroupSource = readMobileSource('../design/foundation/action-group.tsx');
+const badgeSource = readMobileSource('../design/components/badge.tsx');
 const buttonSource = readMobileSource('../design/components/button.tsx');
 const chipSource = readMobileSource('../design/components/chip.tsx');
+const placePrimitiveSource = readMobileSource('../design/components/place.tsx');
+const selectableCardSource = readMobileSource('../design/components/selectable-card.tsx');
 const segmentedControlSource = readMobileSource('../design/components/segmented-control.tsx');
 const heroSource = readMobileSource('../design/patterns/hero.tsx');
 const tabButtonSource = readOptionalMobileSource('../design/components/tab-button.tsx');
@@ -64,6 +68,7 @@ const expensesSource = readMobileSource('../../app/trips/[tripId]/(tabs)/expense
 const todaySpendSource = readMobileSource('../trip-ui/TodaySpendCard.tsx');
 const representativeNextPlaceHeroSource = readMobileSource('../trip-ui/NextPlaceHeroCard.tsx');
 const representativeMapPartsSource = readMobileSource('../trip-ui/TripMapScreenParts.tsx');
+const representativePlaceSearchSource = readMobileSource('../../app/trips/[tripId]/days/[date]/place-search.tsx');
 
 test('Issue 395 representative surfaces adopt Hero and shared action primitives', () => {
   assert.match(representativeNextPlaceHeroSource, /import \{[\s\S]*HeroActions[\s\S]*HeroCard[\s\S]*HeroHeader/);
@@ -234,6 +239,38 @@ test('Issue 399 navigation chrome adopts shared interactive primitives without r
     floatingActionButtonSource,
     /floatingActionButtonGraphite:[\s\S]*backgroundColor: theme\.color\.actionPrimary/,
   );
+});
+
+test('shared primitives encode stable secondary-label and action layout defaults', () => {
+  const dayChipsSource = readMobileSource('../trip-ui/DayChips.tsx');
+
+  assert.match(chipSource, /statusPlacement\?: 'auto' \| 'below'/);
+  assert.match(chipSource, /statusPlacement = 'below'/);
+  assert.match(chipSource, /statusPlacement === 'below'/);
+  assert.match(chipSource, /styles\.filterChipStatusBelow/);
+  assert.doesNotMatch(dayChipsSource, /statusPlacement="below"/);
+
+  assert.match(actionGroupSource, /buildResponsiveTextProfile/);
+  assert.match(actionGroupSource, /direction === 'row' && profile\.prefersStackedContent/);
+  assert.match(heroSource, /<ActionGroup[\s\S]*direction=\{secondary \? 'row' : 'column'\}/);
+
+  assert.match(buttonSource, /styles\.loadingStack/);
+  assert.doesNotMatch(buttonSource, /loadingRow:[\s\S]*flexWrap: 'wrap'/);
+
+  assert.match(segmentedControlSource, /numberOfLines=\{2\}/);
+  assert.match(segmentedControlSource, /styles\.segmentTextBounded/);
+
+  assert.match(selectableCardSource, /metaPlacement = 'below'/);
+  assert.match(selectableCardSource, /metaPlacement\?: 'below' \| 'inline'/);
+  assert.match(selectableCardSource, /styles\.selectableCardMetaBelow/);
+
+  assert.doesNotMatch(badgeSource, /pill:[\s\S]*flexWrap: 'wrap'/);
+  assert.doesNotMatch(placePrimitiveSource, /placeTag:[\s\S]*flexWrap: 'wrap'/);
+
+  assert.match(representativeMapPartsSource, /labelNumberOfLines=\{1\}/);
+  assert.match(representativeMapPartsSource, /style=\{styles\.scheduleAddSelectedChip\}/);
+  assert.match(representativePlaceSearchSource, /labelNumberOfLines=\{1\}/);
+  assert.match(representativePlaceSearchSource, /style=\{styles\.batchSelectedChip\}/);
 });
 
 test('key tab and chip primitives expose explicit accessibility labels with selected state', () => {

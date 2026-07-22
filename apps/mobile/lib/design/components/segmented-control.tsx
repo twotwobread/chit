@@ -24,6 +24,7 @@ export function SegmentedControl({
     minHeight: theme.layout.tapMin,
     verticalPadding: theme.space[3],
   });
+  const segmentItemMinHeight = Math.max(textLayout.minHeight, textLayout.lineHeight * 2 + theme.space[2] * 2);
 
   return (
     <View style={[styles.segment, dark ? styles.segmentDark : null]}>
@@ -37,20 +38,22 @@ export function SegmentedControl({
             accessibilityRole="tab"
             disabled={disabled}
             key={option}
-            minHeight={textLayout.minHeight}
+            minHeight={segmentItemMinHeight}
             onPress={() => onChange(option)}
             selected={active}
             style={[
               styles.segmentItem,
-              { minHeight: textLayout.minHeight },
+              { minHeight: segmentItemMinHeight },
               active ? (dark ? styles.segmentItemActiveDark : styles.segmentItemActive) : null,
               disabled ? styles.segmentItemDisabled : null,
             ]}
           >
             <Text
+              numberOfLines={2}
               style={[
                 styles.segmentText,
-                { lineHeight: textLayout.lineHeight },
+                styles.segmentTextBounded,
+                { lineHeight: textLayout.lineHeight, minHeight: textLayout.lineHeight * 2 },
                 dark ? styles.segmentTextDark : null,
                 active ? (dark ? styles.segmentTextActiveDark : styles.segmentTextActive) : null,
                 disabled ? styles.segmentTextDisabled : null,
@@ -102,6 +105,9 @@ const styles = StyleSheet.create({
     fontSize: theme.font.size.label,
     fontWeight: theme.font.weight.bold,
     textAlign: 'center',
+  },
+  segmentTextBounded: {
+    textAlignVertical: 'center',
   },
   segmentTextActive: {
     color: theme.color.textStrong,

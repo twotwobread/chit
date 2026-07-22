@@ -211,8 +211,10 @@ function MapScheduleAddTray({
               disabled={isSubmitting}
               key={`map-selected-${result.id}`}
               label={result.placeName}
+              labelNumberOfLines={1}
               onPress={() => onRemoveResult(result.id)}
               statusLabel="제거"
+              style={styles.scheduleAddSelectedChip}
             />
           ))}
         </View>

@@ -68,7 +68,7 @@ export function PrimaryButton({
       ]}
     >
       {loading ? (
-        <View style={styles.loadingRow}>
+        <View style={styles.loadingStack}>
           <ActivityIndicator color={spinnerColor} />
           <ResponsiveLabel
             fontSize={theme.font.size.label}
@@ -139,11 +139,9 @@ const styles = StyleSheet.create({
   disabled: {
     opacity: 0.5,
   },
-  loadingRow: {
+  loadingStack: {
     alignItems: 'center',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: theme.space[3],
+    gap: theme.space[2],
     justifyContent: 'center',
   },
   primaryButton: {

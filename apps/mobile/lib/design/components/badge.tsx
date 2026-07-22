@@ -85,7 +85,6 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     borderRadius: theme.radius.pill,
     flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: theme.space[2],
     maxWidth: '100%',
     paddingHorizontal: theme.space[4],

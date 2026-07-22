@@ -16,6 +16,7 @@ export type SelectableCardProps = {
   disabled?: boolean;
   expanded?: boolean;
   meta?: ReactNode;
+  metaPlacement?: 'below' | 'inline';
   mode?: SelectableCardMode;
   onPress: PressableProps['onPress'];
   selected?: boolean;
@@ -33,6 +34,7 @@ export function SelectableCard({
   disabled,
   expanded,
   meta,
+  metaPlacement = 'below',
   mode = 'button',
   onPress,
   selected,
@@ -70,12 +72,17 @@ export function SelectableCard({
               styles.selectableCardTitle,
               active ? styles.selectableCardTitleSelected : null,
             ])}
-            {meta ? (
+            {meta && metaPlacement === 'inline' ? (
               <View style={styles.selectableCardMetaWrap}>
                 {renderTextSlot(meta, theme.font.size.caption, styles.selectableCardMeta)}
               </View>
             ) : null}
           </View>
+          {meta && metaPlacement === 'below' ? (
+            <View style={styles.selectableCardMetaBelow}>
+              {renderTextSlot(meta, theme.font.size.caption, styles.selectableCardMeta)}
+            </View>
+          ) : null}
           {description ? (
             <View>{renderTextSlot(description, theme.font.size.caption, styles.selectableCardDescription)}</View>
           ) : null}
@@ -151,6 +158,9 @@ const styles = StyleSheet.create({
     fontFamily: theme.font.family.semibold,
     fontSize: theme.font.size.caption,
     fontWeight: theme.font.weight.semibold,
+  },
+  selectableCardMetaBelow: {
+    alignSelf: 'flex-start',
   },
   selectableCardMetaWrap: {
     flexShrink: 0,
