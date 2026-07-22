@@ -38,7 +38,6 @@ test('uses the shared keyboard-aware primitive on main raw-scroll form screens',
     'app/trips/[tripId]/days/[date]/places/new.tsx',
     'app/trips/[tripId]/days/[date]/expenses/quick.tsx',
     'app/trips/[tripId]/days/[date]/expenses/[expenseId]/edit.tsx',
-    'app/trips/[tripId]/(tabs)/today.tsx',
     'lib/trip-ui/DayItineraryEditor.tsx',
     'lib/trip-ui/BottomSheet.tsx',
   ]) {
