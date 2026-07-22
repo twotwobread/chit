@@ -347,7 +347,7 @@ const styles = StyleSheet.create({
     width: 7,
   },
   carouselDotActive: {
-    backgroundColor: theme.color.primary,
+    backgroundColor: theme.color.uiAccent,
     width: 18,
   },
   carouselDots: {

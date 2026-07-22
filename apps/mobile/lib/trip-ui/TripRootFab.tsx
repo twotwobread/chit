@@ -21,9 +21,8 @@ export function TripRootFab({
       accessibilityLabel={accessibilityLabel}
       onPress={onPress}
       style={layout}
-      tone="lime"
     >
-      <Plus color={theme.color.onUiAccent} size={30} strokeWidth={2.8} />
+      <Plus color={theme.color.uiAccent} size={30} strokeWidth={2.8} />
     </FloatingActionButton>
   );
 }

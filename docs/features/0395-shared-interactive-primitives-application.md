@@ -13,13 +13,13 @@
 
 공유 mobile design layer를 기존 `components.tsx` 중심의 개별 구현 묶음에서 foundation/component/pattern 계층으로 재정리한다. 기존 public import surface는 유지하면서, 반복되는 `Pressable`, accessibility state, hitSlop, pressed/disabled state, responsive label, surface/card/action group 패턴을 shared foundation primitive로 모은다.
 
-새 Hero pattern은 Chit brand/design source의 `Dark Shell + Off-white Content`, Graphite primary hierarchy, sparse Acid Lime 규칙을 따른다. Hero의 구조와 요약은 Graphite/Off-white로 잡고, `지출 추가`처럼 화면의 최상위 핵심 실행 CTA 하나만 Acid Lime으로 강조한다.
+새 Hero pattern은 Chit brand/design source의 `Pure Dark Graphite`, Graphite primary hierarchy, sparse Acid Lime 규칙을 따른다. Hero의 구조와 요약은 dark graphite layers로 잡고, `지출 추가`처럼 화면의 최상위 핵심 실행 CTA 하나만 명시적으로 허용된 경우에만 Acid Lime으로 강조한다.
 
 ## Goals
 
 - 공용 컴포넌트 내부 반복 패턴을 primitive/base layer로 정리한다.
 - 기존 `../design` public exports와 주요 props 호환성을 유지한다.
-- Graphite 중심 Hero pattern과 single Lime CTA 사용 규칙을 추가한다.
+- Pure Dark Graphite 중심 Hero pattern과 명시적으로 허용된 rare Lime CTA 사용 규칙을 추가한다.
 - 대표 화면에 새 구조를 적용해 실제 화면 품질과 API 사용성을 검증한다.
 - 기존 화면의 정보 구조, copy 의미, route/navigation behavior는 유지한다.
 
@@ -36,13 +36,13 @@
 
 ### Visual decision
 
-- Hero default direction: **Graphite Hero + Lime 핵심 CTA 1개**.
-- Default reusable variant: Off-white Hero body + Graphite metric/summary panel + Lime primary CTA.
+- Hero default direction: **Pure Dark Graphite Hero + rare Lime signal**.
+- Default reusable variant: dark graphite hero body + darker/lighter graphite metric panel + Graphite primary CTA.
 - Supported variants:
-  - `panel`: Off-white card with Graphite summary panel. Default for expense/settlement/spend summary.
+  - `panel`: Graphite Card with Graphite Elevated metric/summary panel. Default for expense/settlement/spend summary.
   - `graphite`: Full Graphite hero surface. Use for high-emphasis Today/Home execution moments.
-  - `split`: Graphite header + Off-white body. Use for map/itinerary/action-heavy contexts.
-- Acid Lime is allowed for one primary CTA in a Hero/action moment, selected/soft state, or BrandStamp. It must not become repeated small foreground text on Off-white surfaces.
+  - `split`: Graphite header + Graphite Card body. Use for map/itinerary/action-heavy contexts.
+- Acid Lime is allowed for BrandStamp, selected dot/underline/edge, rare success emphasis, or one explicitly approved primary CTA in a Hero/action moment. It must not become repeated small foreground text or repeated routine fill.
 
 ### Layering decision
 
@@ -108,7 +108,7 @@ The exact file split may be adjusted during implementation if TypeScript or Expo
   - `FormField`, `EmptyState`, `ErrorState`, `LoadingState`.
 - Add button tone support:
   - default primary action remains Graphite.
-  - `tone="lime"` is available for explicitly approved high-emphasis primary CTAs.
+  - `tone="lime"` is available only for explicitly approved high-emphasis primary CTAs.
   - `PrimaryButton` remains backward-compatible and defaults to Graphite.
 - Add Hero pattern exports:
   - `HeroCard`.
@@ -118,7 +118,7 @@ The exact file split may be adjusted during implementation if TypeScript or Expo
   - Public types for Hero variants/action props.
 - Apply the new shared structure to representative surfaces:
   - `NextPlaceHeroCard`: adopt Hero pattern and replace local action `Pressable` controls with shared actions where behavior fits.
-  - `TodaySpendCard`: adopt Hero/metric/action primitives and use a single Lime primary CTA for the add action.
+  - `TodaySpendCard`: adopt Hero/metric/action primitives and keep the add action Graphite by default unless the current screen spec explicitly approves a Lime hero CTA.
   - Expense tab: replace local filter chip and link-button patterns with shared `FilterChip`, `TextLink` or `InlineAction` while preserving current mode/filter behavior.
   - Map schedule add tray: replace selected-result chip/remove and primary schedule add affordances with shared chip/action primitives where this does not break overlay/context-bound behavior.
 - Update or add tests/source guards for public exports, token-only styling, foundation usage, Hero token policy, accessibility/touch behavior, and representative adoption.
@@ -141,7 +141,7 @@ The exact file split may be adjusted during implementation if TypeScript or Expo
   - `FilterChip`, `ChoiceChip`.
   - Existing primitive exports such as `Badge`, `Pill`, `Chip`, `AmountText`, `PlacePin`, `PlaceTag`, `Avatar`, `AvatarGroup`, `ListRow`, `SegmentedControl`.
 - New Hero exports must be available from `../design`.
-- `PrimaryButton` and `HeroActions` must support a Lime primary CTA explicitly; existing call sites without tone must remain Graphite.
+- `PrimaryButton` and `HeroActions` may support an explicit Lime primary CTA tone; existing call sites without tone must remain Graphite.
 - Icon-only controls must continue to require explicit `accessibilityLabel` and support `accessibilityHint`/hitSlop.
 
 ## Accessibility and UX requirements
@@ -151,7 +151,8 @@ The exact file split may be adjusted during implementation if TypeScript or Expo
 - Touch targets remain at least `theme.layout.tapMin` (44pt floor).
 - Adjacent action controls keep at least tokenized 8pt-ish spacing through shared layout.
 - Pressed/disabled visual states must not cause layout shift.
-- Hero Lime CTA uses Acid Lime fill with Charcoal foreground; Lime must not be used as small text on Off-white surfaces.
+- Hero CTA defaults to Graphite; any Lime CTA must be explicit, rare, and covered by the current screen spec.
+- Lime must not be used as repeated small text or repeated routine fill.
 - Representative screen adoption must preserve existing Korean copy meaning and route behavior.
 - Context-bound mobile UI rule applies to map/search overlays: if a shared wrapper is unsafe outside a provider tree, keep a local plain RN fallback and document the gap.
 
@@ -159,14 +160,14 @@ The exact file split may be adjusted during implementation if TypeScript or Expo
 
 - [ ] `apps/mobile/lib/design` has a clear foundation/component/pattern layering, with compatibility barrels preserving existing public exports.
 - [ ] Shared interactive components are rebuilt on top of foundation primitives where practical instead of duplicating `Pressable` role/state/pressed/disabled/touch logic in each component.
-- [ ] `PrimaryButton` remains backward-compatible and supports a Lime high-emphasis CTA tone without changing default Graphite behavior.
-- [ ] New Hero pattern exports exist and implement Graphite-centered variants with a single Lime primary CTA option.
+- [ ] `PrimaryButton` remains backward-compatible and supports an explicit Lime high-emphasis CTA tone without changing default Graphite behavior.
+- [ ] New Hero pattern exports exist and implement Pure Dark Graphite-centered variants with a rare Lime signal/CTA option.
 - [ ] `NextPlaceHeroCard` and `TodaySpendCard` use the Hero/action primitives while preserving existing behavior and copy meaning.
 - [ ] Expense tab no longer owns a duplicate local FilterChip implementation for day/category browser chips.
 - [ ] At least one map or itinerary action cluster adopts shared chip/action primitives, or the spec records a concrete context-bound reason for retaining a local plain RN implementation.
 - [ ] All changed shared UI uses theme tokens only; no raw hex colors or decorative emoji are introduced.
 - [ ] Interactive primitives keep default accessibility role/state and 44pt touch target behavior.
-- [ ] Existing visual hierarchy remains Chit-compliant: Dark Shell + Off-white Content, Graphite primary hierarchy, sparse Acid Lime.
+- [ ] Existing visual hierarchy remains Chit-compliant: Pure Dark Graphite, Graphite primary hierarchy, sparse Acid Lime, Compact Premium Dark density.
 
 ## Implementation notes
 
@@ -199,9 +200,9 @@ None.
 
 - Add or update mobile source tests to cover:
   - public design exports remain available;
-  - Hero exports exist and use Graphite/Lime semantic tokens;
+  - Hero exports exist and use Pure Dark Graphite/Lime semantic tokens;
   - shared interactive components use foundation primitives;
-  - default primary button remains Graphite and Lime tone is explicit;
+  - default primary button remains Graphite and Lime tone is explicit/rare;
   - representative surfaces import/use Hero/FilterChip/Action primitives.
 - Run:
   - `pnpm --filter @i-um/mobile test`

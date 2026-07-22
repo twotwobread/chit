@@ -288,14 +288,14 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.bold,
   },
   timelineMarkerTextTimed: {
-    color: theme.color.onPrimary,
+    color: theme.color.textStrong,
   },
   timelineMarkerTextUntimed: {
     color: theme.color.textMuted,
   },
   timelineMarkerTimed: {
-    backgroundColor: theme.color.green[600],
-    borderColor: theme.color.green[600],
+    backgroundColor: theme.color.surfaceSoft,
+    borderColor: theme.color.uiAccent,
     borderStyle: 'solid',
   },
   timelineMarkerUntimed: {
@@ -393,11 +393,11 @@ const styles = StyleSheet.create({
     top: theme.space[2],
   },
   spineStrong: {
-    backgroundColor: theme.color.green[300],
+    backgroundColor: theme.color.uiAccent,
     width: 3,
   },
   time: {
-    color: theme.color.primary,
+    color: theme.color.textMuted,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.label,
     fontVariant: ['tabular-nums'],

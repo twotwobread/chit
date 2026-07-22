@@ -235,7 +235,7 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.semibold,
   },
   quickDurationButton: {
-    backgroundColor: theme.color.primarySoft,
+    backgroundColor: theme.color.surfaceSoft,
     borderColor: theme.color.borderDefault,
     borderRadius: theme.radius.pill,
     borderWidth: 1,
@@ -246,7 +246,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   quickDurationButtonText: {
-    color: theme.color.primary,
+    color: theme.color.uiAccent,
     fontFamily: theme.font.family.semibold,
     fontSize: theme.font.size.caption,
     fontWeight: theme.font.weight.semibold,
@@ -279,7 +279,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   timeSegmentActive: {
-    backgroundColor: theme.color.primarySoft,
+    backgroundColor: theme.color.surfaceSoft,
   },
   timeSegmentedControl: {
     alignItems: 'center',
@@ -298,7 +298,7 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.semibold,
   },
   timeSegmentLabelActive: {
-    color: theme.color.primary,
+    color: theme.color.uiAccent,
   },
   timeSegmentText: {
     color: theme.color.textStrong,
@@ -307,6 +307,6 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.bold,
   },
   timeSegmentTextActive: {
-    color: theme.color.primary,
+    color: theme.color.uiAccent,
   },
 });

@@ -94,7 +94,7 @@ export const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   dayLabel: {
-    color: theme.color.primaryTextOnLight,
+    color: theme.color.uiAccent,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.body,
     fontWeight: theme.font.weight.bold,
@@ -138,14 +138,14 @@ export const styles = StyleSheet.create({
   },
   participantAvatar: {
     alignItems: 'center',
-    backgroundColor: theme.color.primarySoft,
+    backgroundColor: theme.color.surfaceSoft,
     borderRadius: theme.radius.pill,
     height: 34,
     justifyContent: 'center',
     width: 34,
   },
   participantAvatarText: {
-    color: theme.color.primaryTextOnLight,
+    color: theme.color.textStrong,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.caption,
     fontWeight: theme.font.weight.bold,
@@ -195,7 +195,7 @@ export const styles = StyleSheet.create({
   },
   button: {
     alignItems: 'center',
-    backgroundColor: theme.color.primary,
+    backgroundColor: theme.color.actionPrimary,
     borderRadius: theme.radius.md,
     justifyContent: 'center',
     minHeight: theme.layout.controlH,
@@ -203,14 +203,14 @@ export const styles = StyleSheet.create({
     paddingVertical: theme.space[4],
   },
   buttonText: {
-    color: theme.color.onPrimary,
+    color: theme.color.onActionPrimary,
     fontFamily: theme.font.family.bold,
     fontWeight: theme.font.weight.bold,
     textAlign: 'center',
   },
   secondaryButton: {
     alignItems: 'center',
-    borderColor: theme.color.primary,
+    borderColor: theme.color.uiAccent,
     borderRadius: theme.radius.md,
     borderWidth: 1,
     justifyContent: 'center',
@@ -220,7 +220,7 @@ export const styles = StyleSheet.create({
   },
   secondaryActionButton: {
     alignItems: 'center',
-    borderColor: theme.color.primary,
+    borderColor: theme.color.uiAccent,
     borderRadius: theme.radius.md,
     borderWidth: 1,
     flex: 1,
@@ -230,7 +230,7 @@ export const styles = StyleSheet.create({
     paddingVertical: theme.space[4],
   },
   secondaryButtonText: {
-    color: theme.color.primaryTextOnLight,
+    color: theme.color.uiAccent,
     fontFamily: theme.font.family.bold,
     fontWeight: theme.font.weight.bold,
     textAlign: 'center',

@@ -36,7 +36,7 @@ export function TabButton({
   selected?: boolean;
   style?: StyleProp<ViewStyle>;
 }) {
-  const iconColor = selected ? theme.color.onPrimary : theme.color.textFaint;
+  const iconColor = selected ? theme.color.uiAccent : theme.color.textFaint;
   const strokeWidth = selected ? 2.2 : 2;
 
   return (
@@ -71,7 +71,7 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.semibold,
   },
   labelSelected: {
-    color: theme.color.onPrimary,
+    color: theme.color.textStrong,
     fontFamily: theme.font.family.bold,
     fontWeight: theme.font.weight.bold,
   },
@@ -88,7 +88,8 @@ const styles = StyleSheet.create({
     opacity: 0.72,
   },
   tabButtonSelected: {
-    backgroundColor: theme.color.primary,
-    ...theme.shadow.xs,
+    backgroundColor: theme.color.surfaceSoft,
+    borderBottomColor: theme.color.uiAccent,
+    borderBottomWidth: 3,
   },
 });

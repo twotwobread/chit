@@ -308,10 +308,10 @@ export function CompanionsSheet({
 
 const styles = StyleSheet.create({
   copyButton: {
-    backgroundColor: theme.color.primary,
+    backgroundColor: theme.color.actionPrimary,
   },
   copyText: {
-    color: theme.color.onPrimary,
+    color: theme.color.onActionPrimary,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.label,
     fontWeight: theme.font.weight.bold,

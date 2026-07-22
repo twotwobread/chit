@@ -172,9 +172,8 @@ const styles = StyleSheet.create({
     opacity: 0.78,
   },
   chipSelected: {
-    backgroundColor: theme.color.primary,
-    borderColor: theme.color.primaryPressed,
-    ...theme.shadow.xs,
+    backgroundColor: theme.color.uiAccentSoft,
+    borderColor: theme.color.uiAccent,
   },
   chipText: {
     color: theme.color.textBody,
@@ -185,7 +184,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   chipTextSelected: {
-    color: theme.color.onPrimary,
+    color: theme.color.uiAccent,
     fontFamily: theme.font.family.bold,
   },
   choiceChip: {
@@ -211,7 +210,7 @@ const styles = StyleSheet.create({
     borderColor: theme.color.uiAccent,
   },
   choiceChipSelectedAccent: {
-    backgroundColor: theme.color.uiAccent,
+    backgroundColor: theme.color.uiAccentSoft,
     borderColor: theme.color.uiAccent,
   },
   choiceChipText: {
@@ -223,7 +222,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   choiceChipTextSelected: {
-    color: theme.color.onUiAccent,
+    color: theme.color.textStrong,
   },
   disabled: {
     opacity: 0.5,
@@ -253,7 +252,7 @@ const styles = StyleSheet.create({
     borderColor: theme.color.uiAccent,
   },
   filterChipSelectedAccent: {
-    backgroundColor: theme.color.uiAccent,
+    backgroundColor: theme.color.uiAccentSoft,
     borderColor: theme.color.uiAccent,
   },
   filterChipStatus: {
@@ -264,7 +263,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   filterChipStatusSelected: {
-    color: theme.color.onUiAccent,
+    color: theme.color.uiAccent,
   },
   filterChipText: {
     color: theme.color.textStrong,
@@ -275,6 +274,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   filterChipTextSelected: {
-    color: theme.color.onUiAccent,
+    color: theme.color.textStrong,
   },
 });

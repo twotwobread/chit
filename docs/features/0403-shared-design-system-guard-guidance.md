@@ -49,7 +49,7 @@ theme tokens
 
 `patterns`는 여러 component를 조합해 반복 화면 구조를 만든다. Hero, form field, state card처럼 섹션 단위 의미가 있을 때 사용한다.
 
-- `HeroCard`, `HeroHeader`, `HeroMetricPanel`, `HeroActions`는 Graphite 중심 구조와 explicit Lime CTA를 표현한다.
+- `HeroCard`, `HeroHeader`, `HeroMetricPanel`, `HeroActions`는 Pure Dark Graphite 중심 구조와 rare/explicit Lime signal 또는 CTA를 표현한다.
 - Loading, empty, error state는 screen state를 소유하지 않고 표시 구조만 제공한다.
 - Pattern은 route, API call, business state를 직접 알지 않는다.
 
@@ -88,14 +88,14 @@ theme tokens
 
 Graphite is the default primary action for normal product UI. In Korean context: 일반 주요 액션의 기본 primary CTA는 Graphite fill + Off-white text다.
 
-Acid Lime is sparse and explicit. Use Acid Lime for one high-emphasis CTA in a Hero/action moment, selected/soft state, BrandStamp/app icon/splash/onboarding brand moment, or rare success emphasis. Do not use Acid Lime repeatedly as small foreground text on Off-white surfaces, neutral spinners, dense routine tabs, danger actions, or long body copy.
+Acid Lime is sparse and explicit. Use Acid Lime for BrandStamp/app icon/splash/onboarding brand moments, selected dot/underline/edge signals, rare success emphasis, or one high-emphasis CTA only when the current screen spec explicitly approves it. Do not use Acid Lime repeatedly as small foreground text, neutral spinners, dense routine tabs/chips/FAB/buttons, danger actions, or long body copy.
 
 Practical rules:
 
 - `PrimaryButton` default tone stays Graphite. Use `tone="lime"` only when the current spec says this is the one high-emphasis CTA.
-- `HeroActions` may contain a Lime primary action, but keep it to one core action in the hero moment.
+- `HeroActions` may contain a Lime primary action, but keep it rare and explicit; Graphite remains the default hero CTA.
 - Dense rows, routine form actions, and destructive actions stay Graphite/neutral/danger tokens, not Lime.
-- Selected chips can use Acid Lime fill or soft surface with Charcoal foreground when selected state must pop.
+- Selected chips/tabs should prefer Graphite Elevated or Acid Lime Surface with a small Lime underline/dot/edge signal; avoid repeated full Acid Lime fill in dense UI.
 
 ## Representative examples
 
@@ -114,7 +114,7 @@ Use shared components first:
 
 Do not create a local raw `Pressable` with hand-written role, state, pressed opacity, hitSlop, and token copies unless a provider/context boundary makes the shared wrapper unsafe.
 
-### Hero-level primary CTA
+### Explicit rare Lime hero CTA
 
 ```tsx
 <HeroActions
@@ -125,7 +125,7 @@ Do not create a local raw `Pressable` with hand-written role, state, pressed opa
 />
 ```
 
-Only one high-emphasis Lime action should appear in that Hero/action moment. If two actions feel equally important, pick the actual next action and keep the other Graphite/secondary.
+Use this only when the current screen spec explicitly approves a Lime hero CTA. Otherwise keep the primary action Graphite. If two actions feel equally important, pick the actual next action and keep the other Graphite/secondary.
 
 ### Public export compatibility
 

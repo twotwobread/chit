@@ -20,7 +20,7 @@ export function TransferRow({ amount, currency = 'JPY', fromColor, fromName, toC
         <Text accessibilityLabel={fromName} numberOfLines={2} style={styles.name}>
           {fromName}
         </Text>
-        <ArrowRight color={theme.color.primary} size={18} strokeWidth={2.4} />
+        <ArrowRight color={theme.color.textMuted} size={18} strokeWidth={2.4} />
         <Text accessibilityLabel={toName} numberOfLines={2} style={styles.name}>
           {toName}
         </Text>

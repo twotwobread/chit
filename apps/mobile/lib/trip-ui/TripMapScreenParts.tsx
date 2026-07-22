@@ -237,7 +237,6 @@ function MapScheduleAddTray({
             onSubmit(targetDay.id);
           }
         }}
-        tone="lime"
       />
     </View>
   );

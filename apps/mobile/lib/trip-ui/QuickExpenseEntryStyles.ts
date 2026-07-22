@@ -246,8 +246,8 @@ export const styles = StyleSheet.create({
     padding: theme.space[4],
   },
   optionCardSelected: {
-    backgroundColor: theme.color.primarySoft,
-    borderColor: theme.color.primary,
+    backgroundColor: theme.color.surfaceSoft,
+    borderColor: theme.color.uiAccent,
   },
   selectedPlaceBox: {
     backgroundColor: theme.color.surfaceSunken,
@@ -303,9 +303,9 @@ export const styles = StyleSheet.create({
     paddingVertical: theme.space[1],
   },
   orderBadge: {
-    backgroundColor: theme.color.primary,
+    backgroundColor: theme.color.surfaceSoft,
     borderRadius: theme.radius.pill,
-    color: theme.color.onPrimary,
+    color: theme.color.uiAccent,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.caption,
     fontWeight: theme.font.weight.bold,

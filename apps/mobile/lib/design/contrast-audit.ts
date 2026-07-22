@@ -63,7 +63,7 @@ export const auditedContrastPairs: ContrastAuditPair[] = [
     background: theme.color.primarySoft,
     foreground: theme.color.primaryTextOnLight,
     minimumRatio: 4.5,
-    name: 'accent-soft text on light surface',
+    name: 'accent-soft text on dark surface',
   },
 ];
 

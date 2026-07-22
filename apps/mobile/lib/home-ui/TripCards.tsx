@@ -117,7 +117,7 @@ export function ActiveTripCard({
 
       <View style={styles.heroCta}>
         <Text style={styles.heroCtaText}>{ctaLabel}</Text>
-        <ChevronRight color={theme.color.onPrimary} size={18} strokeWidth={2.4} />
+        <ChevronRight color={theme.color.onActionPrimary} size={18} strokeWidth={2.4} />
       </View>
     </Pressable>
   );
@@ -229,28 +229,28 @@ export function PastTripRow({
 const styles = StyleSheet.create({
   ddayBadge: {
     alignItems: 'center',
-    backgroundColor: theme.color.primary,
+    backgroundColor: theme.color.uiAccentSoft,
     borderRadius: theme.radius.md,
     height: 52,
     justifyContent: 'center',
     width: 54,
   },
   ddayCaption: {
-    color: theme.color.onPrimary,
+    color: theme.color.uiAccent,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.micro,
     fontWeight: theme.font.weight.bold,
     letterSpacing: 0.4,
   },
   ddayText: {
-    color: theme.color.onPrimary,
+    color: theme.color.textStrong,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.headline,
     fontWeight: theme.font.weight.bold,
     letterSpacing: -0.4,
   },
   fill: {
-    backgroundColor: theme.color.primary,
+    backgroundColor: theme.color.uiAccent,
     borderRadius: theme.radius.pill,
     height: '100%',
   },
@@ -265,7 +265,7 @@ const styles = StyleSheet.create({
   },
   heroCta: {
     alignItems: 'center',
-    backgroundColor: theme.color.primary,
+    backgroundColor: theme.color.actionPrimary,
     borderRadius: theme.radius.lg,
     flexDirection: 'row',
     gap: theme.space[2],
@@ -274,7 +274,7 @@ const styles = StyleSheet.create({
     marginTop: theme.space[5],
   },
   heroCtaText: {
-    color: theme.color.onPrimary,
+    color: theme.color.onActionPrimary,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.subhead,
     fontWeight: theme.font.weight.bold,

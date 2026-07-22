@@ -142,12 +142,20 @@ function flightListErrorMessage(error: unknown): string {
 
 const styles = StyleSheet.create({
   badge: {
-    color: theme.color.primary,
+    backgroundColor: theme.color.surfaceSunken,
+    borderColor: theme.color.uiAccent,
+    borderRadius: theme.radius.pill,
+    borderWidth: 1,
+    color: theme.color.uiAccent,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.caption,
     fontWeight: theme.font.weight.bold,
+    paddingHorizontal: theme.space[3],
+    paddingVertical: theme.space[1],
   },
   card: {
+    backgroundColor: theme.color.surfaceSoft,
+    borderColor: theme.color.borderStrong,
     padding: theme.space[5],
   },
   cardHeader: {
@@ -177,10 +185,11 @@ const styles = StyleSheet.create({
     opacity: 0.72,
   },
   route: {
-    color: theme.color.textBody,
+    color: theme.color.textStrong,
     fontFamily: theme.font.family.bold,
-    fontSize: theme.font.size.body,
+    fontSize: theme.font.size.headline,
     fontWeight: theme.font.weight.bold,
+    letterSpacing: -0.2,
   },
   section: {
     gap: theme.space[3],

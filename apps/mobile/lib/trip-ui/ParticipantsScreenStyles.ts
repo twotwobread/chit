@@ -83,8 +83,8 @@ export const styles = StyleSheet.create({
     fontWeight: theme.font.weight.semibold,
   },
   ownerBadge: {
-    backgroundColor: theme.color.primarySoft,
-    borderColor: theme.color.primary,
+    backgroundColor: theme.color.surfaceSoft,
+    borderColor: theme.color.uiAccent,
     borderRadius: theme.radius.pill,
     borderWidth: 1,
     paddingHorizontal: theme.space[3],
@@ -99,7 +99,7 @@ export const styles = StyleSheet.create({
     paddingVertical: theme.space[2],
   },
   ownerBadgeText: {
-    color: theme.color.primaryTextOnLight,
+    color: theme.color.textStrong,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.caption,
     fontWeight: theme.font.weight.bold,
@@ -188,7 +188,7 @@ export const styles = StyleSheet.create({
     textAlign: 'center',
   },
   successMessage: {
-    color: theme.color.primaryTextOnLight,
+    color: theme.color.uiAccent,
     fontFamily: theme.font.family.semibold,
     fontWeight: theme.font.weight.semibold,
     textAlign: 'center',

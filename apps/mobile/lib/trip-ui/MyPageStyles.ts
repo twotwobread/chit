@@ -68,7 +68,7 @@ export const styles = StyleSheet.create({
     gap: theme.space[2],
   },
   settlementChipReceive: {
-    backgroundColor: theme.color.primarySoft,
+    backgroundColor: theme.color.uiAccentSoft,
   },
   settlementChipSend: {
     backgroundColor: theme.color.red[100],

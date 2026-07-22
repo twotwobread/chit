@@ -458,8 +458,8 @@ const styles = StyleSheet.create({
     paddingVertical: theme.space[3],
   },
   dateTimeButtonActive: {
-    backgroundColor: theme.color.primarySoft,
-    borderColor: theme.color.primary,
+    backgroundColor: theme.color.surfaceSoft,
+    borderColor: theme.color.uiAccent,
   },
   dateTimeButtonLabel: {
     color: theme.color.textMuted,
@@ -468,7 +468,7 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.semibold,
   },
   dateTimeButtonLabelActive: {
-    color: theme.color.primary,
+    color: theme.color.uiAccent,
   },
   dateTimeButtonValue: {
     color: theme.color.textStrong,
@@ -495,7 +495,8 @@ const styles = StyleSheet.create({
     gap: theme.space[2],
   },
   input: {
-    borderColor: theme.color.borderSubtle,
+    backgroundColor: theme.color.surfaceSunken,
+    borderColor: theme.color.borderDefault,
     borderRadius: theme.radius.md,
     borderWidth: 1,
     color: theme.color.textStrong,
@@ -534,7 +535,7 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.bold,
   },
   passengerStateSelected: {
-    color: theme.color.primary,
+    color: theme.color.uiAccent,
   },
   placeholderText: {
     color: theme.color.textMuted,
@@ -549,7 +550,8 @@ const styles = StyleSheet.create({
   },
   selectButton: {
     alignItems: 'center',
-    borderColor: theme.color.borderSubtle,
+    backgroundColor: theme.color.surfaceSunken,
+    borderColor: theme.color.borderDefault,
     borderRadius: theme.radius.md,
     borderWidth: 1,
     flexDirection: 'row',
@@ -566,7 +568,7 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.bold,
   },
   selectChevron: {
-    color: theme.color.primary,
+    color: theme.color.uiAccent,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.caption,
     fontWeight: theme.font.weight.bold,
@@ -577,7 +579,7 @@ const styles = StyleSheet.create({
     paddingVertical: theme.space[3],
   },
   selectOptionSelected: {
-    backgroundColor: theme.color.primarySoft,
+    backgroundColor: theme.color.surfaceSoft,
   },
   selectOptionText: {
     color: theme.color.textBody,
@@ -585,7 +587,7 @@ const styles = StyleSheet.create({
     fontSize: theme.font.size.body,
   },
   selectOptionTextSelected: {
-    color: theme.color.primary,
+    color: theme.color.uiAccent,
     fontFamily: theme.font.family.bold,
     fontWeight: theme.font.weight.bold,
   },
