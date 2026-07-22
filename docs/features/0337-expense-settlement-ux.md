@@ -24,7 +24,8 @@
 - 현재 `정산` 탭에 섞여 있는 지출 관리 정보는 새 `지출` 탭으로 이동한다.
 - `오늘`의 빠른 지출은 현장에서 빠르게 기록하는 흐름으로 유지한다.
 - `지출` 페이지는 전체 지출 관리와 상세 등록 흐름을 담당한다.
-- `지출 추가` 첫 화면은 `직접 입력`을 primary로, `영수증으로 채우기`를 secondary로 제공한다.
+- `오늘`의 빠른 지출은 선택 화면 없이 바로 직접 입력 폼으로 시작한다. 폼 안에서 영수증 촬영/자동 채우기를 선택할 수 있다.
+- 상세 `지출 추가` 첫 화면은 `직접 입력`을 primary로, `영수증으로 채우기`를 secondary로 제공한다.
 - 영수증/OCR draft 기능은 선택형 자동 채우기로 유지하며, OCR 값은 저장 전 확인이 필요한 초안으로 표시한다.
 - 상세 지출 등록 폼은 긴 입력 폼이 아니라 초안 요약 + 확인 그룹 + 항목별 수정 구조로 단순화한다.
 - 상세 지출 등록 본문은 중복되는 상단 제목/설명을 줄이고, 하나의 큰 outer card 안에 작은 card를 넣지 않는다. 배경 위에 초안/확인 그룹 card를 직접 배치한다.
@@ -54,7 +55,8 @@
   - 선택한 카테고리 합계/건수/비율.
   - 선택한 카테고리의 지출 목록.
 - Expense add flow:
-  - Direct-input-primary choice screen.
+  - Today quick expense starts at the direct input form without a preliminary choice screen.
+  - Detailed expense add keeps a direct-input-primary choice screen.
   - Optional receipt/OCR auto-fill.
   - OCR draft applied state and verification copy.
   - Draft summary and grouped review/edit sections instead of one flat form stack.
@@ -132,12 +134,14 @@ Expense main은 상단부터 다음 순서로 보여준다.
 
 ### Expense add
 
-첫 화면은 두 선택지를 보여준다.
+빠른 지출은 선택 화면 없이 직접 입력 폼부터 보여준다. 영수증은 폼 안의 선택형 자동 채우기 action으로 제공한다.
+
+상세 지출 첫 화면은 두 선택지를 보여준다.
 
 1. `직접 입력` — primary.
 2. `영수증으로 채우기` — secondary.
 
-영수증은 필수가 아니다. OCR draft 적용 후에는 작은 상태 카드로 표시한다.
+상세 지출 선택 화면도 하나의 큰 outer card에 option card를 중첩하지 않고, 직접 입력 화면과 같은 card surface 구조로 보여준다. 영수증은 필수가 아니다. OCR draft 적용 후에는 작은 상태 카드로 표시한다.
 
 예시 copy:
 
@@ -222,7 +226,7 @@ No DB changes.
 - [ ] AC-03: Category summary shows category label, amount, count, and percentage without relying on color alone.
 - [ ] AC-04: `일자별 보기` shows Day N tabs and per-day expense lists, including `여행 전체` for unanchored expenses.
 - [ ] AC-05: `카테고리별 사용 > 전체 보기` filters expenses by selected category.
-- [ ] AC-06: `지출 추가` choice screen visually prioritizes `직접 입력` over optional `영수증으로 채우기`.
+- [ ] AC-06: Today quick expense starts at direct input without a preliminary choice screen, while detailed `지출 추가` choice screen visually prioritizes `직접 입력` over optional `영수증으로 채우기`.
 - [ ] AC-07: OCR draft can fill available fields and is clearly labeled as an optional draft requiring verification before save.
 - [ ] AC-08: Detailed expense form shows a draft summary and grouped review/edit sections as direct screen cards instead of one nested outer-card form stack.
 - [ ] AC-09: Today quick expense remains lightweight and does not inherit heavier Expense tab controls.
@@ -246,7 +250,7 @@ No DB changes.
 | Category summary groups by category/currency and computes amount/count/percentage | Mobile helper | `pnpm --filter @i-um/mobile test` |
 | Day N browsing groups expenses by Day and `여행 전체` | Mobile helper | `pnpm --filter @i-um/mobile test` |
 | Category browsing filters expense rows by selected category | Mobile helper | `pnpm --filter @i-um/mobile test` |
-| Expense add choice/draft view model keeps direct input primary and receipt/OCR optional with draft verification copy | Mobile helper/component seam | `pnpm --filter @i-um/mobile test` |
+| Expense add entry keeps Today quick direct-to-form while detailed choice keeps direct input primary and receipt/OCR optional with draft verification copy | Mobile helper/component seam | `pnpm --filter @i-um/mobile test` |
 | Settlement tab view model excludes expense management content by default | Mobile helper | `pnpm --filter @i-um/mobile test` |
 | Settlement detail view model renders totals, balances, transfers, formula, included/excluded expenses, multi-currency sections | Mobile helper | `pnpm --filter @i-um/mobile test` |
 | Settlement share message includes latest detail link and latest/current copy | Mobile helper | `pnpm --filter @i-um/mobile test` |

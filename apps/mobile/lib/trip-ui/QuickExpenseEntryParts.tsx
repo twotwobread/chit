@@ -234,7 +234,8 @@ export function QuickExpenseForm({
   const [activeSheet, setActiveSheet] = useState<'split' | 'settlement' | 'schedule' | 'category' | 'currency' | null>(
     null,
   );
-  const [entryMode, setEntryMode] = useState<'choice' | 'manual'>(receiptDraft ? 'manual' : 'choice');
+  const initialEntryMode = receiptDraft || mode === 'today' ? 'manual' : 'choice';
+  const [entryMode, setEntryMode] = useState<'choice' | 'manual'>(initialEntryMode);
   const [scannerVisible, setScannerVisible] = useState(false);
   const [paymentDatePickerOpen, setPaymentDatePickerOpen] = useState(false);
   const [paymentCalendarMonth, setPaymentCalendarMonth] = useState(() => monthStringFromDate(new Date()));
@@ -603,35 +604,61 @@ export function QuickExpenseForm({
 
   const renderManualForm = () => (mode === 'settlement' ? renderDetailedManualForm() : renderStandardManualForm());
 
+  const renderDetailedEntryChoice = () => (
+    <View style={styles.detailedFormSurface}>
+      <View style={styles.detailedSummaryCard}>
+        <Text style={styles.detailEyebrow}>상세 지출 등록</Text>
+        <Text style={styles.detailTitle}>{entryChoice.title}</Text>
+        <Text style={styles.helper}>{entryChoice.helper}</Text>
+        <Text style={styles.helper}>{entryChoice.verificationCopy}</Text>
+      </View>
+      <EntryChoiceActionCard helper={entryChoice.primaryAction.helper} title={entryChoice.primaryAction.label}>
+        <PrimaryButton
+          disabled={entryChoice.primaryAction.disabled}
+          label={entryChoice.primaryAction.label}
+          onPress={handleDirectInput}
+        />
+      </EntryChoiceActionCard>
+      <EntryChoiceActionCard helper={entryChoice.secondaryAction.helper} title={entryChoice.secondaryAction.label}>
+        <SecondaryButton
+          disabled={entryChoice.secondaryAction.disabled}
+          label={entryChoice.secondaryAction.label}
+          onPress={() => setScannerVisible(true)}
+        />
+      </EntryChoiceActionCard>
+    </View>
+  );
+
+  const renderStandardEntryChoice = () => (
+    <Card>
+      <View style={styles.fieldGroup}>
+        <Text style={styles.screenTitle}>{entryChoice.title}</Text>
+        <Text style={styles.helper}>{entryChoice.helper}</Text>
+      </View>
+      <EntryChoiceActionCard helper={entryChoice.primaryAction.helper} title={entryChoice.primaryAction.label}>
+        <PrimaryButton
+          disabled={entryChoice.primaryAction.disabled}
+          label={entryChoice.primaryAction.label}
+          onPress={handleDirectInput}
+        />
+      </EntryChoiceActionCard>
+      <EntryChoiceActionCard helper={entryChoice.secondaryAction.helper} title={entryChoice.secondaryAction.label}>
+        <SecondaryButton
+          disabled={entryChoice.secondaryAction.disabled}
+          label={entryChoice.secondaryAction.label}
+          onPress={() => setScannerVisible(true)}
+        />
+      </EntryChoiceActionCard>
+      <Text style={styles.helper}>{entryChoice.verificationCopy}</Text>
+    </Card>
+  );
+
+  const renderEntryChoice = () => (mode === 'settlement' ? renderDetailedEntryChoice() : renderStandardEntryChoice());
+
   if (entryMode === 'choice' && !receiptDraft) {
     return (
       <>
-        <Card>
-          <View style={styles.fieldGroup}>
-            <Text style={styles.screenTitle}>{entryChoice.title}</Text>
-            <Text style={styles.helper}>{entryChoice.helper}</Text>
-          </View>
-          <View style={styles.noticeBox}>
-            <Text style={styles.label}>{entryChoice.primaryAction.label}</Text>
-            <Text style={styles.helper}>{entryChoice.primaryAction.helper}</Text>
-            <PrimaryButton
-              disabled={entryChoice.primaryAction.disabled}
-              label={entryChoice.primaryAction.label}
-              onPress={handleDirectInput}
-            />
-          </View>
-          <View style={styles.noticeBox}>
-            <Text style={styles.label}>{entryChoice.secondaryAction.label}</Text>
-            <Text style={styles.helper}>{entryChoice.secondaryAction.helper}</Text>
-            <SecondaryButton
-              disabled={entryChoice.secondaryAction.disabled}
-              label={entryChoice.secondaryAction.label}
-              onPress={() => setScannerVisible(true)}
-            />
-          </View>
-          <Text style={styles.helper}>{entryChoice.verificationCopy}</Text>
-          <SecondaryButton label="돌아가기" onPress={onBack} />
-        </Card>
+        {renderEntryChoice()}
         <ReceiptCaptureScanner
           onClose={() => setScannerVisible(false)}
           onDirectInput={handleDirectInput}
@@ -725,6 +752,26 @@ function DetailedExpenseReviewGroup({
 }) {
   return (
     <View style={styles.reviewGroup}>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.reviewGroupTitle}>{title}</Text>
+        <Text style={styles.helper}>{helper}</Text>
+      </View>
+      {children}
+    </View>
+  );
+}
+
+function EntryChoiceActionCard({
+  children,
+  helper,
+  title,
+}: {
+  children: ReactNode;
+  helper: string;
+  title: string;
+}) {
+  return (
+    <View style={styles.entryChoiceActionCard}>
       <View style={styles.sectionHeader}>
         <Text style={styles.reviewGroupTitle}>{title}</Text>
         <Text style={styles.helper}>{helper}</Text>

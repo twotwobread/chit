@@ -152,6 +152,14 @@ export const styles = StyleSheet.create({
     paddingHorizontal: theme.space[3],
     paddingVertical: theme.space[2],
   },
+  entryChoiceActionCard: {
+    backgroundColor: theme.color.surfaceSunken,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    gap: theme.space[4],
+    padding: theme.space[4],
+  },
   reviewGroup: {
     backgroundColor: theme.color.surfaceSunken,
     borderColor: theme.color.borderSubtle,

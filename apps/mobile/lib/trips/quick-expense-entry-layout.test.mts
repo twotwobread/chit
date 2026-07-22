@@ -15,8 +15,8 @@ const todayQuickSource = readFileSync(resolve(currentDir, '../trip-ui/QuickExpen
 test('detailed expense entry uses direct input as the primary entry action and receipt as optional auto-fill', () => {
   const choiceBlock = sourceBetween(
     entryPartsSource,
-    "if (entryMode === 'choice' && !receiptDraft) {",
-    "      </>\n    );\n  }\n\n  return (",
+    'const renderDetailedEntryChoice = () => (',
+    '  const renderStandardEntryChoice = () => (',
   );
   const primaryButtonBlock = firstJsxTagBlock(choiceBlock, 'PrimaryButton');
   const secondaryButtonBlock = firstJsxTagBlock(choiceBlock, 'SecondaryButton');
@@ -30,6 +30,23 @@ test('detailed expense entry uses direct input as the primary entry action and r
     choiceBlock.indexOf('entryChoice.primaryAction.label') < choiceBlock.indexOf('entryChoice.secondaryAction.label'),
     'direct-input primary action should render before optional receipt action',
   );
+});
+
+test('quick/today expense opens the manual form first because receipt capture is available inside it', () => {
+  assert.match(entryPartsSource, /const initialEntryMode = receiptDraft \|\| mode === 'today' \? 'manual' : 'choice';/);
+  assert.match(entryPartsSource, /useState<'choice' \| 'manual'>\(initialEntryMode\)/);
+});
+
+test('detailed entry choice uses direct screen cards without a duplicate inline back action', () => {
+  const choiceBlock = sourceBetween(
+    entryPartsSource,
+    'const renderDetailedEntryChoice = () => (',
+    '  const renderStandardEntryChoice = () => (',
+  );
+
+  assert.match(choiceBlock, /styles\.detailedFormSurface/);
+  assert.match(choiceBlock, /EntryChoiceActionCard/);
+  assert.doesNotMatch(choiceBlock, /label="돌아가기"/);
 });
 
 test('detailed settlement expense entry renders review cards directly instead of one flat outer card', () => {
