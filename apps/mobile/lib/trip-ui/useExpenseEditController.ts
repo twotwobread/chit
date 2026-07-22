@@ -79,6 +79,7 @@ export function useExpenseEditController() {
   const [payerParticipantId, setPayerParticipantId] = useState<string | null>(null);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [selectedTripDayId, setSelectedTripDayId] = useState<string | null>(null);
+  const [selectedTripPlaceId, setSelectedTripPlaceId] = useState<string | null>(null);
   const [selectedSplitParticipantIds, setSelectedSplitParticipantIds] = useState<string[]>([]);
   const [splitPolicy, setSplitPolicy] = useState<QuickExpenseSplitPolicy>('equal');
   const [manualSplitInputs, setManualSplitInputs] = useState<QuickExpenseManualSplitInput[]>([]);
@@ -133,6 +134,7 @@ export function useExpenseEditController() {
       const itemIDs = new Set(itineraries.flatMap((candidate) => candidate.scheduleItems.map((item) => item.id)));
       const selectedItemId =
         expense.scheduleItemId && itemIDs.has(expense.scheduleItemId) ? expense.scheduleItemId : null;
+      const selectedTripPlaceId = selectedItemId ? null : (expense.place?.tripPlaceId ?? null);
       setTitleInput(expense.title ?? (expense.anchorType === 'trip' ? expense.displayTitle : ''));
       setAmountInput(buildExpenseEditInitialAmountInput(expense));
       setCurrency(expense.currency);
@@ -144,6 +146,7 @@ export function useExpenseEditController() {
           : null,
       );
       setSelectedItemId(selectedItemId);
+      setSelectedTripPlaceId(selectedTripPlaceId);
       setSelectedTripDayId(resolveQuickExpenseItemDayId(itineraries, selectedItemId) ?? expense.tripDayId ?? null);
       setSelectedSplitParticipantIds(
         buildExpenseEditSelectedSplitParticipantIds(expense, participantsResponse.participants),
@@ -195,6 +198,7 @@ export function useExpenseEditController() {
       participantIds: buildExpenseEditParticipantIds(state.participants, selectedSplitParticipantIds),
       manualSplitInputs: activeManualSplitInputs,
       scheduleItemId: selectedItemId,
+      tripPlaceId: selectedItemId ? null : selectedTripPlaceId,
       titleInput,
       includeInSettlement,
     });
@@ -240,6 +244,7 @@ export function useExpenseEditController() {
     saving,
     selectedItemId,
     selectedSplitParticipantIds,
+    selectedTripPlaceId,
     selectedTripDayId,
     splitPolicy,
     state,
@@ -291,6 +296,7 @@ export function useExpenseEditController() {
   const selectTripDay = useCallback((tripDayId: string) => {
     setSelectedTripDayId(tripDayId);
     setSelectedItemId(null);
+    setSelectedTripPlaceId(null);
     setErrors((current) => ({ ...current, item: undefined }));
     setFormMessage(null);
   }, []);
@@ -298,6 +304,7 @@ export function useExpenseEditController() {
   const clearTripDay = useCallback(() => {
     setSelectedTripDayId(null);
     setSelectedItemId(null);
+    setSelectedTripPlaceId(null);
     setErrors((current) => ({ ...current, item: undefined }));
     setFormMessage(null);
   }, []);
@@ -305,6 +312,7 @@ export function useExpenseEditController() {
   const selectItem = useCallback(
     (itemId: string | null) => {
       setSelectedItemId(itemId);
+      setSelectedTripPlaceId(null);
       if (state.status === 'success') {
         setSelectedTripDayId(resolveQuickExpenseItemDayId(state.itineraries, itemId) ?? selectedTripDayId);
       }

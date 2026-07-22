@@ -195,6 +195,7 @@ export function buildUpdateExpenseRequest({
   participantIds,
   manualSplitInputs,
   scheduleItemId,
+  tripPlaceId = null,
   memoInput,
   payerParticipantId,
   titleInput,
@@ -207,6 +208,7 @@ export function buildUpdateExpenseRequest({
   participantIds: string[];
   manualSplitInputs: QuickExpenseManualSplitInput[];
   scheduleItemId: string | null;
+  tripPlaceId?: string | null;
   memoInput: string;
   payerParticipantId: string | null;
   titleInput?: string;
@@ -256,6 +258,7 @@ export function buildUpdateExpenseRequest({
         memo: memo === '' ? null : memo,
         ...(titleInput !== undefined ? { title: title === '' ? null : title } : {}),
         scheduleItemId,
+        tripPlaceId,
         ...(includeInSettlement !== undefined ? { includeInSettlement } : {}),
       },
     };
@@ -280,6 +283,7 @@ export function buildUpdateExpenseRequest({
       memo: memo === '' ? null : memo,
       ...(titleInput !== undefined ? { title: title === '' ? null : title } : {}),
       scheduleItemId,
+      tripPlaceId,
       ...(includeInSettlement !== undefined ? { includeInSettlement } : {}),
     },
   };

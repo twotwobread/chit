@@ -34,6 +34,7 @@ export default function QuickExpenseScreen() {
     clearReceiptDraft,
     clearTripDay,
     completeSavedExpense,
+    createReceiptPlaceCandidate,
     errors,
     expenseCategory,
     expenseDateInput,
@@ -47,6 +48,7 @@ export default function QuickExpenseScreen() {
     receiptBusy,
     receiptDraft,
     receiptMessage,
+    receiptPlaceBusy,
     savedSummary,
     saving,
     selectCurrency,
@@ -57,6 +59,7 @@ export default function QuickExpenseScreen() {
     selectTripDay,
     selectedItemId,
     selectedSplitParticipantIds,
+    selectedTripPlaceId,
     setMemoInput,
     splitPolicy,
     state,
@@ -148,6 +151,7 @@ export default function QuickExpenseScreen() {
         payerParticipantId,
         saving,
         selectedItemId,
+        selectedTripPlaceId,
         selectedSplitParticipantIds,
         splitPolicy,
         titleInput,
@@ -196,6 +200,7 @@ export default function QuickExpenseScreen() {
             onBack={backToDay}
             onClearReceiptDraft={() => void clearReceiptDraft()}
             onClearTripDay={clearTripDay}
+            onCreateReceiptPlaceCandidate={() => void createReceiptPlaceCandidate()}
             onReceiptDraftCreated={acceptReceiptDraft}
             onSelectCurrency={selectCurrency}
             onSelectExpenseCategory={selectExpenseCategory}
@@ -217,8 +222,10 @@ export default function QuickExpenseScreen() {
             receiptBusy={receiptBusy}
             receiptDraft={receiptDraft}
             receiptMessage={receiptMessage}
+            receiptPlaceBusy={receiptPlaceBusy}
             saving={saving}
             selectedItemId={selectedItemId}
+            selectedTripPlaceId={selectedTripPlaceId}
             selectedSplitParticipantIds={selectedSplitParticipantIds}
             splitPolicy={splitPolicy}
             manualSplitInputs={manualSplitInputs}

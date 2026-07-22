@@ -237,7 +237,29 @@ test('builds update expense request with trimmed memo and nullable place', () =>
     participantIds: ['participant-a', 'participant-b'],
     memo: '저녁 식사',
     scheduleItemId: null,
+    tripPlaceId: null,
   });
+});
+
+test('builds update expense request linked to a trip place without schedule', () => {
+  const result = buildUpdateExpenseRequest({
+    amountInput: '2,500',
+    currency: 'JPY',
+    splitPolicy: 'equal',
+    participantIds: buildExpenseEditParticipantIds(participants),
+    manualSplitInputs: [],
+    payerParticipantId: 'participant-a',
+    memoInput: '',
+    scheduleItemId: null,
+    tripPlaceId: 'place-receipt',
+  });
+
+  assert.equal(result.ok, true);
+  if (!result.ok) {
+    return;
+  }
+  assert.equal(result.request.scheduleItemId, null);
+  assert.equal(result.request.tripPlaceId, 'place-receipt');
 });
 
 test('builds edit participant ids from selected split targets', () => {
@@ -291,6 +313,7 @@ test('builds update expense request with nullable general expense title', () => 
     memo: null,
     title: '항공권',
     scheduleItemId: null,
+    tripPlaceId: null,
   });
 
   const clearedTitleResult = buildUpdateExpenseRequest({
@@ -367,6 +390,7 @@ test('builds update expense request with manual split rows', () => {
     ],
     memo: null,
     scheduleItemId: 'item-a',
+    tripPlaceId: null,
   });
 });
 
