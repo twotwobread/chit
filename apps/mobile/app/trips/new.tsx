@@ -33,6 +33,7 @@ import {
   validateTripDestinations,
 } from '../../lib/trips/destinations';
 import { createTrip, searchDestinations } from '../../lib/trips/trip-api';
+import { ConfirmationModal } from '../../lib/trip-ui/ConfirmationModal';
 import { KeyboardAwareFormScrollView } from '../../lib/trip-ui/KeyboardAwareFormScrollView';
 import { StickyActionFooter, useStickyActionFooterLayout } from '../../lib/trip-ui/StickyActionFooter';
 import { TripDateRangeEditor } from '../../lib/trip-ui/TripDateRangeEditor';
@@ -632,22 +633,6 @@ function InlineDestinationSearchPanel({
         <Text style={styles.resultPanelTitle}>검색 결과</Text>
         {searchSubmitState.helperText ? <Text style={styles.helperText}>{searchSubmitState.helperText}</Text> : null}
         {loading ? <Text style={styles.helperText}>도시를 검색하는 중...</Text> : null}
-        {pendingCountryMismatchConfirmation ? (
-          <View style={styles.destinationWarningBox}>
-            <Text style={styles.destinationWarningTitle}>{pendingCountryMismatchConfirmation.title}</Text>
-            <Text style={styles.destinationWarningText}>{pendingCountryMismatchConfirmation.message}</Text>
-            <View style={styles.destinationWarningActions}>
-              <SecondaryButton
-                label={pendingCountryMismatchConfirmation.cancelLabel}
-                onPress={() => setPendingCountryMismatchResult(null)}
-              />
-              <PrimaryButton
-                label={pendingCountryMismatchConfirmation.confirmLabel}
-                onPress={confirmCountryMismatchAdd}
-              />
-            </View>
-          </View>
-        ) : null}
         {!loading && trimmedQuery.length < 2 ? (
           <Text style={styles.resultEmptyText}>두 글자 이상 입력하면 후보 도시를 찾을 수 있어요.</Text>
         ) : null}
@@ -677,6 +662,17 @@ function InlineDestinationSearchPanel({
           );
         })}
       </View>
+      {pendingCountryMismatchConfirmation ? (
+        <ConfirmationModal
+          cancelLabel={pendingCountryMismatchConfirmation.cancelLabel}
+          confirmLabel={pendingCountryMismatchConfirmation.confirmLabel}
+          message={pendingCountryMismatchConfirmation.message}
+          onCancel={() => setPendingCountryMismatchResult(null)}
+          onConfirm={confirmCountryMismatchAdd}
+          title={pendingCountryMismatchConfirmation.title}
+          visible={Boolean(pendingCountryMismatchConfirmation)}
+        />
+      ) : null}
     </View>
   );
 }
@@ -1097,55 +1093,6 @@ const styles = StyleSheet.create({
     fontFamily: theme.font.family.regular,
     lineHeight: 20,
     textAlign: 'center',
-  },
-  destinationWarningBox: {
-    backgroundColor: theme.color.accentSoft,
-    borderColor: theme.color.warning,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    gap: theme.space[3],
-    padding: theme.space[4],
-  },
-  destinationWarningTitle: {
-    color: theme.color.textStrong,
-    fontFamily: theme.font.family.bold,
-    fontWeight: theme.font.weight.bold,
-  },
-  destinationWarningText: {
-    color: theme.color.textBody,
-    fontFamily: theme.font.family.regular,
-    lineHeight: 20,
-  },
-  destinationWarningActions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: theme.space[3],
-    justifyContent: 'flex-end',
-  },
-  destinationWarningSecondaryButton: {
-    borderColor: theme.color.borderDefault,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    justifyContent: 'center',
-    minHeight: theme.layout.tapMin,
-    paddingHorizontal: theme.space[4],
-  },
-  destinationWarningSecondaryText: {
-    color: theme.color.textBody,
-    fontFamily: theme.font.family.semibold,
-    fontWeight: theme.font.weight.semibold,
-  },
-  destinationWarningPrimaryButton: {
-    backgroundColor: theme.color.actionPrimary,
-    borderRadius: theme.radius.md,
-    justifyContent: 'center',
-    minHeight: theme.layout.tapMin,
-    paddingHorizontal: theme.space[4],
-  },
-  destinationWarningPrimaryText: {
-    color: theme.color.onActionPrimary,
-    fontFamily: theme.font.family.semibold,
-    fontWeight: theme.font.weight.semibold,
   },
   resultRow: {
     alignItems: 'center',

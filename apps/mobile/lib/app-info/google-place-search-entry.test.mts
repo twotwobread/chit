@@ -7,6 +7,7 @@ const placeSearchSource = readFileSync(
   'utf8',
 );
 const mapSearchSource = readFileSync(new URL('../trip-ui/GooglePlaceMapSearch.tsx', import.meta.url), 'utf8');
+const confirmationModalSource = readFileSync(new URL('../trip-ui/ConfirmationModal.tsx', import.meta.url), 'utf8');
 const googleSearchSource = readFileSync(new URL('../places/google-search.ts', import.meta.url), 'utf8');
 const tripMapPartsSource = readFileSync(new URL('../trip-ui/TripMapScreenParts.tsx', import.meta.url), 'utf8');
 const tripMapControllerSource = readFileSync(new URL('../trip-ui/useTripMapController.ts', import.meta.url), 'utf8');
@@ -238,7 +239,8 @@ describe('google place search native module entry setup', () => {
       /<PrimaryButton[\s\S]*label=\{actionButtonLabel \?\? ''\}[\s\S]*selected=\{isPrimaryActionSelected\}/,
     );
     assert.match(mapSearchSource, /<InlineAction[\s\S]*label=\{detail\.mapSearchLabel\}/);
-    assert.match(mapSearchSource, /<SecondaryButton[\s\S]*label=\{confirmation\.cancelLabel\}/);
+    assert.match(mapSearchSource, /<ConfirmationModal[\s\S]*cancelLabel=\{duplicateConfirmation\.cancelLabel\}/);
+    assert.match(confirmationModalSource, /<SecondaryButton[\s\S]*label=\{cancelLabel\}/);
     assert.doesNotMatch(
       mapSearchSource,
       /accessibilityState=\{\{ disabled: isPrimaryActionDisabled, selected: isPrimaryActionSelected \}\}/,

@@ -113,6 +113,7 @@ import {
   type SearchBiasSource,
 } from '../places/google-search';
 import { resolveMapProvider, type MapProvider } from '../trips/map-provider';
+import { ConfirmationModal } from './ConfirmationModal';
 import { DayChips, type DayChip } from './DayChips';
 import { RouteMapOverlay, type RouteMapPlace, type RouteMapPolyline } from './RouteMap';
 
@@ -501,6 +502,16 @@ export function GooglePlaceMapSearch({
     state.status === 'success' ||
     state.status === 'empty' ||
     state.status === 'error';
+  const duplicateConfirmationResult = actionState.status === 'confirmingDuplicate' ? actionState.result : null;
+  const duplicateConfirmation = duplicateConfirmationResult
+    ? buildGooglePlaceSearchResultActionView({
+        addState: actionState,
+        bookmarkResults,
+        mode: actionMode,
+        result: duplicateConfirmationResult,
+        selectedBatchPlaceIds,
+      }).duplicateConfirmation
+    : null;
 
   const resetActionState = useCallback(() => {
     onResetActionState?.();
@@ -1246,6 +1257,24 @@ export function GooglePlaceMapSearch({
         />
       ) : null}
 
+      {duplicateConfirmation ? (
+        <ConfirmationModal
+          cancelLabel={duplicateConfirmation.cancelLabel}
+          confirmLabel={duplicateConfirmation.confirmLabel}
+          confirmLoading={duplicateConfirmation.isLoading}
+          confirmLoadingLabel="추가 중..."
+          message={duplicateConfirmation.message}
+          onCancel={resetActionState}
+          onConfirm={() => {
+            if (duplicateConfirmationResult) {
+              onPrimaryAction?.(duplicateConfirmationResult, true);
+            }
+          }}
+          title="이미 추가된 장소예요."
+          visible={Boolean(duplicateConfirmation)}
+        />
+      ) : null}
+
       <GooglePlaceBottomSheet
         backgroundStyle={styles.sheetBackground}
         bottomInset={0}
@@ -1350,8 +1379,6 @@ export function GooglePlaceMapSearch({
                           key={item.id}
                           mapActionMessage={selectedResult?.id === item.id ? mapActionMessage : null}
                           mapProvider={mapProvider}
-                          onCancelDuplicate={resetActionState}
-                          onConfirmDuplicate={() => onPrimaryAction?.(item, true)}
                           onDeleteBookmark={undefined}
                           onImageError={() => setImageFailures((current) => ({ ...current, [item.id]: true }))}
                           onLayout={(y) => {
@@ -1428,8 +1455,6 @@ export function GooglePlaceMapSearch({
                           key={`${selectedSheetTab}-list-${item.id}`}
                           mapActionMessage={selectedResult?.id === item.id ? mapActionMessage : null}
                           mapProvider={mapProvider}
-                          onCancelDuplicate={resetActionState}
-                          onConfirmDuplicate={() => onPrimaryAction?.(item, true)}
                           onDeleteBookmark={undefined}
                           onImageError={() => setImageFailures((current) => ({ ...current, [item.id]: true }))}
                           onLayout={(y) => {
@@ -1493,8 +1518,6 @@ function PlaceResultCard({
   isSelected,
   mapActionMessage,
   mapProvider,
-  onCancelDuplicate,
-  onConfirmDuplicate,
   onDeleteBookmark,
   onImageError,
   onLayout,
@@ -1519,8 +1542,6 @@ function PlaceResultCard({
   imageFailed: boolean;
   mapActionMessage: string | null;
   mapProvider: MapProvider;
-  onCancelDuplicate: () => void;
-  onConfirmDuplicate: () => void;
   onDeleteBookmark?: () => void;
   onPrimaryAction: () => void;
   onPress: () => void;
@@ -1645,14 +1666,6 @@ function PlaceResultCard({
               />
             ) : null}
           </View>
-          {actionView.duplicateConfirmation ? (
-            <DuplicateConfirmationCard
-              confirmation={actionView.duplicateConfirmation}
-              isBusy={isBusy}
-              onCancel={onCancelDuplicate}
-              onConfirm={onConfirmDuplicate}
-            />
-          ) : null}
         </View>
       ) : null}
     </View>
@@ -1699,35 +1712,6 @@ function PlacePhoto({
           사진: {result.photo.attributionLabel}
         </Text>
       ) : null}
-    </View>
-  );
-}
-
-function DuplicateConfirmationCard({
-  confirmation,
-  isBusy,
-  onCancel,
-  onConfirm,
-}: {
-  confirmation: NonNullable<PlaceResultActionView['duplicateConfirmation']>;
-  isBusy: boolean;
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  return (
-    <View style={styles.noticeCard}>
-      <Text style={styles.errorTitle}>이미 추가된 장소예요.</Text>
-      <Text style={styles.message}>{confirmation.message}</Text>
-      <View style={styles.detailActions}>
-        <PrimaryButton
-          disabled={isBusy}
-          label={confirmation.isLoading ? '추가 중...' : confirmation.confirmLabel}
-          loading={confirmation.isLoading}
-          loadingLabel="추가 중..."
-          onPress={onConfirm}
-        />
-        <SecondaryButton disabled={isBusy} label={confirmation.cancelLabel} onPress={onCancel} />
-      </View>
     </View>
   );
 }
