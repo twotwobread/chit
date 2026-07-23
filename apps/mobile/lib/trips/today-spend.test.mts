@@ -73,6 +73,21 @@ test('sums today spend by currency without converting between currencies', () =>
   assert.deepEqual(viewModel.additionalTotals, [{ amountMinor: 18500, amountLabel: '18,500원', currency: 'KRW' }]);
 });
 
+test('adds locally pending quick expenses to today spend totals without conversion', () => {
+  const viewModel = buildTodaySpendSummaryViewModel({
+    ...baseInput,
+    expenses: [expense({ id: 'expense-a', amountMinor: 1200, currency: 'JPY' })],
+    pendingExpenses: [
+      { amountMinor: 300, currency: 'JPY' },
+      { amountMinor: 18500, currency: 'KRW' },
+    ],
+  });
+
+  assert.equal(viewModel.primaryTotal.amountMinor, 1500);
+  assert.equal(viewModel.primaryTotal.amountLabel, '1,500엔');
+  assert.deepEqual(viewModel.additionalTotals, [{ amountMinor: 18500, amountLabel: '18,500원', currency: 'KRW' }]);
+});
+
 test('builds my spend and composition breakdown by regular and public fund shares', () => {
   const viewModel = buildTodaySpendSummaryViewModel({
     ...baseInput,

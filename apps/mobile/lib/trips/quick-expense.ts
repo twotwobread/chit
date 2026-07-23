@@ -746,6 +746,8 @@ export function buildCreateQuickExpenseRequest({
   payerParticipantId,
   includeInSettlement,
   receiptDraftId,
+  memoInput,
+  clientMutationId,
 }: {
   amountInput: string;
   currency: SupportedCurrency;
@@ -759,6 +761,8 @@ export function buildCreateQuickExpenseRequest({
   payerParticipantId: string | null;
   includeInSettlement?: boolean;
   receiptDraftId?: string | null;
+  memoInput?: string;
+  clientMutationId?: string | null;
 }): { ok: true; request: CreateQuickExpenseRequest } | { ok: false; errors: QuickExpenseFormErrors } {
   const validation = validateExpenseAmountPayerAndSplits({
     amountInput,
@@ -785,21 +789,29 @@ export function buildCreateQuickExpenseRequest({
     return { ok: false, errors: validation.errors };
   }
 
+  const memo = memoInput?.trim() ?? '';
+  const normalizedClientMutationId = clientMutationId?.trim() ?? '';
+  const baseRequest = {
+    scheduleItemId,
+    tripPlaceId: normalizedTripPlaceId,
+    amountMinor: validation.parsedAmount.amountMinor,
+    currency,
+    ...(expenseCategory ? { expenseCategory } : {}),
+    ...(expenseKind ? { expenseKind: normalizedExpenseKind } : {}),
+    payerParticipantId,
+    splitPolicy,
+    ...(normalizedIncludeInSettlement !== undefined ? { includeInSettlement: normalizedIncludeInSettlement } : {}),
+    ...(receiptDraftId ? { receiptDraftId } : {}),
+    ...(normalizedClientMutationId ? { clientMutationId: normalizedClientMutationId } : {}),
+    ...(memo ? { memo } : {}),
+  };
+
   if (splitPolicy === 'equal') {
     return {
       ok: true,
       request: {
-        scheduleItemId,
-        tripPlaceId: normalizedTripPlaceId,
-        amountMinor: validation.parsedAmount.amountMinor,
-        currency,
-        ...(expenseCategory ? { expenseCategory } : {}),
-        ...(expenseKind ? { expenseKind: normalizedExpenseKind } : {}),
-        payerParticipantId,
-        splitPolicy,
+        ...baseRequest,
         participantIds,
-        ...(normalizedIncludeInSettlement !== undefined ? { includeInSettlement: normalizedIncludeInSettlement } : {}),
-        ...(receiptDraftId ? { receiptDraftId } : {}),
       },
     };
   }
@@ -807,17 +819,8 @@ export function buildCreateQuickExpenseRequest({
   return {
     ok: true,
     request: {
-      scheduleItemId,
-      tripPlaceId: normalizedTripPlaceId,
-      amountMinor: validation.parsedAmount.amountMinor,
-      currency,
-      ...(expenseCategory ? { expenseCategory } : {}),
-      ...(expenseKind ? { expenseKind: normalizedExpenseKind } : {}),
-      payerParticipantId,
-      splitPolicy,
+      ...baseRequest,
       splits: validation.manualSummary.requestSplits,
-      ...(normalizedIncludeInSettlement !== undefined ? { includeInSettlement: normalizedIncludeInSettlement } : {}),
-      ...(receiptDraftId ? { receiptDraftId } : {}),
     },
   };
 }

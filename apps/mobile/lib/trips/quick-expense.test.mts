@@ -863,6 +863,36 @@ test('builds create quick expense request with an explicit settlement exclusion 
   );
 });
 
+test('builds create quick expense request with memo and client mutation id', () => {
+  assert.deepEqual(
+    buildCreateQuickExpenseRequest({
+      amountInput: '18,500',
+      currency: 'KRW',
+      scheduleItemId: 'item-a',
+      splitPolicy: 'equal',
+      participantIds: ['participant-b'],
+      manualSplitInputs: [],
+      payerParticipantId: 'participant-a',
+      memoInput: '  현장 결제  ',
+      clientMutationId: 'today-offline-001',
+    }),
+    {
+      ok: true,
+      request: {
+        scheduleItemId: 'item-a',
+        tripPlaceId: null,
+        amountMinor: 18500,
+        currency: 'KRW',
+        payerParticipantId: 'participant-a',
+        splitPolicy: 'equal',
+        participantIds: ['participant-b'],
+        clientMutationId: 'today-offline-001',
+        memo: '현장 결제',
+      },
+    },
+  );
+});
+
 test('builds create quick expense request with a reviewed receipt draft id', () => {
   assert.deepEqual(
     buildCreateQuickExpenseRequest({
