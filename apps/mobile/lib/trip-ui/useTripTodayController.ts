@@ -42,6 +42,7 @@ import {
   resolveTodayQuickExpenseInitialItemId,
   type QuickExpenseRouteTarget,
 } from '../trips/quick-expense';
+import { loadQuickExpensePreset, saveQuickExpensePreset } from '../trips/quick-expense-preset';
 import {
   buildRoutePreviewRequest,
   buildTodayRoutePreviewSummarySuccessState,
@@ -95,6 +96,8 @@ export type QuickExpenseOverlayState =
       itinerary: GetDayScheduleItemsResponse;
       participants: TripParticipantListItem[];
       selectedItemId: string | null;
+      expenseKind: 'regular' | 'public_fund';
+      includeInSettlement: boolean;
       payerParticipantId: string | null;
       selectedSplitParticipantIds: string[];
       errorMessage: string | null;
@@ -152,9 +155,10 @@ export function useTripTodayController() {
         return;
       }
 
-      const [itinerary, expensesResponse] = await Promise.all([
+      const [itinerary, expensesResponse, participantsResponse] = await Promise.all([
         getTripDayItinerary(tripId, currentDay.id),
         listDayExpenses(tripId, currentDay.id),
+        listTripParticipants(tripId),
       ]);
       const viewModel = buildTodayExecutionViewModel({
         itinerary,
@@ -180,8 +184,10 @@ export function useTripTodayController() {
         spendSummary: buildTodaySpendSummaryViewModel({
           actionRoute:
             'quickExpenseAction' in viewModel ? viewModel.quickExpenseAction.route : viewModel.primaryAction.route,
+          currentUserParticipantId: participantsResponse.currentUserParticipantId,
           defaultCurrency: detail.trip.defaultCurrency,
           expenses: expensesResponse.expenses,
+          participants: participantsResponse.participants,
         }),
       });
     } catch (error) {
@@ -316,6 +322,11 @@ export function useTripTodayController() {
         const tripDetail = shellDetail.detail;
         const selectedItemId = resolveTodayQuickExpenseInitialItemId(itinerary.scheduleItems, target.itemId);
         const participants = participantsResponse.participants;
+        const preset = await loadQuickExpensePreset({
+          currentUserParticipantId: participantsResponse.currentUserParticipantId,
+          participants,
+          tripId: target.tripId,
+        });
         setQuickExpenseState({
           status: 'ready',
           target,
@@ -324,8 +335,14 @@ export function useTripTodayController() {
           itinerary,
           participants,
           selectedItemId,
-          payerParticipantId: participants.length === 1 ? participants[0].participantId : null,
-          selectedSplitParticipantIds: buildDefaultSplitParticipantIds(participants),
+          expenseKind: preset.expenseKind,
+          includeInSettlement: preset.includeInSettlement,
+          payerParticipantId:
+            preset.payerParticipantId || (participants.length === 1 ? participants[0].participantId : null),
+          selectedSplitParticipantIds:
+            preset.splitParticipantIds.length > 0
+              ? preset.splitParticipantIds
+              : buildDefaultSplitParticipantIds(participants),
           errorMessage: null,
         });
       } catch (error) {
@@ -351,6 +368,7 @@ export function useTripTodayController() {
   const submitQuickExpenseOverlay = useCallback(
     async ({
       amount,
+      expenseKind,
       itemId,
       memoInput,
       payerParticipantId,
@@ -359,6 +377,7 @@ export function useTripTodayController() {
       receiptDraftId,
     }: {
       amount: number;
+      expenseKind: 'regular' | 'public_fund';
       itemId: string;
       memoInput: string;
       payerParticipantId: string;
@@ -375,6 +394,7 @@ export function useTripTodayController() {
         currency: quickExpenseState.currency,
         scheduleItemId: itemId,
         tripPlaceId: null,
+        expenseKind,
         splitPolicy: 'equal',
         participantIds: splitParticipantIds,
         manualSplitInputs: [],
@@ -410,6 +430,21 @@ export function useTripTodayController() {
             memoUpdateRequest,
           );
         }
+        await saveQuickExpensePreset({
+          tripId: quickExpenseState.target.tripId,
+          preset: {
+            expenseKind,
+            includeInSettlement,
+            payerParticipantId,
+            splitParticipantIds,
+            splitTargetMode:
+              quickExpenseState.participants.length <= 1
+                ? 'self'
+                : splitParticipantIds.length === quickExpenseState.participants.length
+                  ? 'all'
+                  : 'custom',
+          },
+        });
         const summary = buildSavedEqualSplitSummary({
           amountMinor: response.expense.amountMinor,
           currency: response.expense.currency,

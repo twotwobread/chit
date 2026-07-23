@@ -778,6 +778,63 @@ test('builds create quick expense request linked to a trip place without schedul
   );
 });
 
+test('builds public-fund quick expense request with default settlement exclusion', () => {
+  assert.deepEqual(
+    buildCreateQuickExpenseRequest({
+      amountInput: '18,500',
+      currency: 'KRW',
+      expenseKind: 'public_fund',
+      scheduleItemId: 'item-a',
+      splitPolicy: 'equal',
+      participantIds: ['participant-b'],
+      manualSplitInputs: [],
+      payerParticipantId: 'participant-a',
+    }),
+    {
+      ok: true,
+      request: {
+        scheduleItemId: 'item-a',
+        tripPlaceId: null,
+        amountMinor: 18500,
+        currency: 'KRW',
+        expenseKind: 'public_fund',
+        payerParticipantId: 'participant-a',
+        splitPolicy: 'equal',
+        participantIds: ['participant-b'],
+        includeInSettlement: false,
+      },
+    },
+  );
+});
+
+test('builds regular quick expense request with explicit kind', () => {
+  assert.deepEqual(
+    buildCreateQuickExpenseRequest({
+      amountInput: '18,500',
+      currency: 'KRW',
+      expenseKind: 'regular',
+      scheduleItemId: 'item-a',
+      splitPolicy: 'equal',
+      participantIds: ['participant-b'],
+      manualSplitInputs: [],
+      payerParticipantId: 'participant-a',
+    }),
+    {
+      ok: true,
+      request: {
+        scheduleItemId: 'item-a',
+        tripPlaceId: null,
+        amountMinor: 18500,
+        currency: 'KRW',
+        expenseKind: 'regular',
+        payerParticipantId: 'participant-a',
+        splitPolicy: 'equal',
+        participantIds: ['participant-b'],
+      },
+    },
+  );
+});
+
 test('builds create quick expense request with an explicit settlement exclusion flag', () => {
   assert.deepEqual(
     buildCreateQuickExpenseRequest({

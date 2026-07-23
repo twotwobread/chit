@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { type ExpenseReceiptDraft } from '@i-um/api-contract';
+import { type ExpenseKind, type ExpenseReceiptDraft } from '@i-um/api-contract';
 
 import {
   FormField,
@@ -38,6 +38,7 @@ export type QuickExpenseParticipantOption = {
 
 export type QuickExpenseDraft = {
   amountInput: string;
+  expenseKind: ExpenseKind;
   itemId: string | null;
   payerParticipantId: string | null;
   splitMode: QuickExpenseSplitPolicy;
@@ -49,6 +50,7 @@ export type QuickExpenseDraft = {
 export type QuickExpenseSubmitPayload = {
   amount: number;
   currency: 'KRW' | 'JPY' | string;
+  expenseKind: ExpenseKind;
   itemId: string;
   payerParticipantId: string;
   splitParticipantIds: string[];
@@ -71,6 +73,16 @@ export type QuickExpenseFormProps = {
 };
 
 type QuickExpenseErrors = Partial<Record<'amount' | 'item' | 'payer' | 'participants', string>>;
+
+const EXPENSE_KIND_LABELS: Record<ExpenseKind, string> = {
+  regular: '일반 지출',
+  public_fund: '공금 지출',
+};
+
+const EXPENSE_KIND_HELPERS: Record<ExpenseKind, string> = {
+  regular: '개인 지출과 대리 구매 모두 일반 지출로 기록해요.',
+  public_fund: '공금에서 낸 지출이에요. 기본은 최종 정산 제외예요.',
+};
 
 const SPLIT_OPTION_LABELS: Record<QuickExpenseSplitPolicy, string> = {
   equal: '1/N 분할',
@@ -105,6 +117,7 @@ export function QuickExpenseForm({
   });
   const [draft, setDraft] = useState<QuickExpenseDraft>({
     amountInput: initialDraft?.amountInput ?? '',
+    expenseKind: initialDraft?.expenseKind ?? 'regular',
     itemId: defaultItemId,
     payerParticipantId: defaultPayerId,
     splitMode: defaultSplitMode,
@@ -113,13 +126,15 @@ export function QuickExpenseForm({
     includeInSettlement: initialDraft?.includeInSettlement ?? true,
   });
   const [errors, setErrors] = useState<QuickExpenseErrors>({});
+  const [settlementTouched, setSettlementTouched] = useState(false);
   const [itemSelectorExpanded, setItemSelectorExpanded] = useState(false);
-  const [activeSheet, setActiveSheet] = useState<'split' | 'settlement' | null>(null);
+  const [activeSheet, setActiveSheet] = useState<'kind' | 'split' | 'settlement' | null>(null);
   const [entryMode, setEntryMode] = useState<'choice' | 'manual'>('choice');
   const [receiptDraft, setReceiptDraft] = useState<ExpenseReceiptDraft | null>(null);
   const [receiptBusy, setReceiptBusy] = useState(false);
   const [receiptMessage, setReceiptMessage] = useState<string | null>(null);
   const [scannerVisible, setScannerVisible] = useState(false);
+  const amountInputRef = useRef<TextInput>(null);
   const splitMode = draft.splitMode;
   const selectedItem = useMemo(
     () => itemOptions.find((item) => item.id === draft.itemId) ?? null,
@@ -132,6 +147,24 @@ export function QuickExpenseForm({
 
   const updateDraft = (patch: Partial<QuickExpenseDraft>) => {
     setDraft((current) => ({ ...current, ...patch }));
+  };
+
+  const selectExpenseKind = (expenseKind: ExpenseKind) => {
+    setDraft((current) => {
+      const includeInSettlementDefault =
+        expenseKind === 'regular' ? true : expenseKind === 'public_fund' ? false : current.includeInSettlement;
+
+      return {
+        ...current,
+        expenseKind,
+        includeInSettlement: settlementTouched ? current.includeInSettlement : includeInSettlementDefault,
+      };
+    });
+  };
+
+  const selectSettlementInclusion = (includeInSettlement: boolean) => {
+    setSettlementTouched(true);
+    updateDraft({ includeInSettlement });
   };
 
   const selectItem = (itemId: string) => {
@@ -229,12 +262,20 @@ export function QuickExpenseForm({
 
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0 || parsedAmount == null || !draft.itemId || !draft.payerParticipantId) {
+      if (nextErrors.amount) {
+        amountInputRef.current?.focus();
+      } else if (nextErrors.item) {
+        setItemSelectorExpanded(true);
+      } else if (nextErrors.payer || nextErrors.participants) {
+        setActiveSheet('split');
+      }
       return;
     }
 
     onSave({
       amount: parsedAmount,
       currency,
+      expenseKind: draft.expenseKind,
       itemId: draft.itemId,
       payerParticipantId: draft.payerParticipantId,
       splitParticipantIds: draft.splitParticipantIds,
@@ -255,6 +296,7 @@ export function QuickExpenseForm({
   });
   const splitErrorMessage = errors.payer ?? errors.participants;
   const settlementSummary = settlementStatusSummaryLabel(draft.includeInSettlement);
+  const expenseKindSummary = EXPENSE_KIND_LABELS[draft.expenseKind];
   const handleDirectInput = () => {
     setScannerVisible(false);
     setEntryMode('manual');
@@ -291,6 +333,7 @@ export function QuickExpenseForm({
               keyboardType="decimal-pad"
               onChangeText={(amountInput) => updateDraft({ amountInput })}
               placeholder="0"
+              ref={amountInputRef}
               placeholderTextColor={theme.color.textFaint}
               style={styles.amountInput}
               value={draft.amountInput}
@@ -386,11 +429,23 @@ export function QuickExpenseForm({
 
         <SummaryActionRow
           disabled={submitting}
+          helper={EXPENSE_KIND_HELPERS[draft.expenseKind]}
+          onPress={() => setActiveSheet('kind')}
+          title="지출 종류"
+          value={expenseKindSummary}
+        />
+
+        <SummaryActionRow
+          disabled={submitting}
           onPress={() => setActiveSheet('split')}
           title="결제/분할"
           value={paymentSplitSummary}
         />
-        {splitErrorMessage ? <Text style={styles.errorText}>{splitErrorMessage}</Text> : null}
+        {splitErrorMessage ? (
+          <Text accessibilityLiveRegion="polite" style={styles.errorText}>
+            {splitErrorMessage}
+          </Text>
+        ) : null}
 
         <SummaryActionRow
           disabled={submitting}
@@ -412,7 +467,11 @@ export function QuickExpenseForm({
             value={draft.memoInput}
           />
         </FormField>
-        {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+        {errorMessage ? (
+          <Text accessibilityLiveRegion="polite" style={styles.errorText}>
+            {errorMessage}
+          </Text>
+        ) : null}
 
         <View style={styles.actionRow}>
           {onCancel ? <SecondaryButton label="취소" onPress={onCancel} style={styles.cancel} /> : null}
@@ -427,25 +486,57 @@ export function QuickExpenseForm({
         </View>
       </View>
 
+      <BottomSheet onClose={() => setActiveSheet(null)} visible={activeSheet === 'kind'}>
+        <View style={styles.sheetContent}>
+          <View style={styles.sheetHeader}>
+            <Text style={styles.sheetTitle}>지출 종류</Text>
+            <Text style={styles.helperText}>개인/대리 구매는 일반 지출에서 결제자와 분할 대상을 조정해 표현해요.</Text>
+          </View>
+          <SettlementChoice
+            description={EXPENSE_KIND_HELPERS.regular}
+            label={EXPENSE_KIND_LABELS.regular}
+            onPress={() => selectExpenseKind('regular')}
+            selected={draft.expenseKind === 'regular'}
+          />
+          <SettlementChoice
+            description={EXPENSE_KIND_HELPERS.public_fund}
+            label={EXPENSE_KIND_LABELS.public_fund}
+            onPress={() => selectExpenseKind('public_fund')}
+            selected={draft.expenseKind === 'public_fund'}
+          />
+          <PrimaryButton label="적용" onPress={() => setActiveSheet(null)} />
+        </View>
+      </BottomSheet>
+
       <BottomSheet onClose={() => setActiveSheet(null)} scrollable visible={activeSheet === 'split'}>
         <View style={styles.sheetContent}>
           <View style={styles.sheetHeader}>
             <Text style={styles.sheetTitle}>결제/분할 설정</Text>
-            <Text style={styles.helperText}>누가 냈고 누구와 나눌지 설정해요.</Text>
+            <Text style={styles.helperText}>
+              누가 냈고 누구와 나눌지 설정해요. 나만 선택하면 개인 지출, 결제자와 분할 대상을 다르게 하면 대리 구매예요.
+            </Text>
           </View>
           <Text style={styles.label}>결제자</Text>
           <View style={styles.optionList}>
-            {participantOptions.map((participant) => (
-              <ParticipantChip
-                key={participant.id}
-                color={participant.color}
-                label={participant.name}
-                onPress={() => updateDraft({ payerParticipantId: participant.id })}
-                selected={participant.id === draft.payerParticipantId}
-              />
-            ))}
+            {participantOptions.map((participant) => {
+              const selected = participant.id === draft.payerParticipantId;
+              return (
+                <ParticipantChip
+                  accessibilityLabel={`${participant.name} 결제자${selected ? ' 선택됨' : ' 선택'}`}
+                  key={participant.id}
+                  color={participant.color}
+                  label={participant.name}
+                  onPress={() => updateDraft({ payerParticipantId: participant.id })}
+                  selected={selected}
+                />
+              );
+            })}
           </View>
-          {errors.payer ? <Text style={styles.errorText}>{errors.payer}</Text> : null}
+          {errors.payer ? (
+            <Text accessibilityLiveRegion="polite" style={styles.errorText}>
+              {errors.payer}
+            </Text>
+          ) : null}
 
           <Text style={styles.label}>분할</Text>
           <SegmentedControl
@@ -473,17 +564,25 @@ export function QuickExpenseForm({
             <Text style={styles.helperText}>{directSplitUnavailableMessage}</Text>
           ) : null}
           <View style={styles.optionList}>
-            {participantOptions.map((participant) => (
-              <ParticipantChip
-                key={participant.id}
-                color={participant.color}
-                label={participant.name}
-                onPress={() => toggleSplitParticipant(participant.id)}
-                selected={draft.splitParticipantIds.includes(participant.id)}
-              />
-            ))}
+            {participantOptions.map((participant) => {
+              const selected = draft.splitParticipantIds.includes(participant.id);
+              return (
+                <ParticipantChip
+                  accessibilityLabel={`${participant.name} 분할 대상${selected ? ' 선택됨' : ' 선택'}`}
+                  key={participant.id}
+                  color={participant.color}
+                  label={participant.name}
+                  onPress={() => toggleSplitParticipant(participant.id)}
+                  selected={selected}
+                />
+              );
+            })}
           </View>
-          {errors.participants ? <Text style={styles.errorText}>{errors.participants}</Text> : null}
+          {errors.participants ? (
+            <Text accessibilityLiveRegion="polite" style={styles.errorText}>
+              {errors.participants}
+            </Text>
+          ) : null}
           <PrimaryButton label="적용" onPress={() => setActiveSheet(null)} />
         </View>
       </BottomSheet>
@@ -497,13 +596,13 @@ export function QuickExpenseForm({
           <SettlementChoice
             description="나중에 여행 정산에서 함께 계산할 지출이에요."
             label="최종 정산에 포함"
-            onPress={() => updateDraft({ includeInSettlement: true })}
+            onPress={() => selectSettlementInclusion(true)}
             selected={draft.includeInSettlement}
           />
           <SettlementChoice
             description="이미 돈을 주고받은 지출이에요. 내역과 총 사용 금액에는 남고 최종 정산에서는 제외돼요."
             label="현장 정산 완료"
-            onPress={() => updateDraft({ includeInSettlement: false })}
+            onPress={() => selectSettlementInclusion(false)}
             selected={!draft.includeInSettlement}
           />
           <PrimaryButton label="적용" onPress={() => setActiveSheet(null)} />
@@ -562,11 +661,13 @@ function SettlementChoice({
 }
 
 function ParticipantChip({
+  accessibilityLabel,
   color = theme.color.primary,
   label,
   onPress,
   selected,
 }: {
+  accessibilityLabel?: string;
   label: string;
   color?: string;
   selected: boolean;
@@ -574,6 +675,7 @@ function ParticipantChip({
 }) {
   return (
     <Pressable
+      accessibilityLabel={accessibilityLabel ?? label}
       accessibilityRole="button"
       accessibilityState={{ selected }}
       onPress={onPress}
