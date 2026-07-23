@@ -1827,10 +1827,14 @@ func TestListTripParticipantsHandler(t *testing.T) {
 	}
 
 	var body struct {
-		Participants []map[string]interface{} `json:"participants"`
+		CurrentUserParticipantID string                   `json:"currentUserParticipantId"`
+		Participants             []map[string]interface{} `json:"participants"`
 	}
 	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
 		t.Fatalf("decode response: %v", err)
+	}
+	if body.CurrentUserParticipantID != backend.participants[tripID][0].ID {
+		t.Fatalf("expected current user participant id %q, got %#v", backend.participants[tripID][0].ID, body)
 	}
 	if len(body.Participants) != 2 {
 		t.Fatalf("expected two participants, got %#v", body.Participants)
@@ -3017,7 +3021,7 @@ func TestCreateQuickExpenseHandler(t *testing.T) {
 	backend.participants[tripID] = append(backend.participants[tripID], member)
 	payerID := backend.participants[tripID][0].ID
 
-	requestBody := []byte(fmt.Sprintf(`{"scheduleItemId":%q,"amountMinor":1001,"currency":"USD","expenseCategory":"shopping","payerParticipantId":%q,"splitPolicy":"equal","participantIds":[%q],"includeInSettlement":false}`, item.ID, payerID, member.ID))
+	requestBody := []byte(fmt.Sprintf(`{"scheduleItemId":%q,"amountMinor":1001,"currency":"USD","expenseCategory":"shopping","expenseKind":"public_fund","payerParticipantId":%q,"splitPolicy":"equal","participantIds":[%q]}`, item.ID, payerID, member.ID))
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/days/2026-07-11/expenses/quick", bytes.NewReader(requestBody))
 	request.Header.Set("Content-Type", "application/json")
@@ -3038,6 +3042,7 @@ func TestCreateQuickExpenseHandler(t *testing.T) {
 			AmountMinor         int64  `json:"amountMinor"`
 			Currency            string `json:"currency"`
 			ExpenseCategory     string `json:"expenseCategory"`
+			ExpenseKind         string `json:"expenseKind"`
 			SplitPolicy         string `json:"splitPolicy"`
 			IncludeInSettlement *bool  `json:"includeInSettlement"`
 			Payer               struct {
@@ -3068,7 +3073,7 @@ func TestCreateQuickExpenseHandler(t *testing.T) {
 	if body.Expense.TripID != tripID || body.Expense.TripDayID != "2026-07-11" || body.Expense.ScheduleItemID != item.ID || body.Expense.Place.TripPlaceID != item.PlaceID {
 		t.Fatalf("unexpected linked expense ids: %#v", body.Expense)
 	}
-	if body.Expense.AmountMinor != 1001 || body.Expense.Currency != "USD" || body.Expense.ExpenseCategory != "shopping" || body.Expense.SplitPolicy != "equal" || body.Expense.IncludeInSettlement == nil || *body.Expense.IncludeInSettlement || body.Expense.Payer.ParticipantID != payerID || body.Expense.Payer.DisplayName != "민수" || body.Expense.Payer.Source != "live" {
+	if body.Expense.AmountMinor != 1001 || body.Expense.Currency != "USD" || body.Expense.ExpenseCategory != "shopping" || body.Expense.ExpenseKind != "public_fund" || body.Expense.SplitPolicy != "equal" || body.Expense.IncludeInSettlement == nil || *body.Expense.IncludeInSettlement || body.Expense.Payer.ParticipantID != payerID || body.Expense.Payer.DisplayName != "민수" || body.Expense.Payer.Source != "live" {
 		t.Fatalf("unexpected money/payer display: %#v", body.Expense)
 	}
 	if body.Expense.DisplayTitle != "도톤보리" || body.Expense.Place.Name != "도톤보리" || body.Expense.Place.Address != "Dotonbori" || body.Expense.Place.PlaceType != "food" || body.Expense.Place.Source != "live" {
@@ -6600,6 +6605,7 @@ func (b *fakeAuthBackend) CreateQuickExpense(_ context.Context, record tripdomai
 		AmountMinor:         record.AmountMinor,
 		Currency:            currency,
 		ExpenseCategory:     expenseCategory,
+		ExpenseKind:         record.ExpenseKind,
 		Payer:               payerDisplay,
 		SplitPolicy:         record.SplitPolicy,
 		Splits:              daySplits,
@@ -6619,6 +6625,7 @@ func (b *fakeAuthBackend) CreateQuickExpense(_ context.Context, record tripdomai
 		AmountMinor:         record.AmountMinor,
 		Currency:            currency,
 		ExpenseCategory:     expenseCategory,
+		ExpenseKind:         record.ExpenseKind,
 		Payer:               payerDisplay,
 		SplitPolicy:         record.SplitPolicy,
 		Splits:              splits,
@@ -7136,6 +7143,15 @@ func (b *fakeAuthBackend) DeleteScheduleItem(_ context.Context, tripID string, d
 		return true, nil
 	}
 	return false, nil
+}
+
+func (b *fakeAuthBackend) GetCurrentTripParticipantID(_ context.Context, tripID string, userID string) (string, bool, error) {
+	for _, participant := range b.participants[tripID] {
+		if participant.UserID == userID {
+			return participant.ID, true, nil
+		}
+	}
+	return "", false, nil
 }
 
 func (b *fakeAuthBackend) ListTripParticipants(_ context.Context, tripID string) ([]tripdomain.ParticipantListItem, error) {

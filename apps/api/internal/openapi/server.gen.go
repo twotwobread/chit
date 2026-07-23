@@ -73,6 +73,12 @@ const (
 	Live     ExpenseDisplaySource = "live"
 )
 
+// Defines values for ExpenseKind.
+const (
+	PublicFund ExpenseKind = "public_fund"
+	Regular    ExpenseKind = "regular"
+)
+
 // Defines values for ExpenseReceiptConfidence.
 const (
 	High   ExpenseReceiptConfidence = "high"
@@ -398,6 +404,9 @@ type CreateQuickExpenseRequest struct {
 	Currency        *SupportedCurrency `json:"currency,omitempty"`
 	ExpenseCategory *ExpenseCategory   `json:"expenseCategory,omitempty"`
 
+	// ExpenseKind Top-level expense kind. Personal spending is represented as a regular expense with payer and split target set to the current user.
+	ExpenseKind *ExpenseKind `json:"expenseKind,omitempty"`
+
 	// IncludeInSettlement Whether to include the expense in final settlement calculations. Defaults to true when omitted.
 	IncludeInSettlement *bool `json:"includeInSettlement,omitempty"`
 
@@ -442,6 +451,9 @@ type CreateTripExpenseRequest struct {
 
 	// ExpenseDate Actual payment/business date. It may be outside the trip range.
 	ExpenseDate openapi_types.Date `json:"expenseDate"`
+
+	// ExpenseKind Top-level expense kind. Personal spending is represented as a regular expense with payer and split target set to the current user.
+	ExpenseKind *ExpenseKind `json:"expenseKind,omitempty"`
 
 	// IncludeInSettlement Whether to include the expense in final settlement calculations. Defaults to true when omitted.
 	IncludeInSettlement *bool   `json:"includeInSettlement,omitempty"`
@@ -534,7 +546,10 @@ type DayExpenseListItem struct {
 	DisplayTitle    string             `json:"displayTitle"`
 	ExpenseCategory ExpenseCategory    `json:"expenseCategory"`
 	ExpenseDate     openapi_types.Date `json:"expenseDate"`
-	Id              string             `json:"id"`
+
+	// ExpenseKind Top-level expense kind. Personal spending is represented as a regular expense with payer and split target set to the current user.
+	ExpenseKind ExpenseKind `json:"expenseKind"`
+	Id          string      `json:"id"`
 
 	// IncludeInSettlement Whether this expense is included in final settlement calculations. False means it was settled on-site and remains in history/total spend only.
 	IncludeInSettlement bool                      `json:"includeInSettlement"`
@@ -588,7 +603,10 @@ type Expense struct {
 	DisplayTitle    string             `json:"displayTitle"`
 	ExpenseCategory ExpenseCategory    `json:"expenseCategory"`
 	ExpenseDate     openapi_types.Date `json:"expenseDate"`
-	Id              string             `json:"id"`
+
+	// ExpenseKind Top-level expense kind. Personal spending is represented as a regular expense with payer and split target set to the current user.
+	ExpenseKind ExpenseKind `json:"expenseKind"`
+	Id          string      `json:"id"`
 
 	// IncludeInSettlement Whether this expense is included in final settlement calculations. False means it was settled on-site and remains in history/total spend only.
 	IncludeInSettlement bool                      `json:"includeInSettlement"`
@@ -618,6 +636,9 @@ type ExpenseCategory string
 
 // ExpenseDisplaySource Display value source for diagnostics and tests. Do not render this as user-visible copy.
 type ExpenseDisplaySource string
+
+// ExpenseKind Top-level expense kind. Personal spending is represented as a regular expense with payer and split target set to the current user.
+type ExpenseKind string
 
 // ExpenseParticipantDisplay defines model for ExpenseParticipantDisplay.
 type ExpenseParticipantDisplay struct {
@@ -921,7 +942,9 @@ type ListTripFlightsResponse struct {
 
 // ListTripParticipantsResponse defines model for ListTripParticipantsResponse.
 type ListTripParticipantsResponse struct {
-	Participants []TripParticipantListItem `json:"participants"`
+	// CurrentUserParticipantId Authenticated user's current participant id for this trip, or null if no active participant can be resolved.
+	CurrentUserParticipantId *string                   `json:"currentUserParticipantId"`
+	Participants             []TripParticipantListItem `json:"participants"`
 }
 
 // ListTripPlaceBookmarksResponse defines model for ListTripPlaceBookmarksResponse.
@@ -1510,6 +1533,9 @@ type UpdateExpenseRequest struct {
 	AmountMinor     int64              `json:"amountMinor"`
 	Currency        *SupportedCurrency `json:"currency,omitempty"`
 	ExpenseCategory *ExpenseCategory   `json:"expenseCategory,omitempty"`
+
+	// ExpenseKind Top-level expense kind. Personal spending is represented as a regular expense with payer and split target set to the current user.
+	ExpenseKind *ExpenseKind `json:"expenseKind,omitempty"`
 
 	// IncludeInSettlement When provided, updates whether the expense is included in final settlement calculations. Omit to keep the existing value.
 	IncludeInSettlement *bool `json:"includeInSettlement,omitempty"`

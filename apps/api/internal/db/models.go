@@ -59,6 +59,7 @@ type Expense struct {
 	AmountMinor         int64
 	Currency            string
 	ExpenseCategory     string
+	ExpenseKind         string
 	SplitPolicy         string
 	PayerParticipantID  pgtype.UUID
 	PayerDisplayName    string

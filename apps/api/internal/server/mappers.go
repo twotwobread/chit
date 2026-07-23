@@ -116,9 +116,9 @@ func getTripDetailResponseToOpenAPI(result trip.GetDetailResult) openapi.GetTrip
 	}
 }
 
-func listTripParticipantsResponseToOpenAPI(participants []trip.ParticipantListItem) openapi.ListTripParticipantsResponse {
-	items := make([]openapi.TripParticipantListItem, 0, len(participants))
-	for _, participant := range participants {
+func listTripParticipantsResponseToOpenAPI(result trip.ListParticipantsResult) openapi.ListTripParticipantsResponse {
+	items := make([]openapi.TripParticipantListItem, 0, len(result.Participants))
+	for _, participant := range result.Participants {
 		items = append(items, openapi.TripParticipantListItem{
 			ParticipantId: participant.ParticipantID,
 			DisplayName:   participant.DisplayName,
@@ -126,7 +126,7 @@ func listTripParticipantsResponseToOpenAPI(participants []trip.ParticipantListIt
 			JoinedAt:      participant.JoinedAt,
 		})
 	}
-	return openapi.ListTripParticipantsResponse{Participants: items}
+	return openapi.ListTripParticipantsResponse{CurrentUserParticipantId: result.CurrentUserParticipantID, Participants: items}
 }
 
 func getTripSettlementResponseToOpenAPI(result trip.GetTripSettlementResult) openapi.GetTripSettlementResponse {
@@ -351,6 +351,7 @@ func dayExpenseListItemToOpenAPI(expense trip.DayExpenseListItem) openapi.DayExp
 		AmountMinor:         expense.AmountMinor,
 		Currency:            openapi.SupportedCurrency(expense.Currency),
 		ExpenseCategory:     openapi.ExpenseCategory(expense.ExpenseCategory),
+		ExpenseKind:         openapi.ExpenseKind(expense.ExpenseKind),
 		Payer:               expenseParticipantDisplayToOpenAPI(expense.Payer),
 		SplitPolicy:         openapi.ExpenseSplitPolicy(expense.SplitPolicy),
 		Splits:              splits,
@@ -381,6 +382,7 @@ func expenseToOpenAPI(expense trip.Expense) openapi.Expense {
 		AmountMinor:         expense.AmountMinor,
 		Currency:            openapi.SupportedCurrency(expense.Currency),
 		ExpenseCategory:     openapi.ExpenseCategory(expense.ExpenseCategory),
+		ExpenseKind:         openapi.ExpenseKind(expense.ExpenseKind),
 		Payer:               expenseParticipantDisplayToOpenAPI(expense.Payer),
 		Memo:                expense.Memo,
 		SplitPolicy:         openapi.ExpenseSplitPolicy(expense.SplitPolicy),

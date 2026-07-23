@@ -5,6 +5,7 @@
 import type { DayExpenseSplitListItem } from './DayExpenseSplitListItem';
 import type { ExpenseAnchorType } from './ExpenseAnchorType';
 import type { ExpenseCategory } from './ExpenseCategory';
+import type { ExpenseKind } from './ExpenseKind';
 import type { ExpenseParticipantDisplay } from './ExpenseParticipantDisplay';
 import type { ExpensePlaceDisplay } from './ExpensePlaceDisplay';
 import type { ExpenseReceiptSummary } from './ExpenseReceiptSummary';
@@ -24,6 +25,7 @@ export type DayExpenseListItem = {
     amountMinor: number;
     currency: SupportedCurrency;
     expenseCategory: ExpenseCategory;
+    expenseKind: ExpenseKind;
     payer: ExpenseParticipantDisplay;
     splitPolicy: ExpenseSplitPolicy;
     splits: Array<DayExpenseSplitListItem>;

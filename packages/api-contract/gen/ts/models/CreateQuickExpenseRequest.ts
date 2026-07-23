@@ -3,6 +3,7 @@
 /* tslint:disable */
 /* eslint-disable */
 import type { ExpenseCategory } from './ExpenseCategory';
+import type { ExpenseKind } from './ExpenseKind';
 import type { ExpenseSplitPolicy } from './ExpenseSplitPolicy';
 import type { ManualExpenseSplitInput } from './ManualExpenseSplitInput';
 import type { SupportedCurrency } from './SupportedCurrency';
@@ -27,6 +28,10 @@ export type CreateQuickExpenseRequest = {
      * Expense category used for settlement analytics. Defaults to linked place type when available, otherwise etc.
      */
     expenseCategory?: ExpenseCategory;
+    /**
+     * Expense kind. Defaults to regular when omitted. Public-fund expenses default to settlement-excluded unless includeInSettlement is explicitly provided.
+     */
+    expenseKind?: ExpenseKind;
     /**
      * Active trip participant who paid the expense.
      */

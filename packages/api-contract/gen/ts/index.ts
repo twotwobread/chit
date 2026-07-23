@@ -53,6 +53,7 @@ export type { Expense } from './models/Expense';
 export type { ExpenseAnchorType } from './models/ExpenseAnchorType';
 export type { ExpenseCategory } from './models/ExpenseCategory';
 export type { ExpenseDisplaySource } from './models/ExpenseDisplaySource';
+export type { ExpenseKind } from './models/ExpenseKind';
 export type { ExpenseParticipantDisplay } from './models/ExpenseParticipantDisplay';
 export type { ExpensePlaceDisplay } from './models/ExpensePlaceDisplay';
 export type { ExpenseReceiptConfidence } from './models/ExpenseReceiptConfidence';

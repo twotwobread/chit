@@ -5461,6 +5461,7 @@ components:
         - amountMinor
         - currency
         - expenseCategory
+        - expenseKind
         - payer
         - splitPolicy
         - splits
@@ -5497,6 +5498,8 @@ components:
           $ref: '#/components/schemas/SupportedCurrency'
         expenseCategory:
           $ref: '#/components/schemas/ExpenseCategory'
+        expenseKind:
+          $ref: '#/components/schemas/ExpenseKind'
         payer:
           $ref: '#/components/schemas/ExpenseParticipantDisplay'
         splitPolicy:
@@ -5828,6 +5831,9 @@ components:
         expenseCategory:
           $ref: '#/components/schemas/ExpenseCategory'
           description: When provided, replaces the expense category used for settlement analytics and row markers. Omit to keep the existing value.
+        expenseKind:
+          $ref: '#/components/schemas/ExpenseKind'
+          description: When provided, replaces the expense kind. Omit to keep the existing value.
         includeInSettlement:
           type: boolean
           description: When provided, updates whether the expense is included in final settlement calculations. Omit to keep the existing value.
@@ -5884,6 +5890,9 @@ components:
         expenseCategory:
           $ref: '#/components/schemas/ExpenseCategory'
           description: Expense category used for settlement analytics. Defaults to linked place type when available, otherwise etc.
+        expenseKind:
+          $ref: '#/components/schemas/ExpenseKind'
+          description: Expense kind. Defaults to regular when omitted. Public-fund expenses default to settlement-excluded unless includeInSettlement is explicitly provided.
         payerParticipantId:
           type: string
         splitPolicy:
@@ -5949,6 +5958,9 @@ components:
         expenseCategory:
           $ref: '#/components/schemas/ExpenseCategory'
           description: Expense category used for settlement analytics. Defaults to linked place type when available, otherwise etc.
+        expenseKind:
+          $ref: '#/components/schemas/ExpenseKind'
+          description: Expense kind. Defaults to regular when omitted. Public-fund expenses default to settlement-excluded unless includeInSettlement is explicitly provided.
         payerParticipantId:
           type: string
           description: Active trip participant who paid the expense.
@@ -5998,6 +6010,7 @@ components:
         - amountMinor
         - currency
         - expenseCategory
+        - expenseKind
         - payer
         - memo
         - splitPolicy
@@ -6043,6 +6056,8 @@ components:
           $ref: '#/components/schemas/SupportedCurrency'
         expenseCategory:
           $ref: '#/components/schemas/ExpenseCategory'
+        expenseKind:
+          $ref: '#/components/schemas/ExpenseKind'
         payer:
           $ref: '#/components/schemas/ExpenseParticipantDisplay'
         memo:
@@ -6081,6 +6096,12 @@ components:
         - equal
         - manual
       description: Persisted split policy for current quick expenses.
+    ExpenseKind:
+      type: string
+      enum:
+        - regular
+        - public_fund
+      description: Top-level expense kind. Personal spending is represented as a regular expense with payer and split target set to the current user.
     ExpensePlaceDisplay:
       type: object
       additionalProperties: false
@@ -6770,8 +6791,13 @@ components:
     ListTripParticipantsResponse:
       type: object
       required:
+        - currentUserParticipantId
         - participants
       properties:
+        currentUserParticipantId:
+          type: string
+          nullable: true
+          description: Authenticated user's current participant id for this trip, or null if no active participant can be resolved.
         participants:
           type: array
           items:
