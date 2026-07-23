@@ -1,0 +1,14 @@
+appId: ${APP_ID}
+---
+- runFlow:
+    when:
+      notVisible: '칫 Chit'
+    commands:
+      - extendedWaitUntil:
+          visible: '로그인하기'
+          timeout: 90000
+      - tapOn: '로그인하기'
+- extendedWaitUntil:
+    visible: '칫 Chit'
+    timeout: 30000
+- assertVisible: '로그인하면 바로 이어가요'

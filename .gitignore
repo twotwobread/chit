@@ -39,6 +39,9 @@ crash.*.log
 # Local brainstorming mockups
 .superpowers/
 
+# Local smoke/test artifacts
+.artifacts/
+
 # Logs
 *.log
 .pi/harness-audit/
