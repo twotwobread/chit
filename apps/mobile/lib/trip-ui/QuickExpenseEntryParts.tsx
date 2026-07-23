@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { Fragment, useState, type ReactNode } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 
 import { type ExpenseReceiptDraft, type SupportedCurrency } from '@i-um/api-contract';
@@ -64,6 +64,7 @@ export type QuickExpenseFormSubmitStateInput = {
   payerParticipantId: string | null;
   saving: boolean;
   selectedItemId: string | null;
+  selectedTripPlaceId: string | null;
   selectedSplitParticipantIds: string[];
   splitPolicy: QuickExpenseSplitPolicy;
   titleInput: string;
@@ -81,6 +82,7 @@ export function buildQuickExpenseFormSubmitState({
   payerParticipantId,
   saving,
   selectedItemId,
+  selectedTripPlaceId,
   selectedSplitParticipantIds,
   splitPolicy,
   titleInput,
@@ -99,6 +101,7 @@ export function buildQuickExpenseFormSubmitState({
           expenseCategory,
           selectedTripDayId: viewModel.selectedTripDayId,
           scheduleItemId: selectedItemId,
+          tripPlaceId: selectedTripPlaceId,
           splitPolicy,
           participantIds: selectedSplitParticipantIds,
           manualSplitInputs: activeManualSplitInputs,
@@ -111,6 +114,7 @@ export function buildQuickExpenseFormSubmitState({
           currency: viewModel.currency,
           expenseCategory,
           scheduleItemId: selectedItemId,
+          tripPlaceId: selectedTripPlaceId,
           splitPolicy,
           participantIds: selectedSplitParticipantIds,
           manualSplitInputs: activeManualSplitInputs,
@@ -132,6 +136,7 @@ export function QuickExpenseForm({
   onBack,
   onClearReceiptDraft,
   onClearTripDay,
+  onCreateReceiptPlaceCandidate,
   onSelectCurrency,
   onSelectExpenseCategory,
   onSelectItem,
@@ -153,8 +158,10 @@ export function QuickExpenseForm({
   receiptBusy,
   receiptDraft,
   receiptMessage,
+  receiptPlaceBusy,
   saving,
   selectedItemId,
+  selectedTripPlaceId,
   selectedSplitParticipantIds,
   showActions = true,
   splitPolicy,
@@ -174,6 +181,7 @@ export function QuickExpenseForm({
   mode: 'today' | 'settlement';
   onBack: () => void;
   onClearTripDay: () => void;
+  onCreateReceiptPlaceCandidate: () => void;
   onSelectCurrency: (currency: SupportedCurrency) => void;
   onSelectExpenseCategory: (expenseCategory: ExpenseCategory) => void;
   onSelectItem: (itemId: string) => void;
@@ -197,10 +205,12 @@ export function QuickExpenseForm({
   receiptBusy: boolean;
   receiptDraft: ExpenseReceiptDraft | null;
   receiptMessage: string | null;
+  receiptPlaceBusy: boolean;
   onClearReceiptDraft: () => void;
   onReceiptDraftCreated: (draft: ExpenseReceiptDraft) => void;
   saving: boolean;
   selectedItemId: string | null;
+  selectedTripPlaceId: string | null;
   selectedSplitParticipantIds: string[];
   showActions?: boolean;
   splitPolicy: QuickExpenseSplitPolicy;
@@ -222,6 +232,7 @@ export function QuickExpenseForm({
     payerParticipantId,
     saving,
     selectedItemId,
+    selectedTripPlaceId,
     selectedSplitParticipantIds,
     splitPolicy,
     titleInput,
@@ -601,7 +612,12 @@ export function QuickExpenseForm({
     </Card>
   );
 
-  const renderManualForm = () => (mode === 'settlement' ? renderDetailedManualForm() : renderStandardManualForm());
+  const renderManualForm = () =>
+    mode === 'settlement' ? (
+      <Fragment>{renderDetailedManualForm()}</Fragment>
+    ) : (
+      <Fragment>{renderStandardManualForm()}</Fragment>
+    );
 
   const renderDetailedEntryChoice = () => (
     <View style={styles.detailedFormSurface}>
@@ -760,15 +776,7 @@ function DetailedExpenseReviewGroup({
   );
 }
 
-function EntryChoiceActionCard({
-  children,
-  helper,
-  title,
-}: {
-  children: ReactNode;
-  helper: string;
-  title: string;
-}) {
+function EntryChoiceActionCard({ children, helper, title }: { children: ReactNode; helper: string; title: string }) {
   return (
     <View style={styles.entryChoiceActionCard}>
       <View style={styles.sectionHeader}>
