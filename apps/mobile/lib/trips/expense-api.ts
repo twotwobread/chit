@@ -22,12 +22,15 @@ import {
 
 import { runAuthenticatedRequest } from '../auth/client';
 
+import { normalizeTripExpenseSearchQuery } from './expense-search';
+
 export async function listDayExpenses(tripId: string, tripDayId: string): Promise<ListDayExpensesResponse> {
   return runAuthenticatedRequest(() => TripsService.listDayExpenses(tripId, tripDayId));
 }
 
-export async function listTripExpenses(tripId: string): Promise<ListTripExpensesResponse> {
-  return runAuthenticatedRequest(() => TripsService.listTripExpenses(tripId));
+export async function listTripExpenses(tripId: string, searchQuery?: string): Promise<ListTripExpensesResponse> {
+  const normalizedQuery = searchQuery ? normalizeTripExpenseSearchQuery(searchQuery) : '';
+  return runAuthenticatedRequest(() => TripsService.listTripExpenses(tripId, normalizedQuery || undefined));
 }
 
 export async function getDayExpense(tripId: string, tripDayId: string, expenseId: string): Promise<GetExpenseResponse> {
