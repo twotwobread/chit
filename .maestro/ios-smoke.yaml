@@ -1,5 +1,7 @@
 appId: ${APP_ID}
 ---
+- launchApp:
+    clearState: false
 - extendedWaitUntil:
     visible: '로그인하기'
     timeout: 90000

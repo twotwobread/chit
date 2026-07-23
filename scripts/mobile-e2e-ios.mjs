@@ -78,14 +78,19 @@ export function selectSimulatorDevice(simctlJson, preferredName) {
     .flat()
     .filter((device) => device && device.isAvailable !== false && device.name && device.udid && device.state);
 
+  const preferredDevices = preferredName ? devices.filter((device) => device.name === preferredName) : [];
+  const preferredBooted = preferredDevices.find((device) => device.state === 'Booted');
+  if (preferredBooted) {
+    return toSimulatorDevice(preferredBooted);
+  }
+
+  if (preferredDevices[0]) {
+    return toSimulatorDevice(preferredDevices[0]);
+  }
+
   const booted = devices.find((device) => device.state === 'Booted');
   if (booted) {
     return toSimulatorDevice(booted);
-  }
-
-  const preferred = preferredName ? devices.find((device) => device.name === preferredName) : null;
-  if (preferred) {
-    return toSimulatorDevice(preferred);
   }
 
   for (const candidateName of DEFAULT_DEVICE_NAMES) {

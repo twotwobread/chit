@@ -146,7 +146,7 @@ MOBILE_E2E_APP_ID=com.twotwobread.ium.staging pnpm mobile:e2e:ios
 
 ### Persisted login/session state
 
-The default flow expects a no-session state with `로그인하기`. If the app is already logged in, clear the app state manually or use a fresh Simulator. The first flow does not call Maestro `clearState` because clearing Expo Go can detach the loaded Expo project.
+The default flow expects a no-session state with `로그인하기`. If the app is already logged in, clear the app state manually or use a fresh Simulator. The first flow launches the app with `clearState: false` because clearing Expo Go can detach the loaded Expo project.
 
 ### Local `.env` changes test behavior
 

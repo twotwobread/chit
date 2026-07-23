@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import {
@@ -48,7 +49,7 @@ test('createArtifactDirName is stable and filesystem-safe', () => {
   assert.equal(createArtifactDirName(new Date('2026-07-23T04:05:06Z')), 'ios-smoke-20260723-040506');
 });
 
-test('selectSimulatorDevice prefers booted devices before named available devices', () => {
+test('selectSimulatorDevice prefers the requested device over an unrelated booted simulator', () => {
   const simctlJson = JSON.stringify({
     devices: {
       'com.apple.CoreSimulator.SimRuntime.iOS-18-0': [
@@ -59,6 +60,23 @@ test('selectSimulatorDevice prefers booted devices before named available device
   });
 
   assert.deepEqual(selectSimulatorDevice(simctlJson, 'iPhone 15'), {
+    name: 'iPhone 15',
+    udid: 'A',
+    state: 'Shutdown',
+  });
+});
+
+test('selectSimulatorDevice uses a booted simulator when no preferred device is requested', () => {
+  const simctlJson = JSON.stringify({
+    devices: {
+      'com.apple.CoreSimulator.SimRuntime.iOS-18-0': [
+        { name: 'iPhone 15', udid: 'A', state: 'Shutdown', isAvailable: true },
+        { name: 'iPhone 16', udid: 'B', state: 'Booted', isAvailable: true },
+      ],
+    },
+  });
+
+  assert.deepEqual(selectSimulatorDevice(simctlJson), {
     name: 'iPhone 16',
     udid: 'B',
     state: 'Booted',
@@ -113,4 +131,10 @@ test('buildRunSummary records local/free smoke settings', () => {
   assert.match(summary, /local iOS Simulator/);
   assert.match(summary, /host\.exp\.Exponent/);
   assert.match(summary, /iPhone 16/);
+});
+
+test('ios smoke flow explicitly launches the selected app without clearing Expo Go state', () => {
+  const flow = readFileSync('.maestro/ios-smoke.yaml', 'utf8');
+
+  assert.match(flow, /- launchApp:\n\s+clearState: false/);
 });
