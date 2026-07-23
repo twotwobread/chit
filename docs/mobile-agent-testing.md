@@ -60,6 +60,12 @@ Use a preferred simulator:
 pnpm mobile:e2e:ios -- --device "iPhone 16"
 ```
 
+Use another Expo port when `8081` is already occupied:
+
+```bash
+pnpm mobile:e2e:ios -- --expo-port 8082
+```
+
 Use an installed development build instead of Expo Go:
 
 ```bash
@@ -136,6 +142,16 @@ Open Xcode Settings > Platforms and install an iOS runtime. Then confirm:
 xcrun simctl list devices available
 ```
 
+### Port 8081 is already in use
+
+If another Expo/Metro server is running on port `8081`, choose another port explicitly:
+
+```bash
+pnpm mobile:e2e:ios -- --expo-port 8082
+```
+
+Do not kill another worktree's Expo server unless you know it is safe.
+
 ### Expo Go vs development build app id
 
 The default app id is Expo Go: `host.exp.Exponent`. If Maestro cannot attach to the app, and you are using an installed development build, run with:
@@ -146,7 +162,7 @@ MOBILE_E2E_APP_ID=com.twotwobread.ium.staging pnpm mobile:e2e:ios
 
 ### Persisted login/session state
 
-The default flow expects a no-session state with `로그인하기`. If the app is already logged in, clear the app state manually or use a fresh Simulator. The first flow launches the app with `clearState: false` because clearing Expo Go can detach the loaded Expo project.
+The default flow expects a no-session state with `로그인하기`. If the app is already logged in, clear the app state manually or use a fresh Simulator. The first flow does not call Maestro `launchApp` or `clearState` because Expo CLI opens the project URL in Expo Go; launching Expo Go again can return to the Expo Go home screen, and clearing Expo Go can detach the loaded Expo project.
 
 ### Local `.env` changes test behavior
 

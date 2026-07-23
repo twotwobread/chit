@@ -4,6 +4,7 @@ import test from 'node:test';
 
 import {
   buildExpoEnv,
+  buildExpoStartCommand,
   buildRunSummary,
   createArtifactDirName,
   formatMissingToolMessage,
@@ -22,6 +23,8 @@ test('parseArgs applies safe local defaults and supports overrides', () => {
     '--dry-run',
     '--artifacts-dir',
     '.artifacts/custom',
+    '--expo-port',
+    '8082',
   ]);
 
   assert.equal(options.appId, 'com.twotwobread.ium.staging');
@@ -29,6 +32,7 @@ test('parseArgs applies safe local defaults and supports overrides', () => {
   assert.equal(options.skipStart, true);
   assert.equal(options.dryRun, true);
   assert.equal(options.artifactsDir, '.artifacts/custom');
+  assert.equal(options.expoPort, 8082);
 });
 
 test('parseArgs defaults to Expo Go app id and generated artifact dir', () => {
@@ -122,6 +126,19 @@ test('buildExpoEnv enables safe local auth dev mode without mutating input', () 
   assert.equal(output.KEEP, 'value');
 });
 
+test('buildExpoStartCommand pins the requested Expo port for non-interactive runs', () => {
+  assert.deepEqual(buildExpoStartCommand(8082), [
+    '--filter',
+    '@i-um/mobile',
+    'exec',
+    'expo',
+    'start',
+    '--ios',
+    '--port',
+    '8082',
+  ]);
+});
+
 test('buildRunSummary records local/free smoke settings', () => {
   const summary = buildRunSummary(
     { appId: 'host.exp.Exponent', dryRun: true, skipStart: false, flowPath: '.maestro/ios-smoke.yaml' },
@@ -133,8 +150,11 @@ test('buildRunSummary records local/free smoke settings', () => {
   assert.match(summary, /iPhone 16/);
 });
 
-test('ios smoke flow explicitly launches the selected app without clearing Expo Go state', () => {
+test('ios smoke flow supports both root no-session and already-open login states', () => {
   const flow = readFileSync('.maestro/ios-smoke.yaml', 'utf8');
 
-  assert.match(flow, /- launchApp:\n\s+clearState: false/);
+  assert.doesNotMatch(flow, /launchApp/);
+  assert.match(flow, /notVisible: ['"]칫 Chit['"]/);
+  assert.match(flow, /visible: ['"]로그인하기['"]/);
+  assert.match(flow, /tapOn: ['"]로그인하기['"]/);
 });

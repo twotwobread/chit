@@ -10,6 +10,7 @@ export const DEFAULT_APP_ID = 'host.exp.Exponent';
 export const DEFAULT_FLOW_PATH = '.maestro/ios-smoke.yaml';
 export const DEFAULT_ARTIFACTS_ROOT = '.artifacts/mobile-e2e';
 export const DEFAULT_DEVICE_NAMES = ['iPhone 16', 'iPhone 15', 'iPhone 14'];
+export const DEFAULT_EXPO_PORT = 8081;
 export const DEFAULT_START_WAIT_MS = 90_000;
 
 export function parseArgs(argv, env = process.env, now = new Date()) {
@@ -18,6 +19,7 @@ export function parseArgs(argv, env = process.env, now = new Date()) {
     artifactsDir: `${DEFAULT_ARTIFACTS_ROOT}/${createArtifactDirName(now)}`,
     deviceName: env.MOBILE_E2E_DEVICE?.trim() || undefined,
     dryRun: false,
+    expoPort: parsePositiveInt(env.MOBILE_E2E_EXPO_PORT, DEFAULT_EXPO_PORT),
     flowPath: DEFAULT_FLOW_PATH,
     help: false,
     skipStart: false,
@@ -40,6 +42,9 @@ export function parseArgs(argv, env = process.env, now = new Date()) {
         break;
       case '--flow':
         options.flowPath = readOptionValue(argv, (index += 1), arg);
+        break;
+      case '--expo-port':
+        options.expoPort = parsePositiveInt(readOptionValue(argv, (index += 1), arg), DEFAULT_EXPO_PORT);
         break;
       case '--start-wait-ms':
         options.startWaitMs = parsePositiveInt(readOptionValue(argv, (index += 1), arg), DEFAULT_START_WAIT_MS);
@@ -129,11 +134,16 @@ export function buildExpoEnv(baseEnv = process.env) {
   };
 }
 
+export function buildExpoStartCommand(expoPort) {
+  return ['--filter', '@i-um/mobile', 'exec', 'expo', 'start', '--ios', '--port', String(expoPort)];
+}
+
 export function buildRunSummary(options, device) {
   return [
     'Mobile iOS smoke: local iOS Simulator + Maestro',
     `appId: ${options.appId}`,
     `flow: ${options.flowPath}`,
+    `expo port: ${options.expoPort}`,
     `device: ${device ? `${device.name} (${device.state}, ${device.udid})` : 'not selected'}`,
     `mode: ${options.dryRun ? 'dry-run' : 'run'}`,
     `start Expo: ${options.skipStart ? 'no (--skip-start)' : 'yes'}`,
@@ -189,7 +199,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, cwd 
     let expoProcess = null;
     try {
       if (!options.skipStart) {
-        expoProcess = startExpo(cwd, env, join(artifactsDir, 'expo.log'), logger);
+        expoProcess = startExpo(cwd, env, join(artifactsDir, 'expo.log'), logger, options.expoPort);
         await waitForExpoStartup(expoProcess, options.startWaitMs, logger);
       } else {
         logger('Skipping Expo start because --skip-start was provided.');
@@ -272,9 +282,10 @@ async function bootSimulatorIfNeeded(device, logger) {
   }
 }
 
-function startExpo(cwd, env, logPath, logger) {
-  logger('Starting Expo iOS command: pnpm --filter @i-um/mobile ios');
-  const child = spawn('pnpm', ['--filter', '@i-um/mobile', 'ios'], {
+function startExpo(cwd, env, logPath, logger, expoPort) {
+  const args = buildExpoStartCommand(expoPort);
+  logger(`Starting Expo iOS command: pnpm ${args.join(' ')}`);
+  const child = spawn('pnpm', args, {
     cwd,
     env: buildExpoEnv(env),
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -378,7 +389,7 @@ function createLogger(logPath) {
 }
 
 function helpText() {
-  return `Usage: pnpm mobile:e2e:ios -- [options]\n\nOptions:\n  --app-id <id>             App id for Maestro. Default: ${DEFAULT_APP_ID}\n  --device <name>           Preferred simulator name, e.g. "iPhone 16"\n  --flow <path>             Maestro flow template. Default: ${DEFAULT_FLOW_PATH}\n  --artifacts-dir <path>    Output directory. Default: ${DEFAULT_ARTIFACTS_ROOT}/ios-smoke-<timestamp>\n  --skip-start              Do not run Expo; use an already-open app/dev build\n  --dry-run                 Check tools, render flow, and report without running\n  --start-wait-ms <ms>      Wait for Expo startup output before Maestro. Default: ${DEFAULT_START_WAIT_MS}\n  -h, --help                Show this help\n\nExamples:\n  pnpm mobile:e2e:ios -- --dry-run\n  pnpm mobile:e2e:ios\n  MOBILE_E2E_APP_ID=com.twotwobread.ium.staging pnpm mobile:e2e:ios\n`;
+  return `Usage: pnpm mobile:e2e:ios -- [options]\n\nOptions:\n  --app-id <id>             App id for Maestro. Default: ${DEFAULT_APP_ID}\n  --device <name>           Preferred simulator name, e.g. "iPhone 16"\n  --flow <path>             Maestro flow template. Default: ${DEFAULT_FLOW_PATH}\n  --artifacts-dir <path>    Output directory. Default: ${DEFAULT_ARTIFACTS_ROOT}/ios-smoke-<timestamp>\n  --skip-start              Do not run Expo; use an already-open app/dev build\n  --expo-port <port>        Expo dev server port. Default: ${DEFAULT_EXPO_PORT}\n  --dry-run                 Check tools, render flow, and report without running\n  --start-wait-ms <ms>      Wait for Expo startup output before Maestro. Default: ${DEFAULT_START_WAIT_MS}\n  -h, --help                Show this help\n\nExamples:\n  pnpm mobile:e2e:ios -- --dry-run\n  pnpm mobile:e2e:ios\n  MOBILE_E2E_APP_ID=com.twotwobread.ium.staging pnpm mobile:e2e:ios\n`;
 }
 
 function readOptionValue(argv, index, optionName) {

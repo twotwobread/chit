@@ -1,11 +1,13 @@
 appId: ${APP_ID}
 ---
-- launchApp:
-    clearState: false
-- extendedWaitUntil:
-    visible: '로그인하기'
-    timeout: 90000
-- tapOn: '로그인하기'
+- runFlow:
+    when:
+      notVisible: '칫 Chit'
+    commands:
+      - extendedWaitUntil:
+          visible: '로그인하기'
+          timeout: 90000
+      - tapOn: '로그인하기'
 - extendedWaitUntil:
     visible: '칫 Chit'
     timeout: 30000
