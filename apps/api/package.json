@@ -3,8 +3,8 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "dev": "go run ./cmd/api",
-    "test": "go test ./...",
+    "dev": "CGO_ENABLED=0 go run ./cmd/api",
+    "test": "CGO_ENABLED=0 go test ./...",
     "build": "tmpdir=$(mktemp -d) && trap 'rm -rf \"$tmpdir\"' EXIT && go build -buildvcs=false -o \"$tmpdir/api\" ./cmd/api && go build -buildvcs=false -o \"$tmpdir/notification-worker\" ./cmd/notification-worker",
     "lint": "go vet ./...",
     "format": "gofmt -w $(find . -type f -name '*.go')",
