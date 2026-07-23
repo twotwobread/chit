@@ -267,6 +267,7 @@ SELECT
     ELSE 'fallback'
   END::text AS payer_source,
   e.memo,
+  e.client_mutation_id,
   e.split_policy,
   e.include_in_settlement,
   (er.expense_id IS NOT NULL)::boolean AS receipt_exists,
@@ -327,6 +328,7 @@ type GetExpenseByTripDayAndIDRow struct {
 	PayerDisplayName    string
 	PayerSource         string
 	Memo                pgtype.Text
+	ClientMutationID    pgtype.Text
 	SplitPolicy         string
 	IncludeInSettlement bool
 	ReceiptExists       bool
@@ -361,6 +363,7 @@ func (q *Queries) GetExpenseByTripDayAndID(ctx context.Context, arg GetExpenseBy
 		&i.PayerDisplayName,
 		&i.PayerSource,
 		&i.Memo,
+		&i.ClientMutationID,
 		&i.SplitPolicy,
 		&i.IncludeInSettlement,
 		&i.ReceiptExists,
@@ -369,6 +372,36 @@ func (q *Queries) GetExpenseByTripDayAndID(ctx context.Context, arg GetExpenseBy
 		&i.ReceiptUploadedAt,
 		&i.CreatedAt,
 	)
+	return i, err
+}
+
+const getExpenseIDByClientMutationID = `-- name: GetExpenseIDByClientMutationID :one
+SELECT
+  id::text,
+  COALESCE(trip_day_id::text, '')::text AS trip_day_id,
+  anchor_type
+FROM expenses
+WHERE trip_id = $1::uuid
+  AND created_by = $2::uuid
+  AND client_mutation_id = $3
+`
+
+type GetExpenseIDByClientMutationIDParams struct {
+	TripID           pgtype.UUID
+	CreatedBy        pgtype.UUID
+	ClientMutationID pgtype.Text
+}
+
+type GetExpenseIDByClientMutationIDRow struct {
+	ID         string
+	TripDayID  string
+	AnchorType string
+}
+
+func (q *Queries) GetExpenseIDByClientMutationID(ctx context.Context, arg GetExpenseIDByClientMutationIDParams) (GetExpenseIDByClientMutationIDRow, error) {
+	row := q.db.QueryRow(ctx, getExpenseIDByClientMutationID, arg.TripID, arg.CreatedBy, arg.ClientMutationID)
+	var i GetExpenseIDByClientMutationIDRow
+	err := row.Scan(&i.ID, &i.TripDayID, &i.AnchorType)
 	return i, err
 }
 
@@ -626,6 +659,7 @@ SELECT
     ELSE 'fallback'
   END::text AS payer_source,
   e.memo,
+  e.client_mutation_id,
   e.split_policy,
   e.include_in_settlement,
   (er.expense_id IS NOT NULL)::boolean AS receipt_exists,
@@ -677,6 +711,7 @@ type GetTripExpenseByIDRow struct {
 	PayerDisplayName    string
 	PayerSource         string
 	Memo                pgtype.Text
+	ClientMutationID    pgtype.Text
 	SplitPolicy         string
 	IncludeInSettlement bool
 	ReceiptExists       bool
@@ -711,6 +746,7 @@ func (q *Queries) GetTripExpenseByID(ctx context.Context, arg GetTripExpenseByID
 		&i.PayerDisplayName,
 		&i.PayerSource,
 		&i.Memo,
+		&i.ClientMutationID,
 		&i.SplitPolicy,
 		&i.IncludeInSettlement,
 		&i.ReceiptExists,
@@ -794,6 +830,7 @@ INSERT INTO expenses (
   payer_participant_id,
   payer_display_name,
   memo,
+  client_mutation_id,
   include_in_settlement,
   created_by
 ) VALUES (
@@ -816,7 +853,8 @@ INSERT INTO expenses (
   $17,
   $18,
   $19,
-  $20::uuid
+  $20,
+  $21::uuid
 )
 RETURNING
   id::text,
@@ -838,6 +876,7 @@ RETURNING
   COALESCE(payer_participant_id::text, '')::text AS payer_participant_id,
   payer_display_name,
   memo,
+  client_mutation_id,
   include_in_settlement,
   false::boolean AS receipt_exists,
   ''::text AS receipt_content_type,
@@ -865,6 +904,7 @@ type InsertExpenseParams struct {
 	PayerParticipantID  pgtype.UUID
 	PayerDisplayName    string
 	Memo                pgtype.Text
+	ClientMutationID    pgtype.Text
 	IncludeInSettlement bool
 	CreatedBy           pgtype.UUID
 }
@@ -889,6 +929,7 @@ type InsertExpenseRow struct {
 	PayerParticipantID  string
 	PayerDisplayName    string
 	Memo                pgtype.Text
+	ClientMutationID    pgtype.Text
 	IncludeInSettlement bool
 	ReceiptExists       bool
 	ReceiptContentType  string
@@ -917,6 +958,7 @@ func (q *Queries) InsertExpense(ctx context.Context, arg InsertExpenseParams) (I
 		arg.PayerParticipantID,
 		arg.PayerDisplayName,
 		arg.Memo,
+		arg.ClientMutationID,
 		arg.IncludeInSettlement,
 		arg.CreatedBy,
 	)
@@ -941,6 +983,7 @@ func (q *Queries) InsertExpense(ctx context.Context, arg InsertExpenseParams) (I
 		&i.PayerParticipantID,
 		&i.PayerDisplayName,
 		&i.Memo,
+		&i.ClientMutationID,
 		&i.IncludeInSettlement,
 		&i.ReceiptExists,
 		&i.ReceiptContentType,
@@ -1217,6 +1260,7 @@ SELECT
     ELSE 'fallback'
   END::text AS payer_source,
   e.split_policy,
+  e.client_mutation_id,
   e.include_in_settlement,
   (er.expense_id IS NOT NULL)::boolean AS receipt_exists,
   COALESCE(er.content_type, '')::text AS receipt_content_type,
@@ -1273,6 +1317,7 @@ type ListDayExpensesByTripDayRow struct {
 	PayerDisplayName    string
 	PayerSource         string
 	SplitPolicy         string
+	ClientMutationID    pgtype.Text
 	IncludeInSettlement bool
 	ReceiptExists       bool
 	ReceiptContentType  string
@@ -1310,6 +1355,7 @@ func (q *Queries) ListDayExpensesByTripDay(ctx context.Context, arg ListDayExpen
 			&i.PayerDisplayName,
 			&i.PayerSource,
 			&i.SplitPolicy,
+			&i.ClientMutationID,
 			&i.IncludeInSettlement,
 			&i.ReceiptExists,
 			&i.ReceiptContentType,
@@ -1682,6 +1728,7 @@ SELECT
     ELSE 'fallback'
   END::text AS payer_source,
   e.split_policy,
+  e.client_mutation_id,
   e.include_in_settlement,
   (er.expense_id IS NOT NULL)::boolean AS receipt_exists,
   COALESCE(er.content_type, '')::text AS receipt_content_type,
@@ -1785,6 +1832,7 @@ type ListTripExpensesByTripRow struct {
 	PayerDisplayName    string
 	PayerSource         string
 	SplitPolicy         string
+	ClientMutationID    pgtype.Text
 	IncludeInSettlement bool
 	ReceiptExists       bool
 	ReceiptContentType  string
@@ -1822,6 +1870,7 @@ func (q *Queries) ListTripExpensesByTrip(ctx context.Context, arg ListTripExpens
 			&i.PayerDisplayName,
 			&i.PayerSource,
 			&i.SplitPolicy,
+			&i.ClientMutationID,
 			&i.IncludeInSettlement,
 			&i.ReceiptExists,
 			&i.ReceiptContentType,
@@ -1951,6 +2000,7 @@ RETURNING
   COALESCE(payer_participant_id::text, '')::text AS payer_participant_id,
   payer_display_name,
   memo,
+  client_mutation_id,
   include_in_settlement,
   EXISTS(SELECT 1 FROM expense_receipts er WHERE er.expense_id = expenses.id)::boolean AS receipt_exists,
   COALESCE((SELECT er.content_type FROM expense_receipts er WHERE er.expense_id = expenses.id), '')::text AS receipt_content_type,
@@ -2001,6 +2051,7 @@ type UpdateExpenseRow struct {
 	PayerParticipantID  string
 	PayerDisplayName    string
 	Memo                pgtype.Text
+	ClientMutationID    pgtype.Text
 	IncludeInSettlement bool
 	ReceiptExists       bool
 	ReceiptContentType  string
@@ -2052,6 +2103,7 @@ func (q *Queries) UpdateExpense(ctx context.Context, arg UpdateExpenseParams) (U
 		&i.PayerParticipantID,
 		&i.PayerDisplayName,
 		&i.Memo,
+		&i.ClientMutationID,
 		&i.IncludeInSettlement,
 		&i.ReceiptExists,
 		&i.ReceiptContentType,
@@ -2105,6 +2157,7 @@ RETURNING
   COALESCE(payer_participant_id::text, '')::text AS payer_participant_id,
   payer_display_name,
   memo,
+  client_mutation_id,
   include_in_settlement,
   EXISTS(SELECT 1 FROM expense_receipts er WHERE er.expense_id = expenses.id)::boolean AS receipt_exists,
   COALESCE((SELECT er.content_type FROM expense_receipts er WHERE er.expense_id = expenses.id), '')::text AS receipt_content_type,
@@ -2152,6 +2205,7 @@ type UpdateTripExpenseRow struct {
 	PayerParticipantID  string
 	PayerDisplayName    string
 	Memo                pgtype.Text
+	ClientMutationID    pgtype.Text
 	IncludeInSettlement bool
 	ReceiptExists       bool
 	ReceiptContentType  string
@@ -2200,6 +2254,7 @@ func (q *Queries) UpdateTripExpense(ctx context.Context, arg UpdateTripExpensePa
 		&i.PayerParticipantID,
 		&i.PayerDisplayName,
 		&i.Memo,
+		&i.ClientMutationID,
 		&i.IncludeInSettlement,
 		&i.ReceiptExists,
 		&i.ReceiptContentType,

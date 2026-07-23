@@ -400,15 +400,21 @@ type CreateManualTripPlaceResponse struct {
 // CreateQuickExpenseRequest defines model for CreateQuickExpenseRequest.
 type CreateQuickExpenseRequest struct {
 	// AmountMinor Positive amount in currency minor units.
-	AmountMinor     int64              `json:"amountMinor"`
-	Currency        *SupportedCurrency `json:"currency,omitempty"`
-	ExpenseCategory *ExpenseCategory   `json:"expenseCategory,omitempty"`
+	AmountMinor int64 `json:"amountMinor"`
+
+	// ClientMutationId Optional client-generated idempotency key for offline/retry creates. Scoped by trip and creator.
+	ClientMutationId *string            `json:"clientMutationId,omitempty"`
+	Currency         *SupportedCurrency `json:"currency,omitempty"`
+	ExpenseCategory  *ExpenseCategory   `json:"expenseCategory,omitempty"`
 
 	// ExpenseKind Top-level expense kind. Personal spending is represented as a regular expense with payer and split target set to the current user.
 	ExpenseKind *ExpenseKind `json:"expenseKind,omitempty"`
 
 	// IncludeInSettlement Whether to include the expense in final settlement calculations. Defaults to true when omitted.
 	IncludeInSettlement *bool `json:"includeInSettlement,omitempty"`
+
+	// Memo Optional memo stored with the quick expense create so offline retries do not need a follow-up update.
+	Memo *string `json:"memo"`
 
 	// ParticipantIds Required only when splitPolicy is equal. Must be omitted for manual.
 	ParticipantIds *[]string `json:"participantIds,omitempty"`
@@ -539,8 +545,11 @@ type CreateTripResponse struct {
 type DayExpenseListItem struct {
 	AmountMinor int64             `json:"amountMinor"`
 	AnchorType  ExpenseAnchorType `json:"anchorType"`
-	CreatedAt   time.Time         `json:"createdAt"`
-	Currency    SupportedCurrency `json:"currency"`
+
+	// ClientMutationId Client-generated idempotency key when this expense was created by an offline/retry-capable client.
+	ClientMutationId *string           `json:"clientMutationId"`
+	CreatedAt        time.Time         `json:"createdAt"`
+	Currency         SupportedCurrency `json:"currency"`
 
 	// DisplayTitle User-facing title resolved by the server. For current schedule-item quick expenses this is the linked place/schedule display name or fallback place name.
 	DisplayTitle    string             `json:"displayTitle"`
@@ -596,8 +605,11 @@ type ErrorResponse struct {
 type Expense struct {
 	AmountMinor int64             `json:"amountMinor"`
 	AnchorType  ExpenseAnchorType `json:"anchorType"`
-	CreatedAt   time.Time         `json:"createdAt"`
-	Currency    SupportedCurrency `json:"currency"`
+
+	// ClientMutationId Client-generated idempotency key when this expense was created by an offline/retry-capable client.
+	ClientMutationId *string           `json:"clientMutationId"`
+	CreatedAt        time.Time         `json:"createdAt"`
+	Currency         SupportedCurrency `json:"currency"`
 
 	// DisplayTitle User-facing title resolved by the server.
 	DisplayTitle    string             `json:"displayTitle"`

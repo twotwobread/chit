@@ -939,6 +939,7 @@ func (s *Store) ListDayExpensesByTripDay(ctx context.Context, tripID string, tri
 			ExpenseCategory:     expenseRow.ExpenseCategory,
 			ExpenseKind:         expenseRow.ExpenseKind,
 			Payer:               expenseParticipantDisplay(expenseRow.PayerParticipantID, expenseRow.PayerDisplayName, expenseRow.PayerSource),
+			ClientMutationID:    textPtr(expenseRow.ClientMutationID),
 			SplitPolicy:         expenseRow.SplitPolicy,
 			Splits:              []trip.DayExpenseSplitListItem{},
 			IncludeInSettlement: expenseRow.IncludeInSettlement,
@@ -991,6 +992,7 @@ func (s *Store) ListTripExpenses(ctx context.Context, tripID string, searchQuery
 			ExpenseCategory:     expenseRow.ExpenseCategory,
 			ExpenseKind:         expenseRow.ExpenseKind,
 			Payer:               expenseParticipantDisplay(expenseRow.PayerParticipantID, expenseRow.PayerDisplayName, expenseRow.PayerSource),
+			ClientMutationID:    textPtr(expenseRow.ClientMutationID),
 			SplitPolicy:         expenseRow.SplitPolicy,
 			Splits:              []trip.DayExpenseSplitListItem{},
 			IncludeInSettlement: expenseRow.IncludeInSettlement,
@@ -1582,6 +1584,16 @@ func (s *Store) CreateQuickExpense(ctx context.Context, record trip.CreateQuickE
 		return trip.CreateQuickExpenseResult{}, err
 	}
 
+	if record.ClientMutationID != nil {
+		expense, found, err := s.quickExpenseByClientMutationID(ctx, qtx, record.TripID, record.CreatedBy, *record.ClientMutationID)
+		if err != nil {
+			return trip.CreateQuickExpenseResult{}, err
+		}
+		if found {
+			return trip.CreateQuickExpenseResult{Expense: expense}, nil
+		}
+	}
+
 	anchorType := "trip_day"
 	tripDayID := mustUUID(dayRow.ID)
 	scheduleItemID := pgtype.UUID{}
@@ -1679,10 +1691,22 @@ func (s *Store) CreateQuickExpense(ctx context.Context, record trip.CreateQuickE
 		SplitPolicy:         record.SplitPolicy,
 		PayerParticipantID:  mustUUID(payerRow.ID),
 		PayerDisplayName:    trip.NormalizeParticipantDisplayName(payerRow.DisplayName),
-		Memo:                pgtype.Text{},
+		Memo:                nullableText(record.Memo),
+		ClientMutationID:    nullableText(record.ClientMutationID),
 		IncludeInSettlement: record.IncludeInSettlement,
 		CreatedBy:           mustUUID(record.CreatedBy),
 	})
+	if isUniqueConstraintViolation(err, "expenses_client_mutation_unique_idx") && record.ClientMutationID != nil {
+		_ = tx.Rollback(ctx)
+		expense, found, lookupErr := s.quickExpenseByClientMutationID(ctx, s.queries, record.TripID, record.CreatedBy, *record.ClientMutationID)
+		if lookupErr != nil {
+			return trip.CreateQuickExpenseResult{}, lookupErr
+		}
+		if found {
+			return trip.CreateQuickExpenseResult{Expense: expense}, nil
+		}
+		return trip.CreateQuickExpenseResult{}, err
+	}
 	if isForeignKeyViolation(err) {
 		return trip.CreateQuickExpenseResult{}, trip.ErrConflict
 	}
@@ -1759,6 +1783,7 @@ func (s *Store) CreateQuickExpense(ctx context.Context, record trip.CreateQuickE
 		ExpenseKind:         expenseRow.ExpenseKind,
 		Payer:               expenseParticipantDisplay(expenseRow.PayerParticipantID, expenseRow.PayerDisplayName, trip.ExpenseDisplaySourceLive),
 		Memo:                textPtr(expenseRow.Memo),
+		ClientMutationID:    textPtr(expenseRow.ClientMutationID),
 		SplitPolicy:         expenseRow.SplitPolicy,
 		Splits:              splits,
 		IncludeInSettlement: expenseRow.IncludeInSettlement,
@@ -3788,6 +3813,44 @@ func (s *Store) listExpenseSplits(ctx context.Context, queries *db.Queries, expe
 	return splits, nil
 }
 
+func (s *Store) quickExpenseByClientMutationID(ctx context.Context, queries *db.Queries, tripID string, createdBy string, clientMutationID string) (trip.Expense, bool, error) {
+	existing, err := queries.GetExpenseIDByClientMutationID(ctx, db.GetExpenseIDByClientMutationIDParams{
+		TripID:           mustUUID(tripID),
+		CreatedBy:        mustUUID(createdBy),
+		ClientMutationID: textValue(clientMutationID),
+	})
+	if err == pgx.ErrNoRows {
+		return trip.Expense{}, false, nil
+	}
+	if err != nil {
+		return trip.Expense{}, false, err
+	}
+	if existing.AnchorType == "trip" {
+		row, err := queries.GetTripExpenseByID(ctx, db.GetTripExpenseByIDParams{TripID: mustUUID(tripID), ExpenseID: mustUUID(existing.ID)})
+		if err != nil {
+			return trip.Expense{}, false, err
+		}
+		expense := expenseFromTripGetRow(row)
+		splits, err := s.listExpenseSplits(ctx, queries, existing.ID)
+		if err != nil {
+			return trip.Expense{}, false, err
+		}
+		expense.Splits = splits
+		return expense, true, nil
+	}
+	row, err := queries.GetExpenseByTripDayAndID(ctx, db.GetExpenseByTripDayAndIDParams{TripID: mustUUID(tripID), TripDayID: mustUUID(existing.TripDayID), ExpenseID: mustUUID(existing.ID)})
+	if err != nil {
+		return trip.Expense{}, false, err
+	}
+	expense := expenseFromGetRow(row)
+	splits, err := s.listExpenseSplits(ctx, queries, existing.ID)
+	if err != nil {
+		return trip.Expense{}, false, err
+	}
+	expense.Splits = splits
+	return expense, true, nil
+}
+
 func expenseFromGetRow(row db.GetExpenseByTripDayAndIDRow) trip.Expense {
 	return trip.Expense{
 		ID:                  row.ID,
@@ -3805,6 +3868,7 @@ func expenseFromGetRow(row db.GetExpenseByTripDayAndIDRow) trip.Expense {
 		ExpenseKind:         row.ExpenseKind,
 		Payer:               expenseParticipantDisplay(row.PayerParticipantID, row.PayerDisplayName, row.PayerSource),
 		Memo:                textPtr(row.Memo),
+		ClientMutationID:    textPtr(row.ClientMutationID),
 		SplitPolicy:         row.SplitPolicy,
 		Splits:              []trip.ExpenseSplit{},
 		IncludeInSettlement: row.IncludeInSettlement,
@@ -3830,6 +3894,7 @@ func expenseFromTripGetRow(row db.GetTripExpenseByIDRow) trip.Expense {
 		ExpenseKind:         row.ExpenseKind,
 		Payer:               expenseParticipantDisplay(row.PayerParticipantID, row.PayerDisplayName, row.PayerSource),
 		Memo:                textPtr(row.Memo),
+		ClientMutationID:    textPtr(row.ClientMutationID),
 		SplitPolicy:         row.SplitPolicy,
 		Splits:              []trip.ExpenseSplit{},
 		IncludeInSettlement: row.IncludeInSettlement,
@@ -3859,6 +3924,7 @@ func expenseFromUpdateRow(row db.UpdateExpenseRow) trip.Expense {
 		ExpenseKind:         row.ExpenseKind,
 		Payer:               expenseParticipantDisplay(row.PayerParticipantID, row.PayerDisplayName, trip.ExpenseDisplaySourceLive),
 		Memo:                textPtr(row.Memo),
+		ClientMutationID:    textPtr(row.ClientMutationID),
 		SplitPolicy:         row.SplitPolicy,
 		Splits:              []trip.ExpenseSplit{},
 		IncludeInSettlement: row.IncludeInSettlement,
@@ -3888,6 +3954,7 @@ func expenseFromUpdateTripRow(row db.UpdateTripExpenseRow) trip.Expense {
 		ExpenseKind:         row.ExpenseKind,
 		Payer:               expenseParticipantDisplay(row.PayerParticipantID, row.PayerDisplayName, trip.ExpenseDisplaySourceLive),
 		Memo:                textPtr(row.Memo),
+		ClientMutationID:    textPtr(row.ClientMutationID),
 		SplitPolicy:         row.SplitPolicy,
 		Splits:              []trip.ExpenseSplit{},
 		IncludeInSettlement: row.IncludeInSettlement,
@@ -3913,6 +3980,7 @@ func expenseFromInsertRow(row db.InsertExpenseRow, splits []trip.ExpenseSplit, p
 		ExpenseKind:         row.ExpenseKind,
 		Payer:               expenseParticipantDisplay(row.PayerParticipantID, row.PayerDisplayName, trip.ExpenseDisplaySourceLive),
 		Memo:                textPtr(row.Memo),
+		ClientMutationID:    textPtr(row.ClientMutationID),
 		SplitPolicy:         row.SplitPolicy,
 		Splits:              splits,
 		IncludeInSettlement: row.IncludeInSettlement,

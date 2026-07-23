@@ -5,12 +5,20 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Card, ListRow, PrimaryButton, SecondaryButton, theme } from '../../../../lib/design';
 import { BottomSheet } from '../../../../lib/trip-ui/BottomSheet';
 import { NextPlaceHeroCard } from '../../../../lib/trip-ui/NextPlaceHeroCard';
-import { QuickExpenseForm, type QuickExpenseSubmitPayload } from '../../../../lib/trip-ui/QuickExpenseForm';
+import {
+  QuickExpenseForm,
+  type QuickExpenseDraft,
+  type QuickExpenseSubmitPayload,
+} from '../../../../lib/trip-ui/QuickExpenseForm';
 import { TodaySpendCard } from '../../../../lib/trip-ui/TodaySpendCard';
 import { TripScreen, TripStateCard } from '../../../../lib/trip-ui/TripScreenScaffold';
 import { openTodayFlightBoardingPass, type TodayFlightCardViewModel } from '../../../../lib/flights/today';
 import { openMyFlightBoardingPass } from '../../../../lib/flights/flight-api';
-import { type QuickExpenseOverlayState, useTripTodayController } from '../../../../lib/trip-ui/useTripTodayController';
+import {
+  type QuickExpenseOverlayState,
+  type QuickExpenseRecoveryItem,
+  useTripTodayController,
+} from '../../../../lib/trip-ui/useTripTodayController';
 import { buildQuickExpenseViewModel, type QuickExpenseRouteTarget } from '../../../../lib/trips/quick-expense';
 import {
   type TodayAction,
@@ -36,6 +44,7 @@ export default function TripTodayTabScreen() {
   const {
     actionMessage,
     closeQuickExpenseOverlay,
+    editFailedQuickExpense,
     goHome,
     goToLogin,
     handleTravelMode,
@@ -43,10 +52,13 @@ export default function TripTodayTabScreen() {
     openQuickExpenseOverlay,
     pendingItemId,
     quickExpenseState,
+    retryQuickExpenseSync,
     routePreviewState,
     runAction,
+    saveQuickExpenseOverlayDraft,
     state,
     submitQuickExpenseOverlay,
+    deleteFailedQuickExpense,
   } = useTripTodayController();
 
   const flightCard = 'flightCard' in state ? state.flightCard : null;
@@ -77,11 +89,16 @@ export default function TripTodayTabScreen() {
       {state.status === 'ready' ? (
         <TodayReadyContent
           actionMessage={actionMessage}
+          failedQuickExpenses={state.quickExpenseFailedItems}
           onAction={(action) => void runAction(action)}
+          onDeleteFailedQuickExpense={(itemId) => void deleteFailedQuickExpense(itemId)}
+          onEditFailedQuickExpense={(itemId) => void editFailedQuickExpense(itemId)}
           onTravelMode={handleTravelMode}
           pendingItemId={pendingItemId}
+          onRetryQuickExpenseSync={(itemId) => void retryQuickExpenseSync(itemId)}
           routePreviewState={routePreviewState}
           spendSummary={state.spendSummary}
+          quickExpenseSyncSummary={state.quickExpenseSyncSummary}
           viewModel={state.viewModel}
         />
       ) : null}
@@ -89,6 +106,7 @@ export default function TripTodayTabScreen() {
       <QuickExpenseOverlaySheet
         onClose={closeQuickExpenseOverlay}
         onRetry={(target) => void openQuickExpenseOverlay(target)}
+        onDraftChange={saveQuickExpenseOverlayDraft}
         onSubmit={(payload) => void submitQuickExpenseOverlay(payload)}
         state={quickExpenseState}
       />
@@ -163,16 +181,26 @@ function TodayReadyContent({
   onAction,
   onTravelMode,
   pendingItemId,
+  failedQuickExpenses,
+  onDeleteFailedQuickExpense,
+  onEditFailedQuickExpense,
+  onRetryQuickExpenseSync,
   routePreviewState,
   spendSummary,
+  quickExpenseSyncSummary,
   viewModel,
 }: {
   viewModel: TodayExecutionViewModel;
   spendSummary: TodaySpendSummaryViewModel;
+  quickExpenseSyncSummary: { pendingCount: number; failedCount: number };
+  failedQuickExpenses: QuickExpenseRecoveryItem[];
   actionMessage: string | null;
   pendingItemId: string | null;
   routePreviewState: TodayRoutePreviewSummaryState;
   onAction: (action: TodayAction) => void;
+  onDeleteFailedQuickExpense: (itemId: string) => void;
+  onEditFailedQuickExpense: (itemId: string) => void;
+  onRetryQuickExpenseSync: (itemId?: string) => void;
   onTravelMode: (label: string) => void;
 }) {
   return (
@@ -287,6 +315,7 @@ function TodayReadyContent({
           myRegularSpendLabel={spendSummary.mySpend.regular.amountLabel}
           mySpendLabel={spendSummary.mySpend.total.amountLabel}
           needsReviewCount={spendSummary.needsReviewCount}
+          failedSyncCount={quickExpenseSyncSummary.failedCount}
           publicFundTotalLabel={spendSummary.composition.publicFund.amountLabel}
           regularTotalLabel={spendSummary.composition.regular.amountLabel}
           settlementHelper={spendSummary.settlementSnapshot.helper}
@@ -294,8 +323,19 @@ function TodayReadyContent({
           onPressAdd={() =>
             onAction({ kind: 'route', label: spendSummary.actionLabel, route: spendSummary.actionRoute })
           }
+          onPressRetryFailed={onRetryQuickExpenseSync}
+          pendingSyncCount={quickExpenseSyncSummary.pendingCount}
           totalAmount={spendSummary.primaryTotal.amountMinor}
           totalAmountLabel={spendSummary.primaryTotal.amountLabel}
+        />
+      ) : null}
+
+      {failedQuickExpenses.length > 0 ? (
+        <FailedQuickExpensesCard
+          items={failedQuickExpenses}
+          onDelete={onDeleteFailedQuickExpense}
+          onEdit={onEditFailedQuickExpense}
+          onRetry={onRetryQuickExpenseSync}
         />
       ) : null}
 
@@ -308,14 +348,52 @@ function TodayReadyContent({
   );
 }
 
+function FailedQuickExpensesCard({
+  items,
+  onDelete,
+  onEdit,
+  onRetry,
+}: {
+  items: QuickExpenseRecoveryItem[];
+  onDelete: (itemId: string) => void;
+  onEdit: (itemId: string) => void;
+  onRetry: (itemId: string) => void;
+}) {
+  return (
+    <Card>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.errorTitle}>저장 실패 지출 확인이 필요해요.</Text>
+        <Text style={styles.cardHelper}>
+          기기에 보관되어 있어요. 다시 저장하거나, 수정해서 저장하거나, 삭제할 수 있어요.
+        </Text>
+      </View>
+      {items.map((item, index) => (
+        <View key={item.id} style={[styles.failedExpenseItem, index === 0 ? styles.failedExpenseItemFirst : null]}>
+          <View style={styles.failedExpenseCopy}>
+            <Text style={styles.cardTitle}>{item.amountLabel}</Text>
+            {item.lastError ? <Text style={styles.cardHelper}>{item.lastError}</Text> : null}
+          </View>
+          <View style={styles.failedExpenseActions}>
+            <SecondaryButton label="다시 시도" onPress={() => onRetry(item.id)} style={styles.failedExpenseButton} />
+            <SecondaryButton label="수정" onPress={() => onEdit(item.id)} style={styles.failedExpenseButton} />
+            <SecondaryButton label="삭제" onPress={() => onDelete(item.id)} style={styles.failedExpenseButton} />
+          </View>
+        </View>
+      ))}
+    </Card>
+  );
+}
+
 function QuickExpenseOverlaySheet({
   onClose,
+  onDraftChange,
   onRetry,
   onSubmit,
   state,
 }: {
   state: QuickExpenseOverlayState;
   onClose: () => void;
+  onDraftChange: (draft: QuickExpenseDraft) => void;
   onRetry: (target: QuickExpenseRouteTarget) => void;
   onSubmit: (payload: QuickExpenseSubmitPayload) => void;
 }) {
@@ -360,19 +438,14 @@ function QuickExpenseOverlaySheet({
           <QuickExpenseForm
             currency={state.currency}
             errorMessage={state.errorMessage}
-            initialDraft={{
-              expenseKind: state.expenseKind,
-              includeInSettlement: state.includeInSettlement,
-              itemId: state.selectedItemId,
-              payerParticipantId: state.payerParticipantId,
-              splitParticipantIds: state.selectedSplitParticipantIds,
-            }}
+            initialDraft={quickExpenseFormInitialDraft(state)}
             itemOptions={viewModel.itemOptions.map((item) => ({
               id: item.itemId,
               label: `${item.orderLabel}. ${item.placeName}`,
               helper: `${item.placeTypeLabel} · ${item.address}`,
             }))}
             onCancel={onClose}
+            onChange={onDraftChange}
             onSave={onSubmit}
             participantOptions={viewModel.payerOptions.map((participant) => ({
               id: participant.participantId,
@@ -385,6 +458,21 @@ function QuickExpenseOverlaySheet({
       </View>
     </BottomSheet>
   );
+}
+
+function quickExpenseFormInitialDraft(
+  state: Extract<QuickExpenseOverlayState, { status: 'ready' | 'saving' }>,
+): Partial<QuickExpenseDraft> {
+  return {
+    amountInput: state.draft?.amountInput,
+    itemId: state.selectedItemId,
+    payerParticipantId: state.payerParticipantId,
+    splitMode: state.draft?.splitMode,
+    splitParticipantIds: state.selectedSplitParticipantIds,
+    memoInput: state.draft?.memoInput,
+    expenseKind: state.draft?.expenseKind ?? state.expenseKind,
+    includeInSettlement: state.draft?.includeInSettlement ?? state.includeInSettlement,
+  };
 }
 
 function SkippedPlacesSection({
@@ -488,6 +576,30 @@ const styles = StyleSheet.create({
     fontSize: theme.font.size.body,
     fontWeight: theme.font.weight.bold,
     textAlign: 'center',
+  },
+  failedExpenseActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.space[2],
+  },
+  failedExpenseButton: {
+    minHeight: theme.layout.tapMin,
+    paddingHorizontal: theme.space[3],
+  },
+  failedExpenseCopy: {
+    flex: 1,
+    gap: theme.space[1],
+    minWidth: 0,
+  },
+  failedExpenseItem: {
+    borderTopColor: theme.color.borderSubtle,
+    borderTopWidth: 1,
+    gap: theme.space[3],
+    paddingTop: theme.space[3],
+  },
+  failedExpenseItemFirst: {
+    borderTopWidth: 0,
+    paddingTop: 0,
   },
   eyebrow: {
     color: theme.color.primary,

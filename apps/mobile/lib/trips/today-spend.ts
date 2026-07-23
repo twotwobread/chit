@@ -36,6 +36,13 @@ export type TodayExcludedPublicFundSummary = {
   label: string;
 };
 
+export type TodaySpendPendingExpenseInput = {
+  amountMinor: number;
+  currency: SupportedCurrency;
+  expenseKind?: ExpenseKind;
+  includeInSettlement?: boolean;
+};
+
 export type TodaySpendSummaryViewModel = {
   primaryTotal: TodaySpendCurrencyTotal;
   additionalTotals: TodaySpendCurrencyTotal[];
@@ -54,12 +61,14 @@ export function buildTodaySpendSummaryViewModel({
   defaultCurrency,
   expenses,
   participants = [],
+  pendingExpenses = [],
 }: {
   actionRoute: Href;
   currentUserParticipantId?: string | null;
   defaultCurrency: SupportedCurrency;
   expenses: DayExpenseListItem[];
   participants?: TripParticipantListItem[];
+  pendingExpenses?: TodaySpendPendingExpenseInput[];
 }): TodaySpendSummaryViewModel {
   const totalsByCurrency = new Map<SupportedCurrency, number>();
   const regularCompositionByCurrency = new Map<SupportedCurrency, number>();
@@ -97,6 +106,22 @@ export function buildTodaySpendSummaryViewModel({
       const current = excludedPublicFundByCurrency.get(expense.currency) ?? { amountMinor: 0, count: 0 };
       excludedPublicFundByCurrency.set(expense.currency, {
         amountMinor: current.amountMinor + expense.amountMinor,
+        count: current.count + 1,
+      });
+    }
+  }
+  for (const pendingExpense of pendingExpenses) {
+    const kind = normalizeExpenseKind(pendingExpense.expenseKind);
+    addToCurrencyMap(totalsByCurrency, pendingExpense.currency, pendingExpense.amountMinor);
+    addToCurrencyMap(
+      kind === 'public_fund' ? publicFundCompositionByCurrency : regularCompositionByCurrency,
+      pendingExpense.currency,
+      pendingExpense.amountMinor,
+    );
+    if (kind === 'public_fund' && pendingExpense.includeInSettlement === false) {
+      const current = excludedPublicFundByCurrency.get(pendingExpense.currency) ?? { amountMinor: 0, count: 0 };
+      excludedPublicFundByCurrency.set(pendingExpense.currency, {
+        amountMinor: current.amountMinor + pendingExpense.amountMinor,
         count: current.count + 1,
       });
     }

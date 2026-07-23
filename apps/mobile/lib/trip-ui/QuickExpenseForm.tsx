@@ -110,6 +110,9 @@ export function QuickExpenseForm({
     : (participantOptions[0]?.id ?? null);
   const defaultSplitIds = initialDraft?.splitParticipantIds ?? participantOptions.map((participant) => participant.id);
   const directSplitUnavailableMessage = quickExpenseDirectSplitUnavailableMessage(participantOptions.length);
+  const hasRestoredDraftContent = Boolean(
+    initialDraft?.amountInput?.trim() || initialDraft?.memoInput?.trim() || initialDraft?.includeInSettlement === false,
+  );
   const defaultSplitMode = resolveQuickExpenseSheetInitialSplitMode({
     requestedSplitMode: initialDraft?.splitMode,
     participantCount: participantOptions.length,
@@ -129,7 +132,7 @@ export function QuickExpenseForm({
   const [settlementTouched, setSettlementTouched] = useState(false);
   const [itemSelectorExpanded, setItemSelectorExpanded] = useState(false);
   const [activeSheet, setActiveSheet] = useState<'kind' | 'split' | 'settlement' | null>(null);
-  const [entryMode, setEntryMode] = useState<'choice' | 'manual'>('choice');
+  const [entryMode, setEntryMode] = useState<'choice' | 'manual'>(hasRestoredDraftContent ? 'manual' : 'choice');
   const [receiptDraft, setReceiptDraft] = useState<ExpenseReceiptDraft | null>(null);
   const [receiptBusy, setReceiptBusy] = useState(false);
   const [receiptMessage, setReceiptMessage] = useState<string | null>(null);

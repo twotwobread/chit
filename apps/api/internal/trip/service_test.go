@@ -1993,6 +1993,8 @@ func TestServiceCreateQuickExpense(t *testing.T) {
 		PayerParticipantID: payerID,
 		SplitPolicy:        ExpenseSplitPolicyEqual,
 		ParticipantIDs:     []string{strings.ToUpper(splitParticipantID)},
+		ClientMutationID:   stringPtr(" today-expense-001 "),
+		Memo:               stringPtr("  현장 결제  "),
 	})
 	if err != nil {
 		t.Fatalf("CreateQuickExpense returned error: %v", err)
@@ -2006,6 +2008,12 @@ func TestServiceCreateQuickExpense(t *testing.T) {
 	}
 	if len(repo.quickExpenseRecord.ParticipantIDs) != 1 || repo.quickExpenseRecord.ParticipantIDs[0] != splitParticipantID {
 		t.Fatalf("expected payer-excluded one-person split target, got %#v", repo.quickExpenseRecord.ParticipantIDs)
+	}
+	if repo.quickExpenseRecord.ClientMutationID == nil || *repo.quickExpenseRecord.ClientMutationID != "today-expense-001" {
+		t.Fatalf("expected trimmed client mutation id, got %#v", repo.quickExpenseRecord.ClientMutationID)
+	}
+	if repo.quickExpenseRecord.Memo == nil || *repo.quickExpenseRecord.Memo != "현장 결제" {
+		t.Fatalf("expected trimmed memo, got %#v", repo.quickExpenseRecord.Memo)
 	}
 	if result.Expense.ID == "" || result.Expense.AmountMinor != 1001 || result.Expense.Currency != "JPY" || result.Expense.ScheduleItemID == nil || *result.Expense.ScheduleItemID != itemID || !result.Expense.IncludeInSettlement {
 		t.Fatalf("unexpected quick expense result: %#v", result.Expense)

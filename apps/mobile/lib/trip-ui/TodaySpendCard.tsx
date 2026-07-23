@@ -17,8 +17,11 @@ export type TodaySpendCardProps = {
   settlementHelper?: string;
   excludedPublicFundLabel?: string | null;
   needsReviewCount?: number;
+  pendingSyncCount?: number;
+  failedSyncCount?: number;
   additionalAmountLabels?: string[];
   onPressAdd: () => void;
+  onPressRetryFailed?: () => void;
   addLabel?: string;
 };
 
@@ -32,7 +35,10 @@ export function TodaySpendCard({
   mySpendLabel,
   needsReviewCount = 0,
   onPressAdd,
+  onPressRetryFailed,
   paidByMeAmount,
+  pendingSyncCount = 0,
+  failedSyncCount = 0,
   publicFundTotalLabel,
   regularTotalLabel,
   settlementHelper,
@@ -47,6 +53,18 @@ export function TodaySpendCard({
   const hasBreakdownDetails = Boolean(
     myRegularSpendLabel || myPublicFundSpendLabel || regularTotalLabel || publicFundTotalLabel,
   );
+  const syncMeta =
+    failedSyncCount > 0
+      ? `저장 실패 ${failedSyncCount}`
+      : pendingSyncCount > 0
+        ? `저장 대기 ${pendingSyncCount}`
+        : null;
+  const syncHelper =
+    failedSyncCount > 0
+      ? '서버 저장에 실패한 지출이 있어요. 연결/로그인 상태를 확인한 뒤 다시 시도해주세요.'
+      : pendingSyncCount > 0
+        ? '기기에 보관된 지출을 연결되면 자동으로 저장해요.'
+        : null;
 
   return (
     <HeroCard
@@ -55,7 +73,13 @@ export function TodaySpendCard({
         <HeroHeader
           body="오늘 쓴 돈만 빠르게 확인해요."
           eyebrow="오늘 지출"
-          meta={needsReviewCount > 0 ? <Badge label={`확인 필요 ${needsReviewCount}`} tone="amber" /> : null}
+          meta={
+            syncMeta ? (
+              <Badge label={syncMeta} tone={failedSyncCount > 0 ? 'danger' : 'amber'} />
+            ) : needsReviewCount > 0 ? (
+              <Badge label={`확인 필요 ${needsReviewCount}`} tone="amber" />
+            ) : null
+          }
           title="금액만 확인하면 끝."
         />
       }
@@ -81,6 +105,9 @@ export function TodaySpendCard({
         </View>
       ) : null}
       {excludedPublicFundLabel ? <Text style={styles.excludedPublicFundPill}>{excludedPublicFundLabel}</Text> : null}
+      {syncHelper ? (
+        <Text style={failedSyncCount > 0 ? styles.syncErrorText : styles.syncPendingText}>{syncHelper}</Text>
+      ) : null}
       {hasBreakdownDetails ? (
         <InlineAction
           accessibilityLabel={showBreakdownDetails ? '오늘 지출 구성 숨기기' : '오늘 지출 구성 보기'}
@@ -122,7 +149,12 @@ export function TodaySpendCard({
           <AmountText currency={currency} size="sm" value={paidByMeAmount} style={styles.paidByMeAmount} />
         </View>
       )}
-      <HeroActions primary={{ label: addLabel, onPress: onPressAdd }} />
+      <HeroActions
+        primary={{ label: addLabel, onPress: onPressAdd }}
+        secondary={
+          failedSyncCount > 0 && onPressRetryFailed ? { label: '다시 저장', onPress: onPressRetryFailed } : undefined
+        }
+      />
     </HeroCard>
   );
 }
@@ -246,5 +278,18 @@ const styles = StyleSheet.create({
   },
   summaryGridStacked: {
     flexDirection: 'column',
+  },
+  syncErrorText: {
+    color: theme.color.danger,
+    fontFamily: theme.font.family.semibold,
+    fontSize: theme.font.size.caption,
+    fontWeight: theme.font.weight.semibold,
+    lineHeight: theme.font.size.caption * theme.font.leading.normal,
+  },
+  syncPendingText: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.caption,
+    lineHeight: theme.font.size.caption * theme.font.leading.normal,
   },
 });
