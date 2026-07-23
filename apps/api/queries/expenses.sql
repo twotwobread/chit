@@ -68,6 +68,16 @@ FROM trip_participants
 WHERE trip_id = sqlc.arg(trip_id)::uuid
 ORDER BY joined_at ASC, id ASC;
 
+-- name: GetExpenseIDByClientMutationID :one
+SELECT
+  id::text,
+  COALESCE(trip_day_id::text, '')::text AS trip_day_id,
+  anchor_type
+FROM expenses
+WHERE trip_id = sqlc.arg(trip_id)::uuid
+  AND created_by = sqlc.arg(created_by)::uuid
+  AND client_mutation_id = sqlc.arg(client_mutation_id);
+
 -- name: InsertExpense :one
 INSERT INTO expenses (
   trip_id,
@@ -88,6 +98,7 @@ INSERT INTO expenses (
   payer_participant_id,
   payer_display_name,
   memo,
+  client_mutation_id,
   include_in_settlement,
   created_by
 ) VALUES (
@@ -109,6 +120,7 @@ INSERT INTO expenses (
   sqlc.arg(payer_participant_id)::uuid,
   sqlc.arg(payer_display_name),
   sqlc.narg(memo),
+  sqlc.narg(client_mutation_id),
   sqlc.arg(include_in_settlement),
   sqlc.arg(created_by)::uuid
 )
@@ -132,6 +144,7 @@ RETURNING
   COALESCE(payer_participant_id::text, '')::text AS payer_participant_id,
   payer_display_name,
   memo,
+  client_mutation_id,
   include_in_settlement,
   false::boolean AS receipt_exists,
   ''::text AS receipt_content_type,
@@ -167,6 +180,7 @@ SELECT
     ELSE 'fallback'
   END::text AS payer_source,
   e.split_policy,
+  e.client_mutation_id,
   e.include_in_settlement,
   (er.expense_id IS NOT NULL)::boolean AS receipt_exists,
   COALESCE(er.content_type, '')::text AS receipt_content_type,
@@ -225,6 +239,7 @@ SELECT
     ELSE 'fallback'
   END::text AS payer_source,
   e.split_policy,
+  e.client_mutation_id,
   e.include_in_settlement,
   (er.expense_id IS NOT NULL)::boolean AS receipt_exists,
   COALESCE(er.content_type, '')::text AS receipt_content_type,
@@ -426,6 +441,7 @@ SELECT
     ELSE 'fallback'
   END::text AS payer_source,
   e.memo,
+  e.client_mutation_id,
   e.split_policy,
   e.include_in_settlement,
   (er.expense_id IS NOT NULL)::boolean AS receipt_exists,
@@ -487,6 +503,7 @@ SELECT
     ELSE 'fallback'
   END::text AS payer_source,
   e.memo,
+  e.client_mutation_id,
   e.split_policy,
   e.include_in_settlement,
   (er.expense_id IS NOT NULL)::boolean AS receipt_exists,
@@ -573,6 +590,7 @@ RETURNING
   COALESCE(payer_participant_id::text, '')::text AS payer_participant_id,
   payer_display_name,
   memo,
+  client_mutation_id,
   include_in_settlement,
   EXISTS(SELECT 1 FROM expense_receipts er WHERE er.expense_id = expenses.id)::boolean AS receipt_exists,
   COALESCE((SELECT er.content_type FROM expense_receipts er WHERE er.expense_id = expenses.id), '')::text AS receipt_content_type,
@@ -623,6 +641,7 @@ RETURNING
   COALESCE(payer_participant_id::text, '')::text AS payer_participant_id,
   payer_display_name,
   memo,
+  client_mutation_id,
   include_in_settlement,
   EXISTS(SELECT 1 FROM expense_receipts er WHERE er.expense_id = expenses.id)::boolean AS receipt_exists,
   COALESCE((SELECT er.content_type FROM expense_receipts er WHERE er.expense_id = expenses.id), '')::text AS receipt_content_type,

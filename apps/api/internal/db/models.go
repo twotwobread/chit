@@ -64,6 +64,7 @@ type Expense struct {
 	PayerParticipantID  pgtype.UUID
 	PayerDisplayName    string
 	Memo                pgtype.Text
+	ClientMutationID    pgtype.Text
 	IncludeInSettlement bool
 	CreatedBy           pgtype.UUID
 	CreatedAt           pgtype.Timestamptz

@@ -50,6 +50,14 @@ export type CreateQuickExpenseRequest = {
      */
     includeInSettlement?: boolean;
     /**
+     * Optional client-generated idempotency key for offline/retry creates. Scoped by trip and creator.
+     */
+    clientMutationId?: string;
+    /**
+     * Optional memo stored with the quick expense create so offline retries do not need a follow-up update.
+     */
+    memo?: string | null;
+    /**
      * Optional reviewed receipt draft to promote as the saved expense receipt. Must belong to the same trip and authenticated user.
      */
     receiptDraftId?: string | null;

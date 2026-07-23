@@ -429,6 +429,7 @@ CREATE TABLE expenses (
   payer_participant_id uuid REFERENCES trip_participants(id) ON DELETE SET NULL,
   payer_display_name text NOT NULL,
   memo text,
+  client_mutation_id text,
   include_in_settlement boolean NOT NULL DEFAULT true,
   created_by uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   created_at timestamptz NOT NULL DEFAULT now(),
@@ -452,7 +453,11 @@ CREATE TABLE expenses (
   CONSTRAINT expenses_expense_kind_check CHECK (expense_kind IN ('regular', 'public_fund')),
   CONSTRAINT expenses_split_policy_check CHECK (split_policy IN ('equal', 'manual')),
   CONSTRAINT expenses_payer_display_name_length_check CHECK (char_length(payer_display_name) BETWEEN 1 AND 80),
-  CONSTRAINT expenses_memo_length_check CHECK (memo IS NULL OR char_length(memo) <= 240)
+  CONSTRAINT expenses_memo_length_check CHECK (memo IS NULL OR char_length(memo) <= 240),
+  CONSTRAINT expenses_client_mutation_id_length_check CHECK (
+    client_mutation_id IS NULL
+    OR char_length(btrim(client_mutation_id)) BETWEEN 1 AND 80
+  )
 );
 
 CREATE INDEX expenses_trip_anchor_date_created_idx ON expenses (trip_id, anchor_type, expense_date DESC, created_at DESC);
@@ -460,6 +465,7 @@ CREATE INDEX expenses_trip_day_created_idx ON expenses (trip_id, trip_day_id, cr
 CREATE INDEX expenses_trip_schedule_item_idx ON expenses (trip_id, schedule_item_id) WHERE schedule_item_id IS NOT NULL;
 CREATE INDEX expenses_trip_place_idx ON expenses (trip_id, trip_place_id) WHERE trip_place_id IS NOT NULL;
 CREATE INDEX expenses_payer_participant_idx ON expenses (payer_participant_id) WHERE payer_participant_id IS NOT NULL;
+CREATE UNIQUE INDEX expenses_client_mutation_unique_idx ON expenses (trip_id, created_by, client_mutation_id) WHERE client_mutation_id IS NOT NULL;
 
 CREATE TABLE expense_splits (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

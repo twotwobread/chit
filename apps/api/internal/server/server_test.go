@@ -3021,7 +3021,7 @@ func TestCreateQuickExpenseHandler(t *testing.T) {
 	backend.participants[tripID] = append(backend.participants[tripID], member)
 	payerID := backend.participants[tripID][0].ID
 
-	requestBody := []byte(fmt.Sprintf(`{"scheduleItemId":%q,"amountMinor":1001,"currency":"USD","expenseCategory":"shopping","expenseKind":"public_fund","payerParticipantId":%q,"splitPolicy":"equal","participantIds":[%q]}`, item.ID, payerID, member.ID))
+	requestBody := []byte(fmt.Sprintf(`{"scheduleItemId":%q,"amountMinor":1001,"currency":"USD","expenseCategory":"shopping","expenseKind":"public_fund","payerParticipantId":%q,"splitPolicy":"equal","participantIds":[%q],"includeInSettlement":false,"clientMutationId":"today-expense-001","memo":"현장 결제"}`, item.ID, payerID, member.ID))
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/days/2026-07-11/expenses/quick", bytes.NewReader(requestBody))
 	request.Header.Set("Content-Type", "application/json")
@@ -3035,16 +3035,18 @@ func TestCreateQuickExpenseHandler(t *testing.T) {
 
 	var body struct {
 		Expense struct {
-			TripID              string `json:"tripId"`
-			TripDayID           string `json:"tripDayId"`
-			ScheduleItemID      string `json:"scheduleItemId"`
-			DisplayTitle        string `json:"displayTitle"`
-			AmountMinor         int64  `json:"amountMinor"`
-			Currency            string `json:"currency"`
-			ExpenseCategory     string `json:"expenseCategory"`
-			ExpenseKind         string `json:"expenseKind"`
-			SplitPolicy         string `json:"splitPolicy"`
-			IncludeInSettlement *bool  `json:"includeInSettlement"`
+			TripID              string  `json:"tripId"`
+			TripDayID           string  `json:"tripDayId"`
+			ScheduleItemID      string  `json:"scheduleItemId"`
+			DisplayTitle        string  `json:"displayTitle"`
+			AmountMinor         int64   `json:"amountMinor"`
+			Currency            string  `json:"currency"`
+			ExpenseCategory     string  `json:"expenseCategory"`
+			ExpenseKind         string  `json:"expenseKind"`
+			SplitPolicy         string  `json:"splitPolicy"`
+			IncludeInSettlement *bool   `json:"includeInSettlement"`
+			ClientMutationID    *string `json:"clientMutationId"`
+			Memo                *string `json:"memo"`
 			Payer               struct {
 				ParticipantID string `json:"participantId"`
 				DisplayName   string `json:"displayName"`
@@ -3073,7 +3075,7 @@ func TestCreateQuickExpenseHandler(t *testing.T) {
 	if body.Expense.TripID != tripID || body.Expense.TripDayID != "2026-07-11" || body.Expense.ScheduleItemID != item.ID || body.Expense.Place.TripPlaceID != item.PlaceID {
 		t.Fatalf("unexpected linked expense ids: %#v", body.Expense)
 	}
-	if body.Expense.AmountMinor != 1001 || body.Expense.Currency != "USD" || body.Expense.ExpenseCategory != "shopping" || body.Expense.ExpenseKind != "public_fund" || body.Expense.SplitPolicy != "equal" || body.Expense.IncludeInSettlement == nil || *body.Expense.IncludeInSettlement || body.Expense.Payer.ParticipantID != payerID || body.Expense.Payer.DisplayName != "민수" || body.Expense.Payer.Source != "live" {
+	if body.Expense.AmountMinor != 1001 || body.Expense.Currency != "USD" || body.Expense.ExpenseCategory != "shopping" || body.Expense.ExpenseKind != "public_fund" || body.Expense.SplitPolicy != "equal" || body.Expense.IncludeInSettlement == nil || *body.Expense.IncludeInSettlement || body.Expense.ClientMutationID == nil || *body.Expense.ClientMutationID != "today-expense-001" || body.Expense.Memo == nil || *body.Expense.Memo != "현장 결제" || body.Expense.Payer.ParticipantID != payerID || body.Expense.Payer.DisplayName != "민수" || body.Expense.Payer.Source != "live" {
 		t.Fatalf("unexpected money/payer display: %#v", body.Expense)
 	}
 	if body.Expense.DisplayTitle != "도톤보리" || body.Expense.Place.Name != "도톤보리" || body.Expense.Place.Address != "Dotonbori" || body.Expense.Place.PlaceType != "food" || body.Expense.Place.Source != "live" {
@@ -6607,6 +6609,7 @@ func (b *fakeAuthBackend) CreateQuickExpense(_ context.Context, record tripdomai
 		ExpenseCategory:     expenseCategory,
 		ExpenseKind:         record.ExpenseKind,
 		Payer:               payerDisplay,
+		ClientMutationID:    record.ClientMutationID,
 		SplitPolicy:         record.SplitPolicy,
 		Splits:              daySplits,
 		IncludeInSettlement: record.IncludeInSettlement,
@@ -6627,6 +6630,8 @@ func (b *fakeAuthBackend) CreateQuickExpense(_ context.Context, record tripdomai
 		ExpenseCategory:     expenseCategory,
 		ExpenseKind:         record.ExpenseKind,
 		Payer:               payerDisplay,
+		Memo:                record.Memo,
+		ClientMutationID:    record.ClientMutationID,
 		SplitPolicy:         record.SplitPolicy,
 		Splits:              splits,
 		IncludeInSettlement: record.IncludeInSettlement,

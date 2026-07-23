@@ -27,6 +27,10 @@ export type DayExpenseListItem = {
     expenseCategory: ExpenseCategory;
     expenseKind: ExpenseKind;
     payer: ExpenseParticipantDisplay;
+    /**
+     * Client-generated idempotency key when this expense was created by an offline/retry-capable client.
+     */
+    clientMutationId: string | null;
     splitPolicy: ExpenseSplitPolicy;
     splits: Array<DayExpenseSplitListItem>;
     /**

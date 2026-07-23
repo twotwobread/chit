@@ -36,6 +36,10 @@ export type Expense = {
     expenseKind: ExpenseKind;
     payer: ExpenseParticipantDisplay;
     memo: string | null;
+    /**
+     * Client-generated idempotency key when this expense was created by an offline/retry-capable client.
+     */
+    clientMutationId: string | null;
     splitPolicy: ExpenseSplitPolicy;
     splits: Array<ExpenseSplit>;
     /**

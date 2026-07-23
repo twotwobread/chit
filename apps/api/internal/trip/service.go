@@ -895,6 +895,14 @@ func (s *Service) CreateQuickExpense(ctx context.Context, userID string, tripID 
 	if err != nil {
 		return CreateQuickExpenseResult{}, err
 	}
+	memo, err := normalizeExpenseMemo(input.Memo)
+	if err != nil {
+		return CreateQuickExpenseResult{}, err
+	}
+	clientMutationID, err := normalizeOptionalClientMutationID(input.ClientMutationID)
+	if err != nil {
+		return CreateQuickExpenseResult{}, err
+	}
 	receiptDraftID, err := normalizeOptionalReceiptDraftID(input.ReceiptDraftID)
 	if err != nil {
 		return CreateQuickExpenseResult{}, err
@@ -932,6 +940,8 @@ func (s *Service) CreateQuickExpense(ctx context.Context, userID string, tripID 
 		ParticipantIDs:      participantIDs,
 		ManualSplits:        manualSplits,
 		IncludeInSettlement: includeInSettlementDefaultForKind(input.IncludeInSettlement, expenseKind),
+		ClientMutationID:    clientMutationID,
+		Memo:                memo,
 		ReceiptDraftID:      receiptDraftID,
 		CreatedBy:           userID,
 	})
@@ -1118,6 +1128,20 @@ func normalizeExpenseMemo(value *string) (*string, error) {
 		return nil, ErrValidation
 	}
 	return &memo, nil
+}
+
+func normalizeOptionalClientMutationID(value *string) (*string, error) {
+	if value == nil {
+		return nil, nil
+	}
+	clientMutationID := strings.TrimSpace(*value)
+	if clientMutationID == "" {
+		return nil, nil
+	}
+	if len([]rune(clientMutationID)) > 80 {
+		return nil, ErrValidation
+	}
+	return &clientMutationID, nil
 }
 
 func normalizeExpenseSplitInput(policy string, participantIDs []string, manualSplits []ManualExpenseSplitInput, amountMinor int64) (string, []string, []ManualExpenseSplitInput, error) {

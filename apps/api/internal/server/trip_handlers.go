@@ -620,6 +620,8 @@ func (s apiServer) CreateQuickExpense(w http.ResponseWriter, r *http.Request, tr
 		ParticipantIDs:      optionalStringSlice(body.ParticipantIds),
 		ManualSplits:        manualExpenseSplitsFromOpenAPI(body.Splits),
 		IncludeInSettlement: body.IncludeInSettlement,
+		ClientMutationID:    body.ClientMutationId,
+		Memo:                body.Memo,
 		ReceiptDraftID:      body.ReceiptDraftId,
 	})
 	if err != nil {

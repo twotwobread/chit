@@ -103,6 +103,8 @@ type CreateQuickExpenseInput struct {
 	ParticipantIDs      []string
 	ManualSplits        []ManualExpenseSplitInput
 	IncludeInSettlement *bool
+	ClientMutationID    *string
+	Memo                *string
 	ReceiptDraftID      *string
 }
 
@@ -310,6 +312,8 @@ type CreateQuickExpenseRecord struct {
 	ParticipantIDs      []string
 	ManualSplits        []ManualExpenseSplitInput
 	IncludeInSettlement bool
+	ClientMutationID    *string
+	Memo                *string
 	ReceiptDraftID      *string
 	CreatedBy           string
 }
@@ -800,6 +804,7 @@ type Expense struct {
 	ExpenseKind         string
 	Payer               ExpenseParticipantDisplay
 	Memo                *string
+	ClientMutationID    *string
 	SplitPolicy         string
 	Splits              []ExpenseSplit
 	IncludeInSettlement bool
@@ -842,6 +847,7 @@ type DayExpenseListItem struct {
 	ExpenseCategory     string
 	ExpenseKind         string
 	Payer               ExpenseParticipantDisplay
+	ClientMutationID    *string
 	SplitPolicy         string
 	Splits              []DayExpenseSplitListItem
 	IncludeInSettlement bool

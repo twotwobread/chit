@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"sync"
 	"testing"
 	"time"
 
@@ -376,6 +377,169 @@ func TestExpenseDisplayUsesLiveRowsThenFallback(t *testing.T) {
 	fallback := fallbackExpenses[0]
 	if fallback.DisplayTitle != "라이브 라멘" || fallback.Place == nil || fallback.Place.Name != "라이브 라멘" || fallback.Place.Source != trip.ExpenseDisplaySourceFallback || fallback.Payer.DisplayName != "민수" || fallback.Payer.Source != trip.ExpenseDisplaySourceFallback || fallback.Payer.ParticipantID != nil || len(fallback.Splits) != 2 || fallback.Splits[1].Participant.DisplayName != "지영" || fallback.Splits[1].Participant.Source != trip.ExpenseDisplaySourceFallback || fallback.Splits[1].Participant.ParticipantID != nil {
 		t.Fatalf("expected fallback display values, got %#v", fallback)
+	}
+}
+
+func TestCreateQuickExpenseIsIdempotentByClientMutationID(t *testing.T) {
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("DATABASE_URL is required for storage integration test")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	store, err := Open(ctx, databaseURL)
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer store.Close()
+
+	ownerUserID := insertTripRepositoryTestUser(t, ctx, store, "idempotent owner")
+	memberUserID := insertTripRepositoryTestUser(t, ctx, store, "idempotent member")
+	tripID := insertTripRepositoryTestTrip(t, ctx, store, "idempotent quick expense trip", ownerUserID)
+	ownerParticipantID := insertTripRepositoryTestParticipant(t, ctx, store, tripID, ownerUserID, trip.RoleOwner, "민수")
+	memberParticipantID := insertTripRepositoryTestParticipant(t, ctx, store, tripID, memberUserID, trip.RoleMember, "지영")
+	tripDayID := tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-11")
+	placeID := insertTripRepositoryTestPlace(t, ctx, store, tripID, "도톤보리", "food")
+	scheduleItemID := insertTripRepositoryTestScheduleItem(t, ctx, store, tripID, tripDayID, placeID, "도톤보리", "", "", "", 1, "0000000000000001024", 1, false)
+
+	clientMutationID := "today-offline-001"
+	memo := "현장 결제"
+	record := trip.CreateQuickExpenseRecord{
+		TripID:              tripID,
+		TripDayID:           tripDayID,
+		ScheduleItemID:      stringPtr(scheduleItemID),
+		AmountMinor:         1001,
+		PayerParticipantID:  ownerParticipantID,
+		SplitPolicy:         trip.ExpenseSplitPolicyEqual,
+		ParticipantIDs:      []string{ownerParticipantID, memberParticipantID},
+		IncludeInSettlement: true,
+		ClientMutationID:    &clientMutationID,
+		Memo:                &memo,
+		CreatedBy:           ownerUserID,
+	}
+
+	first, err := store.CreateQuickExpense(ctx, record)
+	if err != nil {
+		t.Fatalf("first create quick expense: %v", err)
+	}
+	second, err := store.CreateQuickExpense(ctx, record)
+	if err != nil {
+		t.Fatalf("second idempotent create quick expense: %v", err)
+	}
+
+	if first.Expense.ID == "" || second.Expense.ID != first.Expense.ID {
+		t.Fatalf("expected duplicate client mutation id to return first expense, first=%#v second=%#v", first.Expense, second.Expense)
+	}
+	if first.Expense.ClientMutationID == nil || *first.Expense.ClientMutationID != clientMutationID || first.Expense.Memo == nil || *first.Expense.Memo != memo {
+		t.Fatalf("expected idempotency key and memo on created expense, got %#v", first.Expense)
+	}
+
+	var expenseCount int
+	if err := store.pool.QueryRow(ctx, `
+		SELECT count(*)::int
+		FROM expenses
+		WHERE trip_id = $1::uuid
+		  AND created_by = $2::uuid
+		  AND client_mutation_id = $3
+	`, tripID, ownerUserID, clientMutationID).Scan(&expenseCount); err != nil {
+		t.Fatalf("count idempotent expenses: %v", err)
+	}
+	if expenseCount != 1 {
+		t.Fatalf("expected one expense for client mutation id, got %d", expenseCount)
+	}
+}
+
+func TestCreateQuickExpenseConcurrentDuplicateClientMutationIDReturnsExistingExpense(t *testing.T) {
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("DATABASE_URL is required for storage integration test")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	store, err := Open(ctx, databaseURL)
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer store.Close()
+
+	ownerUserID := insertTripRepositoryTestUser(t, ctx, store, "concurrent idempotent owner")
+	memberUserID := insertTripRepositoryTestUser(t, ctx, store, "concurrent idempotent member")
+	tripID := insertTripRepositoryTestTrip(t, ctx, store, "concurrent idempotent trip", ownerUserID)
+	ownerParticipantID := insertTripRepositoryTestParticipant(t, ctx, store, tripID, ownerUserID, trip.RoleOwner, "민수")
+	memberParticipantID := insertTripRepositoryTestParticipant(t, ctx, store, tripID, memberUserID, trip.RoleMember, "지영")
+	tripDayID := tripRepositoryTestDayID(t, ctx, store, tripID, "2026-07-12")
+	placeID := insertTripRepositoryTestPlace(t, ctx, store, tripID, "우메다", "shopping")
+	scheduleItemID := insertTripRepositoryTestScheduleItem(t, ctx, store, tripID, tripDayID, placeID, "우메다", "", "", "", 1, "0000000000000001025", 1, false)
+
+	clientMutationID := "today-offline-concurrent-001"
+	record := trip.CreateQuickExpenseRecord{
+		TripID:              tripID,
+		TripDayID:           tripDayID,
+		ScheduleItemID:      stringPtr(scheduleItemID),
+		AmountMinor:         2300,
+		PayerParticipantID:  ownerParticipantID,
+		SplitPolicy:         trip.ExpenseSplitPolicyEqual,
+		ParticipantIDs:      []string{ownerParticipantID, memberParticipantID},
+		IncludeInSettlement: true,
+		ClientMutationID:    &clientMutationID,
+		CreatedBy:           ownerUserID,
+	}
+
+	const workers = 8
+	start := make(chan struct{})
+	results := make(chan trip.CreateQuickExpenseResult, workers)
+	errs := make(chan error, workers)
+	var wg sync.WaitGroup
+	for range workers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			created, err := store.CreateQuickExpense(ctx, record)
+			if err != nil {
+				errs <- err
+				return
+			}
+			results <- created
+		}()
+	}
+	close(start)
+	wg.Wait()
+	close(results)
+	close(errs)
+
+	for err := range errs {
+		t.Fatalf("expected concurrent idempotent create to return existing expense, got error: %v", err)
+	}
+	var expenseID string
+	for result := range results {
+		if expenseID == "" {
+			expenseID = result.Expense.ID
+		}
+		if result.Expense.ID != expenseID {
+			t.Fatalf("expected all concurrent creates to return same expense, first=%s got=%s", expenseID, result.Expense.ID)
+		}
+	}
+	if expenseID == "" {
+		t.Fatal("expected at least one create result")
+	}
+
+	var expenseCount int
+	if err := store.pool.QueryRow(ctx, `
+		SELECT count(*)::int
+		FROM expenses
+		WHERE trip_id = $1::uuid
+		  AND created_by = $2::uuid
+		  AND client_mutation_id = $3
+	`, tripID, ownerUserID, clientMutationID).Scan(&expenseCount); err != nil {
+		t.Fatalf("count concurrent idempotent expenses: %v", err)
+	}
+	if expenseCount != 1 {
+		t.Fatalf("expected one expense for concurrent client mutation id, got %d", expenseCount)
 	}
 }
 
