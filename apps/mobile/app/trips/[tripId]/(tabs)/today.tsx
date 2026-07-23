@@ -282,7 +282,15 @@ function TodayReadyContent({
           addLabel={spendSummary.actionLabel}
           additionalAmountLabels={spendSummary.additionalTotals.map((total) => total.amountLabel)}
           currency={spendSummary.primaryTotal.currency}
+          excludedPublicFundLabel={spendSummary.excludedPublicFundSummary?.label ?? null}
+          myPublicFundSpendLabel={spendSummary.mySpend.publicFund.amountLabel}
+          myRegularSpendLabel={spendSummary.mySpend.regular.amountLabel}
+          mySpendLabel={spendSummary.mySpend.total.amountLabel}
           needsReviewCount={spendSummary.needsReviewCount}
+          publicFundTotalLabel={spendSummary.composition.publicFund.amountLabel}
+          regularTotalLabel={spendSummary.composition.regular.amountLabel}
+          settlementHelper={spendSummary.settlementSnapshot.helper}
+          settlementTitle={spendSummary.settlementSnapshot.title}
           onPressAdd={() =>
             onAction({ kind: 'route', label: spendSummary.actionLabel, route: spendSummary.actionRoute })
           }
@@ -353,6 +361,8 @@ function QuickExpenseOverlaySheet({
             currency={state.currency}
             errorMessage={state.errorMessage}
             initialDraft={{
+              expenseKind: state.expenseKind,
+              includeInSettlement: state.includeInSettlement,
               itemId: state.selectedItemId,
               payerParticipantId: state.payerParticipantId,
               splitParticipantIds: state.selectedSplitParticipantIds,

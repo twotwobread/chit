@@ -309,6 +309,18 @@ func (r *fakeRepository) GetTripParticipantSummary(context.Context, string) (Par
 	return ParticipantSummary{TotalCount: r.participantCount, PreviewNames: r.previewNames}, nil
 }
 
+func (r *fakeRepository) GetCurrentTripParticipantID(_ context.Context, tripID string, userID string) (string, bool, error) {
+	if r.isParticipant {
+		for _, participant := range r.listParticipants {
+			if participant.ParticipantID != "" {
+				return participant.ParticipantID, true, nil
+			}
+		}
+		return testUUID(2001), true, nil
+	}
+	return "", false, nil
+}
+
 func (r *fakeRepository) ListTripParticipants(_ context.Context, tripID string) ([]ParticipantListItem, error) {
 	r.listParticipantsTripID = tripID
 	return r.listParticipants, nil
@@ -522,6 +534,7 @@ func (r *fakeRepository) UpdateTripExpense(_ context.Context, record UpdateExpen
 		Place:               nil,
 		AmountMinor:         record.AmountMinor,
 		Currency:            r.trip.DefaultCurrency,
+		ExpenseKind:         firstStringPtr(record.ExpenseKind, ExpenseKindRegular),
 		Payer:               ExpenseParticipantDisplay{ParticipantID: &payerID, DisplayName: "민수", Source: ExpenseDisplaySourceLive},
 		Memo:                record.Memo,
 		SplitPolicy:         record.SplitPolicy,
@@ -569,6 +582,7 @@ func (r *fakeRepository) UpdateExpense(_ context.Context, record UpdateExpenseRe
 		Place:               &ExpensePlaceDisplay{TripPlaceID: &placeID, Name: placeName, Address: &placeAddress, PlaceType: &placeType, Source: placeSource},
 		AmountMinor:         record.AmountMinor,
 		Currency:            r.trip.DefaultCurrency,
+		ExpenseKind:         firstStringPtr(record.ExpenseKind, ExpenseKindRegular),
 		Payer:               ExpenseParticipantDisplay{ParticipantID: &payerID, DisplayName: "민수", Source: ExpenseDisplaySourceLive},
 		Memo:                record.Memo,
 		SplitPolicy:         record.SplitPolicy,
@@ -625,6 +639,7 @@ func (r *fakeRepository) CreateQuickExpense(_ context.Context, record CreateQuic
 		Place:               &ExpensePlaceDisplay{TripPlaceID: &placeID, Name: "도톤보리", Address: &placeAddress, PlaceType: &placeType, Source: ExpenseDisplaySourceLive},
 		AmountMinor:         record.AmountMinor,
 		Currency:            r.trip.DefaultCurrency,
+		ExpenseKind:         record.ExpenseKind,
 		Payer:               ExpenseParticipantDisplay{ParticipantID: &payerID, DisplayName: "민수", Source: ExpenseDisplaySourceLive},
 		SplitPolicy:         record.SplitPolicy,
 		Splits:              []ExpenseSplit{{Participant: ExpenseParticipantDisplay{ParticipantID: &payerID, DisplayName: "민수", Source: ExpenseDisplaySourceLive}, AmountMinor: record.AmountMinor}},
@@ -654,6 +669,7 @@ func (r *fakeRepository) CreateTripExpense(_ context.Context, record CreateTripE
 		DisplayTitle:        firstStringPtr(record.Title, "지출"),
 		AmountMinor:         record.AmountMinor,
 		Currency:            r.trip.DefaultCurrency,
+		ExpenseKind:         record.ExpenseKind,
 		Payer:               ExpenseParticipantDisplay{ParticipantID: &payerID, DisplayName: "민수", Source: ExpenseDisplaySourceLive},
 		Memo:                record.Memo,
 		SplitPolicy:         record.SplitPolicy,
@@ -668,6 +684,13 @@ func includeInSettlementFromOptional(value *bool, fallback bool) bool {
 		return fallback
 	}
 	return *value
+}
+
+func firstString(value string, fallback string) string {
+	if value == "" {
+		return fallback
+	}
+	return value
 }
 
 func firstStringPtr(value *string, fallback string) string {
@@ -1515,21 +1538,24 @@ func TestServiceListParticipants(t *testing.T) {
 	}
 	service := newTestService(repo)
 
-	participants, err := service.ListParticipants(context.Background(), "user-1", testTripID)
+	result, err := service.ListParticipants(context.Background(), "user-1", testTripID)
 	if err != nil {
 		t.Fatalf("ListParticipants returned error: %v", err)
+	}
+	if result.CurrentUserParticipantID == nil || *result.CurrentUserParticipantID != "participant-1" {
+		t.Fatalf("expected current user participant id, got %#v", result)
 	}
 	if repo.listParticipantsTripID != testTripID {
 		t.Fatalf("expected repository to list participants for %s, got %q", testTripID, repo.listParticipantsTripID)
 	}
-	if len(participants) != 2 {
-		t.Fatalf("expected two participants, got %#v", participants)
+	if len(result.Participants) != 2 {
+		t.Fatalf("expected two participants, got %#v", result.Participants)
 	}
-	if participants[0].ParticipantID != "participant-1" || participants[0].DisplayName != "민수" || participants[0].Role != RoleOwner {
-		t.Fatalf("unexpected owner participant: %#v", participants[0])
+	if result.Participants[0].ParticipantID != "participant-1" || result.Participants[0].DisplayName != "민수" || result.Participants[0].Role != RoleOwner {
+		t.Fatalf("unexpected owner participant: %#v", result.Participants[0])
 	}
-	if participants[1].DisplayName != "여행자" {
-		t.Fatalf("expected blank display name fallback, got %#v", participants[1])
+	if result.Participants[1].DisplayName != "여행자" {
+		t.Fatalf("expected blank display name fallback, got %#v", result.Participants[1])
 	}
 }
 
@@ -1984,6 +2010,105 @@ func TestServiceCreateQuickExpense(t *testing.T) {
 	if result.Expense.ID == "" || result.Expense.AmountMinor != 1001 || result.Expense.Currency != "JPY" || result.Expense.ScheduleItemID == nil || *result.Expense.ScheduleItemID != itemID || !result.Expense.IncludeInSettlement {
 		t.Fatalf("unexpected quick expense result: %#v", result.Expense)
 	}
+}
+
+func TestServiceCreateQuickExpenseExpenseKindDefaults(t *testing.T) {
+	payerID := testUUID(2001)
+	splitParticipantID := testUUID(2002)
+	itemID := testUUID(7001)
+
+	t.Run("regular defaults to settlement included", func(t *testing.T) {
+		repo := &fakeRepository{
+			trip:          Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13", DefaultCurrency: "JPY"},
+			tripFound:     true,
+			isParticipant: true,
+		}
+
+		_, err := newTestService(repo).CreateQuickExpense(context.Background(), "user-1", testTripID, "2026-07-11", CreateQuickExpenseInput{
+			ScheduleItemID:     stringPtr(itemID),
+			AmountMinor:        1001,
+			ExpenseKind:        ExpenseKindRegular,
+			PayerParticipantID: payerID,
+			SplitPolicy:        ExpenseSplitPolicyEqual,
+			ParticipantIDs:     []string{splitParticipantID},
+		})
+		if err != nil {
+			t.Fatalf("CreateQuickExpense returned error: %v", err)
+		}
+		if repo.quickExpenseRecord.ExpenseKind != ExpenseKindRegular || !repo.quickExpenseRecord.IncludeInSettlement {
+			t.Fatalf("expected regular included record, got %#v", repo.quickExpenseRecord)
+		}
+	})
+
+	t.Run("public fund defaults to settlement excluded", func(t *testing.T) {
+		repo := &fakeRepository{
+			trip:          Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13", DefaultCurrency: "JPY"},
+			tripFound:     true,
+			isParticipant: true,
+		}
+
+		result, err := newTestService(repo).CreateQuickExpense(context.Background(), "user-1", testTripID, "2026-07-11", CreateQuickExpenseInput{
+			ScheduleItemID:     stringPtr(itemID),
+			AmountMinor:        1001,
+			ExpenseKind:        ExpenseKindPublicFund,
+			PayerParticipantID: payerID,
+			SplitPolicy:        ExpenseSplitPolicyEqual,
+			ParticipantIDs:     []string{splitParticipantID},
+		})
+		if err != nil {
+			t.Fatalf("CreateQuickExpense returned error: %v", err)
+		}
+		if repo.quickExpenseRecord.ExpenseKind != ExpenseKindPublicFund || repo.quickExpenseRecord.IncludeInSettlement {
+			t.Fatalf("expected public fund excluded record, got %#v", repo.quickExpenseRecord)
+		}
+		if result.Expense.ExpenseKind != ExpenseKindPublicFund || result.Expense.IncludeInSettlement {
+			t.Fatalf("expected public fund excluded result, got %#v", result.Expense)
+		}
+	})
+
+	t.Run("public fund preserves explicit settlement inclusion", func(t *testing.T) {
+		repo := &fakeRepository{
+			trip:          Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13", DefaultCurrency: "JPY"},
+			tripFound:     true,
+			isParticipant: true,
+		}
+
+		_, err := newTestService(repo).CreateQuickExpense(context.Background(), "user-1", testTripID, "2026-07-11", CreateQuickExpenseInput{
+			ScheduleItemID:      stringPtr(itemID),
+			AmountMinor:         1001,
+			ExpenseKind:         ExpenseKindPublicFund,
+			PayerParticipantID:  payerID,
+			SplitPolicy:         ExpenseSplitPolicyEqual,
+			ParticipantIDs:      []string{splitParticipantID},
+			IncludeInSettlement: boolPtr(true),
+		})
+		if err != nil {
+			t.Fatalf("CreateQuickExpense returned error: %v", err)
+		}
+		if repo.quickExpenseRecord.ExpenseKind != ExpenseKindPublicFund || !repo.quickExpenseRecord.IncludeInSettlement {
+			t.Fatalf("expected public fund explicitly included record, got %#v", repo.quickExpenseRecord)
+		}
+	})
+
+	t.Run("invalid expense kind is rejected", func(t *testing.T) {
+		repo := &fakeRepository{
+			trip:          Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13", DefaultCurrency: "JPY"},
+			tripFound:     true,
+			isParticipant: true,
+		}
+
+		_, err := newTestService(repo).CreateQuickExpense(context.Background(), "user-1", testTripID, "2026-07-11", CreateQuickExpenseInput{
+			ScheduleItemID:     stringPtr(itemID),
+			AmountMinor:        1001,
+			ExpenseKind:        "personal",
+			PayerParticipantID: payerID,
+			SplitPolicy:        ExpenseSplitPolicyEqual,
+			ParticipantIDs:     []string{splitParticipantID},
+		})
+		if !errors.Is(err, ErrValidation) {
+			t.Fatalf("expected ErrValidation, got %v", err)
+		}
+	})
 }
 
 func TestServiceCreateQuickExpenseCanExcludeFromSettlement(t *testing.T) {

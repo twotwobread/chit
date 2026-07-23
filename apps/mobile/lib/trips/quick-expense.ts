@@ -8,6 +8,7 @@ import type {
   ExpenseSplit,
   GetDayScheduleItemsResponse,
   ExpenseCategory,
+  ExpenseKind,
   SupportedCurrency,
   TripParticipantListItem,
 } from '@i-um/api-contract';
@@ -720,6 +721,7 @@ export function buildQuickExpenseMemoUpdateRequest({
     splitPolicy: createRequest.splitPolicy,
     ...(createRequest.currency ? { currency: createRequest.currency } : {}),
     ...(createRequest.expenseCategory ? { expenseCategory: createRequest.expenseCategory } : {}),
+    ...(createRequest.expenseKind ? { expenseKind: createRequest.expenseKind } : {}),
     ...(createRequest.participantIds ? { participantIds: createRequest.participantIds } : {}),
     ...(createRequest.splits ? { splits: createRequest.splits } : {}),
     memo,
@@ -737,6 +739,7 @@ export function buildCreateQuickExpenseRequest({
   scheduleItemId,
   tripPlaceId,
   expenseCategory,
+  expenseKind,
   splitPolicy,
   participantIds,
   manualSplitInputs,
@@ -749,6 +752,7 @@ export function buildCreateQuickExpenseRequest({
   scheduleItemId: string | null;
   tripPlaceId?: string | null;
   expenseCategory?: ExpenseCategory;
+  expenseKind?: ExpenseKind;
   splitPolicy: QuickExpenseSplitPolicy;
   participantIds: string[];
   manualSplitInputs: QuickExpenseManualSplitInput[];
@@ -765,6 +769,9 @@ export function buildCreateQuickExpenseRequest({
     payerParticipantId,
   });
   const normalizedTripPlaceId = tripPlaceId?.trim() || null;
+  const normalizedExpenseKind = expenseKind ?? 'regular';
+  const normalizedIncludeInSettlement =
+    includeInSettlement ?? (normalizedExpenseKind === 'public_fund' ? false : undefined);
   if (!scheduleItemId && !normalizedTripPlaceId) {
     validation.errors.item = '지출을 연결할 일정이나 영수증 장소를 선택해주세요.';
   }
@@ -787,10 +794,11 @@ export function buildCreateQuickExpenseRequest({
         amountMinor: validation.parsedAmount.amountMinor,
         currency,
         ...(expenseCategory ? { expenseCategory } : {}),
+        ...(expenseKind ? { expenseKind: normalizedExpenseKind } : {}),
         payerParticipantId,
         splitPolicy,
         participantIds,
-        ...(includeInSettlement !== undefined ? { includeInSettlement } : {}),
+        ...(normalizedIncludeInSettlement !== undefined ? { includeInSettlement: normalizedIncludeInSettlement } : {}),
         ...(receiptDraftId ? { receiptDraftId } : {}),
       },
     };
@@ -804,10 +812,11 @@ export function buildCreateQuickExpenseRequest({
       amountMinor: validation.parsedAmount.amountMinor,
       currency,
       ...(expenseCategory ? { expenseCategory } : {}),
+      ...(expenseKind ? { expenseKind: normalizedExpenseKind } : {}),
       payerParticipantId,
       splitPolicy,
       splits: validation.manualSummary.requestSplits,
-      ...(includeInSettlement !== undefined ? { includeInSettlement } : {}),
+      ...(normalizedIncludeInSettlement !== undefined ? { includeInSettlement: normalizedIncludeInSettlement } : {}),
       ...(receiptDraftId ? { receiptDraftId } : {}),
     },
   };

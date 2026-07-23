@@ -439,6 +439,7 @@ func (s apiServer) CreateTripExpense(w http.ResponseWriter, r *http.Request, tri
 		AmountMinor:         body.AmountMinor,
 		Currency:            optionalCurrencyFromOpenAPI(body.Currency),
 		ExpenseCategory:     optionalExpenseCategoryFromOpenAPI(body.ExpenseCategory),
+		ExpenseKind:         optionalExpenseKindFromOpenAPI(body.ExpenseKind),
 		PayerParticipantID:  body.PayerParticipantId,
 		SplitPolicy:         string(body.SplitPolicy),
 		ParticipantIDs:      optionalStringSlice(body.ParticipantIds),
@@ -489,6 +490,7 @@ func (s apiServer) UpdateTripExpense(w http.ResponseWriter, r *http.Request, tri
 		AmountMinor:         body.AmountMinor,
 		Currency:            optionalCurrencyFromOpenAPI(body.Currency),
 		ExpenseCategory:     optionalExpenseCategoryFromOpenAPI(body.ExpenseCategory),
+		ExpenseKind:         optionalExpenseKindPtrFromOpenAPI(body.ExpenseKind),
 		PayerParticipantID:  body.PayerParticipantId,
 		SplitPolicy:         string(body.SplitPolicy),
 		ParticipantIDs:      optionalStringSlice(body.ParticipantIds),
@@ -556,6 +558,7 @@ func (s apiServer) UpdateExpense(w http.ResponseWriter, r *http.Request, tripId 
 		AmountMinor:         body.AmountMinor,
 		Currency:            optionalCurrencyFromOpenAPI(body.Currency),
 		ExpenseCategory:     optionalExpenseCategoryFromOpenAPI(body.ExpenseCategory),
+		ExpenseKind:         optionalExpenseKindPtrFromOpenAPI(body.ExpenseKind),
 		PayerParticipantID:  body.PayerParticipantId,
 		SplitPolicy:         string(body.SplitPolicy),
 		ParticipantIDs:      optionalStringSlice(body.ParticipantIds),
@@ -611,6 +614,7 @@ func (s apiServer) CreateQuickExpense(w http.ResponseWriter, r *http.Request, tr
 		AmountMinor:         body.AmountMinor,
 		Currency:            optionalCurrencyFromOpenAPI(body.Currency),
 		ExpenseCategory:     optionalExpenseCategoryFromOpenAPI(body.ExpenseCategory),
+		ExpenseKind:         optionalExpenseKindFromOpenAPI(body.ExpenseKind),
 		PayerParticipantID:  body.PayerParticipantId,
 		SplitPolicy:         string(body.SplitPolicy),
 		ParticipantIDs:      optionalStringSlice(body.ParticipantIds),
@@ -796,6 +800,21 @@ func optionalStringSlice(value *[]string) []string {
 		return nil
 	}
 	return *value
+}
+
+func optionalExpenseKindFromOpenAPI(value *openapi.ExpenseKind) string {
+	if value == nil {
+		return ""
+	}
+	return string(*value)
+}
+
+func optionalExpenseKindPtrFromOpenAPI(value *openapi.ExpenseKind) *string {
+	if value == nil {
+		return nil
+	}
+	expenseKind := string(*value)
+	return &expenseKind
 }
 
 func manualExpenseSplitsFromOpenAPI(value *[]openapi.ManualExpenseSplitInput) []trip.ManualExpenseSplitInput {

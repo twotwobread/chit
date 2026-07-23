@@ -3,6 +3,7 @@
 /* tslint:disable */
 /* eslint-disable */
 import type { ExpenseCategory } from './ExpenseCategory';
+import type { ExpenseKind } from './ExpenseKind';
 import type { ExpenseSplitPolicy } from './ExpenseSplitPolicy';
 import type { ManualExpenseSplitInput } from './ManualExpenseSplitInput';
 import type { SupportedCurrency } from './SupportedCurrency';
@@ -45,6 +46,10 @@ export type UpdateExpenseRequest = {
      * When provided, replaces the expense category used for settlement analytics and row markers. Omit to keep the existing value.
      */
     expenseCategory?: ExpenseCategory;
+    /**
+     * When provided, replaces the expense kind. Omit to keep the existing value.
+     */
+    expenseKind?: ExpenseKind;
     /**
      * When provided, updates whether the expense is included in final settlement calculations. Omit to keep the existing value.
      */

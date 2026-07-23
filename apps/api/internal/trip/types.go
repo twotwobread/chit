@@ -97,6 +97,7 @@ type CreateQuickExpenseInput struct {
 	AmountMinor         int64
 	Currency            *string
 	ExpenseCategory     *string
+	ExpenseKind         string
 	PayerParticipantID  string
 	SplitPolicy         string
 	ParticipantIDs      []string
@@ -114,6 +115,7 @@ type CreateTripExpenseInput struct {
 	AmountMinor         int64
 	Currency            *string
 	ExpenseCategory     *string
+	ExpenseKind         string
 	PayerParticipantID  string
 	SplitPolicy         string
 	ParticipantIDs      []string
@@ -127,6 +129,7 @@ type UpdateExpenseInput struct {
 	AmountMinor         int64
 	Currency            *string
 	ExpenseCategory     *string
+	ExpenseKind         *string
 	PayerParticipantID  string
 	SplitPolicy         string
 	ParticipantIDs      []string
@@ -301,6 +304,7 @@ type CreateQuickExpenseRecord struct {
 	AmountMinor         int64
 	Currency            *string
 	ExpenseCategory     *string
+	ExpenseKind         string
 	PayerParticipantID  string
 	SplitPolicy         string
 	ParticipantIDs      []string
@@ -320,6 +324,7 @@ type CreateTripExpenseRecord struct {
 	AmountMinor         int64
 	Currency            *string
 	ExpenseCategory     *string
+	ExpenseKind         string
 	PayerParticipantID  string
 	SplitPolicy         string
 	ParticipantIDs      []string
@@ -337,6 +342,7 @@ type UpdateExpenseRecord struct {
 	AmountMinor         int64
 	Currency            *string
 	ExpenseCategory     *string
+	ExpenseKind         *string
 	PayerParticipantID  string
 	SplitPolicy         string
 	ParticipantIDs      []string
@@ -603,6 +609,8 @@ const (
 	ExpenseDisplaySourceFallback = "fallback"
 	ExpenseSplitPolicyEqual      = "equal"
 	ExpenseSplitPolicyManual     = "manual"
+	ExpenseKindRegular           = "regular"
+	ExpenseKindPublicFund        = "public_fund"
 
 	ExpenseCategoryCafe      = "cafe"
 	ExpenseCategoryEtc       = "etc"
@@ -789,6 +797,7 @@ type Expense struct {
 	AmountMinor         int64
 	Currency            string
 	ExpenseCategory     string
+	ExpenseKind         string
 	Payer               ExpenseParticipantDisplay
 	Memo                *string
 	SplitPolicy         string
@@ -831,6 +840,7 @@ type DayExpenseListItem struct {
 	AmountMinor         int64
 	Currency            string
 	ExpenseCategory     string
+	ExpenseKind         string
 	Payer               ExpenseParticipantDisplay
 	SplitPolicy         string
 	Splits              []DayExpenseSplitListItem
@@ -841,6 +851,11 @@ type DayExpenseListItem struct {
 
 type ListDayExpensesResult struct {
 	Expenses []DayExpenseListItem
+}
+
+type ListParticipantsResult struct {
+	CurrentUserParticipantID *string
+	Participants             []ParticipantListItem
 }
 
 type TripExpenseDayListItem struct {
@@ -979,6 +994,7 @@ type Repository interface {
 	AcceptTripInvite(ctx context.Context, record AcceptTripInviteRecord) (AcceptTripInviteResult, error)
 	CountTripParticipants(ctx context.Context, tripID string) (int, error)
 	ListTripParticipantPreviewNames(ctx context.Context, tripID string) ([]string, error)
+	GetCurrentTripParticipantID(ctx context.Context, tripID string, userID string) (string, bool, error)
 	ListTripParticipants(ctx context.Context, tripID string) ([]ParticipantListItem, error)
 	ListTripsByParticipantUser(ctx context.Context, userID string) ([]ListItem, error)
 	ListActiveTripDaysByTrip(ctx context.Context, tripID string) ([]TripDay, error)

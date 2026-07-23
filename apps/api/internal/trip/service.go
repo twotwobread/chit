@@ -506,40 +506,40 @@ func (s *Service) getTripParticipantSummary(ctx context.Context, tripID string) 
 	return summary, nil
 }
 
-func (s *Service) ListParticipants(ctx context.Context, userID string, tripID string) ([]ParticipantListItem, error) {
+func (s *Service) ListParticipants(ctx context.Context, userID string, tripID string) (ListParticipantsResult, error) {
 	if strings.TrimSpace(userID) == "" {
-		return nil, ErrUnauthorized
+		return ListParticipantsResult{}, ErrUnauthorized
 	}
 
 	tripID = strings.TrimSpace(tripID)
 	if !isUUID(tripID) {
-		return nil, ErrValidation
+		return ListParticipantsResult{}, ErrValidation
 	}
 
 	_, ok, err := s.repo.GetTripByID(ctx, tripID)
 	if err != nil {
-		return nil, err
+		return ListParticipantsResult{}, err
 	}
 	if !ok {
-		return nil, ErrNotFound
+		return ListParticipantsResult{}, ErrNotFound
 	}
 
-	isParticipant, err := s.repo.IsTripParticipant(ctx, tripID, userID)
+	currentParticipantID, ok, err := s.repo.GetCurrentTripParticipantID(ctx, tripID, userID)
 	if err != nil {
-		return nil, err
+		return ListParticipantsResult{}, err
 	}
-	if !isParticipant {
-		return nil, ErrForbidden
+	if !ok {
+		return ListParticipantsResult{}, ErrForbidden
 	}
 
 	participants, err := s.repo.ListTripParticipants(ctx, tripID)
 	if err != nil {
-		return nil, err
+		return ListParticipantsResult{}, err
 	}
 	for index, participant := range participants {
 		participants[index].DisplayName = participantDisplayName(participant.DisplayName)
 	}
-	return participants, nil
+	return ListParticipantsResult{CurrentUserParticipantID: &currentParticipantID, Participants: participants}, nil
 }
 
 func (s *Service) GetTripSettlement(ctx context.Context, userID string, tripID string) (GetTripSettlementResult, error) {
@@ -722,6 +722,10 @@ func (s *Service) UpdateTripExpense(ctx context.Context, userID string, tripID s
 	if err != nil {
 		return UpdateExpenseResult{}, err
 	}
+	expenseKind, err := normalizeOptionalExpenseKind(input.ExpenseKind)
+	if err != nil {
+		return UpdateExpenseResult{}, err
+	}
 	if !isUUID(expenseID) || !isUUID(payerParticipantID) || input.AmountMinor < 1 {
 		return UpdateExpenseResult{}, ErrValidation
 	}
@@ -751,6 +755,7 @@ func (s *Service) UpdateTripExpense(ctx context.Context, userID string, tripID s
 		AmountMinor:         input.AmountMinor,
 		Currency:            currency,
 		ExpenseCategory:     expenseCategory,
+		ExpenseKind:         expenseKind,
 		PayerParticipantID:  payerParticipantID,
 		SplitPolicy:         splitPolicy,
 		ParticipantIDs:      participantIDs,
@@ -801,6 +806,10 @@ func (s *Service) UpdateExpense(ctx context.Context, userID string, tripID strin
 	if err != nil {
 		return UpdateExpenseResult{}, err
 	}
+	expenseKind, err := normalizeOptionalExpenseKind(input.ExpenseKind)
+	if err != nil {
+		return UpdateExpenseResult{}, err
+	}
 	if !isUUID(expenseID) || !isUUID(payerParticipantID) || input.AmountMinor < 1 {
 		return UpdateExpenseResult{}, ErrValidation
 	}
@@ -837,6 +846,7 @@ func (s *Service) UpdateExpense(ctx context.Context, userID string, tripID strin
 		AmountMinor:         input.AmountMinor,
 		Currency:            currency,
 		ExpenseCategory:     expenseCategory,
+		ExpenseKind:         expenseKind,
 		PayerParticipantID:  payerParticipantID,
 		SplitPolicy:         splitPolicy,
 		ParticipantIDs:      participantIDs,
@@ -897,6 +907,10 @@ func (s *Service) CreateQuickExpense(ctx context.Context, userID string, tripID 
 	if err != nil {
 		return CreateQuickExpenseResult{}, err
 	}
+	expenseKind, err := normalizeExpenseKind(input.ExpenseKind)
+	if err != nil {
+		return CreateQuickExpenseResult{}, err
+	}
 	if (scheduleItemID == nil && tripPlaceID == nil) || !isUUID(payerParticipantID) || input.AmountMinor < 1 {
 		return CreateQuickExpenseResult{}, ErrValidation
 	}
@@ -912,11 +926,12 @@ func (s *Service) CreateQuickExpense(ctx context.Context, userID string, tripID 
 		AmountMinor:         input.AmountMinor,
 		Currency:            currency,
 		ExpenseCategory:     expenseCategory,
+		ExpenseKind:         expenseKind,
 		PayerParticipantID:  payerParticipantID,
 		SplitPolicy:         splitPolicy,
 		ParticipantIDs:      participantIDs,
 		ManualSplits:        manualSplits,
-		IncludeInSettlement: includeInSettlementDefaultTrue(input.IncludeInSettlement),
+		IncludeInSettlement: includeInSettlementDefaultForKind(input.IncludeInSettlement, expenseKind),
 		ReceiptDraftID:      receiptDraftID,
 		CreatedBy:           userID,
 	})
@@ -987,6 +1002,10 @@ func (s *Service) CreateTripExpense(ctx context.Context, userID string, tripID s
 	if err != nil {
 		return CreateTripExpenseResult{}, err
 	}
+	expenseKind, err := normalizeExpenseKind(input.ExpenseKind)
+	if err != nil {
+		return CreateTripExpenseResult{}, err
+	}
 
 	_, ok, err := s.repo.GetTripByID(ctx, tripID)
 	if err != nil {
@@ -1020,12 +1039,13 @@ func (s *Service) CreateTripExpense(ctx context.Context, userID string, tripID s
 		AmountMinor:         input.AmountMinor,
 		Currency:            currency,
 		ExpenseCategory:     expenseCategory,
+		ExpenseKind:         expenseKind,
 		PayerParticipantID:  payerParticipantID,
 		SplitPolicy:         splitPolicy,
 		ParticipantIDs:      participantIDs,
 		ManualSplits:        manualSplits,
 		Memo:                memo,
-		IncludeInSettlement: includeInSettlementDefaultTrue(input.IncludeInSettlement),
+		IncludeInSettlement: includeInSettlementDefaultForKind(input.IncludeInSettlement, expenseKind),
 		ReceiptDraftID:      receiptDraftID,
 		CreatedBy:           userID,
 	})
@@ -1033,6 +1053,37 @@ func (s *Service) CreateTripExpense(ctx context.Context, userID string, tripID s
 
 func includeInSettlementDefaultTrue(value *bool) bool {
 	return value == nil || *value
+}
+
+func includeInSettlementDefaultForKind(value *bool, expenseKind string) bool {
+	if value != nil {
+		return *value
+	}
+	return expenseKind != ExpenseKindPublicFund
+}
+
+func normalizeExpenseKind(value string) (string, error) {
+	switch strings.TrimSpace(value) {
+	case "":
+		return ExpenseKindRegular, nil
+	case ExpenseKindRegular:
+		return ExpenseKindRegular, nil
+	case ExpenseKindPublicFund:
+		return ExpenseKindPublicFund, nil
+	default:
+		return "", ErrValidation
+	}
+}
+
+func normalizeOptionalExpenseKind(value *string) (*string, error) {
+	if value == nil {
+		return nil, nil
+	}
+	expenseKind, err := normalizeExpenseKind(*value)
+	if err != nil {
+		return nil, err
+	}
+	return &expenseKind, nil
 }
 
 func normalizeExpenseTitle(value *string, required bool) (*string, error) {
