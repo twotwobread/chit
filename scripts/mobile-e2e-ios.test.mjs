@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  buildExpoEnv,
+  buildRunSummary,
   createArtifactDirName,
   formatMissingToolMessage,
   parseArgs,
@@ -84,4 +86,25 @@ test('formatMissingToolMessage includes install guidance for known tools', () =>
   assert.match(formatMissingToolMessage('maestro'), /curl -Ls "https:\/\/get\.maestro\.mobile\.dev" \| bash/);
   assert.match(formatMissingToolMessage('xcrun'), /Xcode/);
   assert.match(formatMissingToolMessage('pnpm'), /corepack/);
+});
+
+test('buildExpoEnv enables safe local auth dev mode without mutating input', () => {
+  const input = { EXPO_PUBLIC_AUTH_DEV_MODE: 'false', KEEP: 'value' };
+  const output = buildExpoEnv(input);
+
+  assert.equal(input.EXPO_PUBLIC_AUTH_DEV_MODE, 'false');
+  assert.equal(output.EXPO_PUBLIC_AUTH_DEV_MODE, 'true');
+  assert.equal(output.EXPO_PUBLIC_API_BASE_URL, 'http://localhost:8080');
+  assert.equal(output.KEEP, 'value');
+});
+
+test('buildRunSummary records local/free smoke settings', () => {
+  const summary = buildRunSummary(
+    { appId: 'host.exp.Exponent', dryRun: true, skipStart: false, flowPath: '.maestro/ios-smoke.yaml' },
+    { name: 'iPhone 16', udid: 'B', state: 'Booted' },
+  );
+
+  assert.match(summary, /local iOS Simulator/);
+  assert.match(summary, /host\.exp\.Exponent/);
+  assert.match(summary, /iPhone 16/);
 });
