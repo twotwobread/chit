@@ -1,0 +1,87 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+
+import {
+  createArtifactDirName,
+  formatMissingToolMessage,
+  parseArgs,
+  renderMaestroFlow,
+  selectSimulatorDevice,
+} from './mobile-e2e-ios.mjs';
+
+test('parseArgs applies safe local defaults and supports overrides', () => {
+  const options = parseArgs([
+    '--app-id',
+    'com.twotwobread.ium.staging',
+    '--device',
+    'iPhone 15',
+    '--skip-start',
+    '--dry-run',
+    '--artifacts-dir',
+    '.artifacts/custom',
+  ]);
+
+  assert.equal(options.appId, 'com.twotwobread.ium.staging');
+  assert.equal(options.deviceName, 'iPhone 15');
+  assert.equal(options.skipStart, true);
+  assert.equal(options.dryRun, true);
+  assert.equal(options.artifactsDir, '.artifacts/custom');
+});
+
+test('parseArgs defaults to Expo Go app id and generated artifact dir', () => {
+  const options = parseArgs([]);
+
+  assert.equal(options.appId, 'host.exp.Exponent');
+  assert.equal(options.flowPath, '.maestro/ios-smoke.yaml');
+  assert.match(options.artifactsDir, /^\.artifacts\/mobile-e2e\/ios-smoke-\d{8}-\d{6}$/);
+});
+
+test('createArtifactDirName is stable and filesystem-safe', () => {
+  assert.equal(createArtifactDirName(new Date('2026-07-23T04:05:06Z')), 'ios-smoke-20260723-040506');
+});
+
+test('selectSimulatorDevice prefers booted devices before named available devices', () => {
+  const simctlJson = JSON.stringify({
+    devices: {
+      'com.apple.CoreSimulator.SimRuntime.iOS-18-0': [
+        { name: 'iPhone 15', udid: 'A', state: 'Shutdown', isAvailable: true },
+        { name: 'iPhone 16', udid: 'B', state: 'Booted', isAvailable: true },
+      ],
+    },
+  });
+
+  assert.deepEqual(selectSimulatorDevice(simctlJson, 'iPhone 15'), {
+    name: 'iPhone 16',
+    udid: 'B',
+    state: 'Booted',
+  });
+});
+
+test('selectSimulatorDevice returns preferred available shutdown device when none are booted', () => {
+  const simctlJson = JSON.stringify({
+    devices: {
+      'com.apple.CoreSimulator.SimRuntime.iOS-18-0': [
+        { name: 'iPhone 14', udid: 'A', state: 'Shutdown', isAvailable: true },
+        { name: 'iPhone 15', udid: 'B', state: 'Shutdown', isAvailable: true },
+      ],
+    },
+  });
+
+  assert.deepEqual(selectSimulatorDevice(simctlJson, 'iPhone 15'), {
+    name: 'iPhone 15',
+    udid: 'B',
+    state: 'Shutdown',
+  });
+});
+
+test('renderMaestroFlow replaces only the APP_ID placeholder', () => {
+  const rendered = renderMaestroFlow('appId: ${APP_ID}\n---\n- assertVisible: "로그인하기"\n', 'host.exp.Exponent');
+
+  assert.equal(rendered, 'appId: host.exp.Exponent\n---\n- assertVisible: "로그인하기"\n');
+});
+
+test('formatMissingToolMessage includes install guidance for known tools', () => {
+  assert.match(formatMissingToolMessage('maestro'), /curl -Ls "https:\/\/get\.maestro\.mobile\.dev" \| bash/);
+  assert.match(formatMissingToolMessage('xcrun'), /Xcode/);
+  assert.match(formatMissingToolMessage('pnpm'), /corepack/);
+});
