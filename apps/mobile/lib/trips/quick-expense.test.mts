@@ -204,23 +204,23 @@ test('resolves trip-level expense form mode for Expense and Settlement tab retur
   assert.equal(resolveQuickExpenseFormMode('today'), 'today');
 });
 
-test('builds OCR-primary quick expense entry choice copy', () => {
+test('builds direct-input-primary detailed expense entry choice copy', () => {
   assert.deepEqual(buildQuickExpenseEntryChoiceViewModel({ hasTripId: true }), {
     title: '지출을 어떻게 추가할까요?',
-    helper: '영수증을 먼저 촬영하면 입력할 내용을 줄일 수 있어요.',
+    helper: '직접 입력으로 바로 시작하고, 영수증이 있으면 자동 채우기로 보조할 수 있어요.',
     primaryAction: {
-      label: '영수증 촬영으로 입력',
-      helper: '금액, 결제일자, 지출명 초안을 자동으로 채워요. 저장 전 확인이 필요해요.',
+      label: '직접 입력',
+      helper: '금액, 지출명, 결제자를 먼저 확인하고 필요한 항목만 조정해요.',
       disabled: false,
     },
     secondaryAction: {
-      label: '직접 입력',
-      helper: '영수증이 없거나 바로 기록할 때 금액과 결제자부터 입력해요.',
+      label: '영수증으로 채우기',
+      helper: '영수증이 있다면 금액, 결제일자, 지출명 초안을 채워요. 저장 전 확인이 필요해요.',
       disabled: false,
     },
-    verificationCopy: 'OCR 초안은 자동 저장되지 않아요. 확인 후 저장해야 정산에 반영됩니다.',
+    verificationCopy: '영수증은 선택이에요. 직접 입력으로도 지출을 저장할 수 있어요.',
   });
-  assert.equal(buildQuickExpenseEntryChoiceViewModel({ hasTripId: false }).primaryAction.disabled, true);
+  assert.equal(buildQuickExpenseEntryChoiceViewModel({ hasTripId: false }).secondaryAction.disabled, true);
 });
 
 test('builds compact payment split summary labels', () => {
