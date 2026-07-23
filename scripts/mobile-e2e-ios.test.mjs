@@ -38,6 +38,12 @@ test('parseArgs defaults to Expo Go app id and generated artifact dir', () => {
   assert.match(options.artifactsDir, /^\.artifacts\/mobile-e2e\/ios-smoke-\d{8}-\d{6}$/);
 });
 
+test('parseArgs ignores the pnpm forwarded argument separator', () => {
+  const options = parseArgs(['--', '--dry-run']);
+
+  assert.equal(options.dryRun, true);
+});
+
 test('createArtifactDirName is stable and filesystem-safe', () => {
   assert.equal(createArtifactDirName(new Date('2026-07-23T04:05:06Z')), 'ios-smoke-20260723-040506');
 });

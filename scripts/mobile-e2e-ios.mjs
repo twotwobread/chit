@@ -27,6 +27,8 @@ export function parseArgs(argv, env = process.env, now = new Date()) {
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     switch (arg) {
+      case '--':
+        break;
       case '--app-id':
         options.appId = readOptionValue(argv, (index += 1), arg);
         break;
@@ -162,7 +164,9 @@ export async function main(argv = process.argv.slice(2), env = process.env, cwd 
 
     const device = discoverSimulatorDevice(options.deviceName);
     if (!device) {
-      throw new Error('No available iOS Simulator devices found. Install an iOS Simulator runtime in Xcode > Settings > Platforms.');
+      throw new Error(
+        'No available iOS Simulator devices found. Install an iOS Simulator runtime in Xcode > Settings > Platforms.',
+      );
     }
 
     const renderedFlowPath = renderFlowFile(flowPath, artifactsDir, options.appId);
@@ -250,7 +254,10 @@ async function bootSimulatorIfNeeded(device, logger) {
 
   logger(`Booting simulator: ${device.name} (${device.udid})`);
   const boot = spawnSync('xcrun', ['simctl', 'boot', device.udid], { encoding: 'utf8' });
-  if (boot.status !== 0 && !`${boot.stderr}\n${boot.stdout}`.includes('Unable to boot device in current state: Booted')) {
+  if (
+    boot.status !== 0 &&
+    !`${boot.stderr}\n${boot.stdout}`.includes('Unable to boot device in current state: Booted')
+  ) {
     throw new Error(boot.stderr?.trim() || `Failed to boot simulator ${device.name}.`);
   }
 
@@ -278,7 +285,9 @@ async function waitForExpoStartup(child, timeoutMs, logger) {
   const ready = new Promise((resolveReady, rejectReady) => {
     const timer = setTimeout(() => {
       cleanup();
-      logger(`Expo startup wait timed out after ${timeoutMs}ms; continuing to Maestro because Expo may already be open.`);
+      logger(
+        `Expo startup wait timed out after ${timeoutMs}ms; continuing to Maestro because Expo may already be open.`,
+      );
       resolveReady(false);
     }, timeoutMs);
 
