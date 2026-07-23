@@ -328,19 +328,24 @@ export class TripsService {
     }
     /**
      * List expenses for a trip
-     * Returns read-only expense rows grouped by trip context in one request. Trip-level rows are returned separately, and day rows are ordered by day then newest expense first.
+     * Returns read-only expense rows grouped by trip context in one request. Trip-level rows are returned separately, and day rows are ordered by day then newest expense first. Optional text search filters expense rows by expense fields and saved receipt extraction fields without returning extracted receipt text.
      * @param tripId
+     * @param q Optional expense search text. Blank values are treated as no filter.
      * @returns ListTripExpensesResponse Trip expenses grouped by trip context.
      * @throws ApiError
      */
     public static listTripExpenses(
         tripId: string,
+        q?: string,
     ): CancelablePromise<ListTripExpensesResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/trips/{tripId}/expenses',
             path: {
                 'tripId': tripId,
+            },
+            query: {
+                'q': q,
             },
             errors: {
                 400: `Validation error.`,

@@ -940,8 +940,11 @@ func (s *Store) ListDayExpensesByTripDay(ctx context.Context, tripID string, tri
 	return expenses, nil
 }
 
-func (s *Store) ListTripExpenses(ctx context.Context, tripID string) (trip.ListTripExpensesResult, error) {
-	expenseRows, err := s.queries.ListTripExpensesByTrip(ctx, mustUUID(tripID))
+func (s *Store) ListTripExpenses(ctx context.Context, tripID string, searchQuery string) (trip.ListTripExpensesResult, error) {
+	expenseRows, err := s.queries.ListTripExpensesByTrip(ctx, db.ListTripExpensesByTripParams{
+		TripID:      mustUUID(tripID),
+		SearchQuery: searchQuery,
+	})
 	if err != nil {
 		return trip.ListTripExpensesResult{}, err
 	}

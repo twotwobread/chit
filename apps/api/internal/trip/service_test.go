@@ -91,6 +91,7 @@ type fakeRepository struct {
 	tripExpenses                 []DayExpenseListItem
 	tripExpenseDays              []TripExpenseDayListItem
 	listedTripExpensesTripID     string
+	listedTripExpensesQuery      string
 	listTripExpensesCalled       bool
 	listTripExpensesErr          error
 	settlementData               SettlementInput
@@ -434,8 +435,9 @@ func (r *fakeRepository) ListDayExpensesByTripDay(_ context.Context, tripID stri
 	return []DayExpenseListItem{}, nil
 }
 
-func (r *fakeRepository) ListTripExpenses(_ context.Context, tripID string) (ListTripExpensesResult, error) {
+func (r *fakeRepository) ListTripExpenses(_ context.Context, tripID string, searchQuery string) (ListTripExpensesResult, error) {
 	r.listedTripExpensesTripID = tripID
+	r.listedTripExpensesQuery = searchQuery
 	r.listTripExpensesCalled = true
 	if r.listTripExpensesErr != nil {
 		return ListTripExpensesResult{}, r.listTripExpensesErr
@@ -1780,18 +1782,52 @@ func TestServiceListTripExpensesUsesBatchRepository(t *testing.T) {
 	}
 	service := newTestService(repo)
 
-	result, err := service.ListTripExpenses(context.Background(), "user-1", testTripID)
+	result, err := service.ListTripExpenses(context.Background(), "user-1", testTripID, "")
 	if err != nil {
 		t.Fatalf("ListTripExpenses returned error: %v", err)
 	}
-	if !repo.listTripExpensesCalled || repo.listedTripExpensesTripID != testTripID {
-		t.Fatalf("expected batch repository call, got trip=%q called=%v", repo.listedTripExpensesTripID, repo.listTripExpensesCalled)
+	if !repo.listTripExpensesCalled || repo.listedTripExpensesTripID != testTripID || repo.listedTripExpensesQuery != "" {
+		t.Fatalf("expected batch repository call, got trip=%q query=%q called=%v", repo.listedTripExpensesTripID, repo.listedTripExpensesQuery, repo.listTripExpensesCalled)
 	}
 	if repo.listDayExpensesCalled {
 		t.Fatal("expected day expense repository call not to be used")
 	}
 	if len(result.Days) != 1 || result.Days[0].TripDayID != testUUID(9101) || len(result.Days[0].Expenses) != 1 || !result.Days[0].Expenses[0].CreatedAt.Equal(createdAt) {
 		t.Fatalf("unexpected trip expense result: %#v", result)
+	}
+}
+
+func TestServiceListTripExpensesTrimsSearchQuery(t *testing.T) {
+	repo := &fakeRepository{
+		trip:          Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"},
+		tripFound:     true,
+		isParticipant: true,
+	}
+	service := newTestService(repo)
+
+	_, err := service.ListTripExpenses(context.Background(), "user-1", testTripID, "  라멘  ")
+	if err != nil {
+		t.Fatalf("ListTripExpenses returned error: %v", err)
+	}
+	if repo.listedTripExpensesQuery != "라멘" {
+		t.Fatalf("expected trimmed search query, got %q", repo.listedTripExpensesQuery)
+	}
+}
+
+func TestServiceListTripExpensesRejectsOverlongSearchQuery(t *testing.T) {
+	repo := &fakeRepository{
+		trip:          Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13"},
+		tripFound:     true,
+		isParticipant: true,
+	}
+	service := newTestService(repo)
+
+	_, err := service.ListTripExpenses(context.Background(), "user-1", testTripID, strings.Repeat("가", 81))
+	if !errors.Is(err, ErrValidation) {
+		t.Fatalf("expected ErrValidation, got %v", err)
+	}
+	if repo.listTripExpensesCalled {
+		t.Fatal("expected repository not to be called for overlong search query")
 	}
 }
 

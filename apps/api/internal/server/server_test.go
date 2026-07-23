@@ -2829,7 +2829,7 @@ func TestCreateTripExpenseHandlerCreatesTripLevelExpense(t *testing.T) {
 	}
 
 	listRecorder := httptest.NewRecorder()
-	listRequest := httptest.NewRequest(http.MethodGet, "/trips/"+tripID+"/expenses", nil)
+	listRequest := httptest.NewRequest(http.MethodGet, "/trips/"+tripID+"/expenses?q=+%EB%9D%BC%EB%A9%98+", nil)
 	listRequest.Header.Set("Authorization", "Bearer "+ownerToken)
 	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(listRecorder, listRequest)
 	if listRecorder.Code != http.StatusOK {
@@ -2851,6 +2851,9 @@ func TestCreateTripExpenseHandlerCreatesTripLevelExpense(t *testing.T) {
 	}
 	if len(listBody.TripExpenses) != 1 || listBody.TripExpenses[0].AnchorType != "trip" || listBody.TripExpenses[0].Title != nil || listBody.TripExpenses[0].DisplayTitle != "항공권" || listBody.TripExpenses[0].Currency != "USD" || listBody.TripExpenses[0].ExpenseCategory != "transport" || listBody.TripExpenses[0].IncludeInSettlement == nil || !*listBody.TripExpenses[0].IncludeInSettlement || len(listBody.Days) != 0 {
 		t.Fatalf("unexpected list response: %#v", listBody)
+	}
+	if backend.listTripExpensesQ != "라멘" {
+		t.Fatalf("expected handler to forward trimmed search query, got %q", backend.listTripExpensesQ)
 	}
 }
 
@@ -5263,6 +5266,7 @@ type fakeAuthBackend struct {
 	dayLodgingPlaces  map[string]tripdomain.TripPlaceSummary
 	dayScheduleItems  map[string][]tripdomain.ScheduleItem
 	tripExpenses      map[string][]tripdomain.DayExpenseListItem
+	listTripExpensesQ string
 	tripExpenseDetail map[string]tripdomain.Expense
 	dayExpenses       map[string][]tripdomain.DayExpenseListItem
 	tripInvites       map[string]tripdomain.TripInvite
@@ -6076,7 +6080,8 @@ func (b *fakeAuthBackend) ListDayExpensesByTripDay(_ context.Context, tripID str
 	return expenses, nil
 }
 
-func (b *fakeAuthBackend) ListTripExpenses(_ context.Context, tripID string) (tripdomain.ListTripExpensesResult, error) {
+func (b *fakeAuthBackend) ListTripExpenses(_ context.Context, tripID string, searchQuery string) (tripdomain.ListTripExpensesResult, error) {
+	b.listTripExpensesQ = searchQuery
 	tripExpenses := append([]tripdomain.DayExpenseListItem(nil), b.tripExpenses[tripID]...)
 	sort.SliceStable(tripExpenses, func(left, right int) bool {
 		if tripExpenses[left].CreatedAt.Equal(tripExpenses[right].CreatedAt) {

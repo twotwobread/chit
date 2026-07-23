@@ -1289,7 +1289,7 @@ paths:
     get:
       operationId: listTripExpenses
       summary: List expenses for a trip
-      description: Returns read-only expense rows grouped by trip context in one request. Trip-level rows are returned separately, and day rows are ordered by day then newest expense first.
+      description: Returns read-only expense rows grouped by trip context in one request. Trip-level rows are returned separately, and day rows are ordered by day then newest expense first. Optional text search filters expense rows by expense fields and saved receipt extraction fields without returning extracted receipt text.
       tags:
         - Trips
       security:
@@ -1300,6 +1300,14 @@ paths:
           required: true
           schema:
             type: string
+        - name: q
+          in: query
+          required: false
+          description: Optional expense search text. Blank values are treated as no filter.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 80
       responses:
         '200':
           description: Trip expenses grouped by trip context.

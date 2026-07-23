@@ -633,12 +633,16 @@ func (s *Service) ListDayExpenses(ctx context.Context, userID string, tripID str
 	return ListDayExpensesResult{Expenses: expenses}, nil
 }
 
-func (s *Service) ListTripExpenses(ctx context.Context, userID string, tripID string) (ListTripExpensesResult, error) {
+func (s *Service) ListTripExpenses(ctx context.Context, userID string, tripID string, searchQuery string) (ListTripExpensesResult, error) {
 	if strings.TrimSpace(userID) == "" {
 		return ListTripExpensesResult{}, ErrUnauthorized
 	}
 	tripID = strings.TrimSpace(tripID)
 	if !isUUID(tripID) {
+		return ListTripExpensesResult{}, ErrValidation
+	}
+	searchQuery = strings.TrimSpace(searchQuery)
+	if len([]rune(searchQuery)) > 80 {
 		return ListTripExpensesResult{}, ErrValidation
 	}
 
@@ -657,7 +661,7 @@ func (s *Service) ListTripExpenses(ctx context.Context, userID string, tripID st
 		return ListTripExpensesResult{}, ErrForbidden
 	}
 
-	result, err := s.repo.ListTripExpenses(ctx, tripID)
+	result, err := s.repo.ListTripExpenses(ctx, tripID, searchQuery)
 	if err != nil {
 		return ListTripExpensesResult{}, err
 	}

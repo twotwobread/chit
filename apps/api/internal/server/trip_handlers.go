@@ -390,7 +390,7 @@ func (s apiServer) ListDayExpenses(w http.ResponseWriter, r *http.Request, tripI
 	writeJSON(w, http.StatusOK, listDayExpensesResponseToOpenAPI(result))
 }
 
-func (s apiServer) ListTripExpenses(w http.ResponseWriter, r *http.Request, tripId string) {
+func (s apiServer) ListTripExpenses(w http.ResponseWriter, r *http.Request, tripId string, params openapi.ListTripExpensesParams) {
 	if s.auth == nil || s.trips == nil {
 		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "trip expense listing is not configured", nil)
 		return
@@ -401,7 +401,11 @@ func (s apiServer) ListTripExpenses(w http.ResponseWriter, r *http.Request, trip
 		return
 	}
 
-	result, err := s.trips.ListTripExpenses(r.Context(), authContext.UserID, tripId)
+	searchQuery := ""
+	if params.Q != nil {
+		searchQuery = *params.Q
+	}
+	result, err := s.trips.ListTripExpenses(r.Context(), authContext.UserID, tripId, searchQuery)
 	if err != nil {
 		writeDayExpenseListError(w, err)
 		return

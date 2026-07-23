@@ -3128,6 +3128,106 @@ func TestDeleteTripMemberParticipantRefreshesExpenseParticipantFallbacks(t *test
 	assertTripRepositoryParticipantCount(t, ctx, store, tripID, targetParticipantID, 0)
 }
 
+func TestListTripExpensesSearchMatchesSavedReceiptExtraction(t *testing.T) {
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("DATABASE_URL is required for storage integration test")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	store, err := Open(ctx, databaseURL)
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer store.Close()
+
+	ownerUserID := insertTripRepositoryTestUser(t, ctx, store, "F432 Owner")
+	t.Cleanup(func() {
+		_, _ = store.pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1::uuid`, ownerUserID)
+	})
+	tripID := insertTripRepositoryTestTrip(t, ctx, store, "F432 지출 검색 여행", ownerUserID)
+	t.Cleanup(func() { _, _ = store.pool.Exec(context.Background(), `DELETE FROM trips WHERE id = $1::uuid`, tripID) })
+	payerParticipantID := insertTripRepositoryTestParticipant(t, ctx, store, tripID, ownerUserID, trip.RoleOwner, "민수")
+
+	var receiptExpenseID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO expenses (trip_id, anchor_type, expense_date, title, amount_minor, currency, split_policy, payer_participant_id, payer_display_name, created_by)
+		VALUES ($1::uuid, 'trip', '2026-07-11', '카드 결제', 1200, 'JPY', 'equal', $2::uuid, '민수', $3::uuid)
+		RETURNING id::text
+	`, tripID, payerParticipantID, ownerUserID).Scan(&receiptExpenseID); err != nil {
+		t.Fatalf("insert receipt-backed expense: %v", err)
+	}
+	var taxiExpenseID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO expenses (trip_id, anchor_type, expense_date, title, amount_minor, currency, split_policy, payer_participant_id, payer_display_name, created_by)
+		VALUES ($1::uuid, 'trip', '2026-07-11', '택시', 900, 'JPY', 'equal', $2::uuid, '민수', $3::uuid)
+		RETURNING id::text
+	`, tripID, payerParticipantID, ownerUserID).Scan(&taxiExpenseID); err != nil {
+		t.Fatalf("insert non-matching expense: %v", err)
+	}
+	if _, err := store.pool.Exec(ctx, `
+		INSERT INTO expense_receipts (expense_id, trip_id, uploaded_by_user_id, objects_json, image_count, content_type, byte_size, uploaded_at)
+		VALUES ($1::uuid, $2::uuid, $3::uuid, '[{"bucket":"receipt-bucket","objectKey":"receipts/f432.png","generation":"1","role":"single"}]'::jsonb, 1, 'image/png', 42, now())
+	`, receiptExpenseID, tripID, ownerUserID); err != nil {
+		t.Fatalf("insert saved receipt metadata: %v", err)
+	}
+	if _, err := store.pool.Exec(ctx, `
+		INSERT INTO expense_receipt_drafts (trip_id, created_by_user_id, capture_mode, objects_json, image_count, content_type, byte_size, uploaded_at, extraction_json, confidence, status, expires_at, used_expense_id)
+		VALUES (
+		  $1::uuid,
+		  $2::uuid,
+		  'single',
+		  '[{"bucket":"receipt-bucket","objectKey":"receipts/f432.png","generation":"1","role":"single"}]'::jsonb,
+		  1,
+		  'image/png',
+		  42,
+		  now(),
+		  '{"merchantName":"오사카 식당","merchantAddress":"난바","expenseTitle":"저녁","placeCandidateName":"오사카 라멘","placeCandidateAddress":"난바","lineItems":[{"name":"라멘 세트","amountMinor":1200,"quantity":1}],"confidence":"high","warnings":[]}'::jsonb,
+		  'high',
+		  'used',
+		  now() + interval '1 day',
+		  $3::uuid
+		), (
+		  $1::uuid,
+		  $2::uuid,
+		  'single',
+		  '[{"bucket":"receipt-bucket","objectKey":"receipts/f432-duplicate.png","generation":"1","role":"single"}]'::jsonb,
+		  1,
+		  'image/png',
+		  42,
+		  now(),
+		  '{"merchantName":"라멘 보관용","merchantAddress":"난바","expenseTitle":"저녁","placeCandidateName":"오사카 라멘","placeCandidateAddress":"난바","lineItems":[{"name":"라멘 세트","amountMinor":1200,"quantity":1}],"confidence":"high","warnings":[]}'::jsonb,
+		  'high',
+		  'used',
+		  now() + interval '1 day',
+		  $3::uuid
+		)
+	`, tripID, ownerUserID, receiptExpenseID); err != nil {
+		t.Fatalf("insert used receipt draft extractions: %v", err)
+	}
+
+	result, err := store.ListTripExpenses(ctx, tripID, "라멘")
+	if err != nil {
+		t.Fatalf("ListTripExpenses search returned error: %v", err)
+	}
+	if len(result.TripExpenses) != 1 || result.TripExpenses[0].ID != receiptExpenseID {
+		t.Fatalf("expected only receipt extraction match %s, got trip=%#v days=%#v", receiptExpenseID, result.TripExpenses, result.Days)
+	}
+	if !result.TripExpenses[0].Receipt.Exists {
+		t.Fatalf("expected normal expense row to keep receipt summary, got %#v", result.TripExpenses[0].Receipt)
+	}
+
+	blankResult, err := store.ListTripExpenses(ctx, tripID, "   ")
+	if err != nil {
+		t.Fatalf("ListTripExpenses blank query returned error: %v", err)
+	}
+	if len(blankResult.TripExpenses) != 2 {
+		t.Fatalf("expected blank query to preserve full list including %s and %s, got %#v", receiptExpenseID, taxiExpenseID, blankResult.TripExpenses)
+	}
+}
+
 func TestListTripParticipantsOrdersOwnerFirstThenJoinedAt(t *testing.T) {
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
