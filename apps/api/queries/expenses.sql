@@ -227,6 +227,9 @@ SELECT
   er.uploaded_at AS receipt_uploaded_at,
   e.created_at
 FROM expenses e
+CROSS JOIN LATERAL (
+  SELECT NULLIF(btrim(sqlc.arg(search_query)::text), '') AS query
+) search
 LEFT JOIN expense_receipts er
   ON er.expense_id = e.id
  AND er.trip_id = e.trip_id
@@ -247,6 +250,47 @@ LEFT JOIN trip_participants payer
  AND payer.trip_id = e.trip_id
 WHERE e.trip_id = sqlc.arg(trip_id)::uuid
   AND e.anchor_type IN ('trip', 'trip_day', 'schedule_item')
+  AND (
+    search.query IS NULL
+    OR position(lower(search.query) in lower(COALESCE(e.title, ''))) > 0
+    OR position(lower(search.query) in lower(COALESCE(e.memo, ''))) > 0
+    OR position(lower(search.query) in lower(COALESCE(live_place.name, e.place_name, ''))) > 0
+    OR position(lower(search.query) in lower(COALESCE(live_place.address, e.place_address, ''))) > 0
+    OR position(lower(search.query) in lower(COALESCE(payer.display_name, e.payer_display_name, ''))) > 0
+    OR position(lower(search.query) in lower(e.expense_category)) > 0
+    OR position(lower(search.query) in lower(CASE e.expense_category
+      WHEN 'cafe' THEN '카페 cafe'
+      WHEN 'etc' THEN '기타 etc'
+      WHEN 'food' THEN '식당 food 음식'
+      WHEN 'lodging' THEN '숙소 lodging'
+      WHEN 'shopping' THEN '쇼핑 shopping'
+      WHEN 'sights' THEN '관광지 sights'
+      WHEN 'transport' THEN '교통 transport 택시'
+      ELSE e.expense_category
+    END)) > 0
+    OR (
+      er.expense_id IS NOT NULL
+      AND EXISTS (
+        SELECT 1
+        FROM expense_receipt_drafts erd
+        WHERE erd.trip_id = e.trip_id
+          AND erd.used_expense_id = e.id
+          AND erd.status = 'used'
+          AND (
+            position(lower(search.query) in lower(COALESCE(erd.extraction_json->>'merchantName', ''))) > 0
+            OR position(lower(search.query) in lower(COALESCE(erd.extraction_json->>'merchantAddress', ''))) > 0
+            OR position(lower(search.query) in lower(COALESCE(erd.extraction_json->>'expenseTitle', ''))) > 0
+            OR position(lower(search.query) in lower(COALESCE(erd.extraction_json->>'placeCandidateName', ''))) > 0
+            OR position(lower(search.query) in lower(COALESCE(erd.extraction_json->>'placeCandidateAddress', ''))) > 0
+            OR EXISTS (
+              SELECT 1
+              FROM jsonb_array_elements(COALESCE(erd.extraction_json->'lineItems', '[]'::jsonb)) AS receipt_line_item(value)
+              WHERE position(lower(search.query) in lower(COALESCE(receipt_line_item.value->>'name', ''))) > 0
+            )
+          )
+      )
+    )
+  )
 ORDER BY
   CASE WHEN e.anchor_type = 'trip' THEN 0 ELSE 1 END ASC,
   e.trip_day_id ASC NULLS FIRST,

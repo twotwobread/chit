@@ -992,7 +992,7 @@ type Repository interface {
 	ListScheduleItemsByTripDay(ctx context.Context, tripID string, tripDayID string) ([]ScheduleItem, error)
 	ListTripScheduleItems(ctx context.Context, tripID string) ([]TripScheduleItemsDayListItem, error)
 	ListDayExpensesByTripDay(ctx context.Context, tripID string, tripDayID string) ([]DayExpenseListItem, error)
-	ListTripExpenses(ctx context.Context, tripID string) (ListTripExpensesResult, error)
+	ListTripExpenses(ctx context.Context, tripID string, searchQuery string) (ListTripExpensesResult, error)
 	GetTripSettlementInput(ctx context.Context, tripID string) (SettlementInput, error)
 	GetExpenseByTripDayAndID(ctx context.Context, tripID string, tripDayID string, expenseID string) (Expense, bool, error)
 	GetTripExpenseByID(ctx context.Context, tripID string, expenseID string) (Expense, bool, error)

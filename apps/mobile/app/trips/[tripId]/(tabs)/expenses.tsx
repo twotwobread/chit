@@ -1,11 +1,12 @@
-import { useCallback, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Keyboard, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { Search as SearchIcon, X } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { ListTripExpensesResponse } from '@i-um/api-contract';
 
-import { FilterChip, InlineAction, SecondaryButton, TextLink, theme } from '../../../../lib/design';
+import { FilterChip, IconButton, InlineAction, SecondaryButton, TextLink, theme } from '../../../../lib/design';
 import { ExpenseRow } from '../../../../lib/trip-ui/ExpenseRow';
 import { TripRootFab } from '../../../../lib/trip-ui/TripRootFab';
 import { TripListCard, TripScreen, TripScreenHeader, TripStateCard } from '../../../../lib/trip-ui/TripScreenScaffold';
@@ -21,6 +22,13 @@ import {
   type ExpenseDayBrowserViewModel,
   tripExpenseBucketId,
 } from '../../../../lib/trips/expense-dashboard';
+import {
+  EXPENSE_SEARCH_QUERY_MAX_LENGTH,
+  buildExpenseSearchEmptyState,
+  buildExpenseSearchStatus,
+  hasTripExpenseRows,
+  normalizeTripExpenseSearchQuery,
+} from '../../../../lib/trips/expense-search';
 import {
   resolveTripExpensesRouteState,
   tripExpensesStatePath,
@@ -60,10 +68,38 @@ export default function TripExpensesTabScreen() {
   });
   const shellState = useTripShellState();
   const [state, setState] = useState<TripExpensesState>({ status: 'loading' });
+  const [searchInput, setSearchInput] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const requestSeq = useRef(0);
+  const stateStatusRef = useRef<TripExpensesState['status']>('loading');
   const insets = useSafeAreaInsets();
+
+  useEffect(() => {
+    stateStatusRef.current = state.status;
+  }, [state.status]);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setDebouncedSearchQuery(normalizeTripExpenseSearchQuery(searchInput));
+    }, 300);
+    return () => clearTimeout(timeout);
+  }, [searchInput]);
+
+  const submitSearch = useCallback(() => {
+    setDebouncedSearchQuery(normalizeTripExpenseSearchQuery(searchInput));
+    Keyboard.dismiss();
+  }, [searchInput]);
+
+  const clearSearch = useCallback(() => {
+    setSearchInput('');
+    setDebouncedSearchQuery('');
+    Keyboard.dismiss();
+  }, []);
 
   const load = useCallback(async () => {
     if (!tripId) {
+      setIsSearching(false);
       setState({ status: 'notFound' });
       return;
     }
@@ -73,17 +109,28 @@ export default function TripExpensesTabScreen() {
       return;
     }
     if (shellDetail.status !== 'success') {
+      setIsSearching(false);
       setState(expenseShellFailureState(shellDetail.status));
       return;
     }
 
-    setState({ status: 'loading' });
+    const requestID = requestSeq.current + 1;
+    requestSeq.current = requestID;
+    setIsSearching(stateStatusRef.current === 'ready');
+    setState((current) => (current.status === 'ready' ? current : { status: 'loading' }));
     try {
-      setState({ status: 'ready', response: await listTripExpenses(tripId) });
+      const response = await listTripExpenses(tripId, debouncedSearchQuery);
+      if (requestSeq.current === requestID) {
+        setState({ status: 'ready', response });
+        setIsSearching(false);
+      }
     } catch {
-      setState({ status: 'error' });
+      if (requestSeq.current === requestID) {
+        setState({ status: 'error' });
+        setIsSearching(false);
+      }
     }
-  }, [shellState, tripId]);
+  }, [debouncedSearchQuery, shellState, tripId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -139,15 +186,21 @@ export default function TripExpensesTabScreen() {
           <ExpenseContent
             mode={expenseRouteState.mode}
             onBack={() => updateExpenseRouteState({ mode: 'main', selectedCategory: null, selectedDayId: null })}
+            isSearching={isSearching}
             onCategorySelect={(category) =>
               updateExpenseRouteState({ mode: 'categories', selectedCategory: category, selectedDayId: null })
             }
+            onClearSearch={clearSearch}
             onDaySelect={(dayId) =>
               updateExpenseRouteState({ mode: 'days', selectedCategory: null, selectedDayId: dayId })
             }
             onOpenCategories={() => updateExpenseRouteState({ mode: 'categories', selectedDayId: null })}
             onOpenDays={() => updateExpenseRouteState({ mode: 'days', selectedCategory: null })}
+            onSearchInputChange={setSearchInput}
+            onSubmitSearch={submitSearch}
             response={state.response}
+            searchInput={searchInput}
+            searchQuery={debouncedSearchQuery}
             selectedCategory={expenseRouteState.selectedCategory}
             selectedDayId={expenseRouteState.selectedDayId}
             tripDays={detail.days}
@@ -168,13 +221,19 @@ export default function TripExpensesTabScreen() {
 }
 
 function ExpenseContent({
+  isSearching,
   mode,
   onBack,
   onCategorySelect,
+  onClearSearch,
   onDaySelect,
   onOpenCategories,
   onOpenDays,
+  onSearchInputChange,
+  onSubmitSearch,
   response,
+  searchInput,
+  searchQuery,
   selectedCategory,
   selectedDayId,
   tripDays,
@@ -186,12 +245,40 @@ function ExpenseContent({
   mode: TripExpensesRouteMode;
   selectedDayId: string | null;
   selectedCategory: string | null;
+  searchInput: string;
+  searchQuery: string;
+  isSearching: boolean;
   onOpenDays: () => void;
   onOpenCategories: () => void;
   onBack: () => void;
+  onClearSearch: () => void;
+  onSearchInputChange: (value: string) => void;
+  onSubmitSearch: () => void;
   onDaySelect: (dayId: string) => void;
   onCategorySelect: (category: string) => void;
 }) {
+  const hasRows = hasTripExpenseRows(response);
+  const searchCard = (
+    <ExpenseSearchCard
+      activeQuery={searchQuery}
+      hasResults={hasRows}
+      isSearching={isSearching}
+      onChange={onSearchInputChange}
+      onClear={onClearSearch}
+      onSubmit={onSubmitSearch}
+      query={searchInput}
+    />
+  );
+  if (searchQuery && !isSearching && !hasRows) {
+    const emptyState = buildExpenseSearchEmptyState(searchQuery);
+    return (
+      <>
+        {searchCard}
+        <TripStateCard helper={emptyState.helper} title={emptyState.title} />
+      </>
+    );
+  }
+
   if (mode === 'days') {
     const viewModel = buildExpenseDayBrowserViewModel({
       tripId,
@@ -199,7 +286,12 @@ function ExpenseContent({
       response,
       selectedSectionId: selectedDayId,
     });
-    return <ExpenseDayBrowserContent onBack={onBack} onSelectDay={onDaySelect} viewModel={viewModel} />;
+    return (
+      <>
+        {searchCard}
+        <ExpenseDayBrowserContent onBack={onBack} onSelectDay={onDaySelect} viewModel={viewModel} />
+      </>
+    );
   }
 
   if (mode === 'categories') {
@@ -211,11 +303,86 @@ function ExpenseContent({
         typeof buildExpenseCategoryBrowserViewModel
       >[0]['selectedCategory'],
     });
-    return <ExpenseCategoryBrowserContent onBack={onBack} onSelectCategory={onCategorySelect} viewModel={viewModel} />;
+    return (
+      <>
+        {searchCard}
+        <ExpenseCategoryBrowserContent onBack={onBack} onSelectCategory={onCategorySelect} viewModel={viewModel} />
+      </>
+    );
   }
 
   const viewModel = buildExpenseDashboardViewModel({ tripId, days: tripDays, response });
-  return <ExpenseDashboardContent onOpenCategories={onOpenCategories} onOpenDays={onOpenDays} viewModel={viewModel} />;
+  return (
+    <>
+      {searchCard}
+      <ExpenseDashboardContent onOpenCategories={onOpenCategories} onOpenDays={onOpenDays} viewModel={viewModel} />
+    </>
+  );
+}
+
+function ExpenseSearchCard({
+  activeQuery,
+  hasResults,
+  isSearching,
+  onChange,
+  onClear,
+  onSubmit,
+  query,
+}: {
+  query: string;
+  activeQuery: string;
+  hasResults: boolean;
+  isSearching: boolean;
+  onChange: (value: string) => void;
+  onClear: () => void;
+  onSubmit: () => void;
+}) {
+  const status = buildExpenseSearchStatus({ hasResults, isSearching, query: activeQuery });
+
+  return (
+    <TripListCard>
+      <View style={styles.searchCard}>
+        <View style={styles.cardHeaderText}>
+          <Text style={styles.sectionTitle}>지출 검색</Text>
+          <Text style={styles.sectionHelper}>제목, 장소, 메모, 영수증 품목까지 찾아요.</Text>
+        </View>
+        <View style={styles.searchInputRow}>
+          <SearchIcon color={theme.color.textMuted} size={18} strokeWidth={2.4} />
+          <TextInput
+            accessibilityHint="입력한 검색어로 지출 목록을 필터링합니다."
+            accessibilityLabel="지출 검색어"
+            autoCapitalize="none"
+            autoCorrect={false}
+            maxLength={EXPENSE_SEARCH_QUERY_MAX_LENGTH}
+            onChangeText={onChange}
+            onSubmitEditing={onSubmit}
+            placeholder="라멘, 택시, 숙소 검색"
+            placeholderTextColor={theme.color.textFaint}
+            returnKeyType="search"
+            style={styles.searchInput}
+            value={query}
+          />
+          {isSearching ? <ActivityIndicator color={theme.color.primary} size="small" /> : null}
+          {query ? (
+            <IconButton
+              accessibilityLabel="검색어 지우기"
+              onPress={onClear}
+              style={styles.searchClearButton}
+              variant="plain"
+            >
+              <X color={theme.color.textMuted} size={17} strokeWidth={2.5} />
+            </IconButton>
+          ) : null}
+        </View>
+        {status ? (
+          <View accessibilityLiveRegion="polite" style={styles.searchStatusRow}>
+            <Text style={styles.searchStatusLabel}>{status.label}</Text>
+            <Text style={styles.searchStatusHelper}>{status.helper}</Text>
+          </View>
+        ) : null}
+      </View>
+    </TripListCard>
+  );
 }
 
 function ExpenseDashboardContent({
@@ -621,6 +788,55 @@ const styles = StyleSheet.create({
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.label,
     fontWeight: theme.font.weight.bold,
+  },
+  searchCard: {
+    gap: theme.space[4],
+    paddingHorizontal: theme.space[5],
+    paddingVertical: theme.space[4],
+  },
+  searchClearButton: {
+    backgroundColor: theme.color.surfaceSunken,
+  },
+  searchInput: {
+    color: theme.color.textStrong,
+    flex: 1,
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.body,
+    minHeight: theme.layout.controlH,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+  },
+  searchInputRow: {
+    alignItems: 'center',
+    backgroundColor: theme.color.surface,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.pill,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: theme.space[3],
+    minHeight: theme.layout.controlH,
+    paddingLeft: theme.space[4],
+    paddingRight: theme.space[2],
+    ...theme.shadow.xs,
+  },
+  searchStatusHelper: {
+    color: theme.color.textMuted,
+    flex: 1,
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.caption,
+    lineHeight: theme.font.size.caption * theme.font.leading.normal,
+  },
+  searchStatusLabel: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.semibold,
+    fontSize: theme.font.size.label,
+    fontWeight: theme.font.weight.semibold,
+  },
+  searchStatusRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: theme.space[3],
+    minHeight: theme.layout.tapMin,
   },
   sectionHelper: {
     color: theme.color.textMuted,

@@ -1698,6 +1698,12 @@ type CreateExpenseReceiptDraftMultipartBody struct {
 	TotalImage *openapi_types.File `json:"totalImage,omitempty"`
 }
 
+// ListTripExpensesParams defines parameters for ListTripExpenses.
+type ListTripExpensesParams struct {
+	// Q Optional expense search text. Blank values are treated as no filter.
+	Q *string `form:"q,omitempty" json:"q,omitempty"`
+}
+
 // LinkOAuthProviderJSONRequestBody defines body for LinkOAuthProvider for application/json ContentType.
 type LinkOAuthProviderJSONRequestBody = OAuthLinkRequest
 
@@ -1930,7 +1936,7 @@ type ServerInterface interface {
 	CancelExpenseReceiptDraft(w http.ResponseWriter, r *http.Request, tripId string, receiptDraftId string)
 	// List expenses for a trip
 	// (GET /trips/{tripId}/expenses)
-	ListTripExpenses(w http.ResponseWriter, r *http.Request, tripId string)
+	ListTripExpenses(w http.ResponseWriter, r *http.Request, tripId string, params ListTripExpensesParams)
 	// Create a general trip expense
 	// (POST /trips/{tripId}/expenses)
 	CreateTripExpense(w http.ResponseWriter, r *http.Request, tripId string)
@@ -2305,7 +2311,7 @@ func (_ Unimplemented) CancelExpenseReceiptDraft(w http.ResponseWriter, r *http.
 
 // List expenses for a trip
 // (GET /trips/{tripId}/expenses)
-func (_ Unimplemented) ListTripExpenses(w http.ResponseWriter, r *http.Request, tripId string) {
+func (_ Unimplemented) ListTripExpenses(w http.ResponseWriter, r *http.Request, tripId string, params ListTripExpensesParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -4225,8 +4231,19 @@ func (siw *ServerInterfaceWrapper) ListTripExpenses(w http.ResponseWriter, r *ht
 
 	r = r.WithContext(ctx)
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListTripExpensesParams
+
+	// ------------- Optional query parameter "q" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "q", r.URL.Query(), &params.Q)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "q", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListTripExpenses(w, r, tripId)
+		siw.Handler.ListTripExpenses(w, r, tripId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
