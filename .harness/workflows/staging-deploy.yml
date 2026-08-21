@@ -10,5 +10,7 @@ phases:
     provider: "staging-deploy-provider"
 
 checks:
+  before_mobile_build:
+    - mobile-expo-sdk-compatibility
   before_output:
     - secret-log-safety

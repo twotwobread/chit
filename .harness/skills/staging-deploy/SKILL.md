@@ -141,6 +141,8 @@ DATABASE_URL='<local-or-runtime-postgresql-url>' pnpm db:status
 
 ## Deploy API to Cloud Run
 
+If the current local branch/worktree is ahead of `origin/develop` and the user asked to deploy the current code, do not use a branch trigger that reads remote `develop`. Use the direct Cloud Build submit path below and record the short SHA/image tag.
+
 After F-004 is merged to `develop`, run the manual Cloud Build trigger:
 
 ```bash
@@ -167,6 +169,8 @@ CLOUD_RUN_URL="$(gcloud run services describe i-um-api-staging \
   --region=asia-northeast3 \
   --format='value(status.url)')"
 ```
+
+Before smoke, confirm the deployed revision uses the intended image tag/short SHA. If `DATABASE_URL` uses `/cloudsql/...`, also confirm the Cloud Run service has the Cloud SQL instance attached and the runtime service account has `roles/cloudsql.client`; missing either causes `/ready` to fail even when the app image is healthy.
 
 Smoke test:
 
@@ -204,6 +208,14 @@ npx eas-cli@latest login
 npx eas-cli@latest init
 ```
 
+Before any EAS internal build, run the Expo SDK compatibility gate. This is blocking; align all reported packages before building, especially launch-time native modules such as `expo-notifications`, `expo-constants`, and `react-native-keyboard-controller`.
+
+```bash
+pnpm --filter @i-um/mobile exec expo install --check
+```
+
+Increment the platform build number for every new installable internal build. For iOS, update `expo.ios.buildNumber`; for Android, update `expo.android.versionCode`. Do not reuse the same bundle/package id + version + build number for a new device install.
+
 Configure the public staging API URL for the EAS `preview` environment. The value is not a secret, but it should point to the Cloud Run staging URL.
 
 ```bash
@@ -224,8 +236,11 @@ Use interactive mode for the first iOS build because EAS must create or select A
 
 If Apple Developer Program activation is still pending, this step may fail until Apple enables certificate/profile management for the account.
 
-Install the build from the EAS build link on an iPhone. Open the app and verify:
+Install the build from the EAS build link on a registered iPhone. Installation is not enough for smoke evidence; open the app and verify it launches past the splash/black screen. If it crashes on launch, collect device crash logs before speculative fixes whenever the device is log-accessible. If logs are unavailable, state that root cause is unconfirmed and prioritize Expo SDK/native dependency compatibility checks before rebuilding.
 
+Verify:
+
+- App launches past splash/black screen
 - `API 연결 성공`
 - `DB 연결 성공`
 - `status: ok`

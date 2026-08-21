@@ -1,0 +1,9 @@
+id: mobile-expo-sdk-compatibility
+type: command
+severity: blocking
+command: pnpm --filter @i-um/mobile exec expo install --check
+applies_to:
+  contracts:
+    - staging.deploy
+evidence:
+  write_to: artifacts/checks/mobile-expo-sdk-compatibility.log
