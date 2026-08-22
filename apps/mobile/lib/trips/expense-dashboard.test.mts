@@ -57,6 +57,36 @@ function response(overrides: Partial<ListTripExpensesResponse> = {}): ListTripEx
   };
 }
 
+test('builds Ledger wording titles for expense dashboard and browsers', () => {
+  const dashboard = buildExpenseDashboardViewModel({
+    tripId: 'trip-a',
+    days: [tripDay()],
+    response: response({ days: [{ tripDayId: 'day-1', expenses: [expense()] }] }),
+  });
+  assert.equal(dashboard.status, 'success');
+  if (dashboard.status !== 'success') return;
+  assert.equal(dashboard.title, '장부');
+  assert.equal(dashboard.helper, '총 1건의 장부 기록을 관리할 수 있어요.');
+
+  const dayBrowser = buildExpenseDayBrowserViewModel({
+    tripId: 'trip-a',
+    days: [tripDay()],
+    response: response({ days: [{ tripDayId: 'day-1', expenses: [expense()] }] }),
+  });
+  assert.equal(dayBrowser.status, 'success');
+  if (dayBrowser.status !== 'success') return;
+  assert.equal(dayBrowser.title, '일자별 장부');
+
+  const categoryBrowser = buildExpenseCategoryBrowserViewModel({
+    tripId: 'trip-a',
+    days: [tripDay()],
+    response: response({ days: [{ tripDayId: 'day-1', expenses: [expense()] }] }),
+  });
+  assert.equal(categoryBrowser.status, 'success');
+  if (categoryBrowser.status !== 'success') return;
+  assert.equal(categoryBrowser.title, '카테고리별 장부');
+});
+
 test('builds expense dashboard summary with category amounts counts and percentages', () => {
   const viewModel = buildExpenseDashboardViewModel({
     tripId: 'trip-a',
