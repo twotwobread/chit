@@ -5539,6 +5539,25 @@ components:
             sortOrder:
               type: integer
               minimum: 0
+    TripEventContext:
+      type: object
+      required:
+        - eventId
+        - meetingId
+        - meetingName
+        - meetingVisibility
+      additionalProperties: false
+      properties:
+        eventId:
+          type: string
+        meetingId:
+          type: string
+        meetingName:
+          type: string
+          minLength: 1
+          maxLength: 80
+        meetingVisibility:
+          $ref: '#/components/schemas/MeetingVisibility'
     Trip:
       type: object
       required:
@@ -5551,6 +5570,7 @@ components:
         - createdBy
         - createdAt
         - updatedAt
+        - eventContext
         - destinations
       properties:
         id:
@@ -5575,6 +5595,11 @@ components:
         updatedAt:
           type: string
           format: date-time
+        eventContext:
+          allOf:
+            - $ref: '#/components/schemas/TripEventContext'
+          nullable: true
+          description: Meeting/event identity for this trip. Null only for compatibility while backfill migrations roll forward.
         destinations:
           type: array
           items:
@@ -7270,6 +7295,7 @@ components:
         - createdAt
         - myRole
         - participantCount
+        - eventContext
       properties:
         id:
           type: string
@@ -7296,6 +7322,11 @@ components:
         participantCount:
           type: integer
           minimum: 1
+        eventContext:
+          allOf:
+            - $ref: '#/components/schemas/TripEventContext'
+          nullable: true
+          description: Meeting/event identity for this trip. Null only for compatibility while backfill migrations roll forward.
     ListTripsResponse:
       type: object
       required:

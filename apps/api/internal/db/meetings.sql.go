@@ -378,6 +378,47 @@ func (q *Queries) GetMeetingCreator(ctx context.Context, dollar_1 pgtype.UUID) (
 	return i, err
 }
 
+const getMeetingMemberByMeetingAndUser = `-- name: GetMeetingMemberByMeetingAndUser :one
+SELECT
+  id::text,
+  meeting_id::text,
+  user_id::text,
+  role,
+  display_name,
+  joined_at
+FROM meeting_members
+WHERE meeting_id = $1::uuid
+  AND user_id = $2::uuid
+`
+
+type GetMeetingMemberByMeetingAndUserParams struct {
+	Column1 pgtype.UUID
+	Column2 pgtype.UUID
+}
+
+type GetMeetingMemberByMeetingAndUserRow struct {
+	ID          string
+	MeetingID   string
+	UserID      string
+	Role        string
+	DisplayName string
+	JoinedAt    pgtype.Timestamptz
+}
+
+func (q *Queries) GetMeetingMemberByMeetingAndUser(ctx context.Context, arg GetMeetingMemberByMeetingAndUserParams) (GetMeetingMemberByMeetingAndUserRow, error) {
+	row := q.db.QueryRow(ctx, getMeetingMemberByMeetingAndUser, arg.Column1, arg.Column2)
+	var i GetMeetingMemberByMeetingAndUserRow
+	err := row.Scan(
+		&i.ID,
+		&i.MeetingID,
+		&i.UserID,
+		&i.Role,
+		&i.DisplayName,
+		&i.JoinedAt,
+	)
+	return i, err
+}
+
 const getMeetingMemberForUser = `-- name: GetMeetingMemberForUser :one
 SELECT
   id::text,

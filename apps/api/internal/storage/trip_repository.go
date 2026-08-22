@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/twotwobread/i-um/apps/api/internal/db"
+	meetingdomain "github.com/twotwobread/i-um/apps/api/internal/meeting"
 	"github.com/twotwobread/i-um/apps/api/internal/notification"
 	"github.com/twotwobread/i-um/apps/api/internal/place"
 	"github.com/twotwobread/i-um/apps/api/internal/trip"
@@ -129,6 +130,45 @@ func (s *Store) CreateTripWithOwner(ctx context.Context, record trip.CreateRecor
 		return trip.CreateResult{}, err
 	}
 
+	eventMeeting, meetingOwner, err := createMeetingWithOwner(ctx, qtx, meetingdomain.CreateMeetingRecord{
+		Name:             createdTrip.Name,
+		Visibility:       meetingdomain.MeetingVisibilityOneOff,
+		CreatedBy:        record.CreatedBy,
+		OwnerDisplayName: record.OwnerDisplayName,
+	})
+	if err != nil {
+		return trip.CreateResult{}, err
+	}
+	createdEvent, err := qtx.CreateEvent(ctx, db.CreateEventParams{
+		MeetingID:       mustUUID(eventMeeting.ID),
+		EventType:       meetingdomain.EventTypeTrip,
+		Title:           createdTrip.Name,
+		StartDate:       createdTrip.StartDate,
+		EndDate:         createdTrip.EndDate,
+		DefaultCurrency: createdTrip.DefaultCurrency,
+		Status:          meetingdomain.EventStatusPlanned,
+		TripID:          mustUUID(createdTrip.ID),
+		CreatedBy:       mustUUID(record.CreatedBy),
+	})
+	if err != nil {
+		return trip.CreateResult{}, err
+	}
+	if _, err := qtx.CreateEventParticipant(ctx, db.CreateEventParticipantParams{
+		EventID:         mustUUID(createdEvent.ID),
+		MeetingMemberID: optionalUUID(meetingOwner.ID),
+		UserID:          mustUUID(record.CreatedBy),
+		Role:            meetingdomain.RoleOwner,
+		DisplayName:     record.OwnerDisplayName,
+	}); err != nil {
+		return trip.CreateResult{}, err
+	}
+	eventContext := &trip.TripEventContext{
+		EventID:           createdEvent.ID,
+		MeetingID:         eventMeeting.ID,
+		MeetingName:       eventMeeting.Name,
+		MeetingVisibility: eventMeeting.Visibility,
+	}
+
 	destinations := make([]trip.TripDestination, 0, len(record.Destinations))
 	for _, destination := range record.Destinations {
 		row, err := qtx.CreateTripDestination(ctx, db.CreateTripDestinationParams{
@@ -169,6 +209,7 @@ func (s *Store) CreateTripWithOwner(ctx context.Context, record trip.CreateRecor
 			CreatedBy:         createdTrip.CreatedBy,
 			CreatedAt:         createdTrip.CreatedAt.Time,
 			UpdatedAt:         createdTrip.UpdatedAt.Time,
+			EventContext:      eventContext,
 			Destinations:      destinations,
 		},
 		OwnerParticipant: trip.Participant{
@@ -197,15 +238,16 @@ func (s *Store) GetTripByID(ctx context.Context, tripID string) (trip.Trip, bool
 	}
 
 	return trip.Trip{
-		ID:                row.ID,
+		ID:                row.TID,
 		Name:              row.Name,
 		StartDate:         dateString(row.StartDate),
 		EndDate:           dateString(row.EndDate),
 		DefaultCurrency:   row.DefaultCurrency,
 		DefaultTravelMode: row.DefaultTravelMode,
-		CreatedBy:         row.CreatedBy,
+		CreatedBy:         row.TCreatedBy,
 		CreatedAt:         row.CreatedAt.Time,
 		UpdatedAt:         row.UpdatedAt.Time,
+		EventContext:      tripEventContextFromValues(row.EventID, row.MeetingID, row.MeetingName, row.MeetingVisibility),
 		Destinations:      destinations,
 	}, true, nil
 }
@@ -220,6 +262,66 @@ func (s *Store) listTripDestinations(ctx context.Context, tripID string) ([]trip
 		destinations = append(destinations, tripDestinationFromListRow(row))
 	}
 	return destinations, nil
+}
+
+func createTripLinkedEventParticipant(ctx context.Context, queries *db.Queries, tripID string, userID string, role string, displayName string) error {
+	eventContext, err := queries.GetTripEventContextByTripID(ctx, mustUUID(tripID))
+	if err == pgx.ErrNoRows {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	createdMeetingMember, err := queries.CreateMeetingMember(ctx, db.CreateMeetingMemberParams{
+		MeetingID:   mustUUID(eventContext.MeetingID),
+		UserID:      mustUUID(userID),
+		Role:        role,
+		DisplayName: displayName,
+	})
+	meetingMemberID := createdMeetingMember.ID
+	if isUniqueConstraintViolation(err, "meeting_members_meeting_user_unique") {
+		existingMeetingMember, existingErr := queries.GetMeetingMemberByMeetingAndUser(ctx, db.GetMeetingMemberByMeetingAndUserParams{
+			Column1: mustUUID(eventContext.MeetingID),
+			Column2: mustUUID(userID),
+		})
+		if existingErr != nil {
+			return existingErr
+		}
+		meetingMemberID = existingMeetingMember.ID
+		err = nil
+	}
+	if err != nil {
+		return err
+	}
+	_, err = queries.CreateEventParticipant(ctx, db.CreateEventParticipantParams{
+		EventID:         mustUUID(eventContext.EventID),
+		MeetingMemberID: optionalUUID(meetingMemberID),
+		UserID:          mustUUID(userID),
+		Role:            role,
+		DisplayName:     displayName,
+	})
+	if isUniqueConstraintViolation(err, "event_participants_event_user_unique") {
+		return nil
+	}
+	return err
+}
+
+func getTripEventContextByTripID(ctx context.Context, queries *db.Queries, tripID string) (*trip.TripEventContext, error) {
+	row, err := queries.GetTripEventContextByTripID(ctx, mustUUID(tripID))
+	if err == pgx.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return tripEventContextFromValues(row.EventID, row.MeetingID, row.MeetingName, row.MeetingVisibility), nil
+}
+
+func tripEventContextFromValues(eventID string, meetingID string, meetingName string, meetingVisibility string) *trip.TripEventContext {
+	if strings.TrimSpace(eventID) == "" || strings.TrimSpace(meetingID) == "" {
+		return nil
+	}
+	return &trip.TripEventContext{EventID: eventID, MeetingID: meetingID, MeetingName: meetingName, MeetingVisibility: meetingVisibility}
 }
 
 func tripDestinationFromCreateRow(row db.CreateTripDestinationRow) trip.TripDestination {
@@ -320,6 +422,19 @@ func (s *Store) UpdateTripBasicInfo(ctx context.Context, record trip.UpdateRecor
 	if err := syncActiveTripDays(ctx, tx, row.ID, row.StartDate, row.EndDate); err != nil {
 		return trip.Trip{}, err
 	}
+	if err := qtx.UpdateTripEventFromTripBasicInfo(ctx, db.UpdateTripEventFromTripBasicInfoParams{
+		TripID:          mustUUID(row.ID),
+		Name:            row.Name,
+		StartDate:       row.StartDate,
+		EndDate:         row.EndDate,
+		DefaultCurrency: row.DefaultCurrency,
+	}); err != nil {
+		return trip.Trip{}, err
+	}
+	eventContext, err := getTripEventContextByTripID(ctx, qtx, row.ID)
+	if err != nil {
+		return trip.Trip{}, err
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return trip.Trip{}, err
 	}
@@ -339,6 +454,7 @@ func (s *Store) UpdateTripBasicInfo(ctx context.Context, record trip.UpdateRecor
 		CreatedBy:         row.CreatedBy,
 		CreatedAt:         row.CreatedAt.Time,
 		UpdatedAt:         row.UpdatedAt.Time,
+		EventContext:      eventContext,
 		Destinations:      destinations,
 	}, nil
 }
@@ -369,6 +485,9 @@ func (s *Store) DeleteTripByID(ctx context.Context, tripID string) (bool, error)
 			return false, err
 		}
 	}
+	if err := qtx.DeleteTripEventByTripID(ctx, tripUUID); err != nil {
+		return false, err
+	}
 	_, err = qtx.DeleteTripByID(ctx, tripUUID)
 	if err == pgx.ErrNoRows {
 		return false, nil
@@ -396,6 +515,12 @@ func (s *Store) DeleteTripMemberParticipant(ctx context.Context, tripID string, 
 		if err := qtx.EnqueueFlightBoardingPassDeletionJobsForParticipant(ctx, db.EnqueueFlightBoardingPassDeletionJobsForParticipantParams{Reason: "participant_removed", TripID: mustUUID(tripID), ParticipantID: mustUUID(participantID)}); err != nil {
 			return false, err
 		}
+	}
+	if err := qtx.DeleteTripLinkedEventParticipantByTripParticipant(ctx, db.DeleteTripLinkedEventParticipantByTripParticipantParams{
+		TripID:        mustUUID(tripID),
+		ParticipantID: mustUUID(participantID),
+	}); err != nil {
+		return false, err
 	}
 	_, err = qtx.DeleteTripMemberParticipant(ctx, db.DeleteTripMemberParticipantParams{
 		TripID:        mustUUID(tripID),
@@ -511,11 +636,12 @@ func (s *Store) AcceptTripInvite(ctx context.Context, record trip.AcceptTripInvi
 		return trip.AcceptTripInviteResult{}, err
 	}
 
+	displayName := trip.NormalizeParticipantDisplayName(user.DisplayName)
 	_, err = qtx.CreateTripParticipant(ctx, db.CreateTripParticipantParams{
 		Column1:     mustUUID(invite.TiTripID),
 		Column2:     mustUUID(record.UserID),
 		Role:        trip.RoleMember,
-		DisplayName: trip.NormalizeParticipantDisplayName(user.DisplayName),
+		DisplayName: displayName,
 	})
 	if isUniqueConstraintViolation(err, "trip_participants_trip_user_unique") {
 		participantRole, err := qtx.GetTripParticipantRole(ctx, db.GetTripParticipantRoleParams{
@@ -531,6 +657,9 @@ func (s *Store) AcceptTripInvite(ctx context.Context, record trip.AcceptTripInvi
 		return trip.AcceptTripInviteResult{TripID: invite.TiTripID, TripName: invite.TripName, Role: participantRole, AlreadyAccepted: true}, nil
 	}
 	if err != nil {
+		return trip.AcceptTripInviteResult{}, err
+	}
+	if err := createTripLinkedEventParticipant(ctx, qtx, invite.TiTripID, record.UserID, meetingdomain.RoleMember, displayName); err != nil {
 		return trip.AcceptTripInviteResult{}, err
 	}
 
@@ -598,6 +727,7 @@ func (s *Store) ListTripsByParticipantUser(ctx context.Context, userID string) (
 			CreatedAt:         row.CreatedAt.Time,
 			MyRole:            row.MyRole,
 			ParticipantCount:  int(row.ParticipantCount),
+			EventContext:      tripEventContextFromValues(row.EventID, row.MeetingID, row.MeetingName, row.MeetingVisibility),
 		})
 	}
 	return trips, nil

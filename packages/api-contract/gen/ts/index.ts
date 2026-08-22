@@ -170,6 +170,7 @@ export type { TripDay } from './models/TripDay';
 export type { TripDefaultTravelMode } from './models/TripDefaultTravelMode';
 export type { TripDestination } from './models/TripDestination';
 export type { TripDestinationInput } from './models/TripDestinationInput';
+export type { TripEventContext } from './models/TripEventContext';
 export type { TripExpenseDayListItem } from './models/TripExpenseDayListItem';
 export type { TripInvite } from './models/TripInvite';
 export type { TripListItem } from './models/TripListItem';

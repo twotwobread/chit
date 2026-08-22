@@ -397,7 +397,15 @@ type Trip struct {
 	CreatedBy         string
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
+	EventContext      *TripEventContext
 	Destinations      []TripDestination
+}
+
+type TripEventContext struct {
+	EventID           string
+	MeetingID         string
+	MeetingName       string
+	MeetingVisibility string
 }
 
 type TripDestination struct {
@@ -985,6 +993,7 @@ type ListItem struct {
 	CreatedAt         time.Time
 	MyRole            string
 	ParticipantCount  int
+	EventContext      *TripEventContext
 }
 
 type Repository interface {

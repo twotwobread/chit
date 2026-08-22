@@ -5,6 +5,7 @@
 import type { SupportedCurrency } from './SupportedCurrency';
 import type { TripDefaultTravelMode } from './TripDefaultTravelMode';
 import type { TripDestination } from './TripDestination';
+import type { TripEventContext } from './TripEventContext';
 export type Trip = {
     id: string;
     name: string;
@@ -15,5 +16,9 @@ export type Trip = {
     createdBy: string;
     createdAt: string;
     updatedAt: string;
+    /**
+     * Meeting/event identity for this trip. Null only for compatibility while backfill migrations roll forward.
+     */
+    eventContext: TripEventContext | null;
     destinations: Array<TripDestination>;
 };

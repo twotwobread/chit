@@ -585,6 +585,71 @@ func (q *Queries) DeleteTripByID(ctx context.Context, dollar_1 pgtype.UUID) (str
 	return id, err
 }
 
+const deleteTripEventByTripID = `-- name: DeleteTripEventByTripID :exec
+WITH linked AS (
+  SELECT
+    e.id AS event_id,
+    m.id AS meeting_id,
+    m.visibility AS meeting_visibility
+  FROM events e
+  JOIN meetings m ON m.id = e.meeting_id
+  WHERE e.trip_id = $1::uuid
+), deleted_event AS (
+  DELETE FROM events
+  WHERE id IN (SELECT event_id FROM linked)
+  RETURNING 1
+)
+DELETE FROM meetings
+WHERE id IN (
+  SELECT meeting_id
+  FROM linked
+  WHERE meeting_visibility = 'one_off'
+)
+  AND EXISTS (SELECT 1 FROM deleted_event)
+`
+
+func (q *Queries) DeleteTripEventByTripID(ctx context.Context, tripID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteTripEventByTripID, tripID)
+	return err
+}
+
+const deleteTripLinkedEventParticipantByTripParticipant = `-- name: DeleteTripLinkedEventParticipantByTripParticipant :exec
+WITH linked AS (
+  SELECT
+    ep.id AS event_participant_id,
+    ep.meeting_member_id,
+    m.visibility AS meeting_visibility
+  FROM trip_participants tp
+  JOIN events e ON e.trip_id = tp.trip_id
+  JOIN event_participants ep ON ep.event_id = e.id AND ep.user_id = tp.user_id
+  JOIN meetings m ON m.id = e.meeting_id
+  WHERE tp.trip_id = $1::uuid
+    AND tp.id = $2::uuid
+    AND tp.role = 'member'
+), deleted_event_participant AS (
+  DELETE FROM event_participants
+  WHERE id IN (SELECT event_participant_id FROM linked)
+  RETURNING 1
+)
+DELETE FROM meeting_members
+WHERE id IN (
+  SELECT meeting_member_id
+  FROM linked
+  WHERE meeting_visibility = 'one_off'
+)
+  AND EXISTS (SELECT 1 FROM deleted_event_participant)
+`
+
+type DeleteTripLinkedEventParticipantByTripParticipantParams struct {
+	TripID        pgtype.UUID
+	ParticipantID pgtype.UUID
+}
+
+func (q *Queries) DeleteTripLinkedEventParticipantByTripParticipant(ctx context.Context, arg DeleteTripLinkedEventParticipantByTripParticipantParams) error {
+	_, err := q.db.Exec(ctx, deleteTripLinkedEventParticipantByTripParticipant, arg.TripID, arg.ParticipantID)
+	return err
+}
+
 const deleteTripMemberParticipant = `-- name: DeleteTripMemberParticipant :one
 WITH target AS (
   SELECT
@@ -971,44 +1036,88 @@ func (q *Queries) GetScheduleItemByTripDayAndID(ctx context.Context, arg GetSche
 
 const getTripByID = `-- name: GetTripByID :one
 SELECT
-  id::text,
-  name,
-  start_date,
-  end_date,
-  default_currency,
-  default_travel_mode,
-  created_by::text,
-  created_at,
-  updated_at
-FROM trips
-WHERE id = $1::uuid
+  t.id::text,
+  t.name,
+  t.start_date,
+  t.end_date,
+  t.default_currency,
+  t.default_travel_mode,
+  t.created_by::text,
+  t.created_at,
+  t.updated_at,
+  COALESCE(e.id::text, ''::text)::text AS event_id,
+  COALESCE(m.id::text, ''::text)::text AS meeting_id,
+  COALESCE(m.name, ''::text)::text AS meeting_name,
+  COALESCE(m.visibility, ''::text)::text AS meeting_visibility
+FROM trips t
+LEFT JOIN events e ON e.trip_id = t.id
+LEFT JOIN meetings m ON m.id = e.meeting_id
+WHERE t.id = $1::uuid
 `
 
 type GetTripByIDRow struct {
-	ID                string
+	TID               string
 	Name              string
 	StartDate         pgtype.Date
 	EndDate           pgtype.Date
 	DefaultCurrency   string
 	DefaultTravelMode string
-	CreatedBy         string
+	TCreatedBy        string
 	CreatedAt         pgtype.Timestamptz
 	UpdatedAt         pgtype.Timestamptz
+	EventID           string
+	MeetingID         string
+	MeetingName       string
+	MeetingVisibility string
 }
 
 func (q *Queries) GetTripByID(ctx context.Context, dollar_1 pgtype.UUID) (GetTripByIDRow, error) {
 	row := q.db.QueryRow(ctx, getTripByID, dollar_1)
 	var i GetTripByIDRow
 	err := row.Scan(
-		&i.ID,
+		&i.TID,
 		&i.Name,
 		&i.StartDate,
 		&i.EndDate,
 		&i.DefaultCurrency,
 		&i.DefaultTravelMode,
-		&i.CreatedBy,
+		&i.TCreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.EventID,
+		&i.MeetingID,
+		&i.MeetingName,
+		&i.MeetingVisibility,
+	)
+	return i, err
+}
+
+const getTripEventContextByTripID = `-- name: GetTripEventContextByTripID :one
+SELECT
+  e.id::text AS event_id,
+  m.id::text AS meeting_id,
+  m.name AS meeting_name,
+  m.visibility AS meeting_visibility
+FROM events e
+JOIN meetings m ON m.id = e.meeting_id
+WHERE e.trip_id = $1::uuid
+`
+
+type GetTripEventContextByTripIDRow struct {
+	EventID           string
+	MeetingID         string
+	MeetingName       string
+	MeetingVisibility string
+}
+
+func (q *Queries) GetTripEventContextByTripID(ctx context.Context, dollar_1 pgtype.UUID) (GetTripEventContextByTripIDRow, error) {
+	row := q.db.QueryRow(ctx, getTripEventContextByTripID, dollar_1)
+	var i GetTripEventContextByTripIDRow
+	err := row.Scan(
+		&i.EventID,
+		&i.MeetingID,
+		&i.MeetingName,
+		&i.MeetingVisibility,
 	)
 	return i, err
 }
@@ -1717,9 +1826,15 @@ SELECT
     SELECT count(*)::int
     FROM trip_participants participants
     WHERE participants.trip_id = t.id
-  ) AS participant_count
+  ) AS participant_count,
+  COALESCE(e.id::text, ''::text)::text AS event_id,
+  COALESCE(m.id::text, ''::text)::text AS meeting_id,
+  COALESCE(m.name, ''::text)::text AS meeting_name,
+  COALESCE(m.visibility, ''::text)::text AS meeting_visibility
 FROM trips t
 JOIN trip_participants tp ON tp.trip_id = t.id
+LEFT JOIN events e ON e.trip_id = t.id
+LEFT JOIN meetings m ON m.id = e.meeting_id
 WHERE tp.user_id = $1::uuid
 ORDER BY tp.joined_at DESC, t.created_at DESC, t.id DESC
 `
@@ -1736,6 +1851,10 @@ type ListTripsByParticipantUserRow struct {
 	CreatedAt         pgtype.Timestamptz
 	MyRole            string
 	ParticipantCount  int32
+	EventID           string
+	MeetingID         string
+	MeetingName       string
+	MeetingVisibility string
 }
 
 func (q *Queries) ListTripsByParticipantUser(ctx context.Context, dollar_1 pgtype.UUID) ([]ListTripsByParticipantUserRow, error) {
@@ -1759,6 +1878,10 @@ func (q *Queries) ListTripsByParticipantUser(ctx context.Context, dollar_1 pgtyp
 			&i.CreatedAt,
 			&i.MyRole,
 			&i.ParticipantCount,
+			&i.EventID,
+			&i.MeetingID,
+			&i.MeetingName,
+			&i.MeetingVisibility,
 		); err != nil {
 			return nil, err
 		}
@@ -1966,6 +2089,46 @@ func (q *Queries) UpdateTripBasicInfo(ctx context.Context, arg UpdateTripBasicIn
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const updateTripEventFromTripBasicInfo = `-- name: UpdateTripEventFromTripBasicInfo :exec
+WITH updated_event AS (
+  UPDATE events
+  SET
+    title = $1,
+    start_date = $2,
+    end_date = $3,
+    default_currency = $4,
+    updated_at = now()
+  WHERE trip_id = $5::uuid
+  RETURNING meeting_id
+)
+UPDATE meetings m
+SET
+  name = $1,
+  updated_at = now()
+FROM updated_event e
+WHERE m.id = e.meeting_id
+  AND m.visibility = 'one_off'
+`
+
+type UpdateTripEventFromTripBasicInfoParams struct {
+	Name            string
+	StartDate       pgtype.Date
+	EndDate         pgtype.Date
+	DefaultCurrency string
+	TripID          pgtype.UUID
+}
+
+func (q *Queries) UpdateTripEventFromTripBasicInfo(ctx context.Context, arg UpdateTripEventFromTripBasicInfoParams) error {
+	_, err := q.db.Exec(ctx, updateTripEventFromTripBasicInfo,
+		arg.Name,
+		arg.StartDate,
+		arg.EndDate,
+		arg.DefaultCurrency,
+		arg.TripID,
+	)
+	return err
 }
 
 const updateTripPlaceSnapshotByScheduleItem = `-- name: UpdateTripPlaceSnapshotByScheduleItem :one
