@@ -1,5 +1,13 @@
-import { useCallback, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import { useCallback, useRef, useState, type ReactNode } from 'react';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+} from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -20,6 +28,8 @@ import { ActiveTripCard, PastTripRow, UpcomingTripRow } from '../lib/home-ui/Tri
 import { BottomMenu } from '../lib/navigation/BottomMenu';
 import { getRootScreenContentTopPadding } from '../lib/navigation/root-screen-layout';
 import { registerDeviceForPushNotifications } from '../lib/notifications/runtime';
+import { listMeetings } from '../lib/trips/meeting-api';
+import { getMySettlementSummary } from '../lib/trips/settlement-api';
 import { listMyTrips } from '../lib/trips/trip-api';
 import {
   buildHomeRootRefreshFailureViewModel,
@@ -27,6 +37,8 @@ import {
   buildHomeRootViewModel,
   type HomeCurrentTripViewModel,
   type HomeRootViewModel,
+  type HomeSavedMeetingViewModel,
+  type HomeSettlementTaskViewModel,
   type HomeTripCardViewModel,
   type HomeTripStatusSectionViewModel,
   type HomeViewModel,
@@ -70,8 +82,18 @@ export default function HomeScreen() {
         void registerDeviceForPushNotifications();
       }
 
-      const response = await listMyTrips();
-      const nextState = buildHomeRootViewModel({ explicitHomeIntent, status: 'ready', trips: response.trips });
+      const [tripsResponse, meetingsResponse, settlementSummary] = await Promise.all([
+        listMyTrips(),
+        listMeetings(),
+        getMySettlementSummary(),
+      ]);
+      const nextState = buildHomeRootViewModel({
+        explicitHomeIntent,
+        meetings: meetingsResponse.meetings,
+        settlementSummary,
+        status: 'ready',
+        trips: tripsResponse.trips,
+      });
       setState(nextState);
     } catch (error) {
       if (await handleAuthError(error)) {
@@ -166,25 +188,122 @@ function HomeContent({ viewModel }: { viewModel: HomeViewModel }) {
   if (viewModel.isEmpty) {
     return (
       <EmptyState
-        action={{ label: '새 여행 만들기', onPress: () => router.push('/trips/new'), variant: 'primary' }}
-        body="새 여행을 만들고 여정을 이어가요."
-        title="아직 여행이 없어요."
+        action={{ label: '여행 일정 만들기', onPress: () => router.push('/trips/new'), variant: 'primary' }}
+        body="일정을 만들면 장부와 정산까지 함께 이어져요."
+        title="아직 일정이나 모임이 없어요."
       />
     );
   }
 
+  const upcomingSections = viewModel.sections.filter((section) => section.status === 'upcoming');
+  const pastSections = viewModel.sections.filter((section) => section.status === 'past');
+
   return (
     <View style={styles.homeBody}>
-      {viewModel.ongoingTrips.length > 0 ? <OngoingTripCarousel trips={viewModel.ongoingTrips} /> : null}
-      <TripSections sections={viewModel.sections} />
-      {!viewModel.hasVisibleTrips ? <HomeHistoryOnlyCard /> : null}
-      <SecondaryButton label="새 여행 만들기" onPress={() => router.push('/trips/new')} />
+      <HomeSection title="다가오는 일정">
+        {viewModel.ongoingTrips.length > 0 ? <OngoingTripCarousel trips={viewModel.ongoingTrips} /> : null}
+        <TripSections sections={upcomingSections} showTitles={false} />
+        {!viewModel.hasVisibleTrips ? (
+          <HomeInfoCard body="새 일정을 만들거나 초대를 받으면 여기에 보여요." title="다가오는 일정이 없어요." />
+        ) : null}
+      </HomeSection>
+
+      <SettlementTasksSection tasks={viewModel.settlementTasks} />
+      <SavedMeetingsSection meetings={viewModel.savedMeetings} />
+
+      {pastSections.length > 0 ? (
+        <HomeSection title="지난 일정">
+          <TripSections sections={pastSections} showTitles={false} />
+        </HomeSection>
+      ) : null}
+
+      <SecondaryButton label="여행 일정 만들기" onPress={() => router.push('/trips/new')} />
     </View>
   );
 }
 
-function HomeHistoryOnlyCard() {
-  return <EmptyState body="지난 여행은 마이페이지에서 볼 수 있어요." title="진행 중이거나 예정된 여행이 없어요." />;
+function HomeSection({ children, title }: { children: ReactNode; title: string }) {
+  return (
+    <View style={styles.homeSection}>
+      <Text style={styles.tripSectionTitle}>{title}</Text>
+      {children}
+    </View>
+  );
+}
+
+function HomeInfoCard({ body, title }: { body: string; title: string }) {
+  return (
+    <View style={styles.infoCard}>
+      <Text style={styles.infoTitle}>{title}</Text>
+      <Text style={styles.infoBody}>{body}</Text>
+    </View>
+  );
+}
+
+function SettlementTasksSection({ tasks }: { tasks: HomeSettlementTaskViewModel[] }) {
+  return (
+    <HomeSection title="정산할 일">
+      {tasks.length === 0 ? (
+        <HomeInfoCard body="보내거나 받을 금액이 있는 일정이 생기면 알려드릴게요." title="정산할 일이 없어요." />
+      ) : (
+        <View style={styles.tripList}>
+          {tasks.map((task, index) => (
+            <Pressable
+              accessibilityRole="button"
+              key={task.tripId}
+              onPress={() => router.push(task.route)}
+              style={({ pressed }) => [
+                styles.settlementRow,
+                index === 0 ? null : styles.rowDivider,
+                pressed ? styles.pressed : null,
+              ]}
+            >
+              <View style={styles.rowBody}>
+                <Text numberOfLines={2} style={styles.rowTitle}>
+                  {task.tripName}
+                </Text>
+                <Text style={styles.rowMeta}>{task.dateRangeLabel}</Text>
+                <View style={styles.rowMetaWrap}>
+                  {task.summaryLabels.map((label) => (
+                    <Text key={label} style={styles.rowMetaLabel}>
+                      {label}
+                    </Text>
+                  ))}
+                </View>
+              </View>
+              <Text style={styles.rowAction}>정산 보기</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
+    </HomeSection>
+  );
+}
+
+function SavedMeetingsSection({ meetings }: { meetings: HomeSavedMeetingViewModel[] }) {
+  return (
+    <HomeSection title="내 모임">
+      {meetings.length === 0 ? (
+        <HomeInfoCard body="이번만 함께한 일정은 모임 목록에 저장하지 않아요." title="저장된 모임이 없어요." />
+      ) : (
+        <View style={styles.tripList}>
+          {meetings.map((meeting, index) => (
+            <View key={meeting.id} style={[styles.meetingRow, index === 0 ? null : styles.rowDivider]}>
+              <View style={styles.meetingAvatar}>
+                <Text style={styles.meetingAvatarText}>{meeting.name.trim().slice(0, 1) || '모'}</Text>
+              </View>
+              <View style={styles.rowBody}>
+                <Text numberOfLines={2} style={styles.rowTitle}>
+                  {meeting.name}
+                </Text>
+                <Text style={styles.rowMeta}>{[meeting.memberCountLabel, meeting.roleLabel].join(' · ')}</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
+    </HomeSection>
+  );
 }
 
 function OngoingTripCarousel({ trips }: { trips: HomeCurrentTripViewModel[] }) {
@@ -207,7 +326,7 @@ function OngoingTripCarousel({ trips }: { trips: HomeCurrentTripViewModel[] }) {
   return (
     <View style={styles.ongoingCarousel}>
       <View style={styles.ongoingHeader}>
-        <Text style={styles.tripSectionTitle}>진행 중인 여행{hasMultipleTrips ? ` ${trips.length}개` : ''}</Text>
+        <Text style={styles.tripSectionTitle}>오늘 이어갈 일정{hasMultipleTrips ? ` ${trips.length}개` : ''}</Text>
         {hasMultipleTrips ? (
           <Text style={styles.carouselCounter}>
             {safePageIndex + 1}/{trips.length}
@@ -249,7 +368,7 @@ function CurrentTripCard({ trip }: { trip: HomeCurrentTripViewModel }) {
       ctaLabel={trip.resumeLabel}
       currencyLabel={trip.currencyLabel}
       dateLabel={trip.dateRangeLabel}
-      dayLabel="진행 중인 여행"
+      dayLabel="진행 중인 일정"
       metaLabels={trip.metaLabels}
       name={trip.name}
       onPress={() => router.push(trip.resumePath)}
@@ -257,7 +376,13 @@ function CurrentTripCard({ trip }: { trip: HomeCurrentTripViewModel }) {
   );
 }
 
-function TripSections({ sections }: { sections: HomeTripStatusSectionViewModel[] }) {
+function TripSections({
+  sections,
+  showTitles = true,
+}: {
+  sections: HomeTripStatusSectionViewModel[];
+  showTitles?: boolean;
+}) {
   if (sections.length === 0) {
     return null;
   }
@@ -266,7 +391,7 @@ function TripSections({ sections }: { sections: HomeTripStatusSectionViewModel[]
     <View style={styles.tripSections}>
       {sections.map((section) => (
         <View key={section.title} style={styles.tripSection}>
-          <Text style={styles.tripSectionTitle}>{section.title}</Text>
+          {showTitles ? <Text style={styles.tripSectionTitle}>{section.title}</Text> : null}
           <View style={styles.tripList}>
             {section.trips.map((trip, index) => (
               <TripRow key={trip.id} first={index === 0} section={section} trip={trip} />
@@ -390,6 +515,52 @@ const styles = StyleSheet.create({
     maxWidth: theme.layout.cardMaxW,
     width: '100%',
   },
+  homeSection: {
+    gap: theme.space[3],
+    width: '100%',
+  },
+  infoBody: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.caption,
+    lineHeight: 19,
+  },
+  infoCard: {
+    backgroundColor: theme.color.surface,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.xl,
+    borderWidth: 1,
+    gap: theme.space[1],
+    padding: theme.space[4],
+  },
+  infoTitle: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.body,
+    fontWeight: theme.font.weight.bold,
+  },
+  meetingAvatar: {
+    alignItems: 'center',
+    backgroundColor: theme.color.uiAccentSoft,
+    borderRadius: theme.radius.pill,
+    height: 42,
+    justifyContent: 'center',
+    width: 42,
+  },
+  meetingAvatarText: {
+    color: theme.color.uiAccent,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.body,
+    fontWeight: theme.font.weight.bold,
+  },
+  meetingRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: theme.space[3],
+    minHeight: theme.layout.tapMin,
+    paddingHorizontal: theme.space[4],
+    paddingVertical: theme.space[3],
+  },
   message: {
     color: theme.color.textBody,
     fontFamily: theme.font.family.regular,
@@ -399,13 +570,65 @@ const styles = StyleSheet.create({
     gap: theme.space[3],
     width: '100%',
   },
+  pressed: {
+    opacity: 0.82,
+  },
   ongoingHeader: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
+  rowAction: {
+    color: theme.color.primary,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.caption,
+    fontWeight: theme.font.weight.bold,
+  },
+  rowBody: {
+    flex: 1,
+    gap: theme.space[1],
+  },
+  rowDivider: {
+    borderTopColor: theme.color.borderSubtle,
+    borderTopWidth: 1,
+  },
+  rowMeta: {
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.caption,
+  },
+  rowMetaLabel: {
+    backgroundColor: theme.color.surfaceSunken,
+    borderRadius: theme.radius.pill,
+    color: theme.color.textMuted,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.micro,
+    fontWeight: theme.font.weight.bold,
+    overflow: 'hidden',
+    paddingHorizontal: theme.space[2],
+    paddingVertical: theme.space[1],
+  },
+  rowMetaWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.space[1],
+  },
+  rowTitle: {
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.bold,
+    fontSize: theme.font.size.body,
+    fontWeight: theme.font.weight.bold,
+  },
   screen: {
     flex: 1,
+  },
+  settlementRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: theme.space[3],
+    minHeight: theme.layout.tapMin,
+    paddingHorizontal: theme.space[4],
+    paddingVertical: theme.space[3],
   },
   scroll: {
     flex: 1,
