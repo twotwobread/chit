@@ -161,7 +161,7 @@ export default function TripExpensesTabScreen() {
   return (
     <View style={styles.root}>
       <TripScreen contentContainerStyle={showFab ? fabLayout.scrollContent : undefined}>
-        {state.status === 'loading' ? <TripStateCard loading title="지출을 불러오는 중..." /> : null}
+        {state.status === 'loading' ? <TripStateCard loading title="장부를 불러오는 중..." /> : null}
         {state.status === 'auth' ? (
           <TripStateCard
             primaryAction={{ label: '로그인하기', onPress: () => router.replace('/login') }}
@@ -179,7 +179,7 @@ export default function TripExpensesTabScreen() {
           <TripStateCard
             helper="잠시 후 다시 시도해주세요."
             primaryAction={{ label: '다시 시도', onPress: () => void load() }}
-            title="지출을 불러올 수 없어요."
+            title="장부를 불러올 수 없어요."
           />
         ) : null}
         {state.status === 'ready' && detail ? (
@@ -343,26 +343,26 @@ function ExpenseSearchCard({
     <TripListCard>
       <View style={styles.searchCard}>
         <View style={styles.cardHeaderText}>
-          <Text style={styles.sectionTitle}>지출 검색</Text>
-          <Text style={styles.sectionHelper}>제목, 장소, 메모, 영수증 품목까지 찾아요.</Text>
+          <Text style={styles.sectionTitle}>장부 검색</Text>
+          <Text style={styles.sectionHelper}>기록명, 장소, 메모, 영수증 품목까지 찾아요.</Text>
         </View>
         <View style={styles.searchInputRow}>
           <SearchIcon color={theme.color.textMuted} size={18} strokeWidth={2.4} />
           <TextInput
-            accessibilityHint="입력한 검색어로 지출 목록을 필터링합니다."
-            accessibilityLabel="지출 검색어"
+            accessibilityHint="입력한 검색어로 장부 기록을 필터링합니다."
+            accessibilityLabel="장부 검색어"
             autoCapitalize="none"
             autoCorrect={false}
             maxLength={EXPENSE_SEARCH_QUERY_MAX_LENGTH}
             onChangeText={onChange}
             onSubmitEditing={onSubmit}
-            placeholder="라멘, 택시, 숙소 검색"
+            placeholder="라멘, 택시, 숙소 기록"
             placeholderTextColor={theme.color.textFaint}
             returnKeyType="search"
             style={styles.searchInput}
             value={query}
           />
-          {isSearching ? <ActivityIndicator color={theme.color.primary} size="small" /> : null}
+          {isSearching ? <ActivityIndicator color={theme.color.textLink} size="small" /> : null}
           {query ? (
             <IconButton
               accessibilityLabel="검색어 지우기"
@@ -408,10 +408,10 @@ function ExpenseDashboardContent({
       <ExpenseCategorySummaryCard categorySections={viewModel.categorySections} onOpenCategories={onOpenCategories} />
       <ExpenseRowsCard
         actionLabel="일자별 보기"
-        emptyTitle="최근 지출이 없어요."
+        emptyTitle="최근 장부 기록이 없어요."
         onAction={onOpenDays}
         rows={viewModel.recentRows}
-        title="최근 지출"
+        title="최근 장부 기록"
       />
     </>
   );
@@ -421,8 +421,8 @@ function ExpenseTotalCard({ viewModel }: { viewModel: Extract<ExpenseDashboardVi
   return (
     <TripListCard>
       <View style={styles.cardHeader}>
-        <Text style={styles.sectionTitle}>총 지출</Text>
-        <Text style={styles.sectionHelper}>통화별로 환산 없이 따로 보여줘요.</Text>
+        <Text style={styles.sectionTitle}>장부 합계</Text>
+        <Text style={styles.sectionHelper}>통화별로 환산 없이 정확히 따로 보여줘요.</Text>
       </View>
       <View style={styles.totalSectionList}>
         {viewModel.totalSections.map((section) => (
@@ -510,7 +510,7 @@ function ExpenseDayBrowserContent({
     return (
       <TripStateCard
         helper={viewModel.helper}
-        primaryAction={{ label: '지출로 돌아가기', onPress: onBack }}
+        primaryAction={{ label: '장부로 돌아가기', onPress: onBack }}
         title={viewModel.emptyTitle}
       />
     );
@@ -518,7 +518,7 @@ function ExpenseDayBrowserContent({
 
   return (
     <>
-      <SubscreenHeader helper="Day별로 지출을 나눠 확인해요." onBack={onBack} title={viewModel.title} />
+      <SubscreenHeader helper="Day별로 장부 기록을 나눠 확인해요." onBack={onBack} title={viewModel.title} />
       <View style={styles.chipList}>
         {viewModel.sections.map((section) => (
           <FilterChip
@@ -531,7 +531,7 @@ function ExpenseDayBrowserContent({
         ))}
       </View>
       <ExpenseRowsCard
-        emptyTitle="이 구간에 등록된 지출이 없어요."
+        emptyTitle="이 구간에 장부 기록이 없어요."
         rows={viewModel.selectedSection.rows}
         subtitle={viewModel.selectedSection.statusLabel}
         title={viewModel.selectedSection.title}
@@ -553,7 +553,7 @@ function ExpenseCategoryBrowserContent({
     return (
       <TripStateCard
         helper={viewModel.helper}
-        primaryAction={{ label: '지출로 돌아가기', onPress: onBack }}
+        primaryAction={{ label: '장부로 돌아가기', onPress: onBack }}
         title={viewModel.emptyTitle}
       />
     );
@@ -561,7 +561,7 @@ function ExpenseCategoryBrowserContent({
 
   return (
     <>
-      <SubscreenHeader helper="카테고리별로 지출을 필터링해요." onBack={onBack} title={viewModel.title} />
+      <SubscreenHeader helper="카테고리별로 장부 기록을 필터링해요." onBack={onBack} title={viewModel.title} />
       <View style={styles.chipList}>
         {viewModel.categoryChips.map((chip) => (
           <FilterChip
@@ -581,7 +581,7 @@ function ExpenseCategoryBrowserContent({
         </View>
         <Text style={styles.totalAmount}>{viewModel.selectedCategorySummary.amountLabel}</Text>
       </TripListCard>
-      <ExpenseRowsCard emptyTitle="이 카테고리에 등록된 지출이 없어요." rows={viewModel.rows} title="지출 목록" />
+      <ExpenseRowsCard emptyTitle="이 카테고리에 장부 기록이 없어요." rows={viewModel.rows} title="장부 기록" />
     </>
   );
 }
@@ -640,7 +640,7 @@ function ExpenseRowsCard({
 function SubscreenHeader({ helper, onBack, title }: { title: string; helper: string; onBack: () => void }) {
   return (
     <View style={styles.subscreenHeader}>
-      <SecondaryButton label="지출로 돌아가기" onPress={onBack} />
+      <SecondaryButton label="장부로 돌아가기" onPress={onBack} />
       <TripScreenHeader helper={helper} title={title} />
     </View>
   );

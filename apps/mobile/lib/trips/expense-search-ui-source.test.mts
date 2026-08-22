@@ -31,7 +31,7 @@ test('expense search input uses polished search affordances and native search su
     /onSubmitEditing=\{onSubmit\}/,
     'expected keyboard search submit to trigger search immediately',
   );
-  assert.match(expenseTabSource, /accessibilityHint="입력한 검색어로 지출 목록을 필터링합니다\."/);
+  assert.match(expenseTabSource, /accessibilityHint="입력한 검색어로 장부 기록을 필터링합니다\."/);
   assert.doesNotMatch(
     expenseTabSource,
     /clearButtonMode=/,

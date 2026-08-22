@@ -29,26 +29,26 @@ test('limits the UI search query length to the server contract', () => {
   assert.equal(EXPENSE_SEARCH_QUERY_MAX_LENGTH, 80);
 });
 
-test('builds clear no-match copy that names the active expense search query', () => {
+test('builds clear no-match copy that names the active ledger search query', () => {
   assert.deepEqual(buildExpenseSearchEmptyState(' 라멘 '), {
-    title: '“라멘” 검색 결과가 없어요.',
-    helper: '제목, 장소, 메모, 영수증 품목을 다른 말로 찾아보세요.',
+    title: '“라멘” 장부 기록이 없어요.',
+    helper: '기록명, 장소, 메모, 영수증 품목을 다른 말로 찾아보세요.',
   });
 });
 
-test('builds live expense search status copy for loading and result states', () => {
+test('builds live ledger search status copy for loading and result states', () => {
   assert.deepEqual(buildExpenseSearchStatus({ hasResults: true, isSearching: true, query: ' 라멘 ' }), {
-    label: '검색 중...',
-    helper: '“라멘” 검색 결과를 찾는 중이에요.',
+    label: '장부 검색 중...',
+    helper: '“라멘” 장부 기록을 찾는 중이에요.',
   });
   assert.deepEqual(buildExpenseSearchStatus({ hasResults: true, isSearching: false, query: '라멘' }), {
-    label: '“라멘” 검색 결과',
-    helper: '일치하는 지출만 보여줘요.',
+    label: '“라멘” 장부 기록',
+    helper: '일치하는 기록만 보여줘요.',
   });
   assert.equal(buildExpenseSearchStatus({ hasResults: false, isSearching: false, query: '라멘' }), null);
   assert.deepEqual(buildExpenseSearchStatus({ hasResults: true, isSearching: true, query: '   ' }), {
-    label: '전체 지출 새로고침 중...',
-    helper: '최신 지출 목록을 다시 확인하고 있어요.',
+    label: '전체 장부 새로고침 중...',
+    helper: '최신 장부 기록을 다시 확인하고 있어요.',
   });
   assert.equal(buildExpenseSearchStatus({ hasResults: true, isSearching: false, query: '   ' }), null);
 });

@@ -139,16 +139,16 @@ export function buildExpenseDashboardViewModel({
   if (entries.length === 0) {
     return {
       status: 'empty',
-      title: '지출',
-      emptyTitle: '아직 등록된 지출이 없어요.',
-      helper: '영수증 촬영이나 직접 입력으로 여행 지출을 추가해보세요.',
+      title: '장부',
+      emptyTitle: '아직 장부 기록이 없어요.',
+      helper: '영수증 촬영이나 직접 입력으로 첫 지출을 장부에 남겨보세요.',
     };
   }
 
   return {
     status: 'success',
-    title: '지출',
-    helper: `총 ${entries.length}건의 지출을 관리할 수 있어요.`,
+    title: '장부',
+    helper: `총 ${entries.length}건의 장부 기록을 관리할 수 있어요.`,
     totalSections: buildTotalSections(entries),
     categorySections: buildCategorySections(entries),
     recentRows: buildRows(entries, tripId).slice(0, 5),
@@ -172,9 +172,9 @@ export function buildExpenseDayBrowserViewModel({
   if (sections.length === 0) {
     return {
       status: 'empty',
-      title: '일자별 지출',
+      title: '일자별 장부',
       emptyTitle: '여행 일정이 없어요.',
-      helper: '여행 일정을 만든 뒤 일자별 지출을 확인할 수 있어요.',
+      helper: '여행 일정을 만든 뒤 일자별 장부를 확인할 수 있어요.',
     };
   }
 
@@ -182,7 +182,7 @@ export function buildExpenseDayBrowserViewModel({
 
   return {
     status: 'success',
-    title: '일자별 지출',
+    title: '일자별 장부',
     sections,
     selectedSection,
   };
@@ -203,9 +203,9 @@ export function buildExpenseCategoryBrowserViewModel({
   if (entries.length === 0) {
     return {
       status: 'empty',
-      title: '카테고리별 지출',
-      emptyTitle: '분류할 지출이 없어요.',
-      helper: '지출을 등록하면 카테고리별로 모아볼 수 있어요.',
+      title: '카테고리별 장부',
+      emptyTitle: '분류할 장부 기록이 없어요.',
+      helper: '지출을 등록하면 카테고리별 장부로 모아볼 수 있어요.',
     };
   }
 
@@ -219,7 +219,7 @@ export function buildExpenseCategoryBrowserViewModel({
 
   return {
     status: 'success',
-    title: '카테고리별 지출',
+    title: '카테고리별 장부',
     categoryChips: allCategoryRows.map((row) => ({
       category: row.category,
       label: row.label,
