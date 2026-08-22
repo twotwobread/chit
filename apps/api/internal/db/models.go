@@ -44,6 +44,31 @@ type AuthSession struct {
 	UpdatedAt             pgtype.Timestamptz
 }
 
+type Event struct {
+	ID              pgtype.UUID
+	MeetingID       pgtype.UUID
+	EventType       string
+	Title           string
+	StartDate       pgtype.Date
+	EndDate         pgtype.Date
+	DefaultCurrency string
+	Status          string
+	TripID          pgtype.UUID
+	CreatedBy       pgtype.UUID
+	CreatedAt       pgtype.Timestamptz
+	UpdatedAt       pgtype.Timestamptz
+}
+
+type EventParticipant struct {
+	ID              pgtype.UUID
+	EventID         pgtype.UUID
+	MeetingMemberID pgtype.UUID
+	UserID          pgtype.UUID
+	Role            string
+	DisplayName     string
+	JoinedAt        pgtype.Timestamptz
+}
+
 type Expense struct {
 	ID                  pgtype.UUID
 	TripID              pgtype.UUID
@@ -162,6 +187,24 @@ type FlightPersonalDetail struct {
 	BoardingPassUploadedAt  pgtype.Timestamptz
 	CreatedAt               pgtype.Timestamptz
 	UpdatedAt               pgtype.Timestamptz
+}
+
+type Meeting struct {
+	ID         pgtype.UUID
+	Name       string
+	Visibility string
+	CreatedBy  pgtype.UUID
+	CreatedAt  pgtype.Timestamptz
+	UpdatedAt  pgtype.Timestamptz
+}
+
+type MeetingMember struct {
+	ID          pgtype.UUID
+	MeetingID   pgtype.UUID
+	UserID      pgtype.UUID
+	Role        string
+	DisplayName string
+	JoinedAt    pgtype.Timestamptz
 }
 
 type NotificationEvent struct {

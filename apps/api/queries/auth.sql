@@ -326,6 +326,143 @@ WHERE trip.id IN (
     )
 );
 
+-- name: DeleteSoloMeetingsByUserID :exec
+DELETE FROM meetings meeting
+WHERE meeting.id IN (
+  SELECT deleting_member.meeting_id
+  FROM meeting_members deleting_member
+  WHERE deleting_member.user_id = $1::uuid
+    AND NOT EXISTS (
+      SELECT 1
+      FROM meeting_members other_member
+      JOIN users other_user
+        ON other_user.id = other_member.user_id
+       AND other_user.deleted_at IS NULL
+      WHERE other_member.meeting_id = deleting_member.meeting_id
+        AND other_member.user_id <> $1::uuid
+    )
+);
+
+-- name: TransferOwnedSharedMeetingsForAccountDeletion :exec
+WITH retained_owned_meetings AS (
+  SELECT m.id AS meeting_id
+  FROM meetings m
+  JOIN meeting_members deleting_member
+    ON deleting_member.meeting_id = m.id
+   AND deleting_member.user_id = $1::uuid
+   AND deleting_member.role = 'owner'
+  WHERE EXISTS (
+    SELECT 1
+    FROM meeting_members other_member
+    JOIN users other_user
+      ON other_user.id = other_member.user_id
+     AND other_user.deleted_at IS NULL
+    WHERE other_member.meeting_id = m.id
+      AND other_member.user_id <> $1::uuid
+  )
+), successor_members AS (
+  SELECT DISTINCT ON (member.meeting_id)
+    member.meeting_id,
+    member.user_id
+  FROM meeting_members member
+  JOIN retained_owned_meetings retained
+    ON retained.meeting_id = member.meeting_id
+  JOIN users successor_user
+    ON successor_user.id = member.user_id
+   AND successor_user.deleted_at IS NULL
+  WHERE member.user_id <> $1::uuid
+  ORDER BY member.meeting_id, member.joined_at ASC, member.id ASC
+), updated_members AS (
+  UPDATE meeting_members member
+  SET role = 'owner'
+  FROM successor_members successor
+  WHERE member.meeting_id = successor.meeting_id
+    AND member.user_id = successor.user_id
+  RETURNING member.meeting_id, member.user_id
+)
+UPDATE meetings meeting
+SET
+  created_by = updated_member.user_id,
+  updated_at = $2
+FROM updated_members updated_member
+WHERE meeting.id = updated_member.meeting_id;
+
+-- name: TransferOwnedSharedEventsForAccountDeletion :exec
+WITH retained_owned_events AS (
+  SELECT e.id AS event_id
+  FROM events e
+  JOIN event_participants deleting_participant
+    ON deleting_participant.event_id = e.id
+   AND deleting_participant.user_id = $1::uuid
+   AND deleting_participant.role = 'owner'
+  WHERE EXISTS (
+    SELECT 1
+    FROM event_participants other_participant
+    JOIN users other_user
+      ON other_user.id = other_participant.user_id
+     AND other_user.deleted_at IS NULL
+    WHERE other_participant.event_id = e.id
+      AND other_participant.user_id <> $1::uuid
+  )
+), successor_participants AS (
+  SELECT DISTINCT ON (participant.event_id)
+    participant.event_id,
+    participant.user_id
+  FROM event_participants participant
+  JOIN retained_owned_events retained
+    ON retained.event_id = participant.event_id
+  JOIN users successor_user
+    ON successor_user.id = participant.user_id
+   AND successor_user.deleted_at IS NULL
+  WHERE participant.user_id <> $1::uuid
+  ORDER BY participant.event_id, participant.joined_at ASC, participant.id ASC
+), updated_participants AS (
+  UPDATE event_participants participant
+  SET role = 'owner'
+  FROM successor_participants successor
+  WHERE participant.event_id = successor.event_id
+    AND participant.user_id = successor.user_id
+  RETURNING participant.event_id, participant.user_id
+)
+UPDATE events event
+SET
+  created_by = updated_participant.user_id,
+  updated_at = $2
+FROM updated_participants updated_participant
+WHERE event.id = updated_participant.event_id;
+
+-- name: AnonymizeMeetingMembersByUserID :exec
+UPDATE meeting_members member
+SET
+  display_name = '탈퇴한 사용자',
+  role = CASE WHEN member.role = 'owner' THEN 'member' ELSE member.role END
+WHERE member.user_id = $1::uuid
+  AND EXISTS (
+    SELECT 1
+    FROM meeting_members other_member
+    JOIN users other_user
+      ON other_user.id = other_member.user_id
+     AND other_user.deleted_at IS NULL
+    WHERE other_member.meeting_id = member.meeting_id
+      AND other_member.user_id <> $1::uuid
+  );
+
+-- name: AnonymizeEventParticipantsByUserID :exec
+UPDATE event_participants participant
+SET
+  display_name = '탈퇴한 사용자',
+  role = CASE WHEN participant.role = 'owner' THEN 'member' ELSE participant.role END
+WHERE participant.user_id = $1::uuid
+  AND EXISTS (
+    SELECT 1
+    FROM event_participants other_participant
+    JOIN users other_user
+      ON other_user.id = other_participant.user_id
+     AND other_user.deleted_at IS NULL
+    WHERE other_participant.event_id = participant.event_id
+      AND other_participant.user_id <> $1::uuid
+  );
+
 -- name: DeleteAuthIdentitiesByUserID :exec
 DELETE FROM auth_identities
 WHERE user_id = $1::uuid;

@@ -49,6 +49,26 @@ const (
 	DestinationProviderGoogle DestinationProvider = "google"
 )
 
+// Defines values for EventMeetingMode.
+const (
+	EventMeetingModeExisting EventMeetingMode = "existing"
+	EventMeetingModeNew      EventMeetingMode = "new"
+	EventMeetingModeOneOff   EventMeetingMode = "one_off"
+)
+
+// Defines values for EventStatus.
+const (
+	Cancelled EventStatus = "cancelled"
+	Completed EventStatus = "completed"
+	Planned   EventStatus = "planned"
+)
+
+// Defines values for EventType.
+const (
+	EventTypeOuting EventType = "outing"
+	EventTypeTrip   EventType = "trip"
+)
+
 // Defines values for ExpenseAnchorType.
 const (
 	ExpenseAnchorTypeScheduleItem ExpenseAnchorType = "schedule_item"
@@ -102,6 +122,18 @@ const (
 // Defines values for HealthResponseStatus.
 const (
 	HealthResponseStatusOk HealthResponseStatus = "ok"
+)
+
+// Defines values for MeetingMemberRole.
+const (
+	MeetingMemberRoleMember MeetingMemberRole = "member"
+	MeetingMemberRoleOwner  MeetingMemberRole = "owner"
+)
+
+// Defines values for MeetingVisibility.
+const (
+	MeetingVisibilityOneOff MeetingVisibility = "one_off"
+	MeetingVisibilitySaved  MeetingVisibility = "saved"
 )
 
 // Defines values for MetadataReadinessCheckSchema.
@@ -205,8 +237,8 @@ const (
 
 // Defines values for TripParticipantRole.
 const (
-	Member TripParticipantRole = "member"
-	Owner  TripParticipantRole = "owner"
+	TripParticipantRoleMember TripParticipantRole = "member"
+	TripParticipantRoleOwner  TripParticipantRole = "owner"
 )
 
 // Defines values for TripPlaceType.
@@ -298,6 +330,25 @@ type AuthUser struct {
 	DisplayName string  `json:"displayName"`
 	Email       *string `json:"email"`
 	Id          string  `json:"id"`
+}
+
+// CreateEventRequest defines model for CreateEventRequest.
+type CreateEventRequest struct {
+	DefaultCurrency SupportedCurrency  `json:"defaultCurrency"`
+	EndDate         openapi_types.Date `json:"endDate"`
+	EventType       EventType          `json:"eventType"`
+	Meeting         EventMeetingChoice `json:"meeting"`
+	StartDate       openapi_types.Date `json:"startDate"`
+
+	// Title Server trims leading/trailing whitespace.
+	Title string `json:"title"`
+}
+
+// CreateEventResponse defines model for CreateEventResponse.
+type CreateEventResponse struct {
+	Event            Event            `json:"event"`
+	Meeting          Meeting          `json:"meeting"`
+	OwnerParticipant EventParticipant `json:"ownerParticipant"`
 }
 
 // CreateExpenseReceiptDraftResponse defines model for CreateExpenseReceiptDraftResponse.
@@ -395,6 +446,18 @@ type CreateManualTripPlaceRequest struct {
 // CreateManualTripPlaceResponse defines model for CreateManualTripPlaceResponse.
 type CreateManualTripPlaceResponse struct {
 	Place TripPlaceSummary `json:"place"`
+}
+
+// CreateMeetingRequest defines model for CreateMeetingRequest.
+type CreateMeetingRequest struct {
+	// Name Server trims leading/trailing whitespace.
+	Name string `json:"name"`
+}
+
+// CreateMeetingResponse defines model for CreateMeetingResponse.
+type CreateMeetingResponse struct {
+	Meeting     Meeting       `json:"meeting"`
+	OwnerMember MeetingMember `json:"ownerMember"`
 }
 
 // CreateQuickExpenseRequest defines model for CreateQuickExpenseRequest.
@@ -600,6 +663,54 @@ type ErrorResponse struct {
 		Message string                   `json:"message"`
 	} `json:"error"`
 }
+
+// Event defines model for Event.
+type Event struct {
+	CreatedAt         time.Time          `json:"createdAt"`
+	CreatedBy         string             `json:"createdBy"`
+	DefaultCurrency   SupportedCurrency  `json:"defaultCurrency"`
+	EndDate           openapi_types.Date `json:"endDate"`
+	EventType         EventType          `json:"eventType"`
+	Id                string             `json:"id"`
+	MeetingId         string             `json:"meetingId"`
+	MeetingName       string             `json:"meetingName"`
+	MeetingVisibility MeetingVisibility  `json:"meetingVisibility"`
+	StartDate         openapi_types.Date `json:"startDate"`
+	Status            EventStatus        `json:"status"`
+	Title             string             `json:"title"`
+	TripId            *string            `json:"tripId"`
+	UpdatedAt         time.Time          `json:"updatedAt"`
+}
+
+// EventMeetingChoice defines model for EventMeetingChoice.
+type EventMeetingChoice struct {
+	// MeetingId Required when mode is existing.
+	MeetingId *string          `json:"meetingId,omitempty"`
+	Mode      EventMeetingMode `json:"mode"`
+
+	// Name Required when mode is new; optional one-off container label when mode is one_off.
+	Name *string `json:"name,omitempty"`
+}
+
+// EventMeetingMode defines model for EventMeetingMode.
+type EventMeetingMode string
+
+// EventParticipant defines model for EventParticipant.
+type EventParticipant struct {
+	DisplayName     string            `json:"displayName"`
+	EventId         string            `json:"eventId"`
+	Id              string            `json:"id"`
+	JoinedAt        time.Time         `json:"joinedAt"`
+	MeetingMemberId *string           `json:"meetingMemberId"`
+	Role            MeetingMemberRole `json:"role"`
+	UserId          string            `json:"userId"`
+}
+
+// EventStatus defines model for EventStatus.
+type EventStatus string
+
+// EventType defines model for EventType.
+type EventType string
 
 // Expense defines model for Expense.
 type Expense struct {
@@ -835,9 +946,20 @@ type GetDayScheduleItemsResponse struct {
 	ScheduleItems []ScheduleItem `json:"scheduleItems"`
 }
 
+// GetEventResponse defines model for GetEventResponse.
+type GetEventResponse struct {
+	Event   Event   `json:"event"`
+	Meeting Meeting `json:"meeting"`
+}
+
 // GetExpenseResponse defines model for GetExpenseResponse.
 type GetExpenseResponse struct {
 	Expense Expense `json:"expense"`
+}
+
+// GetMeetingResponse defines model for GetMeetingResponse.
+type GetMeetingResponse struct {
+	Meeting Meeting `json:"meeting"`
 }
 
 // GetMySettlementSummaryResponse defines model for GetMySettlementSummaryResponse.
@@ -933,6 +1055,11 @@ type ListDayExpensesResponse struct {
 	Expenses []DayExpenseListItem `json:"expenses"`
 }
 
+// ListMeetingsResponse defines model for ListMeetingsResponse.
+type ListMeetingsResponse struct {
+	Meetings []MeetingListItem `json:"meetings"`
+}
+
 // ListNotificationsResponse defines model for ListNotificationsResponse.
 type ListNotificationsResponse struct {
 	NextCursor    *string                    `json:"nextCursor"`
@@ -1010,6 +1137,43 @@ type MarkScheduleItemSkippedResponse struct {
 	// ScheduleItems Latest server source-of-truth schedule items for the selected day, ordered by schedule order/rank.
 	ScheduleItems []ScheduleItem `json:"scheduleItems"`
 }
+
+// Meeting defines model for Meeting.
+type Meeting struct {
+	CreatedAt  time.Time         `json:"createdAt"`
+	CreatedBy  string            `json:"createdBy"`
+	Id         string            `json:"id"`
+	Name       string            `json:"name"`
+	UpdatedAt  time.Time         `json:"updatedAt"`
+	Visibility MeetingVisibility `json:"visibility"`
+}
+
+// MeetingListItem defines model for MeetingListItem.
+type MeetingListItem struct {
+	CreatedAt   time.Time         `json:"createdAt"`
+	Id          string            `json:"id"`
+	MemberCount int               `json:"memberCount"`
+	MyRole      MeetingMemberRole `json:"myRole"`
+	Name        string            `json:"name"`
+	UpdatedAt   time.Time         `json:"updatedAt"`
+	Visibility  MeetingVisibility `json:"visibility"`
+}
+
+// MeetingMember defines model for MeetingMember.
+type MeetingMember struct {
+	DisplayName string            `json:"displayName"`
+	Id          string            `json:"id"`
+	JoinedAt    time.Time         `json:"joinedAt"`
+	MeetingId   string            `json:"meetingId"`
+	Role        MeetingMemberRole `json:"role"`
+	UserId      string            `json:"userId"`
+}
+
+// MeetingMemberRole defines model for MeetingMemberRole.
+type MeetingMemberRole string
+
+// MeetingVisibility defines model for MeetingVisibility.
+type MeetingVisibility string
 
 // MetadataReadinessCheck defines model for MetadataReadinessCheck.
 type MetadataReadinessCheck struct {
@@ -1751,11 +1915,17 @@ type LoginWithOAuthJSONRequestBody = OAuthLoginRequest
 // RefreshTokenJSONRequestBody defines body for RefreshToken for application/json ContentType.
 type RefreshTokenJSONRequestBody = RefreshTokenRequest
 
+// CreateEventJSONRequestBody defines body for CreateEvent for application/json ContentType.
+type CreateEventJSONRequestBody = CreateEventRequest
+
 // UpdateMeJSONRequestBody defines body for UpdateMe for application/json ContentType.
 type UpdateMeJSONRequestBody = UpdateMeRequest
 
 // RegisterPushTokenJSONRequestBody defines body for RegisterPushToken for application/json ContentType.
 type RegisterPushTokenJSONRequestBody = RegisterPushTokenRequest
+
+// CreateMeetingJSONRequestBody defines body for CreateMeeting for application/json ContentType.
+type CreateMeetingJSONRequestBody = CreateMeetingRequest
 
 // CreateTripJSONRequestBody defines body for CreateTrip for application/json ContentType.
 type CreateTripJSONRequestBody = CreateTripRequest
@@ -1846,6 +2016,12 @@ type ServerInterface interface {
 	// Search travel destination cities
 	// (GET /destinations/search)
 	SearchDestinations(w http.ResponseWriter, r *http.Request, params SearchDestinationsParams)
+	// Create an event
+	// (POST /events)
+	CreateEvent(w http.ResponseWriter, r *http.Request)
+	// Get event detail
+	// (GET /events/{eventId})
+	GetEvent(w http.ResponseWriter, r *http.Request, eventId string)
 	// Check API health
 	// (GET /health)
 	GetHealth(w http.ResponseWriter, r *http.Request)
@@ -1876,6 +2052,15 @@ type ServerInterface interface {
 	// Return current user's settlement summary
 	// (GET /me/settlement-summary)
 	GetMySettlementSummary(w http.ResponseWriter, r *http.Request)
+	// List my saved meetings
+	// (GET /meetings)
+	ListMeetings(w http.ResponseWriter, r *http.Request)
+	// Create a saved meeting
+	// (POST /meetings)
+	CreateMeeting(w http.ResponseWriter, r *http.Request)
+	// Get saved meeting detail
+	// (GET /meetings/{meetingId})
+	GetMeeting(w http.ResponseWriter, r *http.Request, meetingId string)
 	// Check API readiness
 	// (GET /ready)
 	GetReady(w http.ResponseWriter, r *http.Request)
@@ -2095,6 +2280,18 @@ func (_ Unimplemented) SearchDestinations(w http.ResponseWriter, r *http.Request
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// Create an event
+// (POST /events)
+func (_ Unimplemented) CreateEvent(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Get event detail
+// (GET /events/{eventId})
+func (_ Unimplemented) GetEvent(w http.ResponseWriter, r *http.Request, eventId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // Check API health
 // (GET /health)
 func (_ Unimplemented) GetHealth(w http.ResponseWriter, r *http.Request) {
@@ -2152,6 +2349,24 @@ func (_ Unimplemented) RevokePushToken(w http.ResponseWriter, r *http.Request, i
 // Return current user's settlement summary
 // (GET /me/settlement-summary)
 func (_ Unimplemented) GetMySettlementSummary(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// List my saved meetings
+// (GET /meetings)
+func (_ Unimplemented) ListMeetings(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Create a saved meeting
+// (POST /meetings)
+func (_ Unimplemented) CreateMeeting(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Get saved meeting detail
+// (GET /meetings/{meetingId})
+func (_ Unimplemented) GetMeeting(w http.ResponseWriter, r *http.Request, meetingId string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -2654,6 +2869,57 @@ func (siw *ServerInterfaceWrapper) SearchDestinations(w http.ResponseWriter, r *
 	handler.ServeHTTP(w, r)
 }
 
+// CreateEvent operation middleware
+func (siw *ServerInterfaceWrapper) CreateEvent(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateEvent(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetEvent operation middleware
+func (siw *ServerInterfaceWrapper) GetEvent(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "eventId" -------------
+	var eventId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "eventId", chi.URLParam(r, "eventId"), &eventId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "eventId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetEvent(w, r, eventId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetHealth operation middleware
 func (siw *ServerInterfaceWrapper) GetHealth(w http.ResponseWriter, r *http.Request) {
 
@@ -2893,6 +3159,77 @@ func (siw *ServerInterfaceWrapper) GetMySettlementSummary(w http.ResponseWriter,
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetMySettlementSummary(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListMeetings operation middleware
+func (siw *ServerInterfaceWrapper) ListMeetings(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListMeetings(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateMeeting operation middleware
+func (siw *ServerInterfaceWrapper) CreateMeeting(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateMeeting(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetMeeting operation middleware
+func (siw *ServerInterfaceWrapper) GetMeeting(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "meetingId" -------------
+	var meetingId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "meetingId", chi.URLParam(r, "meetingId"), &meetingId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "meetingId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetMeeting(w, r, meetingId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -5364,6 +5701,12 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Get(options.BaseURL+"/destinations/search", wrapper.SearchDestinations)
 	})
 	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/events", wrapper.CreateEvent)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/events/{eventId}", wrapper.GetEvent)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/health", wrapper.GetHealth)
 	})
 	r.Group(func(r chi.Router) {
@@ -5392,6 +5735,15 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/me/settlement-summary", wrapper.GetMySettlementSummary)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/meetings", wrapper.ListMeetings)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/meetings", wrapper.CreateMeeting)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/meetings/{meetingId}", wrapper.GetMeeting)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/ready", wrapper.GetReady)

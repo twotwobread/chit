@@ -6,6 +6,7 @@ import (
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
 	"github.com/twotwobread/i-um/apps/api/internal/auth"
+	"github.com/twotwobread/i-um/apps/api/internal/meeting"
 	"github.com/twotwobread/i-um/apps/api/internal/openapi"
 	"github.com/twotwobread/i-um/apps/api/internal/place"
 	"github.com/twotwobread/i-um/apps/api/internal/route"
@@ -50,6 +51,95 @@ func tokensToOpenAPI(tokens auth.TokenPair) openapi.AuthTokens {
 		AccessTokenExpiresAt:  tokens.AccessTokenExpiresAt,
 		RefreshToken:          tokens.RefreshToken,
 		RefreshTokenExpiresAt: tokens.RefreshTokenExpiresAt,
+	}
+}
+
+func listMeetingsResponseToOpenAPI(meetings []meeting.MeetingListItem) openapi.ListMeetingsResponse {
+	items := make([]openapi.MeetingListItem, 0, len(meetings))
+	for _, item := range meetings {
+		items = append(items, openapi.MeetingListItem{
+			Id:          item.ID,
+			Name:        item.Name,
+			Visibility:  openapi.MeetingVisibility(item.Visibility),
+			MemberCount: item.MemberCount,
+			MyRole:      openapi.MeetingMemberRole(item.MyRole),
+			CreatedAt:   item.CreatedAt,
+			UpdatedAt:   item.UpdatedAt,
+		})
+	}
+	return openapi.ListMeetingsResponse{Meetings: items}
+}
+
+func createMeetingResponseToOpenAPI(result meeting.CreateMeetingResult) openapi.CreateMeetingResponse {
+	return openapi.CreateMeetingResponse{Meeting: meetingToOpenAPI(result.Meeting), OwnerMember: meetingMemberToOpenAPI(result.OwnerMember)}
+}
+
+func getMeetingResponseToOpenAPI(result meeting.Meeting) openapi.GetMeetingResponse {
+	return openapi.GetMeetingResponse{Meeting: meetingToOpenAPI(result)}
+}
+
+func createEventResponseToOpenAPI(result meeting.CreateEventResult) openapi.CreateEventResponse {
+	return openapi.CreateEventResponse{
+		Event:            eventToOpenAPI(result.Event),
+		Meeting:          meetingToOpenAPI(result.Meeting),
+		OwnerParticipant: eventParticipantToOpenAPI(result.OwnerParticipant),
+	}
+}
+
+func getEventResponseToOpenAPI(result meeting.EventDetailResult) openapi.GetEventResponse {
+	return openapi.GetEventResponse{Event: eventToOpenAPI(result.Event), Meeting: meetingToOpenAPI(result.Meeting)}
+}
+
+func meetingToOpenAPI(value meeting.Meeting) openapi.Meeting {
+	return openapi.Meeting{
+		Id:         value.ID,
+		Name:       value.Name,
+		Visibility: openapi.MeetingVisibility(value.Visibility),
+		CreatedBy:  value.CreatedBy,
+		CreatedAt:  value.CreatedAt,
+		UpdatedAt:  value.UpdatedAt,
+	}
+}
+
+func meetingMemberToOpenAPI(value meeting.MeetingMember) openapi.MeetingMember {
+	return openapi.MeetingMember{
+		Id:          value.ID,
+		MeetingId:   value.MeetingID,
+		UserId:      value.UserID,
+		Role:        openapi.MeetingMemberRole(value.Role),
+		DisplayName: value.DisplayName,
+		JoinedAt:    value.JoinedAt,
+	}
+}
+
+func eventToOpenAPI(value meeting.Event) openapi.Event {
+	return openapi.Event{
+		Id:                value.ID,
+		MeetingId:         value.MeetingID,
+		MeetingName:       value.MeetingName,
+		MeetingVisibility: openapi.MeetingVisibility(value.MeetingVisibility),
+		EventType:         openapi.EventType(value.EventType),
+		Title:             value.Title,
+		StartDate:         dateToOpenAPI(value.StartDate),
+		EndDate:           dateToOpenAPI(value.EndDate),
+		DefaultCurrency:   openapi.SupportedCurrency(value.DefaultCurrency),
+		Status:            openapi.EventStatus(value.Status),
+		TripId:            value.TripID,
+		CreatedBy:         value.CreatedBy,
+		CreatedAt:         value.CreatedAt,
+		UpdatedAt:         value.UpdatedAt,
+	}
+}
+
+func eventParticipantToOpenAPI(value meeting.EventParticipant) openapi.EventParticipant {
+	return openapi.EventParticipant{
+		Id:              value.ID,
+		EventId:         value.EventID,
+		MeetingMemberId: value.MeetingMemberID,
+		UserId:          value.UserID,
+		Role:            openapi.MeetingMemberRole(value.Role),
+		DisplayName:     value.DisplayName,
+		JoinedAt:        value.JoinedAt,
 	}
 }
 
