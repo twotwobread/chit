@@ -90,32 +90,31 @@ test('Chit foundation components do not introduce raw hex colors outside theme t
   }
 });
 
-test('Issue 385 theme exposes Pure Dark Graphite surface tokens', () => {
-  assert.equal(theme.color.bg, theme.color.chit.graphiteShell);
-  assert.equal(theme.color.surface, theme.color.chit.graphiteCard);
-  assert.equal(theme.color.surfaceSunken, theme.color.chit.graphiteSunken);
-  assert.equal(theme.color.borderDefault, theme.color.chit.graphiteLine);
-  assert.equal(theme.color.shell, theme.color.chit.graphiteShell);
-  assert.equal(theme.color.primaryTextOnLight, theme.color.chit.offWhiteText);
-  assert.equal(theme.color.brandAccent, theme.color.chit.acidLime);
-  assert.equal(theme.color.actionPrimary, theme.color.chit.graphiteHighest);
-  assert.equal(theme.color.shellHighest, theme.color.chit.graphiteHighest);
-  assert.equal(theme.color.uiAccent, theme.color.chit.acidLime);
-  assert.equal(theme.color.uiAccentSoft, theme.color.chit.acidLimeSurface);
-  assert.notEqual(theme.color.actionPrimary, theme.color.brandAccent);
-  assert.notEqual(theme.color.surface, theme.color.chit.warmPaper);
-  assert.notEqual(theme.color.surface, theme.color.chit.offWhiteElevated);
+test('Issue 385 theme exposes Ledger Memory surface tokens', () => {
+  assert.equal(theme.color.bg, theme.color.chit.receiptCream);
+  assert.equal(theme.color.surface, theme.color.chit.paperWhite);
+  assert.equal(theme.color.surfaceSunken, theme.color.chit.softGray);
+  assert.equal(theme.color.borderDefault, theme.color.chit.warmLine);
+  assert.equal(theme.color.shell, theme.color.chit.receiptCream);
+  assert.equal(theme.color.primaryTextOnLight, theme.color.chit.ledgerInk);
+  assert.equal(theme.color.brandAccent, theme.color.chit.coral);
+  assert.equal(theme.color.actionPrimary, theme.color.chit.actionCoral);
+  assert.equal(theme.color.shellHighest, theme.color.chit.ledgerInk);
+  assert.equal(theme.color.uiAccent, theme.color.chit.coral);
+  assert.equal(theme.color.uiAccentSoft, theme.color.chit.coralSoft);
+  assert.notEqual(theme.color.actionPrimary, theme.color.success);
+  assert.notEqual(theme.color.brandAccent, theme.color.danger);
+  assert.equal(theme.color.memorySurface, theme.color.chit.receiptCream);
+  assert.equal(theme.color.ledgerSurface, theme.color.chit.paperWhite);
 });
 
-test('Issue 385 shared components provide BrandStamp, ScreenBackground, and card variants', () => {
-  assert.match(
-    cardSource,
-    /export type CardVariant = Extract<SurfaceFrameVariant, 'content' \| 'hero' \| 'dark' \| 'shelf'>/,
-  );
+test('Issue 385 shared components provide clean BrandStamp, ScreenBackground, and Ledger Memory card variants', () => {
+  assert.match(cardSource, /export type CardVariant = Extract<[\s\S]*'memory' \| 'ledger' \| 'receipt'[\s\S]*>/);
   assert.match(cardSource, /variant = 'content'/);
   assert.match(cardSource, /export function BrandStamp/);
-  assert.match(cardSource, /styles\.brandStamp/);
-  assert.match(cardSource, /transform: \[\{ rotate: '-3deg' \}\]/);
+  assert.match(cardSource, /styles\.brandStampText/);
+  assert.match(cardSource, /styles\.brandStampDot/);
+  assert.doesNotMatch(cardSource, /rotate\(|stroke-dasharray/);
   assert.match(cardSource, /export function ScreenBackground/);
   assert.match(cardSource, /screenBackground:[\s\S]*backgroundColor: theme\.color\.bg/);
   assert.doesNotMatch(cardSource, /LinearGradient|screenBackgroundLimeWash/);
@@ -124,7 +123,7 @@ test('Issue 385 shared components provide BrandStamp, ScreenBackground, and card
   assert.match(indexSource, /ScreenBackground/);
 });
 
-test('Issue 385 core screens adopt dark shell and brand stamp primitives', () => {
+test('Issue 385 core screens adopt shared shell and brand stamp primitives', () => {
   const loginSource = readMobileSource('../../app/login.tsx');
   const homeSource = readMobileSource('../../app/index.tsx');
   const mypageSource = readMobileSource('../../app/mypage.tsx');
@@ -156,11 +155,13 @@ test('Issue 385 core screens adopt dark shell and brand stamp primitives', () =>
   assert.match(tripScreenSource, /<ScreenBackground/);
 });
 
-test('shared primary and secondary buttons use enterprise Chit action hierarchy', () => {
-  assert.match(buttonSource, /primaryButtonGraphite:[\s\S]*backgroundColor: theme\.color\.actionPrimary/);
+test('shared primary and secondary buttons use Ledger Memory action hierarchy', () => {
+  assert.match(buttonSource, /export type PrimaryButtonTone = 'coral' \| 'ink'/);
+  assert.match(buttonSource, /tone = 'coral'/);
+  assert.match(buttonSource, /primaryButtonCoral:[\s\S]*backgroundColor: theme\.color\.actionPrimary/);
+  assert.match(buttonSource, /primaryButtonInk:[\s\S]*backgroundColor: theme\.color\.shellHighest/);
   assert.match(buttonSource, /primaryButtonText:[\s\S]*color: theme\.color\.onActionPrimary/);
-  assert.match(buttonSource, /primaryButtonLime:[\s\S]*backgroundColor: theme\.color\.uiAccent/);
-  assert.match(buttonSource, /primaryButtonTextLime:[\s\S]*color: theme\.color\.onUiAccent/);
+  assert.doesNotMatch(buttonSource, /primaryButtonLime|onUiAccent/);
   assert.match(buttonSource, /secondaryButton:[\s\S]*backgroundColor: theme\.color\.surface/);
   assert.match(buttonSource, /secondaryButton:[\s\S]*borderColor: theme\.color\.borderDefault/);
   assert.match(buttonSource, /secondaryButtonText:[\s\S]*color: theme\.color\.textStrong/);
@@ -174,18 +175,18 @@ test('compact interactive controls keep the 44pt Chit touch target floor', () =>
   assertStyleContains(segmentedControlSource, 'segmentItem', /minHeight: theme\.layout\.tapMin/);
 });
 
-test('selected bottom and trip tab surfaces use dark graphite with sparse Acid Lime edge', () => {
+test('selected bottom and trip tab surfaces use soft paper with a Coral edge', () => {
   const tabSelectionSource = readMobileSource('../navigation/tab-selection.ts');
   const bottomMenuSource = readMobileSource('../navigation/BottomMenu.tsx');
   const tripTabBarSource = readMobileSource('../navigation/TripTabBar.tsx');
 
   assert.match(tabSelectionSource, /backgroundColor: theme\.color\.surfaceSoft/);
-  assert.match(tabSelectionSource, /borderBottomColor: theme\.color\.uiAccent/);
+  assert.match(tabSelectionSource, /borderBottomColor: theme\.color\.brandAccent/);
   assert.doesNotMatch(tabSelectionSource, /backgroundColor: theme\.color\.primary/);
   assert.match(tabButtonSource, /tabButtonSelected:[\s\S]*backgroundColor: theme\.color\.surfaceSoft/);
-  assert.match(tabButtonSource, /tabButtonSelected:[\s\S]*borderBottomColor: theme\.color\.uiAccent/);
+  assert.match(tabButtonSource, /tabButtonSelected:[\s\S]*borderBottomColor: theme\.color\.brandAccent/);
   assert.doesNotMatch(tabButtonSource, /tabButtonSelected:[\s\S]*backgroundColor: theme\.color\.primary/);
-  assert.match(tabButtonSource, /iconColor = selected \? theme\.color\.uiAccent : theme\.color\.textFaint/);
+  assert.match(tabButtonSource, /iconColor = selected \? theme\.color\.brandAccent : theme\.color\.textFaint/);
   assert.match(tabButtonSource, /labelSelected:[\s\S]*color: theme\.color\.textStrong/);
   assert.match(bottomMenuSource, /<TabButton/);
   assert.match(tripTabBarSource, /<TabButton/);
@@ -233,11 +234,15 @@ test('Issue 399 navigation chrome adopts shared interactive primitives without r
   );
   assert.doesNotMatch(tripRootFabSource, /tone="lime"/);
   assert.match(tripRootFabSource, /<Plus color=\{theme\.color\.uiAccent\}/);
-  assert.match(floatingActionButtonSource, /tone = 'graphite'/);
-  assert.match(floatingActionButtonSource, /floatingActionButtonLime:[\s\S]*backgroundColor: theme\.color\.uiAccent/);
+  assert.match(floatingActionButtonSource, /export type FloatingActionButtonTone = 'coral' \| 'ink'/);
+  assert.match(floatingActionButtonSource, /tone = 'ink'/);
   assert.match(
     floatingActionButtonSource,
-    /floatingActionButtonGraphite:[\s\S]*backgroundColor: theme\.color\.actionPrimary/,
+    /floatingActionButtonCoral:[\s\S]*backgroundColor: theme\.color\.actionPrimary/,
+  );
+  assert.match(
+    floatingActionButtonSource,
+    /floatingActionButtonInk:[\s\S]*backgroundColor: theme\.color\.shellHighest/,
   );
 });
 
@@ -297,7 +302,7 @@ test('Issue 372 core journey surfaces do not introduce raw hex colors outside th
   }
 });
 
-test('Issue 395 high-emphasis journey heroes use Graphite Hero and explicit Lime-only moments', () => {
+test('Issue 395 high-emphasis journey heroes use Ledger Memory Hero and Coral action hierarchy', () => {
   const tripCardsSource = readMobileSource('../home-ui/TripCards.tsx');
 
   assertStyleContains(tripCardsSource, 'hero', /backgroundColor: theme\.color\.chit\.charcoal/);

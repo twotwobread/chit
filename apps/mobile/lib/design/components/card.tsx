@@ -4,7 +4,10 @@ import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-na
 import { SurfaceFrame, type SurfaceFrameVariant } from '../foundation/surface-frame';
 import { theme } from '../theme';
 
-export type CardVariant = Extract<SurfaceFrameVariant, 'content' | 'hero' | 'dark' | 'shelf'>;
+export type CardVariant = Extract<
+  SurfaceFrameVariant,
+  'content' | 'hero' | 'dark' | 'shelf' | 'memory' | 'ledger' | 'receipt'
+>;
 
 export function Card({
   children,
@@ -24,14 +27,14 @@ export function Card({
 
 export type BrandStampSize = 'sm' | 'md' | 'lg';
 
-const BRAND_STAMP_SIZE: Record<BrandStampSize, { box: number; font: number; radius: number; offset: number }> = {
-  sm: { box: 38, font: 18, radius: theme.radius.md, offset: 3 },
-  md: { box: 52, font: 25, radius: theme.radius.lg, offset: 4 },
-  lg: { box: 70, font: 34, radius: theme.radius.xl, offset: 5 },
+const BRAND_STAMP_SIZE: Record<BrandStampSize, { box: number; dot: number; font: number }> = {
+  sm: { box: 54, dot: 5, font: 24 },
+  md: { box: 70, dot: 7, font: 31 },
+  lg: { box: 92, dot: 9, font: 42 },
 };
 
 export function BrandStamp({
-  accessibilityLabel = '칫 브랜드 로고',
+  accessibilityLabel = 'chit 브랜드 로고',
   decorative = false,
   size = 'md',
   style,
@@ -49,17 +52,11 @@ export function BrandStamp({
       accessibilityLabel={decorative ? undefined : accessibilityLabel}
       accessibilityRole={decorative ? undefined : 'image'}
       importantForAccessibility={decorative ? 'no-hide-descendants' : 'auto'}
-      style={[
-        styles.brandStampWrap,
-        { height: metrics.box + metrics.offset, width: metrics.box + metrics.offset },
-        style,
-      ]}
+      style={[styles.brandStampWrap, { minHeight: metrics.box, minWidth: metrics.box }, style]}
     >
-      <View
-        style={[styles.brandStampOffset, { borderRadius: metrics.radius, height: metrics.box, width: metrics.box }]}
-      />
-      <View style={[styles.brandStamp, { borderRadius: metrics.radius, height: metrics.box, width: metrics.box }]}>
-        <Text style={[styles.brandStampText, { fontSize: metrics.font }]}>칫</Text>
+      <View style={styles.brandStampRow}>
+        <Text style={[styles.brandStampText, { fontSize: metrics.font }]}>chit</Text>
+        <View style={[styles.brandStampDot, { borderRadius: metrics.dot, height: metrics.dot, width: metrics.dot }]} />
       </View>
     </View>
   );
@@ -74,30 +71,25 @@ export function ScreenBackground({ children, style }: { children: ReactNode; sty
 }
 
 const styles = StyleSheet.create({
-  brandStamp: {
-    alignItems: 'center',
-    backgroundColor: theme.color.chit.charcoal,
-    borderColor: theme.color.shellRaised,
-    borderWidth: 1,
-    justifyContent: 'center',
-    position: 'absolute',
-    transform: [{ rotate: '-3deg' }],
-    ...theme.shadow.md,
-  },
-  brandStampOffset: {
+  brandStampDot: {
+    alignSelf: 'flex-end',
     backgroundColor: theme.color.brandAccent,
-    bottom: 0,
-    position: 'absolute',
-    right: 0,
-    transform: [{ rotate: '-3deg' }],
+    marginBottom: theme.space[3],
+    marginLeft: theme.space[1],
+  },
+  brandStampRow: {
+    alignItems: 'baseline',
+    flexDirection: 'row',
   },
   brandStampText: {
-    color: theme.color.brandAccent,
+    color: theme.color.textStrong,
     fontFamily: theme.font.family.bold,
     fontWeight: theme.font.weight.bold,
-    letterSpacing: -1,
+    letterSpacing: -1.8,
   },
   brandStampWrap: {
+    alignItems: 'flex-start',
+    justifyContent: 'center',
     position: 'relative',
   },
   screenBackground: {

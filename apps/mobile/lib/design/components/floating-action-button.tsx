@@ -4,7 +4,7 @@ import { StyleSheet, type PressableProps, type StyleProp, type ViewStyle } from 
 import { InteractiveSurface } from '../foundation/interactive-surface';
 import { theme } from '../theme';
 
-export type FloatingActionButtonTone = 'lime' | 'graphite';
+export type FloatingActionButtonTone = 'coral' | 'ink';
 
 const FAB_HIT_SLOP = theme.space[3];
 
@@ -14,7 +14,7 @@ export function FloatingActionButton({
   children,
   onPress,
   style,
-  tone = 'graphite',
+  tone = 'ink',
 }: {
   accessibilityLabel: string;
   accessibilityHint: string;
@@ -23,7 +23,7 @@ export function FloatingActionButton({
   style?: StyleProp<ViewStyle>;
   tone?: FloatingActionButtonTone;
 }) {
-  const lime = tone === 'lime';
+  const isCoral = tone === 'coral';
 
   return (
     <InteractiveSurface
@@ -36,8 +36,8 @@ export function FloatingActionButton({
       onPress={onPress}
       style={({ pressed }) => [
         styles.floatingActionButton,
-        lime ? styles.floatingActionButtonLime : styles.floatingActionButtonGraphite,
-        pressed ? (lime ? styles.floatingActionButtonLimePressed : styles.floatingActionButtonGraphitePressed) : null,
+        isCoral ? styles.floatingActionButtonCoral : styles.floatingActionButtonInk,
+        pressed ? (isCoral ? styles.floatingActionButtonCoralPressed : styles.floatingActionButtonInkPressed) : null,
         style,
       ]}
     >
@@ -59,16 +59,16 @@ const styles = StyleSheet.create({
     zIndex: 10,
     ...theme.shadow.lg,
   },
-  floatingActionButtonGraphite: {
+  floatingActionButtonCoral: {
     backgroundColor: theme.color.actionPrimary,
   },
-  floatingActionButtonGraphitePressed: {
+  floatingActionButtonCoralPressed: {
     backgroundColor: theme.color.actionPrimaryPressed,
   },
-  floatingActionButtonLime: {
-    backgroundColor: theme.color.uiAccent,
+  floatingActionButtonInk: {
+    backgroundColor: theme.color.shellHighest,
   },
-  floatingActionButtonLimePressed: {
-    backgroundColor: theme.color.primaryPressed,
+  floatingActionButtonInkPressed: {
+    backgroundColor: theme.color.chit.inkRaised,
   },
 });

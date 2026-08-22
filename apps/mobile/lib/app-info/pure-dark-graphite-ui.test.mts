@@ -4,61 +4,72 @@ import test from 'node:test';
 
 import { theme } from '../design/theme';
 
-test('Pure Dark Graphite tokens make dark graphite the default app surface', () => {
-  assert.equal(theme.color.bg, theme.color.chit.graphiteShell);
-  assert.equal(theme.color.shell, theme.color.chit.graphiteShell);
-  assert.equal(theme.color.shellElevated, theme.color.chit.graphiteRaised);
-  assert.equal(theme.color.surface, theme.color.chit.graphiteCard);
-  assert.equal(theme.color.surfaceSoft, theme.color.chit.graphiteElevated);
-  assert.equal(theme.color.surfaceSunken, theme.color.chit.graphiteSunken);
-  assert.equal(theme.color.actionPrimary, theme.color.chit.graphiteHighest);
-  assert.equal(theme.color.onActionPrimary, theme.color.chit.offWhiteText);
-  assert.notEqual(theme.color.surface, theme.color.chit.offWhiteElevated);
-  assert.notEqual(theme.color.surfaceSunken, theme.color.chit.offWhiteSubtle);
-  assert.notEqual(theme.color.primary, theme.color.actionPrimary);
+test('Ledger Memory tokens make receipt cream the shell and paper white the ledger surface', () => {
+  assert.equal(theme.color.bg, theme.color.chit.receiptCream);
+  assert.equal(theme.color.shell, theme.color.chit.receiptCream);
+  assert.equal(theme.color.shellElevated, theme.color.chit.paperWhite);
+  assert.equal(theme.color.surface, theme.color.chit.paperWhite);
+  assert.equal(theme.color.surfaceSunken, theme.color.chit.softGray);
+  assert.equal(theme.color.memorySurface, theme.color.chit.receiptCream);
+  assert.equal(theme.color.ledgerSurface, theme.color.chit.paperWhite);
+  assert.equal(theme.color.actionPrimary, theme.color.chit.actionCoral);
+  assert.equal(theme.color.onActionPrimary, theme.color.chit.paperWhite);
+  assert.equal(theme.color.brandAccent, theme.color.chit.coral);
+  assert.equal(theme.color.shellHighest, theme.color.chit.ledgerInk);
+  assert.notEqual(theme.color.brandAccent, theme.color.success);
+  assert.notEqual(theme.color.brandAccent, theme.color.danger);
 });
 
-test('Pure Dark Graphite keeps off-white as text or escape only', () => {
-  assert.equal(theme.color.textStrong, theme.color.chit.offWhiteText);
-  assert.equal(theme.color.textBody, theme.color.chit.mutedText);
-  assert.equal(theme.color.textMuted, theme.color.chit.faintText);
-  assert.equal(theme.color.lightEscape, theme.color.chit.offWhiteElevated);
+test('Ledger Memory keeps semantic state colors separate from Coral', () => {
+  assert.equal(theme.color.textStrong, theme.color.chit.ledgerInk);
+  assert.equal(theme.color.textBody, '#44474F');
+  assert.equal(theme.color.textMuted, theme.color.chit.mutedInk);
+  assert.equal(theme.color.lightEscape, theme.color.chit.paperWhite);
+  assert.equal(theme.color.success, theme.color.chit.clearGreen);
+  assert.equal(theme.color.danger, theme.color.chit.alertRed);
+  assert.equal(theme.color.info, theme.color.chit.infoBlue);
 });
 
 const read = (relativePath: string) => readFileSync(new URL(relativePath, import.meta.url), 'utf8');
 
-test('mobile UI rule documents Pure Dark Graphite and Compact Premium Dark', () => {
+test('mobile UI rule documents Ledger Memory and Coral semantic boundaries', () => {
   const rule = read('../../../../.harness/rules/code/mobile-ui.md');
-  assert.match(rule, /Pure Dark Graphite/);
-  assert.match(rule, /Compact Premium Dark/);
-  assert.match(rule, /large floating off-white blocks/);
+  assert.match(rule, /Ledger × Memory/);
+  assert.match(rule, /기록은 정확하게, 기억은 다정하게/);
+  assert.match(rule, /Chit Coral[\s\S]*not use Coral to mean financial success, unpaid, error, or completion/i);
   assert.match(rule, /placeholder-quality place cards/);
 });
 
-test('shared surfaces default to dark graphite instead of off-white', () => {
+test('shared surfaces expose memory, ledger, and receipt frame variants', () => {
   const surfaceFrame = read('../design/foundation/surface-frame.tsx');
   const card = read('../design/components/card.tsx');
   const hero = read('../design/patterns/hero.tsx');
 
-  assert.match(surfaceFrame, /frame:[\s\S]*backgroundColor: theme\.color\.surface/);
-  assert.match(surfaceFrame, /graphite:[\s\S]*backgroundColor: theme\.color\.surfaceSoft/);
+  assert.match(
+    surfaceFrame,
+    /SurfaceFrameVariant = 'content' \| 'hero' \| 'dark' \| 'shelf' \| 'graphite' \| 'memory' \| 'ledger' \| 'receipt'/,
+  );
+  assert.match(surfaceFrame, /memory:[\s\S]*backgroundColor: theme\.color\.memorySurface/);
+  assert.match(surfaceFrame, /ledger:[\s\S]*backgroundColor: theme\.color\.ledgerSurface/);
+  assert.match(surfaceFrame, /receipt:[\s\S]*backgroundColor: theme\.color\.receiptSurface/);
+  assert.match(card, /CardVariant[\s\S]*'memory' \| 'ledger' \| 'receipt'/);
   assert.match(card, /screenBackground:[\s\S]*backgroundColor: theme\.color\.bg/);
-  assert.match(hero, /heroCardPanel:[\s\S]*backgroundColor: theme\.color\.surface/);
+  assert.match(hero, /HeroActions/);
   assert.doesNotMatch(hero, /tone: 'lime' as PrimaryButtonTone, \.\.\.primary/);
 });
 
-test('routine nav and floating actions avoid full Acid Lime fill', () => {
+test('routine nav and floating actions avoid retired Lime tone names', () => {
   const tabButton = read('../design/components/tab-button.tsx');
   const fab = read('../design/components/floating-action-button.tsx');
 
-  assert.doesNotMatch(tabButton, /tabButtonSelected:[\s\S]*backgroundColor: theme\.color\.primary/);
+  assert.doesNotMatch(tabButton, /theme\.color\.primary/);
   assert.match(tabButton, /tabButtonSelected:[\s\S]*backgroundColor: theme\.color\.surfaceSoft/);
-  assert.match(tabButton, /tabButtonSelected:[\s\S]*borderBottomColor: theme\.color\.uiAccent/);
+  assert.match(tabButton, /tabButtonSelected:[\s\S]*borderBottomColor: theme\.color\.brandAccent/);
   assert.doesNotMatch(fab, /tone = 'lime'/);
-  assert.match(fab, /tone = 'graphite'/);
+  assert.doesNotMatch(fab, /FloatingActionButtonTone = 'lime' \| 'graphite'/);
 });
 
-test('navigation shell uses dark selected surfaces and avoids Lime capsules', () => {
+test('navigation shell uses paper/cream surfaces with Coral selected signal', () => {
   const bottomMenu = read('../navigation/BottomMenu.tsx');
   const tripTabBar = read('../navigation/TripTabBar.tsx');
   const selection = read('../navigation/tab-selection.ts');
@@ -69,6 +80,7 @@ test('navigation shell uses dark selected surfaces and avoids Lime capsules', ()
 
   assert.doesNotMatch(selection, /backgroundColor: theme\.color\.primary/);
   assert.match(selection, /backgroundColor: theme\.color\.surfaceSoft/);
+  assert.match(selection, /borderBottomColor: theme\.color\.brandAccent/);
   assert.match(bottomMenu, /backgroundColor: theme\.color\.shellElevated/);
   assert.match(bottomMenu, /borderTopColor: theme\.color\.borderDefault/);
   assert.match(tripTabBar, /backgroundColor: theme\.color\.shellElevated/);
@@ -78,12 +90,10 @@ test('navigation shell uses dark selected surfaces and avoids Lime capsules', ()
   assert.match(bottomSheet, /sheet:[\s\S]*backgroundColor: theme\.color\.shellElevated/);
   assert.match(bottomSheet, /sheet:[\s\S]*borderColor: theme\.color\.borderDefault/);
   assert.match(dayChips, /FilterChip/);
-  assert.match(dayChips, /legendDotSelected:[\s\S]*borderColor: theme\.color\.textStrong/);
   assert.doesNotMatch(tripRootFab, /tone="lime"/);
-  assert.match(tripRootFab, /<Plus color=\{theme\.color\.uiAccent\}/);
 });
 
-test('root screens use Pure Dark Graphite shared surfaces without local off-white blocks', () => {
+test('root screens use shared Ledger Memory surfaces without raw primary fills', () => {
   for (const relativePath of [
     '../../app/login.tsx',
     '../../app/index.tsx',
@@ -96,12 +106,12 @@ test('root screens use Pure Dark Graphite shared surfaces without local off-whit
     '../trip-ui/MyPageStyles.ts',
   ]) {
     const source = read(relativePath);
-    assert.doesNotMatch(source, /offWhiteElevated|offWhiteSubtle|warmPaper/);
     assert.doesNotMatch(source, /backgroundColor: theme\.color\.primary/);
+    assert.doesNotMatch(source, /tone="lime"|tone: 'lime'/);
   }
 });
 
-test('trip tabs use compact premium dark density and avoid routine Lime CTA fill', () => {
+test('trip tabs avoid retired Lime CTA fill while using shared components', () => {
   for (const relativePath of [
     '../../app/trips/[tripId]/(tabs)/today.tsx',
     '../../app/trips/[tripId]/(tabs)/itinerary.tsx',
@@ -118,11 +128,10 @@ test('trip tabs use compact premium dark density and avoid routine Lime CTA fill
     const source = read(relativePath);
     assert.doesNotMatch(source, /backgroundColor: theme\.color\.primary/);
     assert.doesNotMatch(source, /tone="lime"|tone: 'lime'/);
-    assert.doesNotMatch(source, /offWhiteElevated|offWhiteSubtle|warmPaper/);
   }
 });
 
-test('map search overlays use dark surfaces and polished place thumbnails', () => {
+test('map search overlays use tokenized surfaces and polished place thumbnails', () => {
   const mapParts = read('../trip-ui/TripMapScreenParts.tsx');
   const mapStyles = read('../trip-ui/TripMapScreenStyles.ts');
   const googlePlaceMapSearch = read('../trip-ui/GooglePlaceMapSearch.tsx');
@@ -135,7 +144,7 @@ test('map search overlays use dark surfaces and polished place thumbnails', () =
   assert.match(googlePlaceMapSearch, /photo|thumbnail|category|Place/);
 });
 
-test('form and detail flows use dark graphite form surfaces', () => {
+test('form and detail flows avoid retired Lime/primary-fill semantics', () => {
   for (const relativePath of [
     '../../app/trips/new.tsx',
     '../../app/trips/[tripId]/detail.tsx',
@@ -152,7 +161,6 @@ test('form and detail flows use dark graphite form surfaces', () => {
     '../trips/date-picker.tsx',
   ]) {
     const source = read(relativePath);
-    assert.doesNotMatch(source, /offWhiteElevated|offWhiteSubtle|warmPaper/);
     assert.doesNotMatch(source, /backgroundColor: theme\.color\.primary/);
     assert.doesNotMatch(source, /backgroundColor: theme\.color\.primarySoft/);
     assert.doesNotMatch(source, /borderColor: theme\.color\.primary/);

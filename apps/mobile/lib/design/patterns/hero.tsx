@@ -138,7 +138,7 @@ export function HeroMetricPanel({
 }
 
 export function HeroActions({ primary, secondary }: { primary: HeroAction; secondary?: HeroAction }) {
-  const primaryAction = { tone: 'graphite' as PrimaryButtonTone, ...primary };
+  const primaryAction = { tone: 'coral' as PrimaryButtonTone, ...primary };
 
   return (
     <ActionGroup direction={secondary ? 'row' : 'column'} style={styles.heroActions}>
@@ -184,8 +184,8 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   heroCardGraphite: {
-    backgroundColor: theme.color.actionPrimary,
-    borderColor: theme.color.shellRaised,
+    backgroundColor: theme.color.shellHighest,
+    borderColor: theme.color.shellHighest,
   },
   heroCardPanel: {
     backgroundColor: theme.color.surface,
@@ -227,7 +227,7 @@ const styles = StyleSheet.create({
     padding: theme.space[5],
   },
   heroSplitHeader: {
-    backgroundColor: theme.color.actionPrimary,
+    backgroundColor: theme.color.shellHighest,
     gap: theme.space[3],
     padding: theme.space[6],
   },
@@ -269,7 +269,7 @@ const styles = StyleSheet.create({
     padding: theme.space[4],
   },
   metricPanelGraphite: {
-    backgroundColor: theme.color.actionPrimary,
+    backgroundColor: theme.color.shellHighest,
   },
   metricPanelNeutral: {
     backgroundColor: theme.color.surfaceSunken,
