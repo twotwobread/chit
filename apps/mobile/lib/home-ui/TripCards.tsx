@@ -255,8 +255,8 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   hero: {
-    backgroundColor: theme.color.chit.charcoal,
-    borderColor: theme.color.chit.charcoalElevated,
+    backgroundColor: theme.color.shellHighest,
+    borderColor: theme.color.chit.inkRaised,
     borderRadius: theme.radius['2xl'],
     borderWidth: 1,
     padding: theme.space[6],
@@ -280,13 +280,13 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.bold,
   },
   heroDate: {
-    color: theme.color.chit.acidLimeSofter,
+    color: theme.color.chit.inkSoft,
     fontFamily: theme.font.family.regular,
     fontSize: theme.font.size.label,
     marginTop: theme.space[2],
   },
   heroDayBadge: {
-    backgroundColor: theme.color.chit.charcoalElevated,
+    backgroundColor: theme.color.chit.inkRaised,
     borderRadius: theme.radius.pill,
     paddingHorizontal: theme.space[3],
     paddingVertical: theme.space[2],
@@ -303,7 +303,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   heroMeta: {
-    color: theme.color.chit.acidLimeSofter,
+    color: theme.color.chit.inkSoft,
     fontFamily: theme.font.family.regular,
     fontSize: theme.font.size.label,
     marginTop: theme.space[1],
@@ -329,7 +329,7 @@ const styles = StyleSheet.create({
     marginTop: theme.space[4],
   },
   heroNext: {
-    color: theme.color.chit.acidLimeSofter,
+    color: theme.color.chit.inkSoft,
     fontFamily: theme.font.family.regular,
     fontSize: theme.font.size.label,
     marginTop: theme.space[3],
@@ -389,7 +389,7 @@ const styles = StyleSheet.create({
     marginTop: theme.space[4],
   },
   progressText: {
-    color: theme.color.chit.acidLimeSofter,
+    color: theme.color.chit.inkSoft,
     fontFamily: theme.font.family.semibold,
     fontSize: theme.font.size.caption,
     fontWeight: theme.font.weight.semibold,
@@ -401,7 +401,7 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.bold,
   },
   rowMetaLabelOnHero: {
-    color: theme.color.textOnDark,
+    color: theme.color.textStrong,
   },
   rowMetaWrap: {
     flexDirection: 'row',
@@ -424,7 +424,7 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.bold,
   },
   track: {
-    backgroundColor: theme.color.chit.charcoalElevated,
+    backgroundColor: theme.color.chit.inkRaised,
     borderRadius: theme.radius.pill,
     flex: 1,
     height: 6,
@@ -448,8 +448,8 @@ const styles = StyleSheet.create({
     gap: theme.space[2],
   },
   upcomingHomeHero: {
-    backgroundColor: theme.color.chit.charcoal,
-    borderColor: theme.color.chit.charcoalElevated,
+    backgroundColor: theme.color.memorySurface,
+    borderColor: theme.color.borderDefault,
   },
   upcomingMeta: {
     color: theme.color.textMuted,
@@ -457,7 +457,7 @@ const styles = StyleSheet.create({
     fontSize: theme.font.size.caption,
   },
   upcomingMetaOnHero: {
-    color: theme.color.chit.acidLimeSofter,
+    color: theme.color.textBody,
   },
   upcomingName: {
     color: theme.color.textStrong,
@@ -466,6 +466,6 @@ const styles = StyleSheet.create({
     fontWeight: theme.font.weight.bold,
   },
   upcomingNameOnHero: {
-    color: theme.color.textOnDark,
+    color: theme.color.textStrong,
   },
 });

@@ -305,10 +305,10 @@ test('Issue 372 core journey surfaces do not introduce raw hex colors outside th
 test('Issue 395 high-emphasis journey heroes use Ledger Memory Hero and Coral action hierarchy', () => {
   const tripCardsSource = readMobileSource('../home-ui/TripCards.tsx');
 
-  assertStyleContains(tripCardsSource, 'hero', /backgroundColor: theme\.color\.chit\.charcoal/);
+  assertStyleContains(tripCardsSource, 'hero', /backgroundColor: theme\.color\.shellHighest/);
   assertStyleContains(tripCardsSource, 'heroCta', /backgroundColor: theme\.color\.actionPrimary/);
   assertStyleContains(tripCardsSource, 'heroCtaText', /color: theme\.color\.onActionPrimary/);
-  assertStyleContains(tripCardsSource, 'upcomingHomeHero', /backgroundColor: theme\.color\.chit\.charcoal/);
+  assertStyleContains(tripCardsSource, 'upcomingHomeHero', /backgroundColor: theme\.color\.memorySurface/);
 
   assert.match(representativeNextPlaceHeroSource, /<HeroCard[\s\S]*variant="graphite"/);
   assert.match(representativeNextPlaceHeroSource, /HeroActions/);
