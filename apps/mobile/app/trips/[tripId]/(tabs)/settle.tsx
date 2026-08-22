@@ -111,9 +111,9 @@ function SettlementContent({
     <>
       <TripListCard>
         <View style={styles.heroCard}>
-          <Text style={styles.heroEyebrow}>LIVE SETTLEMENT</Text>
-          <Text style={styles.heroTitle}>칫, 정산 별거없네.</Text>
-          <Text style={styles.heroHelper}>현재 지출 기준 최신 정산이에요. 수정하면 사람별 금액도 바로 바뀝니다.</Text>
+          <Text style={styles.heroEyebrow}>정산 장부</Text>
+          <Text style={styles.heroTitle}>기록은 정확하게, 정산은 한눈에.</Text>
+          <Text style={styles.heroHelper}>현재 지출 기준 최신 장부예요. 수정하면 사람별 금액도 바로 바뀝니다.</Text>
           <Text style={styles.heroFormula}>결제 금액 - 부담 금액 = 받을/보낼 금액</Text>
         </View>
       </TripListCard>
@@ -386,21 +386,21 @@ const styles = StyleSheet.create({
     gap: theme.space[3],
   },
   heroCard: {
-    backgroundColor: theme.color.chit.charcoal,
+    backgroundColor: theme.color.shellHighest,
     borderRadius: theme.radius.xl,
     gap: theme.space[3],
     paddingHorizontal: theme.space[5],
     paddingVertical: theme.space[5],
   },
   heroEyebrow: {
-    color: theme.color.primary,
+    color: theme.color.actionPrimary,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.micro,
     fontWeight: theme.font.weight.bold,
     letterSpacing: 0.8,
   },
   heroFormula: {
-    color: theme.color.primary,
+    color: theme.color.actionPrimary,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.label,
     fontWeight: theme.font.weight.bold,
