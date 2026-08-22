@@ -38,7 +38,7 @@ const ICONS: Record<string, typeof Compass> = {
 };
 
 const LABELS: Record<string, string> = {
-  expenses: '지출',
+  expenses: '장부',
   itinerary: '일정',
   map: '지도',
   settle: '정산',
