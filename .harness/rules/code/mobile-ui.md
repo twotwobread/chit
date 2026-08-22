@@ -13,7 +13,9 @@ Use when changing Expo screens, mobile UI state, styling, copy, or navigation.
 ## Voice
 
 - Korean first.
-- Short, confident, and slightly 시크 for normal/product states.
+- Short, confident, and kind for normal/product states.
+- Brand sentence: `기록은 정확하게, 기억은 다정하게.`
+- Keep money/settlement copy exact and explainable; do not sacrifice clarity for cuteness.
 - Keep error/recovery copy clear and kind; do not make failure states sarcastic.
 - Show the next action before long state descriptions.
 - Do not use emoji or decorative unicode in product UI.
@@ -21,32 +23,41 @@ Use when changing Expo screens, mobile UI state, styling, copy, or navigation.
 
 ## Visual rules
 
-- Use Chit `Pure Dark Graphite` as the default app UI language: near-black shell, dark graphite app bars/tabs/cards/lists/forms/sheets, off-white text tiers, and sparse Acid Lime signals.
-- Do not use retired Warm Paper `#F5F1E8` for core app backgrounds/cards.
-- Do not use Off-white as the default content card/sheet/form surface. Off-white is an explicit escape for long-readability, legal, export/share, or accessibility-driven contexts only.
-- Keep shell treatment centralized through design tokens/shared components (`ScreenBackground`, shell/card/input tokens); do not add ad-hoc rgba/radial/glow values per screen.
-- Reserve `Dark Acid`/BrandStamp treatment for app icon, splash, login/home brand moments, empty/loading/completion states, settlement summary/complete hero moments, and other approved high-emphasis surfaces.
-- Use `Stamp Pop`/`BrandStamp` only for approved brand/header, onboarding, empty/loading/completion, mypage accent, or settlement moments; avoid repeated dense rows, bottom tabs, and routine forms.
+- Use Chit `Ledger × Memory` as the default app UI language: Receipt Cream app atmosphere, Paper White ledger surfaces, Ledger Ink text, Chit Coral brand/action signals, and explicit semantic state colors.
+- Chit Coral is for logo, selection, brand moments, and core actions. Do not use Coral to mean financial success, unpaid, error, or completion.
+- Action Coral is the default primary CTA fill. Use Paper White text on Action Coral for primary hierarchy.
+- Paper White is the default surface for expense, settlement, forms, calculation, and other ledger-like areas.
+- Receipt Cream is the default background/atmosphere for home, meeting, event memory, and warm group surfaces.
+- Ledger Ink is the default title, amount, and high-emphasis text color.
+- Clear Green means settlement/payment completion or positive receive state. Alert Red means error, unpaid, destructive, or risky actions. Info Blue means link, external, exchange-rate, or informational guidance.
+- Receipt/ticket/stamp motifs are limited to completion, share/export, reports, invites, and memory cards. Do not use them for app icon defaults, dense lists, routine forms, or bottom tabs.
+- App icon and logo direction is clean `chit.` wordmark/symbol, not a heavy stamp mark.
 - Use theme tokens for color, spacing, radius, typography, and shadow.
 - Do not add raw hex colors in screen code.
 - External brand colors also need tokens before use.
-- Graphite is the default primary CTA / 기본 주요 액션 fill for normal product UI; use Off-white text on Graphite for primary hierarchy.
-- Acid Lime is sparse and explicit: use it for BrandStamp/app icon/splash/onboarding, selected dot/underline/edge, rare success/complete emphasis, and at most one explicitly approved hero CTA; do not use it for long body text, small text, repeated routine tabs/chips/FAB/buttons, dense repeated actions, or danger/error states.
-- Use `Compact Premium Dark` density: hero titles, total spend, settlement results, and next actions are large; repeated rows/chips/settings/forms are compact, aligned, and still 44pt+ touch-safe.
-- Avoid previous visual issues: large floating off-white blocks, repeated Acid Lime fills, over-rounded pill/card repetition, weak all-bold hierarchy, clipped day chips/carousels, appbar misalignment, unsafe sheet/safe-area spacing, and placeholder-quality place cards.
-- Place/map result cards should use real imagery when available, or polished dark thumbnails/category icons when not; avoid text-only placeholder blocks.
+- Use comfortable compact density: hero titles, total spend, settlement results, and next actions are large; repeated rows/chips/settings/forms are compact, aligned, and still 44pt+ touch-safe.
+- Avoid visual issues: overusing Coral, making every card look like a receipt, emoji structural icons, weak number hierarchy, clipped day chips/carousels, appbar misalignment, unsafe sheet/safe-area spacing, and placeholder-quality place cards.
+- Place/map result cards should use real imagery when available, or polished tokenized thumbnails/category icons when not; avoid text-only placeholder blocks.
 - Credit/받을 돈 uses credit color and `+`; debit/보낼 돈 uses debit color and `−`.
 - Reuse shared Button/Card/ListRow/Badge/Chip/ScreenBackground/BrandStamp patterns before duplicating styles.
 - New shared interactive primitives should use `InteractiveSurface` with accessibility role/state, disabled/busy/selected semantics, pressed feedback, `theme.layout.tapMin` touch target, and `hitSlop` for small icon-only controls.
 
+## IA rules
+
+- Root navigation keeps the current 2-depth philosophy: root `홈/마이`; meeting is a normal detail page; event shell tabs appear only inside trip/date/outing events.
+- A meeting detail page should not introduce its own bottom nav just because it is a meeting.
+- Event shell tabs are for active work surfaces such as today, itinerary, map/place, ledger, and settlement.
+
 ## Common patterns
 
-- Trip list: separate logged-out/loading/empty/error/populated states; row tap opens detail.
-- Trip detail: show name/date first; Day rows show `Day N`, date, lodging summary, and clear navigation.
+- Meeting list: separate logged-out/loading/empty/error/populated states; row tap opens meeting detail.
+- Meeting detail: show group identity, next events, settlement summary, past records, and members without switching bottom nav.
+- Event detail/shell: show event name/date/participants first, then event-specific work tabs.
 - Day itinerary: rows show order, name, address/type, lodging status, and explicit actions.
 - Today execution: prioritize next place and immediate actions.
 - Participants/invite: rows focus on display name and role; invite actions are explicit.
 - Forms/sheets: ask only for needed fields; validation copy says how to fix input.
+- Expense/settlement: every row should make payer, total amount, split/participant context, and calculation evidence discoverable.
 
 ## State and logic
 

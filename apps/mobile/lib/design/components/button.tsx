@@ -15,7 +15,7 @@ import { ResponsiveLabel } from '../foundation/responsive-label';
 import { buildCriticalTextLayout } from '../responsive-text';
 import { theme } from '../theme';
 
-export type PrimaryButtonTone = 'graphite' | 'lime';
+export type PrimaryButtonTone = 'coral' | 'ink';
 
 export function PrimaryButton({
   accessibilityLabel,
@@ -26,7 +26,7 @@ export function PrimaryButton({
   onPress,
   selected,
   style,
-  tone = 'graphite',
+  tone = 'coral',
 }: {
   accessibilityLabel?: string;
   disabled?: boolean;
@@ -47,8 +47,7 @@ export function PrimaryButton({
   });
   const isDisabled = disabled || loading;
   const visibleLabel = loading ? (loadingLabel ?? label) : label;
-  const isLime = tone === 'lime';
-  const spinnerColor = isLime ? theme.color.onUiAccent : theme.color.onActionPrimary;
+  const isInk = tone === 'ink';
 
   return (
     <InteractiveSurface
@@ -61,27 +60,21 @@ export function PrimaryButton({
       selected={selected}
       style={({ pressed }) => [
         styles.primaryButton,
-        isLime ? styles.primaryButtonLime : styles.primaryButtonGraphite,
-        pressed && !isDisabled ? (isLime ? styles.primaryButtonLimePressed : styles.primaryButtonPressed) : null,
+        isInk ? styles.primaryButtonInk : styles.primaryButtonCoral,
+        pressed && !isDisabled ? (isInk ? styles.primaryButtonInkPressed : styles.primaryButtonPressed) : null,
         isDisabled ? styles.disabled : null,
         style,
       ]}
     >
       {loading ? (
         <View style={styles.loadingStack}>
-          <ActivityIndicator color={spinnerColor} />
-          <ResponsiveLabel
-            fontSize={theme.font.size.label}
-            style={[styles.primaryButtonText, isLime ? styles.primaryButtonTextLime : null]}
-          >
+          <ActivityIndicator color={theme.color.onActionPrimary} />
+          <ResponsiveLabel fontSize={theme.font.size.label} style={styles.primaryButtonText}>
             {visibleLabel}
           </ResponsiveLabel>
         </View>
       ) : (
-        <ResponsiveLabel
-          fontSize={theme.font.size.label}
-          style={[styles.primaryButtonText, isLime ? styles.primaryButtonTextLime : null]}
-        >
+        <ResponsiveLabel fontSize={theme.font.size.label} style={styles.primaryButtonText}>
           {label}
         </ResponsiveLabel>
       )}
@@ -152,14 +145,14 @@ const styles = StyleSheet.create({
     paddingVertical: theme.space[4],
     ...theme.shadow.xs,
   },
-  primaryButtonGraphite: {
+  primaryButtonCoral: {
     backgroundColor: theme.color.actionPrimary,
   },
-  primaryButtonLime: {
-    backgroundColor: theme.color.uiAccent,
+  primaryButtonInk: {
+    backgroundColor: theme.color.shellHighest,
   },
-  primaryButtonLimePressed: {
-    backgroundColor: theme.color.primaryPressed,
+  primaryButtonInkPressed: {
+    backgroundColor: theme.color.chit.inkRaised,
   },
   primaryButtonPressed: {
     backgroundColor: theme.color.actionPrimaryPressed,
@@ -171,9 +164,6 @@ const styles = StyleSheet.create({
     fontSize: theme.font.size.label,
     fontWeight: theme.font.weight.bold,
     textAlign: 'center',
-  },
-  primaryButtonTextLime: {
-    color: theme.color.onUiAccent,
   },
   secondaryButton: {
     alignItems: 'center',
@@ -188,7 +178,7 @@ const styles = StyleSheet.create({
   },
   secondaryButtonPressed: {
     backgroundColor: theme.color.surfaceSunken,
-    borderColor: theme.color.shellHighest,
+    borderColor: theme.color.borderStrong,
   },
   secondaryButtonText: {
     color: theme.color.textStrong,

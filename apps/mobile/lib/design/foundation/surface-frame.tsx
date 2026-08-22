@@ -3,7 +3,7 @@ import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { theme } from '../theme';
 
-export type SurfaceFrameVariant = 'content' | 'hero' | 'dark' | 'shelf' | 'graphite';
+export type SurfaceFrameVariant = 'content' | 'hero' | 'dark' | 'shelf' | 'graphite' | 'memory' | 'ledger' | 'receipt';
 
 export type SurfaceFrameProps = {
   children: ReactNode;
@@ -28,13 +28,22 @@ function surfaceFrameVariantStyle(variant: SurfaceFrameVariant): StyleProp<ViewS
   if (variant === 'graphite') {
     return styles.graphite;
   }
+  if (variant === 'memory') {
+    return styles.memory;
+  }
+  if (variant === 'ledger') {
+    return styles.ledger;
+  }
+  if (variant === 'receipt') {
+    return styles.receipt;
+  }
   return null;
 }
 
 const styles = StyleSheet.create({
   dark: {
-    backgroundColor: theme.color.chit.charcoal,
-    borderColor: theme.color.borderStrong,
+    backgroundColor: theme.color.shellHighest,
+    borderColor: theme.color.shellHighest,
     ...theme.shadow.md,
   },
   frame: {
@@ -53,6 +62,14 @@ const styles = StyleSheet.create({
     borderColor: theme.color.borderStrong,
     ...theme.shadow.md,
   },
+  ledger: {
+    backgroundColor: theme.color.ledgerSurface,
+    borderColor: theme.color.borderSubtle,
+  },
+  memory: {
+    backgroundColor: theme.color.memorySurface,
+    borderColor: theme.color.borderDefault,
+  },
   hero: {
     backgroundColor: theme.color.surface,
     borderColor: theme.color.borderDefault,
@@ -60,6 +77,12 @@ const styles = StyleSheet.create({
     gap: theme.space[5],
     padding: theme.space[6],
     ...theme.shadow.md,
+  },
+  receipt: {
+    backgroundColor: theme.color.receiptSurface,
+    borderColor: theme.color.borderDefault,
+    borderStyle: 'dashed',
+    shadowOpacity: 0,
   },
   shelf: {
     backgroundColor: theme.color.surfaceSunken,

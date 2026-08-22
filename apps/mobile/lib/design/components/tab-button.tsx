@@ -36,7 +36,7 @@ export function TabButton({
   selected?: boolean;
   style?: StyleProp<ViewStyle>;
 }) {
-  const iconColor = selected ? theme.color.uiAccent : theme.color.textFaint;
+  const iconColor = selected ? theme.color.brandAccent : theme.color.textFaint;
   const strokeWidth = selected ? 2.2 : 2;
 
   return (
@@ -89,7 +89,7 @@ const styles = StyleSheet.create({
   },
   tabButtonSelected: {
     backgroundColor: theme.color.surfaceSoft,
-    borderBottomColor: theme.color.uiAccent,
+    borderBottomColor: theme.color.brandAccent,
     borderBottomWidth: 3,
   },
 });

@@ -1,40 +1,6 @@
-<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="칫 Chit app icon">
-  <defs>
-    <style>
-      @font-face {
-        font-family: "PretendardAppIcon";
-        src: url("../fonts/Pretendard-Bold.otf") format("opentype");
-        font-weight: 800;
-        font-style: normal;
-      }
-      .icon-text {
-        font-family: "PretendardAppIcon", "Pretendard", "Apple SD Gothic Neo", "Noto Sans CJK KR", sans-serif;
-        font-size: 430px;
-        font-weight: 800;
-        letter-spacing: 0;
-      }
-    </style>
-  </defs>
-  <rect width="1024" height="1024" fill="#111315"/>
-  <g transform="rotate(-6 512 512)">
-    <rect x="118" y="258" width="788" height="508" rx="86" fill="#C8FF00"/>
-    <line
-      x1="286"
-      y1="306"
-      x2="286"
-      y2="718"
-      stroke="#111315"
-      stroke-width="10"
-      stroke-linecap="round"
-      stroke-dasharray="1 30"
-    />
-    <text
-      class="icon-text"
-      x="582"
-      y="536"
-      fill="#111315"
-      text-anchor="middle"
-      dominant-baseline="central"
-    >칫</text>
-  </g>
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="chit app mark">
+  <rect width="1024" height="1024" rx="224" fill="#FFF8ED"/>
+  <rect x="132" y="242" width="760" height="540" rx="156" fill="#FFFFFF"/>
+  <path d="M245 599C245 471 340 376 469 376C574 376 654 437 679 529H588C568 488 526 462 469 462C393 462 338 520 338 599C338 678 393 736 469 736C526 736 568 710 588 669H679C654 761 574 822 469 822C340 822 245 727 245 599Z" fill="#22242A"/>
+  <circle cx="732" cy="734" r="54" fill="#FF6258"/>
 </svg>

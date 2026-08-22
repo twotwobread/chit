@@ -141,16 +141,17 @@ test('Issue 395 shared design layer exposes foundation-backed Hero primitives', 
   );
   assert.doesNotMatch(foundationInteractiveSource, /pressed: false/);
 
-  assert.match(buttonSource, /export type PrimaryButtonTone = 'graphite' \| 'lime'/);
-  assert.match(buttonSource, /tone = 'graphite'/);
-  assert.match(buttonSource, /primaryButtonLime/);
-  assert.match(buttonSource, /backgroundColor: theme\.color\.uiAccent/);
-  assert.match(buttonSource, /color: theme\.color\.onUiAccent/);
+  assert.match(buttonSource, /export type PrimaryButtonTone = 'coral' \| 'ink'/);
+  assert.match(buttonSource, /tone = 'coral'/);
+  assert.match(buttonSource, /primaryButtonCoral/);
+  assert.match(buttonSource, /primaryButtonInk/);
+  assert.match(buttonSource, /backgroundColor: theme\.color\.actionPrimary/);
+  assert.match(buttonSource, /color: theme\.color\.onActionPrimary/);
 
   assert.match(heroSource, /variant = 'panel'/);
   assert.match(heroSource, /HeroActions/);
-  assert.match(heroSource, /tone: 'graphite'/);
-  assert.match(heroSource, /theme\.color\.actionPrimary/);
+  assert.match(heroSource, /tone: 'coral'/);
+  assert.match(heroSource, /<PrimaryButton[\s\S]*tone=\{primaryAction\.tone\}/);
   assert.doesNotMatch(heroSource, /#[0-9a-fA-F]{3,8}\b/);
 });
 
@@ -188,17 +189,17 @@ test('Issue 399 navigation chrome primitives are exported and foundation-backed'
   assert.match(tabButtonSource, /hitSlop=\{TAB_BUTTON_HIT_SLOP\}/);
   assert.match(tabButtonSource, /minHeight=\{theme\.layout\.tapMin\}/);
   assert.match(tabButtonSource, /backgroundColor: theme\.color\.surfaceSoft/);
-  assert.match(tabButtonSource, /borderBottomColor: theme\.color\.uiAccent/);
+  assert.match(tabButtonSource, /borderBottomColor: theme\.color\.brandAccent/);
   assert.match(tabButtonSource, /color: theme\.color\.textStrong/);
 
-  assert.match(floatingActionButtonSource, /export type FloatingActionButtonTone = 'lime' \| 'graphite'/);
+  assert.match(floatingActionButtonSource, /export type FloatingActionButtonTone = 'coral' \| 'ink'/);
   assert.match(floatingActionButtonSource, /export function FloatingActionButton\b/);
   assert.match(floatingActionButtonSource, /InteractiveSurface/);
   assert.match(floatingActionButtonSource, /hitSlop=\{FAB_HIT_SLOP\}/);
   assert.match(floatingActionButtonSource, /minHeight=\{theme\.layout\.controlHLg\}/);
   assert.match(floatingActionButtonSource, /minWidth=\{theme\.layout\.controlHLg\}/);
-  assert.match(floatingActionButtonSource, /backgroundColor: theme\.color\.uiAccent/);
   assert.match(floatingActionButtonSource, /backgroundColor: theme\.color\.actionPrimary/);
+  assert.match(floatingActionButtonSource, /backgroundColor: theme\.color\.shellHighest/);
   assert.match(floatingActionButtonSource, /pressed/);
 });
 
@@ -238,20 +239,29 @@ test('Issue 403 contributor guidance documents shared primitive guardrails', () 
     'accessibilityState',
     'theme.layout.tapMin',
     'hitSlop',
-    'Graphite',
-    'Acid Lime',
+    'Ledger × Memory',
+    'Chit Coral',
+    'Action Coral',
+    'Clear Green',
+    'Alert Red',
   ]) {
     assert.match(guidanceSource, new RegExp(escapeRegExp(expected)), `guidance should mention ${expected}`);
   }
 
-  assert.match(guidanceSource, /Graphite[\s\S]*(default|기본)[\s\S]*(primary|CTA|주요 액션)/i);
-  assert.match(guidanceSource, /Acid Lime[\s\S]*(sparse|one|single|한 개|드물게|제한)/i);
+  assert.match(guidanceSource, /Action Coral[\s\S]*(default|기본)[\s\S]*(primary|CTA|주요 액션|action)/i);
+  assert.match(
+    guidanceSource,
+    /Chit Coral[\s\S]*(brand|action|selection)[\s\S]*(financial state|금융 상태|completion|error|unpaid)/i,
+  );
   assert.match(guidanceSource, /foundation[\s\S]*components[\s\S]*patterns/i);
   assert.match(guidanceSource, /InteractiveSurface[\s\S]*theme\.layout\.tapMin[\s\S]*hitSlop/);
 
   assert.match(mobileUiRuleSource, /docs\/features\/0403-shared-design-system-guard-guidance\.md/);
-  assert.match(mobileUiRuleSource, /Graphite[\s\S]*(default|기본)[\s\S]*(primary|CTA|주요 액션)/i);
-  assert.match(mobileUiRuleSource, /Acid Lime[\s\S]*(sparse|one|single|한 개|드물게|제한)/i);
+  assert.match(mobileUiRuleSource, /Action Coral[\s\S]*(default|기본)[\s\S]*(primary|CTA|주요 액션|action)/i);
+  assert.match(
+    mobileUiRuleSource,
+    /Chit Coral[\s\S]*(brand|action|selection)[\s\S]*(financial state|금융 상태|completion|error|unpaid)/i,
+  );
   assert.match(mobileUiRuleSource, /InteractiveSurface[\s\S]*(accessibility|touch|tap|hitSlop|터치)/i);
 });
 
@@ -331,19 +341,22 @@ test('Issue 406 SelectableCard supports rich checked, expanded, and trailing sel
   assert.doesNotMatch(selectableCardSource, /#[0-9a-fA-F]{3,8}\b/);
 });
 
-test('Issue 389 primitives keep Acid Lime vivid but sparse in shared UI', () => {
-  assert.equal(theme.color.brandAccent, theme.color.chit.acidLime);
-  assert.equal(theme.color.actionPrimary, theme.color.chit.graphiteHighest);
-  assert.equal(theme.color.onActionPrimary, theme.color.chit.offWhiteText);
-  assert.equal(theme.color.uiAccent, theme.color.chit.acidLime);
-  assert.equal(theme.color.uiAccentSoft, theme.color.chit.acidLimeSurface);
-  assert.equal(theme.color.onUiAccent, theme.color.chit.charcoal);
-  assert.notEqual(theme.color.actionPrimary, theme.color.brandAccent);
+test('Issue 389 primitives keep Coral as brand/action while semantic state colors stay explicit', () => {
+  assert.equal(theme.color.brandAccent, theme.color.chit.coral);
+  assert.equal(theme.color.actionPrimary, theme.color.chit.actionCoral);
+  assert.equal(theme.color.onActionPrimary, theme.color.chit.paperWhite);
+  assert.equal(theme.color.uiAccent, theme.color.chit.coral);
+  assert.equal(theme.color.uiAccentSoft, theme.color.chit.coralSoft);
+  assert.equal(theme.color.success, theme.color.chit.clearGreen);
+  assert.equal(theme.color.danger, theme.color.chit.alertRed);
+  assert.equal(theme.color.info, theme.color.chit.infoBlue);
+  assert.notEqual(theme.color.brandAccent, theme.color.success);
+  assert.notEqual(theme.color.brandAccent, theme.color.danger);
 
-  assert.match(cardSource, /brandStampOffset:[\s\S]*backgroundColor: theme\.color\.brandAccent/);
-  assert.match(cardSource, /brandStampText:[\s\S]*color: theme\.color\.brandAccent/);
-  assert.match(buttonSource, /ActivityIndicator color=\{spinnerColor\}/);
-  assert.match(buttonSource, /primaryButtonGraphite:[\s\S]*backgroundColor: theme\.color\.actionPrimary/);
+  assert.match(cardSource, /brandStampDot:[\s\S]*backgroundColor: theme\.color\.brandAccent/);
+  assert.match(cardSource, /brandStampText:[\s\S]*color: theme\.color\.textStrong/);
+  assert.match(buttonSource, /ActivityIndicator color=\{theme\.color\.onActionPrimary\}/);
+  assert.match(buttonSource, /primaryButtonCoral:[\s\S]*backgroundColor: theme\.color\.actionPrimary/);
   assert.match(buttonSource, /primaryButtonPressed:[\s\S]*backgroundColor: theme\.color\.actionPrimaryPressed/);
   assert.match(buttonSource, /primaryButtonText:[\s\S]*color: theme\.color\.onActionPrimary/);
   assert.match(linkSource, /inlineActionPrimary:[\s\S]*backgroundColor: theme\.color\.actionPrimary/);
@@ -357,7 +370,7 @@ test('Issue 389 primitives keep Acid Lime vivid but sparse in shared UI', () => 
   assert.doesNotMatch(
     loadingState,
     /ActivityIndicator color=\{theme\.color\.(primary|brandAccent|uiAccent)\}/,
-    'neutral loading spinners on Off-white should not use Acid Lime foreground',
+    'neutral loading spinners should not use Coral foreground',
   );
   assert.match(loadingState, /ActivityIndicator color=\{theme\.color\.textStrong\}/);
 });

@@ -1,11 +1,7 @@
-<svg width="220" height="72" viewBox="0 0 220 72" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="칫 Chit stamp lockup for dark surfaces">
-  <rect width="220" height="72" rx="20" fill="#191B1F"></rect>
-  <g transform="rotate(-7 40 36)">
-    <rect x="10" y="16" width="60" height="40" rx="11" fill="#C8FF00"></rect>
-    <path d="M18 28H62" stroke="#111315" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="3 5" opacity="0.42"></path>
-    <text x="40" y="45" text-anchor="middle" font-family="'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, sans-serif" font-size="24" font-weight="800" letter-spacing="-0.08em" fill="#111315">칫</text>
-  </g>
-  <text x="88" y="43" font-family="'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, sans-serif" font-size="32" font-weight="800" letter-spacing="-0.06em" fill="#FFFFFF">칫</text>
-  <text x="135" y="43" font-family="'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, sans-serif" font-size="18" font-weight="700" letter-spacing="0.12em" fill="#C8FF00">CHIT</text>
-  <path d="M88 53H200" stroke="#C8FF00" stroke-width="2" stroke-linecap="round" stroke-dasharray="5 7" opacity="0.75"></path>
+<svg width="220" height="72" viewBox="0 0 220 72" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="chit wordmark for dark ledger surfaces">
+  <rect width="220" height="72" rx="24" fill="#22242A"/>
+  <text x="22" y="46" font-family="Pretendard, -apple-system, BlinkMacSystemFont, Apple SD Gothic Neo, sans-serif" font-size="38" font-weight="800" letter-spacing="-0.07em" fill="#FFFFFF">chit</text>
+  <circle cx="111" cy="43" r="5" fill="#FF6258"/>
+  <text x="135" y="45" font-family="Pretendard, -apple-system, BlinkMacSystemFont, Apple SD Gothic Neo, sans-serif" font-size="18" font-weight="700" letter-spacing="-0.08em" fill="#FFF8ED">칫</text>
+  <path d="M22 56H198" stroke="#FF6258" stroke-width="2" stroke-linecap="round"/>
 </svg>

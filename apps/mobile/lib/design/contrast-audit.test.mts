@@ -5,8 +5,8 @@ import { auditedContrastPairs, contrastRatio, runContrastAudit, type ContrastAud
 
 describe('mobile contrast audit', () => {
   it('computes WCAG contrast ratios for hex and alpha-over-background colors', () => {
-    assert.equal(Number(contrastRatio('#111315', '#FCFCF8').toFixed(2)), 18.1);
-    assert.equal(Number(contrastRatio('rgba(252,252,248,0.72)', '#191B1F').toFixed(2)), 9.14);
+    assert.equal(Number(contrastRatio('#22242A', '#FFFFFF').toFixed(2)), 15.51);
+    assert.equal(Number(contrastRatio('rgba(34,36,42,0.72)', '#FFF8ED').toFixed(2)), 6.02);
   });
 
   it('keeps audited mobile text/action token pairs above their required thresholds', () => {
@@ -19,7 +19,7 @@ describe('mobile contrast audit', () => {
 
   it('reports failing pairs with the pair name and measured ratio', () => {
     const failingPairs: ContrastAuditPair[] = [
-      { foreground: '#C9C8BE', background: '#FCFCF8', minimumRatio: 4.5, name: 'faint text on surface' },
+      { foreground: '#A7A8AD', background: '#FFFFFF', minimumRatio: 4.5, name: 'faint text on surface' },
     ];
 
     const result = runContrastAudit(failingPairs);

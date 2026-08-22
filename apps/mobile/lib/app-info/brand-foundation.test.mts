@@ -5,52 +5,42 @@ import test from 'node:test';
 import appConfig from '../../app.json' with { type: 'json' };
 import { theme } from '../design/theme';
 
-test('maps semantic mobile tokens to the approved Chit palette', () => {
+test('maps semantic mobile tokens to the approved Ledger Memory Chit palette', () => {
   const { color } = theme;
 
-  assert.equal(color.chit.acidLime, '#C8FF00');
-  assert.equal(color.chit.charcoal, '#111315');
-  assert.equal(color.chit.matteCharcoal, '#191B1F');
-  assert.equal(color.chit.graphite, '#303740');
-  assert.equal(color.chit.graphiteShell, '#101215');
-  assert.equal(color.chit.graphiteRaised, '#1A1E23');
-  assert.equal(color.chit.graphiteCard, '#20252B');
-  assert.equal(color.chit.graphiteElevated, '#262C33');
-  assert.equal(color.chit.graphiteHighest, '#303740');
-  assert.equal(color.chit.graphiteSunken, '#171B20');
-  assert.equal(color.chit.offWhite, '#F7F7F2');
-  assert.equal(color.chit.offWhiteText, '#F7F7F2');
-  assert.equal(color.chit.offWhiteElevated, '#FCFCF8');
-  assert.equal(color.chit.offWhiteSubtle, '#F0F0EA');
-  assert.equal(color.chit.offWhiteBorder, '#E4E3DA');
-  assert.equal(color.chit.warmPaper, '#F5F1E8');
-  assert.equal(color.chit.fintechBlue, '#78A7FF');
-  assert.equal(color.chit.punchRed, '#FF5A67');
-  assert.equal(color.chit.stampCoral, '#FF765C');
+  assert.equal(color.chit.coral, '#FF6258');
+  assert.equal(color.chit.actionCoral, '#C9433B');
+  assert.equal(color.chit.receiptCream, '#FFF8ED');
+  assert.equal(color.chit.paperWhite, '#FFFFFF');
+  assert.equal(color.chit.ledgerInk, '#22242A');
+  assert.equal(color.chit.softGray, '#F2F3F5');
+  assert.equal(color.chit.clearGreen, '#168A5B');
+  assert.equal(color.chit.alertRed, '#D83A45');
+  assert.equal(color.chit.infoBlue, '#3478D4');
+  assert.equal(color.chit.ticketYellow, '#FFC845');
 
-  assert.equal(color.primary, color.chit.acidLime);
-  assert.equal(color.onPrimary, color.chit.charcoal);
-  assert.equal(color.brandAccent, color.chit.acidLime);
-  assert.equal(color.actionPrimary, color.chit.graphiteHighest);
-  assert.equal(color.actionPrimaryPressed, color.chit.graphiteElevated);
-  assert.equal(color.onActionPrimary, color.chit.offWhiteText);
-  assert.equal(color.uiAccent, color.chit.acidLime);
-  assert.equal(color.uiAccentSoft, color.chit.acidLimeSurface);
-  assert.equal(color.onUiAccent, color.chit.charcoal);
-  assert.notEqual(color.actionPrimary, color.brandAccent);
-  assert.equal(color.bg, color.chit.graphiteShell);
-  assert.equal(color.surface, color.chit.graphiteCard);
-  assert.equal(color.surfaceSunken, color.chit.graphiteSunken);
-  assert.equal(color.borderDefault, color.chit.graphiteLine);
-  assert.equal(color.textStrong, color.chit.offWhiteText);
-  assert.equal(color.textOnShell, color.chit.offWhiteText);
-  assert.equal(color.shell, color.chit.graphiteShell);
-  assert.equal(color.textLink, color.chit.fintechBlue);
-  assert.equal(color.info, color.chit.fintechBlue);
-  assert.equal(color.danger, color.chit.punchRed);
-  assert.equal(color.warning, color.chit.stampCoral);
-  assert.equal(color.credit, color.chit.fintechBlue);
-  assert.equal(color.debit, color.chit.punchRed);
+  assert.equal(color.primary, color.chit.coral);
+  assert.equal(color.onPrimary, color.chit.paperWhite);
+  assert.equal(color.brandAccent, color.chit.coral);
+  assert.equal(color.actionPrimary, color.chit.actionCoral);
+  assert.equal(color.onActionPrimary, color.chit.paperWhite);
+  assert.equal(color.uiAccent, color.chit.coral);
+  assert.equal(color.uiAccentSoft, color.chit.coralSoft);
+  assert.equal(color.bg, color.chit.receiptCream);
+  assert.equal(color.surface, color.chit.paperWhite);
+  assert.equal(color.surfaceSunken, color.chit.softGray);
+  assert.equal(color.memorySurface, color.chit.receiptCream);
+  assert.equal(color.ledgerSurface, color.chit.paperWhite);
+  assert.equal(color.shellHighest, color.chit.ledgerInk);
+  assert.equal(color.textStrong, color.chit.ledgerInk);
+  assert.equal(color.textLink, color.chit.infoBlue);
+  assert.equal(color.info, color.chit.infoBlue);
+  assert.equal(color.success, color.chit.clearGreen);
+  assert.equal(color.danger, color.chit.alertRed);
+  assert.equal(color.credit, color.chit.clearGreen);
+  assert.equal(color.debit, color.chit.alertRed);
+  assert.notEqual(color.brandAccent, color.success, 'Coral should not double as completion state');
+  assert.notEqual(color.brandAccent, color.danger, 'Coral should not double as alert/unpaid state');
 });
 
 test('uses Chit icon metadata while keeping existing infrastructure identifiers stable', () => {
@@ -59,7 +49,6 @@ test('uses Chit icon metadata while keeping existing infrastructure identifiers 
   assert.equal(appConfig.expo.scheme, 'ium');
   assert.equal(appConfig.expo.ios?.bundleIdentifier, 'com.twotwobread.ium.staging');
   assert.equal(appConfig.expo.android?.package, 'com.twotwobread.ium');
-  assert.equal(appConfig.expo.android?.adaptiveIcon?.backgroundColor, '#111315');
 });
 
 test('login entry screen uses the formal Chit brand name', () => {
@@ -69,30 +58,37 @@ test('login entry screen uses the formal Chit brand name', () => {
   assert.doesNotMatch(source, />이음<\/Text>/);
 });
 
-test('brand SVG assets use Chit stamp direction and remove the old i-um linked-ring mark', () => {
+test('brand SVG sources use the clean Ledger Memory wordmark direction', () => {
   const brandSvgs = ['logo-mark.svg', 'logo-wordmark.svg', 'logo-wordmark-dark.svg'];
 
   for (const assetName of brandSvgs) {
     const source = readMobileAssetText(`assets/brand/${assetName}`);
     assert.doesNotMatch(source, /이음|i-um|linked-ring/i, `${assetName} should not contain old brand copy`);
-    assert.doesNotMatch(source, /#098563|#0e9c72|#7CE0BE/i, `${assetName} should not contain old i-um green colors`);
-    assert.match(source, /칫/, `${assetName} should include the Korean Chit mark`);
-    assert.match(source, /#111315|#191B1F/i, `${assetName} should use Chit dark surfaces`);
-    assert.match(source, /#C8FF00/i, `${assetName} should use Acid Lime accent`);
+    assert.doesNotMatch(
+      source,
+      /#098563|#0e9c72|#7CE0BE|#C8FF00/i,
+      `${assetName} should not contain retired green/lime colors`,
+    );
+    assert.match(source, /chit|칫/i, `${assetName} should include the Chit mark`);
+    assert.match(source, /#FF6258/i, `${assetName} should use Chit Coral`);
+    assert.match(
+      source,
+      /#22242A|#FFFFFF|#FFF8ED/i,
+      `${assetName} should use Ledger Ink, Paper White, or Receipt Cream`,
+    );
+    assert.doesNotMatch(
+      source,
+      /rotate\(|stroke-dasharray|stamp/i,
+      `${assetName} should not use a stamp-lockup treatment`,
+    );
   }
-
-  assert.match(readMobileAssetText('assets/brand/logo-wordmark.svg'), /CHIT|Chit/);
-  assert.match(readMobileAssetText('assets/brand/logo-wordmark-dark.svg'), /CHIT|Chit/);
 });
 
-test('keeps the selected soft-3D imagegen Chit app icon source in brand assets', () => {
+test('keeps the existing generated app icon PNG dimensions until production asset replacement', () => {
   assert.deepEqual(readPngDimensions('assets/brand/chit-app-icon-imagegen-soft-3d.png'), {
     width: 1254,
     height: 1254,
   });
-});
-
-test('app icon PNG assets are 1024 square Chit raster outputs', () => {
   assert.deepEqual(readPngDimensions('assets/icon.png'), { width: 1024, height: 1024 });
   assert.deepEqual(readPngDimensions('assets/adaptive-icon.png'), { width: 1024, height: 1024 });
 });

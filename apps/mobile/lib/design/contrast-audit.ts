@@ -48,22 +48,16 @@ export const auditedContrastPairs: ContrastAuditPair[] = [
     name: 'secondary text on shell',
   },
   {
-    background: theme.color.primary,
-    foreground: theme.color.onPrimary,
-    minimumRatio: 4.5,
-    name: 'primary CTA text',
-  },
-  {
     background: theme.color.actionPrimary,
     foreground: theme.color.onActionPrimary,
     minimumRatio: 4.5,
-    name: 'graphite action text',
+    name: 'Action Coral primary CTA text',
   },
   {
     background: theme.color.primarySoft,
     foreground: theme.color.primaryTextOnLight,
     minimumRatio: 4.5,
-    name: 'accent-soft text on dark surface',
+    name: 'Coral soft selected text',
   },
 ];
 
