@@ -71,10 +71,10 @@ export default function SettlementDetailScreen() {
 
   return (
     <TripScreen>
-      {state.status === 'loading' ? <TripStateCard loading title="정산 상세를 불러오는 중..." /> : null}
+      {state.status === 'loading' ? <TripStateCard loading title="정산 장부 상세를 불러오는 중..." /> : null}
       {state.status === 'auth' ? (
         <TripStateCard
-          helper="정산 상세는 여행 참여자만 볼 수 있어요. 로그인 후 다시 열어주세요."
+          helper="정산 장부 상세는 여행 참여자만 볼 수 있어요. 로그인 후 다시 열어주세요."
           primaryAction={{ label: '로그인하기', onPress: () => router.replace('/login') }}
           title="로그인이 필요해요."
         />
@@ -83,7 +83,7 @@ export default function SettlementDetailScreen() {
         <TripStateCard
           helper="로그인한 계정이 이 여행의 현재 참여자인지 확인해주세요."
           primaryAction={{ label: '홈으로', onPress: () => router.replace('/') }}
-          title="정산 상세를 볼 수 없어요."
+          title="정산 장부 상세를 볼 수 없어요."
         />
       ) : null}
       {state.status === 'error' ? (
@@ -105,7 +105,7 @@ function SettlementDetailContent({ viewModel }: { viewModel: SettlementDetailVie
       <TripListCard>
         <View style={styles.noticeContent}>
           <Text style={styles.noticeTitle}>{viewModel.latestNotice}</Text>
-          <Text style={styles.noticeHelper}>지출이 바뀌면 이 상세 내역도 최신 기준으로 다시 계산됩니다.</Text>
+          <Text style={styles.noticeHelper}>장부 기록이 바뀌면 이 상세 내역도 최신 기준으로 다시 계산됩니다.</Text>
           <Text style={styles.formulaText}>{viewModel.formulaCopy}</Text>
         </View>
       </TripListCard>
@@ -174,8 +174,8 @@ function SettlementDetailCurrencySection({ section }: { section: SettlementDetai
         )}
       </TripListCard>
 
-      <SettlementDetailExpenseSection rows={section.includedExpenses} title="정산 포함 지출" />
-      <SettlementDetailExpenseSection rows={section.excludedExpenses} title="최종 정산 제외 지출" />
+      <SettlementDetailExpenseSection rows={section.includedExpenses} title="정산 포함 장부 기록" />
+      <SettlementDetailExpenseSection rows={section.excludedExpenses} title="정산 제외 장부 기록" />
     </>
   );
 }
@@ -194,7 +194,7 @@ function SettlementDetailExpenseSection({
         <Text style={styles.sectionHelper}>{rows.length}건</Text>
       </View>
       {rows.length === 0 ? (
-        <Text style={styles.emptyText}>해당 지출이 없어요.</Text>
+        <Text style={styles.emptyText}>해당 장부 기록이 없어요.</Text>
       ) : (
         <View style={styles.expenseList}>
           {rows.map((row, index) => (
@@ -291,7 +291,7 @@ function settlementDetailShellFailureState(status: 'auth' | 'notFound' | 'error'
       status: 'error',
       error: {
         status: 'error',
-        title: '정산 상세를 불러오지 못했어요.',
+        title: '정산 장부 상세를 불러오지 못했어요.',
         helper: '잠시 후 다시 시도해주세요.',
         actionLabel: '다시 시도',
       },
@@ -352,7 +352,7 @@ const styles = StyleSheet.create({
   },
 
   formulaText: {
-    color: theme.color.primary,
+    color: theme.color.actionPrimary,
     fontFamily: theme.font.family.bold,
     fontSize: theme.font.size.label,
     fontWeight: theme.font.weight.bold,

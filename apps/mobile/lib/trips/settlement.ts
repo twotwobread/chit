@@ -584,8 +584,8 @@ export function buildSettlementDetailViewModel({
   expenseDays: SettlementExpenseHistoryDayInput[];
 }): SettlementDetailViewModel {
   return {
-    title: '정산 상세',
-    latestNotice: '현재 여행 지출 기준으로 계산된 최신 정산이에요.',
+    title: '정산 장부 상세',
+    latestNotice: '현재 장부 기록 기준으로 계산된 최신 정산이에요.',
     formulaCopy: '결제 금액 - 부담 금액 = 받을/보낼 금액',
     currencySections: settlement.currencySummaries.map((summary) => {
       const expenseRows = buildSettlementDetailExpenseRows(expenseDays, summary.currency);
