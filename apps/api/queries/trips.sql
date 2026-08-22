@@ -105,17 +105,33 @@ ORDER BY sort_order ASC;
 
 -- name: GetTripByID :one
 SELECT
-  id::text,
-  name,
-  start_date,
-  end_date,
-  default_currency,
-  default_travel_mode,
-  created_by::text,
-  created_at,
-  updated_at
-FROM trips
-WHERE id = $1::uuid;
+  t.id::text,
+  t.name,
+  t.start_date,
+  t.end_date,
+  t.default_currency,
+  t.default_travel_mode,
+  t.created_by::text,
+  t.created_at,
+  t.updated_at,
+  COALESCE(e.id::text, ''::text)::text AS event_id,
+  COALESCE(m.id::text, ''::text)::text AS meeting_id,
+  COALESCE(m.name, ''::text)::text AS meeting_name,
+  COALESCE(m.visibility, ''::text)::text AS meeting_visibility
+FROM trips t
+LEFT JOIN events e ON e.trip_id = t.id
+LEFT JOIN meetings m ON m.id = e.meeting_id
+WHERE t.id = $1::uuid;
+
+-- name: GetTripEventContextByTripID :one
+SELECT
+  e.id::text AS event_id,
+  m.id::text AS meeting_id,
+  m.name AS meeting_name,
+  m.visibility AS meeting_visibility
+FROM events e
+JOIN meetings m ON m.id = e.meeting_id
+WHERE e.trip_id = $1::uuid;
 
 -- name: GetTripParticipantMembership :one
 SELECT id::text
@@ -178,6 +194,32 @@ ORDER BY
   joined_at ASC,
   id ASC;
 
+-- name: DeleteTripLinkedEventParticipantByTripParticipant :exec
+WITH linked AS (
+  SELECT
+    ep.id AS event_participant_id,
+    ep.meeting_member_id,
+    m.visibility AS meeting_visibility
+  FROM trip_participants tp
+  JOIN events e ON e.trip_id = tp.trip_id
+  JOIN event_participants ep ON ep.event_id = e.id AND ep.user_id = tp.user_id
+  JOIN meetings m ON m.id = e.meeting_id
+  WHERE tp.trip_id = sqlc.arg(trip_id)::uuid
+    AND tp.id = sqlc.arg(participant_id)::uuid
+    AND tp.role = 'member'
+), deleted_event_participant AS (
+  DELETE FROM event_participants
+  WHERE id IN (SELECT event_participant_id FROM linked)
+  RETURNING 1
+)
+DELETE FROM meeting_members
+WHERE id IN (
+  SELECT meeting_member_id
+  FROM linked
+  WHERE meeting_visibility = 'one_off'
+)
+  AND EXISTS (SELECT 1 FROM deleted_event_participant);
+
 -- name: DeleteTripMemberParticipant :one
 WITH target AS (
   SELECT
@@ -230,9 +272,15 @@ SELECT
     SELECT count(*)::int
     FROM trip_participants participants
     WHERE participants.trip_id = t.id
-  ) AS participant_count
+  ) AS participant_count,
+  COALESCE(e.id::text, ''::text)::text AS event_id,
+  COALESCE(m.id::text, ''::text)::text AS meeting_id,
+  COALESCE(m.name, ''::text)::text AS meeting_name,
+  COALESCE(m.visibility, ''::text)::text AS meeting_visibility
 FROM trips t
 JOIN trip_participants tp ON tp.trip_id = t.id
+LEFT JOIN events e ON e.trip_id = t.id
+LEFT JOIN meetings m ON m.id = e.meeting_id
 WHERE tp.user_id = $1::uuid
 ORDER BY tp.joined_at DESC, t.created_at DESC, t.id DESC;
 
@@ -256,6 +304,48 @@ RETURNING
   created_by::text,
   created_at,
   updated_at;
+
+-- name: UpdateTripEventFromTripBasicInfo :exec
+WITH updated_event AS (
+  UPDATE events
+  SET
+    title = sqlc.arg(name),
+    start_date = sqlc.arg(start_date),
+    end_date = sqlc.arg(end_date),
+    default_currency = sqlc.arg(default_currency),
+    updated_at = now()
+  WHERE trip_id = sqlc.arg(trip_id)::uuid
+  RETURNING meeting_id
+)
+UPDATE meetings m
+SET
+  name = sqlc.arg(name),
+  updated_at = now()
+FROM updated_event e
+WHERE m.id = e.meeting_id
+  AND m.visibility = 'one_off';
+
+-- name: DeleteTripEventByTripID :exec
+WITH linked AS (
+  SELECT
+    e.id AS event_id,
+    m.id AS meeting_id,
+    m.visibility AS meeting_visibility
+  FROM events e
+  JOIN meetings m ON m.id = e.meeting_id
+  WHERE e.trip_id = sqlc.arg(trip_id)::uuid
+), deleted_event AS (
+  DELETE FROM events
+  WHERE id IN (SELECT event_id FROM linked)
+  RETURNING 1
+)
+DELETE FROM meetings
+WHERE id IN (
+  SELECT meeting_id
+  FROM linked
+  WHERE meeting_visibility = 'one_off'
+)
+  AND EXISTS (SELECT 1 FROM deleted_event);
 
 -- name: DeleteTripByID :one
 DELETE FROM trips

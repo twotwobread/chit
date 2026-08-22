@@ -1566,10 +1566,13 @@ type Trip struct {
 	DefaultTravelMode TripDefaultTravelMode `json:"defaultTravelMode"`
 	Destinations      []TripDestination     `json:"destinations"`
 	EndDate           openapi_types.Date    `json:"endDate"`
-	Id                string                `json:"id"`
-	Name              string                `json:"name"`
-	StartDate         openapi_types.Date    `json:"startDate"`
-	UpdatedAt         time.Time             `json:"updatedAt"`
+
+	// EventContext Meeting/event identity for this trip. Null only for compatibility while backfill migrations roll forward.
+	EventContext *TripEventContext  `json:"eventContext"`
+	Id           string             `json:"id"`
+	Name         string             `json:"name"`
+	StartDate    openapi_types.Date `json:"startDate"`
+	UpdatedAt    time.Time          `json:"updatedAt"`
 }
 
 // TripDay defines model for TripDay.
@@ -1612,6 +1615,14 @@ type TripDestinationInput struct {
 	RadiusMeters    int                 `json:"radiusMeters"`
 }
 
+// TripEventContext defines model for TripEventContext.
+type TripEventContext struct {
+	EventId           string            `json:"eventId"`
+	MeetingId         string            `json:"meetingId"`
+	MeetingName       string            `json:"meetingName"`
+	MeetingVisibility MeetingVisibility `json:"meetingVisibility"`
+}
+
 // TripExpenseDayListItem defines model for TripExpenseDayListItem.
 type TripExpenseDayListItem struct {
 	Expenses  []DayExpenseListItem `json:"expenses"`
@@ -1640,12 +1651,15 @@ type TripListItem struct {
 	DefaultCurrency   SupportedCurrency     `json:"defaultCurrency"`
 	DefaultTravelMode TripDefaultTravelMode `json:"defaultTravelMode"`
 	EndDate           openapi_types.Date    `json:"endDate"`
-	Id                string                `json:"id"`
-	JoinedAt          time.Time             `json:"joinedAt"`
-	MyRole            TripParticipantRole   `json:"myRole"`
-	Name              string                `json:"name"`
-	ParticipantCount  int                   `json:"participantCount"`
-	StartDate         openapi_types.Date    `json:"startDate"`
+
+	// EventContext Meeting/event identity for this trip. Null only for compatibility while backfill migrations roll forward.
+	EventContext     *TripEventContext   `json:"eventContext"`
+	Id               string              `json:"id"`
+	JoinedAt         time.Time           `json:"joinedAt"`
+	MyRole           TripParticipantRole `json:"myRole"`
+	Name             string              `json:"name"`
+	ParticipantCount int                 `json:"participantCount"`
+	StartDate        openapi_types.Date  `json:"startDate"`
 }
 
 // TripParticipant defines model for TripParticipant.

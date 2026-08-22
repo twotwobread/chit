@@ -157,6 +157,7 @@ func listTripsResponseToOpenAPI(trips []trip.ListItem) openapi.ListTripsResponse
 			CreatedAt:         item.CreatedAt,
 			MyRole:            openapi.TripParticipantRole(item.MyRole),
 			ParticipantCount:  item.ParticipantCount,
+			EventContext:      tripEventContextToOpenAPI(item.EventContext),
 		})
 	}
 	return openapi.ListTripsResponse{Trips: items}
@@ -919,7 +920,20 @@ func tripToOpenAPI(value trip.Trip) openapi.Trip {
 		CreatedBy:         value.CreatedBy,
 		CreatedAt:         value.CreatedAt,
 		UpdatedAt:         value.UpdatedAt,
+		EventContext:      tripEventContextToOpenAPI(value.EventContext),
 		Destinations:      tripDestinationsToOpenAPI(value.Destinations),
+	}
+}
+
+func tripEventContextToOpenAPI(value *trip.TripEventContext) *openapi.TripEventContext {
+	if value == nil {
+		return nil
+	}
+	return &openapi.TripEventContext{
+		EventId:           value.EventID,
+		MeetingId:         value.MeetingID,
+		MeetingName:       value.MeetingName,
+		MeetingVisibility: openapi.MeetingVisibility(value.MeetingVisibility),
 	}
 }
 

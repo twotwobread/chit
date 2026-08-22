@@ -89,6 +89,18 @@ FROM meeting_members
 WHERE meeting_id = sqlc.arg(meeting_id)::uuid
   AND user_id = sqlc.arg(user_id)::uuid;
 
+-- name: GetMeetingMemberByMeetingAndUser :one
+SELECT
+  id::text,
+  meeting_id::text,
+  user_id::text,
+  role,
+  display_name,
+  joined_at
+FROM meeting_members
+WHERE meeting_id = $1::uuid
+  AND user_id = $2::uuid;
+
 -- name: CreateEvent :one
 INSERT INTO events (
   meeting_id,

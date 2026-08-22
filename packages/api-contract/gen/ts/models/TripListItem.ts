@@ -4,6 +4,7 @@
 /* eslint-disable */
 import type { SupportedCurrency } from './SupportedCurrency';
 import type { TripDefaultTravelMode } from './TripDefaultTravelMode';
+import type { TripEventContext } from './TripEventContext';
 import type { TripParticipantRole } from './TripParticipantRole';
 export type TripListItem = {
     id: string;
@@ -16,4 +17,8 @@ export type TripListItem = {
     createdAt: string;
     myRole: TripParticipantRole;
     participantCount: number;
+    /**
+     * Meeting/event identity for this trip. Null only for compatibility while backfill migrations roll forward.
+     */
+    eventContext: TripEventContext | null;
 };

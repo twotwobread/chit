@@ -89,6 +89,7 @@ export function buildTripTodayStatusLandingViewModel(
       joinedAt: trip.createdAt,
       myRole: 'member',
       participantCount: detail.participantSummary.totalCount,
+      eventContext: trip.eventContext,
     },
     localToday,
   );

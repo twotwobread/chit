@@ -1149,7 +1149,13 @@ func TestCreateTripHandler(t *testing.T) {
 			DefaultCurrency   string `json:"defaultCurrency"`
 			DefaultTravelMode string `json:"defaultTravelMode"`
 			CreatedBy         string `json:"createdBy"`
-			Destinations      []struct {
+			EventContext      *struct {
+				EventID           string `json:"eventId"`
+				MeetingID         string `json:"meetingId"`
+				MeetingName       string `json:"meetingName"`
+				MeetingVisibility string `json:"meetingVisibility"`
+			} `json:"eventContext"`
+			Destinations []struct {
 				DisplayName     string `json:"displayName"`
 				ProviderPlaceID string `json:"providerPlaceId"`
 				SortOrder       int    `json:"sortOrder"`
@@ -1178,6 +1184,9 @@ func TestCreateTripHandler(t *testing.T) {
 	}
 	if body.Trip.CreatedBy != "user-1" {
 		t.Fatalf("expected createdBy user-1, got %q", body.Trip.CreatedBy)
+	}
+	if body.Trip.EventContext == nil || body.Trip.EventContext.EventID == "" || body.Trip.EventContext.MeetingID == "" || body.Trip.EventContext.MeetingName != "오사카 3박 4일" || body.Trip.EventContext.MeetingVisibility != "one_off" {
+		t.Fatalf("expected one-off event context on created trip, got %#v", body.Trip.EventContext)
 	}
 	if len(body.Trip.Destinations) != 1 || body.Trip.Destinations[0].DisplayName != "오사카, 일본" || body.Trip.Destinations[0].ProviderPlaceID != "google-city-osaka" || body.Trip.Destinations[0].SortOrder != 0 {
 		t.Fatalf("expected created trip destination in response, got %#v", body.Trip.Destinations)
@@ -1486,6 +1495,12 @@ func TestCreateTripThenListTripsShowsCreatedTrip(t *testing.T) {
 			JoinedAt         string `json:"joinedAt"`
 			MyRole           string `json:"myRole"`
 			ParticipantCount int    `json:"participantCount"`
+			EventContext     *struct {
+				EventID           string `json:"eventId"`
+				MeetingID         string `json:"meetingId"`
+				MeetingName       string `json:"meetingName"`
+				MeetingVisibility string `json:"meetingVisibility"`
+			} `json:"eventContext"`
 		} `json:"trips"`
 	}
 	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
@@ -1499,6 +1514,9 @@ func TestCreateTripThenListTripsShowsCreatedTrip(t *testing.T) {
 	}
 	if body.Trips[0].MyRole != tripdomain.RoleOwner || body.Trips[0].ParticipantCount != 1 {
 		t.Fatalf("expected owner role and participant count for created trip, got %#v", body.Trips[0])
+	}
+	if body.Trips[0].EventContext == nil || body.Trips[0].EventContext.EventID == "" || body.Trips[0].EventContext.MeetingVisibility != "one_off" {
+		t.Fatalf("expected created trip list item to include event context, got %#v", body.Trips[0].EventContext)
 	}
 }
 
@@ -1578,6 +1596,12 @@ func TestGetTripDetailHandler(t *testing.T) {
 			StartDate       string `json:"startDate"`
 			EndDate         string `json:"endDate"`
 			DefaultCurrency string `json:"defaultCurrency"`
+			EventContext    *struct {
+				EventID           string `json:"eventId"`
+				MeetingID         string `json:"meetingId"`
+				MeetingName       string `json:"meetingName"`
+				MeetingVisibility string `json:"meetingVisibility"`
+			} `json:"eventContext"`
 		} `json:"trip"`
 		ParticipantSummary struct {
 			TotalCount    int      `json:"totalCount"`
@@ -1597,6 +1621,9 @@ func TestGetTripDetailHandler(t *testing.T) {
 	}
 	if body.Trip.StartDate != "2026-07-10" || body.Trip.EndDate != "2026-07-13" || body.Trip.DefaultCurrency != "JPY" {
 		t.Fatalf("unexpected trip detail: %#v", body.Trip)
+	}
+	if body.Trip.EventContext == nil || body.Trip.EventContext.EventID == "" || body.Trip.EventContext.MeetingName != "오사카 3박 4일" || body.Trip.EventContext.MeetingVisibility != "one_off" {
+		t.Fatalf("expected trip detail event context, got %#v", body.Trip.EventContext)
 	}
 	if body.ParticipantSummary.TotalCount != 1 || body.ParticipantSummary.OverflowCount != 0 {
 		t.Fatalf("unexpected participant summary: %#v", body.ParticipantSummary)
@@ -5992,7 +6019,13 @@ func (b *fakeAuthBackend) CreateTripWithOwner(_ context.Context, record tripdoma
 		CreatedBy:         record.CreatedBy,
 		CreatedAt:         now,
 		UpdatedAt:         now,
-		Destinations:      destinations,
+		EventContext: &tripdomain.TripEventContext{
+			EventID:           testUUID(12000 + b.nextTrip),
+			MeetingID:         testUUID(13000 + b.nextTrip),
+			MeetingName:       record.Name,
+			MeetingVisibility: meetingdomain.MeetingVisibilityOneOff,
+		},
+		Destinations: destinations,
 	}
 	owner := tripdomain.Participant{
 		ID:          participantID,
@@ -7546,6 +7579,7 @@ func (b *fakeAuthBackend) ListTripsByParticipantUser(_ context.Context, userID s
 				CreatedAt:         foundTrip.CreatedAt,
 				MyRole:            participant.Role,
 				ParticipantCount:  len(participants),
+				EventContext:      foundTrip.EventContext,
 			})
 		}
 	}

@@ -928,6 +928,7 @@ function selectedTripFromDetail(detail: GetTripDetailResponse): TripListItem {
     createdAt: detail.trip.createdAt,
     myRole: 'member',
     participantCount: detail.participantSummary.totalCount,
+    eventContext: detail.trip.eventContext,
   };
 }
 
