@@ -29,6 +29,7 @@ test('Issue 396 representative mobile forms adopt shared FormField and TextInput
 
   assert.match(targetSources.account, /<TextInputField[\s\S]*label="이름"/);
   assert.match(targetSources.tripCreate, /<TextInputField[\s\S]*label="여행 이름"/);
+  assert.match(targetSources.tripCreate, /<TextInputField[\s\S]*label="새 모임 이름"/);
   assert.match(targetSources.tripEdit, /<TextInputField[\s\S]*label="여행 이름"/);
   assert.match(targetSources.quickExpenseEntry, /<TextInputField[\s\S]*label="지출명"/);
   assert.match(targetSources.quickExpenseEntry, /<TextInputField[\s\S]*label="메모"/);
@@ -36,7 +37,7 @@ test('Issue 396 representative mobile forms adopt shared FormField and TextInput
   assert.match(targetSources.expenseEdit, /<TextInputField[\s\S]*label="메모"/);
   assert.match(targetSources.editPlacePanel, /<TextInputField[\s\S]*label="메모"/);
 
-  assert.equal(countOccurrences(combinedRepresentativeForms, '<TextInputField'), 8);
+  assert.equal(countOccurrences(combinedRepresentativeForms, '<TextInputField'), 9);
 });
 
 test('Issue 396 custom controls keep visible recovery copy through FormField', () => {

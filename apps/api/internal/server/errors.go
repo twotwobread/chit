@@ -41,6 +41,10 @@ func writeTripError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid trip request", nil)
 	case errors.Is(err, trip.ErrUnauthorized):
 		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "unauthorized", nil)
+	case errors.Is(err, trip.ErrForbidden):
+		writeError(w, http.StatusForbidden, "FORBIDDEN", "forbidden", nil)
+	case errors.Is(err, trip.ErrNotFound):
+		writeError(w, http.StatusNotFound, "NOT_FOUND", "meeting not found", nil)
 	default:
 		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error", nil)
 	}

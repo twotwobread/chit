@@ -12,6 +12,10 @@ const (
 
 	DestinationProviderGoogle = "google"
 
+	MeetingContextModeOneOff   = "one_off"
+	MeetingContextModeExisting = "existing"
+	MeetingContextModeNewSaved = "new_saved"
+
 	ScheduleItemTypePlace = "place"
 )
 
@@ -46,7 +50,14 @@ type CreateInput struct {
 	EndDate           string
 	DefaultCurrency   string
 	DefaultTravelMode string
+	MeetingContext    CreateMeetingContextInput
 	Destinations      []CreateDestinationInput
+}
+
+type CreateMeetingContextInput struct {
+	Mode        string
+	MeetingID   string
+	MeetingName string
 }
 
 type CreateDestinationInput struct {
@@ -180,7 +191,14 @@ type CreateRecord struct {
 	DefaultTravelMode string
 	CreatedBy         string
 	OwnerDisplayName  string
+	MeetingContext    CreateMeetingContextRecord
 	Destinations      []CreateDestinationRecord
+}
+
+type CreateMeetingContextRecord struct {
+	Mode        string
+	MeetingID   string
+	MeetingName string
 }
 
 type CreateDestinationRecord struct {

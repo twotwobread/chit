@@ -174,6 +174,8 @@ export type { TripEventContext } from './models/TripEventContext';
 export type { TripExpenseDayListItem } from './models/TripExpenseDayListItem';
 export type { TripInvite } from './models/TripInvite';
 export type { TripListItem } from './models/TripListItem';
+export type { TripMeetingContextInput } from './models/TripMeetingContextInput';
+export type { TripMeetingContextMode } from './models/TripMeetingContextMode';
 export type { TripParticipant } from './models/TripParticipant';
 export type { TripParticipantListItem } from './models/TripParticipantListItem';
 export type { TripParticipantRole } from './models/TripParticipantRole';

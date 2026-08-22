@@ -111,6 +111,11 @@ func (s *Service) Create(ctx context.Context, userID string, input CreateInput) 
 		return CreateResult{}, ErrValidation
 	}
 
+	meetingContext, err := normalizeCreateMeetingContext(input.MeetingContext)
+	if err != nil {
+		return CreateResult{}, err
+	}
+
 	destinations, err := normalizeCreateDestinations(input.Destinations)
 	if err != nil {
 		return CreateResult{}, err
@@ -132,6 +137,7 @@ func (s *Service) Create(ctx context.Context, userID string, input CreateInput) 
 		DefaultTravelMode: defaultTravelMode,
 		CreatedBy:         creator.ID,
 		OwnerDisplayName:  creator.DisplayName,
+		MeetingContext:    meetingContext,
 		Destinations:      destinations,
 	})
 }
@@ -1993,6 +1999,32 @@ func dateOnly(value time.Time) time.Time {
 		return time.Time{}
 	}
 	return parsed
+}
+
+func normalizeCreateMeetingContext(input CreateMeetingContextInput) (CreateMeetingContextRecord, error) {
+	mode := strings.TrimSpace(input.Mode)
+	if mode == "" {
+		mode = MeetingContextModeOneOff
+	}
+
+	switch mode {
+	case MeetingContextModeOneOff:
+		return CreateMeetingContextRecord{Mode: MeetingContextModeOneOff}, nil
+	case MeetingContextModeExisting:
+		meetingID := strings.TrimSpace(input.MeetingID)
+		if meetingID == "" || !isUUID(meetingID) {
+			return CreateMeetingContextRecord{}, ErrValidation
+		}
+		return CreateMeetingContextRecord{Mode: MeetingContextModeExisting, MeetingID: meetingID}, nil
+	case MeetingContextModeNewSaved:
+		meetingName := strings.TrimSpace(input.MeetingName)
+		if len([]rune(meetingName)) > 80 {
+			return CreateMeetingContextRecord{}, ErrValidation
+		}
+		return CreateMeetingContextRecord{Mode: MeetingContextModeNewSaved, MeetingName: meetingName}, nil
+	default:
+		return CreateMeetingContextRecord{}, ErrValidation
+	}
 }
 
 func normalizeCreateDestinations(inputs []CreateDestinationInput) ([]CreateDestinationRecord, error) {

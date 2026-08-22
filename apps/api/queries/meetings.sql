@@ -89,6 +89,25 @@ FROM meeting_members
 WHERE meeting_id = sqlc.arg(meeting_id)::uuid
   AND user_id = sqlc.arg(user_id)::uuid;
 
+-- name: ListMeetingMembersForSavedMeetingByMemberUser :many
+SELECT
+  mm.id::text,
+  mm.meeting_id::text,
+  mm.user_id::text,
+  mm.role,
+  mm.display_name,
+  mm.joined_at
+FROM meetings m
+JOIN meeting_members requester ON requester.meeting_id = m.id
+JOIN meeting_members mm ON mm.meeting_id = m.id
+WHERE m.id = sqlc.arg(meeting_id)::uuid
+  AND requester.user_id = sqlc.arg(user_id)::uuid
+  AND m.visibility = 'saved'
+ORDER BY
+  CASE WHEN mm.user_id = sqlc.arg(user_id)::uuid THEN 0 ELSE 1 END,
+  mm.joined_at ASC,
+  mm.id ASC;
+
 -- name: GetMeetingMemberByMeetingAndUser :one
 SELECT
   id::text,

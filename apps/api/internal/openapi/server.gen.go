@@ -235,6 +235,13 @@ const (
 	TripDefaultTravelModeTransit TripDefaultTravelMode = "transit"
 )
 
+// Defines values for TripMeetingContextMode.
+const (
+	Existing TripMeetingContextMode = "existing"
+	NewSaved TripMeetingContextMode = "new_saved"
+	OneOff   TripMeetingContextMode = "one_off"
+)
+
 // Defines values for TripParticipantRole.
 const (
 	TripParticipantRoleMember TripParticipantRole = "member"
@@ -591,8 +598,9 @@ type CreateTripRequest struct {
 	Destinations      []TripDestinationInput `json:"destinations"`
 
 	// EndDate End date in YYYY-MM-DD format. Must be today or later and not before startDate.
-	EndDate openapi_types.Date `json:"endDate"`
-	Name    string             `json:"name"`
+	EndDate        openapi_types.Date       `json:"endDate"`
+	MeetingContext *TripMeetingContextInput `json:"meetingContext,omitempty"`
+	Name           string                   `json:"name"`
 
 	// StartDate Start date in YYYY-MM-DD format. Must be today or later.
 	StartDate openapi_types.Date `json:"startDate"`
@@ -1661,6 +1669,19 @@ type TripListItem struct {
 	ParticipantCount int                 `json:"participantCount"`
 	StartDate        openapi_types.Date  `json:"startDate"`
 }
+
+// TripMeetingContextInput defines model for TripMeetingContextInput.
+type TripMeetingContextInput struct {
+	// MeetingId Required when mode is existing.
+	MeetingId *string `json:"meetingId,omitempty"`
+
+	// MeetingName Optional when mode is new_saved. Defaults to the trip name.
+	MeetingName *string                `json:"meetingName,omitempty"`
+	Mode        TripMeetingContextMode `json:"mode"`
+}
+
+// TripMeetingContextMode defines model for TripMeetingContextMode.
+type TripMeetingContextMode string
 
 // TripParticipant defines model for TripParticipant.
 type TripParticipant struct {

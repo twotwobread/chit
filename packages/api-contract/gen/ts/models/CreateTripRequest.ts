@@ -5,6 +5,7 @@
 import type { SupportedCurrency } from './SupportedCurrency';
 import type { TripDefaultTravelMode } from './TripDefaultTravelMode';
 import type { TripDestinationInput } from './TripDestinationInput';
+import type { TripMeetingContextInput } from './TripMeetingContextInput';
 export type CreateTripRequest = {
     name: string;
     /**
@@ -17,5 +18,6 @@ export type CreateTripRequest = {
     endDate: string;
     defaultCurrency: SupportedCurrency;
     defaultTravelMode?: TripDefaultTravelMode;
+    meetingContext?: TripMeetingContextInput;
     destinations: Array<TripDestinationInput>;
 };

@@ -130,15 +130,24 @@ func (s *Store) CreateTripWithOwner(ctx context.Context, record trip.CreateRecor
 		return trip.CreateResult{}, err
 	}
 
-	eventMeeting, meetingOwner, err := createMeetingWithOwner(ctx, qtx, meetingdomain.CreateMeetingRecord{
-		Name:             createdTrip.Name,
-		Visibility:       meetingdomain.MeetingVisibilityOneOff,
-		CreatedBy:        record.CreatedBy,
-		OwnerDisplayName: record.OwnerDisplayName,
-	})
+	eventMeeting, meetingMembers, err := resolveCreateTripMeetingContext(ctx, qtx, createdTrip.Name, record)
 	if err != nil {
 		return trip.CreateResult{}, err
 	}
+	for _, member := range meetingMembers {
+		if member.UserID == record.CreatedBy {
+			continue
+		}
+		if _, err := qtx.CreateTripParticipant(ctx, db.CreateTripParticipantParams{
+			Column1:     mustUUID(createdTrip.ID),
+			Column2:     mustUUID(member.UserID),
+			Role:        trip.RoleMember,
+			DisplayName: member.DisplayName,
+		}); err != nil {
+			return trip.CreateResult{}, err
+		}
+	}
+
 	createdEvent, err := qtx.CreateEvent(ctx, db.CreateEventParams{
 		MeetingID:       mustUUID(eventMeeting.ID),
 		EventType:       meetingdomain.EventTypeTrip,
@@ -153,14 +162,20 @@ func (s *Store) CreateTripWithOwner(ctx context.Context, record trip.CreateRecor
 	if err != nil {
 		return trip.CreateResult{}, err
 	}
-	if _, err := qtx.CreateEventParticipant(ctx, db.CreateEventParticipantParams{
-		EventID:         mustUUID(createdEvent.ID),
-		MeetingMemberID: optionalUUID(meetingOwner.ID),
-		UserID:          mustUUID(record.CreatedBy),
-		Role:            meetingdomain.RoleOwner,
-		DisplayName:     record.OwnerDisplayName,
-	}); err != nil {
-		return trip.CreateResult{}, err
+	for _, member := range meetingMembers {
+		role := meetingdomain.RoleMember
+		if member.UserID == record.CreatedBy {
+			role = meetingdomain.RoleOwner
+		}
+		if _, err := qtx.CreateEventParticipant(ctx, db.CreateEventParticipantParams{
+			EventID:         mustUUID(createdEvent.ID),
+			MeetingMemberID: optionalUUID(member.ID),
+			UserID:          mustUUID(member.UserID),
+			Role:            role,
+			DisplayName:     member.DisplayName,
+		}); err != nil {
+			return trip.CreateResult{}, err
+		}
 	}
 	eventContext := &trip.TripEventContext{
 		EventID:           createdEvent.ID,
@@ -221,6 +236,81 @@ func (s *Store) CreateTripWithOwner(ctx context.Context, record trip.CreateRecor
 			JoinedAt:    owner.JoinedAt.Time,
 		},
 	}, nil
+}
+
+func resolveCreateTripMeetingContext(ctx context.Context, qtx *db.Queries, fallbackName string, record trip.CreateRecord) (meetingdomain.Meeting, []meetingdomain.MeetingMember, error) {
+	mode := strings.TrimSpace(record.MeetingContext.Mode)
+	if mode == "" {
+		mode = trip.MeetingContextModeOneOff
+	}
+
+	switch mode {
+	case trip.MeetingContextModeOneOff:
+		createdMeeting, owner, err := createMeetingWithOwner(ctx, qtx, meetingdomain.CreateMeetingRecord{
+			Name:             fallbackName,
+			Visibility:       meetingdomain.MeetingVisibilityOneOff,
+			CreatedBy:        record.CreatedBy,
+			OwnerDisplayName: record.OwnerDisplayName,
+		})
+		if err != nil {
+			return meetingdomain.Meeting{}, nil, err
+		}
+		return createdMeeting, []meetingdomain.MeetingMember{owner}, nil
+	case trip.MeetingContextModeNewSaved:
+		meetingName := strings.TrimSpace(record.MeetingContext.MeetingName)
+		if meetingName == "" {
+			meetingName = fallbackName
+		}
+		createdMeeting, owner, err := createMeetingWithOwner(ctx, qtx, meetingdomain.CreateMeetingRecord{
+			Name:             meetingName,
+			Visibility:       meetingdomain.MeetingVisibilitySaved,
+			CreatedBy:        record.CreatedBy,
+			OwnerDisplayName: record.OwnerDisplayName,
+		})
+		if err != nil {
+			return meetingdomain.Meeting{}, nil, err
+		}
+		return createdMeeting, []meetingdomain.MeetingMember{owner}, nil
+	case trip.MeetingContextModeExisting:
+		eventMeetingRow, err := qtx.GetSavedMeetingForMember(ctx, db.GetSavedMeetingForMemberParams{
+			MeetingID: mustUUID(record.MeetingContext.MeetingID),
+			UserID:    mustUUID(record.CreatedBy),
+		})
+		if err == pgx.ErrNoRows {
+			return meetingdomain.Meeting{}, nil, trip.ErrNotFound
+		}
+		if err != nil {
+			return meetingdomain.Meeting{}, nil, err
+		}
+		memberRows, err := qtx.ListMeetingMembersForSavedMeetingByMemberUser(ctx, db.ListMeetingMembersForSavedMeetingByMemberUserParams{
+			MeetingID: mustUUID(record.MeetingContext.MeetingID),
+			UserID:    mustUUID(record.CreatedBy),
+		})
+		if err != nil {
+			return meetingdomain.Meeting{}, nil, err
+		}
+		if len(memberRows) == 0 {
+			return meetingdomain.Meeting{}, nil, trip.ErrNotFound
+		}
+		return meetingFromSavedRow(eventMeetingRow), meetingMembersFromSavedRows(memberRows), nil
+	default:
+		return meetingdomain.Meeting{}, nil, fmt.Errorf("%w: unsupported trip meeting context mode %q", trip.ErrValidation, mode)
+	}
+}
+
+func meetingMembersFromSavedRows(rows []db.ListMeetingMembersForSavedMeetingByMemberUserRow) []meetingdomain.MeetingMember {
+	members := make([]meetingdomain.MeetingMember, 0, len(rows))
+	for _, row := range rows {
+		members = append(members, meetingdomain.MeetingMember{
+			ID:          row.MmID,
+			MeetingID:   row.MmMeetingID,
+			UserID:      row.MmUserID,
+			Role:        row.Role,
+			DisplayName: row.DisplayName,
+			JoinedAt:    row.JoinedAt.Time,
+		})
+	}
+	return members
 }
 
 func (s *Store) GetTripByID(ctx context.Context, tripID string) (trip.Trip, bool, error) {

@@ -1,10 +1,11 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, TextInput, View, type ImageSourcePropType } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type {
   DestinationSearchResult,
+  MeetingListItem,
   SupportedCurrency,
   TripDefaultTravelMode,
   TripDestinationInput,
@@ -35,12 +36,20 @@ import {
   tripDestinationInputFromSearchResult,
   validateTripDestinations,
 } from '../../lib/trips/destinations';
+import { listMeetings } from '../../lib/trips/meeting-api';
 import { createTrip, searchDestinations } from '../../lib/trips/trip-api';
 import { ConfirmationModal } from '../../lib/trip-ui/ConfirmationModal';
 import { KeyboardAwareFormScrollView } from '../../lib/trip-ui/KeyboardAwareFormScrollView';
 import { StickyActionFooter, useStickyActionFooterLayout } from '../../lib/trip-ui/StickyActionFooter';
 import { TripDateRangeCalendar } from '../../lib/trip-ui/TripDateRangeCalendar';
 import { isValidDate, monthStringFromDate, todayString } from '../../lib/trips/date';
+import {
+  buildCreateTripMeetingContextPayload,
+  createTripMeetingContextSummary,
+  defaultCreateTripMeetingContext,
+  validateCreateTripMeetingContext,
+  type CreateTripMeetingContextSelection,
+} from '../../lib/trips/create-trip-context';
 import {
   applySuggestedTripName,
   createTripWizardSteps,
@@ -104,10 +113,19 @@ const stepCopy: Record<CreateTripWizardStep, { label: string }> = {
   review: { label: '최종 확인' },
 };
 
+type CreationStep = 'eventType' | 'meetingContext' | 'tripDetails';
+
 export default function NewTripScreen() {
   const insets = useSafeAreaInsets();
   const [form, setForm] = useState<FormState>(initialForm);
   const [destinations, setDestinations] = useState<TripDestinationInput[]>([]);
+  const [creationStep, setCreationStep] = useState<CreationStep>('eventType');
+  const [meetingContext, setMeetingContext] = useState<CreateTripMeetingContextSelection>(() =>
+    defaultCreateTripMeetingContext(),
+  );
+  const [meetings, setMeetings] = useState<MeetingListItem[]>([]);
+  const [meetingsLoading, setMeetingsLoading] = useState(false);
+  const [meetingsError, setMeetingsError] = useState<string | null>(null);
   const [wizardStep, setWizardStep] = useState<CreateTripWizardStep>('destinations');
   const [nameEdited, setNameEdited] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -123,12 +141,52 @@ export default function NewTripScreen() {
   const destinationStatus = destinationSelectionStatus(destinations);
   const suggestedName = suggestTripName(destinations, form.startDate, form.endDate);
   const effectiveTripName = applySuggestedTripName(form.name, suggestedName, nameEdited);
-  const stepIndex = createTripWizardSteps.indexOf(wizardStep);
-  const isFirstStep = wizardStep === 'destinations';
-  const isReviewStep = wizardStep === 'review';
+  const stepIndex =
+    creationStep === 'eventType'
+      ? 0
+      : creationStep === 'meetingContext'
+        ? 1
+        : createTripWizardSteps.indexOf(wizardStep) + 2;
+  const stepLabel =
+    creationStep === 'eventType'
+      ? '만들기 종류'
+      : creationStep === 'meetingContext'
+        ? '함께할 모임'
+        : stepCopy[wizardStep].label;
+  const totalStepCount = createTripWizardSteps.length + 2;
+  const isFirstStep = creationStep === 'eventType';
+  const isReviewStep = creationStep === 'tripDetails' && wizardStep === 'review';
   const footerLayout = useStickyActionFooterLayout({ actionCount: 1 });
   const travelModeSelector = buildTripDefaultTravelModeSelectorViewModel(form.defaultTravelMode);
   const scrollContentStyle = [styles.scrollContent, { paddingTop: insets.top + theme.space[4] }];
+
+  useEffect(() => {
+    let active = true;
+    setMeetingsLoading(true);
+    setMeetingsError(null);
+    listMeetings()
+      .then((response) => {
+        if (!active) {
+          return;
+        }
+        setMeetings(response.meetings.filter((meeting) => meeting.visibility === 'saved'));
+      })
+      .catch(() => {
+        if (!active) {
+          return;
+        }
+        setMeetings([]);
+        setMeetingsError('모임 목록을 불러오지 못했어요. 이번만 함께하기나 새 모임으로 계속할 수 있어요.');
+      })
+      .finally(() => {
+        if (active) {
+          setMeetingsLoading(false);
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const updateDestinationQuery = (query: string) => {
     destinationSearchRequestId.current += 1;
@@ -197,6 +255,23 @@ export default function NewTripScreen() {
   };
 
   const goNext = () => {
+    if (creationStep === 'eventType') {
+      setError(null);
+      setCreationStep('meetingContext');
+      return;
+    }
+
+    if (creationStep === 'meetingContext') {
+      const validationError = validateCreateTripMeetingContext(meetingContext, meetings);
+      if (validationError) {
+        setError(validationError);
+        return;
+      }
+      setError(null);
+      setCreationStep('tripDetails');
+      return;
+    }
+
     const validationError = validateStep(wizardStep);
     if (validationError) {
       setError(validationError);
@@ -208,6 +283,14 @@ export default function NewTripScreen() {
 
   const goBack = () => {
     setError(null);
+    if (creationStep === 'meetingContext') {
+      setCreationStep('eventType');
+      return;
+    }
+    if (creationStep === 'tripDetails' && wizardStep === 'destinations') {
+      setCreationStep('meetingContext');
+      return;
+    }
     setWizardStep((current) => previousCreateTripWizardStep(current));
   };
 
@@ -219,7 +302,10 @@ export default function NewTripScreen() {
 
   const submit = async () => {
     const resolvedName = effectiveTripName.trim();
-    const validationError = validateForm(form, today, resolvedName) ?? validateTripDestinations(destinations);
+    const validationError =
+      validateCreateTripMeetingContext(meetingContext, meetings) ??
+      validateForm(form, today, resolvedName) ??
+      validateTripDestinations(destinations);
     if (validationError) {
       setError(validationError);
       return;
@@ -234,6 +320,7 @@ export default function NewTripScreen() {
         endDate: form.endDate,
         defaultCurrency: form.defaultCurrency,
         defaultTravelMode: form.defaultTravelMode,
+        meetingContext: buildCreateTripMeetingContextPayload(meetingContext, resolvedName),
         destinations: buildCreateTripDestinations(destinations),
       });
       router.replace('/');
@@ -263,11 +350,24 @@ export default function NewTripScreen() {
           <StepWizardHeader
             backAction={!isFirstStep ? { disabled: submitting, label: '이전', onPress: goBack } : undefined}
             currentStep={stepIndex + 1}
-            label={stepCopy[wizardStep].label}
-            totalSteps={createTripWizardSteps.length}
+            label={stepLabel}
+            totalSteps={totalStepCount}
           />
 
-          {wizardStep === 'destinations' ? (
+          {creationStep === 'eventType' ? <EventTypeStep submitting={submitting} /> : null}
+
+          {creationStep === 'meetingContext' ? (
+            <MeetingContextStep
+              meetings={meetings}
+              meetingsError={meetingsError}
+              meetingsLoading={meetingsLoading}
+              onSelect={setMeetingContext}
+              selection={meetingContext}
+              submitting={submitting}
+            />
+          ) : null}
+
+          {creationStep === 'tripDetails' && wizardStep === 'destinations' ? (
             <DestinationStep
               destinationError={destinationError}
               destinationStatus={destinationStatus}
@@ -284,7 +384,7 @@ export default function NewTripScreen() {
             />
           ) : null}
 
-          {wizardStep === 'dates' ? (
+          {creationStep === 'tripDetails' && wizardStep === 'dates' ? (
             <TripDateRangeCalendar
               calendarMonth={calendarMonth}
               disabled={submitting}
@@ -296,7 +396,7 @@ export default function NewTripScreen() {
             />
           ) : null}
 
-          {wizardStep === 'settings' ? (
+          {creationStep === 'tripDetails' && wizardStep === 'settings' ? (
             <View style={styles.stepStack}>
               <SectionCard helper="여행 지출 입력의 기본값으로 사용돼요." title="기본 통화">
                 <View style={styles.optionRow}>
@@ -339,7 +439,7 @@ export default function NewTripScreen() {
             </View>
           ) : null}
 
-          {wizardStep === 'review' ? (
+          {creationStep === 'tripDetails' && wizardStep === 'review' ? (
             <View style={styles.stepStack}>
               <SectionCard>
                 <TextInputField
@@ -371,6 +471,7 @@ export default function NewTripScreen() {
                 />
                 <SummaryRow label="여행 기간" value={`${form.startDate} ~ ${form.endDate}`} />
                 <SummaryRow label="기본 통화" value={form.defaultCurrency} />
+                <SummaryRow label="함께하는 모임" value={createTripMeetingContextSummary(meetingContext, meetings)} />
                 <SummaryRow label="이동 방식" value={travelModeDisplayLabel(form.defaultTravelMode)} />
               </SectionCard>
             </View>
@@ -393,6 +494,110 @@ export default function NewTripScreen() {
         />
       </StickyActionFooter>
     </ScreenBackground>
+  );
+}
+
+type EventTypeStepProps = {
+  submitting: boolean;
+};
+
+function EventTypeStep({ submitting }: EventTypeStepProps) {
+  return (
+    <View style={styles.stepStack}>
+      <SectionCard
+        helper="지금은 여행 일정 만들기를 먼저 열고, 약속 만들기는 다음 slice에서 확장해요."
+        title="무엇을 할까요?"
+      >
+        <SelectableListRow
+          actionLabel="선택됨"
+          disabled={submitting}
+          onPress={() => undefined}
+          selected
+          subtitle="일정·지도·장부·정산이 함께 열리는 여행 이벤트"
+          title="여행"
+        />
+        <SelectableListRow
+          actionLabel="준비 중"
+          disabled
+          subtitle="가벼운 약속 만들기는 후속 이슈에서 연결돼요."
+          title="약속"
+        />
+      </SectionCard>
+    </View>
+  );
+}
+
+type MeetingContextStepProps = {
+  meetings: MeetingListItem[];
+  meetingsError: string | null;
+  meetingsLoading: boolean;
+  onSelect: (selection: CreateTripMeetingContextSelection) => void;
+  selection: CreateTripMeetingContextSelection;
+  submitting: boolean;
+};
+
+function MeetingContextStep({
+  meetings,
+  meetingsError,
+  meetingsLoading,
+  onSelect,
+  selection,
+  submitting,
+}: MeetingContextStepProps) {
+  return (
+    <View style={styles.stepStack}>
+      <SectionCard helper="모임을 먼저 만들지 않아도 여행을 시작할 수 있어요." title="누구와 함께하나요?">
+        <View style={styles.contextOptionList}>
+          <SelectableListRow
+            actionLabel={selection.mode === 'one_off' ? '선택됨' : '선택'}
+            disabled={submitting}
+            onPress={() => onSelect({ mode: 'one_off' })}
+            selected={selection.mode === 'one_off'}
+            subtitle="저장 모임에는 남기지 않고 이번 여행에만 함께해요."
+            title="이번만 함께하기"
+          />
+          <SelectableListRow
+            actionLabel={selection.mode === 'new_saved' ? '선택됨' : '선택'}
+            disabled={submitting}
+            onPress={() => onSelect({ mode: 'new_saved', meetingName: '' })}
+            selected={selection.mode === 'new_saved'}
+            subtitle="여행과 함께 정산/추억 모임을 새로 저장해요."
+            title="새 모임으로 저장"
+          />
+          {selection.mode === 'new_saved' ? (
+            <TextInputField
+              disabled={submitting}
+              helperText="비워두면 여행 이름으로 모임을 저장해요."
+              label="새 모임 이름"
+              onChangeText={(meetingName) => onSelect({ mode: 'new_saved', meetingName })}
+              placeholder="예: 여름 정산 모임"
+              value={selection.meetingName}
+            />
+          ) : null}
+        </View>
+      </SectionCard>
+
+      <SectionCard helper="선택하면 현재 모임 멤버를 여행 참여자로 기본 추가해요." title="기존 모임">
+        {meetingsLoading ? <Text style={styles.helperText}>모임을 불러오는 중...</Text> : null}
+        {meetingsError ? <Text style={styles.helperText}>{meetingsError}</Text> : null}
+        {!meetingsLoading && meetings.length === 0 ? (
+          <Text style={styles.resultEmptyText}>저장된 모임이 아직 없어요. 이번만 함께하거나 새 모임으로 시작해요.</Text>
+        ) : null}
+        <View style={styles.contextOptionList}>
+          {meetings.map((meeting) => (
+            <SelectableListRow
+              actionLabel={selection.mode === 'existing' && selection.meetingId === meeting.id ? '선택됨' : '선택'}
+              disabled={submitting}
+              key={meeting.id}
+              onPress={() => onSelect({ mode: 'existing', meetingId: meeting.id })}
+              selected={selection.mode === 'existing' && selection.meetingId === meeting.id}
+              subtitle={`${meeting.memberCount}명 · 내 역할 ${meeting.myRole === 'owner' ? '모임장' : '멤버'}`}
+              title={meeting.name}
+            />
+          ))}
+        </View>
+      </SectionCard>
+    </View>
   );
 }
 
@@ -743,6 +948,9 @@ const styles = StyleSheet.create({
   searchPanel: {
     gap: theme.space[4],
     width: '100%',
+  },
+  contextOptionList: {
+    gap: theme.space[3],
   },
   searchPanelHeader: {
     alignItems: 'flex-start',
