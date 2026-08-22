@@ -1046,8 +1046,8 @@ test('builds latest settlement detail view model with balances transfers and exp
     ],
   });
 
-  assert.equal(viewModel.title, '정산 상세');
-  assert.equal(viewModel.latestNotice, '현재 여행 지출 기준으로 계산된 최신 정산이에요.');
+  assert.equal(viewModel.title, '정산 장부 상세');
+  assert.equal(viewModel.latestNotice, '현재 장부 기록 기준으로 계산된 최신 정산이에요.');
   assert.equal(viewModel.formulaCopy, '결제 금액 - 부담 금액 = 받을/보낼 금액');
   assert.deepEqual(
     viewModel.currencySections.map((section) => [
