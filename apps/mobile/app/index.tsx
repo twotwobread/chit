@@ -154,7 +154,7 @@ function HomeHeader() {
       <View style={styles.headerTop}>
         <View style={styles.headerCopy}>
           <Text style={styles.title}>홈</Text>
-          <Text style={styles.subtitle}>내 여행을 확인하고 관리해요.</Text>
+          <Text style={styles.subtitle}>기록은 정확하게, 기억은 다정하게.</Text>
         </View>
         <BrandStamp decorative size="sm" />
       </View>

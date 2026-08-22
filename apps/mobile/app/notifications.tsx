@@ -342,7 +342,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   notificationAction: {
-    color: theme.color.primaryTextOnLight,
+    color: theme.color.textLink,
     fontFamily: theme.font.family.semibold,
     fontSize: theme.font.size.caption,
     fontWeight: theme.font.weight.semibold,
