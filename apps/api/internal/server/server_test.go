@@ -1202,6 +1202,80 @@ func TestCreateTripHandler(t *testing.T) {
 	}
 }
 
+func TestCreateTripHandlerAcceptsMeetingContext(t *testing.T) {
+	backend := newFakeAuthBackend()
+	accessToken := loginTestUser(t, backend)
+	tests := []struct {
+		name               string
+		meetingContextJSON string
+		wantMeetingID      string
+		wantMeetingName    string
+	}{
+		{
+			name:               "existing meeting",
+			meetingContextJSON: `{"mode":"existing","meetingId":"00000000-0000-0000-0000-000000000099"}`,
+			wantMeetingID:      "00000000-0000-0000-0000-000000000099",
+			wantMeetingName:    "기존 모임",
+		},
+		{
+			name:               "new saved meeting",
+			meetingContextJSON: `{"mode":"new_saved","meetingName":"여름 정산 모임"}`,
+			wantMeetingName:    "여름 정산 모임",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			requestBody := []byte(`{
+				"name":"오사카 3박 4일",
+				"startDate":"2026-07-10",
+				"endDate":"2026-07-13",
+				"defaultCurrency":"JPY",
+				"meetingContext":` + tt.meetingContextJSON + `,
+				"destinations":[{
+					"cityName":"오사카",
+					"countryName":"일본",
+					"countryCode":"JP",
+					"displayName":"오사카, 일본",
+					"latitude":34.6937,
+					"longitude":135.5023,
+					"radiusMeters":25000,
+					"provider":"google",
+					"providerPlaceId":"google-city-osaka"
+				}]
+			}`)
+			recorder := httptest.NewRecorder()
+			request := httptest.NewRequest(http.MethodPost, "/trips", bytes.NewReader(requestBody))
+			request.Header.Set("Content-Type", "application/json")
+			request.Header.Set("Authorization", "Bearer "+accessToken)
+
+			NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+			if recorder.Code != http.StatusCreated {
+				t.Fatalf("expected status %d, got %d with body %s", http.StatusCreated, recorder.Code, recorder.Body.String())
+			}
+			var body struct {
+				Trip struct {
+					EventContext *struct {
+						MeetingID         string `json:"meetingId"`
+						MeetingName       string `json:"meetingName"`
+						MeetingVisibility string `json:"meetingVisibility"`
+					} `json:"eventContext"`
+				} `json:"trip"`
+			}
+			if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+				t.Fatalf("decode response: %v", err)
+			}
+			if body.Trip.EventContext == nil || body.Trip.EventContext.MeetingVisibility != "saved" || body.Trip.EventContext.MeetingName != tt.wantMeetingName {
+				t.Fatalf("unexpected event context: %#v", body.Trip.EventContext)
+			}
+			if tt.wantMeetingID != "" && body.Trip.EventContext.MeetingID != tt.wantMeetingID {
+				t.Fatalf("expected meeting id %q, got %q", tt.wantMeetingID, body.Trip.EventContext.MeetingID)
+			}
+		})
+	}
+}
+
 func TestCreateTripRequiresAuth(t *testing.T) {
 	backend := newFakeAuthBackend()
 	recorder := httptest.NewRecorder()
@@ -6009,6 +6083,19 @@ func (b *fakeAuthBackend) CreateTripWithOwner(_ context.Context, record tripdoma
 			SortOrder:       destination.SortOrder,
 		})
 	}
+	meetingID := testUUID(13000 + b.nextTrip)
+	meetingName := record.Name
+	meetingVisibility := meetingdomain.MeetingVisibilityOneOff
+	if record.MeetingContext.Mode == tripdomain.MeetingContextModeExisting {
+		meetingID = record.MeetingContext.MeetingID
+		meetingName = "기존 모임"
+		meetingVisibility = meetingdomain.MeetingVisibilitySaved
+	} else if record.MeetingContext.Mode == tripdomain.MeetingContextModeNewSaved {
+		meetingVisibility = meetingdomain.MeetingVisibilitySaved
+		if strings.TrimSpace(record.MeetingContext.MeetingName) != "" {
+			meetingName = strings.TrimSpace(record.MeetingContext.MeetingName)
+		}
+	}
 	createdTrip := tripdomain.Trip{
 		ID:                tripID,
 		Name:              record.Name,
@@ -6021,9 +6108,9 @@ func (b *fakeAuthBackend) CreateTripWithOwner(_ context.Context, record tripdoma
 		UpdatedAt:         now,
 		EventContext: &tripdomain.TripEventContext{
 			EventID:           testUUID(12000 + b.nextTrip),
-			MeetingID:         testUUID(13000 + b.nextTrip),
-			MeetingName:       record.Name,
-			MeetingVisibility: meetingdomain.MeetingVisibilityOneOff,
+			MeetingID:         meetingID,
+			MeetingName:       meetingName,
+			MeetingVisibility: meetingVisibility,
 		},
 		Destinations: destinations,
 	}

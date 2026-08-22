@@ -74,6 +74,7 @@ func (s apiServer) CreateTrip(w http.ResponseWriter, r *http.Request) {
 		EndDate:           dateFromOpenAPI(body.EndDate),
 		DefaultCurrency:   string(body.DefaultCurrency),
 		DefaultTravelMode: tripDefaultTravelModeFromOpenAPI(body.DefaultTravelMode),
+		MeetingContext:    createTripMeetingContextFromOpenAPI(body.MeetingContext),
 		Destinations:      createDestinationsFromOpenAPI(body.Destinations),
 	})
 	if err != nil {

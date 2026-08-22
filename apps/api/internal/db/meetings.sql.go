@@ -503,6 +503,67 @@ func (q *Queries) GetSavedMeetingForMember(ctx context.Context, arg GetSavedMeet
 	return i, err
 }
 
+const listMeetingMembersForSavedMeetingByMemberUser = `-- name: ListMeetingMembersForSavedMeetingByMemberUser :many
+SELECT
+  mm.id::text,
+  mm.meeting_id::text,
+  mm.user_id::text,
+  mm.role,
+  mm.display_name,
+  mm.joined_at
+FROM meetings m
+JOIN meeting_members requester ON requester.meeting_id = m.id
+JOIN meeting_members mm ON mm.meeting_id = m.id
+WHERE m.id = $1::uuid
+  AND requester.user_id = $2::uuid
+  AND m.visibility = 'saved'
+ORDER BY
+  CASE WHEN mm.user_id = $2::uuid THEN 0 ELSE 1 END,
+  mm.joined_at ASC,
+  mm.id ASC
+`
+
+type ListMeetingMembersForSavedMeetingByMemberUserParams struct {
+	MeetingID pgtype.UUID
+	UserID    pgtype.UUID
+}
+
+type ListMeetingMembersForSavedMeetingByMemberUserRow struct {
+	MmID        string
+	MmMeetingID string
+	MmUserID    string
+	Role        string
+	DisplayName string
+	JoinedAt    pgtype.Timestamptz
+}
+
+func (q *Queries) ListMeetingMembersForSavedMeetingByMemberUser(ctx context.Context, arg ListMeetingMembersForSavedMeetingByMemberUserParams) ([]ListMeetingMembersForSavedMeetingByMemberUserRow, error) {
+	rows, err := q.db.Query(ctx, listMeetingMembersForSavedMeetingByMemberUser, arg.MeetingID, arg.UserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListMeetingMembersForSavedMeetingByMemberUserRow
+	for rows.Next() {
+		var i ListMeetingMembersForSavedMeetingByMemberUserRow
+		if err := rows.Scan(
+			&i.MmID,
+			&i.MmMeetingID,
+			&i.MmUserID,
+			&i.Role,
+			&i.DisplayName,
+			&i.JoinedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listSavedMeetingsByMemberUser = `-- name: ListSavedMeetingsByMemberUser :many
 SELECT
   m.id::text AS id,

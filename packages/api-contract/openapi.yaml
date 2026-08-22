@@ -5450,12 +5450,36 @@ components:
           allOf:
             - $ref: '#/components/schemas/TripDefaultTravelMode'
           default: transit
+        meetingContext:
+          $ref: '#/components/schemas/TripMeetingContextInput'
         destinations:
           type: array
           minItems: 1
           maxItems: 5
           items:
             $ref: '#/components/schemas/TripDestinationInput'
+    TripMeetingContextMode:
+      type: string
+      enum:
+        - one_off
+        - existing
+        - new_saved
+    TripMeetingContextInput:
+      type: object
+      required:
+        - mode
+      additionalProperties: false
+      properties:
+        mode:
+          $ref: '#/components/schemas/TripMeetingContextMode'
+        meetingId:
+          type: string
+          description: Required when mode is existing.
+        meetingName:
+          type: string
+          minLength: 1
+          maxLength: 80
+          description: Optional when mode is new_saved. Defaults to the trip name.
     DestinationProvider:
       type: string
       enum:

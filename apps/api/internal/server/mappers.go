@@ -163,6 +163,20 @@ func listTripsResponseToOpenAPI(trips []trip.ListItem) openapi.ListTripsResponse
 	return openapi.ListTripsResponse{Trips: items}
 }
 
+func createTripMeetingContextFromOpenAPI(value *openapi.TripMeetingContextInput) trip.CreateMeetingContextInput {
+	if value == nil {
+		return trip.CreateMeetingContextInput{}
+	}
+	input := trip.CreateMeetingContextInput{Mode: string(value.Mode)}
+	if value.MeetingId != nil {
+		input.MeetingID = *value.MeetingId
+	}
+	if value.MeetingName != nil {
+		input.MeetingName = *value.MeetingName
+	}
+	return input
+}
+
 func createDestinationsFromOpenAPI(values []openapi.TripDestinationInput) []trip.CreateDestinationInput {
 	items := make([]trip.CreateDestinationInput, 0, len(values))
 	for _, value := range values {

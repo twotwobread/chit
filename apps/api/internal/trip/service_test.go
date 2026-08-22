@@ -877,6 +877,69 @@ func TestServiceCreate(t *testing.T) {
 	if len(result.Trip.Destinations) != 1 || result.Trip.Destinations[0].ProviderPlaceID != "google-city-osaka" {
 		t.Fatalf("expected created trip destinations in result, got %#v", result.Trip.Destinations)
 	}
+	if repo.created.MeetingContext.Mode != MeetingContextModeOneOff {
+		t.Fatalf("expected omitted meeting context to default to one_off, got %#v", repo.created.MeetingContext)
+	}
+}
+
+func TestServiceCreateNormalizesMeetingContext(t *testing.T) {
+	tests := []struct {
+		name  string
+		input CreateMeetingContextInput
+		want  CreateMeetingContextRecord
+	}{
+		{name: "one off", input: CreateMeetingContextInput{Mode: MeetingContextModeOneOff}, want: CreateMeetingContextRecord{Mode: MeetingContextModeOneOff}},
+		{name: "existing", input: CreateMeetingContextInput{Mode: MeetingContextModeExisting, MeetingID: "  00000000-0000-0000-0000-000000000099  "}, want: CreateMeetingContextRecord{Mode: MeetingContextModeExisting, MeetingID: "00000000-0000-0000-0000-000000000099"}},
+		{name: "new saved", input: CreateMeetingContextInput{Mode: MeetingContextModeNewSaved, MeetingName: "  여름 모임  "}, want: CreateMeetingContextRecord{Mode: MeetingContextModeNewSaved, MeetingName: "여름 모임"}},
+		{name: "new saved unnamed", input: CreateMeetingContextInput{Mode: MeetingContextModeNewSaved}, want: CreateMeetingContextRecord{Mode: MeetingContextModeNewSaved}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := &fakeRepository{creator: Creator{ID: "user-1", DisplayName: "민수"}, creatorFound: true}
+			service := newTestService(repo)
+
+			_, err := service.Create(context.Background(), "user-1", CreateInput{
+				Name:              "오사카",
+				StartDate:         "2026-07-10",
+				EndDate:           "2026-07-13",
+				DefaultCurrency:   "JPY",
+				DefaultTravelMode: "transit",
+				MeetingContext:    tt.input,
+				Destinations:      validCreateDestinations(),
+			})
+			if err != nil {
+				t.Fatalf("Create returned error: %v", err)
+			}
+			if repo.created.MeetingContext != tt.want {
+				t.Fatalf("expected meeting context %#v, got %#v", tt.want, repo.created.MeetingContext)
+			}
+		})
+	}
+}
+
+func TestServiceCreateRejectsInvalidMeetingContext(t *testing.T) {
+	service := newTestService(&fakeRepository{creator: Creator{ID: "user-1", DisplayName: "민수"}, creatorFound: true})
+	longName := strings.Repeat("가", 81)
+	tests := []CreateMeetingContextInput{
+		{Mode: MeetingContextModeExisting},
+		{Mode: "outing"},
+		{Mode: MeetingContextModeNewSaved, MeetingName: longName},
+	}
+	for _, meetingContext := range tests {
+		_, err := service.Create(context.Background(), "user-1", CreateInput{
+			Name:              "오사카",
+			StartDate:         "2026-07-10",
+			EndDate:           "2026-07-13",
+			DefaultCurrency:   "JPY",
+			DefaultTravelMode: "transit",
+			MeetingContext:    meetingContext,
+			Destinations:      validCreateDestinations(),
+		})
+		if !errors.Is(err, ErrValidation) {
+			t.Fatalf("expected ErrValidation for %#v, got %v", meetingContext, err)
+		}
+	}
 }
 
 func TestServiceCreateDefaultsTravelModeToTransit(t *testing.T) {
