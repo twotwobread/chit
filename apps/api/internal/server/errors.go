@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/twotwobread/i-um/apps/api/internal/auth"
+	"github.com/twotwobread/i-um/apps/api/internal/meeting"
 	"github.com/twotwobread/i-um/apps/api/internal/openapi"
 	"github.com/twotwobread/i-um/apps/api/internal/place"
 	"github.com/twotwobread/i-um/apps/api/internal/route"
@@ -17,6 +18,21 @@ func writeServiceUnavailable(w http.ResponseWriter) {
 
 func writeOpenAPIRequestError(w http.ResponseWriter, _ *http.Request, _ error) {
 	writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid request parameter", nil)
+}
+
+func writeMeetingError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, meeting.ErrValidation):
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid meeting or event request", nil)
+	case errors.Is(err, meeting.ErrUnauthorized):
+		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "unauthorized", nil)
+	case errors.Is(err, meeting.ErrForbidden):
+		writeError(w, http.StatusForbidden, "FORBIDDEN", "forbidden", nil)
+	case errors.Is(err, meeting.ErrNotFound):
+		writeError(w, http.StatusNotFound, "NOT_FOUND", "meeting or event not found", nil)
+	default:
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error", nil)
+	}
 }
 
 func writeTripError(w http.ResponseWriter, err error) {

@@ -8,6 +8,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/twotwobread/i-um/apps/api/internal/auth"
 	"github.com/twotwobread/i-um/apps/api/internal/flight"
+	"github.com/twotwobread/i-um/apps/api/internal/meeting"
 	"github.com/twotwobread/i-um/apps/api/internal/notification"
 	"github.com/twotwobread/i-um/apps/api/internal/openapi"
 	"github.com/twotwobread/i-um/apps/api/internal/place"
@@ -27,6 +28,7 @@ type apiServer struct {
 	readiness                           readinessChecker
 	auth                                *auth.Service
 	trips                               *trip.Service
+	meetings                            *meeting.Service
 	flights                             *flight.Service
 	notifications                       *notification.Service
 	places                              *place.Service
@@ -72,6 +74,11 @@ func NewRouterWithConfig(readiness readinessChecker, config Config) http.Handler
 		tripService = trip.NewService(repo, options...)
 	}
 
+	var meetingService *meeting.Service
+	if repo, ok := readiness.(meeting.Repository); ok {
+		meetingService = meeting.NewService(repo)
+	}
+
 	var notificationService *notification.Service
 	if repo, ok := readiness.(notification.Repository); ok {
 		notificationService = notification.NewService(repo)
@@ -109,6 +116,7 @@ func NewRouterWithConfig(readiness readinessChecker, config Config) http.Handler
 		readiness:                           readiness,
 		auth:                                authService,
 		trips:                               tripService,
+		meetings:                            meetingService,
 		flights:                             flightService,
 		notifications:                       notificationService,
 		places:                              placeService,

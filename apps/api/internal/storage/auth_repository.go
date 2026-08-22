@@ -244,10 +244,25 @@ func (s *Store) DeleteAccount(ctx context.Context, userID string, now time.Time)
 	if err := qtx.DeleteSoloTripsByUserID(ctx, userUUID); err != nil {
 		return err
 	}
+	if err := qtx.DeleteSoloMeetingsByUserID(ctx, userUUID); err != nil {
+		return err
+	}
 	if err := qtx.TransferOwnedSharedTripsForAccountDeletion(ctx, db.TransferOwnedSharedTripsForAccountDeletionParams{Column1: userUUID, UpdatedAt: deletedAt}); err != nil {
 		return err
 	}
+	if err := qtx.TransferOwnedSharedMeetingsForAccountDeletion(ctx, db.TransferOwnedSharedMeetingsForAccountDeletionParams{Column1: userUUID, UpdatedAt: deletedAt}); err != nil {
+		return err
+	}
+	if err := qtx.TransferOwnedSharedEventsForAccountDeletion(ctx, db.TransferOwnedSharedEventsForAccountDeletionParams{Column1: userUUID, UpdatedAt: deletedAt}); err != nil {
+		return err
+	}
 	if err := qtx.AnonymizeTripParticipantsByUserID(ctx, userUUID); err != nil {
+		return err
+	}
+	if err := qtx.AnonymizeMeetingMembersByUserID(ctx, userUUID); err != nil {
+		return err
+	}
+	if err := qtx.AnonymizeEventParticipantsByUserID(ctx, userUUID); err != nil {
 		return err
 	}
 	if err := qtx.DeactivateActiveInvitesCreatedByUserID(ctx, db.DeactivateActiveInvitesCreatedByUserIDParams{Column1: userUUID, DeactivatedAt: deletedAt}); err != nil {
