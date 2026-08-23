@@ -1547,6 +1547,173 @@ func (s *Store) GetTripSettlementInput(ctx context.Context, tripID string) (trip
 	return trip.SettlementInput{Participants: participants, Expenses: expenses}, nil
 }
 
+func (s *Store) GetExpenseEventForParticipant(ctx context.Context, eventID string, userID string) (trip.EventLedgerContext, bool, error) {
+	row, err := s.queries.GetExpenseEventForParticipant(ctx, db.GetExpenseEventForParticipantParams{EventID: mustUUID(eventID), UserID: mustUUID(userID)})
+	if err == pgx.ErrNoRows {
+		return trip.EventLedgerContext{}, false, nil
+	}
+	if err != nil {
+		return trip.EventLedgerContext{}, false, err
+	}
+	return trip.EventLedgerContext{EventID: row.EventID, DefaultCurrency: row.DefaultCurrency, EventType: row.EventType, Status: row.Status, CurrentParticipantID: row.CurrentParticipantID}, true, nil
+}
+
+func (s *Store) ListEventExpenses(ctx context.Context, eventID string) (trip.ListEventExpensesResult, error) {
+	rows, err := s.queries.ListEventExpensesByEvent(ctx, mustUUID(eventID))
+	if err != nil {
+		return trip.ListEventExpensesResult{}, err
+	}
+	expenses := make([]trip.Expense, 0, len(rows))
+	expenseIDs := make([]string, 0, len(rows))
+	for _, row := range rows {
+		expenses = append(expenses, eventExpenseFromListRow(row))
+		expenseIDs = append(expenseIDs, row.ID)
+	}
+	splitsByExpenseID, err := s.listEventExpenseSplitsByExpenseIDs(ctx, s.queries, expenseIDs)
+	if err != nil {
+		return trip.ListEventExpensesResult{}, err
+	}
+	for index := range expenses {
+		expenses[index].Splits = splitsByExpenseID[expenses[index].ID]
+	}
+	return trip.ListEventExpensesResult{Expenses: expenses}, nil
+}
+
+func (s *Store) GetEventSettlementInput(ctx context.Context, eventID string) (trip.SettlementInput, error) {
+	participantRows, err := s.queries.ListSettlementParticipantsByEvent(ctx, mustUUID(eventID))
+	if err != nil {
+		return trip.SettlementInput{}, err
+	}
+	participants := make([]trip.SettlementParticipantInput, 0, len(participantRows))
+	for _, row := range participantRows {
+		participants = append(participants, trip.SettlementParticipantInput{ParticipantID: row.ID, DisplayName: row.DisplayName, JoinedAt: row.JoinedAt.Time})
+	}
+	settlementRows, err := s.queries.ListSettlementRowsByEvent(ctx, mustUUID(eventID))
+	if err != nil {
+		return trip.SettlementInput{}, err
+	}
+	expenseIndexByID := make(map[string]int, len(settlementRows))
+	expenses := make([]trip.SettlementExpenseInput, 0)
+	for _, row := range settlementRows {
+		expenseIndex, ok := expenseIndexByID[row.ExpenseID]
+		if !ok {
+			expenses = append(expenses, trip.SettlementExpenseInput{ExpenseID: row.ExpenseID, Currency: row.Currency, AmountMinor: row.ExpenseAmountMinor, PayerParticipantID: optionalString(row.PayerParticipantID), PayerDisplayName: row.PayerDisplayName, PayerParticipantLive: row.PayerParticipantLive, Splits: []trip.SettlementSplitInput{}})
+			expenseIndex = len(expenses) - 1
+			expenseIndexByID[row.ExpenseID] = expenseIndex
+		}
+		if row.SplitOrder > 0 {
+			expenses[expenseIndex].Splits = append(expenses[expenseIndex].Splits, trip.SettlementSplitInput{ParticipantID: optionalString(row.SplitParticipantID), DisplayName: row.SplitParticipantDisplayName, ParticipantLive: row.SplitParticipantLive, AmountMinor: row.SplitAmountMinor, SplitOrder: int(row.SplitOrder)})
+		}
+	}
+	return trip.SettlementInput{Participants: participants, Expenses: expenses}, nil
+}
+
+func (s *Store) GetEventExpenseByID(ctx context.Context, eventID string, expenseID string) (trip.Expense, bool, error) {
+	row, err := s.queries.GetEventExpenseByID(ctx, db.GetEventExpenseByIDParams{EventID: mustUUID(eventID), ExpenseID: mustUUID(expenseID)})
+	if err == pgx.ErrNoRows {
+		return trip.Expense{}, false, nil
+	}
+	if err != nil {
+		return trip.Expense{}, false, err
+	}
+	expense := eventExpenseFromGetRow(row)
+	splitsByExpenseID, err := s.listEventExpenseSplitsByExpenseIDs(ctx, s.queries, []string{expenseID})
+	if err != nil {
+		return trip.Expense{}, false, err
+	}
+	expense.Splits = splitsByExpenseID[expenseID]
+	return expense, true, nil
+}
+
+func (s *Store) CreateEventExpense(ctx context.Context, record trip.EventExpenseRecord) (trip.CreateEventExpenseResult, error) {
+	expense, err := s.upsertEventExpense(ctx, record, false)
+	if err != nil {
+		return trip.CreateEventExpenseResult{}, err
+	}
+	return trip.CreateEventExpenseResult{Expense: expense}, nil
+}
+
+func (s *Store) UpdateEventExpense(ctx context.Context, record trip.EventExpenseRecord) (trip.Expense, error) {
+	return s.upsertEventExpense(ctx, record, true)
+}
+
+func (s *Store) DeleteEventExpenseByID(ctx context.Context, eventID string, expenseID string) (bool, error) {
+	_, err := s.queries.DeleteEventExpenseByID(ctx, db.DeleteEventExpenseByIDParams{EventID: mustUUID(eventID), ExpenseID: mustUUID(expenseID)})
+	if err == pgx.ErrNoRows {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func (s *Store) upsertEventExpense(ctx context.Context, record trip.EventExpenseRecord, update bool) (trip.Expense, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return trip.Expense{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	qtx := s.queries.WithTx(tx)
+	participants, err := qtx.ListExpenseEventParticipants(ctx, mustUUID(record.EventID))
+	if err != nil {
+		return trip.Expense{}, err
+	}
+	allParticipants := make([]trip.ExpenseSplitParticipant, 0, len(participants))
+	participantByID := make(map[string]db.ListExpenseEventParticipantsRow, len(participants))
+	for _, row := range participants {
+		participantByID[row.ID] = row
+		allParticipants = append(allParticipants, trip.ExpenseSplitParticipant{ParticipantID: row.ID, UserID: row.UserID, DisplayName: row.DisplayName, JoinedAt: row.JoinedAt.Time})
+	}
+	payer, ok := participantByID[record.PayerParticipantID]
+	if !ok {
+		return trip.Expense{}, trip.ErrNotFound
+	}
+	splitRecords, err := trip.BuildExpenseSplitRecords(record.AmountMinor, record.SplitPolicy, allParticipants, record.ParticipantIDs, record.ManualSplits)
+	if err != nil {
+		return trip.Expense{}, err
+	}
+	var expense trip.Expense
+	if update {
+		if err := qtx.DeleteSplitsByExpenseID(ctx, mustUUID(record.ExpenseID)); err != nil {
+			return trip.Expense{}, err
+		}
+		row, err := qtx.UpdateEventExpense(ctx, db.UpdateEventExpenseParams{EventID: mustUUID(record.EventID), ExpenseID: mustUUID(record.ExpenseID), Title: nullableText(record.Title), ExpenseDate: dateValue(record.ExpenseDate), AmountMinor: record.AmountMinor, Currency: expenseCurrency(record.Currency, "KRW"), ExpenseCategory: expenseCategory(record.ExpenseCategory, ""), ExpenseKind: expenseKind(record.ExpenseKind), SplitPolicy: record.SplitPolicy, PayerEventParticipantID: mustUUID(payer.ID), PayerDisplayName: trip.NormalizeParticipantDisplayName(payer.DisplayName), Memo: nullableText(record.Memo), IncludeInSettlement: record.IncludeInSettlement})
+		if err == pgx.ErrNoRows {
+			return trip.Expense{}, trip.ErrNotFound
+		}
+		if err != nil {
+			return trip.Expense{}, err
+		}
+		expense = eventExpenseFromUpdateRow(row)
+	} else {
+		row, err := qtx.InsertEventExpense(ctx, db.InsertEventExpenseParams{EventID: mustUUID(record.EventID), ExpenseDate: dateValue(record.ExpenseDate), Title: nullableText(record.Title), AmountMinor: record.AmountMinor, Currency: expenseCurrency(record.Currency, "KRW"), ExpenseCategory: expenseCategory(record.ExpenseCategory, ""), ExpenseKind: expenseKind(record.ExpenseKind), SplitPolicy: record.SplitPolicy, PayerEventParticipantID: mustUUID(payer.ID), PayerDisplayName: trip.NormalizeParticipantDisplayName(payer.DisplayName), Memo: nullableText(record.Memo), ClientMutationID: pgtype.Text{}, IncludeInSettlement: record.IncludeInSettlement, CreatedBy: mustUUID(record.CreatedBy)})
+		if isForeignKeyViolation(err) {
+			return trip.Expense{}, trip.ErrConflict
+		}
+		if err != nil {
+			return trip.Expense{}, err
+		}
+		expense = eventExpenseFromInsertRow(row)
+	}
+	splits := make([]trip.ExpenseSplit, 0, len(splitRecords))
+	for _, splitRecord := range splitRecords {
+		splitRow, err := qtx.InsertEventExpenseSplit(ctx, db.InsertEventExpenseSplitParams{ExpenseID: mustUUID(expense.ID), EventParticipantID: mustUUID(splitRecord.ParticipantID), ParticipantDisplayName: splitRecord.ParticipantDisplayName, AmountMinor: splitRecord.AmountMinor, SplitOrder: int32(splitRecord.SplitOrder)})
+		if isForeignKeyViolation(err) {
+			return trip.Expense{}, trip.ErrConflict
+		}
+		if err != nil {
+			return trip.Expense{}, err
+		}
+		splits = append(splits, trip.ExpenseSplit{Participant: expenseParticipantDisplay(splitRow.ParticipantID, splitRow.ParticipantDisplayName, trip.ExpenseDisplaySourceLive), AmountMinor: splitRow.AmountMinor})
+	}
+	expense.Splits = splits
+	if err := tx.Commit(ctx); err != nil {
+		return trip.Expense{}, err
+	}
+	return expense, nil
+}
+
 func (s *Store) GetTripSettlementInputs(ctx context.Context, tripIDs []string) (map[string]trip.SettlementInput, error) {
 	inputByTripID := make(map[string]*trip.SettlementInput, len(tripIDs))
 	tripUUIDs := make([]pgtype.UUID, 0, len(tripIDs))
@@ -4288,6 +4455,46 @@ func (s *Store) quickExpenseByClientMutationID(ctx context.Context, queries *db.
 	}
 	expense.Splits = splits
 	return expense, true, nil
+}
+
+func eventExpenseFromListRow(row db.ListEventExpensesByEventRow) trip.Expense {
+	return trip.Expense{ID: row.ID, EventID: row.EventID, AnchorType: "event", ExpenseDate: dateString(row.ExpenseDate), Title: textPtr(row.Title), DisplayTitle: row.DisplayTitle, AmountMinor: row.AmountMinor, Currency: row.Currency, ExpenseCategory: row.ExpenseCategory, ExpenseKind: row.ExpenseKind, Payer: expenseParticipantDisplay(row.PayerParticipantID, row.PayerDisplayName, row.PayerSource), Memo: textPtr(row.Memo), SplitPolicy: row.SplitPolicy, IncludeInSettlement: row.IncludeInSettlement, Receipt: receiptSummary(row.ReceiptExists, row.ReceiptContentType, row.ReceiptByteSize, row.ReceiptUploadedAt), CreatedAt: row.CreatedAt.Time}
+}
+
+func eventExpenseFromGetRow(row db.GetEventExpenseByIDRow) trip.Expense {
+	return trip.Expense{ID: row.ID, EventID: row.EventID, AnchorType: "event", ExpenseDate: dateString(row.ExpenseDate), Title: textPtr(row.Title), DisplayTitle: row.DisplayTitle, AmountMinor: row.AmountMinor, Currency: row.Currency, ExpenseCategory: row.ExpenseCategory, ExpenseKind: row.ExpenseKind, Payer: expenseParticipantDisplay(row.PayerParticipantID, row.PayerDisplayName, row.PayerSource), Memo: textPtr(row.Memo), SplitPolicy: row.SplitPolicy, IncludeInSettlement: row.IncludeInSettlement, Receipt: receiptSummary(row.ReceiptExists, row.ReceiptContentType, row.ReceiptByteSize, row.ReceiptUploadedAt), CreatedAt: row.CreatedAt.Time}
+}
+
+func eventExpenseFromInsertRow(row db.InsertEventExpenseRow) trip.Expense {
+	return trip.Expense{ID: row.ID, EventID: row.EventID, AnchorType: "event", ExpenseDate: dateString(row.ExpenseDate), Title: textPtr(row.Title), DisplayTitle: row.DisplayTitle, AmountMinor: row.AmountMinor, Currency: row.Currency, ExpenseCategory: row.ExpenseCategory, ExpenseKind: row.ExpenseKind, Payer: expenseParticipantDisplay(row.PayerParticipantID, row.PayerDisplayName, trip.ExpenseDisplaySourceLive), Memo: textPtr(row.Memo), SplitPolicy: row.SplitPolicy, IncludeInSettlement: row.IncludeInSettlement, Receipt: emptyReceiptSummary(), CreatedAt: row.CreatedAt.Time}
+}
+
+func eventExpenseFromUpdateRow(row db.UpdateEventExpenseRow) trip.Expense {
+	return trip.Expense{ID: row.ID, EventID: row.EventID, AnchorType: "event", ExpenseDate: dateString(row.ExpenseDate), Title: textPtr(row.Title), DisplayTitle: row.DisplayTitle, AmountMinor: row.AmountMinor, Currency: row.Currency, ExpenseCategory: row.ExpenseCategory, ExpenseKind: row.ExpenseKind, Payer: expenseParticipantDisplay(row.PayerParticipantID, row.PayerDisplayName, trip.ExpenseDisplaySourceLive), Memo: textPtr(row.Memo), SplitPolicy: row.SplitPolicy, IncludeInSettlement: row.IncludeInSettlement, Receipt: emptyReceiptSummary(), CreatedAt: row.CreatedAt.Time}
+}
+
+func (s *Store) listEventExpenseSplitsByExpenseIDs(ctx context.Context, queries *db.Queries, expenseIDs []string) (map[string][]trip.ExpenseSplit, error) {
+	result := make(map[string][]trip.ExpenseSplit, len(expenseIDs))
+	if len(expenseIDs) == 0 {
+		return result, nil
+	}
+	uuids := make([]pgtype.UUID, 0, len(expenseIDs))
+	for _, expenseID := range expenseIDs {
+		result[expenseID] = []trip.ExpenseSplit{}
+		uuids = append(uuids, mustUUID(expenseID))
+	}
+	rows, err := queries.ListEventExpenseSplitsByExpenseIDs(ctx, uuids)
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		result[row.ExpenseID] = append(result[row.ExpenseID], trip.ExpenseSplit{Participant: expenseParticipantDisplay(row.ParticipantID, row.ParticipantDisplayName, row.ParticipantSource), AmountMinor: row.AmountMinor})
+	}
+	return result, nil
+}
+
+func emptyReceiptSummary() trip.ExpenseReceiptSummary {
+	return receiptSummary(false, "", 0, pgtype.Timestamptz{})
 }
 
 func expenseFromGetRow(row db.GetExpenseByTripDayAndIDRow) trip.Expense {

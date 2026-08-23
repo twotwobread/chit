@@ -16,6 +16,7 @@ import {
 } from '../../lib/design';
 import { getEvent } from '../../lib/trips/meeting-api';
 import { buildOutingDetailViewModel } from '../../lib/trips/outing-event';
+import { eventExpensesPath } from '../../lib/trips/routes';
 
 export default function OutingEventDetailScreen() {
   const insets = useSafeAreaInsets();
@@ -116,7 +117,8 @@ export default function OutingEventDetailScreen() {
           </View>
         </SectionCard>
 
-        <PrimaryButton label="홈으로" onPress={() => router.replace('/')} />
+        <PrimaryButton label="약속 장부 열기" onPress={() => router.push(eventExpensesPath(response.event.id))} />
+        <SecondaryButton label="홈으로" onPress={() => router.replace('/')} />
         <SecondaryButton label="뒤로가기" onPress={() => router.back()} />
       </ScrollView>
     </ScreenBackground>

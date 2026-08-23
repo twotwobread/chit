@@ -411,7 +411,8 @@ CREATE INDEX schedule_items_trip_place_idx
 
 CREATE TABLE expenses (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  trip_id uuid NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+  trip_id uuid REFERENCES trips(id) ON DELETE CASCADE,
+  event_id uuid NULL,
   anchor_type text NOT NULL,
   trip_day_id uuid,
   schedule_item_id uuid,
@@ -427,6 +428,7 @@ CREATE TABLE expenses (
   expense_kind text NOT NULL DEFAULT 'regular',
   split_policy text NOT NULL DEFAULT 'equal',
   payer_participant_id uuid REFERENCES trip_participants(id) ON DELETE SET NULL,
+  payer_event_participant_id uuid NULL,
   payer_display_name text NOT NULL,
   memo text,
   client_mutation_id text,
@@ -435,11 +437,13 @@ CREATE TABLE expenses (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT expenses_id_trip_unique UNIQUE (id, trip_id),
-  CONSTRAINT expenses_anchor_type_check CHECK (anchor_type IN ('trip', 'trip_day', 'schedule_item')),
+  CONSTRAINT expenses_scope_check CHECK (trip_id IS NOT NULL OR event_id IS NOT NULL),
+  CONSTRAINT expenses_anchor_type_check CHECK (anchor_type IN ('trip', 'trip_day', 'schedule_item', 'event')),
   CONSTRAINT expenses_anchor_columns_check CHECK (
-    (anchor_type = 'trip' AND trip_day_id IS NULL AND schedule_item_id IS NULL)
-    OR (anchor_type = 'trip_day' AND trip_day_id IS NOT NULL AND schedule_item_id IS NULL)
-    OR (anchor_type = 'schedule_item' AND trip_day_id IS NOT NULL AND schedule_item_id IS NOT NULL)
+    (anchor_type = 'trip' AND trip_id IS NOT NULL AND trip_day_id IS NULL AND schedule_item_id IS NULL)
+    OR (anchor_type = 'trip_day' AND trip_id IS NOT NULL AND trip_day_id IS NOT NULL AND schedule_item_id IS NULL)
+    OR (anchor_type = 'schedule_item' AND trip_id IS NOT NULL AND trip_day_id IS NOT NULL AND schedule_item_id IS NOT NULL)
+    OR (anchor_type = 'event' AND event_id IS NOT NULL AND trip_day_id IS NULL AND schedule_item_id IS NULL AND trip_place_id IS NULL)
   ),
   CONSTRAINT expenses_trip_day_fk FOREIGN KEY (trip_day_id, trip_id) REFERENCES trip_days(id, trip_id) ON DELETE RESTRICT,
   CONSTRAINT expenses_schedule_item_fk FOREIGN KEY (schedule_item_id, trip_day_id, trip_id) REFERENCES schedule_items(id, trip_day_id, trip_id) ON DELETE RESTRICT,
@@ -452,6 +456,7 @@ CREATE TABLE expenses (
   CONSTRAINT expenses_expense_category_check CHECK (expense_category IN ('cafe', 'etc', 'food', 'lodging', 'shopping', 'sights', 'transport')),
   CONSTRAINT expenses_expense_kind_check CHECK (expense_kind IN ('regular', 'public_fund')),
   CONSTRAINT expenses_split_policy_check CHECK (split_policy IN ('equal', 'manual')),
+  CONSTRAINT expenses_payer_scope_check CHECK (NOT (payer_participant_id IS NOT NULL AND payer_event_participant_id IS NOT NULL)),
   CONSTRAINT expenses_payer_display_name_length_check CHECK (char_length(payer_display_name) BETWEEN 1 AND 80),
   CONSTRAINT expenses_memo_length_check CHECK (memo IS NULL OR char_length(memo) <= 240),
   CONSTRAINT expenses_client_mutation_id_length_check CHECK (
@@ -465,12 +470,17 @@ CREATE INDEX expenses_trip_day_created_idx ON expenses (trip_id, trip_day_id, cr
 CREATE INDEX expenses_trip_schedule_item_idx ON expenses (trip_id, schedule_item_id) WHERE schedule_item_id IS NOT NULL;
 CREATE INDEX expenses_trip_place_idx ON expenses (trip_id, trip_place_id) WHERE trip_place_id IS NOT NULL;
 CREATE INDEX expenses_payer_participant_idx ON expenses (payer_participant_id) WHERE payer_participant_id IS NOT NULL;
+CREATE INDEX expenses_event_created_idx ON expenses (event_id, created_at DESC, id DESC) WHERE event_id IS NOT NULL;
+CREATE INDEX expenses_event_settlement_idx ON expenses (event_id, include_in_settlement, created_at, id) WHERE event_id IS NOT NULL;
+CREATE INDEX expenses_payer_event_participant_idx ON expenses (payer_event_participant_id) WHERE payer_event_participant_id IS NOT NULL;
 CREATE UNIQUE INDEX expenses_client_mutation_unique_idx ON expenses (trip_id, created_by, client_mutation_id) WHERE client_mutation_id IS NOT NULL;
+CREATE UNIQUE INDEX expenses_event_client_mutation_unique_idx ON expenses (event_id, created_by, client_mutation_id) WHERE event_id IS NOT NULL AND client_mutation_id IS NOT NULL;
 
 CREATE TABLE expense_splits (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   expense_id uuid NOT NULL REFERENCES expenses(id) ON DELETE CASCADE,
   participant_id uuid REFERENCES trip_participants(id) ON DELETE SET NULL,
+  event_participant_id uuid NULL,
   participant_display_name text NOT NULL,
   amount_minor bigint NOT NULL,
   split_order integer NOT NULL,
@@ -478,10 +488,12 @@ CREATE TABLE expense_splits (
   CONSTRAINT expense_splits_display_name_length_check CHECK (char_length(participant_display_name) BETWEEN 1 AND 80),
   CONSTRAINT expense_splits_amount_minor_check CHECK (amount_minor >= 0),
   CONSTRAINT expense_splits_order_check CHECK (split_order >= 1),
+  CONSTRAINT expense_splits_participant_scope_check CHECK (NOT (participant_id IS NOT NULL AND event_participant_id IS NOT NULL)),
   CONSTRAINT expense_splits_expense_order_unique UNIQUE (expense_id, split_order)
 );
 
 CREATE INDEX expense_splits_participant_idx ON expense_splits (participant_id) WHERE participant_id IS NOT NULL;
+CREATE INDEX expense_splits_event_participant_idx ON expense_splits (event_participant_id) WHERE event_participant_id IS NOT NULL;
 
 CREATE TABLE expense_receipt_drafts (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -736,3 +748,10 @@ CREATE TABLE event_participants (
 CREATE INDEX event_participants_user_id_idx ON event_participants (user_id);
 CREATE INDEX event_participants_event_id_idx ON event_participants (event_id);
 CREATE INDEX event_participants_meeting_member_id_idx ON event_participants (meeting_member_id) WHERE meeting_member_id IS NOT NULL;
+
+ALTER TABLE expenses
+  ADD CONSTRAINT expenses_event_id_fk FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
+  ADD CONSTRAINT expenses_payer_event_participant_id_fk FOREIGN KEY (payer_event_participant_id) REFERENCES event_participants(id) ON DELETE SET NULL;
+
+ALTER TABLE expense_splits
+  ADD CONSTRAINT expense_splits_event_participant_id_fk FOREIGN KEY (event_participant_id) REFERENCES event_participants(id) ON DELETE SET NULL;

@@ -525,6 +525,115 @@ func (s apiServer) CreateTripExpense(w http.ResponseWriter, r *http.Request, tri
 	writeJSON(w, http.StatusCreated, createTripExpenseResponseToOpenAPI(result))
 }
 
+func (s apiServer) ListEventExpenses(w http.ResponseWriter, r *http.Request, eventId string) {
+	if s.auth == nil || s.trips == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "event expense list is not configured", nil)
+		return
+	}
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+	result, err := s.trips.ListEventExpenses(r.Context(), authContext.UserID, eventId)
+	if err != nil {
+		writeDayExpenseMutationError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, listEventExpensesResponseToOpenAPI(result))
+}
+
+func (s apiServer) CreateEventExpense(w http.ResponseWriter, r *http.Request, eventId string) {
+	if s.auth == nil || s.trips == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "event expense creation is not configured", nil)
+		return
+	}
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+	var body openapi.CreateEventExpenseJSONRequestBody
+	if !decodeJSON(w, r, &body) {
+		return
+	}
+	result, err := s.trips.CreateEventExpense(r.Context(), authContext.UserID, eventId, trip.CreateEventExpenseInput{Title: body.Title, ExpenseDate: body.ExpenseDate.Time.Format("2006-01-02"), AmountMinor: body.AmountMinor, Currency: optionalCurrencyFromOpenAPI(body.Currency), ExpenseCategory: optionalExpenseCategoryFromOpenAPI(body.ExpenseCategory), ExpenseKind: optionalExpenseKindFromOpenAPI(body.ExpenseKind), PayerParticipantID: body.PayerParticipantId, SplitPolicy: string(body.SplitPolicy), ParticipantIDs: optionalStringSlice(body.ParticipantIds), ManualSplits: manualExpenseSplitsFromOpenAPI(body.Splits), Memo: body.Memo, IncludeInSettlement: body.IncludeInSettlement})
+	if err != nil {
+		writeQuickExpenseError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, createEventExpenseResponseToOpenAPI(result))
+}
+
+func (s apiServer) GetEventExpense(w http.ResponseWriter, r *http.Request, eventId string, expenseId string) {
+	if s.auth == nil || s.trips == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "event expense detail is not configured", nil)
+		return
+	}
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+	result, err := s.trips.GetEventExpense(r.Context(), authContext.UserID, eventId, expenseId)
+	if err != nil {
+		writeDayExpenseMutationError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, getEventExpenseResponseToOpenAPI(result))
+}
+
+func (s apiServer) UpdateEventExpense(w http.ResponseWriter, r *http.Request, eventId string, expenseId string) {
+	if s.auth == nil || s.trips == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "event expense update is not configured", nil)
+		return
+	}
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+	var body openapi.UpdateEventExpenseJSONRequestBody
+	if !decodeJSON(w, r, &body) {
+		return
+	}
+	result, err := s.trips.UpdateEventExpense(r.Context(), authContext.UserID, eventId, expenseId, trip.UpdateEventExpenseInput{Title: body.Title, ExpenseDate: body.ExpenseDate.Time.Format("2006-01-02"), AmountMinor: body.AmountMinor, Currency: optionalCurrencyFromOpenAPI(body.Currency), ExpenseCategory: optionalExpenseCategoryFromOpenAPI(body.ExpenseCategory), ExpenseKind: optionalExpenseKindFromOpenAPI(body.ExpenseKind), PayerParticipantID: body.PayerParticipantId, SplitPolicy: string(body.SplitPolicy), ParticipantIDs: optionalStringSlice(body.ParticipantIds), ManualSplits: manualExpenseSplitsFromOpenAPI(body.Splits), Memo: body.Memo, IncludeInSettlement: body.IncludeInSettlement})
+	if err != nil {
+		writeDayExpenseMutationError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, updateEventExpenseResponseToOpenAPI(result))
+}
+
+func (s apiServer) DeleteEventExpense(w http.ResponseWriter, r *http.Request, eventId string, expenseId string) {
+	if s.auth == nil || s.trips == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "event expense deletion is not configured", nil)
+		return
+	}
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+	if err := s.trips.DeleteEventExpense(r.Context(), authContext.UserID, eventId, expenseId); err != nil {
+		writeDayExpenseMutationError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s apiServer) GetEventSettlement(w http.ResponseWriter, r *http.Request, eventId string) {
+	if s.auth == nil || s.trips == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "event settlement is not configured", nil)
+		return
+	}
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+	result, err := s.trips.GetEventSettlement(r.Context(), authContext.UserID, eventId)
+	if err != nil {
+		writeTripSettlementError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, getEventSettlementResponseToOpenAPI(result))
+}
+
 func (s apiServer) GetTripExpense(w http.ResponseWriter, r *http.Request, tripId string, expenseId string) {
 	if s.auth == nil || s.trips == nil {
 		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "trip expense detail is not configured", nil)

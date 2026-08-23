@@ -903,3 +903,258 @@ FROM expense_receipts er
 CROSS JOIN LATERAL jsonb_array_elements(er.objects_json) AS receipt_object
 WHERE er.trip_id = sqlc.arg(trip_id)::uuid
 ON CONFLICT DO NOTHING;
+
+-- name: GetExpenseEventForParticipant :one
+SELECT
+  e.id::text AS event_id,
+  e.default_currency,
+  e.event_type,
+  e.status,
+  ep.id::text AS current_participant_id
+FROM events e
+JOIN event_participants ep ON ep.event_id = e.id
+WHERE e.id = sqlc.arg(event_id)::uuid
+  AND ep.user_id = sqlc.arg(user_id)::uuid;
+
+-- name: ListExpenseEventParticipants :many
+SELECT
+  id::text,
+  event_id::text,
+  user_id::text,
+  role,
+  display_name,
+  joined_at
+FROM event_participants
+WHERE event_id = sqlc.arg(event_id)::uuid
+ORDER BY joined_at ASC, id ASC;
+
+-- name: InsertEventExpense :one
+INSERT INTO expenses (
+  trip_id,
+  event_id,
+  anchor_type,
+  expense_date,
+  title,
+  amount_minor,
+  currency,
+  expense_category,
+  expense_kind,
+  split_policy,
+  payer_event_participant_id,
+  payer_display_name,
+  memo,
+  client_mutation_id,
+  include_in_settlement,
+  created_by
+) VALUES (
+  NULL,
+  sqlc.arg(event_id)::uuid,
+  'event',
+  sqlc.arg(expense_date),
+  sqlc.narg(title),
+  sqlc.arg(amount_minor),
+  sqlc.arg(currency),
+  sqlc.arg(expense_category),
+  sqlc.arg(expense_kind),
+  sqlc.arg(split_policy),
+  sqlc.arg(payer_event_participant_id)::uuid,
+  sqlc.arg(payer_display_name),
+  sqlc.narg(memo),
+  sqlc.narg(client_mutation_id),
+  sqlc.arg(include_in_settlement),
+  sqlc.arg(created_by)::uuid
+)
+RETURNING
+  id::text,
+  event_id::text,
+  title,
+  COALESCE(title, '지출')::text AS display_title,
+  expense_date,
+  amount_minor,
+  currency,
+  expense_category,
+  expense_kind,
+  COALESCE(payer_event_participant_id::text, '')::text AS payer_participant_id,
+  payer_display_name,
+  memo,
+  split_policy,
+  include_in_settlement,
+  created_at;
+
+-- name: InsertEventExpenseSplit :one
+INSERT INTO expense_splits (
+  expense_id,
+  event_participant_id,
+  participant_display_name,
+  amount_minor,
+  split_order
+) VALUES (
+  sqlc.arg(expense_id)::uuid,
+  sqlc.arg(event_participant_id)::uuid,
+  sqlc.arg(participant_display_name),
+  sqlc.arg(amount_minor),
+  sqlc.arg(split_order)
+)
+RETURNING
+  expense_id::text,
+  split_order,
+  event_participant_id::text AS participant_id,
+  participant_display_name,
+  amount_minor;
+
+-- name: ListEventExpensesByEvent :many
+SELECT
+  e.id::text AS id,
+  e.event_id::text AS event_id,
+  e.title,
+  COALESCE(e.title, '지출')::text AS display_title,
+  e.expense_date,
+  e.amount_minor,
+  e.currency,
+  e.expense_category,
+  e.expense_kind,
+  COALESCE(payer.id::text, e.payer_event_participant_id::text, '')::text AS payer_participant_id,
+  COALESCE(payer.display_name, e.payer_display_name, '참여자')::text AS payer_display_name,
+  CASE WHEN payer.id IS NOT NULL THEN 'live' ELSE 'fallback' END::text AS payer_source,
+  e.memo,
+  e.split_policy,
+  e.include_in_settlement,
+  false::boolean AS receipt_exists,
+  ''::text AS receipt_content_type,
+  0::integer AS receipt_byte_size,
+  NULL::timestamptz AS receipt_uploaded_at,
+  e.created_at
+FROM expenses e
+LEFT JOIN event_participants payer
+  ON payer.id = e.payer_event_participant_id
+ AND payer.event_id = e.event_id
+WHERE e.event_id = sqlc.arg(event_id)::uuid
+  AND e.anchor_type = 'event'
+ORDER BY e.created_at DESC, e.id DESC;
+
+-- name: ListEventExpenseSplitsByExpenseIDs :many
+SELECT
+  es.expense_id::text AS expense_id,
+  es.split_order,
+  COALESCE(participant.id::text, es.event_participant_id::text, '')::text AS participant_id,
+  COALESCE(participant.display_name, es.participant_display_name, '참여자')::text AS participant_display_name,
+  CASE WHEN participant.id IS NOT NULL THEN 'live' ELSE 'fallback' END::text AS participant_source,
+  es.amount_minor
+FROM expense_splits es
+JOIN expenses e ON e.id = es.expense_id
+LEFT JOIN event_participants participant
+  ON participant.id = es.event_participant_id
+ AND participant.event_id = e.event_id
+WHERE es.expense_id = ANY(sqlc.arg(expense_ids)::uuid[])
+ORDER BY es.expense_id ASC, es.split_order ASC;
+
+-- name: GetEventExpenseByID :one
+SELECT
+  e.id::text AS id,
+  e.event_id::text AS event_id,
+  e.title,
+  COALESCE(e.title, '지출')::text AS display_title,
+  e.expense_date,
+  e.amount_minor,
+  e.currency,
+  e.expense_category,
+  e.expense_kind,
+  COALESCE(payer.id::text, e.payer_event_participant_id::text, '')::text AS payer_participant_id,
+  COALESCE(payer.display_name, e.payer_display_name, '참여자')::text AS payer_display_name,
+  CASE WHEN payer.id IS NOT NULL THEN 'live' ELSE 'fallback' END::text AS payer_source,
+  e.memo,
+  e.split_policy,
+  e.include_in_settlement,
+  false::boolean AS receipt_exists,
+  ''::text AS receipt_content_type,
+  0::integer AS receipt_byte_size,
+  NULL::timestamptz AS receipt_uploaded_at,
+  e.created_at
+FROM expenses e
+LEFT JOIN event_participants payer
+  ON payer.id = e.payer_event_participant_id
+ AND payer.event_id = e.event_id
+WHERE e.event_id = sqlc.arg(event_id)::uuid
+  AND e.id = sqlc.arg(expense_id)::uuid
+  AND e.anchor_type = 'event';
+
+-- name: UpdateEventExpense :one
+UPDATE expenses
+SET
+  title = sqlc.narg(title),
+  expense_date = sqlc.arg(expense_date),
+  amount_minor = sqlc.arg(amount_minor),
+  currency = sqlc.arg(currency),
+  expense_category = sqlc.arg(expense_category),
+  expense_kind = sqlc.arg(expense_kind),
+  split_policy = sqlc.arg(split_policy),
+  payer_event_participant_id = sqlc.arg(payer_event_participant_id)::uuid,
+  payer_display_name = sqlc.arg(payer_display_name),
+  memo = sqlc.narg(memo),
+  include_in_settlement = sqlc.arg(include_in_settlement),
+  updated_at = now()
+WHERE event_id = sqlc.arg(event_id)::uuid
+  AND id = sqlc.arg(expense_id)::uuid
+  AND anchor_type = 'event'
+RETURNING
+  id::text,
+  event_id::text,
+  title,
+  COALESCE(title, '지출')::text AS display_title,
+  expense_date,
+  amount_minor,
+  currency,
+  expense_category,
+  expense_kind,
+  COALESCE(payer_event_participant_id::text, '')::text AS payer_participant_id,
+  payer_display_name,
+  memo,
+  split_policy,
+  include_in_settlement,
+  created_at;
+
+-- name: DeleteSplitsByExpenseID :exec
+DELETE FROM expense_splits WHERE expense_id = sqlc.arg(expense_id)::uuid;
+
+-- name: DeleteEventExpenseByID :one
+DELETE FROM expenses
+WHERE event_id = sqlc.arg(event_id)::uuid
+  AND id = sqlc.arg(expense_id)::uuid
+  AND anchor_type = 'event'
+RETURNING id::text;
+
+-- name: ListSettlementParticipantsByEvent :many
+SELECT
+  id::text,
+  display_name,
+  joined_at
+FROM event_participants
+WHERE event_id = sqlc.arg(event_id)::uuid
+ORDER BY joined_at ASC, id ASC;
+
+-- name: ListSettlementRowsByEvent :many
+SELECT
+  e.id::text AS expense_id,
+  e.currency,
+  e.amount_minor AS expense_amount_minor,
+  COALESCE(payer.id::text, '')::text AS payer_participant_id,
+  COALESCE(payer.display_name, e.payer_display_name, '참여자')::text AS payer_display_name,
+  (payer.id IS NOT NULL)::boolean AS payer_participant_live,
+  COALESCE(es.split_order, 0)::integer AS split_order,
+  COALESCE(split_participant.id::text, '')::text AS split_participant_id,
+  COALESCE(split_participant.display_name, es.participant_display_name, '참여자')::text AS split_participant_display_name,
+  (split_participant.id IS NOT NULL)::boolean AS split_participant_live,
+  COALESCE(es.amount_minor, 0)::bigint AS split_amount_minor
+FROM expenses e
+LEFT JOIN event_participants payer
+  ON payer.id = e.payer_event_participant_id
+ AND payer.event_id = e.event_id
+LEFT JOIN expense_splits es
+  ON es.expense_id = e.id
+LEFT JOIN event_participants split_participant
+  ON split_participant.id = es.event_participant_id
+ AND split_participant.event_id = e.event_id
+WHERE e.event_id = sqlc.arg(event_id)::uuid
+  AND e.anchor_type = 'event'
+  AND e.include_in_settlement = true
+ORDER BY e.currency ASC, e.created_at ASC, e.id ASC, es.split_order ASC;

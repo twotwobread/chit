@@ -476,6 +476,311 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /events/{eventId}/expenses:
+    get:
+      operationId: listEventExpenses
+      summary: List expenses for an event
+      description: Returns event-scoped expense rows for a lightweight outing ledger.
+      tags:
+        - Events
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Event expenses.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListEventExpensesResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Event not found or not visible to the current user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      operationId: createEventExpense
+      summary: Create an event expense
+      description: Creates an outing event expense using event participants for payer and splits.
+      tags:
+        - Events
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateEventExpenseRequest'
+      responses:
+        '201':
+          description: Event expense created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateEventExpenseResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Event, payer, or split participant not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /events/{eventId}/expenses/{expenseId}:
+    get:
+      operationId: getEventExpense
+      summary: Get an event expense
+      tags:
+        - Events
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: expenseId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Event expense detail.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetEventExpenseResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Event expense not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      operationId: updateEventExpense
+      summary: Update an event expense
+      tags:
+        - Events
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: expenseId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateEventExpenseRequest'
+      responses:
+        '200':
+          description: Event expense updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateEventExpenseResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Event expense not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      operationId: deleteEventExpense
+      summary: Delete an event expense
+      tags:
+        - Events
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: expenseId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Event expense deleted.
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Event expense not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /events/{eventId}/settlement:
+    get:
+      operationId: getEventSettlement
+      summary: Get event settlement
+      description: Calculates settlement for one event using event participants and event-scoped expenses.
+      tags:
+        - Events
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Event settlement.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetEventSettlementResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Event not found or not visible to the current user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /events/{eventId}:
     get:
       operationId: getEvent
@@ -5788,6 +6093,179 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/EventParticipant'
+    ListEventExpensesResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - expenses
+      properties:
+        expenses:
+          type: array
+          items:
+            $ref: '#/components/schemas/EventExpense'
+    CreateEventExpenseRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - title
+        - expenseDate
+        - amountMinor
+        - payerParticipantId
+        - splitPolicy
+      properties:
+        title:
+          type: string
+          nullable: true
+          maxLength: 120
+          description: Optional display title. Required when no event place is available.
+        expenseDate:
+          type: string
+          format: date
+        amountMinor:
+          type: integer
+          format: int64
+          minimum: 1
+        currency:
+          $ref: '#/components/schemas/SupportedCurrency'
+          description: Defaults to the event default currency when omitted.
+        expenseCategory:
+          $ref: '#/components/schemas/ExpenseCategory'
+          description: Defaults to etc when omitted.
+        expenseKind:
+          $ref: '#/components/schemas/ExpenseKind'
+          description: Defaults to regular when omitted.
+        payerParticipantId:
+          type: string
+          description: Current event participant who paid the expense.
+        splitPolicy:
+          $ref: '#/components/schemas/ExpenseSplitPolicy'
+        participantIds:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+          description: Required only when splitPolicy is equal. Event participant IDs.
+        splits:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/ManualExpenseSplitInput'
+          description: Required only when splitPolicy is manual. Participant IDs are event participant IDs.
+        memo:
+          type: string
+          nullable: true
+          maxLength: 240
+        includeInSettlement:
+          type: boolean
+          description: Defaults to true for regular expenses and false for public-fund expenses.
+    UpdateEventExpenseRequest:
+      allOf:
+        - $ref: '#/components/schemas/CreateEventExpenseRequest'
+    CreateEventExpenseResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - expense
+      properties:
+        expense:
+          $ref: '#/components/schemas/EventExpense'
+    GetEventExpenseResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - expense
+      properties:
+        expense:
+          $ref: '#/components/schemas/EventExpense'
+    UpdateEventExpenseResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - expense
+      properties:
+        expense:
+          $ref: '#/components/schemas/EventExpense'
+    EventExpense:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - eventId
+        - title
+        - displayTitle
+        - expenseDate
+        - amountMinor
+        - currency
+        - expenseCategory
+        - expenseKind
+        - payer
+        - memo
+        - splitPolicy
+        - splits
+        - includeInSettlement
+        - receipt
+        - createdAt
+      properties:
+        id:
+          type: string
+        eventId:
+          type: string
+        title:
+          type: string
+          nullable: true
+          maxLength: 120
+        displayTitle:
+          type: string
+          minLength: 1
+        expenseDate:
+          type: string
+          format: date
+        amountMinor:
+          type: integer
+          format: int64
+          minimum: 1
+        currency:
+          $ref: '#/components/schemas/SupportedCurrency'
+        expenseCategory:
+          $ref: '#/components/schemas/ExpenseCategory'
+        expenseKind:
+          $ref: '#/components/schemas/ExpenseKind'
+        payer:
+          $ref: '#/components/schemas/ExpenseParticipantDisplay'
+        memo:
+          type: string
+          nullable: true
+          maxLength: 240
+        splitPolicy:
+          $ref: '#/components/schemas/ExpenseSplitPolicy'
+        splits:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExpenseSplit'
+        includeInSettlement:
+          type: boolean
+        receipt:
+          $ref: '#/components/schemas/ExpenseReceiptSummary'
+        createdAt:
+          type: string
+          format: date-time
+    GetEventSettlementResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - eventId
+        - defaultCurrency
+        - currencySummaries
+      properties:
+        eventId:
+          type: string
+        defaultCurrency:
+          $ref: '#/components/schemas/SupportedCurrency'
+        currencySummaries:
+          type: array
+          items:
+            $ref: '#/components/schemas/SettlementCurrencySummary'
     CreateTripRequest:
       type: object
       required:
@@ -7043,6 +7521,7 @@ components:
         - trip
         - trip_day
         - schedule_item
+        - event
     ExpenseDisplaySource:
       type: string
       enum:

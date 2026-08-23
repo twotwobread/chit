@@ -284,6 +284,12 @@ func listTripParticipantsResponseToOpenAPI(result trip.ListParticipantsResult) o
 	return openapi.ListTripParticipantsResponse{CurrentUserParticipantId: result.CurrentUserParticipantID, Participants: items}
 }
 
+func getEventSettlementResponseToOpenAPI(result trip.GetEventSettlementResult) openapi.GetEventSettlementResponse {
+	tripResult := trip.GetTripSettlementResult{TripID: result.EventID, DefaultCurrency: result.DefaultCurrency, CurrencySummaries: result.CurrencySummaries}
+	mapped := getTripSettlementResponseToOpenAPI(tripResult)
+	return openapi.GetEventSettlementResponse{EventId: result.EventID, DefaultCurrency: mapped.DefaultCurrency, CurrencySummaries: mapped.CurrencySummaries}
+}
+
 func getTripSettlementResponseToOpenAPI(result trip.GetTripSettlementResult) openapi.GetTripSettlementResponse {
 	summaries := make([]openapi.SettlementCurrencySummary, 0, len(result.CurrencySummaries))
 	for _, summary := range result.CurrencySummaries {
@@ -471,6 +477,26 @@ func createTripExpenseResponseToOpenAPI(result trip.CreateTripExpenseResult) ope
 	return openapi.CreateTripExpenseResponse{Expense: expenseToOpenAPI(result.Expense)}
 }
 
+func listEventExpensesResponseToOpenAPI(result trip.ListEventExpensesResult) openapi.ListEventExpensesResponse {
+	expenses := make([]openapi.EventExpense, 0, len(result.Expenses))
+	for _, expense := range result.Expenses {
+		expenses = append(expenses, eventExpenseToOpenAPI(expense))
+	}
+	return openapi.ListEventExpensesResponse{Expenses: expenses}
+}
+
+func getEventExpenseResponseToOpenAPI(result trip.GetExpenseResult) openapi.GetEventExpenseResponse {
+	return openapi.GetEventExpenseResponse{Expense: eventExpenseToOpenAPI(result.Expense)}
+}
+
+func createEventExpenseResponseToOpenAPI(result trip.CreateEventExpenseResult) openapi.CreateEventExpenseResponse {
+	return openapi.CreateEventExpenseResponse{Expense: eventExpenseToOpenAPI(result.Expense)}
+}
+
+func updateEventExpenseResponseToOpenAPI(result trip.UpdateExpenseResult) openapi.UpdateEventExpenseResponse {
+	return openapi.UpdateEventExpenseResponse{Expense: eventExpenseToOpenAPI(result.Expense)}
+}
+
 func listDayExpensesResponseToOpenAPI(result trip.ListDayExpensesResult) openapi.ListDayExpensesResponse {
 	expenses := make([]openapi.DayExpenseListItem, 0, len(result.Expenses))
 	for _, expense := range result.Expenses {
@@ -526,6 +552,14 @@ func dayExpenseListItemToOpenAPI(expense trip.DayExpenseListItem) openapi.DayExp
 		Receipt:             expenseReceiptSummaryToOpenAPI(expense.Receipt),
 		CreatedAt:           expense.CreatedAt.UTC(),
 	}
+}
+
+func eventExpenseToOpenAPI(expense trip.Expense) openapi.EventExpense {
+	splits := make([]openapi.ExpenseSplit, 0, len(expense.Splits))
+	for _, split := range expense.Splits {
+		splits = append(splits, openapi.ExpenseSplit{Participant: expenseParticipantDisplayToOpenAPI(split.Participant), AmountMinor: split.AmountMinor})
+	}
+	return openapi.EventExpense{Id: expense.ID, EventId: expense.EventID, ExpenseDate: dateToOpenAPI(expense.ExpenseDate), Title: expense.Title, DisplayTitle: expense.DisplayTitle, AmountMinor: expense.AmountMinor, Currency: openapi.SupportedCurrency(expense.Currency), ExpenseCategory: openapi.ExpenseCategory(expense.ExpenseCategory), ExpenseKind: openapi.ExpenseKind(expense.ExpenseKind), Payer: expenseParticipantDisplayToOpenAPI(expense.Payer), Memo: expense.Memo, SplitPolicy: openapi.ExpenseSplitPolicy(expense.SplitPolicy), Splits: splits, IncludeInSettlement: expense.IncludeInSettlement, Receipt: expenseReceiptSummaryToOpenAPI(expense.Receipt), CreatedAt: expense.CreatedAt.UTC()}
 }
 
 func expenseToOpenAPI(expense trip.Expense) openapi.Expense {

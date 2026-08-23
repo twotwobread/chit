@@ -33,6 +33,10 @@ export function eventPath(eventId: string): `/events/${string}` {
   return `/events/${eventId}`;
 }
 
+export function eventExpensesPath(eventId: string): `/events/${string}/expenses` {
+  return `/events/${eventId}/expenses`;
+}
+
 export function tripRootPath(tripId: string): `/trips/${string}` {
   return `/trips/${tripId}`;
 }

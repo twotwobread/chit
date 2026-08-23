@@ -1,11 +1,15 @@
 import {
   EventsService,
   MeetingsService,
+  type CreateEventExpenseRequest,
+  type CreateEventExpenseResponse,
   type CreateEventRequest,
   type CreateEventResponse,
   type CreateMeetingInviteResponse,
   type GetEventResponse,
+  type GetEventSettlementResponse,
   type GetMeetingResponse,
+  type ListEventExpensesResponse,
   type ListMeetingsResponse,
 } from '@i-um/api-contract';
 
@@ -37,4 +41,19 @@ export async function createEvent(request: CreateEventRequest): Promise<CreateEv
 
 export async function getEvent(eventId: string): Promise<GetEventResponse> {
   return runAuthenticatedRequest(() => EventsService.getEvent(eventId));
+}
+
+export async function listEventExpenses(eventId: string): Promise<ListEventExpensesResponse> {
+  return runAuthenticatedRequest(() => EventsService.listEventExpenses(eventId));
+}
+
+export async function createEventExpense(
+  eventId: string,
+  request: CreateEventExpenseRequest,
+): Promise<CreateEventExpenseResponse> {
+  return runAuthenticatedRequest(() => EventsService.createEventExpense(eventId, request));
+}
+
+export async function getEventSettlement(eventId: string): Promise<GetEventSettlementResponse> {
+  return runAuthenticatedRequest(() => EventsService.getEventSettlement(eventId));
 }

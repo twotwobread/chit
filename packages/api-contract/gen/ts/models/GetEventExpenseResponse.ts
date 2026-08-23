@@ -2,4 +2,7 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-export type ExpenseAnchorType = 'trip' | 'trip_day' | 'schedule_item' | 'event';
+import type { EventExpense } from './EventExpense';
+export type GetEventExpenseResponse = {
+    expense: EventExpense;
+};

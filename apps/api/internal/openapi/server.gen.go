@@ -81,6 +81,7 @@ const (
 
 // Defines values for ExpenseAnchorType.
 const (
+	ExpenseAnchorTypeEvent        ExpenseAnchorType = "event"
 	ExpenseAnchorTypeScheduleItem ExpenseAnchorType = "schedule_item"
 	ExpenseAnchorTypeTrip         ExpenseAnchorType = "trip"
 	ExpenseAnchorTypeTripDay      ExpenseAnchorType = "trip_day"
@@ -356,6 +357,41 @@ type AuthUser struct {
 	DisplayName string  `json:"displayName"`
 	Email       *string `json:"email"`
 	Id          string  `json:"id"`
+}
+
+// CreateEventExpenseRequest defines model for CreateEventExpenseRequest.
+type CreateEventExpenseRequest struct {
+	AmountMinor     int64              `json:"amountMinor"`
+	Currency        *SupportedCurrency `json:"currency,omitempty"`
+	ExpenseCategory *ExpenseCategory   `json:"expenseCategory,omitempty"`
+	ExpenseDate     openapi_types.Date `json:"expenseDate"`
+
+	// ExpenseKind Top-level expense kind. Personal spending is represented as a regular expense with payer and split target set to the current user.
+	ExpenseKind *ExpenseKind `json:"expenseKind,omitempty"`
+
+	// IncludeInSettlement Defaults to true for regular expenses and false for public-fund expenses.
+	IncludeInSettlement *bool   `json:"includeInSettlement,omitempty"`
+	Memo                *string `json:"memo"`
+
+	// ParticipantIds Required only when splitPolicy is equal. Event participant IDs.
+	ParticipantIds *[]string `json:"participantIds,omitempty"`
+
+	// PayerParticipantId Current event participant who paid the expense.
+	PayerParticipantId string `json:"payerParticipantId"`
+
+	// SplitPolicy Persisted split policy for current quick expenses.
+	SplitPolicy ExpenseSplitPolicy `json:"splitPolicy"`
+
+	// Splits Required only when splitPolicy is manual. Participant IDs are event participant IDs.
+	Splits *[]ManualExpenseSplitInput `json:"splits,omitempty"`
+
+	// Title Optional display title. Required when no event place is available.
+	Title *string `json:"title"`
+}
+
+// CreateEventExpenseResponse defines model for CreateEventExpenseResponse.
+type CreateEventExpenseResponse struct {
+	Expense EventExpense `json:"expense"`
 }
 
 // CreateEventRequest defines model for CreateEventRequest.
@@ -737,6 +773,30 @@ type Event struct {
 // EventCategory defines model for EventCategory.
 type EventCategory string
 
+// EventExpense defines model for EventExpense.
+type EventExpense struct {
+	AmountMinor     int64              `json:"amountMinor"`
+	CreatedAt       time.Time          `json:"createdAt"`
+	Currency        SupportedCurrency  `json:"currency"`
+	DisplayTitle    string             `json:"displayTitle"`
+	EventId         string             `json:"eventId"`
+	ExpenseCategory ExpenseCategory    `json:"expenseCategory"`
+	ExpenseDate     openapi_types.Date `json:"expenseDate"`
+
+	// ExpenseKind Top-level expense kind. Personal spending is represented as a regular expense with payer and split target set to the current user.
+	ExpenseKind         ExpenseKind               `json:"expenseKind"`
+	Id                  string                    `json:"id"`
+	IncludeInSettlement bool                      `json:"includeInSettlement"`
+	Memo                *string                   `json:"memo"`
+	Payer               ExpenseParticipantDisplay `json:"payer"`
+	Receipt             ExpenseReceiptSummary     `json:"receipt"`
+
+	// SplitPolicy Persisted split policy for current quick expenses.
+	SplitPolicy ExpenseSplitPolicy `json:"splitPolicy"`
+	Splits      []ExpenseSplit     `json:"splits"`
+	Title       *string            `json:"title"`
+}
+
 // EventMeetingChoice defines model for EventMeetingChoice.
 type EventMeetingChoice struct {
 	// MeetingId Required when mode is existing.
@@ -1001,11 +1061,23 @@ type GetDayScheduleItemsResponse struct {
 	ScheduleItems []ScheduleItem `json:"scheduleItems"`
 }
 
+// GetEventExpenseResponse defines model for GetEventExpenseResponse.
+type GetEventExpenseResponse struct {
+	Expense EventExpense `json:"expense"`
+}
+
 // GetEventResponse defines model for GetEventResponse.
 type GetEventResponse struct {
 	Event        Event              `json:"event"`
 	Meeting      Meeting            `json:"meeting"`
 	Participants []EventParticipant `json:"participants"`
+}
+
+// GetEventSettlementResponse defines model for GetEventSettlementResponse.
+type GetEventSettlementResponse struct {
+	CurrencySummaries []SettlementCurrencySummary `json:"currencySummaries"`
+	DefaultCurrency   SupportedCurrency           `json:"defaultCurrency"`
+	EventId           string                      `json:"eventId"`
 }
 
 // GetExpenseResponse defines model for GetExpenseResponse.
@@ -1114,6 +1186,11 @@ type LinkedIdentity struct {
 // ListDayExpensesResponse defines model for ListDayExpensesResponse.
 type ListDayExpensesResponse struct {
 	Expenses []DayExpenseListItem `json:"expenses"`
+}
+
+// ListEventExpensesResponse defines model for ListEventExpensesResponse.
+type ListEventExpensesResponse struct {
+	Expenses []EventExpense `json:"expenses"`
 }
 
 // ListMeetingsResponse defines model for ListMeetingsResponse.
@@ -1830,6 +1907,14 @@ type TripScheduleItemsDayListItem struct {
 	TripDayId     string         `json:"tripDayId"`
 }
 
+// UpdateEventExpenseRequest defines model for UpdateEventExpenseRequest.
+type UpdateEventExpenseRequest = CreateEventExpenseRequest
+
+// UpdateEventExpenseResponse defines model for UpdateEventExpenseResponse.
+type UpdateEventExpenseResponse struct {
+	Expense EventExpense `json:"expense"`
+}
+
 // UpdateExpenseRequest defines model for UpdateExpenseRequest.
 type UpdateExpenseRequest struct {
 	AmountMinor     int64              `json:"amountMinor"`
@@ -2044,6 +2129,12 @@ type RefreshTokenJSONRequestBody = RefreshTokenRequest
 // CreateEventJSONRequestBody defines body for CreateEvent for application/json ContentType.
 type CreateEventJSONRequestBody = CreateEventRequest
 
+// CreateEventExpenseJSONRequestBody defines body for CreateEventExpense for application/json ContentType.
+type CreateEventExpenseJSONRequestBody = CreateEventExpenseRequest
+
+// UpdateEventExpenseJSONRequestBody defines body for UpdateEventExpense for application/json ContentType.
+type UpdateEventExpenseJSONRequestBody = UpdateEventExpenseRequest
+
 // UpdateMeJSONRequestBody defines body for UpdateMe for application/json ContentType.
 type UpdateMeJSONRequestBody = UpdateMeRequest
 
@@ -2154,6 +2245,24 @@ type ServerInterface interface {
 	// Get event detail
 	// (GET /events/{eventId})
 	GetEvent(w http.ResponseWriter, r *http.Request, eventId string)
+	// List expenses for an event
+	// (GET /events/{eventId}/expenses)
+	ListEventExpenses(w http.ResponseWriter, r *http.Request, eventId string)
+	// Create an event expense
+	// (POST /events/{eventId}/expenses)
+	CreateEventExpense(w http.ResponseWriter, r *http.Request, eventId string)
+	// Delete an event expense
+	// (DELETE /events/{eventId}/expenses/{expenseId})
+	DeleteEventExpense(w http.ResponseWriter, r *http.Request, eventId string, expenseId string)
+	// Get an event expense
+	// (GET /events/{eventId}/expenses/{expenseId})
+	GetEventExpense(w http.ResponseWriter, r *http.Request, eventId string, expenseId string)
+	// Update an event expense
+	// (PUT /events/{eventId}/expenses/{expenseId})
+	UpdateEventExpense(w http.ResponseWriter, r *http.Request, eventId string, expenseId string)
+	// Get event settlement
+	// (GET /events/{eventId}/settlement)
+	GetEventSettlement(w http.ResponseWriter, r *http.Request, eventId string)
 	// Check API health
 	// (GET /health)
 	GetHealth(w http.ResponseWriter, r *http.Request)
@@ -2436,6 +2545,42 @@ func (_ Unimplemented) CreateEvent(w http.ResponseWriter, r *http.Request) {
 // Get event detail
 // (GET /events/{eventId})
 func (_ Unimplemented) GetEvent(w http.ResponseWriter, r *http.Request, eventId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// List expenses for an event
+// (GET /events/{eventId}/expenses)
+func (_ Unimplemented) ListEventExpenses(w http.ResponseWriter, r *http.Request, eventId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Create an event expense
+// (POST /events/{eventId}/expenses)
+func (_ Unimplemented) CreateEventExpense(w http.ResponseWriter, r *http.Request, eventId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Delete an event expense
+// (DELETE /events/{eventId}/expenses/{expenseId})
+func (_ Unimplemented) DeleteEventExpense(w http.ResponseWriter, r *http.Request, eventId string, expenseId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Get an event expense
+// (GET /events/{eventId}/expenses/{expenseId})
+func (_ Unimplemented) GetEventExpense(w http.ResponseWriter, r *http.Request, eventId string, expenseId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Update an event expense
+// (PUT /events/{eventId}/expenses/{expenseId})
+func (_ Unimplemented) UpdateEventExpense(w http.ResponseWriter, r *http.Request, eventId string, expenseId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Get event settlement
+// (GET /events/{eventId}/settlement)
+func (_ Unimplemented) GetEventSettlement(w http.ResponseWriter, r *http.Request, eventId string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -3088,6 +3233,219 @@ func (siw *ServerInterfaceWrapper) GetEvent(w http.ResponseWriter, r *http.Reque
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetEvent(w, r, eventId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListEventExpenses operation middleware
+func (siw *ServerInterfaceWrapper) ListEventExpenses(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "eventId" -------------
+	var eventId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "eventId", chi.URLParam(r, "eventId"), &eventId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "eventId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListEventExpenses(w, r, eventId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateEventExpense operation middleware
+func (siw *ServerInterfaceWrapper) CreateEventExpense(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "eventId" -------------
+	var eventId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "eventId", chi.URLParam(r, "eventId"), &eventId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "eventId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateEventExpense(w, r, eventId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteEventExpense operation middleware
+func (siw *ServerInterfaceWrapper) DeleteEventExpense(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "eventId" -------------
+	var eventId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "eventId", chi.URLParam(r, "eventId"), &eventId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "eventId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "expenseId" -------------
+	var expenseId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "expenseId", chi.URLParam(r, "expenseId"), &expenseId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "expenseId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteEventExpense(w, r, eventId, expenseId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetEventExpense operation middleware
+func (siw *ServerInterfaceWrapper) GetEventExpense(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "eventId" -------------
+	var eventId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "eventId", chi.URLParam(r, "eventId"), &eventId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "eventId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "expenseId" -------------
+	var expenseId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "expenseId", chi.URLParam(r, "expenseId"), &expenseId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "expenseId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetEventExpense(w, r, eventId, expenseId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateEventExpense operation middleware
+func (siw *ServerInterfaceWrapper) UpdateEventExpense(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "eventId" -------------
+	var eventId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "eventId", chi.URLParam(r, "eventId"), &eventId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "eventId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "expenseId" -------------
+	var expenseId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "expenseId", chi.URLParam(r, "expenseId"), &expenseId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "expenseId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateEventExpense(w, r, eventId, expenseId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetEventSettlement operation middleware
+func (siw *ServerInterfaceWrapper) GetEventSettlement(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "eventId" -------------
+	var eventId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "eventId", chi.URLParam(r, "eventId"), &eventId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "eventId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetEventSettlement(w, r, eventId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -6046,6 +6404,24 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/events/{eventId}", wrapper.GetEvent)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/events/{eventId}/expenses", wrapper.ListEventExpenses)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/events/{eventId}/expenses", wrapper.CreateEventExpense)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/events/{eventId}/expenses/{expenseId}", wrapper.DeleteEventExpense)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/events/{eventId}/expenses/{expenseId}", wrapper.GetEventExpense)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/events/{eventId}/expenses/{expenseId}", wrapper.UpdateEventExpense)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/events/{eventId}/settlement", wrapper.GetEventSettlement)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/health", wrapper.GetHealth)
