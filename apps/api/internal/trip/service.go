@@ -1133,6 +1133,177 @@ func (s *Service) CreateTripExpense(ctx context.Context, userID string, tripID s
 	})
 }
 
+func (s *Service) ListEventExpenses(ctx context.Context, userID string, eventID string) (ListEventExpensesResult, error) {
+	context, err := s.authorizedEventLedger(ctx, userID, eventID)
+	if err != nil {
+		return ListEventExpensesResult{}, err
+	}
+	return s.repo.ListEventExpenses(ctx, context.EventID)
+}
+
+func (s *Service) GetEventExpense(ctx context.Context, userID string, eventID string, expenseID string) (GetExpenseResult, error) {
+	context, err := s.authorizedEventLedger(ctx, userID, eventID)
+	if err != nil {
+		return GetExpenseResult{}, err
+	}
+	expenseID = strings.TrimSpace(expenseID)
+	if !isUUID(expenseID) {
+		return GetExpenseResult{}, ErrValidation
+	}
+	expense, ok, err := s.repo.GetEventExpenseByID(ctx, context.EventID, expenseID)
+	if err != nil {
+		return GetExpenseResult{}, err
+	}
+	if !ok {
+		return GetExpenseResult{}, ErrNotFound
+	}
+	return GetExpenseResult{Expense: expense}, nil
+}
+
+func (s *Service) CreateEventExpense(ctx context.Context, userID string, eventID string, input CreateEventExpenseInput) (CreateEventExpenseResult, error) {
+	context, err := s.authorizedEventLedger(ctx, userID, eventID)
+	if err != nil {
+		return CreateEventExpenseResult{}, err
+	}
+	record, err := s.eventExpenseRecordFromInput(context, userID, "", input)
+	if err != nil {
+		return CreateEventExpenseResult{}, err
+	}
+	return s.repo.CreateEventExpense(ctx, record)
+}
+
+func (s *Service) UpdateEventExpense(ctx context.Context, userID string, eventID string, expenseID string, input UpdateEventExpenseInput) (UpdateExpenseResult, error) {
+	context, err := s.authorizedEventLedger(ctx, userID, eventID)
+	if err != nil {
+		return UpdateExpenseResult{}, err
+	}
+	expenseID = strings.TrimSpace(expenseID)
+	if !isUUID(expenseID) {
+		return UpdateExpenseResult{}, ErrValidation
+	}
+	record, err := s.eventExpenseRecordFromInput(context, userID, expenseID, CreateEventExpenseInput(input))
+	if err != nil {
+		return UpdateExpenseResult{}, err
+	}
+	expense, err := s.repo.UpdateEventExpense(ctx, record)
+	if err != nil {
+		return UpdateExpenseResult{}, err
+	}
+	return UpdateExpenseResult{Expense: expense}, nil
+}
+
+func (s *Service) DeleteEventExpense(ctx context.Context, userID string, eventID string, expenseID string) error {
+	context, err := s.authorizedEventLedger(ctx, userID, eventID)
+	if err != nil {
+		return err
+	}
+	expenseID = strings.TrimSpace(expenseID)
+	if !isUUID(expenseID) {
+		return ErrValidation
+	}
+	deleted, err := s.repo.DeleteEventExpenseByID(ctx, context.EventID, expenseID)
+	if err != nil {
+		return err
+	}
+	if !deleted {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (s *Service) GetEventSettlement(ctx context.Context, userID string, eventID string) (GetEventSettlementResult, error) {
+	context, err := s.authorizedEventLedger(ctx, userID, eventID)
+	if err != nil {
+		return GetEventSettlementResult{}, err
+	}
+	input, err := s.repo.GetEventSettlementInput(ctx, context.EventID)
+	if err != nil {
+		return GetEventSettlementResult{}, err
+	}
+	tripResult, err := BuildTripSettlement(context.EventID, context.DefaultCurrency, input)
+	if err != nil {
+		return GetEventSettlementResult{}, err
+	}
+	return GetEventSettlementResult{EventID: context.EventID, DefaultCurrency: context.DefaultCurrency, CurrencySummaries: tripResult.CurrencySummaries}, nil
+}
+
+func (s *Service) authorizedEventLedger(ctx context.Context, userID string, eventID string) (EventLedgerContext, error) {
+	if strings.TrimSpace(userID) == "" {
+		return EventLedgerContext{}, ErrUnauthorized
+	}
+	eventID = strings.TrimSpace(eventID)
+	if !isUUID(eventID) {
+		return EventLedgerContext{}, ErrValidation
+	}
+	context, ok, err := s.repo.GetExpenseEventForParticipant(ctx, eventID, userID)
+	if err != nil {
+		return EventLedgerContext{}, err
+	}
+	if !ok {
+		return EventLedgerContext{}, ErrNotFound
+	}
+	return context, nil
+}
+
+func (s *Service) eventExpenseRecordFromInput(context EventLedgerContext, userID string, expenseID string, input CreateEventExpenseInput) (EventExpenseRecord, error) {
+	payerParticipantID := strings.TrimSpace(input.PayerParticipantID)
+	if !isUUID(payerParticipantID) || input.AmountMinor < 1 {
+		return EventExpenseRecord{}, ErrValidation
+	}
+	expenseDate, err := parseDate(input.ExpenseDate)
+	if err != nil {
+		return EventExpenseRecord{}, ErrValidation
+	}
+	title, err := normalizeExpenseTitle(input.Title, true)
+	if err != nil {
+		return EventExpenseRecord{}, err
+	}
+	memo, err := normalizeExpenseMemo(input.Memo)
+	if err != nil {
+		return EventExpenseRecord{}, err
+	}
+	splitPolicy, participantIDs, manualSplits, err := normalizeExpenseSplitInput(input.SplitPolicy, input.ParticipantIDs, input.ManualSplits, input.AmountMinor)
+	if err != nil {
+		return EventExpenseRecord{}, err
+	}
+	currency, err := normalizeOptionalExpenseCurrency(input.Currency)
+	if err != nil {
+		return EventExpenseRecord{}, err
+	}
+	if currency == nil {
+		currency = &context.DefaultCurrency
+	}
+	expenseCategory, err := normalizeOptionalExpenseCategory(input.ExpenseCategory)
+	if err != nil {
+		return EventExpenseRecord{}, err
+	}
+	if expenseCategory == nil {
+		category := ExpenseCategoryEtc
+		expenseCategory = &category
+	}
+	expenseKind, err := normalizeExpenseKind(input.ExpenseKind)
+	if err != nil {
+		return EventExpenseRecord{}, err
+	}
+	return EventExpenseRecord{
+		EventID:             context.EventID,
+		ExpenseID:           strings.TrimSpace(expenseID),
+		Title:               title,
+		ExpenseDate:         expenseDate,
+		AmountMinor:         input.AmountMinor,
+		Currency:            currency,
+		ExpenseCategory:     expenseCategory,
+		ExpenseKind:         expenseKind,
+		PayerParticipantID:  payerParticipantID,
+		SplitPolicy:         splitPolicy,
+		ParticipantIDs:      participantIDs,
+		ManualSplits:        manualSplits,
+		Memo:                memo,
+		IncludeInSettlement: includeInSettlementDefaultForKind(input.IncludeInSettlement, expenseKind),
+		CreatedBy:           userID,
+	}, nil
+}
+
 func includeInSettlementDefaultTrue(value *bool) bool {
 	return value == nil || *value
 }

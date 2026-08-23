@@ -1242,6 +1242,138 @@ func TestCreateEventWithExistingMeetingRequiresMembershipAndGetEventRequiresPart
 	}
 }
 
+func TestEventExpenseHandlersAndSettlement(t *testing.T) {
+	backend := newFakeAuthBackend()
+	session := loginTestUserSession(t, backend, "event-ledger-owner", "민수")
+
+	createEventRecorder := httptest.NewRecorder()
+	createEventRequest := httptest.NewRequest(http.MethodPost, "/events", bytes.NewReader([]byte(`{
+		"title":"성수 저녁",
+		"startDate":"2026-09-01",
+		"endDate":"2026-09-01",
+		"eventType":"outing",
+		"defaultCurrency":"KRW",
+		"meeting":{"mode":"one_off"}
+	}`)))
+	createEventRequest.Header.Set("Content-Type", "application/json")
+	createEventRequest.Header.Set("Authorization", "Bearer "+session.AccessToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(createEventRecorder, createEventRequest)
+	if createEventRecorder.Code != http.StatusCreated {
+		t.Fatalf("expected create event status %d, got %d with body %s", http.StatusCreated, createEventRecorder.Code, createEventRecorder.Body.String())
+	}
+	var eventBody struct {
+		Event struct {
+			ID string `json:"id"`
+		} `json:"event"`
+		OwnerParticipant struct {
+			ID string `json:"id"`
+		} `json:"ownerParticipant"`
+	}
+	if err := json.NewDecoder(createEventRecorder.Body).Decode(&eventBody); err != nil {
+		t.Fatalf("decode create event response: %v", err)
+	}
+
+	createExpenseRecorder := httptest.NewRecorder()
+	createExpenseRequest := httptest.NewRequest(http.MethodPost, "/events/"+eventBody.Event.ID+"/expenses", bytes.NewReader([]byte(fmt.Sprintf(`{
+		"title":"저녁 식사",
+		"expenseDate":"2026-09-01",
+		"amountMinor":42000,
+		"currency":"KRW",
+		"expenseCategory":"food",
+		"payerParticipantId":%q,
+		"splitPolicy":"equal",
+		"participantIds":[%q],
+		"memo":"성수",
+		"includeInSettlement":true
+	}`, eventBody.OwnerParticipant.ID, eventBody.OwnerParticipant.ID))))
+	createExpenseRequest.Header.Set("Content-Type", "application/json")
+	createExpenseRequest.Header.Set("Authorization", "Bearer "+session.AccessToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(createExpenseRecorder, createExpenseRequest)
+	if createExpenseRecorder.Code != http.StatusCreated {
+		t.Fatalf("expected create event expense status %d, got %d with body %s", http.StatusCreated, createExpenseRecorder.Code, createExpenseRecorder.Body.String())
+	}
+	var expenseBody struct {
+		Expense struct {
+			ID           string `json:"id"`
+			EventID      string `json:"eventId"`
+			DisplayTitle string `json:"displayTitle"`
+			AmountMinor  int64  `json:"amountMinor"`
+		} `json:"expense"`
+	}
+	if err := json.NewDecoder(createExpenseRecorder.Body).Decode(&expenseBody); err != nil {
+		t.Fatalf("decode create expense response: %v", err)
+	}
+	if expenseBody.Expense.EventID != eventBody.Event.ID || expenseBody.Expense.DisplayTitle != "저녁 식사" || expenseBody.Expense.AmountMinor != 42000 {
+		t.Fatalf("unexpected event expense body: %#v", expenseBody.Expense)
+	}
+
+	listRecorder := httptest.NewRecorder()
+	listRequest := httptest.NewRequest(http.MethodGet, "/events/"+eventBody.Event.ID+"/expenses", nil)
+	listRequest.Header.Set("Authorization", "Bearer "+session.AccessToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(listRecorder, listRequest)
+	if listRecorder.Code != http.StatusOK {
+		t.Fatalf("expected list event expenses status %d, got %d with body %s", http.StatusOK, listRecorder.Code, listRecorder.Body.String())
+	}
+	var listBody struct {
+		Expenses []struct {
+			ID      string `json:"id"`
+			EventID string `json:"eventId"`
+		} `json:"expenses"`
+	}
+	if err := json.NewDecoder(listRecorder.Body).Decode(&listBody); err != nil {
+		t.Fatalf("decode list event expenses response: %v", err)
+	}
+	if len(listBody.Expenses) != 1 || listBody.Expenses[0].ID != expenseBody.Expense.ID || listBody.Expenses[0].EventID != eventBody.Event.ID {
+		t.Fatalf("unexpected event expense list: %#v", listBody.Expenses)
+	}
+
+	settlementRecorder := httptest.NewRecorder()
+	settlementRequest := httptest.NewRequest(http.MethodGet, "/events/"+eventBody.Event.ID+"/settlement", nil)
+	settlementRequest.Header.Set("Authorization", "Bearer "+session.AccessToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(settlementRecorder, settlementRequest)
+	if settlementRecorder.Code != http.StatusOK {
+		t.Fatalf("expected event settlement status %d, got %d with body %s", http.StatusOK, settlementRecorder.Code, settlementRecorder.Body.String())
+	}
+	var settlementBody struct {
+		EventID           string `json:"eventId"`
+		DefaultCurrency   string `json:"defaultCurrency"`
+		CurrencySummaries []struct {
+			TotalPaidMinor int64 `json:"totalPaidMinor"`
+		} `json:"currencySummaries"`
+	}
+	if err := json.NewDecoder(settlementRecorder.Body).Decode(&settlementBody); err != nil {
+		t.Fatalf("decode event settlement response: %v", err)
+	}
+	if settlementBody.EventID != eventBody.Event.ID || settlementBody.DefaultCurrency != "KRW" || len(settlementBody.CurrencySummaries) != 1 || settlementBody.CurrencySummaries[0].TotalPaidMinor != 42000 {
+		t.Fatalf("unexpected event settlement body: %#v", settlementBody)
+	}
+
+	updateRecorder := httptest.NewRecorder()
+	updateRequest := httptest.NewRequest(http.MethodPut, "/events/"+eventBody.Event.ID+"/expenses/"+expenseBody.Expense.ID, bytes.NewReader([]byte(fmt.Sprintf(`{
+		"title":"카페",
+		"expenseDate":"2026-09-01",
+		"amountMinor":18000,
+		"currency":"KRW",
+		"payerParticipantId":%q,
+		"splitPolicy":"equal",
+		"participantIds":[%q]
+	}`, eventBody.OwnerParticipant.ID, eventBody.OwnerParticipant.ID))))
+	updateRequest.Header.Set("Content-Type", "application/json")
+	updateRequest.Header.Set("Authorization", "Bearer "+session.AccessToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(updateRecorder, updateRequest)
+	if updateRecorder.Code != http.StatusOK {
+		t.Fatalf("expected update event expense status %d, got %d with body %s", http.StatusOK, updateRecorder.Code, updateRecorder.Body.String())
+	}
+
+	deleteRecorder := httptest.NewRecorder()
+	deleteRequest := httptest.NewRequest(http.MethodDelete, "/events/"+eventBody.Event.ID+"/expenses/"+expenseBody.Expense.ID, nil)
+	deleteRequest.Header.Set("Authorization", "Bearer "+session.AccessToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(deleteRecorder, deleteRequest)
+	if deleteRecorder.Code != http.StatusNoContent {
+		t.Fatalf("expected delete event expense status %d, got %d with body %s", http.StatusNoContent, deleteRecorder.Code, deleteRecorder.Body.String())
+	}
+}
+
 func TestMeetingInviteLifecycleAndMemberManagementHandlers(t *testing.T) {
 	backend := newFakeAuthBackend()
 	owner := loginTestUserSession(t, backend, "meeting-invite-owner", "민수")
@@ -6083,6 +6215,7 @@ type fakeAuthBackend struct {
 	meetingInvites    map[string]meetingdomain.MeetingInvite
 	events            map[string]meetingdomain.Event
 	eventParticipants map[string][]meetingdomain.EventParticipant
+	eventExpenses     map[string][]tripdomain.Expense
 	reorderErr        error
 	reorderRecord     tripdomain.ReorderScheduleItemsRecord
 	moveErr           error
@@ -6354,6 +6487,7 @@ func newFakeAuthBackend() *fakeAuthBackend {
 		meetingInvites:    map[string]meetingdomain.MeetingInvite{},
 		events:            map[string]meetingdomain.Event{},
 		eventParticipants: map[string][]meetingdomain.EventParticipant{},
+		eventExpenses:     map[string][]tripdomain.Expense{},
 	}
 }
 
@@ -7569,6 +7703,146 @@ func fakeExpenseCategory(value *string, fallback string) string {
 		return strings.TrimSpace(fallback)
 	}
 	return tripdomain.ExpenseCategoryEtc
+}
+
+func (b *fakeAuthBackend) GetExpenseEventForParticipant(_ context.Context, eventID string, userID string) (tripdomain.EventLedgerContext, bool, error) {
+	event, ok := b.events[eventID]
+	if !ok {
+		return tripdomain.EventLedgerContext{}, false, nil
+	}
+	for _, participant := range b.eventParticipants[eventID] {
+		if participant.UserID == userID {
+			return tripdomain.EventLedgerContext{EventID: event.ID, DefaultCurrency: event.DefaultCurrency, EventType: event.EventType, Status: event.Status, CurrentParticipantID: participant.ID}, true, nil
+		}
+	}
+	return tripdomain.EventLedgerContext{}, false, nil
+}
+
+func (b *fakeAuthBackend) ListEventExpenses(_ context.Context, eventID string) (tripdomain.ListEventExpensesResult, error) {
+	expenses := append([]tripdomain.Expense(nil), b.eventExpenses[eventID]...)
+	sort.SliceStable(expenses, func(left, right int) bool {
+		if expenses[left].CreatedAt.Equal(expenses[right].CreatedAt) {
+			return expenses[left].ID > expenses[right].ID
+		}
+		return expenses[left].CreatedAt.After(expenses[right].CreatedAt)
+	})
+	return tripdomain.ListEventExpensesResult{Expenses: expenses}, nil
+}
+
+func (b *fakeAuthBackend) GetEventSettlementInput(_ context.Context, eventID string) (tripdomain.SettlementInput, error) {
+	participants := make([]tripdomain.SettlementParticipantInput, 0, len(b.eventParticipants[eventID]))
+	for _, participant := range b.eventParticipants[eventID] {
+		participants = append(participants, tripdomain.SettlementParticipantInput{ParticipantID: participant.ID, DisplayName: participant.DisplayName, JoinedAt: participant.JoinedAt})
+	}
+	expenses := make([]tripdomain.SettlementExpenseInput, 0, len(b.eventExpenses[eventID]))
+	for _, expense := range b.eventExpenses[eventID] {
+		if !expense.IncludeInSettlement {
+			continue
+		}
+		splits := make([]tripdomain.SettlementSplitInput, 0, len(expense.Splits))
+		for index, split := range expense.Splits {
+			splits = append(splits, tripdomain.SettlementSplitInput{ParticipantID: copyStringPtr(split.Participant.ParticipantID), DisplayName: split.Participant.DisplayName, ParticipantLive: split.Participant.ParticipantID != nil, AmountMinor: split.AmountMinor, SplitOrder: index + 1})
+		}
+		expenses = append(expenses, tripdomain.SettlementExpenseInput{ExpenseID: expense.ID, Currency: expense.Currency, AmountMinor: expense.AmountMinor, PayerParticipantID: copyStringPtr(expense.Payer.ParticipantID), PayerDisplayName: expense.Payer.DisplayName, PayerParticipantLive: expense.Payer.ParticipantID != nil, Splits: splits})
+	}
+	return tripdomain.SettlementInput{Participants: participants, Expenses: expenses}, nil
+}
+
+func (b *fakeAuthBackend) GetEventExpenseByID(_ context.Context, eventID string, expenseID string) (tripdomain.Expense, bool, error) {
+	for _, expense := range b.eventExpenses[eventID] {
+		if expense.ID == expenseID {
+			return expense, true, nil
+		}
+	}
+	return tripdomain.Expense{}, false, nil
+}
+
+func (b *fakeAuthBackend) CreateEventExpense(_ context.Context, record tripdomain.EventExpenseRecord) (tripdomain.CreateEventExpenseResult, error) {
+	event, ok := b.events[record.EventID]
+	if !ok {
+		return tripdomain.CreateEventExpenseResult{}, tripdomain.ErrNotFound
+	}
+	payer, participantInputs, ok := b.eventExpensePayerAndParticipants(record.EventID, record.PayerParticipantID)
+	if !ok {
+		return tripdomain.CreateEventExpenseResult{}, tripdomain.ErrNotFound
+	}
+	splitRecords, err := tripdomain.BuildExpenseSplitRecords(record.AmountMinor, record.SplitPolicy, participantInputs, record.ParticipantIDs, record.ManualSplits)
+	if err != nil {
+		return tripdomain.CreateEventExpenseResult{}, err
+	}
+	b.nextExpense++
+	expenseID := testUUID(9000 + b.nextExpense)
+	expense := b.eventExpenseFromRecord(event, expenseID, record, payer, splitRecords, time.Date(2026, 7, 10, 12, b.nextExpense, 0, 0, time.UTC))
+	b.eventExpenses[record.EventID] = append(b.eventExpenses[record.EventID], expense)
+	return tripdomain.CreateEventExpenseResult{Expense: expense}, nil
+}
+
+func (b *fakeAuthBackend) UpdateEventExpense(_ context.Context, record tripdomain.EventExpenseRecord) (tripdomain.Expense, error) {
+	event, ok := b.events[record.EventID]
+	if !ok {
+		return tripdomain.Expense{}, tripdomain.ErrNotFound
+	}
+	expenseIndex := -1
+	for index, expense := range b.eventExpenses[record.EventID] {
+		if expense.ID == record.ExpenseID {
+			expenseIndex = index
+			break
+		}
+	}
+	if expenseIndex < 0 {
+		return tripdomain.Expense{}, tripdomain.ErrNotFound
+	}
+	payer, participantInputs, ok := b.eventExpensePayerAndParticipants(record.EventID, record.PayerParticipantID)
+	if !ok {
+		return tripdomain.Expense{}, tripdomain.ErrNotFound
+	}
+	splitRecords, err := tripdomain.BuildExpenseSplitRecords(record.AmountMinor, record.SplitPolicy, participantInputs, record.ParticipantIDs, record.ManualSplits)
+	if err != nil {
+		return tripdomain.Expense{}, err
+	}
+	existing := b.eventExpenses[record.EventID][expenseIndex]
+	expense := b.eventExpenseFromRecord(event, record.ExpenseID, record, payer, splitRecords, existing.CreatedAt)
+	b.eventExpenses[record.EventID][expenseIndex] = expense
+	return expense, nil
+}
+
+func (b *fakeAuthBackend) DeleteEventExpenseByID(_ context.Context, eventID string, expenseID string) (bool, error) {
+	expenseIndex := -1
+	for index, expense := range b.eventExpenses[eventID] {
+		if expense.ID == expenseID {
+			expenseIndex = index
+			break
+		}
+	}
+	if expenseIndex < 0 {
+		return false, nil
+	}
+	b.eventExpenses[eventID] = append(b.eventExpenses[eventID][:expenseIndex], b.eventExpenses[eventID][expenseIndex+1:]...)
+	return true, nil
+}
+
+func (b *fakeAuthBackend) eventExpensePayerAndParticipants(eventID string, payerID string) (meetingdomain.EventParticipant, []tripdomain.ExpenseSplitParticipant, bool) {
+	participants := b.eventParticipants[eventID]
+	inputs := make([]tripdomain.ExpenseSplitParticipant, 0, len(participants))
+	var payer meetingdomain.EventParticipant
+	for _, participant := range participants {
+		if participant.ID == payerID {
+			payer = participant
+		}
+		inputs = append(inputs, tripdomain.ExpenseSplitParticipant{ParticipantID: participant.ID, UserID: participant.UserID, DisplayName: participant.DisplayName, JoinedAt: participant.JoinedAt})
+	}
+	return payer, inputs, payer.ID != ""
+}
+
+func (b *fakeAuthBackend) eventExpenseFromRecord(event meetingdomain.Event, expenseID string, record tripdomain.EventExpenseRecord, payer meetingdomain.EventParticipant, splitRecords []tripdomain.CreateExpenseSplitRecord, createdAt time.Time) tripdomain.Expense {
+	payerID := payer.ID
+	payerDisplay := tripdomain.ExpenseParticipantDisplay{ParticipantID: &payerID, DisplayName: tripdomain.NormalizeParticipantDisplayName(payer.DisplayName), Source: tripdomain.ExpenseDisplaySourceLive}
+	splits := make([]tripdomain.ExpenseSplit, 0, len(splitRecords))
+	for _, splitRecord := range splitRecords {
+		participantID := splitRecord.ParticipantID
+		splits = append(splits, tripdomain.ExpenseSplit{Participant: tripdomain.ExpenseParticipantDisplay{ParticipantID: &participantID, DisplayName: splitRecord.ParticipantDisplayName, Source: tripdomain.ExpenseDisplaySourceLive}, AmountMinor: splitRecord.AmountMinor})
+	}
+	return tripdomain.Expense{ID: expenseID, EventID: event.ID, AnchorType: "event", ExpenseDate: record.ExpenseDate.Format("2006-01-02"), Title: record.Title, DisplayTitle: firstNonEmptyStringPtr(record.Title, "지출"), AmountMinor: record.AmountMinor, Currency: fakeExpenseCurrency(record.Currency, event.DefaultCurrency), ExpenseCategory: fakeExpenseCategory(record.ExpenseCategory, tripdomain.ExpenseCategoryEtc), ExpenseKind: record.ExpenseKind, Payer: payerDisplay, Memo: record.Memo, SplitPolicy: record.SplitPolicy, Splits: splits, IncludeInSettlement: record.IncludeInSettlement, CreatedAt: createdAt}
 }
 
 func (b *fakeAuthBackend) GetExpenseByTripDayAndID(_ context.Context, tripID string, tripDayID string, expenseID string) (tripdomain.Expense, bool, error) {

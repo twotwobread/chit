@@ -139,6 +139,23 @@ type CreateTripExpenseInput struct {
 	ReceiptDraftID      *string
 }
 
+type CreateEventExpenseInput struct {
+	Title               *string
+	ExpenseDate         string
+	AmountMinor         int64
+	Currency            *string
+	ExpenseCategory     *string
+	ExpenseKind         string
+	PayerParticipantID  string
+	SplitPolicy         string
+	ParticipantIDs      []string
+	ManualSplits        []ManualExpenseSplitInput
+	Memo                *string
+	IncludeInSettlement *bool
+}
+
+type UpdateEventExpenseInput = CreateEventExpenseInput
+
 type UpdateExpenseInput struct {
 	AmountMinor         int64
 	Currency            *string
@@ -359,6 +376,24 @@ type CreateTripExpenseRecord struct {
 	CreatedBy           string
 }
 
+type EventExpenseRecord struct {
+	EventID             string
+	ExpenseID           string
+	Title               *string
+	ExpenseDate         time.Time
+	AmountMinor         int64
+	Currency            *string
+	ExpenseCategory     *string
+	ExpenseKind         string
+	PayerParticipantID  string
+	SplitPolicy         string
+	ParticipantIDs      []string
+	ManualSplits        []ManualExpenseSplitInput
+	Memo                *string
+	IncludeInSettlement bool
+	CreatedBy           string
+}
+
 type UpdateExpenseRecord struct {
 	TripID              string
 	TripDayID           string
@@ -465,6 +500,14 @@ type TripEventContext struct {
 	MeetingID         string
 	MeetingName       string
 	MeetingVisibility string
+}
+
+type EventLedgerContext struct {
+	EventID              string
+	DefaultCurrency      string
+	EventType            string
+	Status               string
+	CurrentParticipantID string
 }
 
 type TripDestination struct {
@@ -859,6 +902,7 @@ type ExpenseSplit struct {
 type Expense struct {
 	ID                  string
 	TripID              string
+	EventID             string
 	AnchorType          string
 	TripDayID           *string
 	ScheduleItemID      *string
@@ -894,6 +938,20 @@ type CreateQuickExpenseResult struct {
 
 type CreateTripExpenseResult struct {
 	Expense Expense
+}
+
+type CreateEventExpenseResult struct {
+	Expense Expense
+}
+
+type ListEventExpensesResult struct {
+	Expenses []Expense
+}
+
+type GetEventSettlementResult struct {
+	EventID           string
+	DefaultCurrency   string
+	CurrencySummaries []SettlementCurrencySummary
 }
 
 type DayExpenseSplitListItem struct {
@@ -1087,6 +1145,13 @@ type Repository interface {
 	ListDayExpensesByTripDay(ctx context.Context, tripID string, tripDayID string) ([]DayExpenseListItem, error)
 	ListTripExpenses(ctx context.Context, tripID string, searchQuery string) (ListTripExpensesResult, error)
 	GetTripSettlementInput(ctx context.Context, tripID string) (SettlementInput, error)
+	GetExpenseEventForParticipant(ctx context.Context, eventID string, userID string) (EventLedgerContext, bool, error)
+	ListEventExpenses(ctx context.Context, eventID string) (ListEventExpensesResult, error)
+	GetEventSettlementInput(ctx context.Context, eventID string) (SettlementInput, error)
+	GetEventExpenseByID(ctx context.Context, eventID string, expenseID string) (Expense, bool, error)
+	CreateEventExpense(ctx context.Context, record EventExpenseRecord) (CreateEventExpenseResult, error)
+	UpdateEventExpense(ctx context.Context, record EventExpenseRecord) (Expense, error)
+	DeleteEventExpenseByID(ctx context.Context, eventID string, expenseID string) (bool, error)
 	GetExpenseByTripDayAndID(ctx context.Context, tripID string, tripDayID string, expenseID string) (Expense, bool, error)
 	GetTripExpenseByID(ctx context.Context, tripID string, expenseID string) (Expense, bool, error)
 	UpdateExpense(ctx context.Context, record UpdateExpenseRecord) (Expense, error)

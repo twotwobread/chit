@@ -82,6 +82,26 @@ func (q *Queries) ClearExpenseReceipt(ctx context.Context, arg ClearExpenseRecei
 	return items, nil
 }
 
+const deleteEventExpenseByID = `-- name: DeleteEventExpenseByID :one
+DELETE FROM expenses
+WHERE event_id = $1::uuid
+  AND id = $2::uuid
+  AND anchor_type = 'event'
+RETURNING id::text
+`
+
+type DeleteEventExpenseByIDParams struct {
+	EventID   pgtype.UUID
+	ExpenseID pgtype.UUID
+}
+
+func (q *Queries) DeleteEventExpenseByID(ctx context.Context, arg DeleteEventExpenseByIDParams) (string, error) {
+	row := q.db.QueryRow(ctx, deleteEventExpenseByID, arg.EventID, arg.ExpenseID)
+	var id string
+	err := row.Scan(&id)
+	return id, err
+}
+
 const deleteExpenseByTripDayAndID = `-- name: DeleteExpenseByTripDayAndID :one
 DELETE FROM expenses
 WHERE trip_id = $1::uuid
@@ -111,6 +131,15 @@ WHERE expense_id = $1::uuid
 
 func (q *Queries) DeleteExpenseSplitsByExpenseID(ctx context.Context, expenseID pgtype.UUID) error {
 	_, err := q.db.Exec(ctx, deleteExpenseSplitsByExpenseID, expenseID)
+	return err
+}
+
+const deleteSplitsByExpenseID = `-- name: DeleteSplitsByExpenseID :exec
+DELETE FROM expense_splits WHERE expense_id = $1::uuid
+`
+
+func (q *Queries) DeleteSplitsByExpenseID(ctx context.Context, expenseID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteSplitsByExpenseID, expenseID)
 	return err
 }
 
@@ -235,6 +264,93 @@ func (q *Queries) ExpireExpenseReceiptDrafts(ctx context.Context, limitCount int
 		return nil, err
 	}
 	return items, nil
+}
+
+const getEventExpenseByID = `-- name: GetEventExpenseByID :one
+SELECT
+  e.id::text AS id,
+  e.event_id::text AS event_id,
+  e.title,
+  COALESCE(e.title, '지출')::text AS display_title,
+  e.expense_date,
+  e.amount_minor,
+  e.currency,
+  e.expense_category,
+  e.expense_kind,
+  COALESCE(payer.id::text, e.payer_event_participant_id::text, '')::text AS payer_participant_id,
+  COALESCE(payer.display_name, e.payer_display_name, '참여자')::text AS payer_display_name,
+  CASE WHEN payer.id IS NOT NULL THEN 'live' ELSE 'fallback' END::text AS payer_source,
+  e.memo,
+  e.split_policy,
+  e.include_in_settlement,
+  false::boolean AS receipt_exists,
+  ''::text AS receipt_content_type,
+  0::integer AS receipt_byte_size,
+  NULL::timestamptz AS receipt_uploaded_at,
+  e.created_at
+FROM expenses e
+LEFT JOIN event_participants payer
+  ON payer.id = e.payer_event_participant_id
+ AND payer.event_id = e.event_id
+WHERE e.event_id = $1::uuid
+  AND e.id = $2::uuid
+  AND e.anchor_type = 'event'
+`
+
+type GetEventExpenseByIDParams struct {
+	EventID   pgtype.UUID
+	ExpenseID pgtype.UUID
+}
+
+type GetEventExpenseByIDRow struct {
+	ID                  string
+	EventID             string
+	Title               pgtype.Text
+	DisplayTitle        string
+	ExpenseDate         pgtype.Date
+	AmountMinor         int64
+	Currency            string
+	ExpenseCategory     string
+	ExpenseKind         string
+	PayerParticipantID  string
+	PayerDisplayName    string
+	PayerSource         string
+	Memo                pgtype.Text
+	SplitPolicy         string
+	IncludeInSettlement bool
+	ReceiptExists       bool
+	ReceiptContentType  string
+	ReceiptByteSize     int32
+	ReceiptUploadedAt   pgtype.Timestamptz
+	CreatedAt           pgtype.Timestamptz
+}
+
+func (q *Queries) GetEventExpenseByID(ctx context.Context, arg GetEventExpenseByIDParams) (GetEventExpenseByIDRow, error) {
+	row := q.db.QueryRow(ctx, getEventExpenseByID, arg.EventID, arg.ExpenseID)
+	var i GetEventExpenseByIDRow
+	err := row.Scan(
+		&i.ID,
+		&i.EventID,
+		&i.Title,
+		&i.DisplayTitle,
+		&i.ExpenseDate,
+		&i.AmountMinor,
+		&i.Currency,
+		&i.ExpenseCategory,
+		&i.ExpenseKind,
+		&i.PayerParticipantID,
+		&i.PayerDisplayName,
+		&i.PayerSource,
+		&i.Memo,
+		&i.SplitPolicy,
+		&i.IncludeInSettlement,
+		&i.ReceiptExists,
+		&i.ReceiptContentType,
+		&i.ReceiptByteSize,
+		&i.ReceiptUploadedAt,
+		&i.CreatedAt,
+	)
+	return i, err
 }
 
 const getExpenseByTripDayAndID = `-- name: GetExpenseByTripDayAndID :one
@@ -371,6 +487,45 @@ func (q *Queries) GetExpenseByTripDayAndID(ctx context.Context, arg GetExpenseBy
 		&i.ReceiptByteSize,
 		&i.ReceiptUploadedAt,
 		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getExpenseEventForParticipant = `-- name: GetExpenseEventForParticipant :one
+SELECT
+  e.id::text AS event_id,
+  e.default_currency,
+  e.event_type,
+  e.status,
+  ep.id::text AS current_participant_id
+FROM events e
+JOIN event_participants ep ON ep.event_id = e.id
+WHERE e.id = $1::uuid
+  AND ep.user_id = $2::uuid
+`
+
+type GetExpenseEventForParticipantParams struct {
+	EventID pgtype.UUID
+	UserID  pgtype.UUID
+}
+
+type GetExpenseEventForParticipantRow struct {
+	EventID              string
+	DefaultCurrency      string
+	EventType            string
+	Status               string
+	CurrentParticipantID string
+}
+
+func (q *Queries) GetExpenseEventForParticipant(ctx context.Context, arg GetExpenseEventForParticipantParams) (GetExpenseEventForParticipantRow, error) {
+	row := q.db.QueryRow(ctx, getExpenseEventForParticipant, arg.EventID, arg.UserID)
+	var i GetExpenseEventForParticipantRow
+	err := row.Scan(
+		&i.EventID,
+		&i.DefaultCurrency,
+		&i.EventType,
+		&i.Status,
+		&i.CurrentParticipantID,
 	)
 	return i, err
 }
@@ -806,6 +961,190 @@ func (q *Queries) GetTripExpenseScheduleItem(ctx context.Context, arg GetTripExp
 		&i.PlaceName,
 		&i.PlaceType,
 		&i.PlaceAddress,
+	)
+	return i, err
+}
+
+const insertEventExpense = `-- name: InsertEventExpense :one
+INSERT INTO expenses (
+  trip_id,
+  event_id,
+  anchor_type,
+  expense_date,
+  title,
+  amount_minor,
+  currency,
+  expense_category,
+  expense_kind,
+  split_policy,
+  payer_event_participant_id,
+  payer_display_name,
+  memo,
+  client_mutation_id,
+  include_in_settlement,
+  created_by
+) VALUES (
+  NULL,
+  $1::uuid,
+  'event',
+  $2,
+  $3,
+  $4,
+  $5,
+  $6,
+  $7,
+  $8,
+  $9::uuid,
+  $10,
+  $11,
+  $12,
+  $13,
+  $14::uuid
+)
+RETURNING
+  id::text,
+  event_id::text,
+  title,
+  COALESCE(title, '지출')::text AS display_title,
+  expense_date,
+  amount_minor,
+  currency,
+  expense_category,
+  expense_kind,
+  COALESCE(payer_event_participant_id::text, '')::text AS payer_participant_id,
+  payer_display_name,
+  memo,
+  split_policy,
+  include_in_settlement,
+  created_at
+`
+
+type InsertEventExpenseParams struct {
+	EventID                 pgtype.UUID
+	ExpenseDate             pgtype.Date
+	Title                   pgtype.Text
+	AmountMinor             int64
+	Currency                string
+	ExpenseCategory         string
+	ExpenseKind             string
+	SplitPolicy             string
+	PayerEventParticipantID pgtype.UUID
+	PayerDisplayName        string
+	Memo                    pgtype.Text
+	ClientMutationID        pgtype.Text
+	IncludeInSettlement     bool
+	CreatedBy               pgtype.UUID
+}
+
+type InsertEventExpenseRow struct {
+	ID                  string
+	EventID             string
+	Title               pgtype.Text
+	DisplayTitle        string
+	ExpenseDate         pgtype.Date
+	AmountMinor         int64
+	Currency            string
+	ExpenseCategory     string
+	ExpenseKind         string
+	PayerParticipantID  string
+	PayerDisplayName    string
+	Memo                pgtype.Text
+	SplitPolicy         string
+	IncludeInSettlement bool
+	CreatedAt           pgtype.Timestamptz
+}
+
+func (q *Queries) InsertEventExpense(ctx context.Context, arg InsertEventExpenseParams) (InsertEventExpenseRow, error) {
+	row := q.db.QueryRow(ctx, insertEventExpense,
+		arg.EventID,
+		arg.ExpenseDate,
+		arg.Title,
+		arg.AmountMinor,
+		arg.Currency,
+		arg.ExpenseCategory,
+		arg.ExpenseKind,
+		arg.SplitPolicy,
+		arg.PayerEventParticipantID,
+		arg.PayerDisplayName,
+		arg.Memo,
+		arg.ClientMutationID,
+		arg.IncludeInSettlement,
+		arg.CreatedBy,
+	)
+	var i InsertEventExpenseRow
+	err := row.Scan(
+		&i.ID,
+		&i.EventID,
+		&i.Title,
+		&i.DisplayTitle,
+		&i.ExpenseDate,
+		&i.AmountMinor,
+		&i.Currency,
+		&i.ExpenseCategory,
+		&i.ExpenseKind,
+		&i.PayerParticipantID,
+		&i.PayerDisplayName,
+		&i.Memo,
+		&i.SplitPolicy,
+		&i.IncludeInSettlement,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const insertEventExpenseSplit = `-- name: InsertEventExpenseSplit :one
+INSERT INTO expense_splits (
+  expense_id,
+  event_participant_id,
+  participant_display_name,
+  amount_minor,
+  split_order
+) VALUES (
+  $1::uuid,
+  $2::uuid,
+  $3,
+  $4,
+  $5
+)
+RETURNING
+  expense_id::text,
+  split_order,
+  event_participant_id::text AS participant_id,
+  participant_display_name,
+  amount_minor
+`
+
+type InsertEventExpenseSplitParams struct {
+	ExpenseID              pgtype.UUID
+	EventParticipantID     pgtype.UUID
+	ParticipantDisplayName string
+	AmountMinor            int64
+	SplitOrder             int32
+}
+
+type InsertEventExpenseSplitRow struct {
+	ExpenseID              string
+	SplitOrder             int32
+	ParticipantID          string
+	ParticipantDisplayName string
+	AmountMinor            int64
+}
+
+func (q *Queries) InsertEventExpenseSplit(ctx context.Context, arg InsertEventExpenseSplitParams) (InsertEventExpenseSplitRow, error) {
+	row := q.db.QueryRow(ctx, insertEventExpenseSplit,
+		arg.ExpenseID,
+		arg.EventParticipantID,
+		arg.ParticipantDisplayName,
+		arg.AmountMinor,
+		arg.SplitOrder,
+	)
+	var i InsertEventExpenseSplitRow
+	err := row.Scan(
+		&i.ExpenseID,
+		&i.SplitOrder,
+		&i.ParticipantID,
+		&i.ParticipantDisplayName,
+		&i.AmountMinor,
 	)
 	return i, err
 }
@@ -1373,6 +1712,203 @@ func (q *Queries) ListDayExpensesByTripDay(ctx context.Context, arg ListDayExpen
 	return items, nil
 }
 
+const listEventExpenseSplitsByExpenseIDs = `-- name: ListEventExpenseSplitsByExpenseIDs :many
+SELECT
+  es.expense_id::text AS expense_id,
+  es.split_order,
+  COALESCE(participant.id::text, es.event_participant_id::text, '')::text AS participant_id,
+  COALESCE(participant.display_name, es.participant_display_name, '참여자')::text AS participant_display_name,
+  CASE WHEN participant.id IS NOT NULL THEN 'live' ELSE 'fallback' END::text AS participant_source,
+  es.amount_minor
+FROM expense_splits es
+JOIN expenses e ON e.id = es.expense_id
+LEFT JOIN event_participants participant
+  ON participant.id = es.event_participant_id
+ AND participant.event_id = e.event_id
+WHERE es.expense_id = ANY($1::uuid[])
+ORDER BY es.expense_id ASC, es.split_order ASC
+`
+
+type ListEventExpenseSplitsByExpenseIDsRow struct {
+	ExpenseID              string
+	SplitOrder             int32
+	ParticipantID          string
+	ParticipantDisplayName string
+	ParticipantSource      string
+	AmountMinor            int64
+}
+
+func (q *Queries) ListEventExpenseSplitsByExpenseIDs(ctx context.Context, expenseIds []pgtype.UUID) ([]ListEventExpenseSplitsByExpenseIDsRow, error) {
+	rows, err := q.db.Query(ctx, listEventExpenseSplitsByExpenseIDs, expenseIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListEventExpenseSplitsByExpenseIDsRow
+	for rows.Next() {
+		var i ListEventExpenseSplitsByExpenseIDsRow
+		if err := rows.Scan(
+			&i.ExpenseID,
+			&i.SplitOrder,
+			&i.ParticipantID,
+			&i.ParticipantDisplayName,
+			&i.ParticipantSource,
+			&i.AmountMinor,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listEventExpensesByEvent = `-- name: ListEventExpensesByEvent :many
+SELECT
+  e.id::text AS id,
+  e.event_id::text AS event_id,
+  e.title,
+  COALESCE(e.title, '지출')::text AS display_title,
+  e.expense_date,
+  e.amount_minor,
+  e.currency,
+  e.expense_category,
+  e.expense_kind,
+  COALESCE(payer.id::text, e.payer_event_participant_id::text, '')::text AS payer_participant_id,
+  COALESCE(payer.display_name, e.payer_display_name, '참여자')::text AS payer_display_name,
+  CASE WHEN payer.id IS NOT NULL THEN 'live' ELSE 'fallback' END::text AS payer_source,
+  e.memo,
+  e.split_policy,
+  e.include_in_settlement,
+  false::boolean AS receipt_exists,
+  ''::text AS receipt_content_type,
+  0::integer AS receipt_byte_size,
+  NULL::timestamptz AS receipt_uploaded_at,
+  e.created_at
+FROM expenses e
+LEFT JOIN event_participants payer
+  ON payer.id = e.payer_event_participant_id
+ AND payer.event_id = e.event_id
+WHERE e.event_id = $1::uuid
+  AND e.anchor_type = 'event'
+ORDER BY e.created_at DESC, e.id DESC
+`
+
+type ListEventExpensesByEventRow struct {
+	ID                  string
+	EventID             string
+	Title               pgtype.Text
+	DisplayTitle        string
+	ExpenseDate         pgtype.Date
+	AmountMinor         int64
+	Currency            string
+	ExpenseCategory     string
+	ExpenseKind         string
+	PayerParticipantID  string
+	PayerDisplayName    string
+	PayerSource         string
+	Memo                pgtype.Text
+	SplitPolicy         string
+	IncludeInSettlement bool
+	ReceiptExists       bool
+	ReceiptContentType  string
+	ReceiptByteSize     int32
+	ReceiptUploadedAt   pgtype.Timestamptz
+	CreatedAt           pgtype.Timestamptz
+}
+
+func (q *Queries) ListEventExpensesByEvent(ctx context.Context, eventID pgtype.UUID) ([]ListEventExpensesByEventRow, error) {
+	rows, err := q.db.Query(ctx, listEventExpensesByEvent, eventID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListEventExpensesByEventRow
+	for rows.Next() {
+		var i ListEventExpensesByEventRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.EventID,
+			&i.Title,
+			&i.DisplayTitle,
+			&i.ExpenseDate,
+			&i.AmountMinor,
+			&i.Currency,
+			&i.ExpenseCategory,
+			&i.ExpenseKind,
+			&i.PayerParticipantID,
+			&i.PayerDisplayName,
+			&i.PayerSource,
+			&i.Memo,
+			&i.SplitPolicy,
+			&i.IncludeInSettlement,
+			&i.ReceiptExists,
+			&i.ReceiptContentType,
+			&i.ReceiptByteSize,
+			&i.ReceiptUploadedAt,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listExpenseEventParticipants = `-- name: ListExpenseEventParticipants :many
+SELECT
+  id::text,
+  event_id::text,
+  user_id::text,
+  role,
+  display_name,
+  joined_at
+FROM event_participants
+WHERE event_id = $1::uuid
+ORDER BY joined_at ASC, id ASC
+`
+
+type ListExpenseEventParticipantsRow struct {
+	ID          string
+	EventID     string
+	UserID      string
+	Role        string
+	DisplayName string
+	JoinedAt    pgtype.Timestamptz
+}
+
+func (q *Queries) ListExpenseEventParticipants(ctx context.Context, eventID pgtype.UUID) ([]ListExpenseEventParticipantsRow, error) {
+	rows, err := q.db.Query(ctx, listExpenseEventParticipants, eventID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListExpenseEventParticipantsRow
+	for rows.Next() {
+		var i ListExpenseEventParticipantsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.EventID,
+			&i.UserID,
+			&i.Role,
+			&i.DisplayName,
+			&i.JoinedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listExpenseSplitsByExpenseID = `-- name: ListExpenseSplitsByExpenseID :many
 SELECT
   COALESCE(participant.id::text, es.participant_id::text, '')::text AS participant_id,
@@ -1470,6 +2006,42 @@ func (q *Queries) ListQuickExpenseSplitParticipants(ctx context.Context, tripID 
 	return items, nil
 }
 
+const listSettlementParticipantsByEvent = `-- name: ListSettlementParticipantsByEvent :many
+SELECT
+  id::text,
+  display_name,
+  joined_at
+FROM event_participants
+WHERE event_id = $1::uuid
+ORDER BY joined_at ASC, id ASC
+`
+
+type ListSettlementParticipantsByEventRow struct {
+	ID          string
+	DisplayName string
+	JoinedAt    pgtype.Timestamptz
+}
+
+func (q *Queries) ListSettlementParticipantsByEvent(ctx context.Context, eventID pgtype.UUID) ([]ListSettlementParticipantsByEventRow, error) {
+	rows, err := q.db.Query(ctx, listSettlementParticipantsByEvent, eventID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListSettlementParticipantsByEventRow
+	for rows.Next() {
+		var i ListSettlementParticipantsByEventRow
+		if err := rows.Scan(&i.ID, &i.DisplayName, &i.JoinedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listSettlementParticipantsByTrip = `-- name: ListSettlementParticipantsByTrip :many
 SELECT
   id::text,
@@ -1538,6 +2110,80 @@ func (q *Queries) ListSettlementParticipantsByTrips(ctx context.Context, tripIds
 			&i.ID,
 			&i.DisplayName,
 			&i.JoinedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listSettlementRowsByEvent = `-- name: ListSettlementRowsByEvent :many
+SELECT
+  e.id::text AS expense_id,
+  e.currency,
+  e.amount_minor AS expense_amount_minor,
+  COALESCE(payer.id::text, '')::text AS payer_participant_id,
+  COALESCE(payer.display_name, e.payer_display_name, '참여자')::text AS payer_display_name,
+  (payer.id IS NOT NULL)::boolean AS payer_participant_live,
+  COALESCE(es.split_order, 0)::integer AS split_order,
+  COALESCE(split_participant.id::text, '')::text AS split_participant_id,
+  COALESCE(split_participant.display_name, es.participant_display_name, '참여자')::text AS split_participant_display_name,
+  (split_participant.id IS NOT NULL)::boolean AS split_participant_live,
+  COALESCE(es.amount_minor, 0)::bigint AS split_amount_minor
+FROM expenses e
+LEFT JOIN event_participants payer
+  ON payer.id = e.payer_event_participant_id
+ AND payer.event_id = e.event_id
+LEFT JOIN expense_splits es
+  ON es.expense_id = e.id
+LEFT JOIN event_participants split_participant
+  ON split_participant.id = es.event_participant_id
+ AND split_participant.event_id = e.event_id
+WHERE e.event_id = $1::uuid
+  AND e.anchor_type = 'event'
+  AND e.include_in_settlement = true
+ORDER BY e.currency ASC, e.created_at ASC, e.id ASC, es.split_order ASC
+`
+
+type ListSettlementRowsByEventRow struct {
+	ExpenseID                   string
+	Currency                    string
+	ExpenseAmountMinor          int64
+	PayerParticipantID          string
+	PayerDisplayName            string
+	PayerParticipantLive        bool
+	SplitOrder                  int32
+	SplitParticipantID          string
+	SplitParticipantDisplayName string
+	SplitParticipantLive        bool
+	SplitAmountMinor            int64
+}
+
+func (q *Queries) ListSettlementRowsByEvent(ctx context.Context, eventID pgtype.UUID) ([]ListSettlementRowsByEventRow, error) {
+	rows, err := q.db.Query(ctx, listSettlementRowsByEvent, eventID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListSettlementRowsByEventRow
+	for rows.Next() {
+		var i ListSettlementRowsByEventRow
+		if err := rows.Scan(
+			&i.ExpenseID,
+			&i.Currency,
+			&i.ExpenseAmountMinor,
+			&i.PayerParticipantID,
+			&i.PayerDisplayName,
+			&i.PayerParticipantLive,
+			&i.SplitOrder,
+			&i.SplitParticipantID,
+			&i.SplitParticipantDisplayName,
+			&i.SplitParticipantLive,
+			&i.SplitAmountMinor,
 		); err != nil {
 			return nil, err
 		}
@@ -1954,6 +2600,113 @@ func (q *Queries) MarkExpenseReceiptDraftUsed(ctx context.Context, arg MarkExpen
 		arg.CreatedByUserID,
 	)
 	return err
+}
+
+const updateEventExpense = `-- name: UpdateEventExpense :one
+UPDATE expenses
+SET
+  title = $1,
+  expense_date = $2,
+  amount_minor = $3,
+  currency = $4,
+  expense_category = $5,
+  expense_kind = $6,
+  split_policy = $7,
+  payer_event_participant_id = $8::uuid,
+  payer_display_name = $9,
+  memo = $10,
+  include_in_settlement = $11,
+  updated_at = now()
+WHERE event_id = $12::uuid
+  AND id = $13::uuid
+  AND anchor_type = 'event'
+RETURNING
+  id::text,
+  event_id::text,
+  title,
+  COALESCE(title, '지출')::text AS display_title,
+  expense_date,
+  amount_minor,
+  currency,
+  expense_category,
+  expense_kind,
+  COALESCE(payer_event_participant_id::text, '')::text AS payer_participant_id,
+  payer_display_name,
+  memo,
+  split_policy,
+  include_in_settlement,
+  created_at
+`
+
+type UpdateEventExpenseParams struct {
+	Title                   pgtype.Text
+	ExpenseDate             pgtype.Date
+	AmountMinor             int64
+	Currency                string
+	ExpenseCategory         string
+	ExpenseKind             string
+	SplitPolicy             string
+	PayerEventParticipantID pgtype.UUID
+	PayerDisplayName        string
+	Memo                    pgtype.Text
+	IncludeInSettlement     bool
+	EventID                 pgtype.UUID
+	ExpenseID               pgtype.UUID
+}
+
+type UpdateEventExpenseRow struct {
+	ID                  string
+	EventID             string
+	Title               pgtype.Text
+	DisplayTitle        string
+	ExpenseDate         pgtype.Date
+	AmountMinor         int64
+	Currency            string
+	ExpenseCategory     string
+	ExpenseKind         string
+	PayerParticipantID  string
+	PayerDisplayName    string
+	Memo                pgtype.Text
+	SplitPolicy         string
+	IncludeInSettlement bool
+	CreatedAt           pgtype.Timestamptz
+}
+
+func (q *Queries) UpdateEventExpense(ctx context.Context, arg UpdateEventExpenseParams) (UpdateEventExpenseRow, error) {
+	row := q.db.QueryRow(ctx, updateEventExpense,
+		arg.Title,
+		arg.ExpenseDate,
+		arg.AmountMinor,
+		arg.Currency,
+		arg.ExpenseCategory,
+		arg.ExpenseKind,
+		arg.SplitPolicy,
+		arg.PayerEventParticipantID,
+		arg.PayerDisplayName,
+		arg.Memo,
+		arg.IncludeInSettlement,
+		arg.EventID,
+		arg.ExpenseID,
+	)
+	var i UpdateEventExpenseRow
+	err := row.Scan(
+		&i.ID,
+		&i.EventID,
+		&i.Title,
+		&i.DisplayTitle,
+		&i.ExpenseDate,
+		&i.AmountMinor,
+		&i.Currency,
+		&i.ExpenseCategory,
+		&i.ExpenseKind,
+		&i.PayerParticipantID,
+		&i.PayerDisplayName,
+		&i.Memo,
+		&i.SplitPolicy,
+		&i.IncludeInSettlement,
+		&i.CreatedAt,
+	)
+	return i, err
 }
 
 const updateExpense = `-- name: UpdateExpense :one

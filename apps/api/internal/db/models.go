@@ -74,30 +74,32 @@ type EventParticipant struct {
 }
 
 type Expense struct {
-	ID                  pgtype.UUID
-	TripID              pgtype.UUID
-	AnchorType          string
-	TripDayID           pgtype.UUID
-	ScheduleItemID      pgtype.UUID
-	ExpenseDate         pgtype.Date
-	Title               pgtype.Text
-	TripPlaceID         pgtype.UUID
-	PlaceName           pgtype.Text
-	PlaceAddress        pgtype.Text
-	PlaceType           pgtype.Text
-	AmountMinor         int64
-	Currency            string
-	ExpenseCategory     string
-	ExpenseKind         string
-	SplitPolicy         string
-	PayerParticipantID  pgtype.UUID
-	PayerDisplayName    string
-	Memo                pgtype.Text
-	ClientMutationID    pgtype.Text
-	IncludeInSettlement bool
-	CreatedBy           pgtype.UUID
-	CreatedAt           pgtype.Timestamptz
-	UpdatedAt           pgtype.Timestamptz
+	ID                      pgtype.UUID
+	TripID                  pgtype.UUID
+	EventID                 pgtype.UUID
+	AnchorType              string
+	TripDayID               pgtype.UUID
+	ScheduleItemID          pgtype.UUID
+	ExpenseDate             pgtype.Date
+	Title                   pgtype.Text
+	TripPlaceID             pgtype.UUID
+	PlaceName               pgtype.Text
+	PlaceAddress            pgtype.Text
+	PlaceType               pgtype.Text
+	AmountMinor             int64
+	Currency                string
+	ExpenseCategory         string
+	ExpenseKind             string
+	SplitPolicy             string
+	PayerParticipantID      pgtype.UUID
+	PayerEventParticipantID pgtype.UUID
+	PayerDisplayName        string
+	Memo                    pgtype.Text
+	ClientMutationID        pgtype.Text
+	IncludeInSettlement     bool
+	CreatedBy               pgtype.UUID
+	CreatedAt               pgtype.Timestamptz
+	UpdatedAt               pgtype.Timestamptz
 }
 
 type ExpenseReceipt struct {
@@ -137,6 +139,7 @@ type ExpenseSplit struct {
 	ID                     pgtype.UUID
 	ExpenseID              pgtype.UUID
 	ParticipantID          pgtype.UUID
+	EventParticipantID     pgtype.UUID
 	ParticipantDisplayName string
 	AmountMinor            int64
 	SplitOrder             int32

@@ -102,6 +102,33 @@ type fakeRepository struct {
 	settlementInputsByTripCalled bool
 	settlementInputsByTripIDs    []string
 	settlementInputsByTripErr    error
+	eventLedgerContext           EventLedgerContext
+	eventLedgerFound             bool
+	eventLedgerLookupEventID     string
+	eventLedgerLookupUserID      string
+	eventExpenses                []Expense
+	listedEventExpensesEventID   string
+	listEventExpensesCalled      bool
+	eventSettlementData          SettlementInput
+	eventSettlementDataEventID   string
+	eventSettlementDataCalled    bool
+	eventSettlementDataErr       error
+	eventExpenseRecord           EventExpenseRecord
+	eventExpenseCalled           bool
+	eventExpenseResult           CreateEventExpenseResult
+	eventExpense                 Expense
+	eventExpenseFound            bool
+	eventExpenseLookupEventID    string
+	eventExpenseLookupExpenseID  string
+	updatedEventExpenseRecord    EventExpenseRecord
+	updatedEventExpenseCalled    bool
+	updatedEventExpense          Expense
+	updateEventExpenseErr        error
+	deletedEventExpenseEventID   string
+	deletedEventExpenseID        string
+	deletedEventExpenseCalled    bool
+	deletedEventExpenseOK        bool
+	deleteEventExpenseErr        error
 	expense                      Expense
 	expenseFound                 bool
 	expenseLookupTripID          string
@@ -509,6 +536,79 @@ func (r *fakeRepository) GetTripSettlementInputs(_ context.Context, tripIDs []st
 		inputs[tripID] = r.settlementData
 	}
 	return inputs, nil
+}
+
+func (r *fakeRepository) GetExpenseEventForParticipant(_ context.Context, eventID string, userID string) (EventLedgerContext, bool, error) {
+	r.eventLedgerLookupEventID = eventID
+	r.eventLedgerLookupUserID = userID
+	if r.eventLedgerFound {
+		context := r.eventLedgerContext
+		if context.EventID == "" {
+			context.EventID = eventID
+		}
+		if context.DefaultCurrency == "" {
+			context.DefaultCurrency = "KRW"
+		}
+		return context, true, nil
+	}
+	return EventLedgerContext{}, false, nil
+}
+
+func (r *fakeRepository) ListEventExpenses(_ context.Context, eventID string) (ListEventExpensesResult, error) {
+	r.listedEventExpensesEventID = eventID
+	r.listEventExpensesCalled = true
+	return ListEventExpensesResult{Expenses: append([]Expense(nil), r.eventExpenses...)}, nil
+}
+
+func (r *fakeRepository) GetEventSettlementInput(_ context.Context, eventID string) (SettlementInput, error) {
+	r.eventSettlementDataEventID = eventID
+	r.eventSettlementDataCalled = true
+	if r.eventSettlementDataErr != nil {
+		return SettlementInput{}, r.eventSettlementDataErr
+	}
+	return r.eventSettlementData, nil
+}
+
+func (r *fakeRepository) GetEventExpenseByID(_ context.Context, eventID string, expenseID string) (Expense, bool, error) {
+	r.eventExpenseLookupEventID = eventID
+	r.eventExpenseLookupExpenseID = expenseID
+	if r.eventExpenseFound {
+		return r.eventExpense, true, nil
+	}
+	return Expense{}, false, nil
+}
+
+func (r *fakeRepository) CreateEventExpense(_ context.Context, record EventExpenseRecord) (CreateEventExpenseResult, error) {
+	r.eventExpenseRecord = record
+	r.eventExpenseCalled = true
+	if r.eventExpenseResult.Expense.ID != "" {
+		return r.eventExpenseResult, nil
+	}
+	payerID := record.PayerParticipantID
+	return CreateEventExpenseResult{Expense: Expense{ID: testUUID(9601), EventID: record.EventID, AnchorType: "event", ExpenseDate: record.ExpenseDate.Format(dateLayout), Title: record.Title, DisplayTitle: firstStringPtr(record.Title, "지출"), AmountMinor: record.AmountMinor, Currency: firstStringPtr(record.Currency, "KRW"), ExpenseCategory: firstStringPtr(record.ExpenseCategory, ExpenseCategoryEtc), ExpenseKind: record.ExpenseKind, Payer: ExpenseParticipantDisplay{ParticipantID: &payerID, DisplayName: "민수", Source: ExpenseDisplaySourceLive}, Memo: record.Memo, SplitPolicy: record.SplitPolicy, Splits: []ExpenseSplit{{Participant: ExpenseParticipantDisplay{ParticipantID: &payerID, DisplayName: "민수", Source: ExpenseDisplaySourceLive}, AmountMinor: record.AmountMinor}}, IncludeInSettlement: record.IncludeInSettlement, CreatedAt: time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC)}}, nil
+}
+
+func (r *fakeRepository) UpdateEventExpense(_ context.Context, record EventExpenseRecord) (Expense, error) {
+	r.updatedEventExpenseRecord = record
+	r.updatedEventExpenseCalled = true
+	if r.updateEventExpenseErr != nil {
+		return Expense{}, r.updateEventExpenseErr
+	}
+	if r.updatedEventExpense.ID != "" {
+		return r.updatedEventExpense, nil
+	}
+	payerID := record.PayerParticipantID
+	return Expense{ID: record.ExpenseID, EventID: record.EventID, AnchorType: "event", ExpenseDate: record.ExpenseDate.Format(dateLayout), Title: record.Title, DisplayTitle: firstStringPtr(record.Title, "지출"), AmountMinor: record.AmountMinor, Currency: firstStringPtr(record.Currency, "KRW"), ExpenseCategory: firstStringPtr(record.ExpenseCategory, ExpenseCategoryEtc), ExpenseKind: record.ExpenseKind, Payer: ExpenseParticipantDisplay{ParticipantID: &payerID, DisplayName: "민수", Source: ExpenseDisplaySourceLive}, Memo: record.Memo, SplitPolicy: record.SplitPolicy, Splits: []ExpenseSplit{{Participant: ExpenseParticipantDisplay{ParticipantID: &payerID, DisplayName: "민수", Source: ExpenseDisplaySourceLive}, AmountMinor: record.AmountMinor}}, IncludeInSettlement: record.IncludeInSettlement, CreatedAt: time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC)}, nil
+}
+
+func (r *fakeRepository) DeleteEventExpenseByID(_ context.Context, eventID string, expenseID string) (bool, error) {
+	r.deletedEventExpenseEventID = eventID
+	r.deletedEventExpenseID = expenseID
+	r.deletedEventExpenseCalled = true
+	if r.deleteEventExpenseErr != nil {
+		return false, r.deleteEventExpenseErr
+	}
+	return r.deletedEventExpenseOK, nil
 }
 
 func (r *fakeRepository) GetExpenseByTripDayAndID(_ context.Context, tripID string, tripDayID string, expenseID string) (Expense, bool, error) {
@@ -2557,6 +2657,89 @@ func TestServiceCreateTripExpenseValidation(t *testing.T) {
 				t.Fatal("expected invalid request not to call repository")
 			}
 		})
+	}
+}
+
+func TestServiceCreateEventExpenseUsesEventParticipants(t *testing.T) {
+	eventID := testUUID(10001)
+	payerID := testUUID(11001)
+	memberID := testUUID(11002)
+	title := "성수 저녁"
+	memo := "공통 지출"
+	repo := &fakeRepository{
+		eventLedgerFound:   true,
+		eventLedgerContext: EventLedgerContext{EventID: eventID, DefaultCurrency: "KRW", EventType: "outing", Status: "planned", CurrentParticipantID: payerID},
+	}
+
+	result, err := newTestService(repo).CreateEventExpense(context.Background(), "user-1", eventID, CreateEventExpenseInput{
+		Title:              &title,
+		ExpenseDate:        "2026-09-01",
+		AmountMinor:        42000,
+		PayerParticipantID: payerID,
+		SplitPolicy:        ExpenseSplitPolicyEqual,
+		ParticipantIDs:     []string{payerID, memberID},
+		Memo:               &memo,
+	})
+	if err != nil {
+		t.Fatalf("CreateEventExpense returned error: %v", err)
+	}
+	if !repo.eventExpenseCalled {
+		t.Fatal("expected repository CreateEventExpense to be called")
+	}
+	if repo.eventExpenseRecord.EventID != eventID || repo.eventExpenseRecord.PayerParticipantID != payerID {
+		t.Fatalf("unexpected event expense record: %#v", repo.eventExpenseRecord)
+	}
+	if repo.eventExpenseRecord.Currency == nil || *repo.eventExpenseRecord.Currency != "KRW" {
+		t.Fatalf("expected event default currency, got %#v", repo.eventExpenseRecord.Currency)
+	}
+	if repo.eventExpenseRecord.ExpenseKind != ExpenseKindRegular || !repo.eventExpenseRecord.IncludeInSettlement {
+		t.Fatalf("unexpected expense kind/settlement defaults: %#v", repo.eventExpenseRecord)
+	}
+	if result.Expense.EventID != eventID || result.Expense.AnchorType != "event" {
+		t.Fatalf("expected event-scoped expense, got %#v", result.Expense)
+	}
+}
+
+func TestServiceGetEventSettlementCalculatesBalances(t *testing.T) {
+	eventID := testUUID(10001)
+	payerID := testUUID(11001)
+	memberID := testUUID(11002)
+	repo := &fakeRepository{
+		eventLedgerFound:   true,
+		eventLedgerContext: EventLedgerContext{EventID: eventID, DefaultCurrency: "KRW", EventType: "outing", Status: "planned", CurrentParticipantID: payerID},
+		eventSettlementData: SettlementInput{
+			Participants: []SettlementParticipantInput{
+				{ParticipantID: payerID, DisplayName: "민수", JoinedAt: time.Date(2026, 9, 1, 10, 0, 0, 0, time.UTC)},
+				{ParticipantID: memberID, DisplayName: "지은", JoinedAt: time.Date(2026, 9, 1, 10, 1, 0, 0, time.UTC)},
+			},
+			Expenses: []SettlementExpenseInput{{
+				ExpenseID:            testUUID(9001),
+				Currency:             "KRW",
+				AmountMinor:          42000,
+				PayerParticipantID:   &payerID,
+				PayerDisplayName:     "민수",
+				PayerParticipantLive: true,
+				Splits: []SettlementSplitInput{
+					{ParticipantID: &payerID, DisplayName: "민수", ParticipantLive: true, AmountMinor: 21000, SplitOrder: 1},
+					{ParticipantID: &memberID, DisplayName: "지은", ParticipantLive: true, AmountMinor: 21000, SplitOrder: 2},
+				},
+			}},
+		},
+	}
+
+	result, err := newTestService(repo).GetEventSettlement(context.Background(), "user-1", eventID)
+	if err != nil {
+		t.Fatalf("GetEventSettlement returned error: %v", err)
+	}
+	if result.EventID != eventID || result.DefaultCurrency != "KRW" || !repo.eventSettlementDataCalled {
+		t.Fatalf("unexpected event settlement result/state: %#v", result)
+	}
+	if len(result.CurrencySummaries) != 1 || len(result.CurrencySummaries[0].SuggestedTransfers) != 1 {
+		t.Fatalf("expected one settlement transfer, got %#v", result.CurrencySummaries)
+	}
+	transfer := result.CurrencySummaries[0].SuggestedTransfers[0]
+	if transfer.FromParticipant.DisplayName != "지은" || transfer.ToParticipant.DisplayName != "민수" || transfer.AmountMinor != 21000 {
+		t.Fatalf("unexpected transfer: %#v", transfer)
 	}
 }
 
