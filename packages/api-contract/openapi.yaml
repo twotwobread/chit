@@ -5051,6 +5051,15 @@ components:
       enum:
         - trip
         - outing
+    EventCategory:
+      type: string
+      enum:
+        - date
+        - friends
+        - meal
+        - cafe
+        - activity
+        - custom
     EventStatus:
       type: string
       enum:
@@ -5615,8 +5624,38 @@ components:
           $ref: '#/components/schemas/EventType'
         defaultCurrency:
           $ref: '#/components/schemas/SupportedCurrency'
+        startTime:
+          type: string
+          nullable: true
+          pattern: '^([01]\\d|2[0-3]):[0-5]\\d$'
+          description: Optional local start time in HH:mm for lightweight outing events.
+        placeName:
+          type: string
+          nullable: true
+          minLength: 1
+          maxLength: 120
+          description: Optional outing place display name. Server trims leading/trailing whitespace.
+        placeAddress:
+          type: string
+          nullable: true
+          minLength: 1
+          maxLength: 240
+          description: Optional outing place address. Server trims leading/trailing whitespace.
+        category:
+          allOf:
+            - $ref: '#/components/schemas/EventCategory'
+          nullable: true
+          description: Optional outing category preset. Defaults to custom for new outing creation.
         meeting:
           $ref: '#/components/schemas/EventMeetingChoice'
+        participantMemberIds:
+          type: array
+          nullable: true
+          minItems: 1
+          uniqueItems: true
+          description: Optional current saved meeting member IDs that should participate when meeting.mode is existing. Omitted means all current saved meeting members.
+          items:
+            type: string
     Event:
       type: object
       required:
@@ -5660,6 +5699,22 @@ components:
           format: date
         defaultCurrency:
           $ref: '#/components/schemas/SupportedCurrency'
+        startTime:
+          type: string
+          nullable: true
+          pattern: '^([01]\\d|2[0-3]):[0-5]\\d$'
+        placeName:
+          type: string
+          nullable: true
+          maxLength: 120
+        placeAddress:
+          type: string
+          nullable: true
+          maxLength: 240
+        category:
+          allOf:
+            - $ref: '#/components/schemas/EventCategory'
+          nullable: true
         status:
           $ref: '#/components/schemas/EventStatus'
         tripId:
@@ -5722,12 +5777,17 @@ components:
       required:
         - event
         - meeting
+        - participants
       additionalProperties: false
       properties:
         event:
           $ref: '#/components/schemas/Event'
         meeting:
           $ref: '#/components/schemas/Meeting'
+        participants:
+          type: array
+          items:
+            $ref: '#/components/schemas/EventParticipant'
     CreateTripRequest:
       type: object
       required:

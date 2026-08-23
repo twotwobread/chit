@@ -1,0 +1,24 @@
+schema_version: classification.v1
+type: feature
+route: ready_for_implementation
+size: normal
+ambiguity: low
+risk: medium
+testability: high
+architecture_impact: cross-service
+domain_sensitivity: none
+product_direction_unclear: false
+implementation_requires_exploration: false
+ready_for_implementation: true
+likely_tier: normal
+next_phase: implementation.execute
+knowns:
+  - API already has /events create/get and EventType=outing.
+  - Current event persistence lacks outing-specific time/place/category and saved-meeting participant subset selection.
+  - Mobile currently hides 약속 creation and routes non-trip meeting events to a disabled 준비 중 row.
+unknowns: []
+blocking_questions: []
+risk_signals:
+  - Requires OpenAPI, migration/schema/sqlc, Go service/storage/server, generated TS, and Expo route/UI changes.
+rationale: >-
+  Existing event foundation makes the slice implementable; spec fixes MVP fields and route behavior.

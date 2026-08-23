@@ -262,7 +262,7 @@ func (s *Store) CreateEventWithMeeting(ctx context.Context, record meeting.Creat
 
 	qtx := s.queries.WithTx(tx)
 	var eventMeeting meeting.Meeting
-	var meetingMemberID string
+	var selectedMembers []meeting.MeetingMember
 	if strings.TrimSpace(record.ExistingMeetingID) == "" {
 		created, owner, err := createMeetingWithOwner(ctx, qtx, meeting.CreateMeetingRecord{
 			Name:             record.NewMeetingName,
@@ -274,18 +274,22 @@ func (s *Store) CreateEventWithMeeting(ctx context.Context, record meeting.Creat
 			return meeting.CreateEventResult{}, err
 		}
 		eventMeeting = created
-		meetingMemberID = owner.ID
+		selectedMembers = []meeting.MeetingMember{owner}
 	} else {
 		row, err := qtx.GetSavedMeetingForMember(ctx, db.GetSavedMeetingForMemberParams{MeetingID: mustUUID(record.ExistingMeetingID), UserID: mustUUID(record.CreatedBy)})
 		if err != nil {
 			return meeting.CreateEventResult{}, err
 		}
 		eventMeeting = meetingFromSavedRow(row)
-		member, err := qtx.GetMeetingMemberForUser(ctx, db.GetMeetingMemberForUserParams{MeetingID: mustUUID(record.ExistingMeetingID), UserID: mustUUID(record.CreatedBy)})
+		memberRows, err := qtx.ListMeetingMembersForSavedMeetingByMemberUser(ctx, db.ListMeetingMembersForSavedMeetingByMemberUserParams{MeetingID: mustUUID(record.ExistingMeetingID), UserID: mustUUID(record.CreatedBy)})
 		if err != nil {
 			return meeting.CreateEventResult{}, err
 		}
-		meetingMemberID = member.ID
+		members := meetingMembersFromSavedRows(memberRows)
+		selectedMembers, err = selectEventMeetingMembersByID(record.CreatedBy, members, record.ParticipantMemberIDs)
+		if err != nil {
+			return meeting.CreateEventResult{}, err
+		}
 	}
 
 	createdEvent, err := qtx.CreateEvent(ctx, db.CreateEventParams{
@@ -295,6 +299,10 @@ func (s *Store) CreateEventWithMeeting(ctx context.Context, record meeting.Creat
 		StartDate:       dateValue(record.StartDate),
 		EndDate:         dateValue(record.EndDate),
 		DefaultCurrency: record.DefaultCurrency,
+		StartTime:       optionalText(record.StartTime),
+		PlaceName:       optionalText(record.PlaceName),
+		PlaceAddress:    optionalText(record.PlaceAddress),
+		Category:        optionalText(record.Category),
 		Status:          record.Status,
 		TripID:          optionalUUID(""),
 		CreatedBy:       mustUUID(record.CreatedBy),
@@ -302,22 +310,35 @@ func (s *Store) CreateEventWithMeeting(ctx context.Context, record meeting.Creat
 	if err != nil {
 		return meeting.CreateEventResult{}, err
 	}
-	ownerParticipant, err := qtx.CreateEventParticipant(ctx, db.CreateEventParticipantParams{
-		EventID:         mustUUID(createdEvent.ID),
-		MeetingMemberID: optionalUUID(meetingMemberID),
-		UserID:          mustUUID(record.CreatedBy),
-		Role:            meeting.RoleOwner,
-		DisplayName:     record.OwnerDisplayName,
-	})
-	if err != nil {
-		return meeting.CreateEventResult{}, err
+	var ownerParticipant meeting.EventParticipant
+	for _, member := range selectedMembers {
+		role := meeting.RoleMember
+		if member.UserID == record.CreatedBy {
+			role = meeting.RoleOwner
+		}
+		participant, err := qtx.CreateEventParticipant(ctx, db.CreateEventParticipantParams{
+			EventID:         mustUUID(createdEvent.ID),
+			MeetingMemberID: optionalUUID(member.ID),
+			UserID:          mustUUID(member.UserID),
+			Role:            role,
+			DisplayName:     member.DisplayName,
+		})
+		if err != nil {
+			return meeting.CreateEventResult{}, err
+		}
+		if member.UserID == record.CreatedBy {
+			ownerParticipant = eventParticipantFromCreateRow(participant)
+		}
+	}
+	if ownerParticipant.ID == "" {
+		return meeting.CreateEventResult{}, meeting.ErrConflict
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return meeting.CreateEventResult{}, err
 	}
 
 	event := eventFromCreateRow(createdEvent, eventMeeting)
-	return meeting.CreateEventResult{Meeting: eventMeeting, Event: event, OwnerParticipant: eventParticipantFromCreateRow(ownerParticipant)}, nil
+	return meeting.CreateEventResult{Meeting: eventMeeting, Event: event, OwnerParticipant: ownerParticipant}, nil
 }
 
 func (s *Store) GetEventForParticipant(ctx context.Context, eventID string, userID string) (meeting.EventDetailResult, bool, error) {
@@ -336,7 +357,11 @@ func (s *Store) GetEventForParticipant(ctx context.Context, eventID string, user
 		CreatedAt:  row.ResultMeetingCreatedAt.Time,
 		UpdatedAt:  row.ResultMeetingUpdatedAt.Time,
 	}
-	return meeting.EventDetailResult{Meeting: resultMeeting, Event: eventFromDetailRow(row)}, true, nil
+	participants, err := s.queries.ListEventParticipants(ctx, db.ListEventParticipantsParams{EventID: mustUUID(eventID), UserID: mustUUID(userID)})
+	if err != nil {
+		return meeting.EventDetailResult{}, false, err
+	}
+	return meeting.EventDetailResult{Meeting: resultMeeting, Event: eventFromDetailRow(row), Participants: eventParticipantsFromRows(participants)}, true, nil
 }
 
 func meetingFromCreateRow(row db.CreateMeetingRow) meeting.Meeting {
@@ -355,6 +380,40 @@ func meetingMemberFromCreateRow(row db.CreateMeetingMemberRow) meeting.MeetingMe
 	return meeting.MeetingMember{ID: row.ID, MeetingID: row.MeetingID, UserID: row.UserID, Role: row.Role, DisplayName: row.DisplayName, JoinedAt: row.JoinedAt.Time}
 }
 
+func selectEventMeetingMembersByID(requiredUserID string, members []meeting.MeetingMember, selectedMemberIDs []string) ([]meeting.MeetingMember, error) {
+	if selectedMemberIDs == nil {
+		return members, nil
+	}
+	membersByID := make(map[string]meeting.MeetingMember, len(members))
+	requiredMemberID := ""
+	for _, member := range members {
+		membersByID[member.ID] = member
+		if member.UserID == requiredUserID {
+			requiredMemberID = member.ID
+		}
+	}
+	if requiredMemberID == "" {
+		return nil, meeting.ErrConflict
+	}
+	selectedIDSet := make(map[string]struct{}, len(selectedMemberIDs))
+	selectedMembers := make([]meeting.MeetingMember, 0, len(selectedMemberIDs))
+	for _, memberID := range selectedMemberIDs {
+		if _, ok := selectedIDSet[memberID]; ok {
+			return nil, meeting.ErrValidation
+		}
+		member, ok := membersByID[memberID]
+		if !ok {
+			return nil, meeting.ErrValidation
+		}
+		selectedIDSet[memberID] = struct{}{}
+		selectedMembers = append(selectedMembers, member)
+	}
+	if _, ok := selectedIDSet[requiredMemberID]; !ok {
+		return nil, meeting.ErrConflict
+	}
+	return selectedMembers, nil
+}
+
 func eventFromCreateRow(row db.CreateEventRow, eventMeeting meeting.Meeting) meeting.Event {
 	return meeting.Event{
 		ID:                row.ID,
@@ -365,6 +424,10 @@ func eventFromCreateRow(row db.CreateEventRow, eventMeeting meeting.Meeting) mee
 		Title:             row.Title,
 		StartDate:         dateString(row.StartDate),
 		EndDate:           dateString(row.EndDate),
+		StartTime:         row.StartTime,
+		PlaceName:         row.PlaceName,
+		PlaceAddress:      row.PlaceAddress,
+		Category:          row.Category,
 		DefaultCurrency:   row.DefaultCurrency,
 		Status:            row.Status,
 		TripID:            optionalStringPointer(row.TripID),
@@ -386,6 +449,10 @@ func eventsFromSavedMeetingRows(rows []db.ListEventsForSavedMeetingByMemberUserR
 			Title:             row.Title,
 			StartDate:         dateString(row.StartDate),
 			EndDate:           dateString(row.EndDate),
+			StartTime:         row.StartTime,
+			PlaceName:         row.PlaceName,
+			PlaceAddress:      row.PlaceAddress,
+			Category:          row.Category,
 			DefaultCurrency:   row.DefaultCurrency,
 			Status:            row.Status,
 			TripID:            optionalStringPointer(row.TripID),
@@ -407,6 +474,10 @@ func eventFromDetailRow(row db.GetEventForParticipantRow) meeting.Event {
 		Title:             row.Title,
 		StartDate:         dateString(row.StartDate),
 		EndDate:           dateString(row.EndDate),
+		StartTime:         row.StartTime,
+		PlaceName:         row.PlaceName,
+		PlaceAddress:      row.PlaceAddress,
+		Category:          row.Category,
 		DefaultCurrency:   row.DefaultCurrency,
 		Status:            row.Status,
 		TripID:            optionalStringPointer(row.TripID),
@@ -428,11 +499,35 @@ func eventParticipantFromCreateRow(row db.CreateEventParticipantRow) meeting.Eve
 	}
 }
 
+func eventParticipantsFromRows(rows []db.ListEventParticipantsRow) []meeting.EventParticipant {
+	participants := make([]meeting.EventParticipant, 0, len(rows))
+	for _, row := range rows {
+		participants = append(participants, meeting.EventParticipant{
+			ID:              row.ID,
+			EventID:         row.EventID,
+			MeetingMemberID: optionalStringPointer(row.MeetingMemberID),
+			UserID:          row.UserID,
+			Role:            row.Role,
+			DisplayName:     row.DisplayName,
+			JoinedAt:        row.JoinedAt.Time,
+		})
+	}
+	return participants
+}
+
 func optionalUUID(value string) pgtype.UUID {
 	if strings.TrimSpace(value) == "" {
 		return pgtype.UUID{}
 	}
 	return mustUUID(value)
+}
+
+func optionalText(value string) pgtype.Text {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return pgtype.Text{}
+	}
+	return pgtype.Text{String: trimmed, Valid: true}
 }
 
 func optionalStringPointer(value string) *string {

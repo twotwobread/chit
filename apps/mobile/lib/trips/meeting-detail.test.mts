@@ -115,7 +115,7 @@ describe('meeting detail view model', () => {
       viewModel.upcomingEvents.map((item) => [item.id, item.title, item.route]),
       [
         ['upcoming', '오사카 3박 4일', '/trips/trip-1/today'],
-        ['outing', '성수 저녁', null],
+        ['outing', '성수 저녁', '/events/outing'],
       ],
     );
     assert.deepEqual(

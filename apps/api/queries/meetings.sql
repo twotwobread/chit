@@ -207,6 +207,10 @@ INSERT INTO events (
   start_date,
   end_date,
   default_currency,
+  start_time,
+  place_name,
+  place_address,
+  category,
   status,
   trip_id,
   created_by
@@ -217,6 +221,10 @@ INSERT INTO events (
   sqlc.arg(start_date),
   sqlc.arg(end_date),
   sqlc.arg(default_currency),
+  sqlc.narg(start_time),
+  sqlc.narg(place_name),
+  sqlc.narg(place_address),
+  sqlc.narg(category),
   sqlc.arg(status),
   sqlc.narg(trip_id)::uuid,
   sqlc.arg(created_by)::uuid
@@ -229,6 +237,10 @@ RETURNING
   start_date,
   end_date,
   default_currency,
+  COALESCE(start_time, ''::text)::text AS start_time,
+  COALESCE(place_name, ''::text)::text AS place_name,
+  COALESCE(place_address, ''::text)::text AS place_address,
+  COALESCE(category, ''::text)::text AS category,
   status,
   COALESCE(trip_id::text, ''::text)::text AS trip_id,
   created_by::text,
@@ -296,6 +308,10 @@ SELECT
   e.start_date,
   e.end_date,
   e.default_currency,
+  COALESCE(e.start_time, ''::text)::text AS start_time,
+  COALESCE(e.place_name, ''::text)::text AS place_name,
+  COALESCE(e.place_address, ''::text)::text AS place_address,
+  COALESCE(e.category, ''::text)::text AS category,
   e.status,
   COALESCE(e.trip_id::text, ''::text)::text AS trip_id,
   e.created_by::text AS created_by,
@@ -324,6 +340,10 @@ SELECT
   e.start_date,
   e.end_date,
   e.default_currency,
+  COALESCE(e.start_time, ''::text)::text AS start_time,
+  COALESCE(e.place_name, ''::text)::text AS place_name,
+  COALESCE(e.place_address, ''::text)::text AS place_address,
+  COALESCE(e.category, ''::text)::text AS category,
   e.status,
   COALESCE(e.trip_id::text, ''::text)::text AS trip_id,
   e.created_by::text AS created_by,
@@ -340,3 +360,19 @@ JOIN meetings m ON m.id = e.meeting_id
 JOIN event_participants ep ON ep.event_id = e.id
 WHERE e.id = sqlc.arg(event_id)::uuid
   AND ep.user_id = sqlc.arg(user_id)::uuid;
+
+-- name: ListEventParticipants :many
+SELECT
+  id::text,
+  event_id::text,
+  COALESCE(meeting_member_id::text, ''::text)::text AS meeting_member_id,
+  user_id::text,
+  role,
+  display_name,
+  joined_at
+FROM event_participants
+WHERE event_id = sqlc.arg(event_id)::uuid
+ORDER BY
+  CASE WHEN user_id = sqlc.arg(user_id)::uuid THEN 0 ELSE 1 END,
+  joined_at ASC,
+  id ASC;

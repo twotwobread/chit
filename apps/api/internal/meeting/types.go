@@ -20,6 +20,13 @@ const (
 	EventTypeTrip   = "trip"
 	EventTypeOuting = "outing"
 
+	EventCategoryDate     = "date"
+	EventCategoryFriends  = "friends"
+	EventCategoryMeal     = "meal"
+	EventCategoryCafe     = "cafe"
+	EventCategoryActivity = "activity"
+	EventCategoryCustom   = "custom"
+
 	EventStatusPlanned   = "planned"
 	EventStatusCompleted = "completed"
 	EventStatusCancelled = "cancelled"
@@ -51,12 +58,18 @@ type EventMeetingInput struct {
 }
 
 type CreateEventInput struct {
-	Title           string
-	StartDate       string
-	EndDate         string
-	EventType       string
-	DefaultCurrency string
-	Meeting         EventMeetingInput
+	Title                   string
+	StartDate               string
+	EndDate                 string
+	StartTime               string
+	PlaceName               string
+	PlaceAddress            string
+	Category                string
+	EventType               string
+	DefaultCurrency         string
+	Meeting                 EventMeetingInput
+	ParticipantMemberIDs    []string
+	ParticipantMemberIDsSet bool
 }
 
 type CreateMeetingRecord struct {
@@ -67,18 +80,23 @@ type CreateMeetingRecord struct {
 }
 
 type CreateEventRecord struct {
-	Title             string
-	StartDate         time.Time
-	EndDate           time.Time
-	EventType         string
-	DefaultCurrency   string
-	Status            string
-	CreatedBy         string
-	OwnerDisplayName  string
-	MeetingMode       string
-	ExistingMeetingID string
-	NewMeetingName    string
-	MeetingVisibility string
+	Title                string
+	StartDate            time.Time
+	EndDate              time.Time
+	StartTime            string
+	PlaceName            string
+	PlaceAddress         string
+	Category             string
+	EventType            string
+	DefaultCurrency      string
+	Status               string
+	CreatedBy            string
+	OwnerDisplayName     string
+	MeetingMode          string
+	ExistingMeetingID    string
+	NewMeetingName       string
+	MeetingVisibility    string
+	ParticipantMemberIDs []string
 }
 
 type Meeting struct {
@@ -118,6 +136,10 @@ type Event struct {
 	Title             string
 	StartDate         string
 	EndDate           string
+	StartTime         string
+	PlaceName         string
+	PlaceAddress      string
+	Category          string
 	DefaultCurrency   string
 	Status            string
 	TripID            *string
@@ -190,8 +212,9 @@ type MeetingDetailResult struct {
 }
 
 type EventDetailResult struct {
-	Meeting Meeting
-	Event   Event
+	Meeting      Meeting
+	Event        Event
+	Participants []EventParticipant
 }
 
 type Repository interface {

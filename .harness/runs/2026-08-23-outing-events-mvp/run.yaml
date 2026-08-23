@@ -1,0 +1,11 @@
+schema_version: run.v1
+run_id: 2026-08-23-outing-events-mvp
+workflow: feature-start
+status: ready_for_pr
+tier: normal
+route: ready_for_implementation
+issue: 459
+branch: feature/459-outing-events
+base_ref: origin/develop
+created_at: '2026-08-23T04:02:00Z'
+updated_at: '2026-08-23T04:55:00Z'

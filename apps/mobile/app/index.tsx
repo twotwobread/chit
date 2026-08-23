@@ -188,8 +188,8 @@ function HomeContent({ viewModel }: { viewModel: HomeViewModel }) {
   if (viewModel.isEmpty) {
     return (
       <EmptyState
-        action={{ label: '여행 일정 만들기', onPress: () => router.push('/trips/new'), variant: 'primary' }}
-        body="일정을 만들면 장부와 정산까지 함께 이어져요."
+        action={{ label: '약속 만들기', onPress: () => router.push('/events/new'), variant: 'primary' }}
+        body="약속이나 여행 일정을 만들면 장부와 정산까지 함께 이어져요."
         title="아직 일정이나 모임이 없어요."
       />
     );
@@ -217,6 +217,7 @@ function HomeContent({ viewModel }: { viewModel: HomeViewModel }) {
         </HomeSection>
       ) : null}
 
+      <SecondaryButton label="약속 만들기" onPress={() => router.push('/events/new')} />
       <SecondaryButton label="여행 일정 만들기" onPress={() => router.push('/trips/new')} />
     </View>
   );

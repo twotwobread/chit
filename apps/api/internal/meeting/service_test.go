@@ -126,6 +126,10 @@ func (r *fakeRepository) CreateEventWithMeeting(_ context.Context, record Create
 			Title:           record.Title,
 			StartDate:       record.StartDate.Format(dateLayout),
 			EndDate:         record.EndDate.Format(dateLayout),
+			StartTime:       record.StartTime,
+			PlaceName:       record.PlaceName,
+			PlaceAddress:    record.PlaceAddress,
+			Category:        record.Category,
 			DefaultCurrency: record.DefaultCurrency,
 			Status:          EventStatusPlanned,
 			CreatedBy:       record.CreatedBy,
@@ -310,6 +314,47 @@ func TestCreateEventWithOneOffMeetingHidesMeetingAndDefaultsName(t *testing.T) {
 	}
 	if repo.createdEvent.NewMeetingName != "성수 저녁" {
 		t.Fatalf("expected one-off meeting name to default to title, got %q", repo.createdEvent.NewMeetingName)
+	}
+}
+
+func TestCreateOutingEventWithExistingMeetingMetadataAndSelectedParticipants(t *testing.T) {
+	repo := &fakeRepository{
+		creator:           Creator{ID: testUserID, DisplayName: "민수"},
+		creatorFound:      true,
+		savedMeeting:      Meeting{ID: testMeetingID, Name: "성수 모임", Visibility: MeetingVisibilitySaved},
+		savedMeetingFound: true,
+		meetingDetail: MeetingDetailResult{Meeting: Meeting{ID: testMeetingID, Name: "성수 모임", Visibility: MeetingVisibilitySaved}, Members: []MeetingMember{
+			{ID: "00000000-0000-0000-0000-000000000401", UserID: testUserID, Role: RoleOwner, DisplayName: "민수"},
+			{ID: "00000000-0000-0000-0000-000000000402", UserID: "00000000-0000-0000-0000-000000000502", Role: RoleMember, DisplayName: "지은"},
+		}},
+		meetingDetailFound: true,
+	}
+
+	_, err := newTestService(repo).CreateEvent(context.Background(), testUserID, CreateEventInput{
+		Title:                " 성수 저녁 ",
+		StartDate:            "2026-09-01",
+		EndDate:              "2026-09-01",
+		StartTime:            "19:30",
+		PlaceName:            " 성수 식당 ",
+		PlaceAddress:         " 서울 성동구 ",
+		Category:             EventCategoryMeal,
+		EventType:            EventTypeOuting,
+		DefaultCurrency:      "KRW",
+		Meeting:              EventMeetingInput{Mode: MeetingModeExisting, MeetingID: testMeetingID},
+		ParticipantMemberIDs: []string{"00000000-0000-0000-0000-000000000401", "00000000-0000-0000-0000-000000000402"},
+	})
+	if err != nil {
+		t.Fatalf("CreateEvent returned error: %v", err)
+	}
+
+	if repo.createdEvent.Title != "성수 저녁" || repo.createdEvent.EventType != EventTypeOuting || repo.createdEvent.StartTime != "19:30" || repo.createdEvent.Category != EventCategoryMeal {
+		t.Fatalf("unexpected outing event record: %#v", repo.createdEvent)
+	}
+	if repo.createdEvent.PlaceName != "성수 식당" || repo.createdEvent.PlaceAddress != "서울 성동구" {
+		t.Fatalf("expected trimmed place fields, got %#v", repo.createdEvent)
+	}
+	if !reflect.DeepEqual(repo.createdEvent.ParticipantMemberIDs, []string{"00000000-0000-0000-0000-000000000401", "00000000-0000-0000-0000-000000000402"}) {
+		t.Fatalf("expected selected participant member ids, got %#v", repo.createdEvent.ParticipantMemberIDs)
 	}
 }
 

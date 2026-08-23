@@ -110,7 +110,11 @@ func createEventResponseToOpenAPI(result meeting.CreateEventResult) openapi.Crea
 }
 
 func getEventResponseToOpenAPI(result meeting.EventDetailResult) openapi.GetEventResponse {
-	return openapi.GetEventResponse{Event: eventToOpenAPI(result.Event), Meeting: meetingToOpenAPI(result.Meeting)}
+	participants := make([]openapi.EventParticipant, 0, len(result.Participants))
+	for _, participant := range result.Participants {
+		participants = append(participants, eventParticipantToOpenAPI(participant))
+	}
+	return openapi.GetEventResponse{Event: eventToOpenAPI(result.Event), Meeting: meetingToOpenAPI(result.Meeting), Participants: participants}
 }
 
 func meetingToOpenAPI(value meeting.Meeting) openapi.Meeting {
@@ -145,6 +149,10 @@ func eventToOpenAPI(value meeting.Event) openapi.Event {
 		Title:             value.Title,
 		StartDate:         dateToOpenAPI(value.StartDate),
 		EndDate:           dateToOpenAPI(value.EndDate),
+		StartTime:         optionalStringPointer(value.StartTime),
+		PlaceName:         optionalStringPointer(value.PlaceName),
+		PlaceAddress:      optionalStringPointer(value.PlaceAddress),
+		Category:          optionalEventCategoryPointer(value.Category),
 		DefaultCurrency:   openapi.SupportedCurrency(value.DefaultCurrency),
 		Status:            openapi.EventStatus(value.Status),
 		TripId:            value.TripID,
@@ -164,6 +172,21 @@ func eventParticipantToOpenAPI(value meeting.EventParticipant) openapi.EventPart
 		DisplayName:     value.DisplayName,
 		JoinedAt:        value.JoinedAt,
 	}
+}
+
+func optionalStringPointer(value string) *string {
+	if value == "" {
+		return nil
+	}
+	return &value
+}
+
+func optionalEventCategoryPointer(value string) *openapi.EventCategory {
+	if value == "" {
+		return nil
+	}
+	category := openapi.EventCategory(value)
+	return &category
 }
 
 func listTripsResponseToOpenAPI(trips []trip.ListItem) openapi.ListTripsResponse {
