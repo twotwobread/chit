@@ -1106,6 +1106,43 @@ func TestCreateEventWithExistingMeetingRequiresMembershipAndGetEventRequiresPart
 	if detailBody.Event.ID != eventBody.Event.ID || detailBody.Event.MeetingVisibility != "saved" {
 		t.Fatalf("unexpected event detail: %#v", detailBody.Event)
 	}
+
+	meetingDetailRecorder := httptest.NewRecorder()
+	meetingDetailRequest := httptest.NewRequest(http.MethodGet, "/meetings/"+meetingBody.Meeting.ID, nil)
+	meetingDetailRequest.Header.Set("Authorization", "Bearer "+owner.AccessToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(meetingDetailRecorder, meetingDetailRequest)
+	if meetingDetailRecorder.Code != http.StatusOK {
+		t.Fatalf("expected owner get meeting detail status %d, got %d with body %s", http.StatusOK, meetingDetailRecorder.Code, meetingDetailRecorder.Body.String())
+	}
+	var meetingDetailBody struct {
+		Meeting struct {
+			ID string `json:"id"`
+		} `json:"meeting"`
+		Members []struct {
+			DisplayName string `json:"displayName"`
+			Role        string `json:"role"`
+		} `json:"members"`
+		Events []struct {
+			ID        string  `json:"id"`
+			Title     string  `json:"title"`
+			TripID    *string `json:"tripId"`
+			EventType string  `json:"eventType"`
+		} `json:"events"`
+	}
+	if err := json.NewDecoder(meetingDetailRecorder.Body).Decode(&meetingDetailBody); err != nil {
+		t.Fatalf("decode meeting detail response: %v", err)
+	}
+	if meetingDetailBody.Meeting.ID != meetingBody.Meeting.ID || len(meetingDetailBody.Members) != 1 || meetingDetailBody.Members[0].Role != "owner" || len(meetingDetailBody.Events) != 1 || meetingDetailBody.Events[0].ID != eventBody.Event.ID {
+		t.Fatalf("unexpected meeting detail body: %#v", meetingDetailBody)
+	}
+
+	outsiderMeetingRecorder := httptest.NewRecorder()
+	outsiderMeetingRequest := httptest.NewRequest(http.MethodGet, "/meetings/"+meetingBody.Meeting.ID, nil)
+	outsiderMeetingRequest.Header.Set("Authorization", "Bearer "+outsider.AccessToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(outsiderMeetingRecorder, outsiderMeetingRequest)
+	if outsiderMeetingRecorder.Code != http.StatusNotFound {
+		t.Fatalf("expected outsider meeting detail status %d, got %d with body %s", http.StatusNotFound, outsiderMeetingRecorder.Code, outsiderMeetingRecorder.Body.String())
+	}
 }
 
 func TestCreateTripHandler(t *testing.T) {
@@ -1187,6 +1224,14 @@ func TestCreateTripHandler(t *testing.T) {
 	}
 	if body.Trip.EventContext == nil || body.Trip.EventContext.EventID == "" || body.Trip.EventContext.MeetingID == "" || body.Trip.EventContext.MeetingName != "오사카 3박 4일" || body.Trip.EventContext.MeetingVisibility != "one_off" {
 		t.Fatalf("expected one-off event context on created trip, got %#v", body.Trip.EventContext)
+	}
+
+	oneOffMeetingRecorder := httptest.NewRecorder()
+	oneOffMeetingRequest := httptest.NewRequest(http.MethodGet, "/meetings/"+body.Trip.EventContext.MeetingID, nil)
+	oneOffMeetingRequest.Header.Set("Authorization", "Bearer "+accessToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(oneOffMeetingRecorder, oneOffMeetingRequest)
+	if oneOffMeetingRecorder.Code != http.StatusNotFound {
+		t.Fatalf("expected one-off meeting detail status %d, got %d with body %s", http.StatusNotFound, oneOffMeetingRecorder.Code, oneOffMeetingRecorder.Body.String())
 	}
 	if len(body.Trip.Destinations) != 1 || body.Trip.Destinations[0].DisplayName != "오사카, 일본" || body.Trip.Destinations[0].ProviderPlaceID != "google-city-osaka" || body.Trip.Destinations[0].SortOrder != 0 {
 		t.Fatalf("expected created trip destination in response, got %#v", body.Trip.Destinations)
@@ -5988,6 +6033,46 @@ func (b *fakeAuthBackend) GetSavedMeetingForMember(_ context.Context, meetingID 
 		}
 	}
 	return meetingdomain.Meeting{}, false, nil
+}
+
+func (b *fakeAuthBackend) GetMeetingDetailForMember(_ context.Context, meetingID string, userID string) (meetingdomain.MeetingDetailResult, bool, error) {
+	meeting, ok := b.meetings[meetingID]
+	if !ok || meeting.Visibility != meetingdomain.MeetingVisibilitySaved {
+		return meetingdomain.MeetingDetailResult{}, false, nil
+	}
+	isMember := false
+	for _, member := range b.meetingMembers[meetingID] {
+		if member.UserID == userID {
+			isMember = true
+			break
+		}
+	}
+	if !isMember {
+		return meetingdomain.MeetingDetailResult{}, false, nil
+	}
+	events := []meetingdomain.Event{}
+	for _, event := range b.events {
+		if event.MeetingID == meetingID {
+			events = append(events, event)
+		}
+	}
+	sort.Slice(events, func(i, j int) bool {
+		if events[i].StartDate != events[j].StartDate {
+			return events[i].StartDate < events[j].StartDate
+		}
+		return events[i].ID < events[j].ID
+	})
+	members := append([]meetingdomain.MeetingMember(nil), b.meetingMembers[meetingID]...)
+	sort.Slice(members, func(i, j int) bool {
+		if members[i].Role != members[j].Role {
+			return members[i].Role == meetingdomain.RoleOwner
+		}
+		if !members[i].JoinedAt.Equal(members[j].JoinedAt) {
+			return members[i].JoinedAt.Before(members[j].JoinedAt)
+		}
+		return members[i].ID < members[j].ID
+	})
+	return meetingdomain.MeetingDetailResult{Meeting: meeting, Members: members, Events: events}, true, nil
 }
 
 func (b *fakeAuthBackend) CreateEventWithMeeting(_ context.Context, record meetingdomain.CreateEventRecord) (meetingdomain.CreateEventResult, error) {

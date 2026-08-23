@@ -74,8 +74,16 @@ func createMeetingResponseToOpenAPI(result meeting.CreateMeetingResult) openapi.
 	return openapi.CreateMeetingResponse{Meeting: meetingToOpenAPI(result.Meeting), OwnerMember: meetingMemberToOpenAPI(result.OwnerMember)}
 }
 
-func getMeetingResponseToOpenAPI(result meeting.Meeting) openapi.GetMeetingResponse {
-	return openapi.GetMeetingResponse{Meeting: meetingToOpenAPI(result)}
+func getMeetingResponseToOpenAPI(result meeting.MeetingDetailResult) openapi.GetMeetingResponse {
+	members := make([]openapi.MeetingMember, 0, len(result.Members))
+	for _, member := range result.Members {
+		members = append(members, meetingMemberToOpenAPI(member))
+	}
+	events := make([]openapi.Event, 0, len(result.Events))
+	for _, event := range result.Events {
+		events = append(events, eventToOpenAPI(event))
+	}
+	return openapi.GetMeetingResponse{Meeting: meetingToOpenAPI(result.Meeting), Members: members, Events: events}
 }
 
 func createEventResponseToOpenAPI(result meeting.CreateEventResult) openapi.CreateEventResponse {

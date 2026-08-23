@@ -288,7 +288,16 @@ function SavedMeetingsSection({ meetings }: { meetings: HomeSavedMeetingViewMode
       ) : (
         <View style={styles.tripList}>
           {meetings.map((meeting, index) => (
-            <View key={meeting.id} style={[styles.meetingRow, index === 0 ? null : styles.rowDivider]}>
+            <Pressable
+              accessibilityRole="button"
+              key={meeting.id}
+              onPress={() => router.push(`/meetings/${meeting.id}`)}
+              style={({ pressed }) => [
+                styles.meetingRow,
+                index === 0 ? null : styles.rowDivider,
+                pressed ? styles.pressed : null,
+              ]}
+            >
               <View style={styles.meetingAvatar}>
                 <Text style={styles.meetingAvatarText}>{meeting.name.trim().slice(0, 1) || '모'}</Text>
               </View>
@@ -298,7 +307,8 @@ function SavedMeetingsSection({ meetings }: { meetings: HomeSavedMeetingViewMode
                 </Text>
                 <Text style={styles.rowMeta}>{[meeting.memberCountLabel, meeting.roleLabel].join(' · ')}</Text>
               </View>
-            </View>
+              <Text style={styles.rowAction}>열기</Text>
+            </Pressable>
           ))}
         </View>
       )}
