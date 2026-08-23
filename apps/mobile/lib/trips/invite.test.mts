@@ -127,6 +127,7 @@ test('invite accept token validation follows API token format', () => {
 
 test('invite accept responses map to success and already accepted copy', () => {
   const accepted: AcceptTripInviteResponse = {
+    scope: 'trip',
     tripId: 'trip-1',
     tripName: '제주 여행',
     role: 'member',
@@ -149,6 +150,30 @@ test('invite accept responses map to success and already accepted copy', () => {
   const owner = toInviteAcceptViewModel({ ...accepted, role: 'owner', alreadyAccepted: true });
   assert.equal(owner.kind, 'ownerAlready');
   assert.equal(owner.title, '이미 주최자로 참여 중인 여행이에요.');
+});
+
+test('meeting invite accept responses map to meeting detail navigation', () => {
+  const accepted: AcceptTripInviteResponse = {
+    scope: 'meeting',
+    meetingId: 'meeting-1',
+    meetingName: '등산 모임',
+    role: 'member',
+    alreadyAccepted: false,
+  };
+
+  assert.deepEqual(toInviteAcceptViewModel(accepted), {
+    kind: 'acceptedMeeting',
+    title: '모임에 참여했어요.',
+    message: '등산 모임 모임의 일정과 멤버를 함께 볼 수 있어요.',
+    primaryAction: 'viewMeeting',
+    primaryLabel: '모임 보기',
+    meetingId: 'meeting-1',
+    meetingName: '등산 모임',
+  });
+
+  const already = toInviteAcceptViewModel({ ...accepted, alreadyAccepted: true });
+  assert.equal(already.kind, 'alreadyMeetingMember');
+  assert.equal(already.title, '이미 참여 중인 모임이에요.');
 });
 
 test('invite accept login and invalid helpers expose required CTA copy', () => {

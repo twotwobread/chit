@@ -2,11 +2,13 @@ package server
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"mime/multipart"
 	"net/http"
 	"strings"
 
+	"github.com/twotwobread/i-um/apps/api/internal/meeting"
 	"github.com/twotwobread/i-um/apps/api/internal/openapi"
 	"github.com/twotwobread/i-um/apps/api/internal/route"
 	"github.com/twotwobread/i-um/apps/api/internal/trip"
@@ -150,8 +152,8 @@ func (s apiServer) CreateTripInvite(w http.ResponseWriter, r *http.Request, trip
 }
 
 func (s apiServer) AcceptTripInvite(w http.ResponseWriter, r *http.Request, token string) {
-	if s.auth == nil || s.trips == nil {
-		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "trip invite acceptance is not configured", nil)
+	if s.auth == nil || (s.meetings == nil && s.trips == nil) {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "invite acceptance is not configured", nil)
 		return
 	}
 
@@ -160,6 +162,22 @@ func (s apiServer) AcceptTripInvite(w http.ResponseWriter, r *http.Request, toke
 		return
 	}
 
+	if s.meetings != nil {
+		result, err := s.meetings.AcceptInvite(r.Context(), authContext.UserID, token)
+		if err == nil {
+			writeJSON(w, http.StatusOK, acceptMeetingInviteResponseToOpenAPI(result))
+			return
+		}
+		if !errors.Is(err, meeting.ErrInviteNotFound) {
+			writeMeetingError(w, err)
+			return
+		}
+	}
+
+	if s.trips == nil {
+		writeMeetingError(w, meeting.ErrInviteNotFound)
+		return
+	}
 	result, err := s.trips.AcceptInvite(r.Context(), authContext.UserID, token)
 	if err != nil {
 		writeTripInviteAcceptError(w, err)

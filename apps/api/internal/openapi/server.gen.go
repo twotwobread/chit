@@ -124,6 +124,12 @@ const (
 	HealthResponseStatusOk HealthResponseStatus = "ok"
 )
 
+// Defines values for InviteScope.
+const (
+	InviteScopeMeeting InviteScope = "meeting"
+	InviteScopeTrip    InviteScope = "trip"
+)
+
 // Defines values for MeetingMemberRole.
 const (
 	MeetingMemberRoleMember MeetingMemberRole = "member"
@@ -261,11 +267,14 @@ const (
 
 // AcceptTripInviteResponse defines model for AcceptTripInviteResponse.
 type AcceptTripInviteResponse struct {
-	// AlreadyAccepted false when this request created a new member participant; true when the user was already a participant.
+	// AlreadyAccepted false when this request created a new meeting member or trip participant; true when the user was already a member/participant.
 	AlreadyAccepted bool                `json:"alreadyAccepted"`
+	MeetingId       *string             `json:"meetingId,omitempty"`
+	MeetingName     *string             `json:"meetingName,omitempty"`
 	Role            TripParticipantRole `json:"role"`
-	TripId          string              `json:"tripId"`
-	TripName        string              `json:"tripName"`
+	Scope           InviteScope         `json:"scope"`
+	TripId          *string             `json:"tripId,omitempty"`
+	TripName        *string             `json:"tripName,omitempty"`
 }
 
 // AddTripFlightPassengersRequest defines model for AddTripFlightPassengersRequest.
@@ -453,6 +462,13 @@ type CreateManualTripPlaceRequest struct {
 // CreateManualTripPlaceResponse defines model for CreateManualTripPlaceResponse.
 type CreateManualTripPlaceResponse struct {
 	Place TripPlaceSummary `json:"place"`
+}
+
+// CreateMeetingInviteResponse defines model for CreateMeetingInviteResponse.
+type CreateMeetingInviteResponse struct {
+	// Created true when this request created a new invite, false when an existing unexpired current invite was reused.
+	Created bool          `json:"created"`
+	Invite  MeetingInvite `json:"invite"`
 }
 
 // CreateMeetingRequest defines model for CreateMeetingRequest.
@@ -1053,6 +1069,9 @@ type HealthResponse struct {
 // HealthResponseStatus defines model for HealthResponse.Status.
 type HealthResponseStatus string
 
+// InviteScope defines model for InviteScope.
+type InviteScope string
+
 // LinkedIdentity defines model for LinkedIdentity.
 type LinkedIdentity struct {
 	Email         *string      `json:"email"`
@@ -1156,6 +1175,22 @@ type Meeting struct {
 	Name       string            `json:"name"`
 	UpdatedAt  time.Time         `json:"updatedAt"`
 	Visibility MeetingVisibility `json:"visibility"`
+}
+
+// MeetingInvite defines model for MeetingInvite.
+type MeetingInvite struct {
+	// CreatedAt UTC ISO 8601 timestamp.
+	CreatedAt time.Time `json:"createdAt"`
+	CreatedBy string    `json:"createdBy"`
+
+	// ExpiresAt UTC ISO 8601 timestamp.
+	ExpiresAt time.Time `json:"expiresAt"`
+	Id        string    `json:"id"`
+	InviteUrl string    `json:"inviteUrl"`
+	MeetingId string    `json:"meetingId"`
+
+	// Token Opaque base64url token. UI copies or shares inviteUrl instead of raw token.
+	Token string `json:"token"`
 }
 
 // MeetingListItem defines model for MeetingListItem.
@@ -2062,7 +2097,7 @@ type ServerInterface interface {
 	// Check API health
 	// (GET /health)
 	GetHealth(w http.ResponseWriter, r *http.Request)
-	// Accept a trip invite link
+	// Accept a meeting or trip invite link
 	// (POST /invites/{token}/accept)
 	AcceptTripInvite(w http.ResponseWriter, r *http.Request, token string)
 	// Delete the current account
@@ -2098,6 +2133,15 @@ type ServerInterface interface {
 	// Get saved meeting detail
 	// (GET /meetings/{meetingId})
 	GetMeeting(w http.ResponseWriter, r *http.Request, meetingId string)
+	// Create or retrieve the current meeting invite link
+	// (POST /meetings/{meetingId}/invites)
+	CreateMeetingInvite(w http.ResponseWriter, r *http.Request, meetingId string)
+	// Leave a saved meeting
+	// (DELETE /meetings/{meetingId}/members/me)
+	LeaveMeeting(w http.ResponseWriter, r *http.Request, meetingId string)
+	// Remove a saved meeting member
+	// (DELETE /meetings/{meetingId}/members/{memberId})
+	RemoveMeetingMember(w http.ResponseWriter, r *http.Request, meetingId string, memberId string)
 	// Check API readiness
 	// (GET /ready)
 	GetReady(w http.ResponseWriter, r *http.Request)
@@ -2335,7 +2379,7 @@ func (_ Unimplemented) GetHealth(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Accept a trip invite link
+// Accept a meeting or trip invite link
 // (POST /invites/{token}/accept)
 func (_ Unimplemented) AcceptTripInvite(w http.ResponseWriter, r *http.Request, token string) {
 	w.WriteHeader(http.StatusNotImplemented)
@@ -2404,6 +2448,24 @@ func (_ Unimplemented) CreateMeeting(w http.ResponseWriter, r *http.Request) {
 // Get saved meeting detail
 // (GET /meetings/{meetingId})
 func (_ Unimplemented) GetMeeting(w http.ResponseWriter, r *http.Request, meetingId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Create or retrieve the current meeting invite link
+// (POST /meetings/{meetingId}/invites)
+func (_ Unimplemented) CreateMeetingInvite(w http.ResponseWriter, r *http.Request, meetingId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Leave a saved meeting
+// (DELETE /meetings/{meetingId}/members/me)
+func (_ Unimplemented) LeaveMeeting(w http.ResponseWriter, r *http.Request, meetingId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Remove a saved meeting member
+// (DELETE /meetings/{meetingId}/members/{memberId})
+func (_ Unimplemented) RemoveMeetingMember(w http.ResponseWriter, r *http.Request, meetingId string, memberId string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -3267,6 +3329,108 @@ func (siw *ServerInterfaceWrapper) GetMeeting(w http.ResponseWriter, r *http.Req
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetMeeting(w, r, meetingId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateMeetingInvite operation middleware
+func (siw *ServerInterfaceWrapper) CreateMeetingInvite(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "meetingId" -------------
+	var meetingId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "meetingId", chi.URLParam(r, "meetingId"), &meetingId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "meetingId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateMeetingInvite(w, r, meetingId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// LeaveMeeting operation middleware
+func (siw *ServerInterfaceWrapper) LeaveMeeting(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "meetingId" -------------
+	var meetingId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "meetingId", chi.URLParam(r, "meetingId"), &meetingId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "meetingId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.LeaveMeeting(w, r, meetingId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RemoveMeetingMember operation middleware
+func (siw *ServerInterfaceWrapper) RemoveMeetingMember(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "meetingId" -------------
+	var meetingId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "meetingId", chi.URLParam(r, "meetingId"), &meetingId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "meetingId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "memberId" -------------
+	var memberId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "memberId", chi.URLParam(r, "memberId"), &memberId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "memberId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RemoveMeetingMember(w, r, meetingId, memberId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -5781,6 +5945,15 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/meetings/{meetingId}", wrapper.GetMeeting)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/meetings/{meetingId}/invites", wrapper.CreateMeetingInvite)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/meetings/{meetingId}/members/me", wrapper.LeaveMeeting)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/meetings/{meetingId}/members/{memberId}", wrapper.RemoveMeetingMember)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/ready", wrapper.GetReady)

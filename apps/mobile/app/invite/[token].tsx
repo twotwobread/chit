@@ -77,6 +77,10 @@ export default function InviteAcceptScreen() {
         router.replace('/login');
         return;
       }
+      if (action === 'viewMeeting' && viewModel.meetingId) {
+        router.replace(`/meetings/${viewModel.meetingId}`);
+        return;
+      }
       if (action === 'viewTrip' && viewModel.tripId) {
         router.replace(tripTodayPath(viewModel.tripId));
         return;

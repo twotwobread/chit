@@ -154,4 +154,42 @@ describe('meeting detail view model', () => {
       ],
     );
   });
+
+  it('marks owner invite and member removal permissions without changing event participation', () => {
+    const viewModel = buildMeetingDetailViewModel({
+      detail: response([]),
+      settlementSummary: { trips: [] },
+      today: '2026-07-01',
+      currentUserId: 'user-1',
+    });
+
+    assert.equal(viewModel.canCreateInvite, true);
+    assert.equal(viewModel.canLeaveMeeting, false);
+    assert.deepEqual(
+      viewModel.members.map((item) => [item.displayName, item.canRemove]),
+      [
+        ['민수', false],
+        ['지은', true],
+      ],
+    );
+  });
+
+  it('marks non-owner members as able to leave but not invite or remove others', () => {
+    const viewModel = buildMeetingDetailViewModel({
+      detail: response([]),
+      settlementSummary: { trips: [] },
+      today: '2026-07-01',
+      currentUserId: 'user-2',
+    });
+
+    assert.equal(viewModel.canCreateInvite, false);
+    assert.equal(viewModel.canLeaveMeeting, true);
+    assert.deepEqual(
+      viewModel.members.map((item) => [item.displayName, item.canRemove]),
+      [
+        ['민수', false],
+        ['지은', false],
+      ],
+    );
+  });
 });

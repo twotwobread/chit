@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -237,5 +238,98 @@ func TestMeetingRepositoryCreatesEventsAndHidesOneOffMeetingsFromSavedList(t *te
 	}
 	if found {
 		t.Fatal("outsider should not be able to read event without event participation")
+	}
+}
+
+func TestMeetingRepositoryMeetingInviteLifecycleAndMemberDeletion(t *testing.T) {
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("DATABASE_URL is required for storage integration test")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	store, err := Open(ctx, databaseURL)
+	if err != nil {
+		t.Skipf("database unavailable for storage integration test: %v", err)
+	}
+	defer store.Close()
+	if err := store.pool.Ping(ctx); err != nil {
+		t.Skipf("database unavailable for storage integration test: %v", err)
+	}
+
+	var ownerUserID string
+	if err := store.pool.QueryRow(ctx, `INSERT INTO users (display_name) VALUES ('민수') RETURNING id::text`).Scan(&ownerUserID); err != nil {
+		t.Fatalf("insert owner user: %v", err)
+	}
+	var memberUserID string
+	if err := store.pool.QueryRow(ctx, `INSERT INTO users (display_name) VALUES ('지은') RETURNING id::text`).Scan(&memberUserID); err != nil {
+		t.Fatalf("insert member user: %v", err)
+	}
+	defer func() {
+		_, _ = store.pool.Exec(context.Background(), `DELETE FROM meetings WHERE created_by = ANY($1::uuid[])`, []string{ownerUserID, memberUserID})
+		_, _ = store.pool.Exec(context.Background(), `DELETE FROM users WHERE id = ANY($1::uuid[])`, []string{ownerUserID, memberUserID})
+	}()
+
+	created, err := store.CreateMeetingWithOwner(ctx, meeting.CreateMeetingRecord{Name: "등산 모임", Visibility: meeting.MeetingVisibilitySaved, CreatedBy: ownerUserID, OwnerDisplayName: "민수"})
+	if err != nil {
+		t.Fatalf("CreateMeetingWithOwner: %v", err)
+	}
+	now := time.Date(2026, 8, 23, 10, 0, 0, 0, time.UTC)
+	inviteToken := "meeting-token-" + strings.ReplaceAll(ownerUserID, "-", "")
+	invite, err := store.CreateOrReturnMeetingInvite(ctx, meeting.CreateMeetingInviteRecord{MeetingID: created.Meeting.ID, CreatedBy: ownerUserID, Token: inviteToken, Now: now, ExpiresAt: now.Add(7 * 24 * time.Hour)})
+	if err != nil {
+		t.Fatalf("CreateOrReturnMeetingInvite: %v", err)
+	}
+	if !invite.Created || invite.Invite.MeetingID != created.Meeting.ID || invite.Invite.Token == "" {
+		t.Fatalf("unexpected invite result: %#v", invite)
+	}
+	reused, err := store.CreateOrReturnMeetingInvite(ctx, meeting.CreateMeetingInviteRecord{MeetingID: created.Meeting.ID, CreatedBy: ownerUserID, Token: "meeting-token-reused-abcdefghijklmnopqrstuvwxyz", Now: now.Add(time.Hour), ExpiresAt: now.Add(8 * 24 * time.Hour)})
+	if err != nil {
+		t.Fatalf("CreateOrReturnMeetingInvite reused: %v", err)
+	}
+	if reused.Created || reused.Invite.ID != invite.Invite.ID {
+		t.Fatalf("expected active invite reuse, got %#v", reused)
+	}
+
+	accepted, err := store.AcceptMeetingInvite(ctx, meeting.AcceptMeetingInviteRecord{Token: invite.Invite.Token, UserID: memberUserID, Now: now.Add(time.Hour)})
+	if err != nil {
+		t.Fatalf("AcceptMeetingInvite: %v", err)
+	}
+	if accepted.MeetingID != created.Meeting.ID || accepted.Role != meeting.RoleMember || accepted.AlreadyAccepted {
+		t.Fatalf("unexpected accept result: %#v", accepted)
+	}
+	acceptedAgain, err := store.AcceptMeetingInvite(ctx, meeting.AcceptMeetingInviteRecord{Token: invite.Invite.Token, UserID: memberUserID, Now: now.Add(2 * time.Hour)})
+	if err != nil {
+		t.Fatalf("AcceptMeetingInvite again: %v", err)
+	}
+	if !acceptedAgain.AlreadyAccepted || acceptedAgain.Role != meeting.RoleMember {
+		t.Fatalf("expected idempotent accept, got %#v", acceptedAgain)
+	}
+
+	detail, found, err := store.GetMeetingDetailForMember(ctx, created.Meeting.ID, ownerUserID)
+	if err != nil || !found {
+		t.Fatalf("GetMeetingDetailForMember owner = %#v, %v, %v", detail, found, err)
+	}
+	var memberID string
+	for _, member := range detail.Members {
+		if member.UserID == memberUserID {
+			memberID = member.ID
+		}
+	}
+	if memberID == "" {
+		t.Fatalf("expected accepted meeting member in detail: %#v", detail.Members)
+	}
+	deleted, err := store.DeleteMeetingMember(ctx, created.Meeting.ID, memberID)
+	if err != nil || !deleted {
+		t.Fatalf("DeleteMeetingMember = %v, %v", deleted, err)
+	}
+	_, found, err = store.GetMeetingDetailForMember(ctx, created.Meeting.ID, memberUserID)
+	if err != nil {
+		t.Fatalf("GetMeetingDetailForMember removed member error: %v", err)
+	}
+	if found {
+		t.Fatal("removed meeting member should not read saved meeting detail")
 	}
 }

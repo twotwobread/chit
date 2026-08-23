@@ -1,4 +1,9 @@
-import type { AcceptTripInviteResponse, CreateTripInviteResponse, GetTripDetailResponse } from '@i-um/api-contract';
+import type {
+  AcceptTripInviteResponse,
+  CreateMeetingInviteResponse,
+  CreateTripInviteResponse,
+  GetTripDetailResponse,
+} from '@i-um/api-contract';
 import type { ShareContent } from 'react-native';
 import type { ExecutionParamType, LinkType, TextTemplateType } from 'react-native-kakao-share-link';
 
@@ -6,8 +11,10 @@ const inviteTokenPattern = /^[A-Za-z0-9_-]{32,128}$/;
 const kakaoInviteTokenParamKey = 'inviteToken';
 
 export type InviteShareInput = {
-  tripName: string;
+  tripName?: string;
+  title?: string;
   inviteUrl: string;
+  scope?: 'meeting' | 'trip';
 };
 
 export type InviteViewModel = {
@@ -18,13 +25,16 @@ export type InviteViewModel = {
   statusLabel: string;
 };
 
-export type InviteAcceptAction = 'viewTrip' | 'login' | 'home' | 'retry';
+export type InviteAcceptAction = 'viewMeeting' | 'viewTrip' | 'login' | 'home' | 'retry';
 
 export type InviteAcceptViewModel = {
   kind:
     | 'accepted'
+    | 'acceptedMeeting'
     | 'alreadyMember'
+    | 'alreadyMeetingMember'
     | 'ownerAlready'
+    | 'meetingOwnerAlready'
     | 'loginRequired'
     | 'authRequired'
     | 'expired'
@@ -38,6 +48,8 @@ export type InviteAcceptViewModel = {
   secondaryLabel?: string;
   tripId?: string;
   tripName?: string;
+  meetingId?: string;
+  meetingName?: string;
 };
 
 export function canCreateTripInvite(
@@ -47,7 +59,7 @@ export function canCreateTripInvite(
   return Boolean(tripDetail && currentUserId && tripDetail.trip.createdBy === currentUserId);
 }
 
-export function toInviteViewModel(response: CreateTripInviteResponse): InviteViewModel {
+export function toInviteViewModel(response: CreateMeetingInviteResponse | CreateTripInviteResponse): InviteViewModel {
   return {
     token: response.invite.token,
     inviteUrl: response.invite.inviteUrl,
@@ -66,11 +78,47 @@ export function isInviteTokenFormatValid(token: string | null | undefined): toke
 }
 
 export function toInviteAcceptViewModel(response: AcceptTripInviteResponse): InviteAcceptViewModel {
+  if (response.scope === 'meeting') {
+    const meetingName = response.meetingName ?? '초대받은 모임';
+    if (response.role === 'owner' && response.alreadyAccepted) {
+      return {
+        kind: 'meetingOwnerAlready',
+        title: '이미 모임장으로 참여 중인 모임이에요.',
+        message: `${meetingName} 모임으로 이동할 수 있어요.`,
+        primaryAction: 'viewMeeting',
+        primaryLabel: '모임 보기',
+        meetingId: response.meetingId,
+        meetingName: response.meetingName,
+      };
+    }
+    if (response.alreadyAccepted) {
+      return {
+        kind: 'alreadyMeetingMember',
+        title: '이미 참여 중인 모임이에요.',
+        message: `${meetingName} 모임으로 이동할 수 있어요.`,
+        primaryAction: 'viewMeeting',
+        primaryLabel: '모임 보기',
+        meetingId: response.meetingId,
+        meetingName: response.meetingName,
+      };
+    }
+    return {
+      kind: 'acceptedMeeting',
+      title: '모임에 참여했어요.',
+      message: `${meetingName} 모임의 일정과 멤버를 함께 볼 수 있어요.`,
+      primaryAction: 'viewMeeting',
+      primaryLabel: '모임 보기',
+      meetingId: response.meetingId,
+      meetingName: response.meetingName,
+    };
+  }
+
+  const tripName = response.tripName ?? '초대받은 여행';
   if (response.role === 'owner' && response.alreadyAccepted) {
     return {
       kind: 'ownerAlready',
       title: '이미 주최자로 참여 중인 여행이에요.',
-      message: `${response.tripName} 여행으로 이동할 수 있어요.`,
+      message: `${tripName} 여행으로 이동할 수 있어요.`,
       primaryAction: 'viewTrip',
       primaryLabel: '여행 보기',
       tripId: response.tripId,
@@ -82,7 +130,7 @@ export function toInviteAcceptViewModel(response: AcceptTripInviteResponse): Inv
     return {
       kind: 'alreadyMember',
       title: '이미 참여 중인 여행이에요.',
-      message: `${response.tripName} 여행으로 이동할 수 있어요.`,
+      message: `${tripName} 여행으로 이동할 수 있어요.`,
       primaryAction: 'viewTrip',
       primaryLabel: '여행 보기',
       tripId: response.tripId,
@@ -93,7 +141,7 @@ export function toInviteAcceptViewModel(response: AcceptTripInviteResponse): Inv
   return {
     kind: 'accepted',
     title: '여행에 참여했어요.',
-    message: `${response.tripName} 여행을 함께 볼 수 있어요.`,
+    message: `${tripName} 여행을 함께 볼 수 있어요.`,
     primaryAction: 'viewTrip',
     primaryLabel: '여행 보기',
     tripId: response.tripId,
@@ -167,7 +215,9 @@ export function getInviteAcceptErrorViewModel(error: unknown): InviteAcceptViewM
 }
 
 export function buildKakaoInviteTemplate(input: InviteShareInput): TextTemplateType {
-  const text = `여행 초대가 왔어요.\n${input.tripName}\n칫에서 함께 일정을 확인해요.\n${input.inviteUrl}`;
+  const name = inviteShareName(input);
+  const noun = inviteScopeNoun(input);
+  const text = `${noun} 초대가 왔어요.\n${name}\n칫에서 함께 일정을 확인해요.\n${input.inviteUrl}`;
   const link = buildKakaoInviteLink(input.inviteUrl);
 
   return {
@@ -190,9 +240,11 @@ export function toKakaoInviteRedirectPath(
 }
 
 export function buildFallbackShareContent(input: InviteShareInput): ShareContent {
+  const name = inviteShareName(input);
+  const noun = inviteScopeNoun(input);
   return {
-    title: '칫 여행 초대',
-    message: `여행 초대가 왔어요.\n${input.tripName}\n칫에서 함께 일정을 확인해요.\n${input.inviteUrl}`,
+    title: `칫 ${noun} 초대`,
+    message: `${noun} 초대가 왔어요.\n${name}\n칫에서 함께 일정을 확인해요.\n${input.inviteUrl}`,
     url: input.inviteUrl,
   };
 }
@@ -210,6 +262,14 @@ export function getInviteActionErrorMessage(error: unknown): string {
 
 export function getKakaoShareFailureMessage(): string {
   return '카카오톡 공유를 열 수 없어요. 링크를 복사하거나 다른 앱으로 공유해보세요.';
+}
+
+function inviteShareName(input: InviteShareInput): string {
+  return input.title ?? input.tripName ?? '초대';
+}
+
+function inviteScopeNoun(input: InviteShareInput): string {
+  return input.scope === 'meeting' ? '모임' : '여행';
 }
 
 function buildKakaoInviteLink(inviteUrl: string): LinkType {

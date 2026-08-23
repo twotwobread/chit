@@ -30,6 +30,12 @@ func writeMeetingError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusForbidden, "FORBIDDEN", "forbidden", nil)
 	case errors.Is(err, meeting.ErrNotFound):
 		writeError(w, http.StatusNotFound, "NOT_FOUND", "meeting or event not found", nil)
+	case errors.Is(err, meeting.ErrConflict):
+		writeError(w, http.StatusConflict, "CONFLICT", "meeting member state conflict", nil)
+	case errors.Is(err, meeting.ErrInviteExpired):
+		writeError(w, http.StatusGone, "INVITE_EXPIRED", "invite token expired or deactivated", nil)
+	case errors.Is(err, meeting.ErrInviteNotFound):
+		writeError(w, http.StatusNotFound, "INVITE_NOT_FOUND", "invite token not found", nil)
 	default:
 		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error", nil)
 	}

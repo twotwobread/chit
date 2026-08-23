@@ -2,6 +2,8 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
+import type { AcceptTripInviteResponse } from '../models/AcceptTripInviteResponse';
+import type { CreateMeetingInviteResponse } from '../models/CreateMeetingInviteResponse';
 import type { CreateMeetingRequest } from '../models/CreateMeetingRequest';
 import type { CreateMeetingResponse } from '../models/CreateMeetingResponse';
 import type { GetMeetingResponse } from '../models/GetMeetingResponse';
@@ -68,6 +70,111 @@ export class MeetingsService {
                 400: `Validation error.`,
                 401: `Unauthorized.`,
                 404: `Meeting not found or not visible to the current user.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
+     * Create or retrieve the current meeting invite link
+     * Creates a new invite link for a saved meeting owner, or returns the existing unexpired current invite link. Hidden one-off meetings are not exposed through this endpoint.
+     * @param meetingId
+     * @returns CreateMeetingInviteResponse Existing active meeting invite link returned.
+     * @throws ApiError
+     */
+    public static createMeetingInvite(
+        meetingId: string,
+    ): CancelablePromise<CreateMeetingInviteResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/meetings/{meetingId}/invites',
+            path: {
+                'meetingId': meetingId,
+            },
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                403: `Forbidden.`,
+                404: `Meeting not found or not visible to the current user.`,
+                409: `Invite token conflict after retry.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
+     * Leave a saved meeting
+     * Removes the authenticated non-owner member from a saved meeting. Owners cannot leave until an owner transfer flow exists.
+     * @param meetingId
+     * @returns void
+     * @throws ApiError
+     */
+    public static leaveMeeting(
+        meetingId: string,
+    ): CancelablePromise<void> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/meetings/{meetingId}/members/me',
+            path: {
+                'meetingId': meetingId,
+            },
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                404: `Meeting not found or not visible to the current user.`,
+                409: `Owner transfer is required before leaving.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
+     * Remove a saved meeting member
+     * Removes a non-owner member from a saved meeting when requested by the authenticated meeting owner. Existing trip/event participation is not mutated.
+     * @param meetingId
+     * @param memberId
+     * @returns void
+     * @throws ApiError
+     */
+    public static removeMeetingMember(
+        meetingId: string,
+        memberId: string,
+    ): CancelablePromise<void> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/meetings/{meetingId}/members/{memberId}',
+            path: {
+                'meetingId': meetingId,
+                'memberId': memberId,
+            },
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                403: `Forbidden.`,
+                404: `Meeting/member not found or not visible to the current user.`,
+                409: `Owner cannot be removed before ownership transfer.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
+     * Accept a meeting or trip invite link
+     * Accepts a reusable active meeting invite for the authenticated user, and falls back to legacy trip invite acceptance when no meeting invite token matches. Existing meeting members or trip participants receive an idempotent success response.
+     * @param token
+     * @returns AcceptTripInviteResponse Invite accepted or already accepted.
+     * @throws ApiError
+     */
+    public static acceptTripInvite(
+        token: string,
+    ): CancelablePromise<AcceptTripInviteResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/invites/{token}/accept',
+            path: {
+                'token': token,
+            },
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                404: `Invite token not found.`,
+                410: `Invite token expired or deactivated.`,
                 500: `Unexpected server error.`,
             },
         });

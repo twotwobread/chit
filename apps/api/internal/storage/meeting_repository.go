@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/twotwobread/i-um/apps/api/internal/db"
 	"github.com/twotwobread/i-um/apps/api/internal/meeting"
+	"github.com/twotwobread/i-um/apps/api/internal/trip"
 )
 
 func (s *Store) GetMeetingCreator(ctx context.Context, userID string) (meeting.Creator, bool, error) {
@@ -126,6 +127,132 @@ func (s *Store) GetMeetingDetailForMember(ctx context.Context, meetingID string,
 	}, true, nil
 }
 
+func (s *Store) CreateOrReturnMeetingInvite(ctx context.Context, record meeting.CreateMeetingInviteRecord) (meeting.CreateMeetingInviteResult, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return meeting.CreateMeetingInviteResult{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	qtx := s.queries.WithTx(tx)
+	if _, err := qtx.LockSavedMeetingForInviteByOwner(ctx, db.LockSavedMeetingForInviteByOwnerParams{MeetingID: mustUUID(record.MeetingID), UserID: mustUUID(record.CreatedBy)}); err == pgx.ErrNoRows {
+		return meeting.CreateMeetingInviteResult{}, meeting.ErrNotFound
+	} else if err != nil {
+		return meeting.CreateMeetingInviteResult{}, err
+	}
+
+	current, err := qtx.GetCurrentMeetingInviteForUpdate(ctx, mustUUID(record.MeetingID))
+	if err != nil && err != pgx.ErrNoRows {
+		return meeting.CreateMeetingInviteResult{}, err
+	}
+	if err == nil {
+		invite := meetingInviteFromRow(current.ID, current.MeetingID, current.Token, current.ExpiresAt, current.CreatedAt, current.CreatedBy)
+		if invite.ExpiresAt.After(record.Now) {
+			if err := tx.Commit(ctx); err != nil {
+				return meeting.CreateMeetingInviteResult{}, err
+			}
+			return meeting.CreateMeetingInviteResult{Invite: invite, Created: false}, nil
+		}
+		if err := qtx.DeactivateMeetingInvite(ctx, db.DeactivateMeetingInviteParams{InviteID: mustUUID(current.ID), DeactivatedAt: timestamptzValue(record.Now)}); err != nil {
+			return meeting.CreateMeetingInviteResult{}, err
+		}
+	}
+
+	exists, err := qtx.InviteTokenExists(ctx, record.Token)
+	if err != nil {
+		return meeting.CreateMeetingInviteResult{}, err
+	}
+	if exists {
+		return meeting.CreateMeetingInviteResult{}, meeting.ErrConflict
+	}
+	created, err := qtx.CreateMeetingInvite(ctx, db.CreateMeetingInviteParams{
+		MeetingID: mustUUID(record.MeetingID),
+		Token:     record.Token,
+		CreatedBy: mustUUID(record.CreatedBy),
+		ExpiresAt: timestamptzValue(record.ExpiresAt),
+		CreatedAt: timestamptzValue(record.Now),
+	})
+	if isUniqueConstraintViolation(err, "meeting_invites_token_unique") || isUniqueConstraintViolation(err, "meeting_invites_one_current_per_meeting") {
+		return meeting.CreateMeetingInviteResult{}, meeting.ErrConflict
+	}
+	if err != nil {
+		return meeting.CreateMeetingInviteResult{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return meeting.CreateMeetingInviteResult{}, err
+	}
+	return meeting.CreateMeetingInviteResult{Invite: meetingInviteFromRow(created.ID, created.MeetingID, created.Token, created.ExpiresAt, created.CreatedAt, created.CreatedBy), Created: true}, nil
+}
+
+func (s *Store) AcceptMeetingInvite(ctx context.Context, record meeting.AcceptMeetingInviteRecord) (meeting.AcceptMeetingInviteResult, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return meeting.AcceptMeetingInviteResult{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	qtx := s.queries.WithTx(tx)
+	invite, err := qtx.GetMeetingInviteForAccept(ctx, record.Token)
+	if err == pgx.ErrNoRows {
+		return meeting.AcceptMeetingInviteResult{}, meeting.ErrInviteNotFound
+	}
+	if err != nil {
+		return meeting.AcceptMeetingInviteResult{}, err
+	}
+	if invite.DeactivatedAt.Valid || !invite.ExpiresAt.Time.After(record.Now) {
+		return meeting.AcceptMeetingInviteResult{}, meeting.ErrInviteExpired
+	}
+
+	member, err := qtx.GetMeetingMemberForUser(ctx, db.GetMeetingMemberForUserParams{MeetingID: mustUUID(invite.MiMeetingID), UserID: mustUUID(record.UserID)})
+	if err == nil {
+		if err := tx.Commit(ctx); err != nil {
+			return meeting.AcceptMeetingInviteResult{}, err
+		}
+		return meeting.AcceptMeetingInviteResult{MeetingID: invite.MiMeetingID, MeetingName: invite.MeetingName, Role: member.Role, AlreadyAccepted: true}, nil
+	}
+	if err != pgx.ErrNoRows {
+		return meeting.AcceptMeetingInviteResult{}, err
+	}
+
+	user, err := qtx.GetUserByID(ctx, mustUUID(record.UserID))
+	if err == pgx.ErrNoRows {
+		return meeting.AcceptMeetingInviteResult{}, meeting.ErrUnauthorized
+	}
+	if err != nil {
+		return meeting.AcceptMeetingInviteResult{}, err
+	}
+	displayName := trip.NormalizeParticipantDisplayName(user.DisplayName)
+	created, err := qtx.CreateMeetingMember(ctx, db.CreateMeetingMemberParams{MeetingID: mustUUID(invite.MiMeetingID), UserID: mustUUID(record.UserID), Role: meeting.RoleMember, DisplayName: displayName})
+	if isUniqueConstraintViolation(err, "meeting_members_meeting_user_unique") {
+		member, err := qtx.GetMeetingMemberForUser(ctx, db.GetMeetingMemberForUserParams{MeetingID: mustUUID(invite.MiMeetingID), UserID: mustUUID(record.UserID)})
+		if err != nil {
+			return meeting.AcceptMeetingInviteResult{}, err
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return meeting.AcceptMeetingInviteResult{}, err
+		}
+		return meeting.AcceptMeetingInviteResult{MeetingID: invite.MiMeetingID, MeetingName: invite.MeetingName, Role: member.Role, AlreadyAccepted: true}, nil
+	}
+	if err != nil {
+		return meeting.AcceptMeetingInviteResult{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return meeting.AcceptMeetingInviteResult{}, err
+	}
+	return meeting.AcceptMeetingInviteResult{MeetingID: invite.MiMeetingID, MeetingName: invite.MeetingName, Role: created.Role, AlreadyAccepted: false}, nil
+}
+
+func (s *Store) DeleteMeetingMember(ctx context.Context, meetingID string, memberID string) (bool, error) {
+	_, err := s.queries.DeleteMeetingMemberByID(ctx, db.DeleteMeetingMemberByIDParams{MeetingID: mustUUID(meetingID), MemberID: mustUUID(memberID)})
+	if err == pgx.ErrNoRows {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 func (s *Store) CreateEventWithMeeting(ctx context.Context, record meeting.CreateEventRecord) (meeting.CreateEventResult, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -214,6 +341,10 @@ func (s *Store) GetEventForParticipant(ctx context.Context, eventID string, user
 
 func meetingFromCreateRow(row db.CreateMeetingRow) meeting.Meeting {
 	return meeting.Meeting{ID: row.ID, Name: row.Name, Visibility: row.Visibility, CreatedBy: row.CreatedBy, CreatedAt: row.CreatedAt.Time, UpdatedAt: row.UpdatedAt.Time}
+}
+
+func meetingInviteFromRow(id string, meetingID string, token string, expiresAt pgtype.Timestamptz, createdAt pgtype.Timestamptz, createdBy string) meeting.MeetingInvite {
+	return meeting.MeetingInvite{ID: id, MeetingID: meetingID, Token: token, ExpiresAt: expiresAt.Time, CreatedAt: createdAt.Time, CreatedBy: createdBy}
 }
 
 func meetingFromSavedRow(row db.GetSavedMeetingForMemberRow) meeting.Meeting {

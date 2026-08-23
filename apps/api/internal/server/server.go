@@ -76,7 +76,7 @@ func NewRouterWithConfig(readiness readinessChecker, config Config) http.Handler
 
 	var meetingService *meeting.Service
 	if repo, ok := readiness.(meeting.Repository); ok {
-		meetingService = meeting.NewService(repo)
+		meetingService = meeting.NewService(repo, meeting.WithInviteBaseURL(config.InviteBaseURL))
 	}
 
 	var notificationService *notification.Service

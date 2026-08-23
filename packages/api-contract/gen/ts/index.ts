@@ -35,6 +35,7 @@ export type { CreateManualScheduleItemRequest } from './models/CreateManualSched
 export type { CreateManualScheduleItemResponse } from './models/CreateManualScheduleItemResponse';
 export type { CreateManualTripPlaceRequest } from './models/CreateManualTripPlaceRequest';
 export type { CreateManualTripPlaceResponse } from './models/CreateManualTripPlaceResponse';
+export type { CreateMeetingInviteResponse } from './models/CreateMeetingInviteResponse';
 export type { CreateMeetingRequest } from './models/CreateMeetingRequest';
 export type { CreateMeetingResponse } from './models/CreateMeetingResponse';
 export type { CreateQuickExpenseRequest } from './models/CreateQuickExpenseRequest';
@@ -95,6 +96,7 @@ export type { GooglePlacePhotoAttribution } from './models/GooglePlacePhotoAttri
 export type { GooglePlaceSearchPhoto } from './models/GooglePlaceSearchPhoto';
 export type { GooglePlaceSearchResult } from './models/GooglePlaceSearchResult';
 export type { HealthResponse } from './models/HealthResponse';
+export type { InviteScope } from './models/InviteScope';
 export type { LinkedIdentity } from './models/LinkedIdentity';
 export type { ListDayExpensesResponse } from './models/ListDayExpensesResponse';
 export type { ListMeetingsResponse } from './models/ListMeetingsResponse';
@@ -111,6 +113,7 @@ export type { MarkNotificationReadResponse } from './models/MarkNotificationRead
 export type { MarkScheduleItemArrivedResponse } from './models/MarkScheduleItemArrivedResponse';
 export type { MarkScheduleItemSkippedResponse } from './models/MarkScheduleItemSkippedResponse';
 export type { Meeting } from './models/Meeting';
+export type { MeetingInvite } from './models/MeetingInvite';
 export type { MeetingListItem } from './models/MeetingListItem';
 export type { MeetingMember } from './models/MeetingMember';
 export type { MeetingMemberRole } from './models/MeetingMemberRole';

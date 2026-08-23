@@ -268,6 +268,9 @@ func (s *Store) DeleteAccount(ctx context.Context, userID string, now time.Time)
 	if err := qtx.DeactivateActiveInvitesCreatedByUserID(ctx, db.DeactivateActiveInvitesCreatedByUserIDParams{Column1: userUUID, DeactivatedAt: deletedAt}); err != nil {
 		return err
 	}
+	if err := qtx.DeactivateActiveMeetingInvitesCreatedByUserID(ctx, db.DeactivateActiveMeetingInvitesCreatedByUserIDParams{Column1: userUUID, DeactivatedAt: deletedAt}); err != nil {
+		return err
+	}
 	if err := qtx.DeleteAuthIdentitiesByUserID(ctx, userUUID); err != nil {
 		return err
 	}

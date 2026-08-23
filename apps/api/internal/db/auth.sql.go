@@ -346,6 +346,38 @@ func (q *Queries) DeactivateActiveInvitesCreatedByUserID(ctx context.Context, ar
 	return err
 }
 
+const deactivateActiveMeetingInvitesCreatedByUserID = `-- name: DeactivateActiveMeetingInvitesCreatedByUserID :exec
+UPDATE meeting_invites invite
+SET deactivated_at = $2
+WHERE invite.created_by = $1::uuid
+  AND invite.deactivated_at IS NULL
+  AND EXISTS (
+    SELECT 1
+    FROM meeting_members deleting_member
+    WHERE deleting_member.meeting_id = invite.meeting_id
+      AND deleting_member.user_id = $1::uuid
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM meeting_members other_member
+    JOIN users other_user
+      ON other_user.id = other_member.user_id
+     AND other_user.deleted_at IS NULL
+    WHERE other_member.meeting_id = invite.meeting_id
+      AND other_member.user_id <> $1::uuid
+  )
+`
+
+type DeactivateActiveMeetingInvitesCreatedByUserIDParams struct {
+	Column1       pgtype.UUID
+	DeactivatedAt pgtype.Timestamptz
+}
+
+func (q *Queries) DeactivateActiveMeetingInvitesCreatedByUserID(ctx context.Context, arg DeactivateActiveMeetingInvitesCreatedByUserIDParams) error {
+	_, err := q.db.Exec(ctx, deactivateActiveMeetingInvitesCreatedByUserID, arg.Column1, arg.DeactivatedAt)
+	return err
+}
+
 const deleteAuthIdentitiesByUserID = `-- name: DeleteAuthIdentitiesByUserID :exec
 DELETE FROM auth_identities
 WHERE user_id = $1::uuid
