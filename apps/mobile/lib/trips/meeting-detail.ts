@@ -23,9 +23,12 @@ export type MeetingDetailEventViewModel = {
 
 export type MeetingDetailMemberViewModel = {
   id: string;
+  userId: string;
   displayName: string;
   roleLabel: string;
   joinedAt: string;
+  isCurrentUser: boolean;
+  canRemove: boolean;
 };
 
 export type MeetingDetailSettlementTaskViewModel = {
@@ -45,6 +48,8 @@ export type MeetingDetailViewModel = {
   pastEvents: MeetingDetailEventViewModel[];
   settlementTasks: MeetingDetailSettlementTaskViewModel[];
   members: MeetingDetailMemberViewModel[];
+  canCreateInvite: boolean;
+  canLeaveMeeting: boolean;
   isEmpty: boolean;
 };
 
@@ -52,14 +57,19 @@ export type BuildMeetingDetailViewModelInput = {
   detail: GetMeetingResponse;
   settlementSummary: GetMySettlementSummaryResponse;
   today: string;
+  currentUserId?: string | null;
 };
 
 export function buildMeetingDetailViewModel({
   detail,
   settlementSummary,
+  currentUserId,
   today,
 }: BuildMeetingDetailViewModelInput): MeetingDetailViewModel {
-  const members = [...detail.members].sort(compareMeetingMembers).map(toMemberViewModel);
+  const sortedMembers = [...detail.members].sort(compareMeetingMembers);
+  const currentMember = sortedMembers.find((member) => member.userId === currentUserId) ?? null;
+  const currentUserIsOwner = currentMember?.role === 'owner';
+  const members = sortedMembers.map((member) => toMemberViewModel(member, { currentUserId, currentUserIsOwner }));
   const upcomingEvents = detail.events
     .filter((event) => event.endDate >= today)
     .sort(compareUpcomingEvents)
@@ -94,6 +104,8 @@ export function buildMeetingDetailViewModel({
     pastEvents,
     settlementTasks,
     members,
+    canCreateInvite: currentUserIsOwner,
+    canLeaveMeeting: Boolean(currentMember && currentMember.role !== 'owner'),
     isEmpty: upcomingEvents.length === 0 && pastEvents.length === 0 && settlementTasks.length === 0,
   };
 }
@@ -111,12 +123,19 @@ export function meetingMemberRoleLabel(role: MeetingMemberRole): string {
   }
 }
 
-function toMemberViewModel(member: MeetingMember): MeetingDetailMemberViewModel {
+function toMemberViewModel(
+  member: MeetingMember,
+  options: { currentUserId?: string | null; currentUserIsOwner: boolean },
+): MeetingDetailMemberViewModel {
+  const isCurrentUser = member.userId === options.currentUserId;
   return {
     id: member.id,
+    userId: member.userId,
     displayName: member.displayName,
     roleLabel: meetingMemberRoleLabel(member.role),
     joinedAt: member.joinedAt,
+    isCurrentUser,
+    canRemove: options.currentUserIsOwner && !isCurrentUser && member.role !== 'owner',
   };
 }
 

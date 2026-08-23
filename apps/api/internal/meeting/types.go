@@ -26,10 +26,13 @@ const (
 )
 
 var (
-	ErrValidation   = errors.New("validation error")
-	ErrUnauthorized = errors.New("unauthorized")
-	ErrForbidden    = errors.New("forbidden")
-	ErrNotFound     = errors.New("not found")
+	ErrValidation     = errors.New("validation error")
+	ErrUnauthorized   = errors.New("unauthorized")
+	ErrForbidden      = errors.New("forbidden")
+	ErrNotFound       = errors.New("not found")
+	ErrConflict       = errors.New("conflict")
+	ErrInviteNotFound = errors.New("invite not found")
+	ErrInviteExpired  = errors.New("invite expired")
 )
 
 type Creator struct {
@@ -133,6 +136,42 @@ type EventParticipant struct {
 	JoinedAt        time.Time
 }
 
+type MeetingInvite struct {
+	ID        string
+	MeetingID string
+	Token     string
+	InviteURL string
+	ExpiresAt time.Time
+	CreatedAt time.Time
+	CreatedBy string
+}
+
+type CreateMeetingInviteRecord struct {
+	MeetingID string
+	CreatedBy string
+	Token     string
+	Now       time.Time
+	ExpiresAt time.Time
+}
+
+type CreateMeetingInviteResult struct {
+	Invite  MeetingInvite
+	Created bool
+}
+
+type AcceptMeetingInviteRecord struct {
+	Token  string
+	UserID string
+	Now    time.Time
+}
+
+type AcceptMeetingInviteResult struct {
+	MeetingID       string
+	MeetingName     string
+	Role            string
+	AlreadyAccepted bool
+}
+
 type CreateMeetingResult struct {
 	Meeting     Meeting
 	OwnerMember MeetingMember
@@ -161,6 +200,9 @@ type Repository interface {
 	ListSavedMeetingsByMemberUser(ctx context.Context, userID string) ([]MeetingListItem, error)
 	GetSavedMeetingForMember(ctx context.Context, meetingID string, userID string) (Meeting, bool, error)
 	GetMeetingDetailForMember(ctx context.Context, meetingID string, userID string) (MeetingDetailResult, bool, error)
+	CreateOrReturnMeetingInvite(ctx context.Context, record CreateMeetingInviteRecord) (CreateMeetingInviteResult, error)
+	AcceptMeetingInvite(ctx context.Context, record AcceptMeetingInviteRecord) (AcceptMeetingInviteResult, error)
+	DeleteMeetingMember(ctx context.Context, meetingID string, memberID string) (bool, error)
 	CreateEventWithMeeting(ctx context.Context, record CreateEventRecord) (CreateEventResult, error)
 	GetEventForParticipant(ctx context.Context, eventID string, userID string) (EventDetailResult, bool, error)
 }

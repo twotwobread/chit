@@ -309,6 +309,27 @@ WHERE invite.created_by = $1::uuid
       AND other_participant.user_id <> $1::uuid
   );
 
+-- name: DeactivateActiveMeetingInvitesCreatedByUserID :exec
+UPDATE meeting_invites invite
+SET deactivated_at = $2
+WHERE invite.created_by = $1::uuid
+  AND invite.deactivated_at IS NULL
+  AND EXISTS (
+    SELECT 1
+    FROM meeting_members deleting_member
+    WHERE deleting_member.meeting_id = invite.meeting_id
+      AND deleting_member.user_id = $1::uuid
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM meeting_members other_member
+    JOIN users other_user
+      ON other_user.id = other_member.user_id
+     AND other_user.deleted_at IS NULL
+    WHERE other_member.meeting_id = invite.meeting_id
+      AND other_member.user_id <> $1::uuid
+  );
+
 -- name: DeleteSoloTripsByUserID :exec
 DELETE FROM trips trip
 WHERE trip.id IN (

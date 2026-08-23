@@ -61,6 +61,11 @@ func TestDeleteAccountTransactionAnonymizesSharedTripsAndInvalidatesAuth(t *test
 	insertAuthDeletionParticipant(t, ctx, store, ownedSharedTripID, lateMemberID, "member", "늦은멤버", "2026-06-21T10:00:00Z")
 	insertAuthDeletionInvite(t, ctx, store, ownedSharedTripID, deleteUserID, "cccccccccccccccccccccccccccccccc")
 
+	ownedSharedMeetingID := insertAuthDeletionMeeting(t, ctx, store, "계정삭제테스트 모임오너공유", deleteUserID)
+	insertAuthDeletionMeetingMember(t, ctx, store, ownedSharedMeetingID, deleteUserID, "owner", "삭제전 이름", "2026-06-21T08:00:00Z")
+	insertAuthDeletionMeetingMember(t, ctx, store, ownedSharedMeetingID, successorID, "member", "후임", "2026-06-21T09:00:00Z")
+	insertAuthDeletionMeetingInvite(t, ctx, store, ownedSharedMeetingID, deleteUserID, "dddddddddddddddddddddddddddddddd")
+
 	deleteAt := time.Date(2026, 6, 24, 12, 0, 0, 0, time.UTC)
 	if err := store.DeleteAccount(ctx, deleteUserID, deleteAt); err != nil {
 		t.Fatalf("delete account: %v", err)
@@ -111,6 +116,15 @@ func TestDeleteAccountTransactionAnonymizesSharedTripsAndInvalidatesAuth(t *test
 
 	assertAuthDeletionDeactivatedInvite(t, ctx, store, memberSharedTripID, deleteAt)
 	assertAuthDeletionDeactivatedInvite(t, ctx, store, ownedSharedTripID, deleteAt)
+	assertAuthDeletionDeactivatedMeetingInvite(t, ctx, store, ownedSharedMeetingID, deleteAt)
+
+	var meetingCreatedBy string
+	if err := store.pool.QueryRow(ctx, `SELECT created_by::text FROM meetings WHERE id = $1::uuid`, ownedSharedMeetingID).Scan(&meetingCreatedBy); err != nil {
+		t.Fatalf("load transferred meeting owner: %v", err)
+	}
+	if meetingCreatedBy != successorID {
+		t.Fatalf("expected meeting created_by transferred to %q, got %q", successorID, meetingCreatedBy)
+	}
 
 	if _, ok, err := store.FindUserByIdentity(ctx, auth.ProviderApple, "delete-subject"); err != nil || ok {
 		t.Fatalf("expected deleted identity to be removed, ok=%v err=%v", ok, err)
@@ -250,10 +264,43 @@ func insertAuthDeletionParticipant(t *testing.T, ctx context.Context, store *Sto
 func insertAuthDeletionInvite(t *testing.T, ctx context.Context, store *Store, tripID string, createdBy string, token string) {
 	t.Helper()
 	if _, err := store.pool.Exec(ctx, `
-		INSERT INTO trip_invites (trip_id, token, created_by, expires_at)
-		VALUES ($1::uuid, $2, $3::uuid, '2026-08-01T00:00:00Z')
+		INSERT INTO trip_invites (trip_id, token, created_by, expires_at, created_at)
+		VALUES ($1::uuid, $2, $3::uuid, '2026-08-01T00:00:00Z', '2026-06-21T00:00:00Z')
 	`, tripID, token, createdBy); err != nil {
 		t.Fatalf("insert invite trip=%s user=%s: %v", tripID, createdBy, err)
+	}
+}
+
+func insertAuthDeletionMeeting(t *testing.T, ctx context.Context, store *Store, name string, createdBy string) string {
+	t.Helper()
+	var meetingID string
+	if err := store.pool.QueryRow(ctx, `
+		INSERT INTO meetings (name, visibility, created_by)
+		VALUES ($1, 'saved', $2::uuid)
+		RETURNING id::text
+	`, name, createdBy).Scan(&meetingID); err != nil {
+		t.Fatalf("insert meeting %q: %v", name, err)
+	}
+	return meetingID
+}
+
+func insertAuthDeletionMeetingMember(t *testing.T, ctx context.Context, store *Store, meetingID string, userID string, role string, displayName string, joinedAt string) {
+	t.Helper()
+	if _, err := store.pool.Exec(ctx, `
+		INSERT INTO meeting_members (meeting_id, user_id, role, display_name, joined_at)
+		VALUES ($1::uuid, $2::uuid, $3, $4, $5::timestamptz)
+	`, meetingID, userID, role, displayName, joinedAt); err != nil {
+		t.Fatalf("insert meeting member meeting=%s user=%s: %v", meetingID, userID, err)
+	}
+}
+
+func insertAuthDeletionMeetingInvite(t *testing.T, ctx context.Context, store *Store, meetingID string, createdBy string, token string) {
+	t.Helper()
+	if _, err := store.pool.Exec(ctx, `
+		INSERT INTO meeting_invites (meeting_id, token, created_by, expires_at, created_at)
+		VALUES ($1::uuid, $2, $3::uuid, '2026-08-01T00:00:00Z', '2026-06-21T00:00:00Z')
+	`, meetingID, token, createdBy); err != nil {
+		t.Fatalf("insert meeting invite meeting=%s user=%s: %v", meetingID, createdBy, err)
 	}
 }
 
@@ -295,6 +342,17 @@ func assertAuthDeletionDeactivatedInvite(t *testing.T, ctx context.Context, stor
 	}
 }
 
+func assertAuthDeletionDeactivatedMeetingInvite(t *testing.T, ctx context.Context, store *Store, meetingID string, want time.Time) {
+	t.Helper()
+	var deactivatedAt time.Time
+	if err := store.pool.QueryRow(ctx, `SELECT deactivated_at FROM meeting_invites WHERE meeting_id = $1::uuid`, meetingID).Scan(&deactivatedAt); err != nil {
+		t.Fatalf("load meeting invite deactivation: %v", err)
+	}
+	if !deactivatedAt.Equal(want) {
+		t.Fatalf("expected meeting invite deactivated_at %v, got %v", want, deactivatedAt)
+	}
+}
+
 func cleanupAuthDeletionFixture(t *testing.T, store *Store, userIDs []string) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -304,6 +362,13 @@ func cleanupAuthDeletionFixture(t *testing.T, store *Store, userIDs []string) {
 			DELETE FROM trips
 			WHERE id IN (
 			  SELECT trip_id FROM trip_participants WHERE user_id = $1::uuid
+			)
+			OR created_by = $1::uuid
+		`, userID)
+		_, _ = store.pool.Exec(ctx, `
+			DELETE FROM meetings
+			WHERE id IN (
+			  SELECT meeting_id FROM meeting_members WHERE user_id = $1::uuid
 			)
 			OR created_by = $1::uuid
 		`, userID)

@@ -1145,6 +1145,206 @@ func TestCreateEventWithExistingMeetingRequiresMembershipAndGetEventRequiresPart
 	}
 }
 
+func TestMeetingInviteLifecycleAndMemberManagementHandlers(t *testing.T) {
+	backend := newFakeAuthBackend()
+	owner := loginTestUserSession(t, backend, "meeting-invite-owner", "민수")
+	member := loginTestUserSession(t, backend, "meeting-invite-member", "지은")
+	outsider := loginTestUserSession(t, backend, "meeting-invite-outsider", "하준")
+
+	createMeetingRecorder := httptest.NewRecorder()
+	createMeetingRequest := httptest.NewRequest(http.MethodPost, "/meetings", bytes.NewReader([]byte(`{"name":"등산 모임"}`)))
+	createMeetingRequest.Header.Set("Content-Type", "application/json")
+	createMeetingRequest.Header.Set("Authorization", "Bearer "+owner.AccessToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(createMeetingRecorder, createMeetingRequest)
+	if createMeetingRecorder.Code != http.StatusCreated {
+		t.Fatalf("expected create meeting status %d, got %d with body %s", http.StatusCreated, createMeetingRecorder.Code, createMeetingRecorder.Body.String())
+	}
+	var meetingBody struct {
+		Meeting struct {
+			ID string `json:"id"`
+		} `json:"meeting"`
+	}
+	if err := json.NewDecoder(createMeetingRecorder.Body).Decode(&meetingBody); err != nil {
+		t.Fatalf("decode meeting: %v", err)
+	}
+
+	memberInviteRecorder := httptest.NewRecorder()
+	memberInviteRequest := httptest.NewRequest(http.MethodPost, "/meetings/"+meetingBody.Meeting.ID+"/invites", nil)
+	memberInviteRequest.Header.Set("Authorization", "Bearer "+member.AccessToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(memberInviteRecorder, memberInviteRequest)
+	if memberInviteRecorder.Code != http.StatusNotFound {
+		t.Fatalf("expected non-member invite status %d, got %d with body %s", http.StatusNotFound, memberInviteRecorder.Code, memberInviteRecorder.Body.String())
+	}
+
+	inviteRecorder := httptest.NewRecorder()
+	inviteRequest := httptest.NewRequest(http.MethodPost, "/meetings/"+meetingBody.Meeting.ID+"/invites", nil)
+	inviteRequest.Header.Set("Authorization", "Bearer "+owner.AccessToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(inviteRecorder, inviteRequest)
+	if inviteRecorder.Code != http.StatusCreated {
+		t.Fatalf("expected invite status %d, got %d with body %s", http.StatusCreated, inviteRecorder.Code, inviteRecorder.Body.String())
+	}
+	var inviteBody struct {
+		Created bool `json:"created"`
+		Invite  struct {
+			MeetingID string `json:"meetingId"`
+			Token     string `json:"token"`
+			InviteURL string `json:"inviteUrl"`
+		} `json:"invite"`
+	}
+	if err := json.NewDecoder(inviteRecorder.Body).Decode(&inviteBody); err != nil {
+		t.Fatalf("decode invite response: %v", err)
+	}
+	if !inviteBody.Created || inviteBody.Invite.MeetingID != meetingBody.Meeting.ID || !strings.Contains(inviteBody.Invite.InviteURL, "/invite/"+inviteBody.Invite.Token) {
+		t.Fatalf("unexpected invite response: %#v", inviteBody)
+	}
+
+	acceptRecorder := httptest.NewRecorder()
+	acceptRequest := httptest.NewRequest(http.MethodPost, "/invites/"+inviteBody.Invite.Token+"/accept", nil)
+	acceptRequest.Header.Set("Authorization", "Bearer "+member.AccessToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(acceptRecorder, acceptRequest)
+	if acceptRecorder.Code != http.StatusOK {
+		t.Fatalf("expected accept status %d, got %d with body %s", http.StatusOK, acceptRecorder.Code, acceptRecorder.Body.String())
+	}
+	var acceptBody struct {
+		Scope           string `json:"scope"`
+		MeetingID       string `json:"meetingId"`
+		MeetingName     string `json:"meetingName"`
+		Role            string `json:"role"`
+		AlreadyAccepted bool   `json:"alreadyAccepted"`
+	}
+	if err := json.NewDecoder(acceptRecorder.Body).Decode(&acceptBody); err != nil {
+		t.Fatalf("decode accept response: %v", err)
+	}
+	if acceptBody.Scope != "meeting" || acceptBody.MeetingID != meetingBody.Meeting.ID || acceptBody.Role != "member" || acceptBody.AlreadyAccepted {
+		t.Fatalf("unexpected accept response: %#v", acceptBody)
+	}
+
+	reacceptRecorder := httptest.NewRecorder()
+	reacceptRequest := httptest.NewRequest(http.MethodPost, "/invites/"+inviteBody.Invite.Token+"/accept", nil)
+	reacceptRequest.Header.Set("Authorization", "Bearer "+member.AccessToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(reacceptRecorder, reacceptRequest)
+	if reacceptRecorder.Code != http.StatusOK {
+		t.Fatalf("expected reaccept status %d, got %d with body %s", http.StatusOK, reacceptRecorder.Code, reacceptRecorder.Body.String())
+	}
+	var reacceptBody struct {
+		AlreadyAccepted bool `json:"alreadyAccepted"`
+	}
+	if err := json.NewDecoder(reacceptRecorder.Body).Decode(&reacceptBody); err != nil {
+		t.Fatalf("decode reaccept response: %v", err)
+	}
+	if !reacceptBody.AlreadyAccepted {
+		t.Fatalf("expected idempotent reaccept, got %#v", reacceptBody)
+	}
+
+	meetingDetailRecorder := httptest.NewRecorder()
+	meetingDetailRequest := httptest.NewRequest(http.MethodGet, "/meetings/"+meetingBody.Meeting.ID, nil)
+	meetingDetailRequest.Header.Set("Authorization", "Bearer "+owner.AccessToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(meetingDetailRecorder, meetingDetailRequest)
+	if meetingDetailRecorder.Code != http.StatusOK {
+		t.Fatalf("expected detail status %d, got %d with body %s", http.StatusOK, meetingDetailRecorder.Code, meetingDetailRecorder.Body.String())
+	}
+	var detailBody struct {
+		Members []struct {
+			ID     string `json:"id"`
+			UserID string `json:"userId"`
+			Role   string `json:"role"`
+		} `json:"members"`
+	}
+	if err := json.NewDecoder(meetingDetailRecorder.Body).Decode(&detailBody); err != nil {
+		t.Fatalf("decode detail response: %v", err)
+	}
+	var memberID string
+	for _, item := range detailBody.Members {
+		if item.UserID == member.UserID {
+			memberID = item.ID
+		}
+	}
+	if memberID == "" {
+		t.Fatalf("expected accepted member in detail: %#v", detailBody.Members)
+	}
+
+	outsiderRemoveRecorder := httptest.NewRecorder()
+	outsiderRemoveRequest := httptest.NewRequest(http.MethodDelete, "/meetings/"+meetingBody.Meeting.ID+"/members/"+memberID, nil)
+	outsiderRemoveRequest.Header.Set("Authorization", "Bearer "+outsider.AccessToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(outsiderRemoveRecorder, outsiderRemoveRequest)
+	if outsiderRemoveRecorder.Code != http.StatusNotFound {
+		t.Fatalf("expected outsider remove status %d, got %d with body %s", http.StatusNotFound, outsiderRemoveRecorder.Code, outsiderRemoveRecorder.Body.String())
+	}
+
+	removeRecorder := httptest.NewRecorder()
+	removeRequest := httptest.NewRequest(http.MethodDelete, "/meetings/"+meetingBody.Meeting.ID+"/members/"+memberID, nil)
+	removeRequest.Header.Set("Authorization", "Bearer "+owner.AccessToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(removeRecorder, removeRequest)
+	if removeRecorder.Code != http.StatusNoContent {
+		t.Fatalf("expected owner remove status %d, got %d with body %s", http.StatusNoContent, removeRecorder.Code, removeRecorder.Body.String())
+	}
+
+	reacceptForLeaveRecorder := httptest.NewRecorder()
+	reacceptForLeaveRequest := httptest.NewRequest(http.MethodPost, "/invites/"+inviteBody.Invite.Token+"/accept", nil)
+	reacceptForLeaveRequest.Header.Set("Authorization", "Bearer "+member.AccessToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(reacceptForLeaveRecorder, reacceptForLeaveRequest)
+	if reacceptForLeaveRecorder.Code != http.StatusOK {
+		t.Fatalf("expected rejoin status %d, got %d with body %s", http.StatusOK, reacceptForLeaveRecorder.Code, reacceptForLeaveRecorder.Body.String())
+	}
+	leaveRecorder := httptest.NewRecorder()
+	leaveRequest := httptest.NewRequest(http.MethodDelete, "/meetings/"+meetingBody.Meeting.ID+"/members/me", nil)
+	leaveRequest.Header.Set("Authorization", "Bearer "+member.AccessToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(leaveRecorder, leaveRequest)
+	if leaveRecorder.Code != http.StatusNoContent {
+		t.Fatalf("expected member leave status %d, got %d with body %s", http.StatusNoContent, leaveRecorder.Code, leaveRecorder.Body.String())
+	}
+
+	ownerLeaveRecorder := httptest.NewRecorder()
+	ownerLeaveRequest := httptest.NewRequest(http.MethodDelete, "/meetings/"+meetingBody.Meeting.ID+"/members/me", nil)
+	ownerLeaveRequest.Header.Set("Authorization", "Bearer "+owner.AccessToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(ownerLeaveRecorder, ownerLeaveRequest)
+	if ownerLeaveRecorder.Code != http.StatusConflict {
+		t.Fatalf("expected owner leave conflict %d, got %d with body %s", http.StatusConflict, ownerLeaveRecorder.Code, ownerLeaveRecorder.Body.String())
+	}
+}
+
+func TestMeetingInviteAcceptFallsBackToLegacyTripInvites(t *testing.T) {
+	backend := newFakeAuthBackend()
+	owner := loginTestUserSession(t, backend, "trip-invite-owner", "민수")
+	member := loginTestUserSession(t, backend, "trip-invite-member", "지은")
+	tripID := createTestTrip(t, backend, owner.AccessToken)
+
+	inviteRecorder := httptest.NewRecorder()
+	inviteRequest := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/invites", nil)
+	inviteRequest.Header.Set("Authorization", "Bearer "+owner.AccessToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(inviteRecorder, inviteRequest)
+	if inviteRecorder.Code != http.StatusCreated {
+		t.Fatalf("expected trip invite status %d, got %d with body %s", http.StatusCreated, inviteRecorder.Code, inviteRecorder.Body.String())
+	}
+	var inviteBody struct {
+		Invite struct {
+			Token string `json:"token"`
+		} `json:"invite"`
+	}
+	if err := json.NewDecoder(inviteRecorder.Body).Decode(&inviteBody); err != nil {
+		t.Fatalf("decode trip invite: %v", err)
+	}
+
+	acceptRecorder := httptest.NewRecorder()
+	acceptRequest := httptest.NewRequest(http.MethodPost, "/invites/"+inviteBody.Invite.Token+"/accept", nil)
+	acceptRequest.Header.Set("Authorization", "Bearer "+member.AccessToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(acceptRecorder, acceptRequest)
+	if acceptRecorder.Code != http.StatusOK {
+		t.Fatalf("expected trip accept status %d, got %d with body %s", http.StatusOK, acceptRecorder.Code, acceptRecorder.Body.String())
+	}
+	var acceptBody struct {
+		Scope  string `json:"scope"`
+		TripID string `json:"tripId"`
+		Role   string `json:"role"`
+	}
+	if err := json.NewDecoder(acceptRecorder.Body).Decode(&acceptBody); err != nil {
+		t.Fatalf("decode trip accept response: %v", err)
+	}
+	if acceptBody.Scope != "trip" || acceptBody.TripID != tripID || acceptBody.Role != "member" {
+		t.Fatalf("unexpected trip fallback response: %#v", acceptBody)
+	}
+}
+
 func TestCreateTripHandler(t *testing.T) {
 	backend := newFakeAuthBackend()
 	accessToken := loginTestUser(t, backend)
@@ -5598,6 +5798,7 @@ type fakeAuthBackend struct {
 	personalDetails   map[string]flightdomain.PersonalDetail
 	meetings          map[string]meetingdomain.Meeting
 	meetingMembers    map[string][]meetingdomain.MeetingMember
+	meetingInvites    map[string]meetingdomain.MeetingInvite
 	events            map[string]meetingdomain.Event
 	eventParticipants map[string][]meetingdomain.EventParticipant
 	reorderErr        error
@@ -5829,6 +6030,7 @@ func newFakeAuthBackend() *fakeAuthBackend {
 		personalDetails:   map[string]flightdomain.PersonalDetail{},
 		meetings:          map[string]meetingdomain.Meeting{},
 		meetingMembers:    map[string][]meetingdomain.MeetingMember{},
+		meetingInvites:    map[string]meetingdomain.MeetingInvite{},
 		events:            map[string]meetingdomain.Event{},
 		eventParticipants: map[string][]meetingdomain.EventParticipant{},
 	}
@@ -6136,6 +6338,92 @@ func (b *fakeAuthBackend) GetEventForParticipant(_ context.Context, eventID stri
 		}
 	}
 	return meetingdomain.EventDetailResult{}, false, nil
+}
+
+func (b *fakeAuthBackend) CreateOrReturnMeetingInvite(_ context.Context, record meetingdomain.CreateMeetingInviteRecord) (meetingdomain.CreateMeetingInviteResult, error) {
+	meeting, ok := b.meetings[record.MeetingID]
+	if !ok || meeting.Visibility != meetingdomain.MeetingVisibilitySaved {
+		return meetingdomain.CreateMeetingInviteResult{}, meetingdomain.ErrNotFound
+	}
+	isOwner := false
+	for _, member := range b.meetingMembers[record.MeetingID] {
+		if member.UserID == record.CreatedBy && member.Role == meetingdomain.RoleOwner {
+			isOwner = true
+			break
+		}
+	}
+	if !isOwner {
+		return meetingdomain.CreateMeetingInviteResult{}, meetingdomain.ErrForbidden
+	}
+	if current, ok := b.meetingInvites[record.MeetingID]; ok && current.ExpiresAt.After(record.Now) {
+		return meetingdomain.CreateMeetingInviteResult{Invite: current, Created: false}, nil
+	}
+	for _, invite := range b.meetingInvites {
+		if invite.Token == record.Token {
+			return meetingdomain.CreateMeetingInviteResult{}, meetingdomain.ErrConflict
+		}
+	}
+	for _, invite := range b.tripInvites {
+		if invite.Token == record.Token {
+			return meetingdomain.CreateMeetingInviteResult{}, meetingdomain.ErrConflict
+		}
+	}
+	b.nextInvite++
+	invite := meetingdomain.MeetingInvite{ID: testUUID(14000 + b.nextInvite), MeetingID: record.MeetingID, Token: record.Token, ExpiresAt: record.ExpiresAt, CreatedAt: record.Now, CreatedBy: record.CreatedBy}
+	b.meetingInvites[record.MeetingID] = invite
+	return meetingdomain.CreateMeetingInviteResult{Invite: invite, Created: true}, nil
+}
+
+func (b *fakeAuthBackend) AcceptMeetingInvite(_ context.Context, record meetingdomain.AcceptMeetingInviteRecord) (meetingdomain.AcceptMeetingInviteResult, error) {
+	var found meetingdomain.MeetingInvite
+	for _, invite := range b.meetingInvites {
+		if invite.Token == record.Token {
+			found = invite
+			break
+		}
+	}
+	if found.ID == "" {
+		return meetingdomain.AcceptMeetingInviteResult{}, meetingdomain.ErrInviteNotFound
+	}
+	if !found.ExpiresAt.After(record.Now) {
+		return meetingdomain.AcceptMeetingInviteResult{}, meetingdomain.ErrInviteExpired
+	}
+	meeting := b.meetings[found.MeetingID]
+	if meeting.Visibility != meetingdomain.MeetingVisibilitySaved {
+		return meetingdomain.AcceptMeetingInviteResult{}, meetingdomain.ErrInviteNotFound
+	}
+	for _, member := range b.meetingMembers[found.MeetingID] {
+		if member.UserID == record.UserID {
+			return meetingdomain.AcceptMeetingInviteResult{MeetingID: found.MeetingID, MeetingName: meeting.Name, Role: member.Role, AlreadyAccepted: true}, nil
+		}
+	}
+	user, ok := b.users[record.UserID]
+	if !ok {
+		return meetingdomain.AcceptMeetingInviteResult{}, meetingdomain.ErrUnauthorized
+	}
+	b.nextMeetingMember++
+	member := meetingdomain.MeetingMember{ID: testUUID(9000 + b.nextMeetingMember), MeetingID: found.MeetingID, UserID: record.UserID, Role: meetingdomain.RoleMember, DisplayName: tripdomain.NormalizeParticipantDisplayName(user.DisplayName), JoinedAt: record.Now}
+	b.meetingMembers[found.MeetingID] = append(b.meetingMembers[found.MeetingID], member)
+	return meetingdomain.AcceptMeetingInviteResult{MeetingID: found.MeetingID, MeetingName: meeting.Name, Role: member.Role, AlreadyAccepted: false}, nil
+}
+
+func (b *fakeAuthBackend) DeleteMeetingMember(_ context.Context, meetingID string, memberID string) (bool, error) {
+	members := b.meetingMembers[meetingID]
+	for index, member := range members {
+		if member.ID != memberID {
+			continue
+		}
+		b.meetingMembers[meetingID] = append(members[:index], members[index+1:]...)
+		for eventID, participants := range b.eventParticipants {
+			for participantIndex := range participants {
+				if participants[participantIndex].MeetingMemberID != nil && *participants[participantIndex].MeetingMemberID == memberID {
+					b.eventParticipants[eventID][participantIndex].MeetingMemberID = nil
+				}
+			}
+		}
+		return true, nil
+	}
+	return false, nil
 }
 
 func (b *fakeAuthBackend) GetCreator(_ context.Context, userID string) (tripdomain.Creator, bool, error) {

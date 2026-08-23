@@ -39,6 +39,17 @@ type fakeRepository struct {
 	eventFound          bool
 	eventLookupID       string
 	eventLookupUserID   string
+
+	createdInvite        CreateMeetingInviteRecord
+	createInviteCalled   bool
+	createInviteResult   CreateMeetingInviteResult
+	acceptedInvite       AcceptMeetingInviteRecord
+	acceptInviteCalled   bool
+	acceptInviteResult   AcceptMeetingInviteResult
+	deletedMeetingMember string
+	deleteMeetingID      string
+	deleteMeetingCalled  bool
+	deleteMeetingResult  bool
 }
 
 func (r *fakeRepository) GetMeetingCreator(context.Context, string) (Creator, bool, error) {
@@ -135,8 +146,50 @@ func (r *fakeRepository) GetEventForParticipant(_ context.Context, eventID strin
 	return r.eventDetail, r.eventFound, nil
 }
 
+func (r *fakeRepository) CreateOrReturnMeetingInvite(_ context.Context, record CreateMeetingInviteRecord) (CreateMeetingInviteResult, error) {
+	r.createdInvite = record
+	r.createInviteCalled = true
+	if r.createInviteResult.Invite.ID != "" {
+		return r.createInviteResult, nil
+	}
+	return CreateMeetingInviteResult{
+		Invite: MeetingInvite{
+			ID:        "invite-1",
+			MeetingID: record.MeetingID,
+			Token:     record.Token,
+			ExpiresAt: record.ExpiresAt,
+			CreatedAt: record.Now,
+			CreatedBy: record.CreatedBy,
+		},
+		Created: true,
+	}, nil
+}
+
+func (r *fakeRepository) AcceptMeetingInvite(_ context.Context, record AcceptMeetingInviteRecord) (AcceptMeetingInviteResult, error) {
+	r.acceptedInvite = record
+	r.acceptInviteCalled = true
+	if r.acceptInviteResult.MeetingID != "" {
+		return r.acceptInviteResult, nil
+	}
+	return AcceptMeetingInviteResult{MeetingID: testMeetingID, MeetingName: "등산 모임", Role: RoleMember, AlreadyAccepted: false}, nil
+}
+
+func (r *fakeRepository) DeleteMeetingMember(_ context.Context, meetingID string, memberID string) (bool, error) {
+	r.deleteMeetingID = meetingID
+	r.deletedMeetingMember = memberID
+	r.deleteMeetingCalled = true
+	if r.deleteMeetingResult {
+		return true, nil
+	}
+	return false, nil
+}
+
 func newTestService(repo *fakeRepository) *Service {
-	return NewService(repo)
+	service := NewService(repo)
+	service.generateInviteToken = func() (string, error) { return "meeting-token-abcdefghijklmnopqrstuvwxyz123456", nil }
+	service.now = func() time.Time { return time.Date(2026, 8, 23, 10, 0, 0, 0, time.UTC) }
+	service.inviteBaseURL = "https://chit.test"
+	return service
 }
 
 func TestCreateMeetingCreatesSavedOwnerMeeting(t *testing.T) {
@@ -343,5 +396,118 @@ func TestGetEventRequiresParticipant(t *testing.T) {
 	}
 	if result.Event.MeetingVisibility != MeetingVisibilityOneOff || repo.eventLookupUserID != testUserID {
 		t.Fatalf("unexpected event lookup/result: lookup=%q result=%#v", repo.eventLookupUserID, result)
+	}
+}
+
+func TestCreateMeetingInviteRequiresSavedMeetingOwner(t *testing.T) {
+	ownerMember := MeetingMember{ID: "00000000-0000-0000-0000-000000000401", MeetingID: testMeetingID, UserID: testUserID, Role: RoleOwner, DisplayName: "민수"}
+	repo := &fakeRepository{
+		meetingDetailFound: true,
+		meetingDetail: MeetingDetailResult{
+			Meeting: Meeting{ID: testMeetingID, Name: "등산 모임", Visibility: MeetingVisibilitySaved},
+			Members: []MeetingMember{ownerMember, MeetingMember{ID: "00000000-0000-0000-0000-000000000402", MeetingID: testMeetingID, UserID: "00000000-0000-0000-0000-000000000102", Role: RoleMember, DisplayName: "지은"}},
+		},
+	}
+
+	result, err := newTestService(repo).CreateInvite(context.Background(), testUserID, testMeetingID)
+	if err != nil {
+		t.Fatalf("CreateInvite returned error: %v", err)
+	}
+	if !repo.createInviteCalled || repo.createdInvite.MeetingID != testMeetingID || repo.createdInvite.CreatedBy != testUserID {
+		t.Fatalf("unexpected invite record: %#v", repo.createdInvite)
+	}
+	if result.Invite.InviteURL != "https://chit.test/invite/meeting-token-abcdefghijklmnopqrstuvwxyz123456" || !result.Created {
+		t.Fatalf("unexpected invite result: %#v", result)
+	}
+
+	memberRepo := &fakeRepository{
+		meetingDetailFound: true,
+		meetingDetail: MeetingDetailResult{
+			Meeting: Meeting{ID: testMeetingID, Name: "등산 모임", Visibility: MeetingVisibilitySaved},
+			Members: []MeetingMember{{ID: "00000000-0000-0000-0000-000000000402", MeetingID: testMeetingID, UserID: testUserID, Role: RoleMember, DisplayName: "지은"}},
+		},
+	}
+	_, err = newTestService(memberRepo).CreateInvite(context.Background(), testUserID, testMeetingID)
+	if !errors.Is(err, ErrForbidden) {
+		t.Fatalf("expected ErrForbidden for member invite create, got %v", err)
+	}
+	if memberRepo.createInviteCalled {
+		t.Fatal("member should not create meeting invite")
+	}
+
+	_, err = newTestService(&fakeRepository{}).CreateInvite(context.Background(), testUserID, testMeetingID)
+	if !errors.Is(err, ErrNotFound) {
+		t.Fatalf("expected ErrNotFound for hidden/missing meeting, got %v", err)
+	}
+}
+
+func TestAcceptMeetingInviteCreatesMemberAndIsIdempotent(t *testing.T) {
+	repo := &fakeRepository{}
+	result, err := newTestService(repo).AcceptInvite(context.Background(), testUserID, " meeting-token-abcdefghijklmnopqrstuvwxyz123456 ")
+	if err != nil {
+		t.Fatalf("AcceptInvite returned error: %v", err)
+	}
+	if !repo.acceptInviteCalled || repo.acceptedInvite.Token != "meeting-token-abcdefghijklmnopqrstuvwxyz123456" || repo.acceptedInvite.UserID != testUserID {
+		t.Fatalf("unexpected accept record: %#v", repo.acceptedInvite)
+	}
+	if result.MeetingID != testMeetingID || result.Role != RoleMember || result.AlreadyAccepted {
+		t.Fatalf("unexpected accept result: %#v", result)
+	}
+
+	alreadyRepo := &fakeRepository{acceptInviteResult: AcceptMeetingInviteResult{MeetingID: testMeetingID, MeetingName: "등산 모임", Role: RoleOwner, AlreadyAccepted: true}}
+	already, err := newTestService(alreadyRepo).AcceptInvite(context.Background(), testUserID, "meeting-token-abcdefghijklmnopqrstuvwxyz123456")
+	if err != nil {
+		t.Fatalf("AcceptInvite already returned error: %v", err)
+	}
+	if !already.AlreadyAccepted || already.Role != RoleOwner {
+		t.Fatalf("expected idempotent owner already accepted, got %#v", already)
+	}
+
+	_, err = newTestService(repo).AcceptInvite(context.Background(), " ", "meeting-token-abcdefghijklmnopqrstuvwxyz123456")
+	if !errors.Is(err, ErrUnauthorized) {
+		t.Fatalf("expected ErrUnauthorized, got %v", err)
+	}
+	_, err = newTestService(repo).AcceptInvite(context.Background(), testUserID, "short")
+	if !errors.Is(err, ErrValidation) {
+		t.Fatalf("expected ErrValidation, got %v", err)
+	}
+}
+
+func TestRemoveAndLeaveMeetingMembersEnforceMinimalPolicy(t *testing.T) {
+	owner := MeetingMember{ID: "00000000-0000-0000-0000-000000000401", MeetingID: testMeetingID, UserID: testUserID, Role: RoleOwner, DisplayName: "민수"}
+	member := MeetingMember{ID: "00000000-0000-0000-0000-000000000402", MeetingID: testMeetingID, UserID: "00000000-0000-0000-0000-000000000102", Role: RoleMember, DisplayName: "지은"}
+	repo := &fakeRepository{
+		meetingDetailFound:  true,
+		meetingDetail:       MeetingDetailResult{Meeting: Meeting{ID: testMeetingID, Name: "등산 모임", Visibility: MeetingVisibilitySaved}, Members: []MeetingMember{owner, member}},
+		deleteMeetingResult: true,
+	}
+
+	if err := newTestService(repo).RemoveMember(context.Background(), testUserID, testMeetingID, member.ID); err != nil {
+		t.Fatalf("RemoveMember returned error: %v", err)
+	}
+	if !repo.deleteMeetingCalled || repo.deletedMeetingMember != member.ID {
+		t.Fatalf("expected member delete, got meeting=%q member=%q", repo.deleteMeetingID, repo.deletedMeetingMember)
+	}
+
+	if err := newTestService(repo).RemoveMember(context.Background(), member.UserID, testMeetingID, owner.ID); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("expected member remove forbidden, got %v", err)
+	}
+	if err := newTestService(repo).RemoveMember(context.Background(), testUserID, testMeetingID, owner.ID); !errors.Is(err, ErrConflict) {
+		t.Fatalf("expected owner removal conflict, got %v", err)
+	}
+
+	leaveRepo := &fakeRepository{
+		meetingDetailFound:  true,
+		meetingDetail:       MeetingDetailResult{Meeting: Meeting{ID: testMeetingID, Name: "등산 모임", Visibility: MeetingVisibilitySaved}, Members: []MeetingMember{owner, member}},
+		deleteMeetingResult: true,
+	}
+	if err := newTestService(leaveRepo).LeaveMeeting(context.Background(), member.UserID, testMeetingID); err != nil {
+		t.Fatalf("LeaveMeeting returned error: %v", err)
+	}
+	if leaveRepo.deletedMeetingMember != member.ID {
+		t.Fatalf("expected leaving member delete, got %q", leaveRepo.deletedMeetingMember)
+	}
+	if err := newTestService(leaveRepo).LeaveMeeting(context.Background(), testUserID, testMeetingID); !errors.Is(err, ErrConflict) {
+		t.Fatalf("expected owner leave conflict, got %v", err)
 	}
 }

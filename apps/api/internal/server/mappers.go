@@ -74,6 +74,21 @@ func createMeetingResponseToOpenAPI(result meeting.CreateMeetingResult) openapi.
 	return openapi.CreateMeetingResponse{Meeting: meetingToOpenAPI(result.Meeting), OwnerMember: meetingMemberToOpenAPI(result.OwnerMember)}
 }
 
+func createMeetingInviteResponseToOpenAPI(result meeting.CreateMeetingInviteResult) openapi.CreateMeetingInviteResponse {
+	return openapi.CreateMeetingInviteResponse{
+		Invite: openapi.MeetingInvite{
+			Id:        result.Invite.ID,
+			MeetingId: result.Invite.MeetingID,
+			Token:     result.Invite.Token,
+			InviteUrl: result.Invite.InviteURL,
+			ExpiresAt: result.Invite.ExpiresAt,
+			CreatedAt: result.Invite.CreatedAt,
+			CreatedBy: result.Invite.CreatedBy,
+		},
+		Created: result.Created,
+	}
+}
+
 func getMeetingResponseToOpenAPI(result meeting.MeetingDetailResult) openapi.GetMeetingResponse {
 	members := make([]openapi.MeetingMember, 0, len(result.Members))
 	for _, member := range result.Members {
@@ -326,10 +341,21 @@ func createTripInviteResponseToOpenAPI(result trip.CreateTripInviteResult) opena
 	}
 }
 
+func acceptMeetingInviteResponseToOpenAPI(result meeting.AcceptMeetingInviteResult) openapi.AcceptTripInviteResponse {
+	return openapi.AcceptTripInviteResponse{
+		Scope:           openapi.InviteScopeMeeting,
+		MeetingId:       &result.MeetingID,
+		MeetingName:     &result.MeetingName,
+		Role:            openapi.TripParticipantRole(result.Role),
+		AlreadyAccepted: result.AlreadyAccepted,
+	}
+}
+
 func acceptTripInviteResponseToOpenAPI(result trip.AcceptTripInviteResult) openapi.AcceptTripInviteResponse {
 	return openapi.AcceptTripInviteResponse{
-		TripId:          result.TripID,
-		TripName:        result.TripName,
+		Scope:           openapi.InviteScopeTrip,
+		TripId:          &result.TripID,
+		TripName:        &result.TripName,
 		Role:            openapi.TripParticipantRole(result.Role),
 		AlreadyAccepted: result.AlreadyAccepted,
 	}

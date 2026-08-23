@@ -195,8 +195,8 @@ export class TripsService {
         });
     }
     /**
-     * Accept a trip invite link
-     * Accepts a reusable active trip invite for the authenticated user. Existing participants receive an idempotent success response.
+     * Accept a meeting or trip invite link
+     * Accepts a reusable active meeting invite for the authenticated user, and falls back to legacy trip invite acceptance when no meeting invite token matches. Existing meeting members or trip participants receive an idempotent success response.
      * @param token
      * @returns AcceptTripInviteResponse Invite accepted or already accepted.
      * @throws ApiError

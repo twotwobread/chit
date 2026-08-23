@@ -120,6 +120,85 @@ FROM meeting_members
 WHERE meeting_id = $1::uuid
   AND user_id = $2::uuid;
 
+-- name: LockSavedMeetingForInviteByOwner :one
+SELECT
+  m.id::text,
+  m.name
+FROM meetings m
+JOIN meeting_members mm ON mm.meeting_id = m.id
+WHERE m.id = sqlc.arg(meeting_id)::uuid
+  AND m.visibility = 'saved'
+  AND mm.user_id = sqlc.arg(user_id)::uuid
+  AND mm.role = 'owner'
+FOR UPDATE OF m;
+
+-- name: InviteTokenExists :one
+SELECT (
+  EXISTS (SELECT 1 FROM meeting_invites mi WHERE mi.token = sqlc.arg(invite_token))
+  OR EXISTS (SELECT 1 FROM trip_invites ti WHERE ti.token = sqlc.arg(invite_token))
+)::bool AS exists;
+
+-- name: GetCurrentMeetingInviteForUpdate :one
+SELECT
+  id::text,
+  meeting_id::text,
+  token,
+  expires_at,
+  deactivated_at,
+  created_at,
+  created_by::text
+FROM meeting_invites
+WHERE meeting_id = sqlc.arg(meeting_id)::uuid
+  AND deactivated_at IS NULL
+FOR UPDATE;
+
+-- name: DeactivateMeetingInvite :exec
+UPDATE meeting_invites
+SET deactivated_at = sqlc.arg(deactivated_at)
+WHERE id = sqlc.arg(invite_id)::uuid;
+
+-- name: CreateMeetingInvite :one
+INSERT INTO meeting_invites (
+  meeting_id,
+  token,
+  created_by,
+  expires_at,
+  created_at
+) VALUES (
+  sqlc.arg(meeting_id)::uuid,
+  sqlc.arg(token),
+  sqlc.arg(created_by)::uuid,
+  sqlc.arg(expires_at),
+  sqlc.arg(created_at)
+)
+RETURNING
+  id::text,
+  meeting_id::text,
+  token,
+  expires_at,
+  deactivated_at,
+  created_at,
+  created_by::text;
+
+-- name: GetMeetingInviteForAccept :one
+SELECT
+  mi.id::text,
+  mi.meeting_id::text,
+  m.name AS meeting_name,
+  mi.expires_at,
+  mi.deactivated_at
+FROM meeting_invites mi
+JOIN meetings m ON m.id = mi.meeting_id
+WHERE mi.token = sqlc.arg(invite_token)
+  AND m.visibility = 'saved'
+FOR UPDATE OF mi;
+
+-- name: DeleteMeetingMemberByID :one
+DELETE FROM meeting_members
+WHERE meeting_id = sqlc.arg(meeting_id)::uuid
+  AND id = sqlc.arg(member_id)::uuid
+RETURNING id::text;
+
 -- name: CreateEvent :one
 INSERT INTO events (
   meeting_id,

@@ -198,6 +198,16 @@ type Meeting struct {
 	UpdatedAt  pgtype.Timestamptz
 }
 
+type MeetingInvite struct {
+	ID            pgtype.UUID
+	MeetingID     pgtype.UUID
+	Token         string
+	ExpiresAt     pgtype.Timestamptz
+	DeactivatedAt pgtype.Timestamptz
+	CreatedAt     pgtype.Timestamptz
+	CreatedBy     pgtype.UUID
+}
+
 type MeetingMember struct {
 	ID          pgtype.UUID
 	MeetingID   pgtype.UUID

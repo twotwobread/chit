@@ -72,6 +72,66 @@ func (s apiServer) GetMeeting(w http.ResponseWriter, r *http.Request, meetingId 
 	writeJSON(w, http.StatusOK, getMeetingResponseToOpenAPI(result))
 }
 
+func (s apiServer) CreateMeetingInvite(w http.ResponseWriter, r *http.Request, meetingId string) {
+	if s.auth == nil || s.meetings == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "meeting invite creation is not configured", nil)
+		return
+	}
+
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	result, err := s.meetings.CreateInvite(r.Context(), authContext.UserID, meetingId)
+	if err != nil {
+		writeMeetingError(w, err)
+		return
+	}
+
+	status := http.StatusCreated
+	if !result.Created {
+		status = http.StatusOK
+	}
+	writeJSON(w, status, createMeetingInviteResponseToOpenAPI(result))
+}
+
+func (s apiServer) LeaveMeeting(w http.ResponseWriter, r *http.Request, meetingId string) {
+	if s.auth == nil || s.meetings == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "meeting leave is not configured", nil)
+		return
+	}
+
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	if err := s.meetings.LeaveMeeting(r.Context(), authContext.UserID, meetingId); err != nil {
+		writeMeetingError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s apiServer) RemoveMeetingMember(w http.ResponseWriter, r *http.Request, meetingId string, memberId string) {
+	if s.auth == nil || s.meetings == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "meeting member removal is not configured", nil)
+		return
+	}
+
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	if err := s.meetings.RemoveMember(r.Context(), authContext.UserID, meetingId, memberId); err != nil {
+		writeMeetingError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (s apiServer) CreateEvent(w http.ResponseWriter, r *http.Request) {
 	if s.auth == nil || s.meetings == nil {
 		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "event creation is not configured", nil)

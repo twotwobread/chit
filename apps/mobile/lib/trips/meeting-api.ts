@@ -1,4 +1,9 @@
-import { MeetingsService, type GetMeetingResponse, type ListMeetingsResponse } from '@i-um/api-contract';
+import {
+  MeetingsService,
+  type CreateMeetingInviteResponse,
+  type GetMeetingResponse,
+  type ListMeetingsResponse,
+} from '@i-um/api-contract';
 
 import { runAuthenticatedRequest } from '../auth/client';
 
@@ -8,4 +13,16 @@ export async function listMeetings(): Promise<ListMeetingsResponse> {
 
 export async function getMeeting(meetingId: string): Promise<GetMeetingResponse> {
   return runAuthenticatedRequest(() => MeetingsService.getMeeting(meetingId));
+}
+
+export async function createMeetingInvite(meetingId: string): Promise<CreateMeetingInviteResponse> {
+  return runAuthenticatedRequest(() => MeetingsService.createMeetingInvite(meetingId));
+}
+
+export async function removeMeetingMember(meetingId: string, memberId: string): Promise<void> {
+  return runAuthenticatedRequest(() => MeetingsService.removeMeetingMember(meetingId, memberId));
+}
+
+export async function leaveMeeting(meetingId: string): Promise<void> {
+  return runAuthenticatedRequest(() => MeetingsService.leaveMeeting(meetingId));
 }

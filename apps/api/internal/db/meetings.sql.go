@@ -216,6 +216,69 @@ func (q *Queries) CreateMeeting(ctx context.Context, arg CreateMeetingParams) (C
 	return i, err
 }
 
+const createMeetingInvite = `-- name: CreateMeetingInvite :one
+INSERT INTO meeting_invites (
+  meeting_id,
+  token,
+  created_by,
+  expires_at,
+  created_at
+) VALUES (
+  $1::uuid,
+  $2,
+  $3::uuid,
+  $4,
+  $5
+)
+RETURNING
+  id::text,
+  meeting_id::text,
+  token,
+  expires_at,
+  deactivated_at,
+  created_at,
+  created_by::text
+`
+
+type CreateMeetingInviteParams struct {
+	MeetingID pgtype.UUID
+	Token     string
+	CreatedBy pgtype.UUID
+	ExpiresAt pgtype.Timestamptz
+	CreatedAt pgtype.Timestamptz
+}
+
+type CreateMeetingInviteRow struct {
+	ID            string
+	MeetingID     string
+	Token         string
+	ExpiresAt     pgtype.Timestamptz
+	DeactivatedAt pgtype.Timestamptz
+	CreatedAt     pgtype.Timestamptz
+	CreatedBy     string
+}
+
+func (q *Queries) CreateMeetingInvite(ctx context.Context, arg CreateMeetingInviteParams) (CreateMeetingInviteRow, error) {
+	row := q.db.QueryRow(ctx, createMeetingInvite,
+		arg.MeetingID,
+		arg.Token,
+		arg.CreatedBy,
+		arg.ExpiresAt,
+		arg.CreatedAt,
+	)
+	var i CreateMeetingInviteRow
+	err := row.Scan(
+		&i.ID,
+		&i.MeetingID,
+		&i.Token,
+		&i.ExpiresAt,
+		&i.DeactivatedAt,
+		&i.CreatedAt,
+		&i.CreatedBy,
+	)
+	return i, err
+}
+
 const createMeetingMember = `-- name: CreateMeetingMember :one
 INSERT INTO meeting_members (
   meeting_id,
@@ -268,6 +331,81 @@ func (q *Queries) CreateMeetingMember(ctx context.Context, arg CreateMeetingMemb
 		&i.Role,
 		&i.DisplayName,
 		&i.JoinedAt,
+	)
+	return i, err
+}
+
+const deactivateMeetingInvite = `-- name: DeactivateMeetingInvite :exec
+UPDATE meeting_invites
+SET deactivated_at = $1
+WHERE id = $2::uuid
+`
+
+type DeactivateMeetingInviteParams struct {
+	DeactivatedAt pgtype.Timestamptz
+	InviteID      pgtype.UUID
+}
+
+func (q *Queries) DeactivateMeetingInvite(ctx context.Context, arg DeactivateMeetingInviteParams) error {
+	_, err := q.db.Exec(ctx, deactivateMeetingInvite, arg.DeactivatedAt, arg.InviteID)
+	return err
+}
+
+const deleteMeetingMemberByID = `-- name: DeleteMeetingMemberByID :one
+DELETE FROM meeting_members
+WHERE meeting_id = $1::uuid
+  AND id = $2::uuid
+RETURNING id::text
+`
+
+type DeleteMeetingMemberByIDParams struct {
+	MeetingID pgtype.UUID
+	MemberID  pgtype.UUID
+}
+
+func (q *Queries) DeleteMeetingMemberByID(ctx context.Context, arg DeleteMeetingMemberByIDParams) (string, error) {
+	row := q.db.QueryRow(ctx, deleteMeetingMemberByID, arg.MeetingID, arg.MemberID)
+	var id string
+	err := row.Scan(&id)
+	return id, err
+}
+
+const getCurrentMeetingInviteForUpdate = `-- name: GetCurrentMeetingInviteForUpdate :one
+SELECT
+  id::text,
+  meeting_id::text,
+  token,
+  expires_at,
+  deactivated_at,
+  created_at,
+  created_by::text
+FROM meeting_invites
+WHERE meeting_id = $1::uuid
+  AND deactivated_at IS NULL
+FOR UPDATE
+`
+
+type GetCurrentMeetingInviteForUpdateRow struct {
+	ID            string
+	MeetingID     string
+	Token         string
+	ExpiresAt     pgtype.Timestamptz
+	DeactivatedAt pgtype.Timestamptz
+	CreatedAt     pgtype.Timestamptz
+	CreatedBy     string
+}
+
+func (q *Queries) GetCurrentMeetingInviteForUpdate(ctx context.Context, meetingID pgtype.UUID) (GetCurrentMeetingInviteForUpdateRow, error) {
+	row := q.db.QueryRow(ctx, getCurrentMeetingInviteForUpdate, meetingID)
+	var i GetCurrentMeetingInviteForUpdateRow
+	err := row.Scan(
+		&i.ID,
+		&i.MeetingID,
+		&i.Token,
+		&i.ExpiresAt,
+		&i.DeactivatedAt,
+		&i.CreatedAt,
+		&i.CreatedBy,
 	)
 	return i, err
 }
@@ -375,6 +513,41 @@ func (q *Queries) GetMeetingCreator(ctx context.Context, dollar_1 pgtype.UUID) (
 	row := q.db.QueryRow(ctx, getMeetingCreator, dollar_1)
 	var i GetMeetingCreatorRow
 	err := row.Scan(&i.ID, &i.DisplayName)
+	return i, err
+}
+
+const getMeetingInviteForAccept = `-- name: GetMeetingInviteForAccept :one
+SELECT
+  mi.id::text,
+  mi.meeting_id::text,
+  m.name AS meeting_name,
+  mi.expires_at,
+  mi.deactivated_at
+FROM meeting_invites mi
+JOIN meetings m ON m.id = mi.meeting_id
+WHERE mi.token = $1
+  AND m.visibility = 'saved'
+FOR UPDATE OF mi
+`
+
+type GetMeetingInviteForAcceptRow struct {
+	MiID          string
+	MiMeetingID   string
+	MeetingName   string
+	ExpiresAt     pgtype.Timestamptz
+	DeactivatedAt pgtype.Timestamptz
+}
+
+func (q *Queries) GetMeetingInviteForAccept(ctx context.Context, inviteToken string) (GetMeetingInviteForAcceptRow, error) {
+	row := q.db.QueryRow(ctx, getMeetingInviteForAccept, inviteToken)
+	var i GetMeetingInviteForAcceptRow
+	err := row.Scan(
+		&i.MiID,
+		&i.MiMeetingID,
+		&i.MeetingName,
+		&i.ExpiresAt,
+		&i.DeactivatedAt,
+	)
 	return i, err
 }
 
@@ -501,6 +674,20 @@ func (q *Queries) GetSavedMeetingForMember(ctx context.Context, arg GetSavedMeet
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const inviteTokenExists = `-- name: InviteTokenExists :one
+SELECT (
+  EXISTS (SELECT 1 FROM meeting_invites mi WHERE mi.token = $1)
+  OR EXISTS (SELECT 1 FROM trip_invites ti WHERE ti.token = $1)
+)::bool AS exists
+`
+
+func (q *Queries) InviteTokenExists(ctx context.Context, inviteToken string) (bool, error) {
+	row := q.db.QueryRow(ctx, inviteTokenExists, inviteToken)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
 }
 
 const listEventsForSavedMeetingByMemberUser = `-- name: ListEventsForSavedMeetingByMemberUser :many
@@ -706,4 +893,34 @@ func (q *Queries) ListSavedMeetingsByMemberUser(ctx context.Context, dollar_1 pg
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockSavedMeetingForInviteByOwner = `-- name: LockSavedMeetingForInviteByOwner :one
+SELECT
+  m.id::text,
+  m.name
+FROM meetings m
+JOIN meeting_members mm ON mm.meeting_id = m.id
+WHERE m.id = $1::uuid
+  AND m.visibility = 'saved'
+  AND mm.user_id = $2::uuid
+  AND mm.role = 'owner'
+FOR UPDATE OF m
+`
+
+type LockSavedMeetingForInviteByOwnerParams struct {
+	MeetingID pgtype.UUID
+	UserID    pgtype.UUID
+}
+
+type LockSavedMeetingForInviteByOwnerRow struct {
+	MID  string
+	Name string
+}
+
+func (q *Queries) LockSavedMeetingForInviteByOwner(ctx context.Context, arg LockSavedMeetingForInviteByOwnerParams) (LockSavedMeetingForInviteByOwnerRow, error) {
+	row := q.db.QueryRow(ctx, lockSavedMeetingForInviteByOwner, arg.MeetingID, arg.UserID)
+	var i LockSavedMeetingForInviteByOwnerRow
+	err := row.Scan(&i.MID, &i.Name)
+	return i, err
 }

@@ -259,6 +259,177 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /meetings/{meetingId}/invites:
+    post:
+      operationId: createMeetingInvite
+      summary: Create or retrieve the current meeting invite link
+      description: Creates a new invite link for a saved meeting owner, or returns the existing unexpired current invite link. Hidden one-off meetings are not exposed through this endpoint.
+      tags:
+        - Meetings
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: meetingId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '201':
+          description: New meeting invite link created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateMeetingInviteResponse'
+        '200':
+          description: Existing active meeting invite link returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateMeetingInviteResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Meeting not found or not visible to the current user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Invite token conflict after retry.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /meetings/{meetingId}/members/me:
+    delete:
+      operationId: leaveMeeting
+      summary: Leave a saved meeting
+      description: Removes the authenticated non-owner member from a saved meeting. Owners cannot leave until an owner transfer flow exists.
+      tags:
+        - Meetings
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: meetingId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Left meeting.
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Meeting not found or not visible to the current user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Owner transfer is required before leaving.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /meetings/{meetingId}/members/{memberId}:
+    delete:
+      operationId: removeMeetingMember
+      summary: Remove a saved meeting member
+      description: Removes a non-owner member from a saved meeting when requested by the authenticated meeting owner. Existing trip/event participation is not mutated.
+      tags:
+        - Meetings
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: meetingId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: memberId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Member removed.
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Meeting/member not found or not visible to the current user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Owner cannot be removed before ownership transfer.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /events:
     post:
       operationId: createEvent
@@ -1211,9 +1382,10 @@ paths:
   /invites/{token}/accept:
     post:
       operationId: acceptTripInvite
-      summary: Accept a trip invite link
-      description: Accepts a reusable active trip invite for the authenticated user. Existing participants receive an idempotent success response.
+      summary: Accept a meeting or trip invite link
+      description: Accepts a reusable active meeting invite for the authenticated user, and falls back to legacy trip invite acceptance when no meeting invite token matches. Existing meeting members or trip participants receive an idempotent success response.
       tags:
+        - Meetings
         - Trips
       security:
         - bearerAuth: []
@@ -7646,14 +7818,69 @@ components:
         created:
           type: boolean
           description: true when this request created a new invite, false when an existing unexpired current invite was reused.
+    MeetingInvite:
+      type: object
+      required:
+        - id
+        - meetingId
+        - token
+        - inviteUrl
+        - expiresAt
+        - createdAt
+        - createdBy
+      properties:
+        id:
+          type: string
+        meetingId:
+          type: string
+        token:
+          type: string
+          minLength: 32
+          maxLength: 128
+          pattern: '^[A-Za-z0-9_-]+$'
+          description: Opaque base64url token. UI copies or shares inviteUrl instead of raw token.
+        inviteUrl:
+          type: string
+          format: uri
+        expiresAt:
+          type: string
+          format: date-time
+          description: UTC ISO 8601 timestamp.
+        createdAt:
+          type: string
+          format: date-time
+          description: UTC ISO 8601 timestamp.
+        createdBy:
+          type: string
+    CreateMeetingInviteResponse:
+      type: object
+      required:
+        - invite
+        - created
+      properties:
+        invite:
+          $ref: '#/components/schemas/MeetingInvite'
+        created:
+          type: boolean
+          description: true when this request created a new invite, false when an existing unexpired current invite was reused.
+    InviteScope:
+      type: string
+      enum:
+        - meeting
+        - trip
     AcceptTripInviteResponse:
       type: object
       required:
-        - tripId
-        - tripName
+        - scope
         - role
         - alreadyAccepted
       properties:
+        scope:
+          $ref: '#/components/schemas/InviteScope'
+        meetingId:
+          type: string
+        meetingName:
+          type: string
         tripId:
           type: string
         tripName:
@@ -7662,7 +7889,7 @@ components:
           $ref: '#/components/schemas/TripParticipantRole'
         alreadyAccepted:
           type: boolean
-          description: false when this request created a new member participant; true when the user was already a participant.
+          description: false when this request created a new meeting member or trip participant; true when the user was already a member/participant.
     TripParticipantSummary:
       type: object
       required:
