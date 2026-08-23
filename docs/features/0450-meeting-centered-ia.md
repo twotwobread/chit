@@ -17,7 +17,7 @@
 
 ## Goal
 
-Chit을 `여행 목록 + 여행 정산` 앱에서 **모임의 일정을 관리하고, 지출·정산을 쉽게 끝내며, 지난 일정이 이력으로 남는 앱**으로 전환한다.
+Chit은 **모임의 일정을 관리하고, 지출·정산을 쉽게 끝내며, 지난 일정이 이력으로 남는 앱**으로 전환한다.
 
 Brand sentence remains:
 
@@ -200,7 +200,7 @@ Follow-up implementation slices should search for stale 여행 중심 terminolog
 Suggested search groups:
 
 ```bash
-rg "여행 중심|여행 목록|여행 상세|trip" docs apps packages
+rg "내 여행|여행 초대|여행 참여자" apps/mobile README.md docs/features/045*.md
 rg "event|meeting|모임|일정" docs apps packages
 rg "지출|장부|정산" apps/mobile/app apps/mobile/lib
 ```

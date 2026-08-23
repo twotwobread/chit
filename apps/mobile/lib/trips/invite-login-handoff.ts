@@ -1,6 +1,6 @@
 import { isInviteTokenFormatValid } from './invite';
 
-export const LOGIN_GENERIC_SUBTITLE = '여행을 함께 이어가려면 로그인해주세요.';
+export const LOGIN_GENERIC_SUBTITLE = '일정을 함께 이어가려면 로그인해주세요.';
 export const LOGIN_INVITE_HANDOFF_SUBTITLE = '로그인하면 이 초대 링크로 돌아와요.';
 
 export type InviteLoginReturnPath = `/invite/${string}`;

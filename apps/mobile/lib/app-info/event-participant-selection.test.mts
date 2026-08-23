@@ -26,7 +26,7 @@ describe('event participant selection source contract', () => {
     const newTripScreen = readRepoFile('apps/mobile/app/trips/new.tsx');
     const editTripScreen = readRepoFile('apps/mobile/app/trips/[tripId]/edit.tsx');
 
-    assert.match(participantsScreen + participantParts, /일정 참여자|여행 참여자/);
+    assert.match(participantsScreen + participantParts, /일정 참여자|일정 참여자/);
     assert.match(participantsScreen + participantParts, /모임 멤버와.*다를 수/);
     assert.match(newTripScreen, /이번 일정 참여자/);
     assert.match(editTripScreen, /이번 일정 참여자/);

@@ -345,7 +345,7 @@ export default function FlightDetailScreen() {
 
       <Card>
         <Text style={styles.sectionTitle}>공유 항공편 정보</Text>
-        <Text style={styles.helper}>여행 참여자는 누구나 편명, 공항, 날짜와 시간을 수정할 수 있어요.</Text>
+        <Text style={styles.helper}>일정 참여자는 누구나 편명, 공항, 날짜와 시간을 수정할 수 있어요.</Text>
         {!editSharedOpen || !editDraft ? (
           <SecondaryButton disabled={updatingShared} label="공유 항공편 정보 수정" onPress={openSharedEdit} />
         ) : (
@@ -461,7 +461,7 @@ export default function FlightDetailScreen() {
 
       <Card>
         <Text style={styles.sectionTitle}>탑승자 추가</Text>
-        <Text style={styles.helper}>현재 여행 참여자 중 아직 이 항공편 탑승자가 아닌 사람을 추가할 수 있어요.</Text>
+        <Text style={styles.helper}>현재 일정 참여자 중 아직 이 항공편 탑승자가 아닌 사람을 추가할 수 있어요.</Text>
         {!addPassengersOpen ? (
           <SecondaryButton disabled={addingPassengers} label="탑승자 추가" onPress={openAddPassengers} />
         ) : (
@@ -633,7 +633,7 @@ function flightDetailErrorMessage(error: unknown): string {
 
 function participantsErrorMessage(error: unknown): string {
   if (error instanceof ApiError && error.status === 403) {
-    return '여행 참여자만 탑승자를 추가할 수 있어요.';
+    return '일정 참여자만 탑승자를 추가할 수 있어요.';
   }
   return '참여자 목록을 불러올 수 없어요. 잠시 후 다시 시도해주세요.';
 }
@@ -654,7 +654,7 @@ function updateFlightErrorMessage(error: unknown): string {
       return '공유 항공편 입력값을 다시 확인해주세요.';
     }
     if (error.status === 403) {
-      return '여행 참여자만 공유 항공편 정보를 수정할 수 있어요.';
+      return '일정 참여자만 공유 항공편 정보를 수정할 수 있어요.';
     }
     if (error.status === 404) {
       return '삭제되었거나 접근할 수 없는 항공편이에요.';
@@ -666,10 +666,10 @@ function updateFlightErrorMessage(error: unknown): string {
 function addPassengersErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     if (error.status === 409) {
-      return '이미 탑승자이거나 현재 여행 참여자가 아니에요. 목록을 새로고침해 주세요.';
+      return '이미 탑승자이거나 현재 일정 참여자가 아니에요. 목록을 새로고침해 주세요.';
     }
     if (error.status === 403) {
-      return '여행 참여자만 탑승자를 추가할 수 있어요.';
+      return '일정 참여자만 탑승자를 추가할 수 있어요.';
     }
     if (error.status === 404) {
       return '삭제되었거나 접근할 수 없는 항공편이에요.';

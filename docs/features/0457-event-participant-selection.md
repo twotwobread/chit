@@ -81,7 +81,7 @@ Existing participant deletion behavior snapshots expense payer/split display nam
 - Existing meeting selection remains in the trip creation flow.
 - After selecting an existing saved meeting, show `이번 일정 참여자` rows from current meeting members.
 - Default all selected; chips/rows can toggle members.
-- Copy clarifies: `모임 멤버와 이 여행 참여자는 다를 수 있어요.`
+- Copy clarifies: `모임 멤버와 이 일정 참여자는 다를 수 있어요.`
 - In trip edit, owners of saved meeting-backed trips see a participant selection card below basic trip info.
 - Expense payer/split pickers continue reading trip participants only.
 

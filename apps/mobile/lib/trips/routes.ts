@@ -2,6 +2,15 @@ import type { Href } from 'expo-router';
 
 export type TripRootTab = 'today' | 'map' | 'itinerary' | 'expenses' | 'settle';
 
+export const TRIP_COMPATIBILITY_ROUTE_POLICY = {
+  basePattern: '/trips/*',
+  canonicalFor: 'trip_planning',
+  retainedBecause:
+    '/trips/* is still the compatibility surface for Day, lodging, flight, map, and trip-specific ledger anchors.',
+  retirementCondition:
+    'Retire only after event route parity exists for trip planning and all stored deep links migrate safely.',
+} as const;
+
 const TRIP_ROOT_TABS: readonly TripRootTab[] = ['today', 'map', 'itinerary', 'expenses', 'settle'];
 
 export type TripHiddenRouteKind =
@@ -136,6 +145,10 @@ export function tripFlightDetailPath(tripId: string, flightId: string): `/trips/
 
 export function isTripRootTab(value: string): value is TripRootTab {
   return TRIP_ROOT_TABS.includes(value as TripRootTab);
+}
+
+export function isTripCompatibilityRoute(pathname: string): boolean {
+  return pathname === '/trips' || pathname.startsWith('/trips/');
 }
 
 export function tripTabPath(tripId: string, tab: TripRootTab): Href {

@@ -133,7 +133,7 @@ export function buildTripAppBarMembers(detail: GetTripDetailResponse | null): Ap
     return [];
   }
 
-  return detail.participantSummary.previewNames.map((name) => ({ name: name.trim() || '여행자' }));
+  return detail.participantSummary.previewNames.map((name) => ({ name: name.trim() || '참여자' }));
 }
 
 export function buildSwitchableTrips(trips: TripListItem[], currentTripId: string): SwitchableTrip[] {

@@ -45,7 +45,7 @@ describe('event participant selection helpers', () => {
     );
     assert.equal(
       validateEventParticipantSelection(members, ['member-a'], 'user-owner'),
-      '내가 참여자로 포함되어야 여행을 만들 수 있어요.',
+      '내가 참여자로 포함되어야 일정을 만들 수 있어요.',
     );
     assert.equal(
       validateEventParticipantSelection(members, ['member-owner', 'missing'], 'user-owner'),
@@ -100,7 +100,7 @@ function meetingMember(overrides: Partial<MeetingMember>): MeetingMember {
     meetingId: 'meeting-id',
     userId: 'user-id',
     role: 'member',
-    displayName: '여행자',
+    displayName: '참여자',
     joinedAt: '2026-06-21T00:00:00Z',
     ...overrides,
   };
@@ -111,7 +111,7 @@ function participant(overrides: Partial<TripParticipantListItem>): TripParticipa
     participantId: 'participant-id',
     userId: 'user-id',
     role: 'member',
-    displayName: '여행자',
+    displayName: '참여자',
     joinedAt: '2026-06-21T00:00:00Z',
     ...overrides,
   };

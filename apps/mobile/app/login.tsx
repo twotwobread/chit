@@ -65,7 +65,7 @@ export default function LoginScreen() {
       <Card style={styles.card}>
         <View style={styles.cardHeader}>
           <Text style={styles.cardTitle}>로그인하면 바로 이어가요</Text>
-          <Text style={styles.cardHelper}>초대받은 여행도, 내 여행도 안전하게 불러옵니다.</Text>
+          <Text style={styles.cardHelper}>초대받은 일정도, 내 일정도 안전하게 불러옵니다.</Text>
         </View>
 
         {providers.map((provider) => {

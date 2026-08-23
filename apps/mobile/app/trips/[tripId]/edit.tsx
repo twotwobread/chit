@@ -380,7 +380,7 @@ export default function EditTripScreen() {
             {meetingMembers.length > 0 ? (
               <FormField
                 disabled={submitting}
-                helperText="모임 멤버와 이 여행 참여자는 다를 수 있어요. 장부와 정산은 여기서 고른 사람 기준이에요."
+                helperText="모임 멤버와 이 일정 참여자는 다를 수 있어요. 장부와 정산은 여기서 고른 사람 기준이에요."
                 label="이번 일정 참여자"
               >
                 <View style={styles.participantSelectionList}>

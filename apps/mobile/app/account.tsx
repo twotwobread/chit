@@ -240,7 +240,7 @@ export default function AccountScreen() {
               <Card style={styles.formCard}>
                 <View style={styles.sectionHeader}>
                   <Text style={styles.sectionTitle}>내 이름 수정</Text>
-                  <Text style={styles.helperText}>여행 참여자와 정산 화면에 표시되는 이름이에요.</Text>
+                  <Text style={styles.helperText}>일정 참여자와 정산 화면에 표시되는 이름이에요.</Text>
                 </View>
                 <TextInputField
                   disabled={isSavingName}

@@ -117,10 +117,10 @@ export function toInviteAcceptViewModel(response: AcceptTripInviteResponse): Inv
   if (response.role === 'owner' && response.alreadyAccepted) {
     return {
       kind: 'ownerAlready',
-      title: '이미 주최자로 참여 중인 여행이에요.',
-      message: `${tripName} 여행으로 이동할 수 있어요.`,
+      title: '이미 주최자로 참여 중인 일정이에요.',
+      message: `${tripName} 일정으로 이동할 수 있어요.`,
       primaryAction: 'viewTrip',
-      primaryLabel: '여행 보기',
+      primaryLabel: '일정 보기',
       tripId: response.tripId,
       tripName: response.tripName,
     };
@@ -129,10 +129,10 @@ export function toInviteAcceptViewModel(response: AcceptTripInviteResponse): Inv
   if (response.alreadyAccepted) {
     return {
       kind: 'alreadyMember',
-      title: '이미 참여 중인 여행이에요.',
-      message: `${tripName} 여행으로 이동할 수 있어요.`,
+      title: '이미 참여 중인 일정이에요.',
+      message: `${tripName} 일정으로 이동할 수 있어요.`,
       primaryAction: 'viewTrip',
-      primaryLabel: '여행 보기',
+      primaryLabel: '일정 보기',
       tripId: response.tripId,
       tripName: response.tripName,
     };
@@ -140,10 +140,10 @@ export function toInviteAcceptViewModel(response: AcceptTripInviteResponse): Inv
 
   return {
     kind: 'accepted',
-    title: '여행에 참여했어요.',
-    message: `${tripName} 여행을 함께 볼 수 있어요.`,
+    title: '일정에 참여했어요.',
+    message: `${tripName} 일정을 함께 볼 수 있어요.`,
     primaryAction: 'viewTrip',
-    primaryLabel: '여행 보기',
+    primaryLabel: '일정 보기',
     tripId: response.tripId,
     tripName: response.tripName,
   };
@@ -252,10 +252,10 @@ export function buildFallbackShareContent(input: InviteShareInput): ShareContent
 export function getInviteActionErrorMessage(error: unknown): string {
   const code = typeof error === 'object' && error !== null && 'code' in error ? String(error.code) : '';
   if (code === 'FORBIDDEN') {
-    return '여행 Owner만 초대 링크를 만들 수 있어요.';
+    return '일정 주최자만 초대 링크를 만들 수 있어요.';
   }
   if (code === 'NOT_FOUND') {
-    return '여행을 찾을 수 없어요.';
+    return '일정을 찾을 수 없어요.';
   }
   return '초대 링크를 만들 수 없어요. 잠시 후 다시 시도해주세요.';
 }
@@ -269,7 +269,7 @@ function inviteShareName(input: InviteShareInput): string {
 }
 
 function inviteScopeNoun(input: InviteShareInput): string {
-  return input.scope === 'meeting' ? '모임' : '여행';
+  return input.scope === 'meeting' ? '모임' : '일정';
 }
 
 function buildKakaoInviteLink(inviteUrl: string): LinkType {

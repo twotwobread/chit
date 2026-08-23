@@ -1073,7 +1073,7 @@ function validateExpenseAmountPayerAndSplits({
 }
 
 function normalizeParticipantDisplayName(value: string): string {
-  return value.trim() || '여행자';
+  return value.trim() || '참여자';
 }
 
 function currencyLabel(currency: SupportedCurrency): string {

@@ -233,10 +233,10 @@ export function selectTodayTrip(trips: TripListItem[], today: string): TodayTrip
 export function buildTodayNoOngoingTripViewModel(): TodayNoOngoingTripViewModel {
   return {
     status: 'noOngoingTrip',
-    title: '오늘 진행 중인 여행이 없어요.',
-    helper: '내 여행에서 예정된 여행을 확인하거나 새 여행을 만들어보세요.',
-    primaryAction: routeAction('내 여행 보기', '/mypage'),
-    secondaryAction: routeAction('새 여행 만들기', '/trips/new'),
+    title: '오늘 진행 중인 일정이 없어요.',
+    helper: '내 일정에서 예정된 일정을 확인하거나 새 일정을 만들어보세요.',
+    primaryAction: routeAction('내 일정 보기', '/mypage'),
+    secondaryAction: routeAction('새 일정 만들기', '/trips/new'),
   };
 }
 
@@ -409,9 +409,9 @@ export function buildTodayRetryableErrorViewModel(tripId?: string): TodayRetryab
   return {
     status: 'retryableError',
     title: '오늘 일정을 불러올 수 없어요.',
-    helper: tripId ? '잠시 후 다시 시도하거나 여행 상세를 확인해주세요.' : '잠시 후 다시 시도해주세요.',
+    helper: tripId ? '잠시 후 다시 시도하거나 일정 상세를 확인해주세요.' : '잠시 후 다시 시도해주세요.',
     primaryAction: retryAction(),
-    ...(tripId ? { secondaryAction: routeAction('여행 상세로', tripDetailPath(tripId)) } : {}),
+    ...(tripId ? { secondaryAction: routeAction('일정 상세로', tripDetailPath(tripId)) } : {}),
   };
 }
 
@@ -419,9 +419,9 @@ export function buildTodayUnavailableViewModel(tripId?: string): TodayUnavailabl
   return {
     status: 'unavailable',
     title: '오늘 일정을 찾을 수 없어요.',
-    helper: '여행 정보가 바뀌었을 수 있어요. 다시 시도하거나 여행 상세를 확인해주세요.',
+    helper: '일정 정보가 바뀌었을 수 있어요. 다시 시도하거나 일정 상세를 확인해주세요.',
     primaryAction: retryAction(),
-    ...(tripId ? { secondaryAction: routeAction('여행 상세로', tripDetailPath(tripId)) } : {}),
+    ...(tripId ? { secondaryAction: routeAction('일정 상세로', tripDetailPath(tripId)) } : {}),
   };
 }
 
@@ -467,8 +467,8 @@ function buildMultipleOngoingTripNotice(ongoingTripCount: number): TodayMultiple
   }
 
   return {
-    message: '다른 진행 중인 여행은 내 여행에서 볼 수 있어요.',
-    action: routeAction('내 여행 보기', '/mypage'),
+    message: '다른 진행 중인 일정은 내 일정에서 볼 수 있어요.',
+    action: routeAction('내 일정 보기', '/mypage'),
   };
 }
 

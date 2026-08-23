@@ -49,7 +49,7 @@ export function validateEventParticipantSelection(
   }
   const currentUserMember = members.find((member) => member.userId === currentUserId);
   if (currentUserMember && !selectedMemberIds.includes(currentUserMember.id)) {
-    return '내가 참여자로 포함되어야 여행을 만들 수 있어요.';
+    return '내가 참여자로 포함되어야 일정을 만들 수 있어요.';
   }
   return null;
 }
@@ -114,5 +114,5 @@ function roleOrder(role: MeetingMember['role']): number {
 
 function normalizeDisplayName(value: string): string {
   const trimmed = value.trim();
-  return trimmed || '여행자';
+  return trimmed || '참여자';
 }

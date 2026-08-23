@@ -394,7 +394,7 @@ test('Issue 372 My Page uses foundation primitives for simple state and section 
   assert.match(partsSource, /ErrorState/);
   assert.match(partsSource, /SkeletonCard/);
   assert.match(partsSource, /label: '다시 시도'[\s\S]*onPress: onRetry/);
-  assert.match(partsSource, /label: '새 여행 만들기'/);
+  assert.match(partsSource, /label: '새 일정 만들기'/);
 });
 
 test('Issue 395 itinerary and map selected actions use Chit action hierarchy', () => {

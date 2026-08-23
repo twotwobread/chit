@@ -148,19 +148,19 @@ export function MyTripsSection({ state, onRetry }: { state: TripListState; onRet
 
   return (
     <View style={styles.sectionStack}>
-      <Text style={styles.sectionTitle}>내 여행</Text>
+      <Text style={styles.sectionTitle}>내 일정</Text>
 
-      {state.status === 'loading' ? <SkeletonCard title="내 여행을 불러오는 중..." /> : null}
+      {state.status === 'loading' ? <SkeletonCard title="내 일정을 불러오는 중..." /> : null}
 
       {state.status === 'error' ? (
-        <ErrorState action={{ label: '다시 시도', onPress: onRetry }} title="내 여행을 불러올 수 없어요." />
+        <ErrorState action={{ label: '다시 시도', onPress: onRetry }} title="내 일정을 불러올 수 없어요." />
       ) : null}
 
       {state.status === 'ready' && state.trips.length === 0 ? (
         <EmptyState
-          action={{ label: '새 여행 만들기', onPress: () => router.push('/trips/new'), variant: 'primary' }}
-          body="새 여행을 만들고 여정을 이어가요."
-          title="아직 여행이 없어요."
+          action={{ label: '새 일정 만들기', onPress: () => router.push('/trips/new'), variant: 'primary' }}
+          body="새 일정을 만들고 기록을 이어가요."
+          title="아직 일정이 없어요."
         />
       ) : null}
 
@@ -168,12 +168,12 @@ export function MyTripsSection({ state, onRetry }: { state: TripListState; onRet
         <>
           <StatRow
             stats={[
-              { label: '전체 여행', value: state.trips.length },
+              { label: '전체 일정', value: state.trips.length },
               { label: '진행 중', value: viewModel.ongoingTripCount },
             ]}
           />
           <TripSections sections={groupedTrips} />
-          <SecondaryButton label="새 여행 만들기" onPress={() => router.push('/trips/new')} />
+          <SecondaryButton label="새 일정 만들기" onPress={() => router.push('/trips/new')} />
         </>
       ) : null}
     </View>

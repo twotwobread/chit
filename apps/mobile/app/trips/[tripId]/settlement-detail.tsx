@@ -74,7 +74,7 @@ export default function SettlementDetailScreen() {
       {state.status === 'loading' ? <TripStateCard loading title="정산 장부 상세를 불러오는 중..." /> : null}
       {state.status === 'auth' ? (
         <TripStateCard
-          helper="정산 장부 상세는 여행 참여자만 볼 수 있어요. 로그인 후 다시 열어주세요."
+          helper="정산 장부 상세는 일정 참여자만 볼 수 있어요. 로그인 후 다시 열어주세요."
           primaryAction={{ label: '로그인하기', onPress: () => router.replace('/login') }}
           title="로그인이 필요해요."
         />

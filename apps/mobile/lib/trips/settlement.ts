@@ -249,7 +249,7 @@ function compactSplitLabel(splitCount: number): string {
 }
 
 function normalizeDisplayName(value: string): string {
-  return value.trim() || '여행자';
+  return value.trim() || '참여자';
 }
 
 function resolveTargetExpenseHistorySection({
