@@ -745,6 +745,70 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /trips/{tripId}/meeting/promotion:
+    post:
+      operationId: promoteTripMeeting
+      summary: Promote a one-off trip meeting
+      description: Saves the one-off meeting backing this trip as a saved meeting without recreating the trip, event, participants, expenses, or settlement data. Only the authenticated trip owner can promote one-off meeting-backed trips.
+      tags:
+        - Trips
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PromoteTripMeetingRequest'
+      responses:
+        '200':
+          description: One-off meeting promoted to a saved meeting.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromoteTripMeetingResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Trip is not backed by a linked one-off meeting or the meeting was already promoted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /trips/{tripId}/flights:
     get:
       operationId: listTripFlights
@@ -7558,6 +7622,29 @@ components:
       properties:
         trip:
           $ref: '#/components/schemas/Trip'
+    PromoteTripMeetingRequest:
+      type: object
+      required:
+        - meetingName
+      additionalProperties: false
+      properties:
+        meetingName:
+          type: string
+          minLength: 1
+          maxLength: 80
+          description: Saved meeting name. Server trims leading/trailing whitespace.
+          example: 성수 저녁 모임
+    PromoteTripMeetingResponse:
+      type: object
+      required:
+        - trip
+        - meeting
+      additionalProperties: false
+      properties:
+        trip:
+          $ref: '#/components/schemas/Trip'
+        meeting:
+          $ref: '#/components/schemas/Meeting'
     TripListItem:
       type: object
       required:

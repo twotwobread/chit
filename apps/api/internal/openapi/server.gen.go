@@ -1356,6 +1356,18 @@ type PlaceScheduleItemDetails struct {
 	Title string `json:"title"`
 }
 
+// PromoteTripMeetingRequest defines model for PromoteTripMeetingRequest.
+type PromoteTripMeetingRequest struct {
+	// MeetingName Saved meeting name. Server trims leading/trailing whitespace.
+	MeetingName string `json:"meetingName"`
+}
+
+// PromoteTripMeetingResponse defines model for PromoteTripMeetingResponse.
+type PromoteTripMeetingResponse struct {
+	Meeting Meeting `json:"meeting"`
+	Trip    Trip    `json:"trip"`
+}
+
 // PushPlatform defines model for PushPlatform.
 type PushPlatform string
 
@@ -2072,6 +2084,9 @@ type UpsertMyFlightPersonalDetailJSONRequestBody = UpsertMyFlightPersonalDetailR
 // AddTripFlightPassengersJSONRequestBody defines body for AddTripFlightPassengers for application/json ContentType.
 type AddTripFlightPassengersJSONRequestBody = AddTripFlightPassengersRequest
 
+// PromoteTripMeetingJSONRequestBody defines body for PromoteTripMeeting for application/json ContentType.
+type PromoteTripMeetingJSONRequestBody = PromoteTripMeetingRequest
+
 // ReplaceTripParticipantsJSONRequestBody defines body for ReplaceTripParticipants for application/json ContentType.
 type ReplaceTripParticipantsJSONRequestBody = ReplaceTripParticipantsRequest
 
@@ -2305,6 +2320,9 @@ type ServerInterface interface {
 	// Create or retrieve the current trip invite link
 	// (POST /trips/{tripId}/invites)
 	CreateTripInvite(w http.ResponseWriter, r *http.Request, tripId string)
+	// Promote a one-off trip meeting
+	// (POST /trips/{tripId}/meeting/promotion)
+	PromoteTripMeeting(w http.ResponseWriter, r *http.Request, tripId string)
 	// List trip participants
 	// (GET /trips/{tripId}/participants)
 	ListTripParticipants(w http.ResponseWriter, r *http.Request, tripId string)
@@ -2782,6 +2800,12 @@ func (_ Unimplemented) AddTripFlightPassengers(w http.ResponseWriter, r *http.Re
 // Create or retrieve the current trip invite link
 // (POST /trips/{tripId}/invites)
 func (_ Unimplemented) CreateTripInvite(w http.ResponseWriter, r *http.Request, tripId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Promote a one-off trip meeting
+// (POST /trips/{tripId}/meeting/promotion)
+func (_ Unimplemented) PromoteTripMeeting(w http.ResponseWriter, r *http.Request, tripId string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -5495,6 +5519,37 @@ func (siw *ServerInterfaceWrapper) CreateTripInvite(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
+// PromoteTripMeeting operation middleware
+func (siw *ServerInterfaceWrapper) PromoteTripMeeting(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PromoteTripMeeting(w, r, tripId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListTripParticipants operation middleware
 func (siw *ServerInterfaceWrapper) ListTripParticipants(w http.ResponseWriter, r *http.Request) {
 
@@ -6157,6 +6212,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/trips/{tripId}/invites", wrapper.CreateTripInvite)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/trips/{tripId}/meeting/promotion", wrapper.PromoteTripMeeting)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/trips/{tripId}/participants", wrapper.ListTripParticipants)

@@ -144,6 +144,41 @@ test('Home dashboard keeps one-off schedules visible while hiding one-off contai
   );
 });
 
+test('Home dashboard labels promoted one-off schedules with the saved meeting name', () => {
+  const viewModel = buildHomeViewModel(
+    {
+      trips: [
+        trip({
+          id: 'promoted-trip',
+          startDate: '2026-06-23',
+          endDate: '2026-06-25',
+          eventContext: {
+            eventId: 'event-promoted',
+            meetingId: 'meeting-promoted',
+            meetingName: '성수 저녁 모임',
+            meetingVisibility: 'saved',
+          },
+        }),
+      ],
+      meetings: [meeting({ id: 'meeting-promoted', name: '성수 저녁 모임', memberCount: 2 })],
+      settlementSummary: settlementSummary(),
+    },
+    '2026-06-22',
+  );
+
+  assert.deepEqual(
+    viewModel.sections.map((section) => [
+      section.status,
+      section.trips.map((item) => [item.id, item.meetingContextLabel]),
+    ]),
+    [['upcoming', [['promoted-trip', '성수 저녁 모임']]]],
+  );
+  assert.deepEqual(
+    viewModel.savedMeetings.map((item) => [item.id, item.name, item.memberCountLabel]),
+    [['meeting-promoted', '성수 저녁 모임', '멤버 2명']],
+  );
+});
+
 test('Home dashboard exposes settlement-needed trips as attention tasks', () => {
   const viewModel = buildHomeViewModel(
     {

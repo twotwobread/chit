@@ -6,7 +6,7 @@ import { styles } from '../../../lib/trip-ui/TripDetailScreenStyles';
 import { useTripDetailController } from '../../../lib/trip-ui/useTripDetailController';
 
 export default function TripDetailScreen() {
-  const { goHome, goLogin, load, state } = useTripDetailController();
+  const { goHome, goLogin, load, promoteMeeting, state } = useTripDetailController();
 
   return (
     <ScreenBackground>
@@ -23,6 +23,8 @@ export default function TripDetailScreen() {
             detail={state.detail}
             participants={state.participants}
             participantsLoadFailed={state.participantsLoadFailed}
+            promotionState={state.promotionState}
+            onPromoteMeeting={promoteMeeting}
           />
         ) : null}
 

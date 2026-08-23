@@ -207,6 +207,31 @@ func (s apiServer) ListTripParticipants(w http.ResponseWriter, r *http.Request, 
 	writeJSON(w, http.StatusOK, listTripParticipantsResponseToOpenAPI(participants))
 }
 
+func (s apiServer) PromoteTripMeeting(w http.ResponseWriter, r *http.Request, tripId string) {
+	if s.auth == nil || s.trips == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "trip meeting promotion is not configured", nil)
+		return
+	}
+
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	var body openapi.PromoteTripMeetingJSONRequestBody
+	if !decodeJSON(w, r, &body) {
+		return
+	}
+
+	result, err := s.trips.PromoteMeeting(r.Context(), authContext.UserID, tripId, trip.PromoteMeetingInput{MeetingName: body.MeetingName})
+	if err != nil {
+		writeTripDetailError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, promoteTripMeetingResponseToOpenAPI(result))
+}
+
 func (s apiServer) ReplaceTripParticipants(w http.ResponseWriter, r *http.Request, tripId string) {
 	if s.auth == nil || s.trips == nil {
 		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "trip participant replacement is not configured", nil)

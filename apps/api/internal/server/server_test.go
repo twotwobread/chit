@@ -2463,6 +2463,98 @@ func TestReplaceTripParticipantsHandler(t *testing.T) {
 	}
 }
 
+func TestPromoteTripMeetingHandlerPromotesOneOffMeeting(t *testing.T) {
+	backend := newFakeAuthBackend()
+	owner := loginTestUserSession(t, backend, "owner-promote-one-off", "민수")
+	tripID := createTestTrip(t, backend, owner.AccessToken)
+	beforeMeetingID := backend.trips[tripID].EventContext.MeetingID
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/trips/"+tripID+"/meeting/promotion", bytes.NewReader([]byte(`{"meetingName":"  성수 저녁 모임  "}`)))
+	request.Header.Set("Authorization", "Bearer "+owner.AccessToken)
+	request.Header.Set("Content-Type", "application/json")
+
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected promote status %d, got %d with body %s", http.StatusOK, recorder.Code, recorder.Body.String())
+	}
+	var body struct {
+		Trip struct {
+			ID           string `json:"id"`
+			EventContext struct {
+				MeetingID         string `json:"meetingId"`
+				MeetingName       string `json:"meetingName"`
+				MeetingVisibility string `json:"meetingVisibility"`
+			} `json:"eventContext"`
+		} `json:"trip"`
+		Meeting struct {
+			ID         string `json:"id"`
+			Name       string `json:"name"`
+			Visibility string `json:"visibility"`
+		} `json:"meeting"`
+	}
+	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+		t.Fatalf("decode promote response: %v", err)
+	}
+	if body.Trip.ID != tripID || body.Trip.EventContext.MeetingID != beforeMeetingID || body.Trip.EventContext.MeetingVisibility != "saved" || body.Trip.EventContext.MeetingName != "성수 저녁 모임" {
+		t.Fatalf("unexpected promoted trip response: %#v", body.Trip)
+	}
+	if body.Meeting.ID != beforeMeetingID || body.Meeting.Name != "성수 저녁 모임" || body.Meeting.Visibility != "saved" {
+		t.Fatalf("unexpected promoted meeting response: %#v", body.Meeting)
+	}
+
+	listRecorder := httptest.NewRecorder()
+	listRequest := httptest.NewRequest(http.MethodGet, "/meetings", nil)
+	listRequest.Header.Set("Authorization", "Bearer "+owner.AccessToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(listRecorder, listRequest)
+	if listRecorder.Code != http.StatusOK {
+		t.Fatalf("expected list meetings status %d, got %d with body %s", http.StatusOK, listRecorder.Code, listRecorder.Body.String())
+	}
+	if !strings.Contains(listRecorder.Body.String(), "성수 저녁 모임") {
+		t.Fatalf("expected promoted meeting in saved meeting list, got %s", listRecorder.Body.String())
+	}
+}
+
+func TestPromoteTripMeetingHandlerErrors(t *testing.T) {
+	backend := newFakeAuthBackend()
+	owner := loginTestUserSession(t, backend, "owner-promote-errors", "민수")
+	member := loginTestUserSession(t, backend, "member-promote-errors", "지은")
+	oneOffTripID := createTestTrip(t, backend, owner.AccessToken)
+	meetingResult, err := backend.CreateMeetingWithOwner(context.Background(), meetingdomain.CreateMeetingRecord{Name: "정식 모임", Visibility: meetingdomain.MeetingVisibilitySaved, CreatedBy: owner.UserID, OwnerDisplayName: "민수"})
+	if err != nil {
+		t.Fatalf("CreateMeetingWithOwner: %v", err)
+	}
+	savedTripID := createTestTripInMeeting(t, backend, owner.AccessToken, meetingResult.Meeting.ID)
+
+	tests := []struct {
+		name       string
+		tripID     string
+		token      string
+		body       string
+		wantStatus int
+	}{
+		{name: "invalid trip", tripID: "bad", token: owner.AccessToken, body: `{"meetingName":"성수 저녁 모임"}`, wantStatus: http.StatusBadRequest},
+		{name: "blank name", tripID: oneOffTripID, token: owner.AccessToken, body: `{"meetingName":"   "}`, wantStatus: http.StatusBadRequest},
+		{name: "forbidden", tripID: oneOffTripID, token: member.AccessToken, body: `{"meetingName":"성수 저녁 모임"}`, wantStatus: http.StatusForbidden},
+		{name: "saved trip conflict", tripID: savedTripID, token: owner.AccessToken, body: `{"meetingName":"성수 저녁 모임"}`, wantStatus: http.StatusConflict},
+		{name: "missing trip", tripID: "00000000-0000-0000-0000-000000000404", token: owner.AccessToken, body: `{"meetingName":"성수 저녁 모임"}`, wantStatus: http.StatusNotFound},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			request := httptest.NewRequest(http.MethodPost, "/trips/"+tt.tripID+"/meeting/promotion", strings.NewReader(tt.body))
+			request.Header.Set("Authorization", "Bearer "+tt.token)
+			request.Header.Set("Content-Type", "application/json")
+			NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(recorder, request)
+			if recorder.Code != tt.wantStatus {
+				t.Fatalf("expected status %d, got %d with body %s", tt.wantStatus, recorder.Code, recorder.Body.String())
+			}
+		})
+	}
+}
+
 func TestListTripParticipantsRequiresAuth(t *testing.T) {
 	backend := newFakeAuthBackend()
 	recorder := httptest.NewRecorder()
@@ -6627,6 +6719,20 @@ func (b *fakeAuthBackend) CreateTripWithOwner(_ context.Context, record tripdoma
 		DisplayName: record.OwnerDisplayName,
 		JoinedAt:    now,
 	}
+	if _, ok := b.meetings[meetingID]; !ok {
+		b.meetings[meetingID] = meetingdomain.Meeting{ID: meetingID, Name: meetingName, Visibility: meetingVisibility, CreatedBy: record.CreatedBy, CreatedAt: now, UpdatedAt: now}
+	}
+	ownerMemberExists := false
+	for _, member := range b.meetingMembers[meetingID] {
+		if member.UserID == record.CreatedBy {
+			ownerMemberExists = true
+			break
+		}
+	}
+	if !ownerMemberExists {
+		b.nextMeetingMember++
+		b.meetingMembers[meetingID] = append(b.meetingMembers[meetingID], meetingdomain.MeetingMember{ID: testUUID(16000 + b.nextMeetingMember), MeetingID: meetingID, UserID: record.CreatedBy, Role: meetingdomain.RoleOwner, DisplayName: record.OwnerDisplayName, JoinedAt: now})
+	}
 	participants := []tripdomain.Participant{owner}
 	selectedMembers, err := b.selectedMeetingMembersForTrip(record.CreatedBy, meetingID, record.MeetingContext.ParticipantMemberIDs)
 	if err != nil {
@@ -6663,6 +6769,20 @@ func (b *fakeAuthBackend) CreateTripWithOwner(_ context.Context, record tripdoma
 		CreatedAt:         now,
 		UpdatedAt:         now,
 	}
+	meetingMemberByUserID := map[string]meetingdomain.MeetingMember{}
+	for _, member := range b.meetingMembers[meetingID] {
+		meetingMemberByUserID[member.UserID] = member
+	}
+	eventParticipants := []meetingdomain.EventParticipant{}
+	for index, participant := range participants {
+		var meetingMemberID *string
+		if member, ok := meetingMemberByUserID[participant.UserID]; ok {
+			memberID := member.ID
+			meetingMemberID = &memberID
+		}
+		eventParticipants = append(eventParticipants, meetingdomain.EventParticipant{ID: testUUID(17000 + b.nextTrip*10 + index), EventID: createdTrip.EventContext.EventID, MeetingMemberID: meetingMemberID, UserID: participant.UserID, Role: participant.Role, DisplayName: participant.DisplayName, JoinedAt: participant.JoinedAt})
+	}
+	b.eventParticipants[createdTrip.EventContext.EventID] = eventParticipants
 
 	return tripdomain.CreateResult{
 		Trip:             createdTrip,
@@ -6821,6 +6941,49 @@ func (b *fakeAuthBackend) ReplaceTripParticipants(_ context.Context, record trip
 	return tripdomain.ReplaceParticipantsResult{CurrentUserParticipantID: currentUserParticipantID, Participants: items}, nil
 }
 
+func (b *fakeAuthBackend) PromoteTripMeeting(_ context.Context, record tripdomain.PromoteMeetingRecord) (tripdomain.PromoteMeetingResult, error) {
+	tripRecord, ok := b.trips[record.TripID]
+	if !ok {
+		return tripdomain.PromoteMeetingResult{}, tripdomain.ErrNotFound
+	}
+	if tripRecord.EventContext == nil || tripRecord.EventContext.MeetingVisibility != meetingdomain.MeetingVisibilityOneOff {
+		return tripdomain.PromoteMeetingResult{}, tripdomain.ErrConflict
+	}
+	meetingRecord, ok := b.meetings[tripRecord.EventContext.MeetingID]
+	if !ok || meetingRecord.Visibility != meetingdomain.MeetingVisibilityOneOff {
+		return tripdomain.PromoteMeetingResult{}, tripdomain.ErrConflict
+	}
+	now := time.Date(2026, 8, 23, 10, 0, 0, 0, time.UTC)
+	meetingRecord.Name = record.MeetingName
+	meetingRecord.Visibility = meetingdomain.MeetingVisibilitySaved
+	meetingRecord.UpdatedAt = now
+	b.meetings[meetingRecord.ID] = meetingRecord
+
+	tripRecord.EventContext.MeetingName = record.MeetingName
+	tripRecord.EventContext.MeetingVisibility = meetingdomain.MeetingVisibilitySaved
+	tripRecord.UpdatedAt = now
+	b.trips[record.TripID] = tripRecord
+
+	if eventRecord, ok := b.events[tripRecord.EventContext.EventID]; ok {
+		eventRecord.MeetingName = record.MeetingName
+		eventRecord.MeetingVisibility = meetingdomain.MeetingVisibilitySaved
+		eventRecord.UpdatedAt = now
+		b.events[eventRecord.ID] = eventRecord
+	}
+
+	return tripdomain.PromoteMeetingResult{
+		Trip: tripRecord,
+		Meeting: tripdomain.PromotedMeeting{
+			ID:         meetingRecord.ID,
+			Name:       meetingRecord.Name,
+			Visibility: meetingRecord.Visibility,
+			CreatedBy:  meetingRecord.CreatedBy,
+			CreatedAt:  meetingRecord.CreatedAt,
+			UpdatedAt:  meetingRecord.UpdatedAt,
+		},
+	}, nil
+}
+
 func (b *fakeAuthBackend) selectedMeetingMembersForTrip(requiredUserID string, meetingID string, selectedMemberIDs []string) ([]meetingdomain.MeetingMember, error) {
 	members := b.meetingMembers[meetingID]
 	if selectedMemberIDs == nil {
@@ -6903,14 +7066,34 @@ func (b *fakeAuthBackend) AcceptTripInvite(_ context.Context, record tripdomain.
 		return tripdomain.AcceptTripInviteResult{}, tripdomain.ErrUnauthorized
 	}
 	b.nextInvite++
-	b.participants[foundInvite.TripID] = append(b.participants[foundInvite.TripID], tripdomain.Participant{
+	displayName := tripdomain.NormalizeParticipantDisplayName(user.DisplayName)
+	participant := tripdomain.Participant{
 		ID:          testUUID(7000 + b.nextInvite),
 		TripID:      foundInvite.TripID,
 		UserID:      record.UserID,
 		Role:        tripdomain.RoleMember,
-		DisplayName: tripdomain.NormalizeParticipantDisplayName(user.DisplayName),
+		DisplayName: displayName,
 		JoinedAt:    record.Now,
-	})
+	}
+	b.participants[foundInvite.TripID] = append(b.participants[foundInvite.TripID], participant)
+	if foundTrip.EventContext != nil {
+		meetingID := foundTrip.EventContext.MeetingID
+		var meetingMemberID string
+		for _, member := range b.meetingMembers[meetingID] {
+			if member.UserID == record.UserID {
+				meetingMemberID = member.ID
+				break
+			}
+		}
+		if meetingMemberID == "" {
+			b.nextMeetingMember++
+			meetingMemberID = testUUID(16000 + b.nextMeetingMember)
+			b.meetingMembers[meetingID] = append(b.meetingMembers[meetingID], meetingdomain.MeetingMember{ID: meetingMemberID, MeetingID: meetingID, UserID: record.UserID, Role: meetingdomain.RoleMember, DisplayName: displayName, JoinedAt: record.Now})
+		}
+		b.nextEventMember++
+		memberID := meetingMemberID
+		b.eventParticipants[foundTrip.EventContext.EventID] = append(b.eventParticipants[foundTrip.EventContext.EventID], meetingdomain.EventParticipant{ID: testUUID(18000 + b.nextEventMember), EventID: foundTrip.EventContext.EventID, MeetingMemberID: &memberID, UserID: record.UserID, Role: meetingdomain.RoleMember, DisplayName: displayName, JoinedAt: record.Now})
+	}
 	return tripdomain.AcceptTripInviteResult{TripID: foundInvite.TripID, TripName: foundTrip.Name, Role: tripdomain.RoleMember, AlreadyAccepted: false}, nil
 }
 

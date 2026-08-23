@@ -133,6 +133,8 @@ export type { OAuthLoginRequest } from './models/OAuthLoginRequest';
 export type { OpenExpenseReceiptResponse } from './models/OpenExpenseReceiptResponse';
 export type { OpenMyFlightBoardingPassResponse } from './models/OpenMyFlightBoardingPassResponse';
 export type { PlaceScheduleItemDetails } from './models/PlaceScheduleItemDetails';
+export type { PromoteTripMeetingRequest } from './models/PromoteTripMeetingRequest';
+export type { PromoteTripMeetingResponse } from './models/PromoteTripMeetingResponse';
 export type { PushPlatform } from './models/PushPlatform';
 export type { PushTokenResponse } from './models/PushTokenResponse';
 export type { PushTokenStatus } from './models/PushTokenStatus';

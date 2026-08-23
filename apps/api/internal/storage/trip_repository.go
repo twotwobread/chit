@@ -593,6 +593,67 @@ func (s *Store) UpdateTripBasicInfo(ctx context.Context, record trip.UpdateRecor
 	}, nil
 }
 
+func (s *Store) PromoteTripMeeting(ctx context.Context, record trip.PromoteMeetingRecord) (trip.PromoteMeetingResult, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return trip.PromoteMeetingResult{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	qtx := s.queries.WithTx(tx)
+	meetingRow, err := qtx.PromoteOneOffTripMeeting(ctx, db.PromoteOneOffTripMeetingParams{
+		MeetingName: record.MeetingName,
+		TripID:      mustUUID(record.TripID),
+	})
+	if err == pgx.ErrNoRows {
+		return trip.PromoteMeetingResult{}, trip.ErrConflict
+	}
+	if err != nil {
+		return trip.PromoteMeetingResult{}, err
+	}
+
+	tripRow, err := qtx.GetTripByID(ctx, mustUUID(record.TripID))
+	if err == pgx.ErrNoRows {
+		return trip.PromoteMeetingResult{}, trip.ErrNotFound
+	}
+	if err != nil {
+		return trip.PromoteMeetingResult{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return trip.PromoteMeetingResult{}, err
+	}
+
+	destinations, err := s.listTripDestinations(ctx, tripRow.TID)
+	if err != nil {
+		return trip.PromoteMeetingResult{}, err
+	}
+
+	return trip.PromoteMeetingResult{
+		Trip: trip.Trip{
+			ID:                tripRow.TID,
+			Name:              tripRow.Name,
+			StartDate:         dateString(tripRow.StartDate),
+			EndDate:           dateString(tripRow.EndDate),
+			DefaultCurrency:   tripRow.DefaultCurrency,
+			DefaultTravelMode: tripRow.DefaultTravelMode,
+			CreatedBy:         tripRow.TCreatedBy,
+			CreatedAt:         tripRow.CreatedAt.Time,
+			UpdatedAt:         tripRow.UpdatedAt.Time,
+			EventContext:      tripEventContextFromValues(tripRow.EventID, tripRow.MeetingID, tripRow.MeetingName, tripRow.MeetingVisibility),
+			Destinations:      destinations,
+		},
+		Meeting: trip.PromotedMeeting{
+			ID:         meetingRow.MID,
+			Name:       meetingRow.Name,
+			Visibility: meetingRow.Visibility,
+			CreatedBy:  meetingRow.MCreatedBy,
+			CreatedAt:  meetingRow.CreatedAt.Time,
+			UpdatedAt:  meetingRow.UpdatedAt.Time,
+		},
+	}, nil
+}
+
 func (s *Store) DeleteTripByID(ctx context.Context, tripID string) (bool, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
