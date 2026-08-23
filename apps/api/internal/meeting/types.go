@@ -144,6 +144,12 @@ type CreateEventResult struct {
 	OwnerParticipant EventParticipant
 }
 
+type MeetingDetailResult struct {
+	Meeting Meeting
+	Members []MeetingMember
+	Events  []Event
+}
+
 type EventDetailResult struct {
 	Meeting Meeting
 	Event   Event
@@ -154,6 +160,7 @@ type Repository interface {
 	CreateMeetingWithOwner(ctx context.Context, record CreateMeetingRecord) (CreateMeetingResult, error)
 	ListSavedMeetingsByMemberUser(ctx context.Context, userID string) ([]MeetingListItem, error)
 	GetSavedMeetingForMember(ctx context.Context, meetingID string, userID string) (Meeting, bool, error)
+	GetMeetingDetailForMember(ctx context.Context, meetingID string, userID string) (MeetingDetailResult, bool, error)
 	CreateEventWithMeeting(ctx context.Context, record CreateEventRecord) (CreateEventResult, error)
 	GetEventForParticipant(ctx context.Context, eventID string, userID string) (EventDetailResult, bool, error)
 }

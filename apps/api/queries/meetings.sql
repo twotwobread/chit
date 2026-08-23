@@ -179,6 +179,34 @@ RETURNING
   display_name,
   joined_at;
 
+-- name: ListEventsForSavedMeetingByMemberUser :many
+SELECT
+  e.id::text AS id,
+  e.meeting_id::text AS meeting_id,
+  m.name AS meeting_name,
+  m.visibility AS meeting_visibility,
+  e.event_type,
+  e.title,
+  e.start_date,
+  e.end_date,
+  e.default_currency,
+  e.status,
+  COALESCE(e.trip_id::text, ''::text)::text AS trip_id,
+  e.created_by::text AS created_by,
+  e.created_at,
+  e.updated_at
+FROM meetings m
+JOIN meeting_members requester ON requester.meeting_id = m.id
+JOIN events e ON e.meeting_id = m.id
+WHERE m.id = sqlc.arg(meeting_id)::uuid
+  AND requester.user_id = sqlc.arg(user_id)::uuid
+  AND m.visibility = 'saved'
+ORDER BY
+  e.start_date ASC,
+  e.end_date ASC,
+  e.created_at DESC,
+  e.id DESC;
+
 -- name: GetEventForParticipant :one
 SELECT
   e.id::text AS id,

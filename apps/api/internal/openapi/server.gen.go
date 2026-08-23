@@ -967,7 +967,9 @@ type GetExpenseResponse struct {
 
 // GetMeetingResponse defines model for GetMeetingResponse.
 type GetMeetingResponse struct {
-	Meeting Meeting `json:"meeting"`
+	Events  []Event         `json:"events"`
+	Meeting Meeting         `json:"meeting"`
+	Members []MeetingMember `json:"members"`
 }
 
 // GetMySettlementSummaryResponse defines model for GetMySettlementSummaryResponse.

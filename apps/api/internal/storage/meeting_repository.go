@@ -94,6 +94,38 @@ func (s *Store) GetSavedMeetingForMember(ctx context.Context, meetingID string, 
 	return meetingFromSavedRow(row), true, nil
 }
 
+func (s *Store) GetMeetingDetailForMember(ctx context.Context, meetingID string, userID string) (meeting.MeetingDetailResult, bool, error) {
+	row, err := s.queries.GetSavedMeetingForMember(ctx, db.GetSavedMeetingForMemberParams{
+		MeetingID: mustUUID(meetingID),
+		UserID:    mustUUID(userID),
+	})
+	if err == pgx.ErrNoRows {
+		return meeting.MeetingDetailResult{}, false, nil
+	}
+	if err != nil {
+		return meeting.MeetingDetailResult{}, false, err
+	}
+	members, err := s.queries.ListMeetingMembersForSavedMeetingByMemberUser(ctx, db.ListMeetingMembersForSavedMeetingByMemberUserParams{
+		MeetingID: mustUUID(meetingID),
+		UserID:    mustUUID(userID),
+	})
+	if err != nil {
+		return meeting.MeetingDetailResult{}, false, err
+	}
+	events, err := s.queries.ListEventsForSavedMeetingByMemberUser(ctx, db.ListEventsForSavedMeetingByMemberUserParams{
+		MeetingID: mustUUID(meetingID),
+		UserID:    mustUUID(userID),
+	})
+	if err != nil {
+		return meeting.MeetingDetailResult{}, false, err
+	}
+	return meeting.MeetingDetailResult{
+		Meeting: meetingFromSavedRow(row),
+		Members: meetingMembersFromSavedRows(members),
+		Events:  eventsFromSavedMeetingRows(events),
+	}, true, nil
+}
+
 func (s *Store) CreateEventWithMeeting(ctx context.Context, record meeting.CreateEventRecord) (meeting.CreateEventResult, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -209,6 +241,29 @@ func eventFromCreateRow(row db.CreateEventRow, eventMeeting meeting.Meeting) mee
 		CreatedAt:         row.CreatedAt.Time,
 		UpdatedAt:         row.UpdatedAt.Time,
 	}
+}
+
+func eventsFromSavedMeetingRows(rows []db.ListEventsForSavedMeetingByMemberUserRow) []meeting.Event {
+	events := make([]meeting.Event, 0, len(rows))
+	for _, row := range rows {
+		events = append(events, meeting.Event{
+			ID:                row.ID,
+			MeetingID:         row.MeetingID,
+			MeetingName:       row.MeetingName,
+			MeetingVisibility: row.MeetingVisibility,
+			EventType:         row.EventType,
+			Title:             row.Title,
+			StartDate:         dateString(row.StartDate),
+			EndDate:           dateString(row.EndDate),
+			DefaultCurrency:   row.DefaultCurrency,
+			Status:            row.Status,
+			TripID:            optionalStringPointer(row.TripID),
+			CreatedBy:         row.CreatedBy,
+			CreatedAt:         row.CreatedAt.Time,
+			UpdatedAt:         row.UpdatedAt.Time,
+		})
+	}
+	return events
 }
 
 func eventFromDetailRow(row db.GetEventForParticipantRow) meeting.Event {

@@ -503,6 +503,92 @@ func (q *Queries) GetSavedMeetingForMember(ctx context.Context, arg GetSavedMeet
 	return i, err
 }
 
+const listEventsForSavedMeetingByMemberUser = `-- name: ListEventsForSavedMeetingByMemberUser :many
+SELECT
+  e.id::text AS id,
+  e.meeting_id::text AS meeting_id,
+  m.name AS meeting_name,
+  m.visibility AS meeting_visibility,
+  e.event_type,
+  e.title,
+  e.start_date,
+  e.end_date,
+  e.default_currency,
+  e.status,
+  COALESCE(e.trip_id::text, ''::text)::text AS trip_id,
+  e.created_by::text AS created_by,
+  e.created_at,
+  e.updated_at
+FROM meetings m
+JOIN meeting_members requester ON requester.meeting_id = m.id
+JOIN events e ON e.meeting_id = m.id
+WHERE m.id = $1::uuid
+  AND requester.user_id = $2::uuid
+  AND m.visibility = 'saved'
+ORDER BY
+  e.start_date ASC,
+  e.end_date ASC,
+  e.created_at DESC,
+  e.id DESC
+`
+
+type ListEventsForSavedMeetingByMemberUserParams struct {
+	MeetingID pgtype.UUID
+	UserID    pgtype.UUID
+}
+
+type ListEventsForSavedMeetingByMemberUserRow struct {
+	ID                string
+	MeetingID         string
+	MeetingName       string
+	MeetingVisibility string
+	EventType         string
+	Title             string
+	StartDate         pgtype.Date
+	EndDate           pgtype.Date
+	DefaultCurrency   string
+	Status            string
+	TripID            string
+	CreatedBy         string
+	CreatedAt         pgtype.Timestamptz
+	UpdatedAt         pgtype.Timestamptz
+}
+
+func (q *Queries) ListEventsForSavedMeetingByMemberUser(ctx context.Context, arg ListEventsForSavedMeetingByMemberUserParams) ([]ListEventsForSavedMeetingByMemberUserRow, error) {
+	rows, err := q.db.Query(ctx, listEventsForSavedMeetingByMemberUser, arg.MeetingID, arg.UserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListEventsForSavedMeetingByMemberUserRow
+	for rows.Next() {
+		var i ListEventsForSavedMeetingByMemberUserRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.MeetingID,
+			&i.MeetingName,
+			&i.MeetingVisibility,
+			&i.EventType,
+			&i.Title,
+			&i.StartDate,
+			&i.EndDate,
+			&i.DefaultCurrency,
+			&i.Status,
+			&i.TripID,
+			&i.CreatedBy,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listMeetingMembersForSavedMeetingByMemberUser = `-- name: ListMeetingMembersForSavedMeetingByMemberUser :many
 SELECT
   mm.id::text,

@@ -49,22 +49,22 @@ func (s *Service) ListMeetings(ctx context.Context, userID string) ([]MeetingLis
 	return s.repo.ListSavedMeetingsByMemberUser(ctx, userID)
 }
 
-func (s *Service) GetMeeting(ctx context.Context, userID string, meetingID string) (Meeting, error) {
+func (s *Service) GetMeeting(ctx context.Context, userID string, meetingID string) (MeetingDetailResult, error) {
 	if strings.TrimSpace(userID) == "" {
-		return Meeting{}, ErrUnauthorized
+		return MeetingDetailResult{}, ErrUnauthorized
 	}
 	meetingID = strings.TrimSpace(meetingID)
 	if !isUUID(meetingID) {
-		return Meeting{}, ErrValidation
+		return MeetingDetailResult{}, ErrValidation
 	}
-	meeting, ok, err := s.repo.GetSavedMeetingForMember(ctx, meetingID, userID)
+	detail, ok, err := s.repo.GetMeetingDetailForMember(ctx, meetingID, userID)
 	if err != nil {
-		return Meeting{}, err
+		return MeetingDetailResult{}, err
 	}
 	if !ok {
-		return Meeting{}, ErrNotFound
+		return MeetingDetailResult{}, ErrNotFound
 	}
-	return meeting, nil
+	return detail, nil
 }
 
 func (s *Service) CreateEvent(ctx context.Context, userID string, input CreateEventInput) (CreateEventResult, error) {

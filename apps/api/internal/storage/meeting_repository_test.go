@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/twotwobread/i-um/apps/api/internal/meeting"
+	"github.com/twotwobread/i-um/apps/api/internal/trip"
 )
 
 func TestMeetingRepositoryDeletesSoloMeetingsAndEventsDuringAccountDeletion(t *testing.T) {
@@ -70,6 +71,92 @@ func TestMeetingRepositoryDeletesSoloMeetingsAndEventsDuringAccountDeletion(t *t
 	}
 	if eventCount != 0 {
 		t.Fatalf("expected solo event to be deleted, count=%d", eventCount)
+	}
+}
+
+func TestMeetingRepositoryGetsSavedMeetingDetailWithMembersAndEvents(t *testing.T) {
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("DATABASE_URL is required for storage integration test")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	store, err := Open(ctx, databaseURL)
+	if err != nil {
+		t.Skipf("database unavailable for storage integration test: %v", err)
+	}
+	defer store.Close()
+	if err := store.pool.Ping(ctx); err != nil {
+		t.Skipf("database unavailable for storage integration test: %v", err)
+	}
+
+	var ownerUserID string
+	if err := store.pool.QueryRow(ctx, `INSERT INTO users (display_name) VALUES ('민수') RETURNING id::text`).Scan(&ownerUserID); err != nil {
+		t.Fatalf("insert owner user: %v", err)
+	}
+	var outsiderUserID string
+	if err := store.pool.QueryRow(ctx, `INSERT INTO users (display_name) VALUES ('지영') RETURNING id::text`).Scan(&outsiderUserID); err != nil {
+		t.Fatalf("insert outsider user: %v", err)
+	}
+	defer func() {
+		_, _ = store.pool.Exec(context.Background(), `DELETE FROM users WHERE id = ANY($1::uuid[])`, []string{ownerUserID, outsiderUserID})
+	}()
+
+	saved, err := store.CreateMeetingWithOwner(ctx, meeting.CreateMeetingRecord{Name: "등산 모임", Visibility: meeting.MeetingVisibilitySaved, CreatedBy: ownerUserID, OwnerDisplayName: "민수"})
+	if err != nil {
+		t.Fatalf("CreateMeetingWithOwner: %v", err)
+	}
+	createdTrip, err := store.CreateTripWithOwner(ctx, trip.CreateRecord{
+		Name:              "오사카 3박 4일",
+		StartDate:         time.Date(2026, 7, 10, 0, 0, 0, 0, time.UTC),
+		EndDate:           time.Date(2026, 7, 13, 0, 0, 0, 0, time.UTC),
+		DefaultCurrency:   "JPY",
+		DefaultTravelMode: "transit",
+		CreatedBy:         ownerUserID,
+		OwnerDisplayName:  "민수",
+		MeetingContext:    trip.CreateMeetingContextRecord{Mode: trip.MeetingContextModeExisting, MeetingID: saved.Meeting.ID},
+		Destinations: []trip.CreateDestinationRecord{{
+			CityName:        "오사카",
+			CountryName:     "일본",
+			CountryCode:     "JP",
+			DisplayName:     "오사카, 일본",
+			Latitude:        34.6937,
+			Longitude:       135.5023,
+			RadiusMeters:    25000,
+			Provider:        trip.DestinationProviderGoogle,
+			ProviderPlaceID: "google-city-osaka",
+		}},
+	})
+	if err != nil {
+		t.Fatalf("CreateTripWithOwner: %v", err)
+	}
+
+	detail, found, err := store.GetMeetingDetailForMember(ctx, saved.Meeting.ID, ownerUserID)
+	if err != nil || !found {
+		t.Fatalf("GetMeetingDetailForMember owner = %#v, %v, %v", detail, found, err)
+	}
+	if detail.Meeting.ID != saved.Meeting.ID || len(detail.Members) != 1 || detail.Members[0].DisplayName != "민수" {
+		t.Fatalf("expected saved meeting member detail, got %#v", detail)
+	}
+	if len(detail.Events) != 1 || detail.Events[0].Title != "오사카 3박 4일" || detail.Events[0].TripID == nil || *detail.Events[0].TripID != createdTrip.Trip.ID {
+		t.Fatalf("expected linked trip event in detail, got %#v", detail.Events)
+	}
+
+	_, found, err = store.GetMeetingDetailForMember(ctx, saved.Meeting.ID, outsiderUserID)
+	if err != nil {
+		t.Fatalf("GetMeetingDetailForMember outsider error: %v", err)
+	}
+	if found {
+		t.Fatal("outsider should not be able to read saved meeting detail")
+	}
+	_, found, err = store.GetMeetingDetailForMember(ctx, createdTrip.Trip.EventContext.MeetingID, ownerUserID)
+	if err != nil {
+		t.Fatalf("GetMeetingDetailForMember event context error: %v", err)
+	}
+	if !found {
+		t.Fatal("saved trip event context should be readable through its saved meeting")
 	}
 }
 

@@ -5260,10 +5260,20 @@ components:
       type: object
       required:
         - meeting
+        - members
+        - events
       additionalProperties: false
       properties:
         meeting:
           $ref: '#/components/schemas/Meeting'
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/MeetingMember'
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/Event'
     EventMeetingChoice:
       type: object
       required:

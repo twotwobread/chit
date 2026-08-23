@@ -28,13 +28,17 @@ type fakeRepository struct {
 	savedMeetingLookupID string
 	savedMeetingUserID   string
 
-	createdEvent      CreateEventRecord
-	createEventCalled bool
-	createEventResult CreateEventResult
-	eventDetail       EventDetailResult
-	eventFound        bool
-	eventLookupID     string
-	eventLookupUserID string
+	createdEvent        CreateEventRecord
+	createEventCalled   bool
+	createEventResult   CreateEventResult
+	meetingDetail       MeetingDetailResult
+	meetingDetailFound  bool
+	meetingDetailLookup string
+	meetingDetailUserID string
+	eventDetail         EventDetailResult
+	eventFound          bool
+	eventLookupID       string
+	eventLookupUserID   string
 }
 
 func (r *fakeRepository) GetMeetingCreator(context.Context, string) (Creator, bool, error) {
@@ -76,6 +80,12 @@ func (r *fakeRepository) GetSavedMeetingForMember(_ context.Context, meetingID s
 	r.savedMeetingLookupID = meetingID
 	r.savedMeetingUserID = userID
 	return r.savedMeeting, r.savedMeetingFound, nil
+}
+
+func (r *fakeRepository) GetMeetingDetailForMember(_ context.Context, meetingID string, userID string) (MeetingDetailResult, bool, error) {
+	r.meetingDetailLookup = meetingID
+	r.meetingDetailUserID = userID
+	return r.meetingDetail, r.meetingDetailFound, nil
 }
 
 func (r *fakeRepository) CreateEventWithMeeting(_ context.Context, record CreateEventRecord) (CreateEventResult, error) {
@@ -160,6 +170,41 @@ func TestListMeetingsRequiresAuthAndListsSavedMemberships(t *testing.T) {
 	_, err = newTestService(repo).ListMeetings(context.Background(), " ")
 	if !errors.Is(err, ErrUnauthorized) {
 		t.Fatalf("expected ErrUnauthorized, got %v", err)
+	}
+}
+
+func TestGetMeetingReturnsSavedMeetingMembersAndEvents(t *testing.T) {
+	repo := &fakeRepository{
+		meetingDetailFound: true,
+		meetingDetail: MeetingDetailResult{
+			Meeting: Meeting{ID: testMeetingID, Name: "등산 모임", Visibility: MeetingVisibilitySaved},
+			Members: []MeetingMember{{ID: "member-1", MeetingID: testMeetingID, UserID: testUserID, Role: RoleOwner, DisplayName: "민수"}},
+			Events:  []Event{{ID: testEventID, MeetingID: testMeetingID, MeetingName: "등산 모임", MeetingVisibility: MeetingVisibilitySaved, EventType: EventTypeTrip, Title: "오사카 3박 4일", StartDate: "2026-07-10", EndDate: "2026-07-13"}},
+		},
+	}
+
+	detail, err := newTestService(repo).GetMeeting(context.Background(), testUserID, testMeetingID)
+	if err != nil {
+		t.Fatalf("GetMeeting returned error: %v", err)
+	}
+	if repo.meetingDetailLookup != testMeetingID || repo.meetingDetailUserID != testUserID {
+		t.Fatalf("unexpected repository lookup meeting=%q user=%q", repo.meetingDetailLookup, repo.meetingDetailUserID)
+	}
+	if detail.Meeting.Name != "등산 모임" || len(detail.Members) != 1 || len(detail.Events) != 1 {
+		t.Fatalf("expected meeting detail with members/events, got %#v", detail)
+	}
+
+	_, err = newTestService(&fakeRepository{}).GetMeeting(context.Background(), testUserID, testMeetingID)
+	if !errors.Is(err, ErrNotFound) {
+		t.Fatalf("expected ErrNotFound, got %v", err)
+	}
+	_, err = newTestService(repo).GetMeeting(context.Background(), " ", testMeetingID)
+	if !errors.Is(err, ErrUnauthorized) {
+		t.Fatalf("expected ErrUnauthorized, got %v", err)
+	}
+	_, err = newTestService(repo).GetMeeting(context.Background(), testUserID, "not-a-uuid")
+	if !errors.Is(err, ErrValidation) {
+		t.Fatalf("expected ErrValidation, got %v", err)
 	}
 }
 
