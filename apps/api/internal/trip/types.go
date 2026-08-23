@@ -55,9 +55,10 @@ type CreateInput struct {
 }
 
 type CreateMeetingContextInput struct {
-	Mode        string
-	MeetingID   string
-	MeetingName string
+	Mode                 string
+	MeetingID            string
+	MeetingName          string
+	ParticipantMemberIDs []string
 }
 
 type CreateDestinationInput struct {
@@ -196,9 +197,10 @@ type CreateRecord struct {
 }
 
 type CreateMeetingContextRecord struct {
-	Mode        string
-	MeetingID   string
-	MeetingName string
+	Mode                 string
+	MeetingID            string
+	MeetingName          string
+	ParticipantMemberIDs []string
 }
 
 type CreateDestinationRecord struct {
@@ -391,6 +393,21 @@ type CreateExpenseSplitRecord struct {
 	SplitOrder             int
 }
 
+type ReplaceParticipantsInput struct {
+	ParticipantMemberIDs []string
+}
+
+type ReplaceParticipantsRecord struct {
+	TripID               string
+	RequestedBy          string
+	ParticipantMemberIDs []string
+}
+
+type ReplaceParticipantsResult struct {
+	CurrentUserParticipantID *string
+	Participants             []ParticipantListItem
+}
+
 type CreateTripInviteRecord struct {
 	TripID    string
 	CreatedBy string
@@ -452,6 +469,7 @@ type Participant struct {
 
 type ParticipantListItem struct {
 	ParticipantID string
+	UserID        string
 	DisplayName   string
 	Role          string
 	JoinedAt      time.Time
@@ -1023,6 +1041,7 @@ type Repository interface {
 	UpdateTripBasicInfo(ctx context.Context, record UpdateRecord) (Trip, error)
 	DeleteTripByID(ctx context.Context, tripID string) (bool, error)
 	DeleteTripMemberParticipant(ctx context.Context, tripID string, participantID string) (bool, error)
+	ReplaceTripParticipants(ctx context.Context, record ReplaceParticipantsRecord) (ReplaceParticipantsResult, error)
 	CreateOrReturnTripInvite(ctx context.Context, record CreateTripInviteRecord) (CreateTripInviteResult, error)
 	AcceptTripInvite(ctx context.Context, record AcceptTripInviteRecord) (AcceptTripInviteResult, error)
 	CountTripParticipants(ctx context.Context, tripID string) (int, error)

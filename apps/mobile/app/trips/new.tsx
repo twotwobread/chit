@@ -6,12 +6,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type {
   DestinationSearchResult,
   MeetingListItem,
+  MeetingMember,
   SupportedCurrency,
   TripDefaultTravelMode,
   TripDestinationInput,
 } from '@i-um/api-contract';
 
-import { MobileAuthError } from '../../lib/auth/client';
+import { getStoredAuthUser, MobileAuthError } from '../../lib/auth/client';
 import {
   ChoiceChip,
   FormField,
@@ -36,7 +37,7 @@ import {
   tripDestinationInputFromSearchResult,
   validateTripDestinations,
 } from '../../lib/trips/destinations';
-import { listMeetings } from '../../lib/trips/meeting-api';
+import { getMeeting, listMeetings } from '../../lib/trips/meeting-api';
 import { createTrip, searchDestinations } from '../../lib/trips/trip-api';
 import { ConfirmationModal } from '../../lib/trip-ui/ConfirmationModal';
 import { KeyboardAwareFormScrollView } from '../../lib/trip-ui/KeyboardAwareFormScrollView';
@@ -50,6 +51,13 @@ import {
   validateCreateTripMeetingContext,
   type CreateTripMeetingContextSelection,
 } from '../../lib/trips/create-trip-context';
+import {
+  buildDefaultEventParticipantMemberIds,
+  buildEventParticipantSelectionRows,
+  eventParticipantSelectionSummary,
+  toggleEventParticipantMemberId,
+  validateEventParticipantSelection,
+} from '../../lib/trips/event-participants';
 import {
   applySuggestedTripName,
   createTripWizardSteps,
@@ -126,6 +134,10 @@ export default function NewTripScreen() {
   const [meetings, setMeetings] = useState<MeetingListItem[]>([]);
   const [meetingsLoading, setMeetingsLoading] = useState(false);
   const [meetingsError, setMeetingsError] = useState<string | null>(null);
+  const [meetingMembers, setMeetingMembers] = useState<MeetingMember[]>([]);
+  const [meetingMembersLoading, setMeetingMembersLoading] = useState(false);
+  const [meetingMembersError, setMeetingMembersError] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [wizardStep, setWizardStep] = useState<CreateTripWizardStep>('destinations');
   const [nameEdited, setNameEdited] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -164,11 +176,12 @@ export default function NewTripScreen() {
     let active = true;
     setMeetingsLoading(true);
     setMeetingsError(null);
-    listMeetings()
-      .then((response) => {
+    Promise.all([listMeetings(), getStoredAuthUser()])
+      .then(([response, currentUser]) => {
         if (!active) {
           return;
         }
+        setCurrentUserId(currentUser.id);
         setMeetings(response.meetings.filter((meeting) => meeting.visibility === 'saved'));
       })
       .catch(() => {
@@ -236,6 +249,68 @@ export default function NewTripScreen() {
     setError(null);
   };
 
+  const selectMeetingContext = (selection: CreateTripMeetingContextSelection) => {
+    setMeetingContext(selection);
+    setError(null);
+    if (selection.mode !== 'existing') {
+      setMeetingMembers([]);
+      setMeetingMembersError(null);
+      setMeetingMembersLoading(false);
+    }
+  };
+
+  const selectExistingMeeting = (meetingId: string) => {
+    setMeetingContext({ mode: 'existing', meetingId });
+    setMeetingMembers([]);
+    setMeetingMembersError(null);
+    setMeetingMembersLoading(true);
+    void getMeeting(meetingId)
+      .then((response) => {
+        setMeetingMembers(response.members);
+        setMeetingContext((current) =>
+          current.mode === 'existing' && current.meetingId === meetingId
+            ? { ...current, participantMemberIds: buildDefaultEventParticipantMemberIds(response.members) }
+            : current,
+        );
+      })
+      .catch(() => {
+        setMeetingMembers([]);
+        setMeetingMembersError('모임 멤버를 불러오지 못했어요. 다시 선택해주세요.');
+      })
+      .finally(() => setMeetingMembersLoading(false));
+  };
+
+  const toggleMeetingParticipant = (memberId: string) => {
+    setMeetingContext((current) => {
+      if (current.mode !== 'existing') {
+        return current;
+      }
+      const selected = current.participantMemberIds ?? buildDefaultEventParticipantMemberIds(meetingMembers);
+      return { ...current, participantMemberIds: toggleEventParticipantMemberId(selected, memberId, meetingMembers) };
+    });
+    setError(null);
+  };
+
+  const validateSelectedMeetingParticipants = (): string | null => {
+    if (meetingContext.mode !== 'existing') {
+      return null;
+    }
+    if (meetingMembersLoading) {
+      return '모임 멤버를 불러오는 중이에요.';
+    }
+    if (meetingMembersError) {
+      return meetingMembersError;
+    }
+    if (meetingMembers.length === 0) {
+      return '모임 멤버를 불러온 뒤 계속해주세요.';
+    }
+    return validateEventParticipantSelection(
+      meetingMembers,
+      meetingContext.participantMemberIds ?? buildDefaultEventParticipantMemberIds(meetingMembers),
+      currentUserId,
+    );
+  };
+
   const addDestination = (result: DestinationSearchResult) => {
     setDestinations((current) => addTripDestination(current, tripDestinationInputFromSearchResult(result)));
     setError(null);
@@ -262,7 +337,8 @@ export default function NewTripScreen() {
     }
 
     if (creationStep === 'meetingContext') {
-      const validationError = validateCreateTripMeetingContext(meetingContext, meetings);
+      const validationError =
+        validateCreateTripMeetingContext(meetingContext, meetings) ?? validateSelectedMeetingParticipants();
       if (validationError) {
         setError(validationError);
         return;
@@ -304,6 +380,7 @@ export default function NewTripScreen() {
     const resolvedName = effectiveTripName.trim();
     const validationError =
       validateCreateTripMeetingContext(meetingContext, meetings) ??
+      validateSelectedMeetingParticipants() ??
       validateForm(form, today, resolvedName) ??
       validateTripDestinations(destinations);
     if (validationError) {
@@ -358,10 +435,16 @@ export default function NewTripScreen() {
 
           {creationStep === 'meetingContext' ? (
             <MeetingContextStep
+              currentUserId={currentUserId}
+              meetingMembers={meetingMembers}
+              meetingMembersError={meetingMembersError}
+              meetingMembersLoading={meetingMembersLoading}
               meetings={meetings}
               meetingsError={meetingsError}
               meetingsLoading={meetingsLoading}
-              onSelect={setMeetingContext}
+              onSelect={selectMeetingContext}
+              onSelectExisting={selectExistingMeeting}
+              onToggleParticipant={toggleMeetingParticipant}
               selection={meetingContext}
               submitting={submitting}
             />
@@ -528,19 +611,31 @@ function EventTypeStep({ submitting }: EventTypeStepProps) {
 }
 
 type MeetingContextStepProps = {
+  currentUserId: string | null;
+  meetingMembers: MeetingMember[];
+  meetingMembersError: string | null;
+  meetingMembersLoading: boolean;
   meetings: MeetingListItem[];
   meetingsError: string | null;
   meetingsLoading: boolean;
   onSelect: (selection: CreateTripMeetingContextSelection) => void;
+  onSelectExisting: (meetingId: string) => void;
+  onToggleParticipant: (memberId: string) => void;
   selection: CreateTripMeetingContextSelection;
   submitting: boolean;
 };
 
 function MeetingContextStep({
+  currentUserId,
+  meetingMembers,
+  meetingMembersError,
+  meetingMembersLoading,
   meetings,
   meetingsError,
   meetingsLoading,
   onSelect,
+  onSelectExisting,
+  onToggleParticipant,
   selection,
   submitting,
 }: MeetingContextStepProps) {
@@ -589,7 +684,7 @@ function MeetingContextStep({
               actionLabel={selection.mode === 'existing' && selection.meetingId === meeting.id ? '선택됨' : '선택'}
               disabled={submitting}
               key={meeting.id}
-              onPress={() => onSelect({ mode: 'existing', meetingId: meeting.id })}
+              onPress={() => onSelectExisting(meeting.id)}
               selected={selection.mode === 'existing' && selection.meetingId === meeting.id}
               subtitle={`${meeting.memberCount}명 · 내 역할 ${meeting.myRole === 'owner' ? '모임장' : '멤버'}`}
               title={meeting.name}
@@ -597,6 +692,41 @@ function MeetingContextStep({
           ))}
         </View>
       </SectionCard>
+
+      {selection.mode === 'existing' ? (
+        <SectionCard
+          helper="모임 멤버와 이 여행 참여자는 다를 수 있어요. 장부와 정산은 여기서 고른 사람 기준이에요."
+          title="이번 일정 참여자"
+        >
+          {meetingMembersLoading ? <Text style={styles.helperText}>모임 멤버를 불러오는 중...</Text> : null}
+          {meetingMembersError ? <Text style={styles.errorText}>{meetingMembersError}</Text> : null}
+          {!meetingMembersLoading && !meetingMembersError && meetingMembers.length > 0 ? (
+            <View style={styles.contextOptionList}>
+              <Text style={styles.inlineHint}>
+                {eventParticipantSelectionSummary(
+                  meetingMembers,
+                  selection.participantMemberIds ?? buildDefaultEventParticipantMemberIds(meetingMembers),
+                )}
+              </Text>
+              {buildEventParticipantSelectionRows(
+                meetingMembers,
+                selection.participantMemberIds ?? buildDefaultEventParticipantMemberIds(meetingMembers),
+                currentUserId,
+              ).map((row) => (
+                <SelectableListRow
+                  actionLabel={row.selected ? '참여' : '제외'}
+                  disabled={submitting || row.disabled}
+                  key={row.memberId}
+                  onPress={() => onToggleParticipant(row.memberId)}
+                  selected={row.selected}
+                  subtitle={`${row.roleLabel}${row.isCurrentUser ? ' · 나' : ''}`}
+                  title={row.displayName}
+                />
+              ))}
+            </View>
+          ) : null}
+        </SectionCard>
+      ) : null}
     </View>
   );
 }

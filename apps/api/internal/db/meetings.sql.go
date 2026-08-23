@@ -924,3 +924,70 @@ func (q *Queries) LockSavedMeetingForInviteByOwner(ctx context.Context, arg Lock
 	err := row.Scan(&i.MID, &i.Name)
 	return i, err
 }
+
+const upsertEventParticipant = `-- name: UpsertEventParticipant :one
+INSERT INTO event_participants (
+  event_id,
+  meeting_member_id,
+  user_id,
+  role,
+  display_name
+) VALUES (
+  $1::uuid,
+  $2::uuid,
+  $3::uuid,
+  $4,
+  $5
+)
+ON CONFLICT (event_id, user_id) DO UPDATE
+SET meeting_member_id = EXCLUDED.meeting_member_id,
+    role = EXCLUDED.role,
+    display_name = EXCLUDED.display_name
+RETURNING
+  id::text,
+  event_id::text,
+  COALESCE(meeting_member_id::text, ''::text)::text AS meeting_member_id,
+  user_id::text,
+  role,
+  display_name,
+  joined_at
+`
+
+type UpsertEventParticipantParams struct {
+	EventID         pgtype.UUID
+	MeetingMemberID pgtype.UUID
+	UserID          pgtype.UUID
+	Role            string
+	DisplayName     string
+}
+
+type UpsertEventParticipantRow struct {
+	ID              string
+	EventID         string
+	MeetingMemberID string
+	UserID          string
+	Role            string
+	DisplayName     string
+	JoinedAt        pgtype.Timestamptz
+}
+
+func (q *Queries) UpsertEventParticipant(ctx context.Context, arg UpsertEventParticipantParams) (UpsertEventParticipantRow, error) {
+	row := q.db.QueryRow(ctx, upsertEventParticipant,
+		arg.EventID,
+		arg.MeetingMemberID,
+		arg.UserID,
+		arg.Role,
+		arg.DisplayName,
+	)
+	var i UpsertEventParticipantRow
+	err := row.Scan(
+		&i.ID,
+		&i.EventID,
+		&i.MeetingMemberID,
+		&i.UserID,
+		&i.Role,
+		&i.DisplayName,
+		&i.JoinedAt,
+	)
+	return i, err
+}

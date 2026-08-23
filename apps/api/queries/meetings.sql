@@ -258,6 +258,33 @@ RETURNING
   display_name,
   joined_at;
 
+-- name: UpsertEventParticipant :one
+INSERT INTO event_participants (
+  event_id,
+  meeting_member_id,
+  user_id,
+  role,
+  display_name
+) VALUES (
+  sqlc.arg(event_id)::uuid,
+  sqlc.narg(meeting_member_id)::uuid,
+  sqlc.arg(user_id)::uuid,
+  sqlc.arg(role),
+  sqlc.arg(display_name)
+)
+ON CONFLICT (event_id, user_id) DO UPDATE
+SET meeting_member_id = EXCLUDED.meeting_member_id,
+    role = EXCLUDED.role,
+    display_name = EXCLUDED.display_name
+RETURNING
+  id::text,
+  event_id::text,
+  COALESCE(meeting_member_id::text, ''::text)::text AS meeting_member_id,
+  user_id::text,
+  role,
+  display_name,
+  joined_at;
+
 -- name: ListEventsForSavedMeetingByMemberUser :many
 SELECT
   e.id::text AS id,

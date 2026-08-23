@@ -201,6 +201,7 @@ function fallbackParticipants(summary: GetTripDetailResponse['participantSummary
     displayName: name.trim() || '여행자',
     joinedAt: '',
     participantId: `preview-${index}`,
+    userId: `preview-user-${index}`,
     role: 'member' as const,
   }));
 
@@ -214,6 +215,7 @@ function fallbackParticipants(summary: GetTripDetailResponse['participantSummary
       displayName: `외 ${summary.overflowCount}명`,
       joinedAt: '',
       participantId: 'preview-overflow',
+      userId: 'preview-user-overflow',
       role: 'member' as const,
     },
   ];

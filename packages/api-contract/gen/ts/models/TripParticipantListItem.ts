@@ -5,6 +5,7 @@
 import type { TripParticipantRole } from './TripParticipantRole';
 export type TripParticipantListItem = {
     participantId: string;
+    userId: string;
     displayName: string;
     role: TripParticipantRole;
     joinedAt: string;

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 
+import type { MeetingMember } from '@i-um/api-contract';
 import { ApiError } from '@i-um/api-contract';
 
 import { MobileAuthError } from '../../../lib/auth/client';
@@ -13,12 +14,14 @@ import {
   PrimaryButton,
   ScreenBackground,
   SecondaryButton,
+  SelectableListRow,
   TextInputField,
   theme,
 } from '../../../lib/design';
 import { KeyboardAwareFormScrollView } from '../../../lib/trip-ui/KeyboardAwareFormScrollView';
 import { StickyActionFooter, useStickyActionFooterLayout } from '../../../lib/trip-ui/StickyActionFooter';
-import { updateTrip } from '../../../lib/trips/trip-api';
+import { getMeeting } from '../../../lib/trips/meeting-api';
+import { listTripParticipants, replaceTripParticipants, updateTrip } from '../../../lib/trips/trip-api';
 import { dateFromString, monthStringFromDate, todayString } from '../../../lib/trips/date';
 import { tripDetailPath } from '../../../lib/trips/routes';
 import { resolveTripShellDetail } from '../../../lib/trips/trip-shell-detail';
@@ -33,6 +36,15 @@ import {
   type TripBasicInfoForm,
 } from '../../../lib/trips/update-form';
 import { buildTripDefaultTravelModeSelectorViewModel } from '../../../lib/trips/travel-mode';
+import {
+  areEventParticipantSelectionsEqual,
+  buildDefaultEventParticipantMemberIds,
+  buildEventParticipantSelectionRows,
+  eventParticipantSelectionSummary,
+  selectedMemberIdsFromTripParticipants,
+  toggleEventParticipantMemberId,
+  validateEventParticipantSelection,
+} from '../../../lib/trips/event-participants';
 
 type DateField = 'startDate' | 'endDate';
 type LoadState = 'loading' | 'ready' | 'auth' | 'notFound' | 'error';
@@ -47,6 +59,10 @@ export default function EditTripScreen() {
   const [form, setForm] = useState<TripBasicInfoForm | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [meetingMembers, setMeetingMembers] = useState<MeetingMember[]>([]);
+  const [originalParticipantMemberIds, setOriginalParticipantMemberIds] = useState<string[]>([]);
+  const [participantMemberIds, setParticipantMemberIds] = useState<string[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [activeDateField, setActiveDateField] = useState<DateField | null>(null);
   const [calendarMonth, setCalendarMonth] = useState(() => monthStringFromDate(new Date()));
 
@@ -75,9 +91,29 @@ export default function EditTripScreen() {
         setLoadState('notFound');
         return;
       }
+      setCurrentUserId(session.user.id);
       const nextForm = tripToBasicInfoForm(detail.trip);
       setOriginal(nextForm);
       setForm(nextForm);
+      if (detail.trip.eventContext?.meetingVisibility === 'saved') {
+        const [meetingResponse, participantsResponse] = await Promise.all([
+          getMeeting(detail.trip.eventContext.meetingId),
+          listTripParticipants(detail.trip.id),
+        ]);
+        const selected = selectedMemberIdsFromTripParticipants(
+          meetingResponse.members,
+          participantsResponse.participants,
+        );
+        const selectedIds =
+          selected.length > 0 ? selected : buildDefaultEventParticipantMemberIds(meetingResponse.members);
+        setMeetingMembers(meetingResponse.members);
+        setOriginalParticipantMemberIds(selectedIds);
+        setParticipantMemberIds(selectedIds);
+      } else {
+        setMeetingMembers([]);
+        setOriginalParticipantMemberIds([]);
+        setParticipantMemberIds([]);
+      }
       setLoadState('ready');
     } catch (error) {
       if (
@@ -106,7 +142,17 @@ export default function EditTripScreen() {
   }, [load]);
 
   const validationError = form ? validateTripBasicInfoForm(form) : null;
-  const canSave = form ? canSubmitTripBasicInfoUpdate({ original, current: form, submitting }) : false;
+  const participantValidationError =
+    meetingMembers.length > 0
+      ? validateEventParticipantSelection(meetingMembers, participantMemberIds, currentUserId)
+      : null;
+  const participantsChanged =
+    meetingMembers.length > 0 &&
+    !areEventParticipantSelectionsEqual(originalParticipantMemberIds, participantMemberIds);
+  const basicInfoChanged = form ? canSubmitTripBasicInfoUpdate({ original, current: form, submitting }) : false;
+  const canSave = form
+    ? !submitting && !participantValidationError && (basicInfoChanged || participantsChanged)
+    : false;
   const footerLayout = useStickyActionFooterLayout({ actionCount: 2 });
 
   const openDatePicker = (field: DateField) => {
@@ -127,6 +173,11 @@ export default function EditTripScreen() {
     setActiveDateField(null);
   };
 
+  const toggleParticipant = (memberId: string) => {
+    setParticipantMemberIds((current) => toggleEventParticipantMemberId(current, memberId, meetingMembers));
+    setSaveError(null);
+  };
+
   const returnToDetail = () => {
     if (!tripId) {
       router.replace('/');
@@ -140,14 +191,14 @@ export default function EditTripScreen() {
       return;
     }
 
-    const currentValidationError = validateTripBasicInfoForm(form);
+    const currentValidationError = validateTripBasicInfoForm(form) ?? participantValidationError;
     if (currentValidationError) {
       setSaveError(currentValidationError);
       return;
     }
 
     const request = buildUpdateTripRequest(original, form);
-    if (Object.keys(request).length === 0) {
+    if (Object.keys(request).length === 0 && !participantsChanged) {
       setSaveError('변경된 내용이 없어요.');
       return;
     }
@@ -155,7 +206,12 @@ export default function EditTripScreen() {
     setSubmitting(true);
     setSaveError(null);
     try {
-      await updateTrip(tripId, request);
+      if (Object.keys(request).length > 0) {
+        await updateTrip(tripId, request);
+      }
+      if (participantsChanged) {
+        await replaceTripParticipants(tripId, { participantMemberIds });
+      }
       returnToDetail();
     } catch (error) {
       if (
@@ -180,6 +236,10 @@ export default function EditTripScreen() {
         }
         if (error.status === 404) {
           setSaveError('여행을 찾을 수 없어요.');
+          return;
+        }
+        if (error.status === 409) {
+          setSaveError('참여자 상태를 수정할 수 없어요. 내가 포함되어 있는지 확인해주세요.');
           return;
         }
       }
@@ -317,7 +377,35 @@ export default function EditTripScreen() {
               </View>
             </FormField>
 
+            {meetingMembers.length > 0 ? (
+              <FormField
+                disabled={submitting}
+                helperText="모임 멤버와 이 여행 참여자는 다를 수 있어요. 장부와 정산은 여기서 고른 사람 기준이에요."
+                label="이번 일정 참여자"
+              >
+                <View style={styles.participantSelectionList}>
+                  <Text style={styles.fieldHelperText}>
+                    {eventParticipantSelectionSummary(meetingMembers, participantMemberIds)}
+                  </Text>
+                  {buildEventParticipantSelectionRows(meetingMembers, participantMemberIds, currentUserId).map(
+                    (row) => (
+                      <SelectableListRow
+                        actionLabel={row.selected ? '참여' : '제외'}
+                        disabled={submitting || row.disabled}
+                        key={row.memberId}
+                        onPress={() => toggleParticipant(row.memberId)}
+                        selected={row.selected}
+                        subtitle={`${row.roleLabel}${row.isCurrentUser ? ' · 나' : ''}`}
+                        title={row.displayName}
+                      />
+                    ),
+                  )}
+                </View>
+              </FormField>
+            ) : null}
+
             {validationError ? <Text style={styles.errorText}>{validationError}</Text> : null}
+            {participantValidationError ? <Text style={styles.errorText}>{participantValidationError}</Text> : null}
             {!validationError && original && !canSave ? (
               <Text style={styles.helperText}>변경된 내용이 없어요.</Text>
             ) : null}
@@ -398,6 +486,9 @@ const styles = StyleSheet.create({
   currencyRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    gap: theme.space[3],
+  },
+  participantSelectionList: {
     gap: theme.space[3],
   },
   currencyChip: {

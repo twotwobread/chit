@@ -207,6 +207,31 @@ func (s apiServer) ListTripParticipants(w http.ResponseWriter, r *http.Request, 
 	writeJSON(w, http.StatusOK, listTripParticipantsResponseToOpenAPI(participants))
 }
 
+func (s apiServer) ReplaceTripParticipants(w http.ResponseWriter, r *http.Request, tripId string) {
+	if s.auth == nil || s.trips == nil {
+		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "trip participant replacement is not configured", nil)
+		return
+	}
+
+	authContext, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	var body openapi.ReplaceTripParticipantsJSONRequestBody
+	if !decodeJSON(w, r, &body) {
+		return
+	}
+
+	result, err := s.trips.ReplaceParticipants(r.Context(), authContext.UserID, tripId, trip.ReplaceParticipantsInput{ParticipantMemberIDs: body.ParticipantMemberIds})
+	if err != nil {
+		writeTripDetailError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, listTripParticipantsResponseToOpenAPI(trip.ListParticipantsResult{CurrentUserParticipantID: result.CurrentUserParticipantID, Participants: result.Participants}))
+}
+
 func (s apiServer) RemoveTripParticipant(w http.ResponseWriter, r *http.Request, tripId string, participantId string) {
 	if s.auth == nil || s.trips == nil {
 		writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "trip participant removal is not configured", nil)

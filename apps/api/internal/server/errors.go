@@ -51,6 +51,8 @@ func writeTripError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusForbidden, "FORBIDDEN", "forbidden", nil)
 	case errors.Is(err, trip.ErrNotFound):
 		writeError(w, http.StatusNotFound, "NOT_FOUND", "meeting not found", nil)
+	case errors.Is(err, trip.ErrConflict):
+		writeError(w, http.StatusConflict, "CONFLICT", "trip participant state conflict", nil)
 	default:
 		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error", nil)
 	}
@@ -66,6 +68,8 @@ func writeTripDetailError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusForbidden, "FORBIDDEN", "forbidden", nil)
 	case errors.Is(err, trip.ErrNotFound):
 		writeError(w, http.StatusNotFound, "NOT_FOUND", "trip not found", nil)
+	case errors.Is(err, trip.ErrConflict):
+		writeError(w, http.StatusConflict, "CONFLICT", "trip participant state conflict", nil)
 	default:
 		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error", nil)
 	}

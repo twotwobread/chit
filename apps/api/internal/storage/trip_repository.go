@@ -292,7 +292,12 @@ func resolveCreateTripMeetingContext(ctx context.Context, qtx *db.Queries, fallb
 		if len(memberRows) == 0 {
 			return meetingdomain.Meeting{}, nil, trip.ErrNotFound
 		}
-		return meetingFromSavedRow(eventMeetingRow), meetingMembersFromSavedRows(memberRows), nil
+		members := meetingMembersFromSavedRows(memberRows)
+		selectedMembers, err := selectCreateTripMeetingMembers(record.CreatedBy, members, record.MeetingContext.ParticipantMemberIDs)
+		if err != nil {
+			return meetingdomain.Meeting{}, nil, err
+		}
+		return meetingFromSavedRow(eventMeetingRow), selectedMembers, nil
 	default:
 		return meetingdomain.Meeting{}, nil, fmt.Errorf("%w: unsupported trip meeting context mode %q", trip.ErrValidation, mode)
 	}
@@ -311,6 +316,45 @@ func meetingMembersFromSavedRows(rows []db.ListMeetingMembersForSavedMeetingByMe
 		})
 	}
 	return members
+}
+
+func selectCreateTripMeetingMembers(createdBy string, members []meetingdomain.MeetingMember, selectedMemberIDs []string) ([]meetingdomain.MeetingMember, error) {
+	if selectedMemberIDs == nil {
+		return members, nil
+	}
+	return selectMeetingMembersByID(createdBy, members, selectedMemberIDs)
+}
+
+func selectMeetingMembersByID(requiredUserID string, members []meetingdomain.MeetingMember, selectedMemberIDs []string) ([]meetingdomain.MeetingMember, error) {
+	membersByID := make(map[string]meetingdomain.MeetingMember, len(members))
+	var requiredMemberID string
+	for _, member := range members {
+		membersByID[member.ID] = member
+		if member.UserID == requiredUserID {
+			requiredMemberID = member.ID
+		}
+	}
+	if requiredMemberID == "" {
+		return nil, trip.ErrConflict
+	}
+
+	selectedIDSet := make(map[string]struct{}, len(selectedMemberIDs))
+	selectedMembers := make([]meetingdomain.MeetingMember, 0, len(selectedMemberIDs))
+	for _, memberID := range selectedMemberIDs {
+		if _, ok := selectedIDSet[memberID]; ok {
+			return nil, trip.ErrValidation
+		}
+		member, ok := membersByID[memberID]
+		if !ok {
+			return nil, trip.ErrValidation
+		}
+		selectedIDSet[memberID] = struct{}{}
+		selectedMembers = append(selectedMembers, member)
+	}
+	if _, ok := selectedIDSet[requiredMemberID]; !ok {
+		return nil, trip.ErrConflict
+	}
+	return selectedMembers, nil
 }
 
 func (s *Store) GetTripByID(ctx context.Context, tripID string) (trip.Trip, bool, error) {
@@ -784,17 +828,131 @@ func (s *Store) ListTripParticipants(ctx context.Context, tripID string) ([]trip
 	if err != nil {
 		return nil, err
 	}
+	return tripParticipantListItemsFromRows(rows), nil
+}
 
+func (s *Store) ReplaceTripParticipants(ctx context.Context, record trip.ReplaceParticipantsRecord) (trip.ReplaceParticipantsResult, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return trip.ReplaceParticipantsResult{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	qtx := s.queries.WithTx(tx)
+	contextRow, err := qtx.GetSavedMeetingTripParticipantContextForUpdate(ctx, mustUUID(record.TripID))
+	if err == pgx.ErrNoRows {
+		return trip.ReplaceParticipantsResult{}, trip.ErrConflict
+	}
+	if err != nil {
+		return trip.ReplaceParticipantsResult{}, err
+	}
+
+	memberRows, err := qtx.ListMeetingMembersForSavedMeetingByMemberUser(ctx, db.ListMeetingMembersForSavedMeetingByMemberUserParams{
+		MeetingID: mustUUID(contextRow.MeetingID),
+		UserID:    mustUUID(record.RequestedBy),
+	})
+	if err != nil {
+		return trip.ReplaceParticipantsResult{}, err
+	}
+	selectedMembers, err := selectMeetingMembersByID(record.RequestedBy, meetingMembersFromSavedRows(memberRows), record.ParticipantMemberIDs)
+	if err != nil {
+		return trip.ReplaceParticipantsResult{}, err
+	}
+
+	currentRows, err := qtx.ListTripParticipantsByTripID(ctx, mustUUID(record.TripID))
+	if err != nil {
+		return trip.ReplaceParticipantsResult{}, err
+	}
+	currentByUserID := make(map[string]db.ListTripParticipantsByTripIDRow, len(currentRows))
+	for _, row := range currentRows {
+		currentByUserID[row.UserID] = row
+	}
+
+	currentMeetingMemberUserIDs := make(map[string]struct{}, len(memberRows))
+	for _, row := range memberRows {
+		currentMeetingMemberUserIDs[row.MmUserID] = struct{}{}
+	}
+	selectedUserIDs := make(map[string]struct{}, len(selectedMembers))
+	for _, member := range selectedMembers {
+		selectedUserIDs[member.UserID] = struct{}{}
+		role := trip.RoleMember
+		if member.UserID == record.RequestedBy {
+			role = trip.RoleOwner
+		}
+		if _, ok := currentByUserID[member.UserID]; !ok {
+			created, err := qtx.CreateTripParticipant(ctx, db.CreateTripParticipantParams{
+				Column1:     mustUUID(record.TripID),
+				Column2:     mustUUID(member.UserID),
+				Role:        role,
+				DisplayName: member.DisplayName,
+			})
+			if err != nil {
+				return trip.ReplaceParticipantsResult{}, err
+			}
+			currentByUserID[member.UserID] = db.ListTripParticipantsByTripIDRow{ID: created.ID, UserID: created.UserID, DisplayName: created.DisplayName, Role: created.Role, JoinedAt: created.JoinedAt}
+		}
+		if _, err := qtx.UpsertEventParticipant(ctx, db.UpsertEventParticipantParams{
+			EventID:         mustUUID(contextRow.EventID),
+			MeetingMemberID: optionalUUID(member.ID),
+			UserID:          mustUUID(member.UserID),
+			Role:            role,
+			DisplayName:     member.DisplayName,
+		}); err != nil {
+			return trip.ReplaceParticipantsResult{}, err
+		}
+	}
+
+	for _, row := range currentRows {
+		if _, isCurrentMeetingMember := currentMeetingMemberUserIDs[row.UserID]; !isCurrentMeetingMember {
+			continue
+		}
+		if _, selected := selectedUserIDs[row.UserID]; selected {
+			continue
+		}
+		if row.Role == trip.RoleOwner {
+			return trip.ReplaceParticipantsResult{}, trip.ErrConflict
+		}
+		if err := qtx.DeleteTripLinkedEventParticipantByTripParticipant(ctx, db.DeleteTripLinkedEventParticipantByTripParticipantParams{TripID: mustUUID(record.TripID), ParticipantID: mustUUID(row.ID)}); err != nil {
+			return trip.ReplaceParticipantsResult{}, err
+		}
+		if _, err := qtx.DeleteTripMemberParticipant(ctx, db.DeleteTripMemberParticipantParams{TripID: mustUUID(record.TripID), ParticipantID: mustUUID(row.ID)}); err == pgx.ErrNoRows {
+			return trip.ReplaceParticipantsResult{}, trip.ErrConflict
+		} else if err != nil {
+			return trip.ReplaceParticipantsResult{}, err
+		}
+	}
+
+	updatedRows, err := qtx.ListTripParticipantsByTripID(ctx, mustUUID(record.TripID))
+	if err != nil {
+		return trip.ReplaceParticipantsResult{}, err
+	}
+	participants := tripParticipantListItemsFromRows(updatedRows)
+	var currentUserParticipantID *string
+	for _, participant := range participants {
+		if participant.UserID == record.RequestedBy {
+			participantID := participant.ParticipantID
+			currentUserParticipantID = &participantID
+			break
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return trip.ReplaceParticipantsResult{}, err
+	}
+	return trip.ReplaceParticipantsResult{CurrentUserParticipantID: currentUserParticipantID, Participants: participants}, nil
+}
+
+func tripParticipantListItemsFromRows(rows []db.ListTripParticipantsByTripIDRow) []trip.ParticipantListItem {
 	participants := make([]trip.ParticipantListItem, 0, len(rows))
 	for _, row := range rows {
 		participants = append(participants, trip.ParticipantListItem{
 			ParticipantID: row.ID,
+			UserID:        row.UserID,
 			DisplayName:   row.DisplayName,
 			Role:          row.Role,
 			JoinedAt:      row.JoinedAt.Time,
 		})
 	}
-	return participants, nil
+	return participants
 }
 
 func (s *Store) ListTripsByParticipantUser(ctx context.Context, userID string) ([]trip.ListItem, error) {

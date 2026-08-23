@@ -1467,6 +1467,12 @@ type ReorderScheduleItemsResponse struct {
 	ScheduleItems []ScheduleItem `json:"scheduleItems"`
 }
 
+// ReplaceTripParticipantsRequest defines model for ReplaceTripParticipantsRequest.
+type ReplaceTripParticipantsRequest struct {
+	// ParticipantMemberIds Current saved meeting member IDs that should participate in this trip-backed event.
+	ParticipantMemberIds []string `json:"participantMemberIds"`
+}
+
 // RestoreScheduleItemResponse defines model for RestoreScheduleItemResponse.
 type RestoreScheduleItemResponse struct {
 	Day          TripDay      `json:"day"`
@@ -1715,6 +1721,9 @@ type TripMeetingContextInput struct {
 	// MeetingName Optional when mode is new_saved. Defaults to the trip name.
 	MeetingName *string                `json:"meetingName,omitempty"`
 	Mode        TripMeetingContextMode `json:"mode"`
+
+	// ParticipantMemberIds Optional selected meeting_member IDs when mode is existing. Omit to select all current saved meeting members for backward compatibility.
+	ParticipantMemberIds *[]string `json:"participantMemberIds,omitempty"`
 }
 
 // TripMeetingContextMode defines model for TripMeetingContextMode.
@@ -1736,6 +1745,7 @@ type TripParticipantListItem struct {
 	JoinedAt      time.Time           `json:"joinedAt"`
 	ParticipantId string              `json:"participantId"`
 	Role          TripParticipantRole `json:"role"`
+	UserId        string              `json:"userId"`
 }
 
 // TripParticipantRole defines model for TripParticipantRole.
@@ -2062,6 +2072,9 @@ type UpsertMyFlightPersonalDetailJSONRequestBody = UpsertMyFlightPersonalDetailR
 // AddTripFlightPassengersJSONRequestBody defines body for AddTripFlightPassengers for application/json ContentType.
 type AddTripFlightPassengersJSONRequestBody = AddTripFlightPassengersRequest
 
+// ReplaceTripParticipantsJSONRequestBody defines body for ReplaceTripParticipants for application/json ContentType.
+type ReplaceTripParticipantsJSONRequestBody = ReplaceTripParticipantsRequest
+
 // CreateGoogleTripPlaceBookmarkJSONRequestBody defines body for CreateGoogleTripPlaceBookmark for application/json ContentType.
 type CreateGoogleTripPlaceBookmarkJSONRequestBody = CreateGoogleTripPlaceBookmarkRequest
 
@@ -2295,6 +2308,9 @@ type ServerInterface interface {
 	// List trip participants
 	// (GET /trips/{tripId}/participants)
 	ListTripParticipants(w http.ResponseWriter, r *http.Request, tripId string)
+	// Replace saved meeting-backed trip participants
+	// (PUT /trips/{tripId}/participants)
+	ReplaceTripParticipants(w http.ResponseWriter, r *http.Request, tripId string)
 	// Remove a trip participant
 	// (DELETE /trips/{tripId}/participants/{participantId})
 	RemoveTripParticipant(w http.ResponseWriter, r *http.Request, tripId string, participantId string)
@@ -2772,6 +2788,12 @@ func (_ Unimplemented) CreateTripInvite(w http.ResponseWriter, r *http.Request, 
 // List trip participants
 // (GET /trips/{tripId}/participants)
 func (_ Unimplemented) ListTripParticipants(w http.ResponseWriter, r *http.Request, tripId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Replace saved meeting-backed trip participants
+// (PUT /trips/{tripId}/participants)
+func (_ Unimplemented) ReplaceTripParticipants(w http.ResponseWriter, r *http.Request, tripId string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -5504,6 +5526,37 @@ func (siw *ServerInterfaceWrapper) ListTripParticipants(w http.ResponseWriter, r
 	handler.ServeHTTP(w, r)
 }
 
+// ReplaceTripParticipants operation middleware
+func (siw *ServerInterfaceWrapper) ReplaceTripParticipants(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "tripId" -------------
+	var tripId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tripId", chi.URLParam(r, "tripId"), &tripId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tripId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReplaceTripParticipants(w, r, tripId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // RemoveTripParticipant operation middleware
 func (siw *ServerInterfaceWrapper) RemoveTripParticipant(w http.ResponseWriter, r *http.Request) {
 
@@ -6107,6 +6160,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/trips/{tripId}/participants", wrapper.ListTripParticipants)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/trips/{tripId}/participants", wrapper.ReplaceTripParticipants)
 	})
 	r.Group(func(r chi.Router) {
 		r.Delete(options.BaseURL+"/trips/{tripId}/participants/{participantId}", wrapper.RemoveTripParticipant)

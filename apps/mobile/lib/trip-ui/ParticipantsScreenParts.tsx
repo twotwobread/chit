@@ -92,8 +92,12 @@ export function ParticipantListCard({
 }) {
   return (
     <Card>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>일정 참여자</Text>
+        <Text style={styles.message}>모임 멤버와 이 여행 참여자는 다를 수 있어요.</Text>
+      </View>
       {removeErrorMessage ? <Text style={styles.errorMessage}>{removeErrorMessage}</Text> : null}
-      {removingParticipantId ? <Text style={styles.message}>참여자를 제거하는 중...</Text> : null}
+      {removingParticipantId ? <Text style={styles.message}>여행 참여자를 제거하는 중...</Text> : null}
       <View style={styles.participantList}>
         {viewModel.rows.map((participant) => {
           const isRemoving = removingParticipantId === participant.participantId;
@@ -109,7 +113,7 @@ export function ParticipantListCard({
               </View>
               {participant.canRemove ? (
                 <Pressable
-                  accessibilityLabel={`${participant.displayName} 참여자 제거`}
+                  accessibilityLabel={`${participant.displayName} 여행 참여자 제거`}
                   accessibilityRole="button"
                   disabled={Boolean(removingParticipantId)}
                   onPress={() => onRequestRemove(participant)}
@@ -144,7 +148,7 @@ export function RemoveParticipantConfirmationModal({
       <View style={styles.modalBackdrop}>
         <View style={styles.modalCard}>
           <Text style={styles.modalTitle}>
-            {participant ? `${participant.displayName}님을 여행에서 제거할까요?` : '참여자를 제거할까요?'}
+            {participant ? `${participant.displayName}님을 여행 참여자에서 제거할까요?` : '여행 참여자를 제거할까요?'}
           </Text>
           <Text style={styles.message}>
             제거되면 이 여행 목록과 일정에 더 이상 접근할 수 없어요. 다시 초대하면 재참여할 수 있어요.
@@ -160,7 +164,7 @@ export function RemoveParticipantConfirmationModal({
               {isRemoving ? (
                 <View style={styles.loadingRow}>
                   <ActivityIndicator color={theme.color.onPrimary} />
-                  <Text style={styles.dangerButtonText}>참여자를 제거하는 중...</Text>
+                  <Text style={styles.dangerButtonText}>여행 참여자를 제거하는 중...</Text>
                 </View>
               ) : (
                 <Text style={styles.dangerButtonText}>제거하기</Text>

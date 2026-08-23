@@ -197,6 +197,9 @@ func createTripMeetingContextFromOpenAPI(value *openapi.TripMeetingContextInput)
 	if value.MeetingName != nil {
 		input.MeetingName = *value.MeetingName
 	}
+	if value.ParticipantMemberIds != nil {
+		input.ParticipantMemberIDs = append([]string(nil), (*value.ParticipantMemberIds)...)
+	}
 	return input
 }
 
@@ -249,6 +252,7 @@ func listTripParticipantsResponseToOpenAPI(result trip.ListParticipantsResult) o
 	for _, participant := range result.Participants {
 		items = append(items, openapi.TripParticipantListItem{
 			ParticipantId: participant.ParticipantID,
+			UserId:        participant.UserID,
 			DisplayName:   participant.DisplayName,
 			Role:          openapi.TripParticipantRole(participant.Role),
 			JoinedAt:      participant.JoinedAt,

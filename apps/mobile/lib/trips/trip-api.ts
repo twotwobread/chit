@@ -9,6 +9,7 @@ import {
   type SearchDestinationsResponse,
   type ListTripParticipantsResponse,
   type ListTripPlacesResponse,
+  type ReplaceTripParticipantsRequest,
   type ListTripsResponse,
   type UpdateTripRequest,
   type UpdateTripResponse,
@@ -38,6 +39,13 @@ export async function listTripPlaces(tripId: string): Promise<ListTripPlacesResp
 
 export async function removeTripParticipant(tripId: string, participantId: string): Promise<void> {
   return runAuthenticatedRequest(() => TripsService.removeTripParticipant(tripId, participantId));
+}
+
+export async function replaceTripParticipants(
+  tripId: string,
+  request: ReplaceTripParticipantsRequest,
+): Promise<ListTripParticipantsResponse> {
+  return runAuthenticatedRequest(() => TripsService.replaceTripParticipants(tripId, request));
 }
 
 export async function createTripInvite(tripId: string): Promise<CreateTripInviteResponse> {

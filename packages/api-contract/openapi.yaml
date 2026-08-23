@@ -2178,7 +2178,7 @@ paths:
     get:
       operationId: listTripParticipants
       summary: List trip participants
-      description: Returns the current accepted participants for a trip. Only authenticated current trip participants can access the list.
+      description: Returns the current accepted event/trip participants for a trip. Only authenticated current trip participants can access the list.
       tags:
         - Trips
       security:
@@ -2216,6 +2216,69 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Trip not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      operationId: replaceTripParticipants
+      summary: Replace saved meeting-backed trip participants
+      description: Replaces the current saved meeting member subset participating in this trip-backed event. Only the trip owner can replace participants. Existing expense payer/split snapshots are preserved when a participant is removed.
+      tags:
+        - Trips
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReplaceTripParticipantsRequest'
+      responses:
+        '200':
+          description: Updated current trip participants.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListTripParticipantsResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trip not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Trip is not a saved meeting-backed event or the owner would be removed.
           content:
             application/json:
               schema:
@@ -5662,6 +5725,13 @@ components:
           minLength: 1
           maxLength: 80
           description: Optional when mode is new_saved. Defaults to the trip name.
+        participantMemberIds:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          description: Optional selected meeting_member IDs when mode is existing. Omit to select all current saved meeting members for backward compatibility.
+          items:
+            type: string
     DestinationProvider:
       type: string
       enum:
@@ -7546,11 +7616,14 @@ components:
       type: object
       required:
         - participantId
+        - userId
         - displayName
         - role
         - joinedAt
       properties:
         participantId:
+          type: string
+        userId:
           type: string
         displayName:
           type: string
@@ -7559,6 +7632,19 @@ components:
         joinedAt:
           type: string
           format: date-time
+    ReplaceTripParticipantsRequest:
+      type: object
+      required:
+        - participantMemberIds
+      additionalProperties: false
+      properties:
+        participantMemberIds:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          description: Current saved meeting member IDs that should participate in this trip-backed event.
+          items:
+            type: string
     ListTripParticipantsResponse:
       type: object
       required:
