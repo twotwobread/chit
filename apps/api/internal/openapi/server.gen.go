@@ -49,6 +49,16 @@ const (
 	DestinationProviderGoogle DestinationProvider = "google"
 )
 
+// Defines values for EventCategory.
+const (
+	EventCategoryActivity EventCategory = "activity"
+	EventCategoryCafe     EventCategory = "cafe"
+	EventCategoryCustom   EventCategory = "custom"
+	EventCategoryDate     EventCategory = "date"
+	EventCategoryFriends  EventCategory = "friends"
+	EventCategoryMeal     EventCategory = "meal"
+)
+
 // Defines values for EventMeetingMode.
 const (
 	EventMeetingModeExisting EventMeetingMode = "existing"
@@ -256,13 +266,13 @@ const (
 
 // Defines values for TripPlaceType.
 const (
-	TripPlaceTypeCafe      TripPlaceType = "cafe"
-	TripPlaceTypeEtc       TripPlaceType = "etc"
-	TripPlaceTypeFood      TripPlaceType = "food"
-	TripPlaceTypeLodging   TripPlaceType = "lodging"
-	TripPlaceTypeShopping  TripPlaceType = "shopping"
-	TripPlaceTypeSights    TripPlaceType = "sights"
-	TripPlaceTypeTransport TripPlaceType = "transport"
+	Cafe      TripPlaceType = "cafe"
+	Etc       TripPlaceType = "etc"
+	Food      TripPlaceType = "food"
+	Lodging   TripPlaceType = "lodging"
+	Shopping  TripPlaceType = "shopping"
+	Sights    TripPlaceType = "sights"
+	Transport TripPlaceType = "transport"
 )
 
 // AcceptTripInviteResponse defines model for AcceptTripInviteResponse.
@@ -350,11 +360,25 @@ type AuthUser struct {
 
 // CreateEventRequest defines model for CreateEventRequest.
 type CreateEventRequest struct {
+	// Category Optional outing category preset. Defaults to custom for new outing creation.
+	Category        *EventCategory     `json:"category"`
 	DefaultCurrency SupportedCurrency  `json:"defaultCurrency"`
 	EndDate         openapi_types.Date `json:"endDate"`
 	EventType       EventType          `json:"eventType"`
 	Meeting         EventMeetingChoice `json:"meeting"`
-	StartDate       openapi_types.Date `json:"startDate"`
+
+	// ParticipantMemberIds Optional current saved meeting member IDs that should participate when meeting.mode is existing. Omitted means all current saved meeting members.
+	ParticipantMemberIds *[]string `json:"participantMemberIds"`
+
+	// PlaceAddress Optional outing place address. Server trims leading/trailing whitespace.
+	PlaceAddress *string `json:"placeAddress"`
+
+	// PlaceName Optional outing place display name. Server trims leading/trailing whitespace.
+	PlaceName *string            `json:"placeName"`
+	StartDate openapi_types.Date `json:"startDate"`
+
+	// StartTime Optional local start time in HH:mm for lightweight outing events.
+	StartTime *string `json:"startTime"`
 
 	// Title Server trims leading/trailing whitespace.
 	Title string `json:"title"`
@@ -690,6 +714,7 @@ type ErrorResponse struct {
 
 // Event defines model for Event.
 type Event struct {
+	Category          *EventCategory     `json:"category"`
 	CreatedAt         time.Time          `json:"createdAt"`
 	CreatedBy         string             `json:"createdBy"`
 	DefaultCurrency   SupportedCurrency  `json:"defaultCurrency"`
@@ -699,12 +724,18 @@ type Event struct {
 	MeetingId         string             `json:"meetingId"`
 	MeetingName       string             `json:"meetingName"`
 	MeetingVisibility MeetingVisibility  `json:"meetingVisibility"`
+	PlaceAddress      *string            `json:"placeAddress"`
+	PlaceName         *string            `json:"placeName"`
 	StartDate         openapi_types.Date `json:"startDate"`
+	StartTime         *string            `json:"startTime"`
 	Status            EventStatus        `json:"status"`
 	Title             string             `json:"title"`
 	TripId            *string            `json:"tripId"`
 	UpdatedAt         time.Time          `json:"updatedAt"`
 }
+
+// EventCategory defines model for EventCategory.
+type EventCategory string
 
 // EventMeetingChoice defines model for EventMeetingChoice.
 type EventMeetingChoice struct {
@@ -972,8 +1003,9 @@ type GetDayScheduleItemsResponse struct {
 
 // GetEventResponse defines model for GetEventResponse.
 type GetEventResponse struct {
-	Event   Event   `json:"event"`
-	Meeting Meeting `json:"meeting"`
+	Event        Event              `json:"event"`
+	Meeting      Meeting            `json:"meeting"`
+	Participants []EventParticipant `json:"participants"`
 }
 
 // GetExpenseResponse defines model for GetExpenseResponse.

@@ -1017,6 +1017,103 @@ func TestCreateMeetingAndOneOffEventVisibility(t *testing.T) {
 	}
 }
 
+func TestCreateOutingEventWithMetadataAndParticipantSelection(t *testing.T) {
+	backend := newFakeAuthBackend()
+	owner := loginTestUserSession(t, backend, "outing-owner", "민수")
+	member := loginTestUserSession(t, backend, "outing-member", "지은")
+
+	createMeetingRecorder := httptest.NewRecorder()
+	createMeetingRequest := httptest.NewRequest(http.MethodPost, "/meetings", bytes.NewReader([]byte(`{"name":"성수 모임"}`)))
+	createMeetingRequest.Header.Set("Content-Type", "application/json")
+	createMeetingRequest.Header.Set("Authorization", "Bearer "+owner.AccessToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(createMeetingRecorder, createMeetingRequest)
+	if createMeetingRecorder.Code != http.StatusCreated {
+		t.Fatalf("expected create meeting status %d, got %d with body %s", http.StatusCreated, createMeetingRecorder.Code, createMeetingRecorder.Body.String())
+	}
+	var meetingBody struct {
+		Meeting struct {
+			ID string `json:"id"`
+		} `json:"meeting"`
+		OwnerMember struct {
+			ID string `json:"id"`
+		} `json:"ownerMember"`
+	}
+	if err := json.NewDecoder(createMeetingRecorder.Body).Decode(&meetingBody); err != nil {
+		t.Fatalf("decode create meeting response: %v", err)
+	}
+
+	backend.nextMeetingMember++
+	memberID := testUUID(12000 + backend.nextMeetingMember)
+	backend.meetingMembers[meetingBody.Meeting.ID] = append(backend.meetingMembers[meetingBody.Meeting.ID], meetingdomain.MeetingMember{
+		ID:          memberID,
+		MeetingID:   meetingBody.Meeting.ID,
+		UserID:      member.UserID,
+		Role:        meetingdomain.RoleMember,
+		DisplayName: "지은",
+		JoinedAt:    time.Date(2026, 8, 22, 10, 30, 0, 0, time.UTC),
+	})
+
+	createEventRecorder := httptest.NewRecorder()
+	createEventRequest := httptest.NewRequest(http.MethodPost, "/events", bytes.NewReader([]byte(fmt.Sprintf(`{
+		"title":" 성수 저녁 ",
+		"startDate":"2026-09-01",
+		"endDate":"2026-09-01",
+		"startTime":"19:30",
+		"placeName":" 성수 식당 ",
+		"placeAddress":" 서울 성동구 ",
+		"category":"meal",
+		"eventType":"outing",
+		"defaultCurrency":"KRW",
+		"meeting":{"mode":"existing","meetingId":%q},
+		"participantMemberIds":[%q]
+	}`, meetingBody.Meeting.ID, meetingBody.OwnerMember.ID))))
+	createEventRequest.Header.Set("Content-Type", "application/json")
+	createEventRequest.Header.Set("Authorization", "Bearer "+owner.AccessToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(createEventRecorder, createEventRequest)
+	if createEventRecorder.Code != http.StatusCreated {
+		t.Fatalf("expected create outing event status %d, got %d with body %s", http.StatusCreated, createEventRecorder.Code, createEventRecorder.Body.String())
+	}
+	var eventBody struct {
+		Event struct {
+			ID           string  `json:"id"`
+			EventType    string  `json:"eventType"`
+			StartTime    *string `json:"startTime"`
+			PlaceName    *string `json:"placeName"`
+			PlaceAddress *string `json:"placeAddress"`
+			Category     *string `json:"category"`
+		} `json:"event"`
+	}
+	if err := json.NewDecoder(createEventRecorder.Body).Decode(&eventBody); err != nil {
+		t.Fatalf("decode create event response: %v", err)
+	}
+	if eventBody.Event.EventType != "outing" || eventBody.Event.StartTime == nil || *eventBody.Event.StartTime != "19:30" || eventBody.Event.Category == nil || *eventBody.Event.Category != "meal" {
+		t.Fatalf("unexpected outing event response: %#v", eventBody.Event)
+	}
+	if eventBody.Event.PlaceName == nil || *eventBody.Event.PlaceName != "성수 식당" || eventBody.Event.PlaceAddress == nil || *eventBody.Event.PlaceAddress != "서울 성동구" {
+		t.Fatalf("expected trimmed place metadata, got %#v", eventBody.Event)
+	}
+
+	ownerGetRecorder := httptest.NewRecorder()
+	ownerGetRequest := httptest.NewRequest(http.MethodGet, "/events/"+eventBody.Event.ID, nil)
+	ownerGetRequest.Header.Set("Authorization", "Bearer "+owner.AccessToken)
+	NewRouterWithConfig(backend, Config{AuthTokenSecret: "test-secret", AllowDevOAuth: true}).ServeHTTP(ownerGetRecorder, ownerGetRequest)
+	if ownerGetRecorder.Code != http.StatusOK {
+		t.Fatalf("expected get event status %d, got %d with body %s", http.StatusOK, ownerGetRecorder.Code, ownerGetRecorder.Body.String())
+	}
+	var detailBody struct {
+		Participants []struct {
+			UserID      string `json:"userId"`
+			DisplayName string `json:"displayName"`
+		} `json:"participants"`
+	}
+	if err := json.NewDecoder(ownerGetRecorder.Body).Decode(&detailBody); err != nil {
+		t.Fatalf("decode event detail response: %v", err)
+	}
+	if len(detailBody.Participants) != 1 || detailBody.Participants[0].UserID != owner.UserID || detailBody.Participants[0].DisplayName != "민수" {
+		t.Fatalf("expected selected owner-only participants, got %#v", detailBody.Participants)
+	}
+}
+
 func TestCreateEventWithExistingMeetingRequiresMembershipAndGetEventRequiresParticipant(t *testing.T) {
 	backend := newFakeAuthBackend()
 	owner := loginTestUserSession(t, backend, "event-owner", "민수")
@@ -6503,51 +6600,73 @@ func (b *fakeAuthBackend) GetMeetingDetailForMember(_ context.Context, meetingID
 
 func (b *fakeAuthBackend) CreateEventWithMeeting(_ context.Context, record meetingdomain.CreateEventRecord) (meetingdomain.CreateEventResult, error) {
 	meetingID := record.ExistingMeetingID
-	var meeting meetingdomain.Meeting
-	var meetingMemberID *string
+	var eventMeeting meetingdomain.Meeting
+	var selectedMembers []meetingdomain.MeetingMember
 	if meetingID == "" {
 		result, err := b.CreateMeetingWithOwner(context.Background(), meetingdomain.CreateMeetingRecord{Name: record.NewMeetingName, Visibility: record.MeetingVisibility, CreatedBy: record.CreatedBy, OwnerDisplayName: record.OwnerDisplayName})
 		if err != nil {
 			return meetingdomain.CreateEventResult{}, err
 		}
-		meeting = result.Meeting
-		meetingID = meeting.ID
-		meetingMemberID = &result.OwnerMember.ID
+		eventMeeting = result.Meeting
+		meetingID = eventMeeting.ID
+		selectedMembers = []meetingdomain.MeetingMember{result.OwnerMember}
 	} else {
-		meeting = b.meetings[meetingID]
-		for _, member := range b.meetingMembers[meetingID] {
-			if member.UserID == record.CreatedBy {
-				memberID := member.ID
-				meetingMemberID = &memberID
-				break
+		eventMeeting = b.meetings[meetingID]
+		members := append([]meetingdomain.MeetingMember(nil), b.meetingMembers[meetingID]...)
+		if record.ParticipantMemberIDs == nil {
+			selectedMembers = members
+		} else {
+			membersByID := make(map[string]meetingdomain.MeetingMember, len(members))
+			for _, member := range members {
+				membersByID[member.ID] = member
+			}
+			for _, memberID := range record.ParticipantMemberIDs {
+				if member, ok := membersByID[memberID]; ok {
+					selectedMembers = append(selectedMembers, member)
+				}
 			}
 		}
 	}
 
 	b.nextEvent++
-	b.nextEventMember++
 	now := time.Date(2026, 8, 22, 10, 0, 0, 0, time.UTC)
 	eventID := testUUID(10000 + b.nextEvent)
-	eventParticipantID := testUUID(11000 + b.nextEventMember)
 	event := meetingdomain.Event{
 		ID:                eventID,
 		MeetingID:         meetingID,
-		MeetingName:       meeting.Name,
-		MeetingVisibility: meeting.Visibility,
+		MeetingName:       eventMeeting.Name,
+		MeetingVisibility: eventMeeting.Visibility,
 		EventType:         record.EventType,
 		Title:             record.Title,
 		StartDate:         record.StartDate.Format("2006-01-02"),
 		EndDate:           record.EndDate.Format("2006-01-02"),
+		StartTime:         record.StartTime,
+		PlaceName:         record.PlaceName,
+		PlaceAddress:      record.PlaceAddress,
+		Category:          record.Category,
 		DefaultCurrency:   record.DefaultCurrency,
 		Status:            record.Status,
 		CreatedBy:         record.CreatedBy,
 		CreatedAt:         now,
 		UpdatedAt:         now,
 	}
-	participant := meetingdomain.EventParticipant{ID: eventParticipantID, EventID: eventID, MeetingMemberID: meetingMemberID, UserID: record.CreatedBy, Role: meetingdomain.RoleOwner, DisplayName: record.OwnerDisplayName, JoinedAt: now}
 	b.events[eventID] = event
-	b.eventParticipants[eventID] = append(b.eventParticipants[eventID], participant)
-	return meetingdomain.CreateEventResult{Meeting: meeting, Event: event, OwnerParticipant: participant}, nil
+
+	var ownerParticipant meetingdomain.EventParticipant
+	for _, member := range selectedMembers {
+		b.nextEventMember++
+		memberID := member.ID
+		role := meetingdomain.RoleMember
+		if member.UserID == record.CreatedBy {
+			role = meetingdomain.RoleOwner
+		}
+		participant := meetingdomain.EventParticipant{ID: testUUID(11000 + b.nextEventMember), EventID: eventID, MeetingMemberID: &memberID, UserID: member.UserID, Role: role, DisplayName: member.DisplayName, JoinedAt: now}
+		if member.UserID == record.CreatedBy {
+			ownerParticipant = participant
+		}
+		b.eventParticipants[eventID] = append(b.eventParticipants[eventID], participant)
+	}
+	return meetingdomain.CreateEventResult{Meeting: eventMeeting, Event: event, OwnerParticipant: ownerParticipant}, nil
 }
 
 func (b *fakeAuthBackend) GetEventForParticipant(_ context.Context, eventID string, userID string) (meetingdomain.EventDetailResult, bool, error) {
@@ -6555,10 +6674,11 @@ func (b *fakeAuthBackend) GetEventForParticipant(_ context.Context, eventID stri
 	if !ok {
 		return meetingdomain.EventDetailResult{}, false, nil
 	}
-	for _, participant := range b.eventParticipants[eventID] {
+	participants := append([]meetingdomain.EventParticipant(nil), b.eventParticipants[eventID]...)
+	for _, participant := range participants {
 		if participant.UserID == userID {
 			meeting := b.meetings[event.MeetingID]
-			return meetingdomain.EventDetailResult{Meeting: meeting, Event: event}, true, nil
+			return meetingdomain.EventDetailResult{Meeting: meeting, Event: event, Participants: participants}, true, nil
 		}
 	}
 	return meetingdomain.EventDetailResult{}, false, nil

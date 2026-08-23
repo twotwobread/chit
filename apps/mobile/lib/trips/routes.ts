@@ -29,6 +29,10 @@ export type TripRouteFallbackInput =
   | { kind: 'day'; tripId: string }
   | { kind: 'dayPlaceSearch' | 'dayPlaceNew' | 'dayQuickExpense'; tripId: string; tripDayId: string };
 
+export function eventPath(eventId: string): `/events/${string}` {
+  return `/events/${eventId}`;
+}
+
 export function tripRootPath(tripId: string): `/trips/${string}` {
   return `/trips/${tripId}`;
 }

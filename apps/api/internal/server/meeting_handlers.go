@@ -148,12 +148,23 @@ func (s apiServer) CreateEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	participantMemberIDs := []string(nil)
+	if body.ParticipantMemberIds != nil {
+		participantMemberIDs = append(participantMemberIDs, (*body.ParticipantMemberIds)...)
+	}
+
 	result, err := s.meetings.CreateEvent(r.Context(), authContext.UserID, meeting.CreateEventInput{
-		Title:           body.Title,
-		StartDate:       dateFromOpenAPI(body.StartDate),
-		EndDate:         dateFromOpenAPI(body.EndDate),
-		EventType:       string(body.EventType),
-		DefaultCurrency: string(body.DefaultCurrency),
+		Title:                   body.Title,
+		StartDate:               dateFromOpenAPI(body.StartDate),
+		EndDate:                 dateFromOpenAPI(body.EndDate),
+		StartTime:               optionalOpenAPIString(body.StartTime),
+		PlaceName:               optionalOpenAPIString(body.PlaceName),
+		PlaceAddress:            optionalOpenAPIString(body.PlaceAddress),
+		Category:                optionalOpenAPIEventCategory(body.Category),
+		EventType:               string(body.EventType),
+		DefaultCurrency:         string(body.DefaultCurrency),
+		ParticipantMemberIDs:    participantMemberIDs,
+		ParticipantMemberIDsSet: body.ParticipantMemberIds != nil,
 		Meeting: meeting.EventMeetingInput{
 			Mode:      string(body.Meeting.Mode),
 			MeetingID: optionalOpenAPIString(body.Meeting.MeetingId),
@@ -193,4 +204,11 @@ func optionalOpenAPIString(value *string) string {
 		return ""
 	}
 	return *value
+}
+
+func optionalOpenAPIEventCategory(value *openapi.EventCategory) string {
+	if value == nil {
+		return ""
+	}
+	return string(*value)
 }

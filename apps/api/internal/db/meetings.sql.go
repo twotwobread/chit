@@ -19,6 +19,10 @@ INSERT INTO events (
   start_date,
   end_date,
   default_currency,
+  start_time,
+  place_name,
+  place_address,
+  category,
   status,
   trip_id,
   created_by
@@ -30,8 +34,12 @@ INSERT INTO events (
   $5,
   $6,
   $7,
-  $8::uuid,
-  $9::uuid
+  $8,
+  $9,
+  $10,
+  $11,
+  $12::uuid,
+  $13::uuid
 )
 RETURNING
   id::text,
@@ -41,6 +49,10 @@ RETURNING
   start_date,
   end_date,
   default_currency,
+  COALESCE(start_time, ''::text)::text AS start_time,
+  COALESCE(place_name, ''::text)::text AS place_name,
+  COALESCE(place_address, ''::text)::text AS place_address,
+  COALESCE(category, ''::text)::text AS category,
   status,
   COALESCE(trip_id::text, ''::text)::text AS trip_id,
   created_by::text,
@@ -55,6 +67,10 @@ type CreateEventParams struct {
 	StartDate       pgtype.Date
 	EndDate         pgtype.Date
 	DefaultCurrency string
+	StartTime       pgtype.Text
+	PlaceName       pgtype.Text
+	PlaceAddress    pgtype.Text
+	Category        pgtype.Text
 	Status          string
 	TripID          pgtype.UUID
 	CreatedBy       pgtype.UUID
@@ -68,6 +84,10 @@ type CreateEventRow struct {
 	StartDate       pgtype.Date
 	EndDate         pgtype.Date
 	DefaultCurrency string
+	StartTime       string
+	PlaceName       string
+	PlaceAddress    string
+	Category        string
 	Status          string
 	TripID          string
 	CreatedBy       string
@@ -83,6 +103,10 @@ func (q *Queries) CreateEvent(ctx context.Context, arg CreateEventParams) (Creat
 		arg.StartDate,
 		arg.EndDate,
 		arg.DefaultCurrency,
+		arg.StartTime,
+		arg.PlaceName,
+		arg.PlaceAddress,
+		arg.Category,
 		arg.Status,
 		arg.TripID,
 		arg.CreatedBy,
@@ -96,6 +120,10 @@ func (q *Queries) CreateEvent(ctx context.Context, arg CreateEventParams) (Creat
 		&i.StartDate,
 		&i.EndDate,
 		&i.DefaultCurrency,
+		&i.StartTime,
+		&i.PlaceName,
+		&i.PlaceAddress,
+		&i.Category,
 		&i.Status,
 		&i.TripID,
 		&i.CreatedBy,
@@ -421,6 +449,10 @@ SELECT
   e.start_date,
   e.end_date,
   e.default_currency,
+  COALESCE(e.start_time, ''::text)::text AS start_time,
+  COALESCE(e.place_name, ''::text)::text AS place_name,
+  COALESCE(e.place_address, ''::text)::text AS place_address,
+  COALESCE(e.category, ''::text)::text AS category,
   e.status,
   COALESCE(e.trip_id::text, ''::text)::text AS trip_id,
   e.created_by::text AS created_by,
@@ -454,6 +486,10 @@ type GetEventForParticipantRow struct {
 	StartDate               pgtype.Date
 	EndDate                 pgtype.Date
 	DefaultCurrency         string
+	StartTime               string
+	PlaceName               string
+	PlaceAddress            string
+	Category                string
 	Status                  string
 	TripID                  string
 	CreatedBy               string
@@ -480,6 +516,10 @@ func (q *Queries) GetEventForParticipant(ctx context.Context, arg GetEventForPar
 		&i.StartDate,
 		&i.EndDate,
 		&i.DefaultCurrency,
+		&i.StartTime,
+		&i.PlaceName,
+		&i.PlaceAddress,
+		&i.Category,
 		&i.Status,
 		&i.TripID,
 		&i.CreatedBy,
@@ -690,6 +730,66 @@ func (q *Queries) InviteTokenExists(ctx context.Context, inviteToken string) (bo
 	return exists, err
 }
 
+const listEventParticipants = `-- name: ListEventParticipants :many
+SELECT
+  id::text,
+  event_id::text,
+  COALESCE(meeting_member_id::text, ''::text)::text AS meeting_member_id,
+  user_id::text,
+  role,
+  display_name,
+  joined_at
+FROM event_participants
+WHERE event_id = $1::uuid
+ORDER BY
+  CASE WHEN user_id = $2::uuid THEN 0 ELSE 1 END,
+  joined_at ASC,
+  id ASC
+`
+
+type ListEventParticipantsParams struct {
+	EventID pgtype.UUID
+	UserID  pgtype.UUID
+}
+
+type ListEventParticipantsRow struct {
+	ID              string
+	EventID         string
+	MeetingMemberID string
+	UserID          string
+	Role            string
+	DisplayName     string
+	JoinedAt        pgtype.Timestamptz
+}
+
+func (q *Queries) ListEventParticipants(ctx context.Context, arg ListEventParticipantsParams) ([]ListEventParticipantsRow, error) {
+	rows, err := q.db.Query(ctx, listEventParticipants, arg.EventID, arg.UserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListEventParticipantsRow
+	for rows.Next() {
+		var i ListEventParticipantsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.EventID,
+			&i.MeetingMemberID,
+			&i.UserID,
+			&i.Role,
+			&i.DisplayName,
+			&i.JoinedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listEventsForSavedMeetingByMemberUser = `-- name: ListEventsForSavedMeetingByMemberUser :many
 SELECT
   e.id::text AS id,
@@ -701,6 +801,10 @@ SELECT
   e.start_date,
   e.end_date,
   e.default_currency,
+  COALESCE(e.start_time, ''::text)::text AS start_time,
+  COALESCE(e.place_name, ''::text)::text AS place_name,
+  COALESCE(e.place_address, ''::text)::text AS place_address,
+  COALESCE(e.category, ''::text)::text AS category,
   e.status,
   COALESCE(e.trip_id::text, ''::text)::text AS trip_id,
   e.created_by::text AS created_by,
@@ -734,6 +838,10 @@ type ListEventsForSavedMeetingByMemberUserRow struct {
 	StartDate         pgtype.Date
 	EndDate           pgtype.Date
 	DefaultCurrency   string
+	StartTime         string
+	PlaceName         string
+	PlaceAddress      string
+	Category          string
 	Status            string
 	TripID            string
 	CreatedBy         string
@@ -760,6 +868,10 @@ func (q *Queries) ListEventsForSavedMeetingByMemberUser(ctx context.Context, arg
 			&i.StartDate,
 			&i.EndDate,
 			&i.DefaultCurrency,
+			&i.StartTime,
+			&i.PlaceName,
+			&i.PlaceAddress,
+			&i.Category,
 			&i.Status,
 			&i.TripID,
 			&i.CreatedBy,

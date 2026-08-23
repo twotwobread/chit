@@ -10,7 +10,7 @@ import type {
 
 import { formatTripDateRange } from './mypage';
 import { formatMoney } from './quick-expense';
-import { tripSettlePath, tripTodayPath } from './routes';
+import { eventPath, tripSettlePath, tripTodayPath } from './routes';
 
 export type MeetingDetailEventViewModel = {
   id: string;
@@ -146,7 +146,7 @@ function toEventViewModel(event: Event): MeetingDetailEventViewModel {
     eventTypeLabel: eventTypeLabel(event.eventType),
     dateRangeLabel: formatTripDateRange(event.startDate, event.endDate),
     statusLabel: eventStatusLabel(event.status),
-    route: event.tripId ? tripTodayPath(event.tripId) : null,
+    route: event.tripId ? tripTodayPath(event.tripId) : eventPath(event.id),
   };
 }
 

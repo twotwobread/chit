@@ -695,6 +695,10 @@ CREATE TABLE events (
   start_date date NOT NULL,
   end_date date NOT NULL,
   default_currency text NOT NULL,
+  start_time text NULL,
+  place_name text NULL,
+  place_address text NULL,
+  category text NULL,
   status text NOT NULL DEFAULT 'planned',
   trip_id uuid NULL REFERENCES trips(id) ON DELETE SET NULL,
   created_by uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
@@ -704,6 +708,10 @@ CREATE TABLE events (
   CONSTRAINT events_title_length_check CHECK (char_length(title) BETWEEN 1 AND 80),
   CONSTRAINT events_date_range_check CHECK (start_date <= end_date),
   CONSTRAINT events_default_currency_check CHECK (default_currency IN ('KRW', 'JPY', 'USD', 'EUR')),
+  CONSTRAINT events_start_time_check CHECK (start_time IS NULL OR start_time ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'),
+  CONSTRAINT events_place_name_length_check CHECK (place_name IS NULL OR char_length(place_name) BETWEEN 1 AND 120),
+  CONSTRAINT events_place_address_length_check CHECK (place_address IS NULL OR char_length(place_address) BETWEEN 1 AND 240),
+  CONSTRAINT events_category_check CHECK (category IS NULL OR category IN ('date', 'friends', 'meal', 'cafe', 'activity', 'custom')),
   CONSTRAINT events_status_check CHECK (status IN ('planned', 'completed', 'cancelled')),
   CONSTRAINT events_trip_id_unique UNIQUE (trip_id)
 );

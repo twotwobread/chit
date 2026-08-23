@@ -55,6 +55,7 @@ export type { DestinationSearchResult } from './models/DestinationSearchResult';
 export type { DeviceInfo } from './models/DeviceInfo';
 export type { ErrorResponse } from './models/ErrorResponse';
 export type { Event } from './models/Event';
+export type { EventCategory } from './models/EventCategory';
 export type { EventMeetingChoice } from './models/EventMeetingChoice';
 export type { EventMeetingMode } from './models/EventMeetingMode';
 export type { EventParticipant } from './models/EventParticipant';

@@ -19,6 +19,7 @@ const (
 var (
 	uuidPattern        = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 	inviteTokenPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{32,128}$`)
+	localTimePattern   = regexp.MustCompile(`^([01]\d|2[0-3]):[0-5]\d$`)
 )
 
 type Service struct {
@@ -245,6 +246,26 @@ func (s *Service) CreateEvent(ctx context.Context, userID string, input CreateEv
 	if !isSupportedEventType(input.EventType) || !isSupportedCurrency(input.DefaultCurrency) {
 		return CreateEventResult{}, ErrValidation
 	}
+	startTime, err := normalizeOptionalLocalTime(input.StartTime)
+	if err != nil {
+		return CreateEventResult{}, err
+	}
+	placeName, err := normalizeOptionalText(input.PlaceName, 120)
+	if err != nil {
+		return CreateEventResult{}, err
+	}
+	placeAddress, err := normalizeOptionalText(input.PlaceAddress, 240)
+	if err != nil {
+		return CreateEventResult{}, err
+	}
+	category, err := normalizeEventCategory(input.Category, input.EventType)
+	if err != nil {
+		return CreateEventResult{}, err
+	}
+	participantMemberIDsSet := input.ParticipantMemberIDsSet || len(input.ParticipantMemberIDs) > 0
+	if participantMemberIDsSet && input.Meeting.Mode != MeetingModeExisting {
+		return CreateEventResult{}, ErrValidation
+	}
 
 	creator, ok, err := s.repo.GetMeetingCreator(ctx, userID)
 	if err != nil {
@@ -258,6 +279,10 @@ func (s *Service) CreateEvent(ctx context.Context, userID string, input CreateEv
 		Title:            title,
 		StartDate:        startDate,
 		EndDate:          endDate,
+		StartTime:        startTime,
+		PlaceName:        placeName,
+		PlaceAddress:     placeAddress,
+		Category:         category,
 		EventType:        input.EventType,
 		DefaultCurrency:  input.DefaultCurrency,
 		Status:           EventStatusPlanned,
@@ -281,6 +306,13 @@ func (s *Service) CreateEvent(ctx context.Context, userID string, input CreateEv
 		}
 		record.ExistingMeetingID = meetingID
 		record.MeetingVisibility = MeetingVisibilitySaved
+		if participantMemberIDsSet {
+			participantMemberIDs, err := s.normalizeEventParticipantMemberIDs(ctx, meetingID, userID, input.ParticipantMemberIDs)
+			if err != nil {
+				return CreateEventResult{}, err
+			}
+			record.ParticipantMemberIDs = participantMemberIDs
+		}
 	case MeetingModeNew:
 		meetingName, err := normalizeName(input.Meeting.Name)
 		if err != nil {
@@ -336,9 +368,55 @@ func parseDate(value string) (time.Time, error) {
 	return time.Parse(dateLayout, strings.TrimSpace(value))
 }
 
+func normalizeOptionalLocalTime(value string) (string, error) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return "", nil
+	}
+	if !localTimePattern.MatchString(trimmed) {
+		return "", ErrValidation
+	}
+	return trimmed, nil
+}
+
+func normalizeOptionalText(value string, maxRunes int) (string, error) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return "", nil
+	}
+	length := len([]rune(trimmed))
+	if length < 1 || length > maxRunes {
+		return "", ErrValidation
+	}
+	return trimmed, nil
+}
+
+func normalizeEventCategory(value string, eventType string) (string, error) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		if eventType == EventTypeOuting {
+			return EventCategoryCustom, nil
+		}
+		return "", nil
+	}
+	if !isSupportedEventCategory(trimmed) {
+		return "", ErrValidation
+	}
+	return trimmed, nil
+}
+
 func isSupportedEventType(value string) bool {
 	switch value {
 	case EventTypeTrip, EventTypeOuting:
+		return true
+	default:
+		return false
+	}
+}
+
+func isSupportedEventCategory(value string) bool {
+	switch value {
+	case EventCategoryDate, EventCategoryFriends, EventCategoryMeal, EventCategoryCafe, EventCategoryActivity, EventCategoryCustom:
 		return true
 	default:
 		return false
@@ -352,6 +430,61 @@ func isSupportedCurrency(value string) bool {
 	default:
 		return false
 	}
+}
+
+func (s *Service) normalizeEventParticipantMemberIDs(ctx context.Context, meetingID string, userID string, values []string) ([]string, error) {
+	ids, err := normalizeParticipantMemberIDs(values)
+	if err != nil {
+		return nil, err
+	}
+	detail, ok, err := s.repo.GetMeetingDetailForMember(ctx, meetingID, userID)
+	if err != nil {
+		return nil, err
+	}
+	if !ok || detail.Meeting.Visibility != MeetingVisibilitySaved {
+		return nil, ErrForbidden
+	}
+	membersByID := make(map[string]MeetingMember, len(detail.Members))
+	currentUserMemberID := ""
+	for _, member := range detail.Members {
+		membersByID[member.ID] = member
+		if member.UserID == userID {
+			currentUserMemberID = member.ID
+		}
+	}
+	includesCurrentUser := false
+	for _, id := range ids {
+		if _, ok := membersByID[id]; !ok {
+			return nil, ErrValidation
+		}
+		if id == currentUserMemberID {
+			includesCurrentUser = true
+		}
+	}
+	if currentUserMemberID == "" || !includesCurrentUser {
+		return nil, ErrValidation
+	}
+	return ids, nil
+}
+
+func normalizeParticipantMemberIDs(values []string) ([]string, error) {
+	if len(values) == 0 {
+		return nil, ErrValidation
+	}
+	seen := make(map[string]struct{}, len(values))
+	ids := make([]string, 0, len(values))
+	for _, value := range values {
+		id := strings.TrimSpace(value)
+		if !isUUID(id) {
+			return nil, ErrValidation
+		}
+		if _, ok := seen[id]; ok {
+			return nil, ErrValidation
+		}
+		seen[id] = struct{}{}
+		ids = append(ids, id)
+	}
+	return ids, nil
 }
 
 func isUUID(value string) bool {

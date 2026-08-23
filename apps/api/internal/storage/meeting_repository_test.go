@@ -200,6 +200,43 @@ func TestMeetingRepositoryCreatesEventsAndHidesOneOffMeetingsFromSavedList(t *te
 	if err != nil {
 		t.Fatalf("CreateMeetingWithOwner saved: %v", err)
 	}
+	var outsiderMemberID string
+	if err := store.pool.QueryRow(ctx, `INSERT INTO meeting_members (meeting_id, user_id, role, display_name) VALUES ($1::uuid, $2::uuid, 'member', '지영') RETURNING id::text`, saved.Meeting.ID, outsiderUserID).Scan(&outsiderMemberID); err != nil {
+		t.Fatalf("insert saved meeting member: %v", err)
+	}
+
+	savedOuting, err := store.CreateEventWithMeeting(ctx, meeting.CreateEventRecord{
+		Title:                "성수 저녁",
+		StartDate:            time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC),
+		EndDate:              time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC),
+		StartTime:            "19:30",
+		PlaceName:            "성수 식당",
+		PlaceAddress:         "서울 성동구",
+		Category:             meeting.EventCategoryMeal,
+		EventType:            meeting.EventTypeOuting,
+		DefaultCurrency:      "KRW",
+		Status:               meeting.EventStatusPlanned,
+		CreatedBy:            ownerUserID,
+		OwnerDisplayName:     "민수",
+		MeetingMode:          meeting.MeetingModeExisting,
+		ExistingMeetingID:    saved.Meeting.ID,
+		MeetingVisibility:    meeting.MeetingVisibilitySaved,
+		ParticipantMemberIDs: []string{saved.OwnerMember.ID},
+	})
+	if err != nil {
+		t.Fatalf("CreateEventWithMeeting saved outing: %v", err)
+	}
+	savedOutingDetail, found, err := store.GetEventForParticipant(ctx, savedOuting.Event.ID, ownerUserID)
+	if err != nil || !found {
+		t.Fatalf("GetEventForParticipant saved outing owner = %#v, %v, %v", savedOutingDetail, found, err)
+	}
+	if savedOutingDetail.Event.StartTime != "19:30" || savedOutingDetail.Event.PlaceName != "성수 식당" || savedOutingDetail.Event.PlaceAddress != "서울 성동구" || savedOutingDetail.Event.Category != meeting.EventCategoryMeal {
+		t.Fatalf("expected saved outing metadata, got %#v", savedOutingDetail.Event)
+	}
+	if len(savedOutingDetail.Participants) != 1 || savedOutingDetail.Participants[0].MeetingMemberID == nil || *savedOutingDetail.Participants[0].MeetingMemberID != saved.OwnerMember.ID {
+		t.Fatalf("expected selected owner participant only, got %#v (excluded member id %s)", savedOutingDetail.Participants, outsiderMemberID)
+	}
+
 	oneOffEvent, err := store.CreateEventWithMeeting(ctx, meeting.CreateEventRecord{
 		Title:             "성수 저녁",
 		StartDate:         time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC),

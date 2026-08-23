@@ -52,6 +52,10 @@ type Event struct {
 	StartDate       pgtype.Date
 	EndDate         pgtype.Date
 	DefaultCurrency string
+	StartTime       pgtype.Text
+	PlaceName       pgtype.Text
+	PlaceAddress    pgtype.Text
+	Category        pgtype.Text
 	Status          string
 	TripID          pgtype.UUID
 	CreatedBy       pgtype.UUID
