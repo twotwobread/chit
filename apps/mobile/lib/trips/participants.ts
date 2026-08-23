@@ -40,7 +40,7 @@ export function toParticipantRowViewModel(
 ): ParticipantRowViewModel {
   return {
     participantId: participant.participantId,
-    displayName: participant.displayName.trim() || '여행자',
+    displayName: participant.displayName.trim() || '참여자',
     role: participant.role,
     roleLabel: participantRoleLabel(participant.role),
     canRemove: Boolean(options.canRemoveMembers && participant.role === 'member'),

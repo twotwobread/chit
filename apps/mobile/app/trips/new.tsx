@@ -672,7 +672,7 @@ function MeetingContextStep({
         </View>
       </SectionCard>
 
-      <SectionCard helper="선택하면 현재 모임 멤버를 여행 참여자로 기본 추가해요." title="기존 모임">
+      <SectionCard helper="선택하면 현재 모임 멤버를 일정 참여자로 기본 추가해요." title="기존 모임">
         {meetingsLoading ? <Text style={styles.helperText}>모임을 불러오는 중...</Text> : null}
         {meetingsError ? <Text style={styles.helperText}>{meetingsError}</Text> : null}
         {!meetingsLoading && meetings.length === 0 ? (
@@ -695,7 +695,7 @@ function MeetingContextStep({
 
       {selection.mode === 'existing' ? (
         <SectionCard
-          helper="모임 멤버와 이 여행 참여자는 다를 수 있어요. 장부와 정산은 여기서 고른 사람 기준이에요."
+          helper="모임 멤버와 이 일정 참여자는 다를 수 있어요. 장부와 정산은 여기서 고른 사람 기준이에요."
           title="이번 일정 참여자"
         >
           {meetingMembersLoading ? <Text style={styles.helperText}>모임 멤버를 불러오는 중...</Text> : null}

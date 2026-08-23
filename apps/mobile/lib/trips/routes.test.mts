@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  TRIP_COMPATIBILITY_ROUTE_POLICY,
   isTripRootTab,
+  isTripCompatibilityRoute,
   isTripRootTabPath,
   tripDetailPath,
   tripFallbackPath,
@@ -24,6 +26,14 @@ import {
   tripTabPathWithState,
   tripTodayPath,
 } from './routes.ts';
+
+test('documents retained trip compatibility routes', () => {
+  assert.equal(TRIP_COMPATIBILITY_ROUTE_POLICY.basePattern, '/trips/*');
+  assert.equal(TRIP_COMPATIBILITY_ROUTE_POLICY.canonicalFor, 'trip_planning');
+  assert.match(TRIP_COMPATIBILITY_ROUTE_POLICY.retirementCondition, /event route parity/i);
+  assert.equal(isTripCompatibilityRoute('/trips/trip-a/today'), true);
+  assert.equal(isTripCompatibilityRoute('/events/event-a'), false);
+});
 
 test('builds canonical trip tab and hidden detail paths', () => {
   assert.equal(tripRootPath('trip-a'), '/trips/trip-a');

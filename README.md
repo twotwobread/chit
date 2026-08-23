@@ -1,6 +1,6 @@
 # i-um
 
-칫 Chit(구 이음/i-um)은 여행 중 다음 일정과 지출·정산을 한 흐름으로 이어주는 공동 여행 실행 앱입니다.
+칫 Chit(구 이음/i-um)은 모임의 일정과 공통 지출·정산을 한 흐름으로 이어주는 Ledger × Memory 앱입니다. 핵심 방향은 Event-first + 모임-backed이며, 브랜드 문장은 “기록은 정확하게, 기억은 다정하게.”입니다.
 
 ## Monorepo Overview
 
@@ -54,6 +54,10 @@ pnpm install
 ## Mobile UI
 
 모바일 브랜드/디자인 기준은 `docs/features/0341-chit-brand-design-system.md`, 구현 규칙은 `.pi/rules/mobile-ui.md`, 토큰은 `apps/mobile/lib/design/theme.ts`, 공용 primitive는 `apps/mobile/lib/design/components.tsx`를 기준으로 합니다. 브랜드 에셋은 `apps/mobile/assets/brand/`에 있습니다.
+
+## Route compatibility
+
+`/events/*`는 outing/event-first 화면의 신규 표면입니다. `/trips/*`는 Day, 숙소, 항공편, 지도, 여행 전용 장부 anchor가 남아 있는 trip-specific planning 호환 route로 유지합니다. `/trips/*` 종료는 event route parity와 저장된 deep link migration이 준비된 뒤 별도 slice에서 결정합니다.
 
 ## OpenAPI/codegen Workflow
 

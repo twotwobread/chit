@@ -73,16 +73,16 @@ test('copy and share helpers use Chit invite copy and inviteUrl rather than the 
   assert.equal(buildInviteCopyText(input.inviteUrl), input.inviteUrl);
 
   const kakaoPayload = buildKakaoInviteTemplate(input);
-  assert.equal(kakaoPayload.text, `여행 초대가 왔어요.\n제주 여행\n칫에서 함께 일정을 확인해요.\n${input.inviteUrl}`);
+  assert.equal(kakaoPayload.text, `일정 초대가 왔어요.\n제주 여행\n칫에서 함께 일정을 확인해요.\n${input.inviteUrl}`);
   assert.equal(kakaoPayload.link.mobileWebUrl, input.inviteUrl);
   assert.equal(kakaoPayload.buttons?.[0]?.title, '칫에서 참여하기');
   assert.equal(kakaoPayload.buttons?.[0]?.link.webUrl, input.inviteUrl);
 
   const fallbackPayload = buildFallbackShareContent(input);
-  assert.equal(fallbackPayload.title, '칫 여행 초대');
+  assert.equal(fallbackPayload.title, '칫 일정 초대');
   assert.equal(
     fallbackPayload.message,
-    `여행 초대가 왔어요.\n제주 여행\n칫에서 함께 일정을 확인해요.\n${input.inviteUrl}`,
+    `일정 초대가 왔어요.\n제주 여행\n칫에서 함께 일정을 확인해요.\n${input.inviteUrl}`,
   );
   assert.equal(fallbackPayload.url, input.inviteUrl);
 });
@@ -106,8 +106,8 @@ test('Kakao installed-app callback carries the invite token back to the invite r
 });
 
 test('failure copy separates invite API errors from Kakao share fallback guidance', () => {
-  assert.equal(getInviteActionErrorMessage({ code: 'FORBIDDEN' }), '여행 Owner만 초대 링크를 만들 수 있어요.');
-  assert.equal(getInviteActionErrorMessage({ code: 'NOT_FOUND' }), '여행을 찾을 수 없어요.');
+  assert.equal(getInviteActionErrorMessage({ code: 'FORBIDDEN' }), '일정 주최자만 초대 링크를 만들 수 있어요.');
+  assert.equal(getInviteActionErrorMessage({ code: 'NOT_FOUND' }), '일정을 찾을 수 없어요.');
   assert.equal(
     getInviteActionErrorMessage(new Error('network')),
     '초대 링크를 만들 수 없어요. 잠시 후 다시 시도해주세요.',
@@ -135,21 +135,21 @@ test('invite accept responses map to success and already accepted copy', () => {
   };
   assert.deepEqual(toInviteAcceptViewModel(accepted), {
     kind: 'accepted',
-    title: '여행에 참여했어요.',
-    message: '제주 여행 여행을 함께 볼 수 있어요.',
+    title: '일정에 참여했어요.',
+    message: '제주 여행 일정을 함께 볼 수 있어요.',
     primaryAction: 'viewTrip',
-    primaryLabel: '여행 보기',
+    primaryLabel: '일정 보기',
     tripId: 'trip-1',
     tripName: '제주 여행',
   });
 
   const member = toInviteAcceptViewModel({ ...accepted, alreadyAccepted: true });
   assert.equal(member.kind, 'alreadyMember');
-  assert.equal(member.title, '이미 참여 중인 여행이에요.');
+  assert.equal(member.title, '이미 참여 중인 일정이에요.');
 
   const owner = toInviteAcceptViewModel({ ...accepted, role: 'owner', alreadyAccepted: true });
   assert.equal(owner.kind, 'ownerAlready');
-  assert.equal(owner.title, '이미 주최자로 참여 중인 여행이에요.');
+  assert.equal(owner.title, '이미 주최자로 참여 중인 일정이에요.');
 });
 
 test('meeting invite accept responses map to meeting detail navigation', () => {

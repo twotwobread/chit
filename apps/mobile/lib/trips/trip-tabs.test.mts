@@ -120,7 +120,7 @@ test('builds app bar members from trip participant preview names', () => {
     days: [],
   } satisfies GetTripDetailResponse;
 
-  assert.deepEqual(buildTripAppBarMembers(detail), [{ name: '민수' }, { name: '여행자' }, { name: '지영' }]);
+  assert.deepEqual(buildTripAppBarMembers(detail), [{ name: '민수' }, { name: '참여자' }, { name: '지영' }]);
   assert.deepEqual(buildTripAppBarMembers(null), []);
 });
 

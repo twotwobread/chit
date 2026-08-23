@@ -261,7 +261,7 @@ function ParticipantSection({
             <View style={styles.participantAvatar}>
               <Text style={styles.participantAvatarText}>{participant.displayName.trim().slice(0, 1) || '여'}</Text>
             </View>
-            <Text style={styles.participantName}>{participant.displayName.trim() || '여행자'}</Text>
+            <Text style={styles.participantName}>{participant.displayName.trim() || '참여자'}</Text>
             {participant.role === 'owner' ? <Badge label="주최자" tone="primary" /> : <Badge label="동행자" />}
           </View>
         ))}
@@ -272,7 +272,7 @@ function ParticipantSection({
 
 function fallbackParticipants(summary: GetTripDetailResponse['participantSummary']): TripParticipantListItem[] {
   const previewRows = summary.previewNames.map((name, index) => ({
-    displayName: name.trim() || '여행자',
+    displayName: name.trim() || '참여자',
     joinedAt: '',
     participantId: `preview-${index}`,
     userId: `preview-user-${index}`,

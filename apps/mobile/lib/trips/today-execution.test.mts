@@ -145,10 +145,10 @@ test('selects today trip using an injected local date and reports multiple ongoi
 test('builds a no-ongoing-trip Today state with MyPage and create-trip actions', () => {
   assert.deepEqual(buildTodayNoOngoingTripViewModel(), {
     status: 'noOngoingTrip',
-    title: '오늘 진행 중인 여행이 없어요.',
-    helper: '내 여행에서 예정된 여행을 확인하거나 새 여행을 만들어보세요.',
-    primaryAction: { kind: 'route', label: '내 여행 보기', route: '/mypage' },
-    secondaryAction: { kind: 'route', label: '새 여행 만들기', route: '/trips/new' },
+    title: '오늘 진행 중인 일정이 없어요.',
+    helper: '내 일정에서 예정된 일정을 확인하거나 새 일정을 만들어보세요.',
+    primaryAction: { kind: 'route', label: '내 일정 보기', route: '/mypage' },
+    secondaryAction: { kind: 'route', label: '새 일정 만들기', route: '/trips/new' },
   });
 });
 
@@ -164,9 +164,9 @@ test('maps a selected ongoing trip without a matching day to an unavailable Toda
   assert.deepEqual(viewModel, {
     status: 'unavailable',
     title: '오늘 일정을 찾을 수 없어요.',
-    helper: '여행 정보가 바뀌었을 수 있어요. 다시 시도하거나 여행 상세를 확인해주세요.',
+    helper: '일정 정보가 바뀌었을 수 있어요. 다시 시도하거나 일정 상세를 확인해주세요.',
     primaryAction: { kind: 'retry', label: '다시 시도' },
-    secondaryAction: { kind: 'route', label: '여행 상세로', route: '/trips/trip-current/detail' },
+    secondaryAction: { kind: 'route', label: '일정 상세로', route: '/trips/trip-current/detail' },
   });
 });
 
@@ -189,8 +189,8 @@ test('builds an empty-itinerary Today state with current day context and day iti
     primaryAction: { kind: 'route', label: '오늘 일정 열기', route: '/trips/trip-current/itinerary?dayId=2026-07-10' },
     lodgingNavigationAction: disabledLodgingNavigationAction,
     multipleOngoingTripNotice: {
-      message: '다른 진행 중인 여행은 내 여행에서 볼 수 있어요.',
-      action: { kind: 'route', label: '내 여행 보기', route: '/mypage' },
+      message: '다른 진행 중인 일정은 내 일정에서 볼 수 있어요.',
+      action: { kind: 'route', label: '내 일정 보기', route: '/mypage' },
     },
   });
 });
@@ -844,16 +844,16 @@ test('builds retryable and unavailable failure states without crashing callers',
   assert.deepEqual(buildTodayRetryableErrorViewModel('trip-current'), {
     status: 'retryableError',
     title: '오늘 일정을 불러올 수 없어요.',
-    helper: '잠시 후 다시 시도하거나 여행 상세를 확인해주세요.',
+    helper: '잠시 후 다시 시도하거나 일정 상세를 확인해주세요.',
     primaryAction: { kind: 'retry', label: '다시 시도' },
-    secondaryAction: { kind: 'route', label: '여행 상세로', route: '/trips/trip-current/detail' },
+    secondaryAction: { kind: 'route', label: '일정 상세로', route: '/trips/trip-current/detail' },
   });
 
   assert.deepEqual(buildTodayUnavailableViewModel('trip-current'), {
     status: 'unavailable',
     title: '오늘 일정을 찾을 수 없어요.',
-    helper: '여행 정보가 바뀌었을 수 있어요. 다시 시도하거나 여행 상세를 확인해주세요.',
+    helper: '일정 정보가 바뀌었을 수 있어요. 다시 시도하거나 일정 상세를 확인해주세요.',
     primaryAction: { kind: 'retry', label: '다시 시도' },
-    secondaryAction: { kind: 'route', label: '여행 상세로', route: '/trips/trip-current/detail' },
+    secondaryAction: { kind: 'route', label: '일정 상세로', route: '/trips/trip-current/detail' },
   });
 });

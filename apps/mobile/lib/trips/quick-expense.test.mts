@@ -495,7 +495,10 @@ for (const fixtureCase of goldenEqualSplitCases) {
         displayName: row.displayName,
         amountMinor: row.amountMinor,
       })),
-      fixtureCase.expectedSplits,
+      fixtureCase.expectedSplits.map((split) => ({
+        ...split,
+        displayName: split.displayName === '여행자' ? '참여자' : split.displayName,
+      })),
     );
     assert.equal(
       rows.reduce((total, row) => total + row.amountMinor, 0),
@@ -534,7 +537,7 @@ test('builds split preview in the quick expense view model for valid amount and 
     viewModel.splitPreviewRows.map((row) => [row.participantId, row.displayName, row.amountLabel]),
     [
       ['00000000-0000-0000-0000-000000002001', '민수', '334엔'],
-      ['00000000-0000-0000-0000-000000002002', '여행자', '333엔'],
+      ['00000000-0000-0000-0000-000000002002', '참여자', '333엔'],
       ['00000000-0000-0000-0000-000000002003', '현우', '333엔'],
     ],
   );
@@ -543,7 +546,7 @@ test('builds split preview in the quick expense view model for valid amount and 
     [
       ['00000000-0000-0000-0000-000000002003', '현우', true],
       ['00000000-0000-0000-0000-000000002001', '민수', true],
-      ['00000000-0000-0000-0000-000000002002', '여행자', true],
+      ['00000000-0000-0000-0000-000000002002', '참여자', true],
     ],
   );
   assert.equal(viewModel.splitPreviewMessage, null);
@@ -695,7 +698,7 @@ test('builds saved split summary from server response splits', () => {
     amountLabel: '667엔',
     splitRows: [
       { participantId: 'participant-a', displayName: '민수', amountMinor: 334, amountLabel: '334엔' },
-      { participantId: null, displayName: '여행자', amountMinor: 333, amountLabel: '333엔' },
+      { participantId: null, displayName: '참여자', amountMinor: 333, amountLabel: '333엔' },
     ],
   });
 });

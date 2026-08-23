@@ -29,8 +29,8 @@ describe('form accessibility helpers', () => {
     );
 
     assert.equal(
-      buildFieldAccessibilityHint({ helperText: '여행 참여자와 정산 화면에 표시돼요.' }),
-      '여행 참여자와 정산 화면에 표시돼요.',
+      buildFieldAccessibilityHint({ helperText: '일정 참여자와 정산 화면에 표시돼요.' }),
+      '일정 참여자와 정산 화면에 표시돼요.',
     );
   });
 });

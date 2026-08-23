@@ -144,5 +144,5 @@ function displayTitle(expense: DayExpenseListItem): string {
 }
 
 function normalizeDisplayName(value: string): string {
-  return value.trim() || '여행자';
+  return value.trim() || '참여자';
 }

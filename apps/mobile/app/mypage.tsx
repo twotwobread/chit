@@ -40,7 +40,7 @@ export default function MyPageScreen() {
       >
         <View style={styles.header}>
           <Text style={styles.title}>마이페이지</Text>
-          <Text style={styles.subtitle}>내 정보와 여행을 한곳에서 확인해요.</Text>
+          <Text style={styles.subtitle}>내 정보와 일정을 한곳에서 확인해요.</Text>
         </View>
 
         {state.status === 'loading' ? <SkeletonCard title="마이페이지를 불러오는 중..." /> : null}

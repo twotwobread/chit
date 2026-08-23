@@ -39,7 +39,7 @@ test('builds participant rows without exposing joinedAt in the row view model', 
     { participantId: 'participant-owner', displayName: '민수', role: 'owner', roleLabel: '주최자', canRemove: false },
     {
       participantId: 'participant-member',
-      displayName: '여행자',
+      displayName: '참여자',
       role: 'member',
       roleLabel: '동행자',
       canRemove: false,
