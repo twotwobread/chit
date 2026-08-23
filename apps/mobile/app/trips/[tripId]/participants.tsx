@@ -34,13 +34,13 @@ export default function TripParticipantsScreen() {
     <ScreenBackground>
       <ScrollView contentContainerStyle={styles.scrollContent} style={styles.scroll}>
         <View style={styles.header}>
-          <Text style={styles.screenTitle}>참여자</Text>
+          <Text style={styles.screenTitle}>여행 참여자</Text>
         </View>
 
         {state.status === 'loading' ? (
           <Card>
             <ActivityIndicator color={theme.color.primary} />
-            <Text style={styles.message}>참여자를 불러오는 중...</Text>
+            <Text style={styles.message}>여행 참여자를 불러오는 중...</Text>
           </Card>
         ) : null}
 
@@ -95,7 +95,7 @@ export default function TripParticipantsScreen() {
 
         {state.status === 'error' ? (
           <Card>
-            <Text style={styles.errorTitle}>참여자 목록을 불러올 수 없어요.</Text>
+            <Text style={styles.errorTitle}>여행 참여자 목록을 불러올 수 없어요.</Text>
             <Text style={styles.message}>잠시 후 다시 시도해주세요.</Text>
             <PrimaryButton label="다시 시도" onPress={() => void load()} />
           </Card>

@@ -13,4 +13,8 @@ export type TripMeetingContextInput = {
      * Optional when mode is new_saved. Defaults to the trip name.
      */
     meetingName?: string;
+    /**
+     * Optional selected meeting_member IDs when mode is existing. Omit to select all current saved meeting members for backward compatibility.
+     */
+    participantMemberIds?: Array<string>;
 };

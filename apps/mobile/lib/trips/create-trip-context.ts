@@ -2,7 +2,7 @@ import type { MeetingListItem, TripMeetingContextInput } from '@i-um/api-contrac
 
 export type CreateTripMeetingContextSelection =
   | { mode: 'one_off' }
-  | { mode: 'existing'; meetingId: string }
+  | { mode: 'existing'; meetingId: string; participantMemberIds?: string[] }
   | { mode: 'new_saved'; meetingName: string };
 
 export function defaultCreateTripMeetingContext(): CreateTripMeetingContextSelection {
@@ -32,7 +32,11 @@ export function buildCreateTripMeetingContextPayload(
   tripName: string,
 ): TripMeetingContextInput {
   if (selection.mode === 'existing') {
-    return { mode: 'existing', meetingId: selection.meetingId };
+    return {
+      mode: 'existing',
+      meetingId: selection.meetingId,
+      ...(selection.participantMemberIds ? { participantMemberIds: selection.participantMemberIds } : {}),
+    };
   }
   if (selection.mode === 'new_saved') {
     const meetingName = selection.meetingName.trim() || tripName.trim();
@@ -49,6 +53,9 @@ export function createTripMeetingContextSummary(
     const meeting = meetings.find((item) => item.id === selection.meetingId);
     if (!meeting) {
       return '기존 모임';
+    }
+    if (selection.participantMemberIds) {
+      return `${meeting.name} · ${selection.participantMemberIds.length}명 선택`;
     }
     return `${meeting.name} · ${meeting.memberCount}명`;
   }

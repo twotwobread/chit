@@ -947,6 +947,32 @@ func (q *Queries) GetGoogleTripPlaceByGooglePlaceID(ctx context.Context, arg Get
 	return i, err
 }
 
+const getSavedMeetingTripParticipantContextForUpdate = `-- name: GetSavedMeetingTripParticipantContextForUpdate :one
+SELECT
+  t.id::text AS trip_id,
+  e.id::text AS event_id,
+  m.id::text AS meeting_id
+FROM trips t
+JOIN events e ON e.trip_id = t.id
+JOIN meetings m ON m.id = e.meeting_id
+WHERE t.id = $1::uuid
+  AND m.visibility = 'saved'
+FOR UPDATE OF t, e, m
+`
+
+type GetSavedMeetingTripParticipantContextForUpdateRow struct {
+	TripID    string
+	EventID   string
+	MeetingID string
+}
+
+func (q *Queries) GetSavedMeetingTripParticipantContextForUpdate(ctx context.Context, tripID pgtype.UUID) (GetSavedMeetingTripParticipantContextForUpdateRow, error) {
+	row := q.db.QueryRow(ctx, getSavedMeetingTripParticipantContextForUpdate, tripID)
+	var i GetSavedMeetingTripParticipantContextForUpdateRow
+	err := row.Scan(&i.TripID, &i.EventID, &i.MeetingID)
+	return i, err
+}
+
 const getScheduleItemByTripDayAndID = `-- name: GetScheduleItemByTripDayAndID :one
 SELECT
   si.id::text AS id,
@@ -1543,6 +1569,7 @@ func (q *Queries) ListTripParticipantPreviewByTripID(ctx context.Context, dollar
 const listTripParticipantsByTripID = `-- name: ListTripParticipantsByTripID :many
 SELECT
   id::text,
+  user_id::text,
   display_name,
   role,
   joined_at
@@ -1556,6 +1583,7 @@ ORDER BY
 
 type ListTripParticipantsByTripIDRow struct {
 	ID          string
+	UserID      string
 	DisplayName string
 	Role        string
 	JoinedAt    pgtype.Timestamptz
@@ -1572,6 +1600,7 @@ func (q *Queries) ListTripParticipantsByTripID(ctx context.Context, dollar_1 pgt
 		var i ListTripParticipantsByTripIDRow
 		if err := rows.Scan(
 			&i.ID,
+			&i.UserID,
 			&i.DisplayName,
 			&i.Role,
 			&i.JoinedAt,

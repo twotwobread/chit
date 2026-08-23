@@ -318,6 +318,39 @@ func (s *Service) Delete(ctx context.Context, userID string, tripID string) erro
 	return nil
 }
 
+func (s *Service) ReplaceParticipants(ctx context.Context, userID string, tripID string, input ReplaceParticipantsInput) (ReplaceParticipantsResult, error) {
+	if strings.TrimSpace(userID) == "" {
+		return ReplaceParticipantsResult{}, ErrUnauthorized
+	}
+
+	tripID = strings.TrimSpace(tripID)
+	if !isUUID(tripID) {
+		return ReplaceParticipantsResult{}, ErrValidation
+	}
+	participantMemberIDs, err := normalizeParticipantMemberIDs(input.ParticipantMemberIDs)
+	if err != nil {
+		return ReplaceParticipantsResult{}, err
+	}
+
+	_, ok, err := s.repo.GetTripByID(ctx, tripID)
+	if err != nil {
+		return ReplaceParticipantsResult{}, err
+	}
+	if !ok {
+		return ReplaceParticipantsResult{}, ErrNotFound
+	}
+
+	isOwner, err := s.repo.IsTripOwner(ctx, tripID, userID)
+	if err != nil {
+		return ReplaceParticipantsResult{}, err
+	}
+	if !isOwner {
+		return ReplaceParticipantsResult{}, ErrForbidden
+	}
+
+	return s.repo.ReplaceTripParticipants(ctx, ReplaceParticipantsRecord{TripID: tripID, RequestedBy: userID, ParticipantMemberIDs: participantMemberIDs})
+}
+
 func (s *Service) RemoveParticipant(ctx context.Context, userID string, tripID string, participantID string) error {
 	if strings.TrimSpace(userID) == "" {
 		return ErrUnauthorized
@@ -2015,7 +2048,15 @@ func normalizeCreateMeetingContext(input CreateMeetingContextInput) (CreateMeeti
 		if meetingID == "" || !isUUID(meetingID) {
 			return CreateMeetingContextRecord{}, ErrValidation
 		}
-		return CreateMeetingContextRecord{Mode: MeetingContextModeExisting, MeetingID: meetingID}, nil
+		var participantMemberIDs []string
+		if input.ParticipantMemberIDs != nil {
+			var err error
+			participantMemberIDs, err = normalizeParticipantMemberIDs(input.ParticipantMemberIDs)
+			if err != nil {
+				return CreateMeetingContextRecord{}, err
+			}
+		}
+		return CreateMeetingContextRecord{Mode: MeetingContextModeExisting, MeetingID: meetingID, ParticipantMemberIDs: participantMemberIDs}, nil
 	case MeetingContextModeNewSaved:
 		meetingName := strings.TrimSpace(input.MeetingName)
 		if len([]rune(meetingName)) > 80 {
@@ -2025,6 +2066,26 @@ func normalizeCreateMeetingContext(input CreateMeetingContextInput) (CreateMeeti
 	default:
 		return CreateMeetingContextRecord{}, ErrValidation
 	}
+}
+
+func normalizeParticipantMemberIDs(input []string) ([]string, error) {
+	if len(input) == 0 {
+		return nil, ErrValidation
+	}
+	seen := make(map[string]struct{}, len(input))
+	out := make([]string, 0, len(input))
+	for _, rawID := range input {
+		id := strings.TrimSpace(rawID)
+		if !isUUID(id) {
+			return nil, ErrValidation
+		}
+		if _, ok := seen[id]; ok {
+			return nil, ErrValidation
+		}
+		seen[id] = struct{}{}
+		out = append(out, id)
+	}
+	return out, nil
 }
 
 func normalizeCreateDestinations(inputs []CreateDestinationInput) ([]CreateDestinationRecord, error) {

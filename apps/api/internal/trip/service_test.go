@@ -170,6 +170,9 @@ type fakeRepository struct {
 	deletedParticipantID         string
 	deletedParticipantCalled     bool
 	deleteParticipantOK          bool
+	replacedParticipantsRecord   ReplaceParticipantsRecord
+	replacedParticipants         ReplaceParticipantsResult
+	replaceParticipantsErr       error
 	inviteRecord                 CreateTripInviteRecord
 	inviteRecords                []CreateTripInviteRecord
 	inviteResult                 CreateTripInviteResult
@@ -249,6 +252,14 @@ func (r *fakeRepository) DeleteTripMemberParticipant(_ context.Context, tripID s
 	r.deletedParticipantID = participantID
 	r.deletedParticipantCalled = true
 	return r.deleteParticipantOK, nil
+}
+
+func (r *fakeRepository) ReplaceTripParticipants(_ context.Context, record ReplaceParticipantsRecord) (ReplaceParticipantsResult, error) {
+	r.replacedParticipantsRecord = record
+	if r.replaceParticipantsErr != nil {
+		return ReplaceParticipantsResult{}, r.replaceParticipantsErr
+	}
+	return r.replacedParticipants, nil
 }
 
 func (r *fakeRepository) CreateOrReturnTripInvite(_ context.Context, record CreateTripInviteRecord) (CreateTripInviteResult, error) {
@@ -911,9 +922,7 @@ func TestServiceCreateNormalizesMeetingContext(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Create returned error: %v", err)
 			}
-			if repo.created.MeetingContext != tt.want {
-				t.Fatalf("expected meeting context %#v, got %#v", tt.want, repo.created.MeetingContext)
-			}
+			assertCreateMeetingContextRecordEqual(t, repo.created.MeetingContext, tt.want)
 		})
 	}
 }
@@ -939,6 +948,116 @@ func TestServiceCreateRejectsInvalidMeetingContext(t *testing.T) {
 		if !errors.Is(err, ErrValidation) {
 			t.Fatalf("expected ErrValidation for %#v, got %v", meetingContext, err)
 		}
+	}
+}
+
+func TestServiceCreateAcceptsSelectedMeetingMemberParticipants(t *testing.T) {
+	repo := &fakeRepository{creator: Creator{ID: "user-1", DisplayName: "민수"}, creatorFound: true}
+	service := newTestService(repo)
+
+	_, err := service.Create(context.Background(), "user-1", CreateInput{
+		Name:              "오사카",
+		StartDate:         "2026-07-10",
+		EndDate:           "2026-07-13",
+		DefaultCurrency:   "JPY",
+		DefaultTravelMode: "transit",
+		MeetingContext: CreateMeetingContextInput{
+			Mode:                 MeetingContextModeExisting,
+			MeetingID:            "00000000-0000-0000-0000-000000000099",
+			ParticipantMemberIDs: []string{"00000000-0000-0000-0000-000000000201", "00000000-0000-0000-0000-000000000202"},
+		},
+		Destinations: validCreateDestinations(),
+	})
+	if err != nil {
+		t.Fatalf("Create returned error: %v", err)
+	}
+
+	assertStringSlicesEqual(t, repo.created.MeetingContext.ParticipantMemberIDs, []string{"00000000-0000-0000-0000-000000000201", "00000000-0000-0000-0000-000000000202"})
+}
+
+func TestServiceCreateRejectsInvalidSelectedMeetingMemberParticipants(t *testing.T) {
+	base := CreateInput{
+		Name:              "오사카",
+		StartDate:         "2026-07-10",
+		EndDate:           "2026-07-13",
+		DefaultCurrency:   "JPY",
+		DefaultTravelMode: "transit",
+		MeetingContext: CreateMeetingContextInput{
+			Mode:      MeetingContextModeExisting,
+			MeetingID: "00000000-0000-0000-0000-000000000099",
+		},
+		Destinations: validCreateDestinations(),
+	}
+	tests := []struct {
+		name string
+		ids  []string
+	}{
+		{name: "explicit empty", ids: []string{}},
+		{name: "invalid uuid", ids: []string{"not-a-uuid"}},
+		{name: "duplicate", ids: []string{"00000000-0000-0000-0000-000000000201", "00000000-0000-0000-0000-000000000201"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			input := base
+			input.MeetingContext.ParticipantMemberIDs = tt.ids
+			service := newTestService(&fakeRepository{creator: Creator{ID: "user-1", DisplayName: "민수"}, creatorFound: true})
+			_, err := service.Create(context.Background(), "user-1", input)
+			if !errors.Is(err, ErrValidation) {
+				t.Fatalf("expected ErrValidation, got %v", err)
+			}
+		})
+	}
+}
+
+func TestServiceReplaceParticipantsPassesSelectedMeetingMembers(t *testing.T) {
+	repo := &fakeRepository{
+		trip:                 Trip{ID: testTripID, StartDate: "2026-07-10", EndDate: "2026-07-13", DefaultCurrency: "JPY"},
+		tripFound:            true,
+		isOwner:              true,
+		replacedParticipants: ReplaceParticipantsResult{Participants: []ParticipantListItem{{ParticipantID: testUUID(3001), UserID: "user-1", DisplayName: "민수", Role: RoleOwner}}},
+	}
+	service := newTestService(repo)
+
+	result, err := service.ReplaceParticipants(context.Background(), "user-1", testTripID, ReplaceParticipantsInput{ParticipantMemberIDs: []string{testUUID(2201), testUUID(2202)}})
+	if err != nil {
+		t.Fatalf("ReplaceParticipants returned error: %v", err)
+	}
+
+	if repo.replacedParticipantsRecord.TripID != testTripID || repo.replacedParticipantsRecord.RequestedBy != "user-1" {
+		t.Fatalf("unexpected replacement record: %#v", repo.replacedParticipantsRecord)
+	}
+	assertStringSlicesEqual(t, repo.replacedParticipantsRecord.ParticipantMemberIDs, []string{testUUID(2201), testUUID(2202)})
+	if len(result.Participants) != 1 || result.Participants[0].UserID != "user-1" {
+		t.Fatalf("expected replacement participants with user id, got %#v", result.Participants)
+	}
+}
+
+func TestServiceReplaceParticipantsValidationAndAuthorization(t *testing.T) {
+	validInput := ReplaceParticipantsInput{ParticipantMemberIDs: []string{testUUID(2201)}}
+	tests := []struct {
+		name   string
+		repo   *fakeRepository
+		userID string
+		tripID string
+		input  ReplaceParticipantsInput
+		want   error
+	}{
+		{name: "auth required", repo: &fakeRepository{}, userID: " ", tripID: testTripID, input: validInput, want: ErrUnauthorized},
+		{name: "invalid trip id", repo: &fakeRepository{}, userID: "user-1", tripID: "bad", input: validInput, want: ErrValidation},
+		{name: "empty members", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, input: ReplaceParticipantsInput{}, want: ErrValidation},
+		{name: "duplicate members", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, input: ReplaceParticipantsInput{ParticipantMemberIDs: []string{testUUID(2201), testUUID(2201)}}, want: ErrValidation},
+		{name: "missing trip", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, input: validInput, want: ErrNotFound},
+		{name: "forbidden", repo: &fakeRepository{trip: Trip{ID: testTripID}, tripFound: true}, userID: "user-1", tripID: testTripID, input: validInput, want: ErrForbidden},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := newTestService(tt.repo).ReplaceParticipants(context.Background(), tt.userID, tt.tripID, tt.input)
+			if !errors.Is(err, tt.want) {
+				t.Fatalf("expected %v, got %v", tt.want, err)
+			}
+		})
 	}
 }
 
@@ -3834,6 +3953,26 @@ func assertSettlementTransfer(t *testing.T, transfer SettlementTransfer, fromPar
 		}
 	} else if transfer.ToParticipant.ParticipantID == nil || *transfer.ToParticipant.ParticipantID != toParticipantID {
 		t.Fatalf("unexpected to participant: %#v", transfer.ToParticipant)
+	}
+}
+
+func assertCreateMeetingContextRecordEqual(t *testing.T, got CreateMeetingContextRecord, want CreateMeetingContextRecord) {
+	t.Helper()
+	if got.Mode != want.Mode || got.MeetingID != want.MeetingID || got.MeetingName != want.MeetingName {
+		t.Fatalf("expected meeting context %#v, got %#v", want, got)
+	}
+	assertStringSlicesEqual(t, got.ParticipantMemberIDs, want.ParticipantMemberIDs)
+}
+
+func assertStringSlicesEqual(t *testing.T, got []string, want []string) {
+	t.Helper()
+	if len(got) != len(want) {
+		t.Fatalf("expected %d values %v, got %d values %v", len(want), want, len(got), got)
+	}
+	for index := range want {
+		if got[index] != want[index] {
+			t.Fatalf("expected values %v, got %v", want, got)
+		}
 	}
 }
 

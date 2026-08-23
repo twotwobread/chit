@@ -184,6 +184,7 @@ FROM ordered_participants;
 -- name: ListTripParticipantsByTripID :many
 SELECT
   id::text,
+  user_id::text,
   display_name,
   role,
   joined_at
@@ -193,6 +194,18 @@ ORDER BY
   CASE WHEN role = 'owner' THEN 0 ELSE 1 END,
   joined_at ASC,
   id ASC;
+
+-- name: GetSavedMeetingTripParticipantContextForUpdate :one
+SELECT
+  t.id::text AS trip_id,
+  e.id::text AS event_id,
+  m.id::text AS meeting_id
+FROM trips t
+JOIN events e ON e.trip_id = t.id
+JOIN meetings m ON m.id = e.meeting_id
+WHERE t.id = sqlc.arg(trip_id)::uuid
+  AND m.visibility = 'saved'
+FOR UPDATE OF t, e, m;
 
 -- name: DeleteTripLinkedEventParticipantByTripParticipant :exec
 WITH linked AS (

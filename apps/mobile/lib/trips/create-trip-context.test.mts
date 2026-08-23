@@ -42,6 +42,21 @@ describe('event-first trip creation context helpers', () => {
     assert.equal(createTripMeetingContextSummary(selection, [savedMeeting]), '등산 모임 · 4명');
   });
 
+  it('includes selected meeting member ids for existing saved meeting event participants', () => {
+    const selection: CreateTripMeetingContextSelection = {
+      mode: 'existing',
+      meetingId: savedMeeting.id,
+      participantMemberIds: ['member-owner', 'member-friend'],
+    };
+
+    assert.deepEqual(buildCreateTripMeetingContextPayload(selection, '오사카 3박 4일'), {
+      mode: 'existing',
+      meetingId: savedMeeting.id,
+      participantMemberIds: ['member-owner', 'member-friend'],
+    });
+    assert.equal(createTripMeetingContextSummary(selection, [savedMeeting]), '등산 모임 · 2명 선택');
+  });
+
   it('builds a new saved meeting payload, defaulting the meeting name to the trip name', () => {
     assert.deepEqual(buildCreateTripMeetingContextPayload({ mode: 'new_saved', meetingName: '' }, '오사카 3박 4일'), {
       mode: 'new_saved',

@@ -36,6 +36,7 @@ import type { ReceiptCaptureMode } from '../models/ReceiptCaptureMode';
 import type { ReceiptOCRLanguage } from '../models/ReceiptOCRLanguage';
 import type { ReorderScheduleItemsRequest } from '../models/ReorderScheduleItemsRequest';
 import type { ReorderScheduleItemsResponse } from '../models/ReorderScheduleItemsResponse';
+import type { ReplaceTripParticipantsRequest } from '../models/ReplaceTripParticipantsRequest';
 import type { RestoreScheduleItemResponse } from '../models/RestoreScheduleItemResponse';
 import type { RoutePreviewResponse } from '../models/RoutePreviewResponse';
 import type { SetDayLodgingPlaceRequest } from '../models/SetDayLodgingPlaceRequest';
@@ -569,7 +570,7 @@ export class TripsService {
     }
     /**
      * List trip participants
-     * Returns the current accepted participants for a trip. Only authenticated current trip participants can access the list.
+     * Returns the current accepted event/trip participants for a trip. Only authenticated current trip participants can access the list.
      * @param tripId
      * @returns ListTripParticipantsResponse Current trip participants.
      * @throws ApiError
@@ -588,6 +589,36 @@ export class TripsService {
                 401: `Unauthorized.`,
                 403: `Forbidden.`,
                 404: `Trip not found.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
+     * Replace saved meeting-backed trip participants
+     * Replaces the current saved meeting member subset participating in this trip-backed event. Only the trip owner can replace participants. Existing expense payer/split snapshots are preserved when a participant is removed.
+     * @param tripId
+     * @param requestBody
+     * @returns ListTripParticipantsResponse Updated current trip participants.
+     * @throws ApiError
+     */
+    public static replaceTripParticipants(
+        tripId: string,
+        requestBody: ReplaceTripParticipantsRequest,
+    ): CancelablePromise<ListTripParticipantsResponse> {
+        return __request(OpenAPI, {
+            method: 'PUT',
+            url: '/trips/{tripId}/participants',
+            path: {
+                'tripId': tripId,
+            },
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                403: `Forbidden.`,
+                404: `Trip not found.`,
+                409: `Trip is not a saved meeting-backed event or the owner would be removed.`,
                 500: `Unexpected server error.`,
             },
         });
