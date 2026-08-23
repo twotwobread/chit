@@ -961,6 +961,24 @@ func tripDayToOpenAPI(day trip.TripDay) openapi.TripDay {
 	}
 }
 
+func promoteTripMeetingResponseToOpenAPI(result trip.PromoteMeetingResult) openapi.PromoteTripMeetingResponse {
+	return openapi.PromoteTripMeetingResponse{
+		Trip:    tripToOpenAPI(result.Trip),
+		Meeting: promotedMeetingToOpenAPI(result.Meeting),
+	}
+}
+
+func promotedMeetingToOpenAPI(value trip.PromotedMeeting) openapi.Meeting {
+	return openapi.Meeting{
+		Id:         value.ID,
+		Name:       value.Name,
+		Visibility: openapi.MeetingVisibility(value.Visibility),
+		CreatedBy:  value.CreatedBy,
+		CreatedAt:  value.CreatedAt,
+		UpdatedAt:  value.UpdatedAt,
+	}
+}
+
 func tripToOpenAPI(value trip.Trip) openapi.Trip {
 	return openapi.Trip{
 		Id:                value.ID,

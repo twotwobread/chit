@@ -173,6 +173,9 @@ type fakeRepository struct {
 	replacedParticipantsRecord   ReplaceParticipantsRecord
 	replacedParticipants         ReplaceParticipantsResult
 	replaceParticipantsErr       error
+	promoteMeetingRecord         PromoteMeetingRecord
+	promoteMeetingResult         PromoteMeetingResult
+	promoteMeetingErr            error
 	inviteRecord                 CreateTripInviteRecord
 	inviteRecords                []CreateTripInviteRecord
 	inviteResult                 CreateTripInviteResult
@@ -260,6 +263,14 @@ func (r *fakeRepository) ReplaceTripParticipants(_ context.Context, record Repla
 		return ReplaceParticipantsResult{}, r.replaceParticipantsErr
 	}
 	return r.replacedParticipants, nil
+}
+
+func (r *fakeRepository) PromoteTripMeeting(_ context.Context, record PromoteMeetingRecord) (PromoteMeetingResult, error) {
+	r.promoteMeetingRecord = record
+	if r.promoteMeetingErr != nil {
+		return PromoteMeetingResult{}, r.promoteMeetingErr
+	}
+	return r.promoteMeetingResult, nil
 }
 
 func (r *fakeRepository) CreateOrReturnTripInvite(_ context.Context, record CreateTripInviteRecord) (CreateTripInviteResult, error) {
@@ -1054,6 +1065,72 @@ func TestServiceReplaceParticipantsValidationAndAuthorization(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := newTestService(tt.repo).ReplaceParticipants(context.Background(), tt.userID, tt.tripID, tt.input)
+			if !errors.Is(err, tt.want) {
+				t.Fatalf("expected %v, got %v", tt.want, err)
+			}
+		})
+	}
+}
+
+func TestServicePromoteMeetingPassesTrimmedNameForOneOffTrip(t *testing.T) {
+	updatedTrip := Trip{
+		ID:                testTripID,
+		Name:              "성수 저녁",
+		StartDate:         "2026-06-20",
+		EndDate:           "2026-06-20",
+		DefaultCurrency:   "KRW",
+		DefaultTravelMode: "transit",
+		CreatedBy:         "user-1",
+		EventContext: &TripEventContext{
+			EventID:           testUUID(12001),
+			MeetingID:         testUUID(13001),
+			MeetingName:       "성수 저녁 모임",
+			MeetingVisibility: "saved",
+		},
+	}
+	repo := &fakeRepository{
+		trip:                 Trip{ID: testTripID, Name: "성수 저녁"},
+		tripFound:            true,
+		isOwner:              true,
+		promoteMeetingResult: PromoteMeetingResult{Trip: updatedTrip, Meeting: PromotedMeeting{ID: testUUID(13001), Name: "성수 저녁 모임", Visibility: "saved", CreatedBy: "user-1"}},
+	}
+	service := newTestService(repo)
+
+	result, err := service.PromoteMeeting(context.Background(), "user-1", testTripID, PromoteMeetingInput{MeetingName: "  성수 저녁 모임  "})
+	if err != nil {
+		t.Fatalf("PromoteMeeting returned error: %v", err)
+	}
+
+	if repo.promoteMeetingRecord.TripID != testTripID || repo.promoteMeetingRecord.RequestedBy != "user-1" || repo.promoteMeetingRecord.MeetingName != "성수 저녁 모임" {
+		t.Fatalf("unexpected promotion record: %#v", repo.promoteMeetingRecord)
+	}
+	if result.Trip.EventContext == nil || result.Trip.EventContext.MeetingVisibility != "saved" || result.Meeting.Name != "성수 저녁 모임" {
+		t.Fatalf("expected saved meeting promotion result, got %#v", result)
+	}
+}
+
+func TestServicePromoteMeetingValidationAuthorizationAndConflict(t *testing.T) {
+	validInput := PromoteMeetingInput{MeetingName: "성수 저녁 모임"}
+	tests := []struct {
+		name   string
+		repo   *fakeRepository
+		userID string
+		tripID string
+		input  PromoteMeetingInput
+		want   error
+	}{
+		{name: "auth required", repo: &fakeRepository{}, userID: " ", tripID: testTripID, input: validInput, want: ErrUnauthorized},
+		{name: "invalid trip id", repo: &fakeRepository{}, userID: "user-1", tripID: "bad", input: validInput, want: ErrValidation},
+		{name: "blank name", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, input: PromoteMeetingInput{}, want: ErrValidation},
+		{name: "too long name", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, input: PromoteMeetingInput{MeetingName: strings.Repeat("가", 81)}, want: ErrValidation},
+		{name: "missing trip", repo: &fakeRepository{}, userID: "user-1", tripID: testTripID, input: validInput, want: ErrNotFound},
+		{name: "forbidden", repo: &fakeRepository{trip: Trip{ID: testTripID}, tripFound: true}, userID: "user-2", tripID: testTripID, input: validInput, want: ErrForbidden},
+		{name: "already saved conflict", repo: &fakeRepository{trip: Trip{ID: testTripID}, tripFound: true, isOwner: true, promoteMeetingErr: ErrConflict}, userID: "user-1", tripID: testTripID, input: validInput, want: ErrConflict},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := newTestService(tt.repo).PromoteMeeting(context.Background(), tt.userID, tt.tripID, tt.input)
 			if !errors.Is(err, tt.want) {
 				t.Fatalf("expected %v, got %v", tt.want, err)
 			}

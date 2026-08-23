@@ -1936,6 +1936,53 @@ func (q *Queries) LockTripForInvite(ctx context.Context, tripID pgtype.UUID) (st
 	return id, err
 }
 
+const promoteOneOffTripMeeting = `-- name: PromoteOneOffTripMeeting :one
+UPDATE meetings m
+SET
+  name = $1,
+  visibility = 'saved',
+  updated_at = now()
+FROM events e
+WHERE e.meeting_id = m.id
+  AND e.trip_id = $2::uuid
+  AND m.visibility = 'one_off'
+RETURNING
+  m.id::text,
+  m.name,
+  m.visibility,
+  m.created_by::text,
+  m.created_at,
+  m.updated_at
+`
+
+type PromoteOneOffTripMeetingParams struct {
+	MeetingName string
+	TripID      pgtype.UUID
+}
+
+type PromoteOneOffTripMeetingRow struct {
+	MID        string
+	Name       string
+	Visibility string
+	MCreatedBy string
+	CreatedAt  pgtype.Timestamptz
+	UpdatedAt  pgtype.Timestamptz
+}
+
+func (q *Queries) PromoteOneOffTripMeeting(ctx context.Context, arg PromoteOneOffTripMeetingParams) (PromoteOneOffTripMeetingRow, error) {
+	row := q.db.QueryRow(ctx, promoteOneOffTripMeeting, arg.MeetingName, arg.TripID)
+	var i PromoteOneOffTripMeetingRow
+	err := row.Scan(
+		&i.MID,
+		&i.Name,
+		&i.Visibility,
+		&i.MCreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const setDayLodgingPlace = `-- name: SetDayLodgingPlace :one
 WITH updated AS (
   UPDATE trip_days

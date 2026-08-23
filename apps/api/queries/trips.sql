@@ -207,6 +207,24 @@ WHERE t.id = sqlc.arg(trip_id)::uuid
   AND m.visibility = 'saved'
 FOR UPDATE OF t, e, m;
 
+-- name: PromoteOneOffTripMeeting :one
+UPDATE meetings m
+SET
+  name = sqlc.arg(meeting_name),
+  visibility = 'saved',
+  updated_at = now()
+FROM events e
+WHERE e.meeting_id = m.id
+  AND e.trip_id = sqlc.arg(trip_id)::uuid
+  AND m.visibility = 'one_off'
+RETURNING
+  m.id::text,
+  m.name,
+  m.visibility,
+  m.created_by::text,
+  m.created_at,
+  m.updated_at;
+
 -- name: DeleteTripLinkedEventParticipantByTripParticipant :exec
 WITH linked AS (
   SELECT

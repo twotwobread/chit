@@ -272,6 +272,156 @@ func TestTripRepositoryReplaceParticipantsPreservesExpenseSnapshots(t *testing.T
 	}
 }
 
+func TestTripRepositoryPromoteOneOffMeetingPreservesEventLedgerAndSavedList(t *testing.T) {
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("DATABASE_URL is required for storage integration test")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	store, err := Open(ctx, databaseURL)
+	if err != nil {
+		t.Skipf("database unavailable for storage integration test: %v", err)
+	}
+	defer store.Close()
+	if err := store.pool.Ping(ctx); err != nil {
+		t.Skipf("database unavailable for storage integration test: %v", err)
+	}
+
+	var ownerUserID string
+	if err := store.pool.QueryRow(ctx, `INSERT INTO users (display_name) VALUES ('민수') RETURNING id::text`).Scan(&ownerUserID); err != nil {
+		t.Fatalf("insert owner user: %v", err)
+	}
+	var memberUserID string
+	if err := store.pool.QueryRow(ctx, `INSERT INTO users (display_name) VALUES ('지은') RETURNING id::text`).Scan(&memberUserID); err != nil {
+		t.Fatalf("insert member user: %v", err)
+	}
+	var promotedMeetingID string
+	defer func() {
+		_, _ = store.pool.Exec(context.Background(), `DELETE FROM trips WHERE created_by = $1::uuid`, ownerUserID)
+		if promotedMeetingID != "" {
+			_, _ = store.pool.Exec(context.Background(), `DELETE FROM meetings WHERE id = $1::uuid`, promotedMeetingID)
+		}
+		_, _ = store.pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1::uuid OR id = $2::uuid`, ownerUserID, memberUserID)
+	}()
+
+	createdTrip, err := store.CreateTripWithOwner(ctx, trip.CreateRecord{
+		Name:              "성수 저녁",
+		StartDate:         time.Date(2026, 7, 10, 0, 0, 0, 0, time.UTC),
+		EndDate:           time.Date(2026, 7, 10, 0, 0, 0, 0, time.UTC),
+		DefaultCurrency:   "KRW",
+		DefaultTravelMode: "transit",
+		CreatedBy:         ownerUserID,
+		OwnerDisplayName:  "민수",
+		MeetingContext:    trip.CreateMeetingContextRecord{Mode: trip.MeetingContextModeOneOff},
+		Destinations:      participantSelectionDestination("google-city-seongsu-promote"),
+	})
+	if err != nil {
+		t.Fatalf("CreateTripWithOwner one-off: %v", err)
+	}
+	if createdTrip.Trip.EventContext == nil || createdTrip.Trip.EventContext.MeetingVisibility != meeting.MeetingVisibilityOneOff {
+		t.Fatalf("expected one-off event context, got %#v", createdTrip.Trip.EventContext)
+	}
+	promotedMeetingID = createdTrip.Trip.EventContext.MeetingID
+
+	inviteToken := "promote-one-off-token-1234567890abcd"
+	_, err = store.CreateOrReturnTripInvite(ctx, trip.CreateTripInviteRecord{TripID: createdTrip.Trip.ID, CreatedBy: ownerUserID, Token: inviteToken, Now: time.Now(), ExpiresAt: time.Now().Add(24 * time.Hour)})
+	if err != nil {
+		t.Fatalf("CreateOrReturnTripInvite: %v", err)
+	}
+	if _, err := store.AcceptTripInvite(ctx, trip.AcceptTripInviteRecord{Token: inviteToken, UserID: memberUserID, Now: time.Now()}); err != nil {
+		t.Fatalf("AcceptTripInvite: %v", err)
+	}
+
+	participants, err := store.ListTripParticipants(ctx, createdTrip.Trip.ID)
+	if err != nil {
+		t.Fatalf("ListTripParticipants before promote: %v", err)
+	}
+	var memberParticipantID string
+	for _, participant := range participants {
+		if participant.UserID == memberUserID {
+			memberParticipantID = participant.ParticipantID
+			break
+		}
+	}
+	if memberParticipantID == "" {
+		t.Fatalf("expected accepted invite member in trip participants: %#v", participants)
+	}
+	expenseID := insertParticipantSelectionExpense(t, ctx, store, createdTrip.Trip.ID, ownerUserID, memberParticipantID, "지은")
+
+	beforeCounts := promotionCounts(t, ctx, store, createdTrip.Trip.ID, createdTrip.Trip.EventContext.EventID, expenseID)
+
+	result, err := store.PromoteTripMeeting(ctx, trip.PromoteMeetingRecord{TripID: createdTrip.Trip.ID, RequestedBy: ownerUserID, MeetingName: "성수 저녁 모임"})
+	if err != nil {
+		t.Fatalf("PromoteTripMeeting: %v", err)
+	}
+	if result.Meeting.ID != promotedMeetingID || result.Meeting.Visibility != meeting.MeetingVisibilitySaved || result.Meeting.Name != "성수 저녁 모임" {
+		t.Fatalf("unexpected promoted meeting: %#v", result.Meeting)
+	}
+	if result.Trip.EventContext == nil || result.Trip.EventContext.MeetingID != promotedMeetingID || result.Trip.EventContext.MeetingVisibility != meeting.MeetingVisibilitySaved || result.Trip.EventContext.MeetingName != "성수 저녁 모임" {
+		t.Fatalf("unexpected promoted trip context: %#v", result.Trip.EventContext)
+	}
+
+	afterCounts := promotionCounts(t, ctx, store, createdTrip.Trip.ID, createdTrip.Trip.EventContext.EventID, expenseID)
+	if beforeCounts != afterCounts {
+		t.Fatalf("expected promotion to preserve counts, before=%#v after=%#v", beforeCounts, afterCounts)
+	}
+
+	meetings, err := store.ListSavedMeetingsByMemberUser(ctx, ownerUserID)
+	if err != nil {
+		t.Fatalf("ListSavedMeetingsByMemberUser: %v", err)
+	}
+	foundSaved := false
+	for _, item := range meetings {
+		if item.ID == promotedMeetingID && item.Name == "성수 저녁 모임" && item.Visibility == meeting.MeetingVisibilitySaved && item.MemberCount == 2 {
+			foundSaved = true
+			break
+		}
+	}
+	if !foundSaved {
+		t.Fatalf("expected promoted meeting in saved list, got %#v", meetings)
+	}
+
+	settlementInput, err := store.GetTripSettlementInput(ctx, createdTrip.Trip.ID)
+	if err != nil {
+		t.Fatalf("GetTripSettlementInput: %v", err)
+	}
+	settlement, err := trip.BuildTripSettlement(createdTrip.Trip.ID, "KRW", settlementInput)
+	if err != nil {
+		t.Fatalf("BuildTripSettlement after promotion: %v", err)
+	}
+	if len(settlement.CurrencySummaries) != 1 || len(settlement.CurrencySummaries[0].Balances) != 2 {
+		t.Fatalf("expected settlement to preserve two participant balances, got %#v", settlement)
+	}
+}
+
+type promotionCountSnapshot struct {
+	TripParticipants  int
+	EventParticipants int
+	Expenses          int
+	ExpenseSplits     int
+}
+
+func promotionCounts(t *testing.T, ctx context.Context, store *Store, tripID string, eventID string, expenseID string) promotionCountSnapshot {
+	t.Helper()
+	var snapshot promotionCountSnapshot
+	if err := store.pool.QueryRow(ctx, `SELECT count(*)::int FROM trip_participants WHERE trip_id = $1::uuid`, tripID).Scan(&snapshot.TripParticipants); err != nil {
+		t.Fatalf("count trip participants: %v", err)
+	}
+	if err := store.pool.QueryRow(ctx, `SELECT count(*)::int FROM event_participants WHERE event_id = $1::uuid`, eventID).Scan(&snapshot.EventParticipants); err != nil {
+		t.Fatalf("count event participants: %v", err)
+	}
+	if err := store.pool.QueryRow(ctx, `SELECT count(*)::int FROM expenses WHERE trip_id = $1::uuid`, tripID).Scan(&snapshot.Expenses); err != nil {
+		t.Fatalf("count expenses: %v", err)
+	}
+	if err := store.pool.QueryRow(ctx, `SELECT count(*)::int FROM expense_splits WHERE expense_id = $1::uuid`, expenseID).Scan(&snapshot.ExpenseSplits); err != nil {
+		t.Fatalf("count expense splits: %v", err)
+	}
+	return snapshot
+}
+
 type participantSelectionFixture struct {
 	ownerUserID   string
 	memberUserIDs []string

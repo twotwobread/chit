@@ -186,6 +186,44 @@ export const styles = StyleSheet.create({
   participantSectionHeader: {
     gap: theme.space[2],
   },
+  promotionSection: {
+    backgroundColor: theme.color.memorySurface,
+    borderColor: theme.color.borderDefault,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    gap: theme.space[4],
+    padding: theme.space[5],
+  },
+  promotionHeader: {
+    gap: theme.space[2],
+  },
+  inputGroup: {
+    gap: theme.space[2],
+  },
+  textInput: {
+    backgroundColor: theme.color.surface,
+    borderColor: theme.color.borderSubtle,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    color: theme.color.textStrong,
+    fontFamily: theme.font.family.regular,
+    fontSize: theme.font.size.body,
+    minHeight: theme.layout.controlH,
+    paddingHorizontal: theme.space[4],
+    paddingVertical: theme.space[3],
+  },
+  successText: {
+    color: theme.color.success,
+    fontFamily: theme.font.family.semibold,
+    fontSize: theme.font.size.caption,
+    fontWeight: theme.font.weight.semibold,
+  },
+  errorText: {
+    color: theme.color.danger,
+    fontFamily: theme.font.family.semibold,
+    fontSize: theme.font.size.caption,
+    fontWeight: theme.font.weight.semibold,
+  },
   errorTitle: {
     color: theme.color.danger,
     fontFamily: theme.font.family.bold,

@@ -32,6 +32,8 @@ import type { MarkScheduleItemSkippedResponse } from '../models/MarkScheduleItem
 import type { MoveScheduleItemToDayRequest } from '../models/MoveScheduleItemToDayRequest';
 import type { MoveScheduleItemToDayResponse } from '../models/MoveScheduleItemToDayResponse';
 import type { OpenExpenseReceiptResponse } from '../models/OpenExpenseReceiptResponse';
+import type { PromoteTripMeetingRequest } from '../models/PromoteTripMeetingRequest';
+import type { PromoteTripMeetingResponse } from '../models/PromoteTripMeetingResponse';
 import type { ReceiptCaptureMode } from '../models/ReceiptCaptureMode';
 import type { ReceiptOCRLanguage } from '../models/ReceiptOCRLanguage';
 import type { ReorderScheduleItemsRequest } from '../models/ReorderScheduleItemsRequest';
@@ -165,6 +167,36 @@ export class TripsService {
                 401: `Unauthorized.`,
                 403: `Forbidden.`,
                 404: `Trip not found.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
+     * Promote a one-off trip meeting
+     * Saves the one-off meeting backing this trip as a saved meeting without recreating the trip, event, participants, expenses, or settlement data. Only the authenticated trip owner can promote one-off meeting-backed trips.
+     * @param tripId
+     * @param requestBody
+     * @returns PromoteTripMeetingResponse One-off meeting promoted to a saved meeting.
+     * @throws ApiError
+     */
+    public static promoteTripMeeting(
+        tripId: string,
+        requestBody: PromoteTripMeetingRequest,
+    ): CancelablePromise<PromoteTripMeetingResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/trips/{tripId}/meeting/promotion',
+            path: {
+                'tripId': tripId,
+            },
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: `Validation error.`,
+                401: `Unauthorized.`,
+                403: `Forbidden.`,
+                404: `Trip not found.`,
+                409: `Trip is not backed by a linked one-off meeting or the meeting was already promoted.`,
                 500: `Unexpected server error.`,
             },
         });

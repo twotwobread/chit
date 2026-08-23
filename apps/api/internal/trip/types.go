@@ -397,6 +397,30 @@ type ReplaceParticipantsInput struct {
 	ParticipantMemberIDs []string
 }
 
+type PromoteMeetingInput struct {
+	MeetingName string
+}
+
+type PromoteMeetingRecord struct {
+	TripID      string
+	RequestedBy string
+	MeetingName string
+}
+
+type PromotedMeeting struct {
+	ID         string
+	Name       string
+	Visibility string
+	CreatedBy  string
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+}
+
+type PromoteMeetingResult struct {
+	Trip    Trip
+	Meeting PromotedMeeting
+}
+
 type ReplaceParticipantsRecord struct {
 	TripID               string
 	RequestedBy          string
@@ -1042,6 +1066,7 @@ type Repository interface {
 	DeleteTripByID(ctx context.Context, tripID string) (bool, error)
 	DeleteTripMemberParticipant(ctx context.Context, tripID string, participantID string) (bool, error)
 	ReplaceTripParticipants(ctx context.Context, record ReplaceParticipantsRecord) (ReplaceParticipantsResult, error)
+	PromoteTripMeeting(ctx context.Context, record PromoteMeetingRecord) (PromoteMeetingResult, error)
 	CreateOrReturnTripInvite(ctx context.Context, record CreateTripInviteRecord) (CreateTripInviteResult, error)
 	AcceptTripInvite(ctx context.Context, record AcceptTripInviteRecord) (AcceptTripInviteResult, error)
 	CountTripParticipants(ctx context.Context, tripID string) (int, error)

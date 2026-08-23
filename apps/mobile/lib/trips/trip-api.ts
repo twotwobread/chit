@@ -9,6 +9,8 @@ import {
   type SearchDestinationsResponse,
   type ListTripParticipantsResponse,
   type ListTripPlacesResponse,
+  type PromoteTripMeetingRequest,
+  type PromoteTripMeetingResponse,
   type ReplaceTripParticipantsRequest,
   type ListTripsResponse,
   type UpdateTripRequest,
@@ -46,6 +48,13 @@ export async function replaceTripParticipants(
   request: ReplaceTripParticipantsRequest,
 ): Promise<ListTripParticipantsResponse> {
   return runAuthenticatedRequest(() => TripsService.replaceTripParticipants(tripId, request));
+}
+
+export async function promoteTripMeeting(
+  tripId: string,
+  request: PromoteTripMeetingRequest,
+): Promise<PromoteTripMeetingResponse> {
+  return runAuthenticatedRequest(() => TripsService.promoteTripMeeting(tripId, request));
 }
 
 export async function createTripInvite(tripId: string): Promise<CreateTripInviteResponse> {

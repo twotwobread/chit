@@ -3,12 +3,18 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 
 import { type GetTripDetailResponse, type TripParticipantListItem } from '@i-um/api-contract';
 
-import { isApiStatus, isMobileAuthSessionError } from '../auth/errors';
+import { apiErrorStatus, isApiStatus, isMobileAuthSessionError } from '../auth/errors';
 import { getStoredSession } from '../auth/session';
+import {
+  buildPromoteMeetingSuccessMessage,
+  promoteMeetingFailureMessage,
+  validatePromoteMeetingName,
+  type PromoteMeetingState,
+} from '../trips/promote-meeting';
 import { beginStaleWhileRevalidate, resolveStaleWhileRevalidateFailure } from '../trips/stale-refresh';
 import { resolveTripShellDetail } from '../trips/trip-shell-detail';
 import { useTripShellState } from '../trips/trip-shell-context';
-import { listTripParticipants } from '../trips/trip-api';
+import { listTripParticipants, promoteTripMeeting } from '../trips/trip-api';
 
 export type TripDetailState =
   | { status: 'loading' }
@@ -18,6 +24,7 @@ export type TripDetailState =
       participants: TripParticipantListItem[];
       participantsLoadFailed: boolean;
       currentUserId?: string;
+      promotionState: PromoteMeetingState;
     }
   | { status: 'auth' }
   | { status: 'notFound' }
@@ -54,13 +61,17 @@ export function useTripDetailController() {
         ),
         getStoredSession(),
       ]);
-      setState({
+      setState((current) => ({
         status: 'success',
         detail,
         participants: participantsResult.participants,
         participantsLoadFailed: participantsResult.status === 'rejected',
         currentUserId: session?.user.id,
-      });
+        promotionState:
+          detail.trip.eventContext?.meetingVisibility === 'one_off'
+            ? previousPromotionState(current)
+            : { status: 'idle' },
+      }));
     } catch (error) {
       const failureState = tripDetailFailureState(error);
       setState((current) =>
@@ -78,6 +89,41 @@ export function useTripDetailController() {
     }, [load]),
   );
 
+  const promoteMeeting = useCallback(
+    async (meetingName: string) => {
+      if (!tripId) {
+        return;
+      }
+      const validationMessage = validatePromoteMeetingName(meetingName);
+      if (validationMessage) {
+        setState((current) => withPromotionState(current, { status: 'error', message: validationMessage }));
+        return;
+      }
+
+      const trimmedName = meetingName.trim();
+      setState((current) => withPromotionState(current, { status: 'submitting' }));
+      try {
+        const response = await promoteTripMeeting(tripId, { meetingName: trimmedName });
+        setState((current) => {
+          if (current.status !== 'success') {
+            return current;
+          }
+          return {
+            ...current,
+            detail: { ...current.detail, trip: response.trip },
+            promotionState: { status: 'success', message: buildPromoteMeetingSuccessMessage(response.meeting.name) },
+          };
+        });
+      } catch (error) {
+        const status = apiErrorStatus(error);
+        setState((current) =>
+          withPromotionState(current, { status: 'error', message: promoteMeetingFailureMessage(status) }),
+        );
+      }
+    },
+    [tripId],
+  );
+
   const goHome = () => {
     router.replace('/');
   };
@@ -90,8 +136,23 @@ export function useTripDetailController() {
     goHome,
     goLogin,
     load,
+    promoteMeeting,
     state,
   };
+}
+
+function previousPromotionState(state: TripDetailState): PromoteMeetingState {
+  if (state.status === 'success') {
+    return state.promotionState;
+  }
+  return { status: 'idle' };
+}
+
+function withPromotionState(state: TripDetailState, promotionState: PromoteMeetingState): TripDetailState {
+  if (state.status !== 'success') {
+    return state;
+  }
+  return { ...state, promotionState };
 }
 
 function tripDetailShellFailureState(status: 'auth' | 'notFound' | 'error'): TripDetailState {

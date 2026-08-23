@@ -318,6 +318,39 @@ func (s *Service) Delete(ctx context.Context, userID string, tripID string) erro
 	return nil
 }
 
+func (s *Service) PromoteMeeting(ctx context.Context, userID string, tripID string, input PromoteMeetingInput) (PromoteMeetingResult, error) {
+	if strings.TrimSpace(userID) == "" {
+		return PromoteMeetingResult{}, ErrUnauthorized
+	}
+
+	tripID = strings.TrimSpace(tripID)
+	if !isUUID(tripID) {
+		return PromoteMeetingResult{}, ErrValidation
+	}
+	meetingName := strings.TrimSpace(input.MeetingName)
+	if len([]rune(meetingName)) < 1 || len([]rune(meetingName)) > 80 {
+		return PromoteMeetingResult{}, ErrValidation
+	}
+
+	_, ok, err := s.repo.GetTripByID(ctx, tripID)
+	if err != nil {
+		return PromoteMeetingResult{}, err
+	}
+	if !ok {
+		return PromoteMeetingResult{}, ErrNotFound
+	}
+
+	isOwner, err := s.repo.IsTripOwner(ctx, tripID, userID)
+	if err != nil {
+		return PromoteMeetingResult{}, err
+	}
+	if !isOwner {
+		return PromoteMeetingResult{}, ErrForbidden
+	}
+
+	return s.repo.PromoteTripMeeting(ctx, PromoteMeetingRecord{TripID: tripID, RequestedBy: userID, MeetingName: meetingName})
+}
+
 func (s *Service) ReplaceParticipants(ctx context.Context, userID string, tripID string, input ReplaceParticipantsInput) (ReplaceParticipantsResult, error) {
 	if strings.TrimSpace(userID) == "" {
 		return ReplaceParticipantsResult{}, ErrUnauthorized
